@@ -276,26 +276,14 @@ export default function DocumentCenterPage() {
         setCompanyData(companyDoc.data() as CompanyData);
       }
 
-      // Cargar facturas
+      // Cargar facturas - igual que invoices-page
       const invoicesSnapshot = await getDocs(
         query(collection(db, `projects/${id}/invoices`), orderBy("createdAt", "desc"))
       );
 
-      const invoicesData: Invoice[] = [];
-      const paymentsData: Record<string, PaymentRecord[]> = {};
-
-      for (const docSnap of invoicesSnapshot.docs) {
+      const allInvoices = invoicesSnapshot.docs.map((docSnap) => {
         const data = docSnap.data();
-
-        // Verificar permisos
-        const canView =
-          permissions.canViewAllPOs ||
-          (permissions.canViewDepartmentPOs && data.department === permissions.department) ||
-          (permissions.canViewOwnPOs && data.createdBy === permissions.userId);
-
-        if (!canView) continue;
-
-        const invoice: Invoice = {
+        return {
           id: docSnap.id,
           documentType: data.documentType || "invoice",
           number: data.number,
@@ -331,17 +319,26 @@ export default function DocumentCenterPage() {
           paidByName: data.paidByName,
           poId: data.poId,
           poNumber: data.poNumber,
-        };
+        } as Invoice;
+      });
 
-        invoicesData.push(invoice);
+      // Filtrar por permisos - igual que invoices-page
+      const invoicesData = allInvoices.filter((inv) => {
+        if (permissions.canViewAllPOs) return true;
+        if (permissions.canViewDepartmentPOs && inv.department === permissions.department) return true;
+        if (permissions.canViewOwnPOs && inv.createdBy === permissions.userId) return true;
+        return false;
+      });
 
-        // Cargar pagos si está pagada
-        if (data.status === "paid") {
+      // Cargar pagos para facturas pagadas
+      const paymentsData: Record<string, PaymentRecord[]> = {};
+      for (const invoice of invoicesData) {
+        if (invoice.status === "paid") {
           const paymentsSnap = await getDocs(
-            collection(db, `projects/${id}/invoices/${docSnap.id}/payments`)
+            collection(db, `projects/${id}/invoices/${invoice.id}/payments`)
           );
           if (!paymentsSnap.empty) {
-            paymentsData[docSnap.id] = paymentsSnap.docs.map((p) => ({
+            paymentsData[invoice.id] = paymentsSnap.docs.map((p) => ({
               id: p.id,
               forecastId: p.data().forecastId,
               forecastName: p.data().forecastName,
@@ -356,6 +353,7 @@ export default function DocumentCenterPage() {
       }
 
       setInvoices(invoicesData);
+      setFilteredInvoices(invoicesData); // Inicializar también filteredInvoices
       setPayments(paymentsData);
     } catch (error) {
       console.error("Error loading data:", error);
@@ -945,6 +943,9 @@ export default function DocumentCenterPage() {
             <FolderDown size={24} style={{ color: "#2F52E0" }} />
             <div>
               <h1 className="text-2xl font-semibold text-slate-900">Centro de documentación</h1>
+              <p className="text-sm text-slate-500">
+                Descarga expedientes con portada de codificación y justificantes
+              </p>
             </div>
           </div>
           <button
