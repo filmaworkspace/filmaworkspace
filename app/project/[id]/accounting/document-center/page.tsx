@@ -10,7 +10,6 @@ import {
   FileText,
   Download,
   Search,
-  Calendar,
   Receipt,
   FileCheck,
   Shield,
@@ -207,7 +206,6 @@ export default function DocumentCenterPage() {
   // Filtros
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -233,7 +231,7 @@ export default function DocumentCenterPage() {
 
   useEffect(() => {
     filterInvoices();
-  }, [searchTerm, statusFilter, dateRange, invoices]);
+  }, [searchTerm, statusFilter, invoices]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -276,7 +274,7 @@ export default function DocumentCenterPage() {
         setCompanyData(companyDoc.data() as CompanyData);
       }
 
-      // Cargar facturas - igual que invoices-page
+      // Cargar facturas - exactamente igual que invoices-page
       const invoicesSnapshot = await getDocs(
         query(collection(db, `projects/${id}/invoices`), orderBy("createdAt", "desc"))
       );
@@ -285,42 +283,16 @@ export default function DocumentCenterPage() {
         const data = docSnap.data();
         return {
           id: docSnap.id,
+          ...data,
           documentType: data.documentType || "invoice",
-          number: data.number,
           displayNumber: data.displayNumber || `FAC-${data.number}`,
-          supplierNumber: data.supplierNumber,
-          supplier: data.supplier,
-          supplierId: data.supplierId,
-          supplierTaxId: data.supplierTaxId,
-          department: data.department,
-          description: data.description,
-          items: data.items || [],
-          baseAmount: data.baseAmount || 0,
-          vatAmount: data.vatAmount || 0,
-          irpfAmount: data.irpfAmount || 0,
-          totalAmount: data.totalAmount || 0,
-          currency: data.currency || "EUR",
-          status: data.status,
+          createdAt: data.createdAt?.toDate() || new Date(),
           dueDate: data.dueDate?.toDate() || new Date(),
           invoiceDate: data.invoiceDate?.toDate(),
-          createdAt: data.createdAt?.toDate() || new Date(),
-          createdBy: data.createdBy,
-          createdByName: data.createdByName,
-          attachmentUrl: data.attachmentUrl,
-          attachmentFileName: data.attachmentFileName,
           codedAt: data.codedAt?.toDate(),
-          codedBy: data.codedBy,
-          codedByName: data.codedByName,
-          accountingEntry: data.accountingEntry,
           paidAt: data.paidAt?.toDate(),
-          paidAmount: data.paidAmount,
-          paymentMethod: data.paymentMethod,
-          paymentReference: data.paymentReference,
-          paidByName: data.paidByName,
-          poId: data.poId,
-          poNumber: data.poNumber,
-        } as Invoice;
-      });
+        };
+      }) as Invoice[];
 
       // Filtrar por permisos - igual que invoices-page
       const invoicesData = allInvoices.filter((inv) => {
@@ -353,7 +325,7 @@ export default function DocumentCenterPage() {
       }
 
       setInvoices(invoicesData);
-      setFilteredInvoices(invoicesData); // Inicializar también filteredInvoices
+      setFilteredInvoices(invoicesData);
       setPayments(paymentsData);
     } catch (error) {
       console.error("Error loading data:", error);
@@ -392,10 +364,10 @@ export default function DocumentCenterPage() {
       const s = searchTerm.toLowerCase();
       filtered = filtered.filter(
         (inv) =>
-          inv.number.toLowerCase().includes(s) ||
-          inv.displayNumber.toLowerCase().includes(s) ||
-          inv.supplier.toLowerCase().includes(s) ||
-          inv.description.toLowerCase().includes(s) ||
+          inv.number?.toLowerCase().includes(s) ||
+          inv.displayNumber?.toLowerCase().includes(s) ||
+          inv.supplier?.toLowerCase().includes(s) ||
+          inv.description?.toLowerCase().includes(s) ||
           (inv.poNumber && inv.poNumber.toLowerCase().includes(s))
       );
     }
@@ -403,17 +375,6 @@ export default function DocumentCenterPage() {
     // Estado
     if (statusFilter !== "all") {
       filtered = filtered.filter((inv) => inv.status === statusFilter);
-    }
-
-    // Rango de fechas
-    if (dateRange.from) {
-      const fromDate = new Date(dateRange.from);
-      filtered = filtered.filter((inv) => inv.createdAt >= fromDate);
-    }
-    if (dateRange.to) {
-      const toDate = new Date(dateRange.to);
-      toDate.setHours(23, 59, 59, 999);
-      filtered = filtered.filter((inv) => inv.createdAt <= toDate);
     }
 
     setFilteredInvoices(filtered);
@@ -943,6 +904,9 @@ export default function DocumentCenterPage() {
             <FolderDown size={24} style={{ color: "#2F52E0" }} />
             <div>
               <h1 className="text-2xl font-semibold text-slate-900">Centro de documentación</h1>
+              <p className="text-sm text-slate-500">
+                Descarga expedientes con portada de codificación y justificantes
+              </p>
             </div>
           </div>
           <button
@@ -1005,36 +969,12 @@ export default function DocumentCenterPage() {
               )}
             </div>
 
-            {/* Date Range */}
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Calendar size={15} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-                <input
-                  type="date"
-                  value={dateRange.from}
-                  onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })}
-                  className="pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                />
-              </div>
-              <span className="text-slate-400">—</span>
-              <div className="relative">
-                <Calendar size={15} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-                <input
-                  type="date"
-                  value={dateRange.to}
-                  onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })}
-                  className="pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                />
-              </div>
-            </div>
-
             {/* Clear Filters */}
-            {(statusFilter !== "all" || searchTerm || dateRange.from || dateRange.to) && (
+            {(statusFilter !== "all" || searchTerm) && (
               <button
                 onClick={() => {
                   setStatusFilter("all");
                   setSearchTerm("");
-                  setDateRange({ from: "", to: "" });
                 }}
                 className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2"
               >
