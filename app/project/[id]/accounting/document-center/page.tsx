@@ -24,10 +24,9 @@ import {
   CheckSquare,
   Square,
   Settings,
-  ToggleLeft,
-  ToggleRight,
   Type,
   Layers,
+  MoreVertical,
 } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { jsPDF } from "jspdf";
@@ -91,21 +90,12 @@ interface PaymentRecord {
   amount: number;
   paidAt: Date;
   paidByName: string;
+  receiptUrl?: string;
+  receiptName?: string;
 }
 
 interface ExportConfig {
   filenameTemplate: string;
-  showHeader: boolean;
-  showCompanyInfo: boolean;
-  showSupplierInfo: boolean;
-  showDocumentData: boolean;
-  showAmounts: boolean;
-  showCoding: boolean;
-  showPaymentInfo: boolean;
-  showAccountBreakdown: boolean;
-  showPaymentBreakdown: boolean;
-  showFooter: boolean;
-  customTitle: string;
 }
 
 // ============================================================================
@@ -136,17 +126,6 @@ const PAYMENT_METHODS: Record<string, string> = {
 
 const DEFAULT_EXPORT_CONFIG: ExportConfig = {
   filenameTemplate: "{tipo}_{numero}_{proveedor}",
-  showHeader: true,
-  showCompanyInfo: true,
-  showSupplierInfo: true,
-  showDocumentData: true,
-  showAmounts: true,
-  showCoding: true,
-  showPaymentInfo: true,
-  showAccountBreakdown: true,
-  showPaymentBreakdown: true,
-  showFooter: true,
-  customTitle: "EXPEDIENTE DE DOCUMENTO",
 };
 
 const FILENAME_VARIABLES = [
@@ -193,6 +172,7 @@ export default function DocumentCenterPage() {
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
   const [showConfigPanel, setShowConfigPanel] = useState(false);
   const [exportConfig, setExportConfig] = useState<ExportConfig>(DEFAULT_EXPORT_CONFIG);
+  const [downloadMenuId, setDownloadMenuId] = useState<string | null>(null);
 
   // ============================================================================
   // EFFECTS - exactamente como invoices-page
@@ -211,6 +191,9 @@ export default function DocumentCenterPage() {
       const target = e.target as HTMLElement;
       if (statusDropdownRef.current && !statusDropdownRef.current.contains(target)) {
         setShowStatusDropdown(false);
+      }
+      if (!target.closest(".download-menu")) {
+        setDownloadMenuId(null);
       }
     };
     document.addEventListener("click", handleClickOutside);
@@ -282,6 +265,8 @@ export default function DocumentCenterPage() {
               amount: p.data().amount,
               paidAt: p.data().paidAt?.toDate(),
               paidByName: p.data().paidByName,
+              receiptUrl: p.data().receiptUrl,
+              receiptName: p.data().receiptName,
             }));
           }
         }
@@ -387,238 +372,352 @@ export default function DocumentCenterPage() {
   };
 
   // ============================================================================
-  // PDF GENERATION
+  // PDF GENERATION - Diseño compacto tipo banner/certificado
   // ============================================================================
 
   const generateCoverPage = async (invoice: Invoice): Promise<jsPDF> => {
-    const pdf = new jsPDF("p", "mm", "a4");
+    // Formato horizontal, medio folio aproximadamente
+    const pdf = new jsPDF("l", "mm", [210, 148]);
     const pageWidth = 210;
-    const pageHeight = 297;
-    const margin = 20;
-    let y = margin;
+    const pageHeight = 148;
+    const margin = 12;
 
-    const primaryColor: [number, number, number] = [47, 82, 224];
-    const textDark: [number, number, number] = [30, 41, 59];
-    const textMuted: [number, number, number] = [100, 116, 139];
-    const borderColor: [number, number, number] = [226, 232, 240];
+    // Colores
+    const brandBlue: [number, number, number] = [47, 82, 224];
+    const darkText: [number, number, number] = [15, 23, 42];
+    const mutedText: [number, number, number] = [100, 116, 139];
+    const lightBg: [number, number, number] = [248, 250, 252];
+    const successGreen: [number, number, number] = [16, 185, 129];
+    const codingPurple: [number, number, number] = [139, 92, 246];
 
-    if (exportConfig.showHeader) {
-      pdf.setFillColor(...primaryColor);
-      pdf.rect(0, 0, pageWidth, 45, "F");
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(24);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(exportConfig.customTitle || "EXPEDIENTE DE DOCUMENTO", margin, 28);
-      pdf.setFontSize(14);
-      pdf.setFont("helvetica", "normal");
-      pdf.text(invoice.displayNumber || "", pageWidth - margin, 28, { align: "right" });
-      y = 60;
+    // === HEADER con logo y número de documento ===
+    // Línea superior decorativa
+    pdf.setFillColor(...brandBlue);
+    pdf.rect(0, 0, pageWidth, 3, "F");
+
+    // Logo FILMA (texto estilizado)
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(18);
+    pdf.setTextColor(...brandBlue);
+    pdf.text("FILMA", margin, 16);
+
+    // Subtítulo
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(7);
+    pdf.setTextColor(...mutedText);
+    pdf.text("GESTIÓN DE PRODUCCIÓN", margin, 21);
+
+    // Número de documento destacado (derecha)
+    const docType = DOCUMENT_TYPES[invoice.documentType] || DOCUMENT_TYPES.invoice;
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(14);
+    pdf.setTextColor(...darkText);
+    pdf.text(invoice.displayNumber || "", pageWidth - margin, 14, { align: "right" });
+
+    // Tipo de documento
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8);
+    pdf.setTextColor(...mutedText);
+    pdf.text(docType.label.toUpperCase(), pageWidth - margin, 20, { align: "right" });
+
+    // === LÍNEA SEPARADORA ===
+    pdf.setDrawColor(226, 232, 240);
+    pdf.setLineWidth(0.3);
+    pdf.line(margin, 28, pageWidth - margin, 28);
+
+    // === SECCIÓN PRINCIPAL: 3 columnas ===
+    const colWidth = (pageWidth - margin * 2 - 16) / 3;
+    const col1X = margin;
+    const col2X = margin + colWidth + 8;
+    const col3X = margin + (colWidth + 8) * 2;
+    let y = 35;
+
+    // --- COLUMNA 1: Proveedor ---
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(6);
+    pdf.setTextColor(...mutedText);
+    pdf.text("PROVEEDOR", col1X, y);
+
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10);
+    pdf.setTextColor(...darkText);
+    const supplierName = (invoice.supplier || "").substring(0, 25);
+    pdf.text(supplierName, col1X, y + 6);
+
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8);
+    pdf.setTextColor(...mutedText);
+    pdf.text(invoice.supplierTaxId || "-", col1X, y + 12);
+
+    // --- COLUMNA 2: Datos documento ---
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(6);
+    pdf.setTextColor(...mutedText);
+    pdf.text("DOCUMENTO", col2X, y);
+
+    pdf.setFontSize(8);
+    pdf.setTextColor(...darkText);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(`Emisión: ${invoice.invoiceDate ? formatDate(invoice.invoiceDate) : "-"}`, col2X, y + 6);
+    pdf.text(`Vencimiento: ${formatDate(invoice.dueDate)}`, col2X, y + 12);
+    if (invoice.poNumber) {
+      pdf.text(`PO: ${invoice.poNumber}`, col2X, y + 18);
     }
 
-    if (exportConfig.showCompanyInfo && companyData) {
-      pdf.setFillColor(248, 250, 252);
-      pdf.roundedRect(margin, y, pageWidth - margin * 2, 35, 3, 3, "F");
-      pdf.setTextColor(...textDark);
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("EMPRESA", margin + 5, y + 8);
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(11);
-      pdf.text(companyData.fiscalName || "", margin + 5, y + 16);
-      pdf.setFontSize(9);
-      pdf.setTextColor(...textMuted);
-      pdf.text(`CIF: ${companyData.taxId || "-"}`, margin + 5, y + 23);
-      if (companyData.address) pdf.text(`${companyData.address}, ${companyData.postalCode || ""} ${companyData.city || ""}`, margin + 5, y + 29);
-      y += 45;
-    }
+    // --- COLUMNA 3: Importe total destacado ---
+    pdf.setFillColor(...lightBg);
+    pdf.roundedRect(col3X - 2, y - 4, colWidth + 4, 24, 2, 2, "F");
 
-    if (exportConfig.showSupplierInfo) {
-      pdf.setFillColor(248, 250, 252);
-      pdf.roundedRect(margin, y, pageWidth - margin * 2, 35, 3, 3, "F");
-      pdf.setTextColor(...textDark);
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("PROVEEDOR", margin + 5, y + 8);
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(11);
-      pdf.text(invoice.supplier || "", margin + 5, y + 16);
-      pdf.setFontSize(9);
-      pdf.setTextColor(...textMuted);
-      pdf.text(`NIF/CIF: ${invoice.supplierTaxId || "-"}`, margin + 5, y + 23);
-      if (invoice.supplierNumber) pdf.text(`Nº Factura proveedor: ${invoice.supplierNumber}`, margin + 5, y + 29);
-      y += 45;
-    }
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(6);
+    pdf.setTextColor(...mutedText);
+    pdf.text("IMPORTE TOTAL", col3X, y);
 
-    if (exportConfig.showDocumentData) {
-      pdf.setTextColor(...textDark);
-      pdf.setFontSize(12);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("DATOS DEL DOCUMENTO", margin, y);
-      y += 8;
-      pdf.setDrawColor(...borderColor);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(16);
+    pdf.setTextColor(...brandBlue);
+    pdf.text(formatCurrency(invoice.totalAmount || 0, invoice.currency), col3X, y + 10);
+
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(7);
+    pdf.setTextColor(...mutedText);
+    pdf.text(`Base: ${formatCurrency(invoice.baseAmount || 0, invoice.currency)}  IVA: ${formatCurrency(invoice.vatAmount || 0, invoice.currency)}`, col3X, y + 16);
+
+    // === SECCIÓN DE CODIFICACIÓN (destacada) ===
+    y = 68;
+
+    if (invoice.codedAt) {
+      // Caja de codificación con borde
+      pdf.setFillColor(250, 245, 255); // Fondo violeta muy claro
+      pdf.setDrawColor(...codingPurple);
       pdf.setLineWidth(0.5);
-      pdf.line(margin, y, pageWidth - margin, y);
-      y += 10;
-      const docType = DOCUMENT_TYPES[invoice.documentType] || DOCUMENT_TYPES.invoice;
-      const rows = [
-        ["Tipo de documento", `${docType.label} (${docType.code})`],
-        ["Número interno", invoice.displayNumber || "-"],
-        ["Descripción", invoice.description || "-"],
-        ["Fecha de emisión", invoice.invoiceDate ? formatDate(invoice.invoiceDate) : "-"],
-        ["Fecha de vencimiento", formatDate(invoice.dueDate)],
-        ["PO vinculada", invoice.poNumber ? `PO-${invoice.poNumber}` : "-"],
-      ];
-      pdf.setFontSize(10);
-      for (const [label, value] of rows) {
-        pdf.setFont("helvetica", "normal");
-        pdf.setTextColor(...textMuted);
-        pdf.text(label, margin, y);
-        pdf.setTextColor(...textDark);
-        pdf.setFont("helvetica", "bold");
-        pdf.text(String(value), margin + 55, y);
-        y += 7;
-      }
-      y += 10;
-    }
+      pdf.roundedRect(margin, y, pageWidth - margin * 2, 32, 3, 3, "FD");
 
-    if (exportConfig.showAmounts) {
-      pdf.setTextColor(...textDark);
-      pdf.setFontSize(12);
+      // Icono check (simulado con texto)
+      pdf.setFillColor(...codingPurple);
+      pdf.circle(margin + 8, y + 10, 4, "F");
       pdf.setFont("helvetica", "bold");
-      pdf.text("IMPORTES", margin, y);
-      y += 8;
-      pdf.setDrawColor(...borderColor);
-      pdf.line(margin, y, pageWidth - margin, y);
-      y += 10;
-      const amounts = [
-        ["Base imponible", formatCurrency(invoice.baseAmount || 0, invoice.currency)],
-        ["IVA", formatCurrency(invoice.vatAmount || 0, invoice.currency)],
-        ["IRPF", `-${formatCurrency(invoice.irpfAmount || 0, invoice.currency)}`],
-      ];
-      pdf.setFontSize(10);
-      for (const [label, value] of amounts) {
-        pdf.setFont("helvetica", "normal");
-        pdf.setTextColor(...textMuted);
-        pdf.text(label, margin, y);
-        pdf.setTextColor(...textDark);
-        pdf.text(value, pageWidth - margin, y, { align: "right" });
-        y += 7;
-      }
-      y += 3;
-      pdf.setFillColor(...primaryColor);
-      pdf.roundedRect(margin, y, pageWidth - margin * 2, 12, 2, 2, "F");
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(11);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("TOTAL", margin + 5, y + 8);
-      pdf.text(formatCurrency(invoice.totalAmount || 0, invoice.currency), pageWidth - margin - 5, y + 8, { align: "right" });
-      y += 25;
-    }
-
-    if (exportConfig.showCoding && invoice.codedAt) {
-      pdf.setTextColor(...textDark);
-      pdf.setFontSize(12);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("CODIFICACIÓN CONTABLE", margin, y);
-      y += 8;
-      pdf.setDrawColor(...borderColor);
-      pdf.line(margin, y, pageWidth - margin, y);
-      y += 10;
-      pdf.setFontSize(10);
-      const coding = [
-        ["Codificado por", invoice.codedByName || "-"],
-        ["Fecha de codificación", formatDateTime(invoice.codedAt)],
-        ["Asiento contable", invoice.accountingEntry || "-"],
-      ];
-      for (const [label, value] of coding) {
-        pdf.setFont("helvetica", "normal");
-        pdf.setTextColor(...textMuted);
-        pdf.text(label, margin, y);
-        pdf.setTextColor(...textDark);
-        pdf.setFont("helvetica", "bold");
-        pdf.text(String(value), margin + 55, y);
-        y += 7;
-      }
-      if (exportConfig.showAccountBreakdown && invoice.items?.length > 0) {
-        y += 5;
-        pdf.setFontSize(9);
-        pdf.setTextColor(...textMuted);
-        pdf.text("Imputación a cuentas:", margin, y);
-        y += 6;
-        for (const item of invoice.items) {
-          if (item.subAccountCode) {
-            pdf.setTextColor(...textDark);
-            pdf.text(`${item.subAccountCode} - ${item.subAccountDescription || ""}`, margin + 5, y);
-            pdf.text(formatCurrency(item.baseAmount || 0, invoice.currency), pageWidth - margin, y, { align: "right" });
-            y += 5;
-          }
-        }
-      }
-      y += 10;
-    }
-
-    if (exportConfig.showPaymentInfo && invoice.status === "paid" && invoice.paidAt) {
-      pdf.setTextColor(...textDark);
-      pdf.setFontSize(12);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("INFORMACIÓN DE PAGO", margin, y);
-      y += 8;
-      pdf.setDrawColor(...borderColor);
-      pdf.line(margin, y, pageWidth - margin, y);
-      y += 10;
-      pdf.setFontSize(10);
-      const payment = [
-        ["Estado", "PAGADA"],
-        ["Fecha de pago", formatDateTime(invoice.paidAt)],
-        ["Método de pago", PAYMENT_METHODS[invoice.paymentMethod || ""] || invoice.paymentMethod || "-"],
-        ["Referencia", invoice.paymentReference || "-"],
-        ["Importe pagado", formatCurrency(invoice.paidAmount || invoice.totalAmount || 0, invoice.currency)],
-        ["Pagado por", invoice.paidByName || "-"],
-      ];
-      for (const [label, value] of payment) {
-        pdf.setFont("helvetica", "normal");
-        pdf.setTextColor(...textMuted);
-        pdf.text(label, margin, y);
-        pdf.setTextColor(...textDark);
-        pdf.setFont("helvetica", "bold");
-        if (label === "Estado") pdf.setTextColor(16, 185, 129);
-        pdf.text(String(value), margin + 55, y);
-        y += 7;
-      }
-      const invoicePayments = payments[invoice.id];
-      if (exportConfig.showPaymentBreakdown && invoicePayments?.length > 0) {
-        y += 5;
-        pdf.setFontSize(9);
-        pdf.setTextColor(...textMuted);
-        pdf.text("Desglose de pagos:", margin, y);
-        y += 6;
-        for (const p of invoicePayments) {
-          pdf.setTextColor(...textDark);
-          pdf.text(`${p.forecastName} - ${formatDateTime(p.paidAt)}`, margin + 5, y);
-          pdf.text(formatCurrency(p.amount, invoice.currency), pageWidth - margin, y, { align: "right" });
-          y += 5;
-        }
-      }
-    }
-
-    if (exportConfig.showFooter) {
       pdf.setFontSize(8);
-      pdf.setTextColor(...textMuted);
-      pdf.text(`Generado el ${formatDateTime(new Date())} - ${projectName}`, pageWidth / 2, pageHeight - 15, { align: "center" });
+      pdf.setTextColor(255, 255, 255);
+      pdf.text("✓", margin + 6, y + 12);
+
+      // Título
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10);
+      pdf.setTextColor(...codingPurple);
+      pdf.text("CODIFICACIÓN CONTABLE", margin + 18, y + 8);
+
+      // Estado
+      pdf.setFillColor(...codingPurple);
+      pdf.roundedRect(margin + 18, y + 11, 22, 6, 1, 1, "F");
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(6);
+      pdf.setTextColor(255, 255, 255);
+      pdf.text("VALIDADO", margin + 20, y + 15);
+
+      // Detalles de codificación
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8);
+      pdf.setTextColor(...darkText);
+      pdf.text(`Por: ${invoice.codedByName || "-"}`, margin + 18, y + 24);
+      pdf.text(`Fecha: ${formatDateTime(invoice.codedAt)}`, margin + 80, y + 24);
+      if (invoice.accountingEntry) {
+        pdf.text(`Asiento: ${invoice.accountingEntry}`, margin + 140, y + 24);
+      }
+
+      // Desglose de cuentas (si hay)
+      if (invoice.items?.length > 0) {
+        const accountsText = invoice.items
+          .filter(item => item.subAccountCode)
+          .map(item => `${item.subAccountCode}`)
+          .join(" · ");
+        if (accountsText) {
+          pdf.setFontSize(7);
+          pdf.setTextColor(...mutedText);
+          pdf.text(`Cuentas: ${accountsText}`, margin + 18, y + 29);
+        }
+      }
+
+      y += 38;
+    } else {
+      // Sin codificar
+      pdf.setFillColor(254, 249, 195); // Amarillo claro
+      pdf.setDrawColor(234, 179, 8);
+      pdf.setLineWidth(0.5);
+      pdf.roundedRect(margin, y, pageWidth - margin * 2, 18, 3, 3, "FD");
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(9);
+      pdf.setTextColor(161, 98, 7);
+      pdf.text("⚠ PENDIENTE DE CODIFICACIÓN CONTABLE", margin + 8, y + 11);
+
+      y += 24;
+    }
+
+    // === SECCIÓN DE PAGO (si aplica) ===
+    if (invoice.status === "paid" && invoice.paidAt) {
+      pdf.setFillColor(236, 253, 245); // Verde claro
+      pdf.setDrawColor(...successGreen);
+      pdf.setLineWidth(0.5);
+      pdf.roundedRect(margin, y, pageWidth - margin * 2, 20, 3, 3, "FD");
+
+      // Check de pagado
+      pdf.setFillColor(...successGreen);
+      pdf.circle(margin + 8, y + 10, 4, "F");
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8);
+      pdf.setTextColor(255, 255, 255);
+      pdf.text("✓", margin + 6, y + 12);
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10);
+      pdf.setTextColor(...successGreen);
+      pdf.text("PAGADO", margin + 18, y + 8);
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8);
+      pdf.setTextColor(...darkText);
+      const paymentMethod = PAYMENT_METHODS[invoice.paymentMethod || ""] || invoice.paymentMethod || "-";
+      pdf.text(`${formatDateTime(invoice.paidAt)} · ${paymentMethod}`, margin + 18, y + 15);
+
+      if (invoice.paymentReference) {
+        pdf.setTextColor(...mutedText);
+        pdf.text(`Ref: ${invoice.paymentReference}`, margin + 120, y + 15);
+      }
+
+      y += 26;
+    }
+
+    // === FOOTER ===
+    pdf.setDrawColor(226, 232, 240);
+    pdf.setLineWidth(0.3);
+    pdf.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(6);
+    pdf.setTextColor(...mutedText);
+    pdf.text(`Expediente generado el ${formatDateTime(new Date())}`, margin, pageHeight - 7);
+    pdf.text(projectName || "", pageWidth - margin, pageHeight - 7, { align: "right" });
+
+    // Empresa (si hay datos)
+    if (companyData?.fiscalName) {
+      pdf.text(`${companyData.fiscalName} · ${companyData.taxId || ""}`, pageWidth / 2, pageHeight - 7, { align: "center" });
     }
 
     return pdf;
   };
 
   // ============================================================================
-  // DOWNLOAD
+  // DOWNLOAD - Expediente completo (banner + factura + justificantes)
   // ============================================================================
 
-  const downloadSingle = async (invoice: Invoice) => {
+  // Función para convertir URL a base64
+  const urlToBase64 = async (url: string): Promise<string | null> => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  };
+
+  // Función para añadir imagen al PDF
+  const addImageToPdf = async (pdf: jsPDF, imageUrl: string, pageTitle: string) => {
+    try {
+      const base64 = await urlToBase64(imageUrl);
+      if (!base64) return false;
+
+      // Añadir nueva página A4 vertical
+      pdf.addPage([210, 297], "p");
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const margin = 15;
+
+      // Header de la página
+      pdf.setFillColor(248, 250, 252);
+      pdf.rect(0, 0, pageWidth, 20, "F");
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text(pageTitle, margin, 13);
+
+      // Línea decorativa
+      pdf.setDrawColor(47, 82, 224);
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, 18, pageWidth - margin, 18);
+
+      // Determinar formato de imagen
+      const isPng = base64.includes("image/png");
+      const isJpg = base64.includes("image/jpeg") || base64.includes("image/jpg");
+      
+      if (isPng || isJpg) {
+        const format = isPng ? "PNG" : "JPEG";
+        // Calcular dimensiones manteniendo aspect ratio
+        const maxWidth = pageWidth - margin * 2;
+        const maxHeight = pageHeight - 40;
+        
+        // Añadir imagen centrada
+        pdf.addImage(base64, format, margin, 25, maxWidth, maxHeight, undefined, "FAST");
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error adding image:", error);
+      return false;
+    }
+  };
+
+  // Función para añadir página de PDF externo (solo muestra info si no puede embeber)
+  const addPdfPlaceholder = (pdf: jsPDF, title: string, url: string) => {
+    pdf.addPage([210, 297], "p");
+    const pageWidth = 210;
+    const margin = 15;
+
+    // Header
+    pdf.setFillColor(248, 250, 252);
+    pdf.rect(0, 0, pageWidth, 20, "F");
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10);
+    pdf.setTextColor(100, 116, 139);
+    pdf.text(title, margin, 13);
+
+    // Línea decorativa
+    pdf.setDrawColor(47, 82, 224);
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, 18, pageWidth - margin, 18);
+
+    // Mensaje
+    pdf.setFillColor(254, 249, 195);
+    pdf.roundedRect(margin, 50, pageWidth - margin * 2, 40, 3, 3, "F");
+    
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(12);
+    pdf.setTextColor(161, 98, 7);
+    pdf.text("Documento adjunto disponible", pageWidth / 2, 65, { align: "center" });
+    
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9);
+    pdf.setTextColor(120, 80, 20);
+    pdf.text("Este documento está disponible en el siguiente enlace:", pageWidth / 2, 75, { align: "center" });
+    
+    pdf.setTextColor(47, 82, 224);
+    pdf.setFontSize(8);
+    const shortUrl = url.length > 70 ? url.substring(0, 70) + "..." : url;
+    pdf.text(shortUrl, pageWidth / 2, 83, { align: "center" });
+  };
+
+  // Descargar solo el banner
+  const downloadBannerOnly = async (invoice: Invoice) => {
     try {
       setDownloading(true);
       const pdf = await generateCoverPage(invoice);
-      pdf.save(generateFilename(invoice));
+      pdf.save(generateFilename(invoice).replace(".pdf", "_banner.pdf"));
     } catch (error) {
       console.error("Error:", error);
       alert("Error al generar el documento");
@@ -627,6 +726,57 @@ export default function DocumentCenterPage() {
     }
   };
 
+  // Descargar expediente completo (banner + factura + justificantes)
+  const downloadFullExpediente = async (invoice: Invoice) => {
+    try {
+      setDownloading(true);
+
+      // 1. Generar banner
+      const pdf = await generateCoverPage(invoice);
+
+      // 2. Añadir factura adjunta si existe
+      if (invoice.attachmentUrl) {
+        const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(invoice.attachmentUrl) || 
+                        invoice.attachmentUrl.includes("image/");
+        const isPdf = /\.pdf$/i.test(invoice.attachmentUrl) || 
+                      invoice.attachmentUrl.includes("application/pdf");
+
+        if (isImage) {
+          await addImageToPdf(pdf, invoice.attachmentUrl, `FACTURA ORIGINAL - ${invoice.displayNumber}`);
+        } else if (isPdf) {
+          addPdfPlaceholder(pdf, `FACTURA ORIGINAL - ${invoice.displayNumber}`, invoice.attachmentUrl);
+        }
+      }
+
+      // 3. Añadir justificantes de pago si existen
+      const invoicePayments = payments[invoice.id] || [];
+      for (const payment of invoicePayments) {
+        if (payment.receiptUrl) {
+          const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(payment.receiptUrl) || 
+                          payment.receiptUrl.includes("image/");
+          const isPdf = /\.pdf$/i.test(payment.receiptUrl) || 
+                        payment.receiptUrl.includes("application/pdf");
+
+          const title = `JUSTIFICANTE DE PAGO - ${payment.forecastName} - ${formatCurrency(payment.amount, invoice.currency)}`;
+
+          if (isImage) {
+            await addImageToPdf(pdf, payment.receiptUrl, title);
+          } else if (isPdf) {
+            addPdfPlaceholder(pdf, title, payment.receiptUrl);
+          }
+        }
+      }
+
+      pdf.save(generateFilename(invoice));
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Error al generar el expediente completo");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  // Descargar seleccionados (expediente completo)
   const downloadSelected = async () => {
     if (selectedIds.size === 0) return;
     try {
@@ -635,9 +785,8 @@ export default function DocumentCenterPage() {
       const selected = filteredInvoices.filter((inv) => selectedIds.has(inv.id));
       for (let i = 0; i < selected.length; i++) {
         setDownloadProgress({ current: i + 1, total: selectedIds.size });
-        const pdf = await generateCoverPage(selected[i]);
-        pdf.save(generateFilename(selected[i]));
-        if (i < selected.length - 1) await new Promise((r) => setTimeout(r, 500));
+        await downloadFullExpediente(selected[i]);
+        if (i < selected.length - 1) await new Promise((r) => setTimeout(r, 800));
       }
     } catch (error) {
       console.error("Error:", error);
@@ -664,16 +813,6 @@ export default function DocumentCenterPage() {
     const c = configs[status] || configs.pending;
     return <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium ${c.bg} ${c.text}`}>{c.label}</span>;
   };
-
-  const ToggleSwitch = ({ enabled, onChange, label }: { enabled: boolean; onChange: () => void; label: string }) => (
-    <button
-      onClick={onChange}
-      className={`flex items-center justify-between w-full p-3 rounded-xl border transition-colors ${enabled ? "border-blue-200 bg-blue-50" : "border-slate-200 bg-white hover:bg-slate-50"}`}
-    >
-      <span className={`text-sm ${enabled ? "text-blue-900 font-medium" : "text-slate-700"}`}>{label}</span>
-      {enabled ? <ToggleRight size={22} className="text-blue-600" /> : <ToggleLeft size={22} className="text-slate-400" />}
-    </button>
-  );
 
   // ============================================================================
   // LOADING / ERROR
@@ -721,6 +860,7 @@ export default function DocumentCenterPage() {
             <FolderDown size={24} style={{ color: "#2F52E0" }} />
             <div>
               <h1 className="text-2xl font-semibold text-slate-900">Centro de documentación</h1>
+              <p className="text-sm text-slate-500">Descarga expedientes con portada de codificación y justificantes</p>
             </div>
           </div>
           <button
@@ -874,18 +1014,72 @@ export default function DocumentCenterPage() {
                         )}
                       </td>
                       <td className="px-4 py-4">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1">
                           <button onClick={() => setPreviewInvoice(invoice)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg" title="Vista previa">
                             <Eye size={16} />
                           </button>
-                          <button onClick={() => downloadSingle(invoice)} disabled={downloading} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg disabled:opacity-50" title="Descargar">
-                            <Download size={16} />
-                          </button>
-                          {invoice.attachmentUrl && (
-                            <a href={invoice.attachmentUrl} target="_blank" rel="noopener noreferrer" className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg" title="Ver original">
-                              <FileText size={16} />
-                            </a>
-                          )}
+                          
+                          {/* Menú de descarga */}
+                          <div className="relative download-menu">
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDownloadMenuId(downloadMenuId === invoice.id ? null : invoice.id);
+                              }} 
+                              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
+                              title="Descargar"
+                            >
+                              <Download size={16} />
+                            </button>
+                            
+                            {downloadMenuId === invoice.id && (
+                              <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden">
+                                <button
+                                  onClick={() => {
+                                    downloadFullExpediente(invoice);
+                                    setDownloadMenuId(null);
+                                  }}
+                                  disabled={downloading}
+                                  className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3 disabled:opacity-50"
+                                >
+                                  <Layers size={15} className="text-blue-500" />
+                                  <div>
+                                    <p className="font-medium">Expediente completo</p>
+                                    <p className="text-xs text-slate-500">Banner + Factura + Justificantes</p>
+                                  </div>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    downloadBannerOnly(invoice);
+                                    setDownloadMenuId(null);
+                                  }}
+                                  disabled={downloading}
+                                  className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3 disabled:opacity-50"
+                                >
+                                  <FileText size={15} className="text-slate-400" />
+                                  <div>
+                                    <p className="font-medium">Solo banner</p>
+                                    <p className="text-xs text-slate-500">Portada de codificación</p>
+                                  </div>
+                                </button>
+                                {invoice.attachmentUrl && (
+                                  <>
+                                    <div className="border-t border-slate-100 my-1" />
+                                    <a
+                                      href={invoice.attachmentUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={() => setDownloadMenuId(null)}
+                                      className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3"
+                                    >
+                                      <Eye size={15} className="text-slate-400" />
+                                      <span>Ver factura original</span>
+                                    </a>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -906,7 +1100,7 @@ export default function DocumentCenterPage() {
       {/* Config Modal */}
       {showConfigPanel && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowConfigPanel(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#2F52E0" }}>
@@ -914,77 +1108,41 @@ export default function DocumentCenterPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-slate-900">Configurar exportación</h3>
-                  <p className="text-xs text-slate-500">Personaliza el nombre y contenido del PDF</p>
+                  <p className="text-xs text-slate-500">Personaliza el nombre del archivo</p>
                 </div>
               </div>
               <button onClick={() => setShowConfigPanel(false)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg">
                 <X size={20} />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Type size={16} className="text-slate-500" />
-                  <h4 className="font-semibold text-slate-900">Nombre del archivo</h4>
-                </div>
-                <input
-                  type="text"
-                  value={exportConfig.filenameTemplate}
-                  onChange={(e) => updateConfig("filenameTemplate", e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                />
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {FILENAME_VARIABLES.map((v) => (
-                    <button key={v.key} onClick={() => updateConfig("filenameTemplate", exportConfig.filenameTemplate + v.key)} className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-mono text-slate-700" title={v.example}>
-                      {v.key}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-2 text-xs text-slate-500">
-                  Vista previa: <span className="font-mono bg-slate-100 px-2 py-0.5 rounded">{exportConfig.filenameTemplate.replace("{tipo}", "FAC").replace("{numero}", "FAC-00001").replace("{proveedor}", "Proveedor_SL").replace("{nif}", "B12345678").replace("{fecha}", "2026-01-15").replace("{importe}", "1500.00").replace("{po}", "PO-00012")}.pdf</span>
-                </p>
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Type size={16} className="text-slate-500" />
+                <h4 className="font-semibold text-slate-900">Nombre del archivo</h4>
               </div>
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Type size={16} className="text-slate-500" />
-                  <h4 className="font-semibold text-slate-900">Título del documento</h4>
-                </div>
-                <input
-                  type="text"
-                  value={exportConfig.customTitle}
-                  onChange={(e) => updateConfig("customTitle", e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="EXPEDIENTE DE DOCUMENTO"
-                />
+              <input
+                type="text"
+                value={exportConfig.filenameTemplate}
+                onChange={(e) => updateConfig("filenameTemplate", e.target.value)}
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+              />
+              <div className="mt-3 flex flex-wrap gap-2">
+                {FILENAME_VARIABLES.map((v) => (
+                  <button key={v.key} onClick={() => updateConfig("filenameTemplate", exportConfig.filenameTemplate + v.key)} className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-mono text-slate-700" title={v.example}>
+                    {v.key}
+                  </button>
+                ))}
               </div>
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Layers size={16} className="text-slate-500" />
-                  <h4 className="font-semibold text-slate-900">Secciones del PDF</h4>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <ToggleSwitch enabled={exportConfig.showHeader} onChange={() => updateConfig("showHeader", !exportConfig.showHeader)} label="Encabezado con título" />
-                  <ToggleSwitch enabled={exportConfig.showCompanyInfo} onChange={() => updateConfig("showCompanyInfo", !exportConfig.showCompanyInfo)} label="Información de empresa" />
-                  <ToggleSwitch enabled={exportConfig.showSupplierInfo} onChange={() => updateConfig("showSupplierInfo", !exportConfig.showSupplierInfo)} label="Información del proveedor" />
-                  <ToggleSwitch enabled={exportConfig.showDocumentData} onChange={() => updateConfig("showDocumentData", !exportConfig.showDocumentData)} label="Datos del documento" />
-                  <ToggleSwitch enabled={exportConfig.showAmounts} onChange={() => updateConfig("showAmounts", !exportConfig.showAmounts)} label="Importes (base, IVA, total)" />
-                  <ToggleSwitch enabled={exportConfig.showCoding} onChange={() => updateConfig("showCoding", !exportConfig.showCoding)} label="Codificación contable" />
-                  <ToggleSwitch enabled={exportConfig.showAccountBreakdown} onChange={() => updateConfig("showAccountBreakdown", !exportConfig.showAccountBreakdown)} label="Desglose por cuentas" />
-                  <ToggleSwitch enabled={exportConfig.showPaymentInfo} onChange={() => updateConfig("showPaymentInfo", !exportConfig.showPaymentInfo)} label="Información de pago" />
-                  <ToggleSwitch enabled={exportConfig.showPaymentBreakdown} onChange={() => updateConfig("showPaymentBreakdown", !exportConfig.showPaymentBreakdown)} label="Desglose de pagos" />
-                  <ToggleSwitch enabled={exportConfig.showFooter} onChange={() => updateConfig("showFooter", !exportConfig.showFooter)} label="Pie de página" />
-                </div>
-              </div>
+              <p className="mt-3 text-xs text-slate-500">
+                Vista previa: <span className="font-mono bg-slate-100 px-2 py-0.5 rounded">{exportConfig.filenameTemplate.replace("{tipo}", "FAC").replace("{numero}", "FAC-00001").replace("{proveedor}", "Proveedor_SL").replace("{nif}", "B12345678").replace("{fecha}", "2026-01-15").replace("{importe}", "1500.00").replace("{po}", "PO-00012")}.pdf</span>
+              </p>
             </div>
-            <div className="px-6 py-4 border-t border-slate-200 flex justify-between">
-              <button onClick={resetConfig} className="px-4 py-2.5 text-slate-600 hover:text-slate-900 text-sm font-medium">Restaurar valores</button>
-              <div className="flex gap-3">
-                <button onClick={() => setShowConfigPanel(false)} className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-100 text-sm font-medium">Cancelar</button>
-                <button onClick={saveConfig} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90" style={{ backgroundColor: "#2F52E0" }}>
-                  <CheckCircle size={16} />
-                  Guardar configuración
-                </button>
-              </div>
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+              <button onClick={resetConfig} className="px-4 py-2.5 text-slate-600 hover:text-slate-900 text-sm font-medium">Restaurar</button>
+              <button onClick={saveConfig} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90" style={{ backgroundColor: "#2F52E0" }}>
+                <CheckCircle size={16} />
+                Guardar
+              </button>
             </div>
           </div>
         </div>
@@ -1043,12 +1201,25 @@ export default function DocumentCenterPage() {
               )}
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex justify-between items-center">
-              <p className="text-xs text-slate-500">Se guardará como: <span className="font-mono bg-slate-200 px-2 py-0.5 rounded">{generateFilename(previewInvoice)}</span></p>
-              <div className="flex gap-3">
+              <p className="text-xs text-slate-500">Archivo: <span className="font-mono bg-slate-200 px-2 py-0.5 rounded">{generateFilename(previewInvoice)}</span></p>
+              <div className="flex gap-2">
                 <button onClick={() => setPreviewInvoice(null)} className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-100 text-sm font-medium">Cerrar</button>
-                <button onClick={() => { downloadSingle(previewInvoice); setPreviewInvoice(null); }} disabled={downloading} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
-                  <Download size={16} />
-                  Descargar expediente
+                <button 
+                  onClick={() => { downloadBannerOnly(previewInvoice); setPreviewInvoice(null); }} 
+                  disabled={downloading} 
+                  className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-100 text-sm font-medium disabled:opacity-50"
+                >
+                  <FileText size={16} />
+                  Solo banner
+                </button>
+                <button 
+                  onClick={() => { downloadFullExpediente(previewInvoice); setPreviewInvoice(null); }} 
+                  disabled={downloading} 
+                  className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50" 
+                  style={{ backgroundColor: "#2F52E0" }}
+                >
+                  <Layers size={16} />
+                  Expediente completo
                 </button>
               </div>
             </div>
