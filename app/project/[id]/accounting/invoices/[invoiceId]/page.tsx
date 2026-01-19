@@ -317,8 +317,35 @@ export default function InvoiceDetailPage() {
   const canEdit = () => invoice && ["draft", "rejected"].includes(invoice.status);
   const isPDF = (url?: string) => url?.toLowerCase().includes(".pdf") || url?.toLowerCase().includes("application/pdf");
 
-  if (permissionsLoading || loading) return <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}><div className="w-10 h-10 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" /></div>;
-  if (permissionsError || !permissions.hasAccountingAccess) return <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}><div className="text-center"><ShieldAlert size={48} className="text-red-400 mx-auto mb-4" /><p className="text-slate-600">Acceso denegado</p></div></div>;
+  if (permissionsLoading || loading) {
+    return (
+      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
+        <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (permissionsError || !permissions.hasAccountingAccess) {
+    return (
+      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <ShieldAlert size={28} className="text-red-500" />
+          </div>
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
+          <p className="text-slate-500 mb-6">No tienes permisos para ver este documento.</p>
+          <Link
+            href={`/project/${projectId}/accounting/invoices`}
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: "#2F52E0" }}
+          >
+            Volver a facturas
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (!invoice) return null;
 
   const config = STATUS_CONFIG[invoice.status];
@@ -338,7 +365,7 @@ export default function InvoiceDetailPage() {
             <button onClick={() => setCodingMode(false)} className="p-2 hover:bg-violet-700 rounded-lg"><X size={20} /></button>
             <div className="flex items-center gap-3">
               <Code size={20} />
-              <span className="font-semibold">Codfificar</span>
+              <span className="font-semibold">CODIFICAR</span>
               <span className="bg-violet-500 px-2 py-0.5 rounded text-sm">{invoice.displayNumber}</span>
             </div>
           </div>
@@ -855,6 +882,28 @@ export default function InvoiceDetailPage() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Pending Replacement Alert */}
+            {invoice.requiresReplacement && invoice.status === "paid" && !invoice.replacedByInvoiceId && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle size={20} className="text-amber-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-amber-900">Pendiente de factura definitiva</p>
+                    <p className="text-sm text-amber-700 mt-1">Este documento ha sido pagado. Recuerda subir la factura definitiva del proveedor.</p>
+                    <Link
+                      href={`/project/${projectId}/accounting/invoices/new?linkTo=${invoice.id}`}
+                      className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl text-sm font-medium hover:bg-amber-700 transition-colors"
+                    >
+                      <FileUp size={16} />
+                      Subir documento
+                    </Link>
+                  </div>
+                </div>
               </div>
             )}
 
