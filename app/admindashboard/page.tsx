@@ -604,14 +604,14 @@ export default function AdminDashboard() {
   // Loading
   if (loading || userLoading) {
     return (
-      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
+      <div className={"min-h-screen bg-white flex items-center justify-center " + inter.className}>
         <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen bg-white ${inter.className}`}>
+    <div className={"min-h-screen bg-white " + inter.className}>
       {/* Toast */}
       {toast && (
         <div className="fixed top-20 right-6 z-50">
