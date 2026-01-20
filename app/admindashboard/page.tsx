@@ -627,182 +627,141 @@ export default function AdminDashboard() {
       )}
 
       {/* Header */}
-      <div className="mt-[4.5rem] bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 md:px-8 lg:px-12 py-8">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-5">
-              <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-500/25">
-                <Shield size={28} className="text-white" />
-              </div>
-              <div>
-                <div className="flex items-center gap-3 mb-1">
-                  <h1 className="text-2xl font-bold text-slate-900">Panel de administración</h1>
-                  <span className="px-2.5 py-1 bg-violet-100 text-violet-700 rounded-lg text-xs font-semibold">ADMIN</span>
-                </div>
-                <p className="text-slate-500">Gestiona proyectos, usuarios y productoras de la plataforma</p>
-              </div>
+      <div className="mt-[4.5rem]">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
+          <h1 className="text-3xl font-bold text-slate-900 text-center">Administración</h1>
+        </div>
+      </div>
+
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        {/* Stats row - minimal */}
+        <div className="flex flex-wrap items-center justify-center gap-6 mb-8 text-sm">
+          <div className="flex items-center gap-2">
+            <Briefcase size={16} className="text-slate-400" />
+            <span className="text-slate-600">{projects.length} proyectos</span>
+            <span className="text-slate-400">·</span>
+            <span className="text-blue-600">{activeProjects} activos</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Users size={16} className="text-slate-400" />
+            <span className="text-slate-600">{users.length} usuarios</span>
+            <span className="text-slate-400">·</span>
+            <span className="text-violet-600">{adminUsers} admins</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Building2 size={16} className="text-slate-400" />
+            <span className="text-slate-600">{producers.length} productoras</span>
+          </div>
+        </div>
+
+        {/* Toolbar con tabs y acciones */}
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6">
+          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+            {/* Tabs */}
+            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1">
+              {[
+                { id: "projects", label: "Proyectos", icon: Briefcase, count: projects.length },
+                { id: "users", label: "Usuarios", icon: Users, count: users.length },
+                { id: "producers", label: "Productoras", icon: Building2, count: producers.length },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
+                    activeTab === tab.id
+                      ? "bg-slate-900 text-white"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                  }`}
+                >
+                  <tab.icon size={14} />
+                  {tab.label}
+                  <span
+                    className={`px-1.5 py-0.5 rounded text-xs ${
+                      activeTab === tab.id ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* Actions */}
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowMessageModal(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
-                <MessageSquare size={16} />
-                Enviar mensaje
+                <MessageSquare size={14} />
+                Mensaje
               </button>
               <button
                 onClick={handleRefresh}
                 disabled={refreshing}
-                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50"
+                className="p-2 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
-                <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
-                Actualizar
+                <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
               </button>
             </div>
-          </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200/50 rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center">
-                  <Briefcase size={20} className="text-white" />
-                </div>
-                <TrendingUp size={16} className="text-blue-500" />
-              </div>
-              <p className="text-3xl font-bold text-slate-900">{projects.length}</p>
-              <p className="text-sm text-slate-600 mt-1">Proyectos totales</p>
-              <p className="text-xs text-blue-600 mt-2 font-medium">{activeProjects} activos</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-violet-50 to-violet-100/50 border border-violet-200/50 rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 bg-violet-500 rounded-xl flex items-center justify-center">
-                  <Users size={20} className="text-white" />
-                </div>
-                <Activity size={16} className="text-violet-500" />
-              </div>
-              <p className="text-3xl font-bold text-slate-900">{users.length}</p>
-              <p className="text-sm text-slate-600 mt-1">Usuarios registrados</p>
-              <p className="text-xs text-violet-600 mt-2 font-medium">{adminUsers} administradores</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200/50 rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center">
-                  <Building2 size={20} className="text-white" />
-                </div>
-                <Sparkles size={16} className="text-amber-500" />
-              </div>
-              <p className="text-3xl font-bold text-slate-900">{producers.length}</p>
-              <p className="text-sm text-slate-600 mt-1">Productoras</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border border-emerald-200/50 rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
-                  <UserPlus size={20} className="text-white" />
-                </div>
-                <Hash size={16} className="text-emerald-500" />
-              </div>
-              <p className="text-3xl font-bold text-slate-900">{totalAssignments}</p>
-              <p className="text-sm text-slate-600 mt-1">Asignaciones</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <main className="max-w-7xl mx-auto px-6 md:px-8 lg:px-12 py-8">
-        {/* Tabs */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-2xl p-1.5 shadow-sm">
-            {[
-              { id: "projects", label: "Proyectos", icon: Briefcase, count: projects.length },
-              { id: "users", label: "Usuarios", icon: Users, count: users.length },
-              { id: "producers", label: "Productoras", icon: Building2, count: producers.length },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  activeTab === tab.id
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                }`}
-              >
-                <tab.icon size={16} />
-                {tab.label}
-                <span
-                  className={`px-2 py-0.5 rounded-lg text-xs font-semibold ${
-                    activeTab === tab.id ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-                  }`}
-                >
-                  {tab.count}
-                </span>
-              </button>
-            ))}
           </div>
         </div>
 
         {/* ==================== PROJECTS TAB ==================== */}
         {activeTab === "projects" && (
-          <div className="space-y-6">
+          <div>
             {/* Toolbar */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-                <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full">
-                  <div className="relative flex-1 max-w-md">
-                    <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Buscar proyectos..."
-                      value={projectSearch}
-                      onChange={(e) => setProjectSearch(e.target.value)}
-                      className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent focus:bg-white outline-none text-sm transition-all"
-                    />
-                  </div>
-                  <select
-                    value={projectPhaseFilter}
-                    onChange={(e) => setProjectPhaseFilter(e.target.value)}
-                    className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none text-sm"
-                  >
-                    <option value="all">Todas las fases</option>
-                    {PHASES.map((phase) => (
-                      <option key={phase} value={phase}>
-                        {phase}
-                      </option>
-                    ))}
-                  </select>
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between mb-6">
+              <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full sm:w-auto">
+                <div className="relative flex-1 sm:max-w-xs">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar proyectos..."
+                    value={projectSearch}
+                    onChange={(e) => setProjectSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white"
+                  />
                 </div>
+                <select
+                  value={projectPhaseFilter}
+                  onChange={(e) => setProjectPhaseFilter(e.target.value)}
+                  className="px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none text-sm bg-white"
+                >
+                  <option value="all">Todas las fases</option>
+                  {PHASES.map((phase) => (
+                    <option key={phase} value={phase}>
+                      {phase}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
-                    <button
-                      onClick={() => setViewMode("grid")}
-                      className={`p-2 rounded-lg transition-all ${
-                        viewMode === "grid" ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"
-                      }`}
-                    >
-                      <LayoutGrid size={16} />
-                    </button>
-                    <button
-                      onClick={() => setViewMode("list")}
-                      className={`p-2 rounded-lg transition-all ${
-                        viewMode === "list" ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"
-                      }`}
-                    >
-                      <List size={16} />
-                    </button>
-                  </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
                   <button
-                    onClick={() => setShowCreateProject(true)}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors shadow-sm"
+                    onClick={() => setViewMode("grid")}
+                    className={`p-2 rounded-md ${
+                      viewMode === "grid" ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"
+                    }`}
                   >
-                    <FolderPlus size={16} />
-                    Crear proyecto
+                    <LayoutGrid size={14} />
+                  </button>
+                  <button
+                    onClick={() => setViewMode("list")}
+                    className={`p-2 rounded-md ${
+                      viewMode === "list" ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    <List size={14} />
                   </button>
                 </div>
+                <button
+                  onClick={() => setShowCreateProject(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium"
+                >
+                  <FolderPlus size={14} />
+                  Crear proyecto
+                </button>
               </div>
             </div>
 
@@ -823,119 +782,108 @@ export default function AdminDashboard() {
                 </button>
               </div>
             ) : viewMode === "grid" ? (
-              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {filteredProjects.map((project) => {
                   const phase = phaseConfig[project.phase] || phaseConfig["Desarrollo"];
-                  const PhaseIcon = phase.icon;
                   return (
                     <div
                       key={project.id}
-                      className="group bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-lg hover:border-slate-300 transition-all"
+                      className="group bg-white border border-slate-200 rounded-2xl p-5 hover:shadow-md hover:border-slate-300"
                     >
-                      {/* Header con fase */}
-                      <div className={`px-5 py-3 ${phase.bg} border-b ${phase.border}`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <PhaseIcon size={14} className={phase.text} />
-                            <span className={`text-xs font-semibold ${phase.text}`}>{project.phase}</span>
-                          </div>
-                          <div className="relative" ref={activeMenu === project.id ? menuRef : null}>
-                            <button
-                              onClick={() => setActiveMenu(activeMenu === project.id ? null : project.id)}
-                              className={`p-1.5 rounded-lg transition-colors ${phase.text} hover:bg-white/50`}
-                            >
-                              <MoreHorizontal size={16} />
-                            </button>
-                            {activeMenu === project.id && (
-                              <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1 overflow-hidden">
-                                <button
-                                  onClick={() => {
-                                    setNewProject({
-                                      name: project.name,
-                                      description: project.description || "",
-                                      phase: project.phase,
-                                      producers: project.producers || [],
-                                    });
-                                    setShowEditProject(project.id);
-                                    setActiveMenu(null);
-                                  }}
-                                  className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3"
-                                >
-                                  <Edit2 size={14} className="text-slate-400" />
-                                  Editar proyecto
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setShowAssignUser(project.id);
-                                    setActiveMenu(null);
-                                  }}
-                                  className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3"
-                                >
-                                  <UserPlus size={14} className="text-slate-400" />
-                                  Asignar usuario
-                                </button>
-                                <Link
-                                  href={`/project/${project.id}/config`}
-                                  onClick={() => setActiveMenu(null)}
-                                  className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3"
-                                >
-                                  <Settings size={14} className="text-slate-400" />
-                                  Configuración
-                                </Link>
-                                <div className="border-t border-slate-100 my-1" />
-                                <button
-                                  onClick={() => handleDeleteProject(project.id)}
-                                  className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
-                                >
-                                  <Trash2 size={14} />
-                                  Eliminar
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                      {/* Header con fase y menú */}
+                      <div className="flex items-center justify-between mb-3">
+                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-lg ${phase.bg} ${phase.text}`}>
+                          {project.phase}
+                        </span>
+                        <div className="relative" ref={activeMenu === project.id ? menuRef : null}>
+                          <button
+                            onClick={() => setActiveMenu(activeMenu === project.id ? null : project.id)}
+                            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 opacity-0 group-hover:opacity-100"
+                          >
+                            <MoreHorizontal size={14} />
+                          </button>
+                          {activeMenu === project.id && (
+                            <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1">
+                              <button
+                                onClick={() => {
+                                  setNewProject({
+                                    name: project.name,
+                                    description: project.description || "",
+                                    phase: project.phase,
+                                    producers: project.producers || [],
+                                  });
+                                  setShowEditProject(project.id);
+                                  setActiveMenu(null);
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                              >
+                                <Edit2 size={14} className="text-slate-400" />
+                                Editar
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setShowAssignUser(project.id);
+                                  setActiveMenu(null);
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                              >
+                                <UserPlus size={14} className="text-slate-400" />
+                                Asignar usuario
+                              </button>
+                              <Link
+                                href={`/project/${project.id}/config`}
+                                onClick={() => setActiveMenu(null)}
+                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                              >
+                                <Settings size={14} className="text-slate-400" />
+                                Config
+                              </Link>
+                              <div className="border-t border-slate-100 my-1" />
+                              <button
+                                onClick={() => handleDeleteProject(project.id)}
+                                className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                              >
+                                <Trash2 size={14} />
+                                Eliminar
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
 
-                      {/* Body */}
-                      <div className="p-5">
-                        <h3 className="text-lg font-semibold text-slate-900 mb-2 line-clamp-1">{project.name}</h3>
-                        {project.description && (
-                          <p className="text-sm text-slate-500 mb-4 line-clamp-2">{project.description}</p>
-                        )}
+                      {/* Nombre */}
+                      <h3 className="font-semibold text-slate-900 mb-2 line-clamp-1">{project.name}</h3>
 
-                        {/* Productoras */}
+                      {/* Info */}
+                      <div className="space-y-1.5 text-xs text-slate-500 mb-4">
                         {project.producerNames && project.producerNames.length > 0 && (
-                          <div className="flex items-center gap-2 mb-4">
-                            <Building2 size={14} className="text-amber-500" />
-                            <span className="text-sm text-slate-600 truncate">{project.producerNames.join(", ")}</span>
+                          <div className="flex items-center gap-1.5">
+                            <Building2 size={12} className="text-slate-400" />
+                            <span className="truncate">{project.producerNames.join(", ")}</span>
                           </div>
                         )}
-
-                        {/* Stats */}
-                        <div className="flex items-center gap-4 text-sm text-slate-500 mb-5">
-                          <span className="flex items-center gap-1.5">
-                            <Users size={14} />
-                            {project.memberCount} miembros
-                          </span>
+                        <div className="flex items-center gap-1.5">
+                          <Users size={12} className="text-slate-400" />
+                          <span>{project.memberCount} miembros</span>
                         </div>
+                      </div>
 
-                        {/* Actions */}
-                        <div className="flex gap-2">
-                          <Link
-                            href={`/admindashboard/project/${project.id}`}
-                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors"
-                          >
-                            <Eye size={14} />
-                            Gestionar
-                          </Link>
-                          <Link
-                            href={`/project/${project.id}`}
-                            className="px-3 py-2.5 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-colors"
-                            title="Ir al proyecto"
-                          >
-                            <ExternalLink size={14} />
-                          </Link>
-                        </div>
+                      {/* Actions */}
+                      <div className="flex gap-2 pt-3 border-t border-slate-100">
+                        <Link
+                          href={`/admindashboard/project/${project.id}`}
+                          className="flex-1 flex items-center justify-center gap-1.5 p-2 bg-slate-900 text-white rounded-xl text-xs font-medium hover:bg-slate-800"
+                        >
+                          <Eye size={12} />
+                          Gestionar
+                        </Link>
+                        <Link
+                          href={`/project/${project.id}`}
+                          className="p-2 border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-50"
+                          title="Ir al proyecto"
+                        >
+                          <ExternalLink size={12} />
+                        </Link>
                       </div>
                     </div>
                   );
@@ -943,56 +891,53 @@ export default function AdminDashboard() {
               </div>
             ) : (
               /* List View */
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
                 <div className="divide-y divide-slate-100">
                   {filteredProjects.map((project) => {
                     const phase = phaseConfig[project.phase] || phaseConfig["Desarrollo"];
-                    const PhaseIcon = phase.icon;
                     const isExpanded = expandedProject === project.id;
 
                     return (
                       <div key={project.id}>
-                        <div className="flex items-center justify-between p-5 hover:bg-slate-50 transition-colors">
-                          <div className="flex items-center gap-4 flex-1 min-w-0">
-                            {project.memberCount > 0 && (
+                        <div className="flex items-center justify-between px-5 py-4 hover:bg-slate-50">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            {project.memberCount > 0 ? (
                               <button
                                 onClick={() => setExpandedProject(isExpanded ? null : project.id)}
                                 className="p-1 text-slate-400 hover:text-slate-600"
                               >
                                 <ChevronRight
-                                  size={16}
-                                  className={`transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                                  size={14}
+                                  className={isExpanded ? "rotate-90" : ""}
                                 />
                               </button>
+                            ) : (
+                              <div className="w-6" />
                             )}
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${phase.bg}`}>
-                              <PhaseIcon size={18} className={phase.text} />
-                            </div>
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-3">
-                                <h3 className="font-semibold text-slate-900 truncate">{project.name}</h3>
-                                <span className={`px-2 py-0.5 rounded-lg text-xs font-medium ${phase.bg} ${phase.text}`}>
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-sm font-semibold text-slate-900 truncate">{project.name}</h3>
+                                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-lg ${phase.bg} ${phase.text}`}>
                                   {project.phase}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-4 mt-1 text-sm text-slate-500">
+                              <div className="flex items-center gap-3 mt-0.5 text-xs text-slate-500">
                                 {project.producerNames && project.producerNames.length > 0 && (
                                   <span className="truncate max-w-[200px]">{project.producerNames.join(", ")}</span>
                                 )}
                                 <span className="flex items-center gap-1">
-                                  <Users size={12} />
+                                  <Users size={11} className="text-slate-400" />
                                   {project.memberCount}
                                 </span>
                               </div>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
                             <Link
                               href={`/admindashboard/project/${project.id}`}
-                              className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
+                              className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800"
                             >
-                              <Eye size={14} />
                               Gestionar
                             </Link>
                             <button
@@ -1005,50 +950,43 @@ export default function AdminDashboard() {
                                 });
                                 setShowEditProject(project.id);
                               }}
-                              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
+                              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
                             >
-                              <Edit2 size={16} />
+                              <Edit2 size={14} />
                             </button>
                             <button
                               onClick={() => setShowAssignUser(project.id)}
-                              className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl"
+                              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
                             >
-                              <UserPlus size={16} />
+                              <UserPlus size={14} />
                             </button>
                           </div>
                         </div>
 
                         {/* Expanded members */}
                         {isExpanded && project.members && project.members.length > 0 && (
-                          <div className="px-5 pb-5 pt-0">
-                            <div className="ml-14 bg-slate-50 rounded-xl p-4">
-                              <p className="text-xs font-semibold text-slate-500 uppercase mb-3">
-                                Miembros del equipo ({project.members.length})
-                              </p>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          <div className="px-5 pb-4">
+                            <div className="ml-9 bg-slate-50 rounded-xl p-3">
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                                 {project.members.map((member) => (
                                   <div
                                     key={member.odId}
-                                    className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-200"
+                                    className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200"
                                   >
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-8 h-8 bg-slate-200 rounded-lg flex items-center justify-center text-slate-600 text-xs font-semibold">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <div className="w-7 h-7 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600 text-xs font-medium flex-shrink-0">
                                         {member.name.charAt(0).toUpperCase()}
                                       </div>
-                                      <div>
-                                        <p className="text-sm font-medium text-slate-900">{member.name}</p>
-                                        <p className="text-xs text-slate-500">{member.email}</p>
+                                      <div className="min-w-0">
+                                        <p className="text-xs font-medium text-slate-900 truncate">{member.name}</p>
+                                        <p className="text-[10px] text-slate-500 truncate">{member.role || member.position}</p>
                                       </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">
-                                        {member.role || member.position}
-                                      </span>
-                                      <button
-                                        onClick={() => handleRemoveUserFromProject(project.id, member.odId)}
-                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                                      >
-                                        <Trash2 size={14} />
+                                    <button
+                                      onClick={() => handleRemoveUserFromProject(project.id, member.odId)}
+                                      className="p-1 text-slate-400 hover:text-red-500 rounded flex-shrink-0"
+                                    >
+                                      <Trash2 size={12} />
                                       </button>
                                     </div>
                                   </div>
@@ -1070,94 +1008,85 @@ export default function AdminDashboard() {
         {activeTab === "users" && (
           <div className="space-y-6">
             {/* Toolbar */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
-                <div className="relative flex-1 max-w-md">
-                  <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Buscar usuarios..."
-                    value={userSearch}
-                    onChange={(e) => setUserSearch(e.target.value)}
-                    className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent focus:bg-white outline-none text-sm transition-all"
-                  />
-                </div>
-                <select
-                  value={userRoleFilter}
-                  onChange={(e) => setUserRoleFilter(e.target.value)}
-                  className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none text-sm"
-                >
-                  <option value="all">Todos los roles</option>
-                  <option value="admin">Administradores</option>
-                  <option value="user">Usuarios</option>
-                </select>
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center mb-6">
+              <div className="relative flex-1 sm:max-w-xs">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar usuarios..."
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white"
+                />
               </div>
+              <select
+                value={userRoleFilter}
+                onChange={(e) => setUserRoleFilter(e.target.value)}
+                className="px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none text-sm bg-white"
+              >
+                <option value="all">Todos los roles</option>
+                <option value="admin">Administradores</option>
+                <option value="user">Usuarios</option>
+              </select>
             </div>
 
             {/* Users List */}
             {filteredUsers.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center shadow-sm">
-                <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Users size={28} className="text-slate-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">No hay usuarios</h3>
+              <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
+                <Users size={28} className="text-slate-300 mx-auto mb-3" />
+                <h3 className="font-semibold text-slate-900 mb-1">No hay usuarios</h3>
                 <p className="text-slate-500 text-sm">No se encontraron usuarios con los filtros actuales</p>
               </div>
             ) : (
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
                 <div className="divide-y divide-slate-100">
                   {filteredUsers.map((user) => (
                     <div
                       key={user.id}
-                      className="flex items-center justify-between p-5 hover:bg-slate-50 transition-colors"
+                      className="flex items-center justify-between px-5 py-4 hover:bg-slate-50"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-slate-200 to-slate-300 rounded-xl flex items-center justify-center text-slate-600 font-semibold text-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600 text-sm font-medium">
                           {user.name.charAt(0).toUpperCase()}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-slate-900">{user.name}</h3>
+                            <h3 className="text-sm font-medium text-slate-900">{user.name}</h3>
                             {user.role === "admin" && (
-                              <span className="flex items-center gap-1 px-2 py-0.5 bg-violet-100 text-violet-700 rounded-lg text-xs font-semibold">
-                                <Crown size={10} />
+                              <span className="px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded text-[10px] font-medium">
                                 Admin
                               </span>
                             )}
                           </div>
-                          <p className="text-sm text-slate-500 flex items-center gap-1 mt-0.5">
-                            <Mail size={12} />
-                            {user.email}
-                          </p>
+                          <p className="text-xs text-slate-500">{user.email}</p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3">
                         <button
                           onClick={() => setShowUserDetails(user.id)}
-                          className="text-sm text-blue-600 hover:text-blue-700 font-medium hover:underline"
+                          className="text-xs text-slate-500 hover:text-slate-700"
                         >
                           {user.projectCount} proyecto{user.projectCount !== 1 ? "s" : ""}
                         </button>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-0.5">
                           <button
                             onClick={() => setShowUserDetails(user.id)}
-                            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
-                            title="Ver detalles"
+                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
                           >
-                            <Eye size={16} />
+                            <Eye size={14} />
                           </button>
                           <button
                             onClick={() => handleToggleUserRole(user.id, user.role)}
                             disabled={saving}
-                            className={`p-2 rounded-xl transition-colors ${
+                            className={`p-1.5 rounded-lg ${
                               user.role === "admin"
-                                ? "text-violet-600 bg-violet-50 hover:bg-violet-100"
+                                ? "text-violet-600 hover:bg-violet-50"
                                 : "text-slate-400 hover:text-violet-600 hover:bg-violet-50"
                             }`}
                             title={user.role === "admin" ? "Quitar admin" : "Hacer admin"}
                           >
-                            <Shield size={16} />
+                            <Shield size={14} />
                           </button>
                         </div>
                       </div>
@@ -1171,109 +1100,81 @@ export default function AdminDashboard() {
 
         {/* ==================== PRODUCERS TAB ==================== */}
         {activeTab === "producers" && (
-          <div className="space-y-6">
+          <div>
             {/* Toolbar */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-                <div className="relative flex-1 max-w-md">
-                  <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Buscar productoras..."
-                    value={producerSearch}
-                    onChange={(e) => setProducerSearch(e.target.value)}
-                    className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent focus:bg-white outline-none text-sm transition-all"
-                  />
-                </div>
-                <button
-                  onClick={() => setShowCreateProducer(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors shadow-sm"
-                >
-                  <Plus size={16} />
-                  Nueva productora
-                </button>
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between mb-6">
+              <div className="relative flex-1 sm:max-w-xs">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar productoras..."
+                  value={producerSearch}
+                  onChange={(e) => setProducerSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white"
+                />
               </div>
+              <button
+                onClick={() => setShowCreateProducer(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium"
+              >
+                <Plus size={14} />
+                Nueva productora
+              </button>
             </div>
 
             {/* Producers Grid */}
             {filteredProducers.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center shadow-sm">
-                <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Building2 size={28} className="text-slate-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">No hay productoras</h3>
-                <p className="text-slate-500 text-sm mb-6">Crea tu primera productora</p>
+              <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
+                <Building2 size={28} className="text-slate-300 mx-auto mb-3" />
+                <h3 className="font-semibold text-slate-900 mb-1">No hay productoras</h3>
+                <p className="text-slate-500 text-sm mb-4">Crea tu primera productora</p>
                 <button
                   onClick={() => setShowCreateProducer(true)}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
                 >
-                  <Plus size={16} />
-                  Nueva productora
+                  <Plus size={14} />
+                  Nueva
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {filteredProducers.map((producer) => (
-                  <div
-                    key={producer.id}
-                    className="group bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg hover:border-slate-300 transition-all"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="w-12 h-12 bg-gradient-to-br from-amber-100 to-amber-200 rounded-xl flex items-center justify-center">
-                        <Building2 size={22} className="text-amber-600" />
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                <div className="divide-y divide-slate-100">
+                  {filteredProducers.map((producer) => (
+                    <div
+                      key={producer.id}
+                      className="flex items-center justify-between px-5 py-4 hover:bg-slate-50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Building2 size={16} className="text-slate-400" />
+                        <div>
+                          <h3 className="text-sm font-medium text-slate-900">{producer.name}</h3>
+                          <p className="text-xs text-slate-500">
+                            {producer.projectCount} proyecto{producer.projectCount !== 1 ? "s" : ""}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1">
                         <button
                           onClick={() => {
                             setNewProducer({ name: producer.name });
                             setShowEditProducer(producer.id);
                           }}
-                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl"
+                          className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
                         >
                           <Edit2 size={14} />
                         </button>
                         <button
                           onClick={() => handleDeleteProducer(producer.id)}
                           disabled={saving || producer.projectCount > 0}
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                          title={producer.projectCount > 0 ? "Tiene proyectos asignados" : "Eliminar"}
+                          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                          title={producer.projectCount > 0 ? "Tiene proyectos" : "Eliminar"}
                         >
                           <Trash2 size={14} />
                         </button>
                       </div>
                     </div>
-
-                    <h3 className="text-lg font-semibold text-slate-900 mb-1">{producer.name}</h3>
-                    <p className="text-sm text-slate-500">
-                      {producer.projectCount} proyecto{producer.projectCount !== 1 ? "s" : ""} asignado
-                      {producer.projectCount !== 1 ? "s" : ""}
-                    </p>
-
-                    {producer.projectCount > 0 && (
-                      <div className="mt-4 pt-4 border-t border-slate-100">
-                        <p className="text-xs text-slate-400">Proyectos:</p>
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {projects
-                            .filter((p) => p.producers?.includes(producer.id))
-                            .slice(0, 3)
-                            .map((p) => (
-                              <span
-                                key={p.id}
-                                className="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs truncate max-w-[120px]"
-                              >
-                                {p.name}
-                              </span>
-                            ))}
-                          {projects.filter((p) => p.producers?.includes(producer.id)).length > 3 && (
-                            <span className="px-2 py-1 bg-slate-100 text-slate-500 rounded-lg text-xs">
-                              +{projects.filter((p) => p.producers?.includes(producer.id)).length - 3}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -1287,14 +1188,9 @@ export default function AdminDashboard() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
-                  <FolderPlus size={20} className="text-slate-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-slate-900">
-                  {showEditProject ? "Editar proyecto" : "Nuevo proyecto"}
-                </h3>
-              </div>
+              <h3 className="text-lg font-semibold text-slate-900">
+                {showEditProject ? "Editar proyecto" : "Nuevo proyecto"}
+              </h3>
               <button
                 onClick={() => {
                   setShowCreateProject(false);
@@ -1310,13 +1206,13 @@ export default function AdminDashboard() {
 
             <div className="p-6 space-y-5">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Nombre del proyecto *</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Nombre *</label>
                 <input
                   type="text"
                   value={newProject.name}
                   onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                  placeholder="Mi nuevo proyecto"
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm transition-all"
+                  placeholder="Nombre del proyecto"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
                 />
               </div>
 
