@@ -987,8 +987,7 @@ export default function AdminDashboard() {
                                       className="p-1 text-slate-400 hover:text-red-500 rounded flex-shrink-0"
                                     >
                                       <Trash2 size={12} />
-                                      </button>
-                                    </div>
+                                    </button>
                                   </div>
                                 ))}
                               </div>
