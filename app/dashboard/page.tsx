@@ -2,11 +2,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
-import { Folder, Search, Users, Settings, Clock, Mail, Check, X as XIcon, Building2, Sparkles, BarChart3, Archive, ChevronDown, FolderOpen, Filter, ArrowUpDown, KeyRound, AlertCircle } from "lucide-react";
+import { Folder, Search, Users, Settings, Clock, Mail, Check, X as XIcon, Building2, Sparkles, BarChart3, Archive, ChevronDown, FolderOpen, Filter, ArrowUpDown, KeyRound, AlertCircle, Bell, Info, AlertTriangle, CheckCircle, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { db, auth } from "@/lib/firebase";
 import { useUser } from "@/contexts/UserContext";
-import { collection, getDocs, getDoc, doc, query, where, updateDoc, setDoc, Timestamp, DocumentData, QueryDocumentSnapshot } from "firebase/firestore";
+import { collection, getDocs, getDoc, doc, query, where, updateDoc, setDoc, Timestamp, DocumentData, QueryDocumentSnapshot, orderBy, deleteDoc } from "firebase/firestore";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
@@ -67,11 +67,22 @@ interface Invitation {
   expiresAt: Date | Timestamp;
 }
 
+interface AdminMessage {
+  id: string;
+  title: string;
+  content: string;
+  type: "info" | "warning" | "success";
+  sentAt: Timestamp;
+  sentByName: string;
+  read: boolean;
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const { user, isLoading: userLoading } = useUser();
   const [projects, setProjects] = useState<Project[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [messages, setMessages] = useState<AdminMessage[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingInvite, setProcessingInvite] = useState<string | null>(null);
@@ -85,6 +96,7 @@ export default function Dashboard() {
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [pendingConfigProjectId, setPendingConfigProjectId] = useState<string | null>(null);
+  const [expandedMessage, setExpandedMessage] = useState<string | null>(null);
   const phaseDropdownRef = useRef<HTMLDivElement>(null);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -183,6 +195,24 @@ export default function Dashboard() {
           };
         });
         setInvitations(invitationsData);
+
+        // Load admin messages
+        const messagesRef = collection(db, `users/${userId}/messages`);
+        const messagesQuery = query(messagesRef, orderBy("sentAt", "desc"));
+        const messagesSnapshot = await getDocs(messagesQuery);
+        const messagesData: AdminMessage[] = messagesSnapshot.docs.map((msgDoc) => {
+          const data = msgDoc.data();
+          return {
+            id: msgDoc.id,
+            title: data.title,
+            content: data.content,
+            type: data.type || "info",
+            sentAt: data.sentAt,
+            sentByName: data.sentByName,
+            read: data.read || false,
+          };
+        });
+        setMessages(messagesData);
       } catch (error) {
         console.error("Error al cargar datos:", error);
       } finally {
@@ -270,6 +300,70 @@ export default function Dashboard() {
       console.error("Error rechazando invitación:", error);
       alert("Error al rechazar la invitación");
       setProcessingInvite(null);
+    }
+  };
+
+  // Message handlers
+  const handleMarkMessageAsRead = async (messageId: string) => {
+    if (!userId) return;
+    try {
+      await updateDoc(doc(db, `users/${userId}/messages`, messageId), { read: true });
+      setMessages(messages.map((m) => (m.id === messageId ? { ...m, read: true } : m)));
+    } catch (error) {
+      console.error("Error marking message as read:", error);
+    }
+  };
+
+  const handleDismissMessage = async (messageId: string) => {
+    if (!userId) return;
+    try {
+      await deleteDoc(doc(db, `users/${userId}/messages`, messageId));
+      setMessages(messages.filter((m) => m.id !== messageId));
+      if (expandedMessage === messageId) setExpandedMessage(null);
+    } catch (error) {
+      console.error("Error dismissing message:", error);
+    }
+  };
+
+  const handleToggleMessage = (messageId: string) => {
+    if (expandedMessage === messageId) {
+      setExpandedMessage(null);
+    } else {
+      setExpandedMessage(messageId);
+      // Mark as read when expanded
+      const msg = messages.find((m) => m.id === messageId);
+      if (msg && !msg.read) {
+        handleMarkMessageAsRead(messageId);
+      }
+    }
+  };
+
+  const unreadMessagesCount = messages.filter((m) => !m.read).length;
+
+  const formatMessageDate = (timestamp: Timestamp) => {
+    if (!timestamp) return "";
+    const date = timestamp.toDate();
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Ahora";
+    if (diffMins < 60) return `Hace ${diffMins} min`;
+    if (diffHours < 24) return `Hace ${diffHours}h`;
+    if (diffDays < 7) return `Hace ${diffDays} día${diffDays > 1 ? "s" : ""}`;
+    return date.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+  };
+
+  const getMessageConfig = (type: AdminMessage["type"]) => {
+    switch (type) {
+      case "warning":
+        return { icon: AlertTriangle, bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700", iconBg: "bg-amber-100" };
+      case "success":
+        return { icon: CheckCircle, bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", iconBg: "bg-emerald-100" };
+      default:
+        return { icon: Info, bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700", iconBg: "bg-blue-100" };
     }
   };
 
@@ -550,6 +644,77 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Admin Messages */}
+        {messages.length > 0 && (
+          <div className="mb-8">
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              {/* Header */}
+              <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MessageSquare size={16} className="text-slate-400" />
+                  <span className="text-sm font-medium text-slate-700">Mensajes</span>
+                </div>
+                {unreadMessagesCount > 0 && (
+                  <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full text-xs font-medium">
+                    {unreadMessagesCount} sin leer
+                  </span>
+                )}
+              </div>
+
+              {/* Messages */}
+              <div className="divide-y divide-slate-100">
+                {messages.map((message) => {
+                  const config = getMessageConfig(message.type);
+                  const Icon = config.icon;
+                  const isExpanded = expandedMessage === message.id;
+
+                  return (
+                    <div key={message.id} className={!message.read ? "bg-blue-50/30" : ""}>
+                      <button
+                        onClick={() => handleToggleMessage(message.id)}
+                        className="w-full px-5 py-4 flex items-center gap-3 text-left hover:bg-slate-50"
+                      >
+                        <Icon size={16} className={config.text} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-medium text-slate-900 truncate">{message.title}</h3>
+                            {!message.read && (
+                              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {message.sentByName} · {formatMessageDate(message.sentAt)}
+                          </p>
+                        </div>
+                        <ChevronDown
+                          size={14}
+                          className={`text-slate-400 flex-shrink-0 ${isExpanded ? "rotate-180" : ""}`}
+                        />
+                      </button>
+
+                      {isExpanded && (
+                        <div className="px-5 pb-4">
+                          <div className="pl-7">
+                            <p className="text-sm text-slate-600 whitespace-pre-wrap">
+                              {message.content}
+                            </p>
+                            <button
+                              onClick={() => handleDismissMessage(message.id)}
+                              className="mt-3 text-xs text-slate-500 hover:text-slate-700"
+                            >
+                              Descartar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
