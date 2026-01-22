@@ -49,6 +49,7 @@ interface Project {
   addedAt: Timestamp | null;
   memberCount?: number;
   archived?: boolean;
+  closingAt?: Timestamp | null;
 }
 
 interface Invitation {
@@ -165,6 +166,7 @@ export default function Dashboard() {
               addedAt: userProjectData.addedAt || null,
               memberCount: membersSnapshot.size,
               archived: projectData.archived || false,
+              closingAt: projectData.closingAt || null,
             });
           }
         }
@@ -325,36 +327,7 @@ export default function Dashboard() {
     }
   };
 
-  const handleToggleMessage = (messageId: string) => {
-    if (expandedMessage === messageId) {
-      setExpandedMessage(null);
-    } else {
-      setExpandedMessage(messageId);
-      // Mark as read when expanded
-      const msg = messages.find((m) => m.id === messageId);
-      if (msg && !msg.read) {
-        handleMarkMessageAsRead(messageId);
-      }
-    }
-  };
-
   const unreadMessagesCount = messages.filter((m) => !m.read).length;
-
-  const formatMessageDate = (timestamp: Timestamp) => {
-    if (!timestamp) return "";
-    const date = timestamp.toDate();
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return "Ahora";
-    if (diffMins < 60) return `Hace ${diffMins} min`;
-    if (diffHours < 24) return `Hace ${diffHours}h`;
-    if (diffDays < 7) return `Hace ${diffDays} día${diffDays > 1 ? "s" : ""}`;
-    return date.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
-  };
 
   const getMessageConfig = (type: AdminMessage["type"]) => {
     switch (type) {
@@ -421,13 +394,34 @@ export default function Dashboard() {
     setPendingConfigProjectId(null);
   };
 
+  // Helper para calcular días hasta el cierre
+  const getDaysUntilClose = (closingAt: Timestamp | null | undefined) => {
+    if (!closingAt) return null;
+    const now = new Date();
+    const closeDate = closingAt.toDate();
+    const diffTime = closeDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  };
+
   const renderProjectCard = (project: Project) => {
     const hasConfig = project.permissions.config;
     const hasAccounting = project.permissions.accounting;
     const hasTeam = project.permissions.team;
+    const daysUntilClose = getDaysUntilClose(project.closingAt);
 
     return (
-      <div key={project.id} className="group bg-white border border-slate-200 rounded-2xl p-5 hover:border-slate-300 hover:shadow-lg transition-all">
+      <div key={project.id} className="group bg-white border border-slate-200 rounded-2xl p-5 hover:border-slate-300 hover:shadow-lg">
+        {/* Aviso de cierre */}
+        {daysUntilClose !== null && (
+          <div className="mb-3 px-2.5 py-1.5 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+            <Clock size={12} className="text-red-500" />
+            <span className="text-[10px] font-medium text-red-700">
+              Cierra en {daysUntilClose} día{daysUntilClose !== 1 ? "s" : ""}
+            </span>
+          </div>
+        )}
+
         {/* Nombre y fase */}
         <div className="flex items-start justify-between mb-2">
           <h2 className="text-base font-semibold text-slate-900 truncate flex-1 min-w-0">{project.name}</h2>
@@ -458,7 +452,7 @@ export default function Dashboard() {
         <div className="flex gap-2 pt-3 border-t border-slate-100">
           {hasConfig && (
             <button onClick={(e) => handleConfigClick(e, project.id)} className="flex-1">
-              <div className="flex items-center justify-center gap-1.5 p-2 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-all text-slate-600 text-xs font-medium">
+              <div className="flex items-center justify-center gap-1.5 p-2 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 text-slate-600 text-xs font-medium">
                 <Settings size={12} />
                 Config
               </div>
@@ -467,7 +461,7 @@ export default function Dashboard() {
           {hasAccounting && (
             <Link href={`/project/${project.id}/accounting`} className="flex-1">
               <div 
-                className="flex items-center justify-center gap-1.5 p-2 rounded-xl transition-all text-xs font-medium border"
+                className="flex items-center justify-center gap-1.5 p-2 rounded-xl text-xs font-medium border"
                 style={{ 
                   backgroundColor: 'rgba(47, 82, 224, 0.1)',
                   borderColor: 'rgba(47, 82, 224, 0.3)',
@@ -482,7 +476,7 @@ export default function Dashboard() {
           {hasTeam && (
             <Link href={`/project/${project.id}/team`} className="flex-1">
               <div 
-                className="flex items-center justify-center gap-1.5 p-2 rounded-xl transition-all text-xs font-medium border"
+                className="flex items-center justify-center gap-1.5 p-2 rounded-xl text-xs font-medium border"
                 style={{ 
                   backgroundColor: 'rgba(137, 211, 34, 0.15)',
                   borderColor: 'rgba(137, 211, 34, 0.4)',
@@ -576,8 +570,57 @@ export default function Dashboard() {
 
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
+      {/* Notification Banners - Fixed at top */}
+      {messages.length > 0 && (
+        <div className="fixed top-[4.5rem] left-0 right-0 z-40 px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-3 space-y-2 bg-gradient-to-b from-white via-white to-transparent pointer-events-none">
+          {messages.slice(0, 3).map((message) => {
+            const config = getMessageConfig(message.type);
+            const Icon = config.icon;
+
+            return (
+              <div
+                key={message.id}
+                className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-sm ${config.bg} ${config.border}`}
+              >
+                <Icon size={16} className={config.text} />
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium ${config.text}`}>{message.title}</p>
+                  {expandedMessage === message.id && (
+                    <p className="text-xs text-slate-600 mt-1">{message.content}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {expandedMessage !== message.id && (
+                    <button
+                      onClick={() => {
+                        setExpandedMessage(message.id);
+                        if (!message.read) handleMarkMessageAsRead(message.id);
+                      }}
+                      className="text-xs text-slate-500 hover:text-slate-700"
+                    >
+                      Ver
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDismissMessage(message.id)}
+                    className="p-1 text-slate-400 hover:text-slate-600 rounded"
+                  >
+                    <XIcon size={14} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          {messages.length > 3 && (
+            <p className="pointer-events-auto text-xs text-slate-500 text-center">
+              +{messages.length - 3} notificación{messages.length - 3 !== 1 ? "es" : ""} más
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Header con título centrado */}
-      <div className="mt-[4.5rem]">
+      <div className={messages.length > 0 ? "mt-[4.5rem] pt-20" : "mt-[4.5rem]"}>
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
           <h1 className="text-3xl font-bold text-slate-900 text-center">Panel de proyectos</h1>
         </div>
@@ -644,77 +687,6 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Admin Messages */}
-        {messages.length > 0 && (
-          <div className="mb-8">
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              {/* Header */}
-              <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MessageSquare size={16} className="text-slate-400" />
-                  <span className="text-sm font-medium text-slate-700">Mensajes</span>
-                </div>
-                {unreadMessagesCount > 0 && (
-                  <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full text-xs font-medium">
-                    {unreadMessagesCount} sin leer
-                  </span>
-                )}
-              </div>
-
-              {/* Messages */}
-              <div className="divide-y divide-slate-100">
-                {messages.map((message) => {
-                  const config = getMessageConfig(message.type);
-                  const Icon = config.icon;
-                  const isExpanded = expandedMessage === message.id;
-
-                  return (
-                    <div key={message.id} className={!message.read ? "bg-blue-50/30" : ""}>
-                      <button
-                        onClick={() => handleToggleMessage(message.id)}
-                        className="w-full px-5 py-4 flex items-center gap-3 text-left hover:bg-slate-50"
-                      >
-                        <Icon size={16} className={config.text} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-medium text-slate-900 truncate">{message.title}</h3>
-                            {!message.read && (
-                              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />
-                            )}
-                          </div>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            {message.sentByName} · {formatMessageDate(message.sentAt)}
-                          </p>
-                        </div>
-                        <ChevronDown
-                          size={14}
-                          className={`text-slate-400 flex-shrink-0 ${isExpanded ? "rotate-180" : ""}`}
-                        />
-                      </button>
-
-                      {isExpanded && (
-                        <div className="px-5 pb-4">
-                          <div className="pl-7">
-                            <p className="text-sm text-slate-600 whitespace-pre-wrap">
-                              {message.content}
-                            </p>
-                            <button
-                              onClick={() => handleDismissMessage(message.id)}
-                              className="mt-3 text-xs text-slate-500 hover:text-slate-700"
-                            >
-                              Descartar
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
               </div>
             </div>
           </div>
