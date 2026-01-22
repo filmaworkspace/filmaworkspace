@@ -570,57 +570,99 @@ export default function Dashboard() {
 
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
-      {/* Notification Banners - Fixed at top */}
+      {/* Notification Bell - Fixed position */}
       {messages.length > 0 && (
-        <div className="fixed top-[4.5rem] left-0 right-0 z-40 px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-3 space-y-2 bg-gradient-to-b from-white via-white to-transparent pointer-events-none">
-          {messages.slice(0, 3).map((message) => {
-            const config = getMessageConfig(message.type);
-            const Icon = config.icon;
+        <div className="fixed top-[5.5rem] right-6 md:right-8 lg:right-12 xl:right-16 2xl:right-24 z-40">
+          <div className="relative">
+            <button
+              onClick={() => setExpandedMessage(expandedMessage ? null : "panel")}
+              className="relative p-3 bg-white border border-slate-200 rounded-xl shadow-lg hover:bg-slate-50"
+            >
+              <Bell size={20} className="text-slate-600" />
+              {unreadMessagesCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {unreadMessagesCount > 9 ? "9+" : unreadMessagesCount}
+                </span>
+              )}
+            </button>
 
-            return (
-              <div
-                key={message.id}
-                className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-sm ${config.bg} ${config.border}`}
-              >
-                <Icon size={16} className={config.text} />
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium ${config.text}`}>{message.title}</p>
-                  {expandedMessage === message.id && (
-                    <p className="text-xs text-slate-600 mt-1">{message.content}</p>
+            {/* Dropdown panel */}
+            {expandedMessage === "panel" && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setExpandedMessage(null)}
+                />
+                <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-900">Notificaciones</span>
+                    {unreadMessagesCount > 0 && (
+                      <span className="text-xs text-slate-500">{unreadMessagesCount} sin leer</span>
+                    )}
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {messages.map((message) => {
+                      const config = getMessageConfig(message.type);
+                      const Icon = config.icon;
+
+                      return (
+                        <div
+                          key={message.id}
+                          className={`px-4 py-3 border-b border-slate-50 last:border-0 ${!message.read ? "bg-blue-50/50" : ""}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${config.bg}`}>
+                              <Icon size={14} className={config.text} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium text-slate-900 truncate">{message.title}</p>
+                                {!message.read && (
+                                  <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{message.content}</p>
+                              <div className="flex items-center justify-between mt-2">
+                                <span className="text-[10px] text-slate-400">{message.sentByName}</span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDismissMessage(message.id);
+                                  }}
+                                  className="text-[10px] text-slate-400 hover:text-red-500"
+                                >
+                                  Descartar
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {messages.length > 0 && (
+                    <div className="px-4 py-2 border-t border-slate-100 bg-slate-50">
+                      <button
+                        onClick={() => {
+                          messages.forEach((m) => {
+                            if (!m.read) handleMarkMessageAsRead(m.id);
+                          });
+                        }}
+                        className="text-xs text-slate-500 hover:text-slate-700 w-full text-center"
+                      >
+                        Marcar todas como leídas
+                      </button>
+                    </div>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  {expandedMessage !== message.id && (
-                    <button
-                      onClick={() => {
-                        setExpandedMessage(message.id);
-                        if (!message.read) handleMarkMessageAsRead(message.id);
-                      }}
-                      className="text-xs text-slate-500 hover:text-slate-700"
-                    >
-                      Ver
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleDismissMessage(message.id)}
-                    className="p-1 text-slate-400 hover:text-slate-600 rounded"
-                  >
-                    <XIcon size={14} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-          {messages.length > 3 && (
-            <p className="pointer-events-auto text-xs text-slate-500 text-center">
-              +{messages.length - 3} notificación{messages.length - 3 !== 1 ? "es" : ""} más
-            </p>
-          )}
+              </>
+            )}
+          </div>
         </div>
       )}
 
       {/* Header con título centrado */}
-      <div className={messages.length > 0 ? "mt-[4.5rem] pt-20" : "mt-[4.5rem]"}>
+      <div className="mt-[4.5rem]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
           <h1 className="text-3xl font-bold text-slate-900 text-center">Panel de proyectos</h1>
         </div>
