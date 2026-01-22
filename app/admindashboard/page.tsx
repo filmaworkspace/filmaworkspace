@@ -127,11 +127,23 @@ export default function AdminDashboard() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"projects" | "users" | "producers">("projects");
+  const [activeTab, setActiveTab] = useState<"projects" | "users" | "producers" | "messages">("projects");
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [producers, setProducers] = useState<Producer[]>([]);
+  const [activeMessages, setActiveMessages] = useState<{
+    id: string;
+    odId: string;
+    title: string;
+    content: string;
+    type: "info" | "warning" | "success";
+    sentAt: Timestamp;
+    expiresAt: Timestamp | null;
+    sentByName: string;
+    targetProjects: string[] | null;
+    recipientCount: number;
+  }[]>([]);
 
   const [projectSearch, setProjectSearch] = useState("");
   const [projectPhaseFilter, setProjectPhaseFilter] = useState("all");
@@ -163,6 +175,7 @@ export default function AdminDashboard() {
     type: "info" as "info" | "warning" | "success",
     sendToAll: true,
     selectedProjects: [] as string[],
+    duration: "indefinite" as "24h" | "7d" | "30d" | "indefinite",
   });
   const [projectSearchInMessage, setProjectSearchInMessage] = useState("");
 
@@ -267,6 +280,60 @@ export default function AdminDashboard() {
         })
       );
       setUsers(usersData);
+
+      // Load active messages from all users
+      const messagesMap = new Map<string, {
+        id: string;
+        odId: string;
+        title: string;
+        content: string;
+        type: "info" | "warning" | "success";
+        sentAt: Timestamp;
+        expiresAt: Timestamp | null;
+        sentByName: string;
+        targetProjects: string[] | null;
+        recipientCount: number;
+      }>();
+
+      for (const user of usersData) {
+        const userMessagesSnap = await getDocs(collection(db, `users/${user.id}/messages`));
+        for (const msgDoc of userMessagesSnap.docs) {
+          const msgData = msgDoc.data();
+          // Use title+content+sentAt as unique key to group same messages
+          const key = `${msgData.title}-${msgData.sentAt?.toMillis()}`;
+          
+          if (messagesMap.has(key)) {
+            const existing = messagesMap.get(key)!;
+            existing.recipientCount++;
+          } else {
+            // Check if expired
+            if (msgData.expiresAt && msgData.expiresAt.toDate() < new Date()) {
+              // Delete expired message
+              await deleteDoc(doc(db, `users/${user.id}/messages`, msgDoc.id));
+              continue;
+            }
+            
+            messagesMap.set(key, {
+              id: msgDoc.id,
+              odId: user.id,
+              title: msgData.title,
+              content: msgData.content,
+              type: msgData.type || "info",
+              sentAt: msgData.sentAt,
+              expiresAt: msgData.expiresAt || null,
+              sentByName: msgData.sentByName || "Admin",
+              targetProjects: msgData.targetProjects || null,
+              recipientCount: 1,
+            });
+          }
+        }
+      }
+
+      const messagesData = Array.from(messagesMap.values()).sort(
+        (a, b) => (b.sentAt?.toMillis() || 0) - (a.sentAt?.toMillis() || 0)
+      );
+      setActiveMessages(messagesData);
+
       setLoading(false);
       setRefreshing(false);
     } catch (error) {
@@ -531,6 +598,15 @@ export default function AdminDashboard() {
         targetUserIds = Array.from(userIdSet);
       }
 
+      // Calculate expiration
+      let expiresAt: Date | null = null;
+      if (messageForm.duration !== "indefinite") {
+        expiresAt = new Date();
+        if (messageForm.duration === "24h") expiresAt.setHours(expiresAt.getHours() + 24);
+        else if (messageForm.duration === "7d") expiresAt.setDate(expiresAt.getDate() + 7);
+        else if (messageForm.duration === "30d") expiresAt.setDate(expiresAt.getDate() + 30);
+      }
+
       // Create a message for each user
       const messageData = {
         title: messageForm.title.trim(),
@@ -541,6 +617,7 @@ export default function AdminDashboard() {
         sentByName: contextUser?.name || contextUser?.email || "Admin",
         read: false,
         targetProjects: messageForm.sendToAll ? null : messageForm.selectedProjects,
+        expiresAt: expiresAt ? Timestamp.fromDate(expiresAt) : null,
       };
 
       // Save message to each user's messages subcollection
@@ -556,13 +633,42 @@ export default function AdminDashboard() {
         type: "info",
         sendToAll: true,
         selectedProjects: [],
+        duration: "indefinite",
       });
       setProjectSearchInMessage("");
       setShowMessageModal(false);
       showToast("success", `Mensaje enviado a ${targetUserIds.length} usuario${targetUserIds.length !== 1 ? "s" : ""}`);
+      await loadData();
     } catch (error) {
       console.error(error);
       showToast("error", "Error al enviar el mensaje");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Delete message from all users
+  const handleDeleteMessage = async (messageTitle: string, messageSentAt: Timestamp) => {
+    if (!confirm("¿Eliminar este mensaje de todos los usuarios?")) return;
+    
+    setSaving(true);
+    try {
+      let deletedCount = 0;
+      for (const user of users) {
+        const userMessagesSnap = await getDocs(collection(db, `users/${user.id}/messages`));
+        for (const msgDoc of userMessagesSnap.docs) {
+          const msgData = msgDoc.data();
+          if (msgData.title === messageTitle && msgData.sentAt?.toMillis() === messageSentAt?.toMillis()) {
+            await deleteDoc(doc(db, `users/${user.id}/messages`, msgDoc.id));
+            deletedCount++;
+          }
+        }
+      }
+      showToast("success", `Mensaje eliminado de ${deletedCount} usuario${deletedCount !== 1 ? "s" : ""}`);
+      await loadData();
+    } catch (error) {
+      console.error(error);
+      showToast("error", "Error al eliminar el mensaje");
     } finally {
       setSaving(false);
     }
@@ -663,6 +769,7 @@ export default function AdminDashboard() {
                 { id: "projects", label: "Proyectos", icon: Briefcase, count: projects.length },
                 { id: "users", label: "Usuarios", icon: Users, count: users.length },
                 { id: "producers", label: "Productoras", icon: Building2, count: producers.length },
+                { id: "messages", label: "Mensajes", icon: Bell, count: activeMessages.length },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -1178,6 +1285,108 @@ export default function AdminDashboard() {
             )}
           </div>
         )}
+
+        {/* ==================== MESSAGES TAB ==================== */}
+        {activeTab === "messages" && (
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <p className="text-sm text-slate-500">
+                Mensajes enviados a usuarios. Los mensajes expirados se eliminan automáticamente.
+              </p>
+              <button
+                onClick={() => setShowMessageModal(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium"
+              >
+                <Send size={14} />
+                Nuevo mensaje
+              </button>
+            </div>
+
+            {activeMessages.length === 0 ? (
+              <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
+                <Bell size={28} className="text-slate-300 mx-auto mb-3" />
+                <h3 className="font-semibold text-slate-900 mb-1">No hay mensajes activos</h3>
+                <p className="text-slate-500 text-sm mb-4">Envía un mensaje a los usuarios</p>
+                <button
+                  onClick={() => setShowMessageModal(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
+                >
+                  <Send size={14} />
+                  Enviar mensaje
+                </button>
+              </div>
+            ) : (
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                <div className="divide-y divide-slate-100">
+                  {activeMessages.map((message) => {
+                    const typeConfig = {
+                      info: { icon: Info, bg: "bg-blue-50", text: "text-blue-700" },
+                      warning: { icon: AlertTriangle, bg: "bg-amber-50", text: "text-amber-700" },
+                      success: { icon: CheckCircle, bg: "bg-emerald-50", text: "text-emerald-700" },
+                    }[message.type];
+                    const Icon = typeConfig.icon;
+
+                    const getExpiryText = () => {
+                      if (!message.expiresAt) return "Indefinido";
+                      const now = new Date();
+                      const expires = message.expiresAt.toDate();
+                      const diffMs = expires.getTime() - now.getTime();
+                      const diffHours = Math.floor(diffMs / 3600000);
+                      const diffDays = Math.floor(diffMs / 86400000);
+                      if (diffDays > 0) return `${diffDays} día${diffDays > 1 ? "s" : ""}`;
+                      if (diffHours > 0) return `${diffHours}h`;
+                      return "< 1h";
+                    };
+
+                    return (
+                      <div key={`${message.title}-${message.sentAt?.toMillis()}`} className="px-5 py-4 hover:bg-slate-50">
+                        <div className="flex items-start gap-4">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${typeConfig.bg}`}>
+                            <Icon size={18} className={typeConfig.text} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="text-sm font-semibold text-slate-900">{message.title}</h3>
+                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${typeConfig.bg} ${typeConfig.text}`}>
+                                {message.type}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 line-clamp-2 mb-2">{message.content}</p>
+                            <div className="flex items-center gap-4 text-xs text-slate-400">
+                              <span className="flex items-center gap-1">
+                                <Users size={12} />
+                                {message.recipientCount} destinatario{message.recipientCount !== 1 ? "s" : ""}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock size={12} />
+                                Expira: {getExpiryText()}
+                              </span>
+                              {message.targetProjects && (
+                                <span className="flex items-center gap-1">
+                                  <Briefcase size={12} />
+                                  {message.targetProjects.length} proyecto{message.targetProjects.length !== 1 ? "s" : ""}
+                                </span>
+                              )}
+                              <span>Por: {message.sentByName}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteMessage(message.title, message.sentAt)}
+                            disabled={saving}
+                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-50"
+                            title="Eliminar de todos los usuarios"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       {/* ==================== MODALS ==================== */}
@@ -1560,7 +1769,7 @@ export default function AdminDashboard() {
               <button
                 onClick={() => {
                   setShowMessageModal(false);
-                  setMessageForm({ title: "", content: "", type: "info", sendToAll: true, selectedProjects: [] });
+                  setMessageForm({ title: "", content: "", type: "info", sendToAll: true, selectedProjects: [], duration: "indefinite" });
                   setProjectSearchInMessage("");
                 }}
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
@@ -1771,13 +1980,43 @@ export default function AdminDashboard() {
                   </div>
                 )}
               </div>
+
+              {/* Duration */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Duración</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { value: "24h", label: "24 horas" },
+                    { value: "7d", label: "7 días" },
+                    { value: "30d", label: "30 días" },
+                    { value: "indefinite", label: "Indefinido" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setMessageForm({ ...messageForm, duration: option.value as typeof messageForm.duration })}
+                      className={`px-3 py-2 rounded-xl border text-sm font-medium ${
+                        messageForm.duration === option.value
+                          ? "bg-slate-900 text-white border-slate-900"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  {messageForm.duration === "indefinite"
+                    ? "El mensaje permanecerá hasta que el usuario lo descarte o lo elimines"
+                    : `El mensaje se eliminará automáticamente después de ${messageForm.duration === "24h" ? "24 horas" : messageForm.duration === "7d" ? "7 días" : "30 días"}`}
+                </p>
+              </div>
             </div>
 
             <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3">
               <button
                 onClick={() => {
                   setShowMessageModal(false);
-                  setMessageForm({ title: "", content: "", type: "info", sendToAll: true, selectedProjects: [] });
+                  setMessageForm({ title: "", content: "", type: "info", sendToAll: true, selectedProjects: [], duration: "indefinite" });
                   setProjectSearchInMessage("");
                 }}
                 className="flex-1 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"
