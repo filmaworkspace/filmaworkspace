@@ -5,7 +5,7 @@ import { Inter } from "next/font/google";
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, orderBy, limit, getDocs, where } from "firebase/firestore";
-import { FileText, Receipt, ArrowRight, Settings, Bell, ChevronRight, Plus, Upload, Clock, AlertCircle, CreditCard, FolderDown } from "lucide-react";
+import { FileText, Receipt, ArrowRight, Settings, ClipboardCheck, ChevronRight, Plus, Upload, Clock, AlertCircle, CreditCard, FolderDown } from "lucide-react";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -23,6 +23,7 @@ export default function AccountingPage() {
   const [userRole, setUserRole] = useState("");
   const [accountingAccessLevel, setAccountingAccessLevel] = useState<string>("");
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+  const [isApprover, setIsApprover] = useState(false);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => { if (user) setUserId(user.uid); });
@@ -44,6 +45,8 @@ export default function AccountingPage() {
         }
 
         let approvalCount = 0;
+        let userIsApprover = false;
+        
         const posRef = collection(db, `projects/${id}/pos`);
         const posQuery = query(posRef, where("status", "==", "pending"));
         const posSnapshot = await getDocs(posQuery);
@@ -52,6 +55,12 @@ export default function AccountingPage() {
           if (poData.approvalSteps && poData.currentApprovalStep !== undefined) {
             const currentStep = poData.approvalSteps[poData.currentApprovalStep];
             if (currentStep?.approvers?.includes(userId)) approvalCount++;
+          }
+          // Check if user is in any approval step
+          if (poData.approvalSteps) {
+            for (const step of poData.approvalSteps) {
+              if (step?.approvers?.includes(userId)) userIsApprover = true;
+            }
           }
         }
 
@@ -64,8 +73,15 @@ export default function AccountingPage() {
             const currentStep = invData.approvalSteps[invData.currentApprovalStep];
             if (currentStep?.approvers?.includes(userId)) approvalCount++;
           }
+          // Check if user is in any approval step
+          if (invData.approvalSteps) {
+            for (const step of invData.approvalSteps) {
+              if (step?.approvers?.includes(userId)) userIsApprover = true;
+            }
+          }
         }
         setPendingApprovalsCount(approvalCount);
+        setIsApprover(userIsApprover);
 
         const posRecentQuery = query(collection(db, `projects/${id}/pos`), orderBy("createdAt", "desc"), limit(5));
         const posRecentSnapshot = await getDocs(posRecentQuery);
@@ -124,11 +140,17 @@ export default function AccountingPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              {pendingApprovalsCount > 0 && (
+              {isApprover && (
                 <Link href={`/project/${id}/accounting/approvals`}>
-                  <button className="relative p-2.5 text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-xl transition-colors border border-amber-200">
-                    <Bell size={18} />
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-white text-xs rounded-full flex items-center justify-center font-bold">{pendingApprovalsCount}</span>
+                  <button className={`relative p-2.5 rounded-xl transition-colors border ${
+                    pendingApprovalsCount > 0 
+                      ? "text-amber-600 bg-amber-50 hover:bg-amber-100 border-amber-200" 
+                      : "text-slate-500 bg-white hover:bg-slate-100 border-slate-200"
+                  }`}>
+                    <ClipboardCheck size={18} />
+                    {pendingApprovalsCount > 0 && (
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-white text-xs rounded-full flex items-center justify-center font-bold">{pendingApprovalsCount}</span>
+                    )}
                   </button>
                 </Link>
               )}
