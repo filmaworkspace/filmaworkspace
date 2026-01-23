@@ -47,6 +47,31 @@ export default function AccountingPage() {
         let approvalCount = 0;
         let userIsApprover = false;
         
+        // Check if user is configured as approver in approval flows
+        const approvalConfigDoc = await getDoc(doc(db, `projects/${id}/config`, "simpleApproval"));
+        if (approvalConfigDoc.exists()) {
+          const config = approvalConfigDoc.data();
+          // Check PO approval flow
+          if (config.poFlow?.steps) {
+            for (const step of config.poFlow.steps) {
+              if (step.approvers?.includes(userId)) {
+                userIsApprover = true;
+                break;
+              }
+            }
+          }
+          // Check Invoice approval flow
+          if (!userIsApprover && config.invoiceFlow?.steps) {
+            for (const step of config.invoiceFlow.steps) {
+              if (step.approvers?.includes(userId)) {
+                userIsApprover = true;
+                break;
+              }
+            }
+          }
+        }
+        
+        // Count pending approvals for this user
         const posRef = collection(db, `projects/${id}/pos`);
         const posQuery = query(posRef, where("status", "==", "pending"));
         const posSnapshot = await getDocs(posQuery);
@@ -55,12 +80,6 @@ export default function AccountingPage() {
           if (poData.approvalSteps && poData.currentApprovalStep !== undefined) {
             const currentStep = poData.approvalSteps[poData.currentApprovalStep];
             if (currentStep?.approvers?.includes(userId)) approvalCount++;
-          }
-          // Check if user is in any approval step
-          if (poData.approvalSteps) {
-            for (const step of poData.approvalSteps) {
-              if (step?.approvers?.includes(userId)) userIsApprover = true;
-            }
           }
         }
 
@@ -72,12 +91,6 @@ export default function AccountingPage() {
           if (invData.approvalSteps && invData.currentApprovalStep !== undefined) {
             const currentStep = invData.approvalSteps[invData.currentApprovalStep];
             if (currentStep?.approvers?.includes(userId)) approvalCount++;
-          }
-          // Check if user is in any approval step
-          if (invData.approvalSteps) {
-            for (const step of invData.approvalSteps) {
-              if (step?.approvers?.includes(userId)) userIsApprover = true;
-            }
           }
         }
         setPendingApprovalsCount(approvalCount);
