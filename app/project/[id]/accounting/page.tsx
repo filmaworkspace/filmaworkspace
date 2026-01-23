@@ -38,9 +38,15 @@ export default function AccountingPage() {
         if (projectDoc.exists()) setProjectName(projectDoc.data().name || "Proyecto");
 
         const memberDoc = await getDoc(doc(db, `projects/${id}/members`, userId));
+        let currentUserRole = "";
+        let currentUserDepartment = "";
+        let currentUserPosition = "";
         if (memberDoc.exists()) {
           const memberData = memberDoc.data();
-          setUserRole(memberData.role || "");
+          currentUserRole = memberData.role || "";
+          currentUserDepartment = memberData.department || "";
+          currentUserPosition = memberData.position || "";
+          setUserRole(currentUserRole);
           setAccountingAccessLevel(memberData.accountingAccessLevel || "user");
         }
 
@@ -49,17 +55,49 @@ export default function AccountingPage() {
         
         // Check if user is configured as approver in approval flows
         const approvalConfigDoc = await getDoc(doc(db, `projects/${id}/config`, "approvals"));
-        console.log("=== DEBUG APPROVALS ===");
-        console.log("userId:", userId);
-        console.log("approvalConfigDoc exists:", approvalConfigDoc.exists());
         if (approvalConfigDoc.exists()) {
           const config = approvalConfigDoc.data();
-          console.log("config:", JSON.stringify(config, null, 2));
+          
+          const checkStepForUser = (step: any): boolean => {
+            if (!step) return false;
+            
+            // Type: fixed - check if user is in approvers array
+            if (step.approverType === "fixed" && step.approvers?.includes(userId)) {
+              return true;
+            }
+            
+            // Type: role - check if user has one of the required roles
+            if (step.approverType === "role" && step.roles?.includes(currentUserRole)) {
+              return true;
+            }
+            
+            // Type: hod - check if user is HOD of the department
+            if (step.approverType === "hod") {
+              const isHOD = currentUserPosition?.toLowerCase().includes("head") || 
+                           currentUserPosition?.toLowerCase().includes("jefe") ||
+                           currentUserRole === "HOD";
+              if (isHOD && (!step.department || step.department === currentUserDepartment)) {
+                return true;
+              }
+            }
+            
+            // Type: coordinator - check if user is coordinator
+            if (step.approverType === "coordinator") {
+              const isCoordinator = currentUserPosition?.toLowerCase().includes("coordinator") || 
+                                   currentUserPosition?.toLowerCase().includes("coordinador") ||
+                                   currentUserRole === "Coordinator";
+              if (isCoordinator && (!step.department || step.department === currentUserDepartment)) {
+                return true;
+              }
+            }
+            
+            return false;
+          };
+          
           // Check PO approval flow
           if (config.poApprovals) {
             for (const step of config.poApprovals) {
-              console.log("PO step approvers:", step.approvers);
-              if (step.approvers?.includes(userId)) {
+              if (checkStepForUser(step)) {
                 userIsApprover = true;
                 break;
               }
@@ -68,16 +106,13 @@ export default function AccountingPage() {
           // Check Invoice approval flow
           if (!userIsApprover && config.invoiceApprovals) {
             for (const step of config.invoiceApprovals) {
-              console.log("Invoice step approvers:", step.approvers);
-              if (step.approvers?.includes(userId)) {
+              if (checkStepForUser(step)) {
                 userIsApprover = true;
                 break;
               }
             }
           }
         }
-        console.log("userIsApprover:", userIsApprover);
-        console.log("=== END DEBUG ===");
         
         // Count pending approvals for this user
         const posRef = collection(db, `projects/${id}/pos`);
