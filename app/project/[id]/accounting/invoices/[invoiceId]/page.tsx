@@ -365,7 +365,7 @@ export default function InvoiceDetailPage() {
             <button onClick={() => setCodingMode(false)} className="p-2 hover:bg-violet-700 rounded-lg"><X size={20} /></button>
             <div className="flex items-center gap-3">
               <Code size={20} />
-              <span className="font-semibold">Codificar</span>
+              <span className="font-semibold">CODIFICAR</span>
               <span className="bg-violet-500 px-2 py-0.5 rounded text-sm">{invoice.displayNumber}</span>
             </div>
           </div>
@@ -733,6 +733,49 @@ export default function InvoiceDetailPage() {
       </div>
 
       <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+        {/* Datos fiscales - Mostrar prominentemente cuando está codificada */}
+        {invoice.codedAt && (
+          <div className="mb-8 bg-white border border-slate-200 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <FileCheck size={18} className="text-violet-600" />
+                <h3 className="font-semibold text-slate-900">Datos fiscales</h3>
+              </div>
+              {canCode() && (
+                <button onClick={() => setCodingMode(true)} className="text-xs text-violet-600 hover:text-violet-800 font-medium">
+                  Editar
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div>
+                <p className="text-xs text-slate-500 mb-1">Nº Factura proveedor</p>
+                <p className="font-mono font-semibold text-slate-900">{invoice.supplierNumber || "-"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 mb-1">Fecha factura</p>
+                <p className="font-medium text-slate-900">{invoice.invoiceDate ? formatDate(invoice.invoiceDate) : "-"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 mb-1">Fecha vencimiento</p>
+                <p className="font-medium text-slate-900">{invoice.dueDate ? formatDate(invoice.dueDate) : "-"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 mb-1">CIF/NIF proveedor</p>
+                <p className="font-mono font-medium text-slate-900">{invoice.supplierTaxId || "-"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 mb-1">IBAN</p>
+                <p className="font-mono text-sm text-slate-900">{invoice.supplierIban || "-"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 mb-1">Codificada por</p>
+                <p className="text-sm text-slate-700">{invoice.codedByName} · {formatDateTime(invoice.codedAt)}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           {/* Left: Document Preview */}
           <div className="space-y-6">
@@ -833,32 +876,8 @@ export default function InvoiceDetailPage() {
               </div>
             </div>
 
-            {/* Coding Status - More compact */}
-            {invoice.codedAt ? (
-              <div className="bg-white border border-slate-200 rounded-2xl p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-violet-100 rounded-lg flex items-center justify-center">
-                    <FileCheck size={16} className="text-violet-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-slate-900">Codificada</span>
-                      <span className="text-xs text-slate-500">por {invoice.codedByName} · {formatDateTime(invoice.codedAt)}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
-                      {invoice.supplierNumber && <span>Nº Prov: <span className="font-mono text-slate-700">{invoice.supplierNumber}</span></span>}
-                      {invoice.invoiceDate && <span>Fecha: {formatDate(invoice.invoiceDate)}</span>}
-                      {invoice.supplierTaxId && <span>CIF: <span className="font-mono text-slate-700">{invoice.supplierTaxId}</span></span>}
-                    </div>
-                  </div>
-                  {canCode() && (
-                    <button onClick={() => setCodingMode(true)} className="p-2 text-violet-600 hover:bg-violet-50 rounded-lg" title="Editar codificación">
-                      <Edit size={16} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ) : canCode() && invoice.status !== "cancelled" ? (
+            {/* Coding Status - Only show if NOT coded yet */}
+            {!invoice.codedAt && canCode() && invoice.status !== "cancelled" ? (
               <button 
                 onClick={() => setCodingMode(true)} 
                 className="w-full bg-violet-50 border border-violet-200 rounded-2xl p-4 flex items-center gap-3 hover:bg-violet-100 transition-colors text-left"
@@ -872,7 +891,7 @@ export default function InvoiceDetailPage() {
                 </div>
                 <ChevronRight size={20} className="text-violet-400" />
               </button>
-            ) : (
+            ) : !invoice.codedAt && (
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center gap-3">
                 <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
                   <Clock size={16} className="text-slate-400" />
