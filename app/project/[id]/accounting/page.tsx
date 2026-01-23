@@ -49,11 +49,16 @@ export default function AccountingPage() {
         
         // Check if user is configured as approver in approval flows
         const approvalConfigDoc = await getDoc(doc(db, `projects/${id}/config`, "approvals"));
+        console.log("=== DEBUG APPROVALS ===");
+        console.log("userId:", userId);
+        console.log("approvalConfigDoc exists:", approvalConfigDoc.exists());
         if (approvalConfigDoc.exists()) {
           const config = approvalConfigDoc.data();
+          console.log("config:", JSON.stringify(config, null, 2));
           // Check PO approval flow
           if (config.poApprovals) {
             for (const step of config.poApprovals) {
+              console.log("PO step approvers:", step.approvers);
               if (step.approvers?.includes(userId)) {
                 userIsApprover = true;
                 break;
@@ -63,6 +68,7 @@ export default function AccountingPage() {
           // Check Invoice approval flow
           if (!userIsApprover && config.invoiceApprovals) {
             for (const step of config.invoiceApprovals) {
+              console.log("Invoice step approvers:", step.approvers);
               if (step.approvers?.includes(userId)) {
                 userIsApprover = true;
                 break;
@@ -70,6 +76,8 @@ export default function AccountingPage() {
             }
           }
         }
+        console.log("userIsApprover:", userIsApprover);
+        console.log("=== END DEBUG ===");
         
         // Count pending approvals for this user
         const posRef = collection(db, `projects/${id}/pos`);
