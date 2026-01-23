@@ -537,8 +537,8 @@ export default function ConfigGeneral() {
                       <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
                         productionData.projectType === "pelicula" ? "bg-violet-100" : "bg-blue-100"
                       }`}>
-                        {productionData.projectType === "pelicula" && <Film size={24} className="text-violet-600" />}
-                        {productionData.projectType === "serie" && <Tv size={24} className="text-blue-600" />}
+                        {productionData.projectType === "pelicula" && <className="text-violet-600" />}
+                        {productionData.projectType === "serie" && <className="text-blue-600" />}
                       </div>
                       <div>
                         <p className="text-lg font-semibold text-slate-900 capitalize">{productionData.projectType}</p>
@@ -898,3 +898,4 @@ export default function ConfigGeneral() {
     </div>
   );
 }
+
