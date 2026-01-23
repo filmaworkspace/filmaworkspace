@@ -16,11 +16,13 @@ import {
   Mail,
   Shield,
   Briefcase,
+  Edit,
+  Settings,
 } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, query, where } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, query, where, updateDoc } from "firebase/firestore";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -69,6 +71,8 @@ export default function ConfigUsers() {
   const [userExists, setUserExists] = useState<boolean | null>(null);
   const [foundUser, setFoundUser] = useState<{ name: string; email: string } | null>(null);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [editPermissions, setEditPermissions] = useState({ config: false, accounting: false, team: false });
   const [inviteForm, setInviteForm] = useState({
     email: "",
     name: "",
@@ -210,6 +214,34 @@ export default function ConfigUsers() {
     } catch { showToast("error", "Error"); } finally { setSaving(false); setActiveMenu(null); }
   };
 
+  const openEditPermissions = (member: Member) => {
+    setEditingMember(member);
+    setEditPermissions({ ...member.permissions });
+    setActiveMenu(null);
+  };
+
+  const handleUpdatePermissions = async () => {
+    if (!editingMember) return;
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, `projects/${id}/members`, editingMember.userId), {
+        permissions: editPermissions
+      });
+      await updateDoc(doc(db, `userProjects/${editingMember.userId}/projects`, id as string), {
+        permissions: editPermissions
+      });
+      setMembers(members.map((m) => 
+        m.userId === editingMember.userId ? { ...m, permissions: editPermissions } : m
+      ));
+      showToast("success", "Permisos actualizados");
+      setEditingMember(null);
+    } catch { 
+      showToast("error", "Error al actualizar permisos"); 
+    } finally { 
+      setSaving(false); 
+    }
+  };
+
   const closeModal = () => {
     setShowInviteModal(false);
     setInviteForm({ email: "", name: "", roleType: "project", role: "", department: "", position: "", permissions: { config: false, accounting: false, team: false } });
@@ -244,8 +276,9 @@ export default function ConfigUsers() {
 
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
+      {/* Toast - bottom right */}
       {toast && (
-        <div className={`fixed top-20 right-6 z-50 px-4 py-3 rounded-2xl text-sm font-medium shadow-lg flex items-center gap-2 ${toast.type === "success" ? "bg-slate-900 text-white" : "bg-red-600 text-white"}`}>
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 ${toast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>
           {toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
           {toast.message}
         </div>
@@ -309,7 +342,7 @@ export default function ConfigUsers() {
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar miembro..."
+              placeholder="Buscar miembro"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
@@ -343,6 +376,29 @@ export default function ConfigUsers() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
+                        <div className="flex gap-1">
+                          {m.permissions.config && (
+                            <span className="px-2 py-1 text-[10px] font-bold rounded-lg bg-slate-100 text-slate-600">
+                              CFG
+                            </span>
+                          )}
+                          {m.permissions.accounting && (
+                            <span 
+                              className="px-2 py-1 text-[10px] font-bold rounded-lg border"
+                              style={{ backgroundColor: 'rgba(47, 82, 224, 0.1)', color: '#2F52E0', borderColor: 'rgba(47, 82, 224, 0.2)' }}
+                            >
+                              ACC
+                            </span>
+                          )}
+                          {m.permissions.team && (
+                            <span 
+                              className="px-2 py-1 text-[10px] font-bold rounded-lg border"
+                              style={{ backgroundColor: 'rgba(137, 211, 34, 0.15)', color: '#6BA319', borderColor: 'rgba(137, 211, 34, 0.3)' }}
+                            >
+                              TEAM
+                            </span>
+                          )}
+                        </div>
                         <span className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600">
                           {m.role}
                         </span>
@@ -354,7 +410,12 @@ export default function ConfigUsers() {
                             {activeMenu === m.userId && (
                               <>
                                 <div className="fixed inset-0 z-10" onClick={() => setActiveMenu(null)} />
-                                <div className="absolute right-0 top-full mt-2 w-40 bg-white border border-slate-200 rounded-2xl shadow-xl py-1.5 z-20">
+                                <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-2xl shadow-xl py-1.5 z-20">
+                                  <button onClick={() => openEditPermissions(m)} className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                                    <Settings size={14} />
+                                    Editar permisos
+                                  </button>
+                                  <div className="border-t border-slate-100 my-1" />
                                   <button onClick={() => handleRemoveMember(m.userId)} className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
                                     <Trash2 size={14} />
                                     Eliminar
@@ -397,9 +458,14 @@ export default function ConfigUsers() {
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="flex gap-1.5">
+                        {m.permissions.config && (
+                          <span className="px-2 py-1 text-[10px] font-bold rounded-lg bg-slate-100 text-slate-600">
+                            CFG
+                          </span>
+                        )}
                         {m.permissions.accounting && (
                           <span 
-                            className="px-2.5 py-1 text-[10px] font-bold rounded-lg border"
+                            className="px-2 py-1 text-[10px] font-bold rounded-lg border"
                             style={{ backgroundColor: 'rgba(47, 82, 224, 0.1)', color: '#2F52E0', borderColor: 'rgba(47, 82, 224, 0.2)' }}
                           >
                             ACC
@@ -407,7 +473,7 @@ export default function ConfigUsers() {
                         )}
                         {m.permissions.team && (
                           <span 
-                            className="px-2.5 py-1 text-[10px] font-bold rounded-lg border"
+                            className="px-2 py-1 text-[10px] font-bold rounded-lg border"
                             style={{ backgroundColor: 'rgba(137, 211, 34, 0.15)', color: '#6BA319', borderColor: 'rgba(137, 211, 34, 0.3)' }}
                           >
                             TEAM
@@ -422,7 +488,12 @@ export default function ConfigUsers() {
                           {activeMenu === m.userId && (
                             <>
                               <div className="fixed inset-0 z-10" onClick={() => setActiveMenu(null)} />
-                              <div className="absolute right-0 top-full mt-2 w-40 bg-white border border-slate-200 rounded-2xl shadow-xl py-1.5 z-20">
+                              <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-2xl shadow-xl py-1.5 z-20">
+                                <button onClick={() => openEditPermissions(m)} className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                                  <Settings size={14} />
+                                  Editar permisos
+                                </button>
+                                <div className="border-t border-slate-100 my-1" />
                                 <button onClick={() => handleRemoveMember(m.userId)} className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
                                   <Trash2 size={14} />
                                   Eliminar
@@ -571,6 +642,78 @@ export default function ConfigUsers() {
               </button>
               <button onClick={handleSendInvitation} disabled={saving} className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">
                 {saving ? "Enviando..." : "Enviar invitación"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Permissions Modal */}
+      {editingMember && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Editar permisos</h3>
+                <p className="text-sm text-slate-500">{editingMember.name}</p>
+              </div>
+              <button onClick={() => setEditingMember(null)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-slate-600 mb-4">Selecciona los permisos para este usuario:</p>
+              <div className="space-y-3">
+                <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${editPermissions.config ? "bg-slate-100 border-slate-300" : "bg-white border-slate-200 hover:bg-slate-50"}`}>
+                  <input 
+                    type="checkbox" 
+                    checked={editPermissions.config} 
+                    onChange={(e) => setEditPermissions({ ...editPermissions, config: e.target.checked })} 
+                    className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                  />
+                  <div className="flex-1">
+                    <p className="font-medium text-slate-900">Config</p>
+                    <p className="text-xs text-slate-500">Configuración del proyecto</p>
+                  </div>
+                </label>
+                <label 
+                  className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all`}
+                  style={editPermissions.accounting ? { backgroundColor: 'rgba(47, 82, 224, 0.1)', borderColor: 'rgba(47, 82, 224, 0.3)' } : {}}
+                >
+                  <input 
+                    type="checkbox" 
+                    checked={editPermissions.accounting} 
+                    onChange={(e) => setEditPermissions({ ...editPermissions, accounting: e.target.checked })} 
+                    className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                  />
+                  <div className="flex-1">
+                    <p className="font-medium" style={editPermissions.accounting ? { color: '#2F52E0' } : { color: '#0f172a' }}>Accounting</p>
+                    <p className="text-xs text-slate-500">Acceso a contabilidad</p>
+                  </div>
+                </label>
+                <label 
+                  className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all`}
+                  style={editPermissions.team ? { backgroundColor: 'rgba(137, 211, 34, 0.15)', borderColor: 'rgba(137, 211, 34, 0.4)' } : {}}
+                >
+                  <input 
+                    type="checkbox" 
+                    checked={editPermissions.team} 
+                    onChange={(e) => setEditPermissions({ ...editPermissions, team: e.target.checked })} 
+                    className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                  />
+                  <div className="flex-1">
+                    <p className="font-medium" style={editPermissions.team ? { color: '#6BA319' } : { color: '#0f172a' }}>Team</p>
+                    <p className="text-xs text-slate-500">Gestión del equipo</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 flex gap-3 bg-slate-50">
+              <button onClick={() => setEditingMember(null)} className="flex-1 py-2.5 text-slate-600 hover:bg-slate-200 rounded-xl text-sm font-medium transition-colors border border-slate-200">
+                Cancelar
+              </button>
+              <button onClick={handleUpdatePermissions} disabled={saving} className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">
+                {saving ? "Guardando..." : "Guardar"}
               </button>
             </div>
           </div>
