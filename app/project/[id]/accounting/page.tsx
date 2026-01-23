@@ -48,12 +48,12 @@ export default function AccountingPage() {
         let userIsApprover = false;
         
         // Check if user is configured as approver in approval flows
-        const approvalConfigDoc = await getDoc(doc(db, `projects/${id}/config`, "simpleApproval"));
+        const approvalConfigDoc = await getDoc(doc(db, `projects/${id}/config`, "approvals"));
         if (approvalConfigDoc.exists()) {
           const config = approvalConfigDoc.data();
           // Check PO approval flow
-          if (config.poFlow?.steps) {
-            for (const step of config.poFlow.steps) {
+          if (config.poApprovals) {
+            for (const step of config.poApprovals) {
               if (step.approvers?.includes(userId)) {
                 userIsApprover = true;
                 break;
@@ -61,8 +61,8 @@ export default function AccountingPage() {
             }
           }
           // Check Invoice approval flow
-          if (!userIsApprover && config.invoiceFlow?.steps) {
-            for (const step of config.invoiceFlow.steps) {
+          if (!userIsApprover && config.invoiceApprovals) {
+            for (const step of config.invoiceApprovals) {
               if (step.approvers?.includes(userId)) {
                 userIsApprover = true;
                 break;
