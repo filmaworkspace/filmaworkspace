@@ -342,7 +342,7 @@ export default function ConfigUsers() {
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar miembro"
+              placeholder="Buscar usuario"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
