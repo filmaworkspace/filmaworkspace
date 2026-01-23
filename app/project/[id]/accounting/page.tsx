@@ -232,14 +232,7 @@ export default function AccountingPage() {
                   <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                     <FileText size={24} className="text-slate-400" />
                   </div>
-                  <p className="text-sm text-slate-500 mb-4">Sin órdenes de compra</p>
-                  <Link 
-                    href={`/project/${id}/accounting/pos/new`} 
-                    className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-xl transition-colors"
-                    style={{ color: '#2F52E0', backgroundColor: 'rgba(47, 82, 224, 0.1)' }}
-                  >
-                    <Plus size={16} /> Crear primera PO
-                  </Link>
+                  <p className="text-sm text-slate-500">Sin órdenes de compra</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -319,14 +312,7 @@ export default function AccountingPage() {
                   <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                     <Receipt size={24} className="text-slate-400" />
                   </div>
-                  <p className="text-sm text-slate-500 mb-4">Sin facturas</p>
-                  <Link 
-                    href={`/project/${id}/accounting/invoices/new`} 
-                    className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-xl transition-colors"
-                    style={{ color: '#2F52E0', backgroundColor: 'rgba(47, 82, 224, 0.1)' }}
-                  >
-                    <Upload size={16} /> Subir primera factura
-                  </Link>
+                  <p className="text-sm text-slate-500">Sin facturas</p>
                 </div>
               ) : (
                 <div className="space-y-2">
