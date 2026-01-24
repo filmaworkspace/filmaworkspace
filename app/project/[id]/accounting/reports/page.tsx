@@ -652,18 +652,19 @@ export default function ReportsPage() {
       <div className="mt-[4.5rem]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div>
+            <div className="flex items-center gap-4">
+              <FileSpreadsheet size={24} style={{ color: '#2F52E0' }} />
               <h1 className="text-2xl font-semibold text-slate-900">Informes</h1>
             </div>
             
             {/* Format Switch */}
             <div className="flex items-center gap-3">
-              <span className="text-sm text-slate-500">Formato:</span>
+              <span className="text-xs text-slate-500">Formato:</span>
               <button
                 onClick={toggleExportFormat}
                 className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg"
               >
-                <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                   exportFormat === "csv" 
                     ? "bg-white text-slate-900 shadow-sm" 
                     : "text-slate-500 hover:text-slate-700"
@@ -671,7 +672,7 @@ export default function ReportsPage() {
                   <FileText size={14} />
                   CSV
                 </span>
-                <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                   exportFormat === "xlsx" 
                     ? "bg-white text-slate-900 shadow-sm" 
                     : "text-slate-500 hover:text-slate-700"
@@ -717,17 +718,18 @@ export default function ReportsPage() {
                       <button
                         onClick={() => generateReport(reportType)}
                         disabled={generating !== null}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+                        className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                        style={{ backgroundColor: '#2F52E0' }}
                       >
                         {generating === reportType ? (
                           <>
                             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            Generando...
+                            Generando
                           </>
                         ) : (
                           <>
                             <Download size={14} />
-                            Exportar {exportFormat.toUpperCase()}
+                            Exportar
                           </>
                         )}
                       </button>
@@ -903,20 +905,19 @@ export default function ReportsPage() {
 
             <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
               {!showSavePreset ? (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    onClick={() => setShowConfig(false)}
+                    className="px-4 py-2.5 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100 transition-colors"
+                  >
+                    Cancelar
+                  </button>
                   <button
                     onClick={() => setShowSavePreset(true)}
-                    className="flex items-center gap-2 px-4 py-2 border border-slate-200 bg-white text-slate-700 rounded-xl text-xs font-medium hover:bg-slate-50 transition-colors"
+                    className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors"
                   >
                     <Save size={14} />
                     Guardar plantilla
-                  </button>
-                  <div className="flex-1" />
-                  <button
-                    onClick={() => setShowConfig(false)}
-                    className="px-4 py-2 text-slate-600 rounded-xl text-xs font-medium hover:bg-slate-100 transition-colors"
-                  >
-                    Cancelar
                   </button>
                   <button
                     onClick={() => {
@@ -924,7 +925,8 @@ export default function ReportsPage() {
                       setShowConfig(false);
                     }}
                     disabled={generating !== null}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-medium transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                    style={{ backgroundColor: '#2F52E0' }}
                   >
                     <Download size={14} />
                     Exportar
@@ -936,21 +938,22 @@ export default function ReportsPage() {
                     type="text"
                     value={newPresetName}
                     onChange={(e) => setNewPresetName(e.target.value)}
-                    placeholder="Nombre de la plantilla..."
-                    className="flex-1 px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    placeholder="Nombre de la plantilla"
+                    className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
                     autoFocus
                     onKeyDown={(e) => e.key === "Enter" && savePreset()}
                   />
                   <button
                     onClick={() => { setShowSavePreset(false); setNewPresetName(""); }}
-                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                    className="px-4 py-2.5 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100 transition-colors"
                   >
-                    <X size={18} />
+                    Cancelar
                   </button>
                   <button
                     onClick={savePreset}
                     disabled={!newPresetName.trim()}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-medium transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                    style={{ backgroundColor: '#2F52E0' }}
                   >
                     <Check size={14} />
                     Guardar
