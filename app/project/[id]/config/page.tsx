@@ -16,13 +16,12 @@ import {
   Calendar,
   RefreshCw,
   X,
-  Film,
-  Tv,
   Clapperboard,
   Hash,
   Clock,
   Users,
   MapPin,
+  Settings,
 } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebase";
@@ -339,7 +338,8 @@ export default function ConfigGeneral() {
       <div className="mt-[4.5rem]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div>
+            <div className="flex items-center gap-4">
+              <Settings size={24} style={{ color: '#2F52E0' }} />
               <h1 className="text-2xl font-semibold text-slate-900">Configuración del proyecto</h1>
             </div>
       
@@ -532,57 +532,36 @@ export default function ConfigGeneral() {
               {!editingProduction ? (
                 productionData.projectType ? (
                   <div className="space-y-6">
-                    {/* Tipo de proyecto */}
-                    <div className="flex items-center gap-4">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
-                        productionData.projectType === "pelicula" ? "bg-violet-100" : "bg-blue-100"
-                      }`}>
-                        {productionData.projectType === "pelicula" && <Film size={24} className="text-violet-600" />}
-                        {productionData.projectType === "serie" && <Tv size={24} className="text-blue-600" />}
-                      </div>
-                      <div>
-                        <p className="text-lg font-semibold text-slate-900 capitalize">{productionData.projectType}</p>
-                        {productionData.format && <p className="text-sm text-slate-500">{productionData.format}</p>}
-                      </div>
-                    </div>
-
                     {/* Info grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                      <div className="p-4 bg-slate-50 rounded-xl">
+                        <span className="text-xs font-medium text-slate-400 uppercase">Tipo</span>
+                        <p className="text-lg font-bold text-slate-900 capitalize mt-1">{productionData.projectType}</p>
+                      </div>
                       {productionData.projectType === "serie" && productionData.episodes && (
                         <div className="p-4 bg-slate-50 rounded-xl">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Hash size={14} className="text-slate-400" />
-                            <span className="text-xs font-medium text-slate-400 uppercase">Capítulos</span>
-                          </div>
-                          <p className="text-xl font-bold text-slate-900">{productionData.episodes}</p>
+                          <span className="text-xs font-medium text-slate-400 uppercase">Capítulos</span>
+                          <p className="text-lg font-bold text-slate-900 mt-1">{productionData.episodes}</p>
                         </div>
                       )}
                       {productionData.episodeDuration && (
                         <div className="p-4 bg-slate-50 rounded-xl">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Clock size={14} className="text-slate-400" />
-                            <span className="text-xs font-medium text-slate-400 uppercase">
-                              {productionData.projectType === "serie" ? "Dur. capítulo" : "Duración"}
-                            </span>
-                          </div>
-                          <p className="text-xl font-bold text-slate-900">{productionData.episodeDuration} min</p>
+                          <span className="text-xs font-medium text-slate-400 uppercase">
+                            {productionData.projectType === "serie" ? "Dur. capítulo" : "Duración"}
+                          </span>
+                          <p className="text-lg font-bold text-slate-900 mt-1">{productionData.episodeDuration} min</p>
                         </div>
                       )}
                       {productionData.shootingDays && (
                         <div className="p-4 bg-slate-50 rounded-xl">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Calendar size={14} className="text-slate-400" />
-                            <span className="text-xs font-medium text-slate-400 uppercase">Días rodaje</span>
-                          </div>
-                          <p className="text-xl font-bold text-slate-900">{productionData.shootingDays}</p>
+                          <span className="text-xs font-medium text-slate-400 uppercase">Días rodaje</span>
+                          <p className="text-lg font-bold text-slate-900 mt-1">{productionData.shootingDays}</p>
                         </div>
                       )}
                       {productionData.language && (
                         <div className="p-4 bg-slate-50 rounded-xl">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-medium text-slate-400 uppercase">Idioma</span>
-                          </div>
-                          <p className="text-xl font-bold text-slate-900">{productionData.language}</p>
+                          <span className="text-xs font-medium text-slate-400 uppercase">Idioma</span>
+                          <p className="text-lg font-bold text-slate-900 mt-1">{productionData.language}</p>
                         </div>
                       )}
                     </div>
@@ -681,34 +660,23 @@ export default function ConfigGeneral() {
                   {/* Tipo de proyecto */}
                   <div>
                     <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-3">Tipo de proyecto</label>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="flex gap-3">
                       {[
-                        { value: "pelicula", label: "Película", icon: Film, color: "violet" },
-                        { value: "serie", label: "Serie", icon: Tv, color: "blue" },
+                        { value: "pelicula", label: "Película" },
+                        { value: "serie", label: "Serie" },
                       ].map((type) => {
-                        const Icon = type.icon;
                         const isSelected = productionForm.projectType === type.value;
                         return (
                           <button
                             key={type.value}
                             onClick={() => setProductionForm({ ...productionForm, projectType: type.value as ProductionData["projectType"] })}
-                            className={`p-4 rounded-xl border-2 transition-all text-center ${
+                            className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
                               isSelected 
-                                ? `border-${type.color}-400 bg-${type.color}-50` 
-                                : "border-slate-200 hover:border-slate-300"
+                                ? "bg-slate-900 text-white" 
+                                : "border border-slate-200 text-slate-600 hover:border-slate-300"
                             }`}
-                            style={isSelected ? { 
-                              borderColor: type.color === "violet" ? "#a78bfa" : "#60a5fa",
-                              backgroundColor: type.color === "violet" ? "#f5f3ff" : "#eff6ff"
-                            } : {}}
                           >
-                            <Icon size={24} className={`mx-auto mb-2 ${isSelected ? `text-${type.color}-600` : "text-slate-400"}`} 
-                              style={isSelected ? { 
-                                color: type.color === "violet" ? "#7c3aed" : "#2563eb"
-                              } : {}} />
-                            <span className={`text-sm font-medium ${isSelected ? "text-slate-900" : "text-slate-600"}`}>
-                              {type.label}
-                            </span>
+                            {type.label}
                           </button>
                         );
                       })}
