@@ -7,7 +7,7 @@ import {
   Clock, User, Calendar, Building2, Eye, Check, X, AlertTriangle,
   MessageSquare, History, TrendingUp, DollarSign, Shield, FileCheck, Zap,
   ChevronDown, ChevronUp, ExternalLink, Send, Info, Flame, Award, Target,
-  PieChart, HelpCircle, Link as LinkIcon,
+  PieChart, HelpCircle, Link as LinkIcon, ClipboardCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebase";
@@ -375,7 +375,7 @@ export default function ApprovalsPage() {
           {/* Page header */}
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
-              <CheckCircle size={24} className="text-slate-400" />
+              <ClipboardCheck size={24} className="text-slate-400" />
               <div>
                 <h1 className="text-2xl font-semibold text-slate-900">Aprobaciones</h1>
                 <p className="text-slate-500 text-sm mt-0.5">
