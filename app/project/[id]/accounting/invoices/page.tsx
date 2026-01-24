@@ -590,7 +590,7 @@ export default function InvoicesPage() {
                   className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
                   style={{ backgroundColor: '#2F52E0' }}
                 >
-                  <Upload size={18} />
+                  <Upload size={16} strokeWidth={2.5} />
                   Subir documento
                 </Link>
               )}
@@ -727,17 +727,7 @@ export default function InvoicesPage() {
               <Receipt size={28} className="text-slate-400" />
             </div>
             <h3 className="text-lg font-semibold text-slate-900 mb-2">{searchTerm || statusFilter !== "all" || typeFilter !== "all" || showUncodedOnly ? "No se encontraron resultados" : "Sin documentos"}</h3>
-            <p className="text-slate-500 text-sm mb-6">{searchTerm || statusFilter !== "all" || typeFilter !== "all" || showUncodedOnly ? "Prueba a ajustar los filtros de búsqueda" : "Sube tu primer documento para empezar"}</p>
-            {!searchTerm && statusFilter === "all" && typeFilter === "all" && !showUncodedOnly && permissions.canCreatePO && (
-              <Link 
-                href={`/project/${id}/accounting/invoices/new`} 
-                className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: '#2F52E0' }}
-              >
-                <Upload size={18} />
-                Subir documento
-              </Link>
-            )}
+            <p className="text-slate-500 text-sm">{searchTerm || statusFilter !== "all" || typeFilter !== "all" || showUncodedOnly ? "Prueba a ajustar los filtros de búsqueda" : "Sube tu primer documento para empezar"}</p>
           </div>
         ) : (
           <div className="bg-white border border-slate-200 rounded-2xl">
