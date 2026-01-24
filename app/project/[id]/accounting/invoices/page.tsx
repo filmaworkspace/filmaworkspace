@@ -638,82 +638,81 @@ export default function InvoicesPage() {
         )}
 
         {/* Filters */}
-        <div className="flex flex-col md:flex-row gap-3 mb-6">
+        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center mb-4">
           <div className="flex-1 relative">
-            <Search size={18} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" />
+            <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Buscar facturas"
-              className="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent bg-white text-sm"
+              className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm"
             />
           </div>
+          <div className="flex gap-2 flex-shrink-0">
+            {/* Status Dropdown */}
+            <div className="relative" ref={statusDropdownRef}>
+              <button
+                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                className="flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-xl text-sm hover:border-slate-300 bg-white min-w-[180px]"
+              >
+                <Filter size={14} className="text-slate-400" />
+                <span className="flex-1 text-left text-xs text-slate-700">{getStatusLabel()}</span>
+                <ChevronDown size={14} className={`text-slate-400 transition-transform ${showStatusDropdown ? "rotate-180" : ""}`} />
+              </button>
+              {showStatusDropdown && (
+                <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden min-w-full">
+                  {STATUS_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => {
+                        setStatusFilter(option.value);
+                        setShowStatusDropdown(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors whitespace-nowrap ${
+                        statusFilter === option.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-          {/* Status Dropdown */}
-          <div className="relative" ref={statusDropdownRef}>
-            <button
-              onClick={() => {
-                setShowStatusDropdown(!showStatusDropdown);
-              }}
-              className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white hover:border-slate-300 transition-colors min-w-[180px]"
-            >
-              <Filter size={15} className="text-slate-400" />
-              <span className="text-slate-700 flex-1 text-left">{getStatusLabel()}</span>
-              <ChevronDown size={14} className={`text-slate-400 transition-transform ${showStatusDropdown ? "rotate-180" : ""}`} />
-            </button>
-            {showStatusDropdown && (
-              <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden min-w-full">
-                {STATUS_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => {
-                      setStatusFilter(option.value);
-                      setShowStatusDropdown(false);
-                    }}
-                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors whitespace-nowrap ${
-                      statusFilter === option.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+            {/* Uncoded Filter Button - Solo para usuarios de contabilidad */}
+            {canCodeInvoices && (
+              <button
+                onClick={() => setShowUncodedOnly(!showUncodedOnly)}
+                className={`flex items-center gap-2 px-3 py-2.5 border rounded-xl text-xs font-medium transition-colors ${
+                  showUncodedOnly 
+                    ? "border-violet-300 bg-violet-50 text-violet-700" 
+                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                }`}
+              >
+                <Code size={14} className={showUncodedOnly ? "text-violet-600" : "text-slate-400"} />
+                Sin codificar
+                {showUncodedOnly && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-violet-200 text-violet-700 rounded text-xs font-semibold">
+                    {invoices.filter(inv => !inv.codedAt).length}
+                  </span>
+                )}
+              </button>
+            )}
+
+            {(statusFilter !== "all" || showUncodedOnly || searchTerm) && (
+              <button
+                onClick={() => {
+                  setStatusFilter("all");
+                  setShowUncodedOnly(false);
+                  setSearchTerm("");
+                }}
+                className="px-3 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-600 hover:bg-slate-50 flex items-center gap-1.5 font-medium"
+              >
+                <X size={14} />Limpiar
+              </button>
             )}
           </div>
-
-          {/* Uncoded Filter Button - Solo para usuarios de contabilidad */}
-          {canCodeInvoices && (
-            <button
-              onClick={() => setShowUncodedOnly(!showUncodedOnly)}
-              className={`flex items-center gap-2 px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors ${
-                showUncodedOnly 
-                  ? "border-violet-300 bg-violet-50 text-violet-700" 
-                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-              }`}
-            >
-              <Code size={15} className={showUncodedOnly ? "text-violet-600" : "text-slate-400"} />
-              Sin codificar
-              {showUncodedOnly && (
-                <span className="ml-1 px-1.5 py-0.5 bg-violet-200 text-violet-700 rounded text-xs font-semibold">
-                  {invoices.filter(inv => !inv.codedAt).length}
-                </span>
-              )}
-            </button>
-          )}
-
-          {(statusFilter !== "all" || showUncodedOnly) && (
-            <button
-              onClick={() => {
-                setStatusFilter("all");
-                setShowUncodedOnly(false);
-              }}
-              className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2"
-            >
-              <X size={14} />
-              Limpiar
-            </button>
-          )}
         </div>
 
         {filteredInvoices.length === 0 ? (
