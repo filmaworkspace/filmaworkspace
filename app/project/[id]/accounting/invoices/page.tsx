@@ -692,24 +692,6 @@ export default function InvoicesPage() {
               >
                 <Code size={14} className={showUncodedOnly ? "text-violet-600" : "text-slate-400"} />
                 Sin codificar
-                {showUncodedOnly && (
-                  <span className="ml-1 px-1.5 py-0.5 bg-violet-200 text-violet-700 rounded text-xs font-semibold">
-                    {invoices.filter(inv => !inv.codedAt).length}
-                  </span>
-                )}
-              </button>
-            )}
-
-            {(statusFilter !== "all" || showUncodedOnly || searchTerm) && (
-              <button
-                onClick={() => {
-                  setStatusFilter("all");
-                  setShowUncodedOnly(false);
-                  setSearchTerm("");
-                }}
-                className="px-3 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-600 hover:bg-slate-50 flex items-center gap-1.5 font-medium"
-              >
-                <X size={14} />Limpiar
               </button>
             )}
           </div>
