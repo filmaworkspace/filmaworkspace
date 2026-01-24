@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { UserCog, UserPlus, Search, Trash2, Shield, X, AlertCircle, CheckCircle2, UserCheck, UserX, Clock, Info, Edit, Building2, Users, Download } from "lucide-react";
+import { UserCog, UserPlus, Search, Trash2, Shield, X, AlertCircle, CheckCircle2, UserCheck, UserX, Clock, Info, Edit, Building2, Users } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, updateDoc, query, where, Timestamp } from "firebase/firestore";
@@ -187,17 +187,6 @@ export default function AccountingUsersPage() {
     } catch (error) { console.error("Error eliminando acceso:", error); setErrorMessage("Error al eliminar el acceso"); setTimeout(() => setErrorMessage(""), 3000); } finally { setSaving(false); }
   };
 
-  const exportUsers = () => {
-    const rows = [["NOMBRE", "EMAIL", "ROL", "DEPARTAMENTO", "POSICIÓN", "NIVEL DE ACCESO"]];
-    accountingMembers.forEach((member) => {
-      const accessLevel = ACCOUNTING_ACCESS_LEVELS[member.accountingAccessLevel as keyof typeof ACCOUNTING_ACCESS_LEVELS]?.label || "Usuario";
-      rows.push([member.name, member.email, member.role || "", member.department || "", member.position || "", accessLevel]);
-    });
-    const csvContent = rows.map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a"); link.setAttribute("href", URL.createObjectURL(blob)); link.setAttribute("download", `usuarios_contabilidad_${new Date().toISOString().split("T")[0]}.csv`); link.click();
-  };
-
   const resetForm = () => { setInviteForm({ email: "", name: "", roleType: "project", role: "", department: "", position: "", accountingAccessLevel: "user" }); setUserExists(null); setFoundUser(null); };
 
   const filteredMembers = accountingMembers.filter((member) => member.name.toLowerCase().includes(searchTerm.toLowerCase()) || member.email.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -230,11 +219,12 @@ export default function AccountingUsersPage() {
       <div className="mt-[4.5rem]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div>
+            <div className="flex items-center gap-4">
+              <Users size={24} style={{ color: '#2F52E0' }} />
               <h1 className="text-2xl font-semibold text-slate-900">Usuarios</h1>
             </div>
-            <button onClick={() => setShowInviteModal(true)} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors">
-              <UserPlus size={18} />Dar acceso
+            <button onClick={() => setShowInviteModal(true)} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity" style={{ backgroundColor: '#2F52E0' }}>
+              <UserPlus size={16} strokeWidth={2.5} />Dar acceso
             </button>
           </div>
         </div>
@@ -264,22 +254,17 @@ export default function AccountingUsersPage() {
           </div>
         )}
 
-        {/* Search and Export */}
+        {/* Search */}
         <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center mb-4">
           <div className="flex-1 relative">
             <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
             <input type="text" placeholder="Buscar usuarios" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm" />
           </div>
-          <div className="flex gap-2 flex-shrink-0">
-            {searchTerm && (
-              <button onClick={() => setSearchTerm("")} className="px-3 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-600 hover:bg-slate-50 flex items-center gap-1.5 font-medium">
-                <X size={14} />Limpiar
-              </button>
-            )}
-            <button onClick={exportUsers} className="px-3 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1.5 text-xs font-medium">
-              <Download size={14} />Exportar
+          {searchTerm && (
+            <button onClick={() => setSearchTerm("")} className="px-3 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-600 hover:bg-slate-50 flex items-center gap-1.5 font-medium">
+              <X size={14} />Limpiar
             </button>
-          </div>
+          )}
         </div>
 
         {/* Members Display */}
@@ -287,8 +272,7 @@ export default function AccountingUsersPage() {
           <div className="border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
             <UserCog size={32} className="text-slate-300 mx-auto mb-3" />
             <h3 className="text-lg font-semibold text-slate-900 mb-1">{searchTerm ? "No se encontraron usuarios" : "No hay usuarios con acceso"}</h3>
-            <p className="text-slate-500 text-sm mb-4">{searchTerm ? "Intenta ajustar la búsqueda" : "Añade usuarios para dar acceso a contabilidad"}</p>
-            {!searchTerm && (<button onClick={() => setShowInviteModal(true)} className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"><UserPlus size={16} />Dar acceso</button>)}
+            <p className="text-slate-500 text-sm">{searchTerm ? "Intenta ajustar la búsqueda" : "Añade usuarios para dar acceso a contabilidad"}</p>
           </div>
         ) : (
           <div className="space-y-8">
