@@ -679,12 +679,7 @@ export default function POsPage() {
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
-              <div 
-                className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: 'rgba(47, 82, 224, 0.1)' }}
-              >
-                <FileText size={20} style={{ color: '#2F52E0' }} />
-              </div>
+              <FileText size={24} style={{ color: '#2F52E0' }} />
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-semibold text-slate-900">Órdenes de compra</h1>
                 {getRoleBadge()}
