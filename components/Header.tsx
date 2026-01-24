@@ -12,13 +12,15 @@ import {
   Folder,
   LayoutDashboard,
   Wallet,
-  BarChart3,
   Briefcase,
   Info,
   UserCog,
   Building2,
   Shield,
   User,
+  FileText,
+  Receipt,
+  FileSpreadsheet,
 } from "lucide-react";
 import { Inter } from "next/font/google";
 import { auth, db } from "@/lib/firebase";
@@ -34,7 +36,6 @@ const inter = Inter({
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [hoveredSection, setHoveredSection] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>("");
   const [permissions, setPermissions] = useState({
@@ -201,65 +202,7 @@ export default function Header() {
     );
   };
 
-  // Badge de sección actual (CONFIG/ACCOUNTING/TEAM) - con soporte para hover
-  const SectionBadge = () => {
-    if (!isInProjectSection || !currentSection) return null;
-
-    const sectionLabels: Record<string, string> = {
-      config: "CONFIGURACIÓN",
-      accounting: "CONTABILIDAD",
-      team: "EQUIPO",
-    };
-
-    // Si hay hover, mostrar la sección hovered, si no, la actual
-    const displaySection = hoveredSection || currentSection;
-    const isHovering = hoveredSection !== null;
-
-    return (
-      <span className={`text-xs mr-2 transition-all duration-150 ${
-        isHovering ? "text-slate-400" : "text-slate-600 font-medium"
-      }`}>
-        {sectionLabels[displaySection]}
-      </span>
-    );
-  };
-
-  // Section Switcher con iconos
-  const SectionSwitcher = () => {
-    if (!isInProjectSection || !projectId) return null;
-
-    const sections = [
-      { key: "config", href: `/project/${projectId}/config`, icon: Settings, label: "Config", hasAccess: permissions.config },
-      { key: "accounting", href: `/project/${projectId}/accounting`, icon: BarChart3, label: "Accounting", hasAccess: permissions.accounting },
-      { key: "team", href: `/project/${projectId}/team`, icon: Users, label: "Team", hasAccess: permissions.team },
-    ];
-
-    const availableSections = sections.filter(s => s.hasAccess && s.key !== currentSection);
-
-    if (availableSections.length === 0) return null;
-
-    return (
-      <div 
-        className="flex items-center gap-0.5 mr-2 pr-2 border-r border-slate-200"
-        onMouseLeave={() => setHoveredSection(null)}
-      >
-        {availableSections.map((section) => {
-          const Icon = section.icon;
-          return (
-            <Link
-              key={section.key}
-              href={section.href}
-              className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-              title={section.label}
-              onMouseEnter={() => setHoveredSection(section.key)}
-            >
-              <Icon size={16} />
-            </Link>
-          );
-        })}
-      </div>
-    );
-  };
+  // Section Switcher con iconos - ELIMINADO
 
   return (
     <header className={`fixed top-0 left-0 w-full z-50 bg-white border-b border-slate-200 ${inter.className}`}>
@@ -345,13 +288,13 @@ export default function Header() {
               )}
               {accountingAccess.users && (
                 <NavLink href={`/project/${projectId}/accounting/users`} isActive={accountingPage === "users"}>
-                  <UserCog size={14} />
+                  <Users size={14} />
                   <span>Usuarios</span>
                 </NavLink>
               )}
               {accountingAccess.reports && (
                 <NavLink href={`/project/${projectId}/accounting/reports`} isActive={accountingPage === "reports"}>
-                  <BarChart3 size={14} />
+                  <FileSpreadsheet size={14} />
                   <span>Informes</span>
                 </NavLink>
               )}
@@ -367,16 +310,8 @@ export default function Header() {
           )}
         </nav>
 
-        {/* Right side: Section Badge + Section Switcher + Profile */}
+        {/* Right side: Profile */}
         <div className="relative flex items-center gap-1">
-          {/* Section Badge - Desktop */}
-          <div className="hidden md:flex">
-            <SectionBadge />
-          </div>
-          {/* Section Switcher - Desktop */}
-          <div className="hidden md:flex">
-            <SectionSwitcher />
-          </div>
           {/* Profile Avatar */}
           <button
             onClick={() => setProfileOpen(!profileOpen)}
