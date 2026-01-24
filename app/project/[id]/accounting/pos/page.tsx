@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { auth, db } from "@/lib/firebase";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { doc, getDoc, collection, getDocs, updateDoc, query, orderBy, Timestamp } from "firebase/firestore";
-import { FileText, Plus, Search, Eye, Edit, X, FileEdit, Download, Receipt, MoreHorizontal, Lock, Unlock, XCircle, ExternalLink, AlertTriangle, ArrowUp, ArrowDown, Clock, CheckCircle2, Ban, Archive, LayoutGrid, List, Calendar, Building2, Hash, KeyRound, AlertCircle, ShieldAlert } from "lucide-react";
+import { FileText, Plus, Search, Eye, Edit, X, FileEdit, Download, Receipt, MoreHorizontal, Lock, Unlock, XCircle, ExternalLink, AlertTriangle, Clock, CheckCircle2, Ban, Archive, Calendar, Building2, Hash, KeyRound, AlertCircle, ShieldAlert, Filter, ChevronDown } from "lucide-react";
 import jsPDF from "jspdf";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
@@ -14,7 +14,11 @@ const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] }
 
 type POStatus = "draft" | "pending" | "approved" | "closed" | "cancelled";
 type SortOrder = "desc" | "asc";
-type ViewMode = "table" | "cards";
+
+const SORT_OPTIONS = [
+  { value: "desc", label: "Más recientes primero" },
+  { value: "asc", label: "Más antiguas primero" },
+];
 
 interface POItem {
   id?: string;
@@ -80,7 +84,7 @@ export default function POsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | POStatus>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
-  const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [stats, setStats] = useState({ total: 0, draft: 0, pending: 0, approved: 0, closed: 0, cancelled: 0, totalBase: 0, totalInvoiced: 0 });
   const [previewPO, setPreviewPO] = useState<PO | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -97,6 +101,7 @@ export default function POsPage() {
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; openUpward: boolean }>({ top: 0, left: 0, openUpward: false });
   const menuButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const menuRef = useRef<HTMLDivElement>(null);
+  const sortDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!permissionsLoading && permissions.userId && id) loadData();
@@ -192,7 +197,7 @@ export default function POsPage() {
     setFilteredPOs(filtered);
   };
 
-  const toggleSortOrder = () => setSortOrder(sortOrder === "desc" ? "asc" : "desc");
+  const getSortLabel = () => SORT_OPTIONS.find(o => o.value === sortOrder)?.label || "Ordenar";
 
   const verifyPassword = async (): Promise<boolean> => {
     if (!passwordInput.trim()) {
@@ -728,41 +733,48 @@ export default function POsPage() {
         </div>
 
         {/* Filters & Controls */}
-        <div className="flex flex-col md:flex-row gap-3 mb-6">
+        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center mb-4">
           <div className="flex-1 relative">
-            <Search size={18} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" />
+            <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Buscar órdenes de compra"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent text-sm bg-white"
+              className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm"
             />
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={toggleSortOrder}
-              className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-xl hover:border-slate-300 bg-white text-sm transition-colors group"
-              title={sortOrder === "desc" ? "Más recientes primero" : "Más antiguas primero"}
-            >
-              <div className="relative w-4 h-4">
-                <ArrowUp size={14} className={`absolute inset-0 transition-all ${sortOrder === "asc" ? "opacity-100 text-slate-900" : "opacity-30 text-slate-400"}`} />
-                <ArrowDown size={14} className={`absolute inset-0 transition-all ${sortOrder === "desc" ? "opacity-100 text-slate-900" : "opacity-30 text-slate-400"}`} />
-              </div>
-              <span className="text-slate-700 hidden sm:inline">{sortOrder === "desc" ? "Recientes" : "Antiguas"}</span>
-            </button>
-            <div className="flex border border-slate-200 rounded-xl overflow-hidden bg-white">
-              <button onClick={() => setViewMode("table")} className={`px-4 py-2.5 text-sm transition-colors ${viewMode === "table" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>
-                <List size={18} />
+          <div className="flex gap-2 flex-shrink-0">
+            {/* Sort Dropdown */}
+            <div className="relative" ref={sortDropdownRef}>
+              <button
+                onClick={() => setShowSortDropdown(!showSortDropdown)}
+                className="flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-xl text-sm hover:border-slate-300 bg-white min-w-[180px]"
+              >
+                <Filter size={14} className="text-slate-400" />
+                <span className="flex-1 text-left text-xs text-slate-700">{getSortLabel()}</span>
+                <ChevronDown size={14} className={`text-slate-400 transition-transform ${showSortDropdown ? "rotate-180" : ""}`} />
               </button>
-              <button onClick={() => setViewMode("cards")} className={`px-4 py-3 text-sm transition-colors border-l border-slate-200 ${viewMode === "cards" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>
-                <LayoutGrid size={18} />
-              </button>
+              {showSortDropdown && (
+                <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden min-w-full">
+                  {SORT_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => { setSortOrder(option.value as SortOrder); setShowSortDropdown(false); }}
+                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors whitespace-nowrap ${
+                        sortOrder === option.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+
             {(statusFilter !== "all" || searchTerm) && (
-              <button onClick={() => { setStatusFilter("all"); setSearchTerm(""); }} className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-xl hover:border-red-300 hover:bg-red-50 text-sm text-slate-600 hover:text-red-600 transition-colors">
-                <X size={16} />
-                <span className="hidden sm:inline">Limpiar</span>
+              <button onClick={() => { setStatusFilter("all"); setSearchTerm(""); }} className="px-3 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-600 hover:bg-slate-50 flex items-center gap-1.5 font-medium">
+                <X size={14} />Limpiar
               </button>
             )}
           </div>
@@ -787,7 +799,7 @@ export default function POsPage() {
               {searchTerm || statusFilter !== "all" ? "Prueba a ajustar los filtros de búsqueda" : "Crea tu primera orden de compra para empezar"}
             </p>
           </div>
-        ) : viewMode === "table" ? (
+        ) : (
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
@@ -861,64 +873,6 @@ export default function POsPage() {
                 })}
               </tbody>
             </table>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredPOs.map((po) => {
-              const baseAmount = po.baseAmount || po.totalAmount || 0;
-              const invoiceProgress = po.status === "approved" && baseAmount > 0 ? Math.min(100, (po.invoicedAmount / baseAmount) * 100) : 0;
-              const config = STATUS_CONFIG[po.status];
-              const poPerms = getPOPermissions(po);
-              return (
-                <div key={po.id} className="bg-white border border-slate-200 rounded-2xl p-5 hover:shadow-lg hover:border-slate-300 transition-all group relative overflow-hidden">
-                  <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${config.gradient}`} />
-                  <div className="flex items-start justify-between mb-3">
-                    <button onClick={() => setPreviewPO(po)} className="text-left group/card">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-bold text-slate-900 group-hover/card:text-[#2F52E0] transition-colors font-mono">PO-{po.number}</p>
-                        {po.version > 1 && <span className="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-md font-medium">V{String(po.version).padStart(2, "0")}</span>}
-                        {!permissions.isProjectRole && poPerms.isOwn && <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">Mía</span>}
-                      </div>
-                      <p className="text-sm text-slate-600 font-medium">{po.supplier}</p>
-                    </button>
-                    <div className="relative menu-container">
-                      <button
-                        ref={(el) => { if (el) menuButtonRefs.current.set(po.id, el); }}
-                        onClick={(e) => handleMenuToggle(po.id, e)}
-                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                      >
-                        <MoreHorizontal size={16} />
-                      </button>
-                    </div>
-                  </div>
-                  {(po.generalDescription || po.description) && (
-                    <p className="text-sm text-slate-600 line-clamp-3 mb-4 bg-slate-50 rounded-lg p-3">{po.generalDescription || po.description}</p>
-                  )}
-                  <div className="flex items-end justify-between">
-                    <div>
-                      <p className="text-xs text-slate-500 mb-0.5">Base imponible</p>
-                      <p className="text-lg font-bold text-slate-900">{formatCurrency(baseAmount)} €</p>
-                    </div>
-                    {getStatusBadge(po.status)}
-                  </div>
-                  {po.status === "approved" && po.invoicedAmount > 0 && (
-                    <div className="mt-4 pt-4 border-t border-slate-100">
-                      <div className="flex items-center justify-between text-xs mb-1.5">
-                        <span className="text-slate-500">Facturado</span>
-                        <span className="text-emerald-600 font-medium">{formatCurrency(po.invoicedAmount)} €</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all" style={{ width: `${invoiceProgress}%` }} />
-                      </div>
-                    </div>
-                  )}
-                  <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                    <span>{formatDateRelative(po.createdAt)}</span>
-                    <span>{po.items?.length || 0} items</span>
-                  </div>
-                </div>
-              );
-            })}
           </div>
         )}
 
