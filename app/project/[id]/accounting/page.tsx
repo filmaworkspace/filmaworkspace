@@ -195,31 +195,36 @@ export default function AccountingPage() {
               <h1 className="text-2xl font-semibold text-slate-900">Panel de contabilidad</h1>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
               {isApprover && (
                 <Link href={`/project/${id}/accounting/approvals`}>
-                  <button className={`relative p-2.5 rounded-xl transition-colors border ${
+                  <button className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                     pendingApprovalsCount > 0 
-                      ? "text-amber-600 bg-amber-50 hover:bg-amber-100 border-amber-200" 
-                      : "text-slate-500 bg-white hover:bg-slate-100 border-slate-200"
+                      ? "text-amber-700 bg-amber-50 hover:bg-amber-100" 
+                      : "text-slate-600 hover:bg-white hover:text-slate-900"
                   }`}>
-                    <ClipboardCheck size={18} />
+                    <ClipboardCheck size={16} />
+                    <span>Aprobaciones</span>
                     {pendingApprovalsCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-white text-xs rounded-full flex items-center justify-center font-bold">{pendingApprovalsCount}</span>
+                      <span className="px-1.5 py-0.5 bg-amber-500 text-white text-xs rounded-full font-bold min-w-[20px] text-center">{pendingApprovalsCount}</span>
                     )}
                   </button>
                 </Link>
               )}
               {(userRole === "EP" || userRole === "PM" || userRole === "Controller") && (
                 <Link href={`/project/${id}/accounting/document-center`}>
-                  <button className="p-2.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors" title="Centro de documentación">
-                    <FolderDown size={18} />
+                  <button className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-white hover:text-slate-900 transition-colors">
+                    <FolderDown size={16} />
+                    <span>Documentos</span>
                   </button>
                 </Link>
               )}
               {(userRole === "EP" || userRole === "PM" || userRole === "Controller") && (
                 <Link href={`/project/${id}/accounting/accountingconfig`}>
-                  <button className="p-2.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"><Settings size={18} /></button>
+                  <button className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-white hover:text-slate-900 transition-colors">
+                    <Settings size={16} />
+                    <span>Ajustes</span>
+                  </button>
                 </Link>
               )}
             </div>
