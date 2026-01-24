@@ -166,7 +166,7 @@ export default function ConfigUsers() {
     setSaving(true);
     try {
       const email = inviteForm.email.trim().toLowerCase();
-      if (members.find((m) => m.email === email)) { showToast("error", "Ya es miembro"); setSaving(false); return; }
+      if (members.find((m) => m.email === email)) { showToast("error", "Ya es usuario del proyecto"); setSaving(false); return; }
       if (pendingInvitations.find((i) => i.invitedEmail === email)) { showToast("error", "Invitación pendiente"); setSaving(false); return; }
 
       const usersSnap = await getDocs(query(collection(db, "users"), where("email", "==", email)));
@@ -210,7 +210,7 @@ export default function ConfigUsers() {
       await deleteDoc(doc(db, `projects/${id}/members`, memberId));
       await deleteDoc(doc(db, `userProjects/${memberId}/projects`, id as string));
       setMembers(members.filter((m) => m.userId !== memberId));
-      showToast("success", "Miembro eliminado");
+      showToast("success", "Usuario eliminado");
     } catch { showToast("error", "Error"); } finally { setSaving(false); setActiveMenu(null); }
   };
 
@@ -370,7 +370,10 @@ export default function ConfigUsers() {
                         <div>
                           <div className="flex items-center gap-2">
                             <p className="font-medium text-slate-900">{m.name}</p>
-                            {m.userId === userId && <span className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">(tú)</span>}
+                            <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600">
+                              {m.role}
+                            </span>
+                            {m.userId === userId && <span className="text-xs text-slate-400">(tú)</span>}
                           </div>
                           <p className="text-sm text-slate-500">{m.email}</p>
                         </div>
@@ -399,9 +402,6 @@ export default function ConfigUsers() {
                             </span>
                           )}
                         </div>
-                        <span className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600">
-                          {m.role}
-                        </span>
                         {m.userId !== userId && (
                           <div className="relative">
                             <button onClick={() => setActiveMenu(activeMenu === m.userId ? null : m.userId)} className="p-2 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors opacity-0 group-hover:opacity-100">
@@ -451,9 +451,13 @@ export default function ConfigUsers() {
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="font-medium text-slate-900">{m.name}</p>
-                          {m.userId === userId && <span className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">(tú)</span>}
+                          <span className="px-2 py-0.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-600">
+                            {m.position}
+                          </span>
+                          <span className="text-xs text-slate-400">{m.department}</span>
+                          {m.userId === userId && <span className="text-xs text-slate-400">(tú)</span>}
                         </div>
-                        <p className="text-sm text-slate-500">{m.position} · {m.department}</p>
+                        <p className="text-sm text-slate-500">{m.email}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -517,8 +521,8 @@ export default function ConfigUsers() {
             <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <Users size={28} className="text-slate-400" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">{searchTerm ? "Sin resultados" : "Sin miembros"}</h3>
-            <p className="text-slate-500 text-sm mb-6">{searchTerm ? "Prueba con otro término" : "Invita al primer miembro del equipo"}</p>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">{searchTerm ? "Sin resultados" : "Sin usuarios"}</h3>
+            <p className="text-slate-500 text-sm mb-6">{searchTerm ? "Prueba con otro término" : "Invita al primer usuario del equipo"}</p>
             {!searchTerm && (
               <button onClick={() => setShowInviteModal(true)} className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors">
                 <UserPlus size={16} />
