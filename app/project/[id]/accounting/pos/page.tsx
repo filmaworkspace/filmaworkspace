@@ -696,7 +696,7 @@ export default function POsPage() {
                 className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: '#2F52E0' }}
               >
-                <Plus size={18} />
+                <Plus size={16} strokeWidth={2.5} />
                 Nueva PO
               </Link>
             )}
@@ -788,19 +788,9 @@ export default function POsPage() {
             <h3 className="text-lg font-semibold text-slate-900 mb-2">
               {searchTerm || statusFilter !== "all" ? "No se encontraron resultados" : "Sin órdenes de compra"}
             </h3>
-            <p className="text-slate-500 text-sm mb-6">
+            <p className="text-slate-500 text-sm">
               {searchTerm || statusFilter !== "all" ? "Prueba a ajustar los filtros de búsqueda" : "Crea tu primera orden de compra para empezar"}
             </p>
-            {!searchTerm && statusFilter === "all" && permissions.canCreatePO && (
-              <Link 
-                href={`/project/${id}/accounting/pos/new`} 
-                className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: '#2F52E0' }}
-              >
-                <Plus size={18} />
-                Nueva PO
-              </Link>
-            )}
           </div>
         ) : viewMode === "table" ? (
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
