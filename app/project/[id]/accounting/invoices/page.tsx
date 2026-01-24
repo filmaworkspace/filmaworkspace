@@ -525,12 +525,7 @@ export default function InvoicesPage() {
           {/* Page header */}
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
-              <div 
-                className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: 'rgba(47, 82, 224, 0.1)' }}
-              >
-                <Receipt size={20} style={{ color: '#2F52E0' }} />
-              </div>
+              <Receipt size={24} style={{ color: '#2F52E0' }} />
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-2xl font-semibold text-slate-900">Facturas</h1>
