@@ -500,12 +500,14 @@ export default function SuppliersPage() {
       <div className="mt-[4.5rem]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div>
+            <div className="flex items-center gap-4">
+              <Building2 size={24} style={{ color: '#2F52E0' }} />
               <h1 className="text-2xl font-semibold text-slate-900">Proveedores</h1>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={openCreateModal} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors">
-                <Plus size={18} />Añadir proveedor
+              <button onClick={openCreateModal} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity" style={{ backgroundColor: '#2F52E0' }}>
+                <Plus size={16} strokeWidth={2.5} />
+                Añadir proveedor
               </button>
             </div>
           </div>
@@ -580,10 +582,7 @@ export default function SuppliersPage() {
           <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
             <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><Building2 size={28} className="text-slate-400" /></div>
             <h3 className="text-lg font-semibold text-slate-900 mb-2">{searchTerm || filterStatus !== "all" ? "No se encontraron proveedores" : "No hay proveedores registrados"}</h3>
-            <p className="text-slate-500 text-sm mb-6">{searchTerm || filterStatus !== "all" ? "Intenta ajustar los filtros" : "Añade tu primer proveedor al proyecto"}</p>
-            {!searchTerm && filterStatus === "all" && (
-              <button onClick={openCreateModal} className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"><Plus size={18} />Añadir proveedor</button>
-            )}
+            <p className="text-slate-500 text-sm">{searchTerm || filterStatus !== "all" ? "Intenta ajustar los filtros" : "Añade tu primer proveedor al proyecto"}</p>
           </div>
         ) : (
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">
