@@ -223,7 +223,7 @@ export default function AccountingPage() {
                 <Link href={`/project/${id}/accounting/accountingconfig`}>
                   <button className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-white hover:text-slate-900 transition-colors">
                     <Settings size={16} />
-                    <span>Ajustes</span>
+                    <span>Configuración</span>
                   </button>
                 </Link>
               )}
@@ -413,3 +413,4 @@ export default function AccountingPage() {
     </div>
   );
 }
+
