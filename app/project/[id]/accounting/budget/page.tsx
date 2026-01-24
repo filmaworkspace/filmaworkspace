@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Inter } from "next/font/google";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, Timestamp } from "firebase/firestore";
-import { Plus, ChevronDown, ChevronRight, Edit, Trash2, X, Search, Download, Upload, AlertCircle, CheckCircle, FileSpreadsheet, Eye, EyeOff } from "lucide-react";
+import { Plus, ChevronDown, ChevronRight, Edit, Trash2, X, Search, Upload, AlertCircle, CheckCircle, FileSpreadsheet, Eye, EyeOff, Wallet } from "lucide-react";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -222,21 +222,6 @@ export default function BudgetPage() {
     reader.readAsText(file);
   };
 
-  const exportBudget = () => {
-    const rows = [["CÓDIGO", "DESCRIPCIÓN", "TIPO", "PRESUPUESTADO", "COMPROMETIDO", "REALIZADO", "DISPONIBLE"]];
-    accounts.forEach((account) => {
-      const totals = getAccountTotals(account);
-      rows.push([account.code, account.description, "CUENTA", totals.budgeted.toString(), totals.committed.toString(), totals.actual.toString(), totals.available.toString()]);
-      account.subAccounts.forEach((sub) => {
-        const available = sub.budgeted - sub.committed - sub.actual;
-        rows.push([sub.code, sub.description, "SUBCUENTA", sub.budgeted.toString(), sub.committed.toString(), sub.actual.toString(), available.toString()]);
-      });
-    });
-    const csvContent = rows.map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a"); link.setAttribute("href", URL.createObjectURL(blob)); link.setAttribute("download", `presupuesto_${new Date().toISOString().split("T")[0]}.csv`); link.click();
-  };
-
   const filteredAccounts = accounts.filter((account) => {
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
@@ -280,7 +265,8 @@ export default function BudgetPage() {
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           {/* Page header */}
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div>
+            <div className="flex items-center gap-4">
+              <Wallet size={24} style={{ color: '#2F52E0' }} />
               <h1 className="text-2xl font-semibold text-slate-900">Presupuesto</h1>
             </div>
 
@@ -288,8 +274,8 @@ export default function BudgetPage() {
               <button onClick={() => setShowImportModal(true)} className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
                 <Upload size={16} />Importar
               </button>
-              <button onClick={openCreateAccountModal} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors">
-                <Plus size={18} />Nueva cuenta
+              <button onClick={openCreateAccountModal} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity" style={{ backgroundColor: '#2F52E0' }}>
+                <Plus size={16} strokeWidth={2.5} />Nueva cuenta
               </button>
             </div>
           </div>
@@ -348,7 +334,6 @@ export default function BudgetPage() {
           <div className="flex gap-2 flex-shrink-0">
             <button onClick={expandAll} className="px-3 py-2.5 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1.5 text-xs font-medium"><Eye size={14} />Expandir</button>
             <button onClick={collapseAll} className="px-3 py-2.5 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1.5 text-xs font-medium"><EyeOff size={14} />Colapsar</button>
-            <button onClick={exportBudget} className="px-3 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1.5 text-xs font-medium"><Download size={14} />Exportar</button>
           </div>
         </div>
 
@@ -357,13 +342,7 @@ export default function BudgetPage() {
           <div className="border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
             <FileSpreadsheet size={32} className="text-slate-300 mx-auto mb-3" />
             <h3 className="text-lg font-semibold text-slate-900 mb-1">{searchTerm ? "No se encontraron cuentas" : "No hay cuentas presupuestarias"}</h3>
-            <p className="text-slate-500 text-sm mb-4">{searchTerm ? "Intenta ajustar la búsqueda" : "Crea tu primera cuenta o importa un presupuesto"}</p>
-            {!searchTerm && (
-              <div className="flex gap-3 justify-center">
-                <button onClick={openCreateAccountModal} className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"><Plus size={16} />Crear cuenta</button>
-                <button onClick={() => setShowImportModal(true)} className="inline-flex items-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"><Upload size={16} />Importar</button>
-              </div>
-            )}
+            <p className="text-slate-500 text-sm">{searchTerm ? "Intenta ajustar la búsqueda" : "Crea tu primera cuenta o importa un presupuesto"}</p>
           </div>
         ) : (
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">
