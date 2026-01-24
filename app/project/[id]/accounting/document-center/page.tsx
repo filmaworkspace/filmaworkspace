@@ -378,6 +378,34 @@ export default function DocumentCenterPage() {
   // PDF GENERATION - Diseño compacto tipo banner/certificado
   // ============================================================================
 
+  // Función para cargar el logo como base64
+  const loadLogo = async (): Promise<string | null> => {
+    try {
+      // Intentar cargar el logo PNG (más compatible con jsPDF que SVG)
+      const response = await fetch('/logoforpdf.png');
+      if (!response.ok) {
+        // Fallback al SVG si no existe PNG
+        const svgResponse = await fetch('/logodark.svg');
+        if (!svgResponse.ok) return null;
+        
+        // Convertir SVG a base64 data URL
+        const svgText = await svgResponse.text();
+        const svgBase64 = btoa(unescape(encodeURIComponent(svgText)));
+        return `data:image/svg+xml;base64,${svgBase64}`;
+      }
+      
+      const blob = await response.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  };
+
   const generateCoverPage = async (invoice: Invoice): Promise<jsPDF> => {
     // Formato horizontal, medio folio aproximadamente
     const pdf = new jsPDF("l", "mm", [210, 148]);
@@ -398,11 +426,27 @@ export default function DocumentCenterPage() {
     pdf.setFillColor(...brandBlue);
     pdf.rect(0, 0, pageWidth, 3, "F");
 
-    // Logo FILMA estilizado
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(22);
-    pdf.setTextColor(...brandBlue);
-    pdf.text("filma", margin, 17);
+    // Intentar cargar el logo real
+    let logoLoaded = false;
+    try {
+      const logoBase64 = await loadLogo();
+      if (logoBase64) {
+        // Logo encontrado - añadirlo al PDF
+        // Dimensiones aproximadas: altura 10mm, ancho proporcional (~35mm)
+        pdf.addImage(logoBase64, 'PNG', margin, 7, 35, 12);
+        logoLoaded = true;
+      }
+    } catch (e) {
+      console.log("Logo not loaded, using text fallback");
+    }
+
+    // Fallback: texto "filma" si no se carga el logo
+    if (!logoLoaded) {
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(22);
+      pdf.setTextColor(...brandBlue);
+      pdf.text("filma", margin, 17);
+    }
 
     // Número de documento destacado (derecha)
     const docType = DOCUMENT_TYPES[invoice.documentType] || DOCUMENT_TYPES.invoice;
@@ -1005,6 +1049,7 @@ export default function DocumentCenterPage() {
             <FolderDown size={24} style={{ color: "#2F52E0" }} />
             <div>
               <h1 className="text-2xl font-semibold text-slate-900">Centro de documentación</h1>
+              <p className="text-sm text-slate-500">Descarga expedientes con portada de codificación y justificantes</p>
             </div>
           </div>
           <button
@@ -1017,26 +1062,25 @@ export default function DocumentCenterPage() {
         </div>
 
         {/* Filters */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-6">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search size={18} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar por número, proveedor o descripción"
-                className="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent bg-white text-sm"
-              />
-            </div>
-
+        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center mb-6">
+          <div className="flex-1 relative">
+            <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar por número, proveedor o descripción"
+              className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm"
+            />
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
             <div className="relative" ref={statusDropdownRef}>
               <button
                 onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white hover:border-slate-300 transition-colors min-w-[180px]"
+                className="flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-xl text-sm hover:border-slate-300 bg-white min-w-[180px]"
               >
-                <Filter size={15} className="text-slate-400" />
-                <span className="text-slate-700 flex-1 text-left">{getStatusLabel()}</span>
+                <Filter size={14} className="text-slate-400" />
+                <span className="flex-1 text-left text-xs text-slate-700">{getStatusLabel()}</span>
                 <ChevronDown size={14} className={`text-slate-400 transition-transform ${showStatusDropdown ? "rotate-180" : ""}`} />
               </button>
               {showStatusDropdown && (
@@ -1053,16 +1097,6 @@ export default function DocumentCenterPage() {
                 </div>
               )}
             </div>
-
-            {(statusFilter !== "all" || searchTerm) && (
-              <button
-                onClick={() => { setStatusFilter("all"); setSearchTerm(""); }}
-                className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2"
-              >
-                <X size={14} />
-                Limpiar
-              </button>
-            )}
           </div>
         </div>
 
