@@ -356,12 +356,6 @@ export default function ConfigGeneral() {
                   <div className="fixed inset-0 z-10" onClick={() => setShowActions(false)} />
                   <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 z-20">
                     <button
-                      onClick={copyProjectId}
-                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 flex items-center gap-3 text-slate-700"
-                    >
-                      <Copy size={15} className="text-slate-400" /> Copiar ID
-                    </button>
-                    <button
                       onClick={archiveProject}
                       className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 flex items-center gap-3 text-slate-700"
                     >
@@ -383,38 +377,9 @@ export default function ConfigGeneral() {
       </div>
 
       {/* Content */}
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8 max-w-4xl">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
         {/* Editing Toggle */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            {/* Completeness indicator */}
-            {(() => {
-              const fields = [
-                project?.name,
-                project?.phase,
-                productionData.projectType,
-                productionData.shootingDays,
-                productionData.shootingStartDate,
-              ];
-              const filled = fields.filter(Boolean).length;
-              const total = fields.length;
-              const percentage = Math.round((filled / total) * 100);
-              return (
-                <div className="flex items-center gap-3">
-                  <div className="w-24 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{ 
-                        width: `${percentage}%`,
-                        backgroundColor: percentage === 100 ? '#10b981' : '#2F52E0'
-                      }}
-                    />
-                  </div>
-                  <span className="text-xs text-slate-400">{percentage}% completo</span>
-                </div>
-              );
-            })()}
-          </div>
+        <div className="flex items-center justify-end mb-8">
           {!editingProject && !editingProduction && (
             <button
               onClick={() => { setEditingProject(true); setEditingProduction(true); }}
@@ -470,37 +435,39 @@ export default function ConfigGeneral() {
             {/* Production Type & Stats */}
             {productionData.projectType ? (
               <section>
-                <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
-                  <div>
-                    <span className="text-xs text-slate-400 uppercase tracking-wide">Tipo</span>
-                    <p className="text-xl font-semibold text-slate-900 capitalize">{productionData.projectType}</p>
-                  </div>
-                  {productionData.projectType === "serie" && productionData.episodes && (
-                    <div>
-                      <span className="text-xs text-slate-400 uppercase tracking-wide">Capítulos</span>
-                      <p className="text-xl font-semibold text-slate-900">{productionData.episodes}</p>
-                    </div>
-                  )}
-                  {productionData.episodeDuration && (
-                    <div>
-                      <span className="text-xs text-slate-400 uppercase tracking-wide">
-                        {productionData.projectType === "serie" ? "Dur. capítulo" : "Duración"}
-                      </span>
-                      <p className="text-xl font-semibold text-slate-900">{productionData.episodeDuration} min</p>
-                    </div>
-                  )}
-                  {productionData.shootingDays && (
-                    <div>
-                      <span className="text-xs text-slate-400 uppercase tracking-wide">Días de rodaje</span>
-                      <p className="text-xl font-semibold text-slate-900">{productionData.shootingDays}</p>
-                    </div>
-                  )}
-                  {productionData.language && (
-                    <div>
-                      <span className="text-xs text-slate-400 uppercase tracking-wide">Idioma</span>
-                      <p className="text-xl font-semibold text-slate-900">{productionData.language}</p>
-                    </div>
-                  )}
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Tipo</th>
+                        {productionData.projectType === "serie" && productionData.episodes && (
+                          <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Capítulos</th>
+                        )}
+                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">
+                          {productionData.projectType === "serie" ? "Dur. capítulo" : "Duración"}
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Días de rodaje</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Idioma</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="px-6 py-4 text-lg font-semibold text-slate-900 capitalize">{productionData.projectType}</td>
+                        {productionData.projectType === "serie" && productionData.episodes && (
+                          <td className="px-6 py-4 text-lg font-semibold text-slate-900">{productionData.episodes}</td>
+                        )}
+                        <td className="px-6 py-4 text-lg font-semibold text-slate-900">
+                          {productionData.episodeDuration ? `${productionData.episodeDuration} min` : <span className="text-slate-300">—</span>}
+                        </td>
+                        <td className="px-6 py-4 text-lg font-semibold text-slate-900">
+                          {productionData.shootingDays || <span className="text-slate-300">—</span>}
+                        </td>
+                        <td className="px-6 py-4 text-lg font-semibold text-slate-900">
+                          {productionData.language || <span className="text-slate-300">—</span>}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </section>
             ) : (
