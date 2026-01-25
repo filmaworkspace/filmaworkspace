@@ -330,9 +330,15 @@ export default function AccountingConfigPage() {
         const d = projectSnap.data();
         setProjectName(d.name);
         setDepartments(d.departments || []);
-        // Cargar tipo de proyecto y episodios
-        setProjectType(d.projectType || null);
-        setProjectEpisodes(d.episodes || 0);
+      }
+
+      // Cargar datos de producción (tipo de proyecto y episodios)
+      const productionRef = doc(db, `projects/${id}/config/production`);
+      const productionSnap = await getDoc(productionRef);
+      if (productionSnap.exists()) {
+        const prodData = productionSnap.data();
+        setProjectType(prodData.projectType || null);
+        setProjectEpisodes(prodData.episodes || 0);
       }
 
       // Cargar configuración del proyecto para contabilidad
