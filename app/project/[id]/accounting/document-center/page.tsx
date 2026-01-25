@@ -1049,7 +1049,6 @@ export default function DocumentCenterPage() {
             <FolderDown size={24} style={{ color: "#2F52E0" }} />
             <div>
               <h1 className="text-2xl font-semibold text-slate-900">Centro de documentación</h1>
-              <p className="text-sm text-slate-500">Descarga expedientes con portada de codificación y justificantes</p>
             </div>
           </div>
           <button
