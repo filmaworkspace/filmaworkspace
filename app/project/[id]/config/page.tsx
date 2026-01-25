@@ -470,37 +470,39 @@ export default function ConfigGeneral() {
             {/* Production Type & Stats */}
             {productionData.projectType ? (
               <section>
-                <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
-                  <div>
-                    <span className="text-xs text-slate-400 uppercase tracking-wide">Tipo</span>
-                    <p className="text-xl font-semibold text-slate-900 capitalize">{productionData.projectType}</p>
-                  </div>
-                  {productionData.projectType === "serie" && productionData.episodes && (
-                    <div>
-                      <span className="text-xs text-slate-400 uppercase tracking-wide">Capítulos</span>
-                      <p className="text-xl font-semibold text-slate-900">{productionData.episodes}</p>
-                    </div>
-                  )}
-                  {productionData.episodeDuration && (
-                    <div>
-                      <span className="text-xs text-slate-400 uppercase tracking-wide">
-                        {productionData.projectType === "serie" ? "Dur. capítulo" : "Duración"}
-                      </span>
-                      <p className="text-xl font-semibold text-slate-900">{productionData.episodeDuration} min</p>
-                    </div>
-                  )}
-                  {productionData.shootingDays && (
-                    <div>
-                      <span className="text-xs text-slate-400 uppercase tracking-wide">Días de rodaje</span>
-                      <p className="text-xl font-semibold text-slate-900">{productionData.shootingDays}</p>
-                    </div>
-                  )}
-                  {productionData.language && (
-                    <div>
-                      <span className="text-xs text-slate-400 uppercase tracking-wide">Idioma</span>
-                      <p className="text-xl font-semibold text-slate-900">{productionData.language}</p>
-                    </div>
-                  )}
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Tipo</th>
+                        {productionData.projectType === "serie" && productionData.episodes && (
+                          <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Capítulos</th>
+                        )}
+                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">
+                          {productionData.projectType === "serie" ? "Dur. capítulo" : "Duración"}
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Días de rodaje</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Idioma</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="px-6 py-4 text-lg font-semibold text-slate-900 capitalize">{productionData.projectType}</td>
+                        {productionData.projectType === "serie" && productionData.episodes && (
+                          <td className="px-6 py-4 text-lg font-semibold text-slate-900">{productionData.episodes}</td>
+                        )}
+                        <td className="px-6 py-4 text-lg font-semibold text-slate-900">
+                          {productionData.episodeDuration ? `${productionData.episodeDuration} min` : <span className="text-slate-300">—</span>}
+                        </td>
+                        <td className="px-6 py-4 text-lg font-semibold text-slate-900">
+                          {productionData.shootingDays || <span className="text-slate-300">—</span>}
+                        </td>
+                        <td className="px-6 py-4 text-lg font-semibold text-slate-900">
+                          {productionData.language || <span className="text-slate-300">—</span>}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </section>
             ) : (
