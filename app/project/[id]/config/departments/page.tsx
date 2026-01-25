@@ -157,7 +157,7 @@ export default function ConfigDepartments() {
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
               <Briefcase size={24} style={{ color: '#2F52E0' }} />
-              <h1 className="text-2xl font-semibold text-slate-900">Departamentos</h1>
+              <h1 className="text-2xl font-semibold text-slate-900">Departamentos del proyecto</h1>
             </div>
       
             <button
