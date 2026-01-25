@@ -243,26 +243,37 @@ export default function PaymentPayPage() {
       
       // Update invoice status back to pending if it was paid
       if (item.invoiceId) {
-        // Check if there are other completed payments for this invoice
-        const otherPaymentsForInvoice = updatedItems.filter(
-          (i) => i.invoiceId === item.invoiceId && i.status === "completed" && i.id !== itemId
-        );
-        
-        if (otherPaymentsForInvoice.length > 0) {
-          // There are still other payments, calculate total paid
-          const totalPaid = otherPaymentsForInvoice.reduce((sum, i) => sum + (i.partialAmount || i.amount), 0);
-          await updateDoc(doc(db, `projects/${id}/invoices`, item.invoiceId), { 
-            status: "partial_paid", 
-            paidAmount: totalPaid
-          });
-        } else {
-          // No other payments, reset to pending
-          await updateDoc(doc(db, `projects/${id}/invoices`, item.invoiceId), { 
-            status: "pending", 
-            paidAmount: 0, 
-            paidAt: null, 
-            paymentForecastId: null 
-          });
+        try {
+          // Check if invoice exists first
+          const invoiceRef = doc(db, `projects/${id}/invoices`, item.invoiceId);
+          const invoiceSnap = await getDoc(invoiceRef);
+          
+          if (invoiceSnap.exists()) {
+            // Check if there are other completed payments for this invoice
+            const otherPaymentsForInvoice = updatedItems.filter(
+              (i) => i.invoiceId === item.invoiceId && i.status === "completed" && i.id !== itemId
+            );
+            
+            if (otherPaymentsForInvoice.length > 0) {
+              // There are still other payments, calculate total paid
+              const totalPaid = otherPaymentsForInvoice.reduce((sum, i) => sum + (i.partialAmount || i.amount), 0);
+              await updateDoc(invoiceRef, { 
+                status: "partial_paid", 
+                paidAmount: totalPaid
+              });
+            } else {
+              // No other payments, reset to pending
+              await updateDoc(invoiceRef, { 
+                status: "pending", 
+                paidAmount: 0, 
+                paidAt: null, 
+                paymentForecastId: null 
+              });
+            }
+          }
+        } catch (invoiceError) {
+          console.warn("Could not update invoice:", invoiceError);
+          // Continue with forecast update even if invoice update fails
         }
       }
       
@@ -354,7 +365,7 @@ export default function PaymentPayPage() {
 
   return (
     <div className={`min-h-screen bg-slate-100 ${inter.className}`}>
-      {toast && <div className="fixed top-4 right-4 z-[60]"><div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium ${toast.type === "success" ? "bg-emerald-600" : toast.type === "error" ? "bg-red-600" : "bg-amber-500"}`}>{toast.type === "success" ? <CheckCircle2 size={16} /> : toast.type === "error" ? <AlertCircle size={16} /> : <AlertTriangle size={16} />}{toast.message}</div></div>}
+      {toast && <div className="fixed bottom-4 right-4 z-[60]"><div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium ${toast.type === "success" ? "bg-emerald-600" : toast.type === "error" ? "bg-red-600" : "bg-amber-500"}`}>{toast.type === "success" ? <CheckCircle2 size={16} /> : toast.type === "error" ? <AlertCircle size={16} /> : <AlertTriangle size={16} />}{toast.message}</div></div>}
 
       {/* Header */}
       <div className="bg-emerald-600 text-white px-6 py-3 flex items-center justify-between fixed top-0 left-0 right-0 z-50">
@@ -362,7 +373,7 @@ export default function PaymentPayPage() {
           <button onClick={() => router.push(`/project/${id}/accounting/payments`)} className="p-2 hover:bg-emerald-700 rounded-lg"><X size={20} /></button>
           <div className="flex items-center gap-3">
             <CreditCard size={20} />
-            <span className="font-semibold">Pagar remesa</span>
+            <span className="font-semibold">PAGAR REMESA</span>
             <span className="bg-emerald-500 px-2 py-0.5 rounded text-sm">{forecast.name}</span>
           </div>
         </div>
@@ -384,31 +395,43 @@ export default function PaymentPayPage() {
             <span className="text-slate-400 text-sm">
               {selectedPayment ? `Documento: ${selectedPayment.supplier}` : "Selecciona un pago"}
             </span>
-            {selectedPayment?.attachmentUrl && (
-              <a href={selectedPayment.attachmentUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-slate-700 text-slate-300 rounded hover:bg-slate-600">
-                <ExternalLink size={16} />
-              </a>
-            )}
+            <div className="flex items-center gap-2">
+              {selectedPayment && (itemReceipts[selectedPayment.id]?.url || selectedPayment.receiptUrl) && (
+                <span className="text-xs text-emerald-400 flex items-center gap-1"><FileCheck size={12} />Justificante</span>
+              )}
+              {(selectedPayment?.attachmentUrl || selectedPayment?.receiptUrl || (selectedPayment && itemReceipts[selectedPayment.id]?.url)) && (
+                <a href={selectedPayment?.receiptUrl || itemReceipts[selectedPayment?.id || ""]?.url || selectedPayment?.attachmentUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-slate-700 text-slate-300 rounded hover:bg-slate-600">
+                  <ExternalLink size={16} />
+                </a>
+              )}
+            </div>
           </div>
           <div className="flex-1 bg-slate-900 rounded-xl overflow-auto flex items-center justify-center">
-            {selectedPayment?.attachmentUrl ? (
-              isPDF(selectedPayment.attachmentUrl) ? (
-                <iframe src={`${selectedPayment.attachmentUrl}#toolbar=0`} className="w-full h-full" />
-              ) : (
-                <img src={selectedPayment.attachmentUrl} alt="Documento" className="max-w-full max-h-full object-contain" />
-              )
-            ) : selectedPayment ? (
-              <div className="text-center text-slate-500">
-                <FileText size={48} className="mx-auto mb-3 opacity-50" />
-                <p>Sin documento adjunto</p>
-                <p className="text-xs mt-1">Sube el justificante a la derecha</p>
-              </div>
-            ) : (
-              <div className="text-center text-slate-500">
-                <Banknote size={48} className="mx-auto mb-3 opacity-50" />
-                <p>Selecciona un pago de la lista</p>
-              </div>
-            )}
+            {(() => {
+              const previewUrl = selectedPayment && (itemReceipts[selectedPayment.id]?.url || selectedPayment.receiptUrl || selectedPayment.attachmentUrl);
+              if (previewUrl) {
+                return isPDF(previewUrl) ? (
+                  <iframe src={`${previewUrl}#toolbar=0`} className="w-full h-full" />
+                ) : (
+                  <img src={previewUrl} alt="Documento" className="max-w-full max-h-full object-contain" />
+                );
+              } else if (selectedPayment) {
+                return (
+                  <div className="text-center text-slate-500">
+                    <FileText size={48} className="mx-auto mb-3 opacity-50" />
+                    <p>Sin documento adjunto</p>
+                    <p className="text-xs mt-1">Sube el justificante a la derecha</p>
+                  </div>
+                );
+              } else {
+                return (
+                  <div className="text-center text-slate-500">
+                    <Banknote size={48} className="mx-auto mb-3 opacity-50" />
+                    <p>Selecciona un pago de la lista</p>
+                  </div>
+                );
+              }
+            })()}
           </div>
         </div>
 
