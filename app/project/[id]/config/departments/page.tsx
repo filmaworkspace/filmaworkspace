@@ -120,7 +120,7 @@ export default function ConfigDepartments() {
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {toast && (
-        <div className={`fixed top-20 right-6 z-50 px-4 py-3 rounded-2xl text-sm font-medium shadow-lg flex items-center gap-2 ${toast.type === "success" ? "bg-slate-900 text-white" : "bg-red-600 text-white"}`}>
+        <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-2xl text-sm font-medium shadow-lg flex items-center gap-2 ${toast.type === "success" ? "bg-slate-900 text-white" : "bg-red-600 text-white"}`}>
           {toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
           {toast.message}
         </div>
@@ -156,14 +156,13 @@ export default function ConfigDepartments() {
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
-              <Briefcase size={24} style={{ color: '#2F52E0' }} />
+              <Briefcase size={24} className="text-slate-900" />
               <h1 className="text-2xl font-semibold text-slate-900">Departamentos del proyecto</h1>
             </div>
       
             <button
               onClick={() => setShowAddForm(!showAddForm)}
-              className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: '#2F52E0' }}
+              className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors bg-slate-900"
             >
               <Plus size={16} strokeWidth={2.5} />
               Nuevo
