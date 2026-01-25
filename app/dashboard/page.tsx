@@ -945,7 +945,6 @@ export default function Dashboard() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">Acceso a Configuración</h3>
-                <p className="text-xs text-slate-500">Confirma tu identidad para continuar</p>
               </div>
             </div>
             <div className="p-6">
