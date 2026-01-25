@@ -286,7 +286,7 @@ export default function ConfigUsers() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Toast - bottom right */}
       {toast && (
-        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 ${toast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>
+        <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 ${toast.type === "success" ? "bg-slate-900 text-white" : "bg-red-600 text-white"}`}>
           {toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
           {toast.message}
         </div>
@@ -297,14 +297,13 @@ export default function ConfigUsers() {
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
-              <UserCog size={24} style={{ color: '#2F52E0' }} />
+              <UserCog size={24} className="text-slate-900" />
               <h1 className="text-2xl font-semibold text-slate-900">Usuarios del proyecto</h1>
             </div>
       
             <button
               onClick={() => setShowInviteModal(true)}
-              className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: '#2F52E0' }}
+              className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors bg-slate-900"
             >
               <UserPlus size={16} strokeWidth={2.5} />
               Invitar
@@ -316,7 +315,7 @@ export default function ConfigUsers() {
       <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8 space-y-6">
         {/* Pending Invitations */}
         {pendingInvitations.length > 0 && (
-          <div className="rounded-2xl p-6" style={{ background: 'linear-gradient(to right, #2F52E0, #4F6FE8)' }}>
+          <div className="rounded-2xl p-6" style={{ background: 'linear-gradient(to right, #0f172a, #334155)' }}>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
                 <Mail size={18} className="text-white" />
@@ -329,7 +328,7 @@ export default function ConfigUsers() {
               {pendingInvitations.map((inv) => (
                 <div key={inv.id} className="flex items-center justify-between bg-white rounded-2xl p-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-semibold text-sm">
+                    <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-semibold text-sm">
                       {inv.invitedName?.[0]?.toUpperCase()}
                     </div>
                     <div>
@@ -360,10 +359,10 @@ export default function ConfigUsers() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
           {/* Project Roles */}
           {projectMembers.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-visible">
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-visible flex-1 lg:max-w-[50%]">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
                 <Shield size={18} className="text-slate-400" />
                 <h3 className="font-semibold text-slate-900">Roles de proyecto</h3>
@@ -374,7 +373,7 @@ export default function ConfigUsers() {
                   return (
                     <div key={m.userId} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/50 transition-colors group">
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-slate-200 text-slate-600 flex items-center justify-center font-semibold text-sm">
+                        <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-semibold text-sm">
                           {m.name?.[0]?.toUpperCase()}
                         </div>
                         <div>
@@ -445,7 +444,7 @@ export default function ConfigUsers() {
 
           {/* Department Members */}
           {deptMembers.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-visible">
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-visible flex-1 lg:max-w-[50%]">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
                 <Briefcase size={18} className="text-slate-400" />
                 <h3 className="font-semibold text-slate-900">Departamentos</h3>
@@ -455,7 +454,7 @@ export default function ConfigUsers() {
                 {deptMembers.map((m) => (
                   <div key={m.userId} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/50 transition-colors group">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center font-semibold text-sm">
+                      <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-semibold text-sm">
                         {m.name?.[0]?.toUpperCase()}
                       </div>
                       <div>
@@ -529,7 +528,7 @@ export default function ConfigUsers() {
         {filteredMembers.length === 0 && (
           <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
             <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Users size={28} className="text-slate-400" />
+              <UserCog size={28} className="text-slate-400" />
             </div>
             <h3 className="text-lg font-semibold text-slate-900 mb-2">{searchTerm ? "Sin resultados" : "Sin usuarios"}</h3>
             <p className="text-slate-500 text-sm">{searchTerm ? "Prueba con otro término" : "Invita al primer usuario del equipo"}</p>
