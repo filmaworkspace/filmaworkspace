@@ -96,6 +96,7 @@ export default function ConfigGeneral() {
   const [showActions, setShowActions] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [showPhaseDropdown, setShowPhaseDropdown] = useState(false);
 
   const LANGUAGES = [
     "Español", "Inglés", "Francés", "Alemán", "Italiano", 
@@ -595,15 +596,36 @@ export default function ConfigGeneral() {
                     className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
                   />
                 </div>
-                <div>
+                <div className="relative">
                   <label className="block text-sm font-medium text-slate-700 mb-2">Fase actual</label>
-                  <select
-                    value={projectForm.phase}
-                    onChange={(e) => setProjectForm({ ...projectForm, phase: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white"
+                  <button
+                    type="button"
+                    onClick={() => setShowPhaseDropdown(!showPhaseDropdown)}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white text-left flex items-center justify-between hover:border-slate-300 transition-colors"
                   >
-                    {PHASES.map((p) => (<option key={p} value={p}>{p}</option>))}
-                  </select>
+                    <span className={projectForm.phase ? "text-slate-900" : "text-slate-400"}>
+                      {projectForm.phase || "Seleccionar"}
+                    </span>
+                    <svg className={`w-4 h-4 text-slate-400 transition-transform ${showPhaseDropdown ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {showPhaseDropdown && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setShowPhaseDropdown(false)} />
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1 max-h-48 overflow-y-auto">
+                        {PHASES.map((p) => (
+                          <button
+                            key={p}
+                            onClick={() => { setProjectForm({ ...projectForm, phase: p }); setShowPhaseDropdown(false); }}
+                            className={`w-full text-left px-4 py-2 text-sm transition-colors ${projectForm.phase === p ? "bg-slate-100 font-medium" : "hover:bg-slate-50"}`}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
               <div>
