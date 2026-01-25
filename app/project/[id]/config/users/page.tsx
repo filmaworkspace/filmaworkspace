@@ -181,10 +181,16 @@ export default function ConfigUsers() {
       if (inviteForm.roleType === "project") {
         inviteData.role = inviteForm.role;
         inviteData.permissions = { config: inviteForm.permissions.config, accounting: inviteForm.permissions.accounting, team: inviteForm.permissions.team };
+        if (inviteForm.permissions.accounting) {
+          inviteData.accountingAccessLevel = "accounting_extended";
+        }
       } else {
         inviteData.department = inviteForm.department;
         inviteData.position = inviteForm.position;
         inviteData.permissions = { config: inviteForm.permissions.config, accounting: inviteForm.permissions.accounting, team: inviteForm.permissions.team };
+        if (inviteForm.permissions.accounting) {
+          inviteData.accountingAccessLevel = "accounting_extended";
+        }
       }
 
       await setDoc(doc(collection(db, "invitations")), inviteData);
@@ -224,12 +230,14 @@ export default function ConfigUsers() {
     if (!editingMember) return;
     setSaving(true);
     try {
-      await updateDoc(doc(db, `projects/${id}/members`, editingMember.userId), {
-        permissions: editPermissions
-      });
-      await updateDoc(doc(db, `userProjects/${editingMember.userId}/projects`, id as string), {
-        permissions: editPermissions
-      });
+      const updateData: any = { permissions: editPermissions };
+      if (editPermissions.accounting) {
+        updateData.accountingAccessLevel = "accounting_extended";
+      } else {
+        updateData.accountingAccessLevel = null;
+      }
+      await updateDoc(doc(db, `projects/${id}/members`, editingMember.userId), updateData);
+      await updateDoc(doc(db, `userProjects/${editingMember.userId}/projects`, id as string), updateData);
       setMembers(members.map((m) => 
         m.userId === editingMember.userId ? { ...m, permissions: editPermissions } : m
       ));
@@ -288,15 +296,17 @@ export default function ConfigUsers() {
       <div className="mt-[4.5rem]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div>
+            <div className="flex items-center gap-4">
+              <Users size={24} style={{ color: '#2F52E0' }} />
               <h1 className="text-2xl font-semibold text-slate-900">Usuarios del proyecto</h1>
             </div>
       
             <button
               onClick={() => setShowInviteModal(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors"
+              className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+              style={{ backgroundColor: '#2F52E0' }}
             >
-              <UserPlus size={16} />
+              <UserPlus size={16} strokeWidth={2.5} />
               Invitar
             </button>
           </div>
@@ -522,13 +532,7 @@ export default function ConfigUsers() {
               <Users size={28} className="text-slate-400" />
             </div>
             <h3 className="text-lg font-semibold text-slate-900 mb-2">{searchTerm ? "Sin resultados" : "Sin usuarios"}</h3>
-            <p className="text-slate-500 text-sm mb-6">{searchTerm ? "Prueba con otro término" : "Invita al primer usuario del equipo"}</p>
-            {!searchTerm && (
-              <button onClick={() => setShowInviteModal(true)} className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors">
-                <UserPlus size={16} />
-                Invitar
-              </button>
-            )}
+            <p className="text-slate-500 text-sm">{searchTerm ? "Prueba con otro término" : "Invita al primer usuario del equipo"}</p>
           </div>
         )}
       </main>
