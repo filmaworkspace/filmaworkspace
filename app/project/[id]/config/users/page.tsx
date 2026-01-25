@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
 import {
-  Users,
+  UserCog,
   UserPlus,
   Search,
   Trash2,
@@ -297,7 +297,7 @@ export default function ConfigUsers() {
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
-              <Users size={24} style={{ color: '#2F52E0' }} />
+              <UserCog size={24} style={{ color: '#2F52E0' }} />
               <h1 className="text-2xl font-semibold text-slate-900">Usuarios del proyecto</h1>
             </div>
       
