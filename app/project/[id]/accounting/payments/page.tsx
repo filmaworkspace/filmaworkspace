@@ -546,7 +546,6 @@ export default function PaymentsPage() {
               <CreditCard size={24} style={{ color: "#2F52E0" }} />
               <div>
                 <h1 className="text-2xl font-semibold text-slate-900">Previsiones de pago</h1>
-                <p className="text-sm text-slate-500 mt-0.5">{forecasts.length} previsiones · {formatCurrency(forecasts.reduce((s, f) => s + f.totalAmount, 0))} € total</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
