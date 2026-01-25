@@ -343,90 +343,53 @@ export default function ConfigGeneral() {
               <h1 className="text-2xl font-semibold text-slate-900">Configuración del proyecto</h1>
             </div>
       
-            <div className="relative">
-              <button
-                onClick={() => setShowActions(!showActions)}
-                className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors border border-slate-200"
-              >
-                <MoreHorizontal size={20} className="text-slate-500" />
-              </button>
-      
-              {showActions && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setShowActions(false)} />
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 z-20">
-                    <button
-                      onClick={copyProjectId}
-                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 flex items-center gap-3 text-slate-700"
-                    >
-                      <Copy size={15} className="text-slate-400" /> Copiar ID
-                    </button>
-                    <button
-                      onClick={archiveProject}
-                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 flex items-center gap-3 text-slate-700"
-                    >
-                      <Archive size={15} className="text-slate-400" /> {project?.archived ? "Restaurar" : "Archivar"}
-                    </button>
-                    <div className="border-t border-slate-100 my-1" />
-                    <button
-                      onClick={() => { setShowActions(false); setShowDeleteConfirm(true); }}
-                      className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
-                    >
-                      <Trash2 size={15} /> Eliminar proyecto
-                    </button>
-                  </div>
-                </>
+            <div className="flex items-center gap-2">
+              {!editingProject && !editingProduction && (
+                <button
+                  onClick={() => { setEditingProject(true); setEditingProduction(true); }}
+                  className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+                  style={{ backgroundColor: '#2F52E0' }}
+                >
+                  <Edit2 size={16} />
+                  Editar
+                </button>
               )}
+              <div className="relative">
+                <button
+                  onClick={() => setShowActions(!showActions)}
+                  className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors border border-slate-200"
+                >
+                  <MoreHorizontal size={20} className="text-slate-500" />
+                </button>
+      
+                {showActions && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowActions(false)} />
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 z-20">
+                      <button
+                        onClick={archiveProject}
+                        className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 flex items-center gap-3 text-slate-700"
+                      >
+                        <Archive size={15} className="text-slate-400" /> {project?.archived ? "Restaurar" : "Archivar"}
+                      </button>
+                      <div className="border-t border-slate-100 my-1" />
+                      <button
+                        onClick={() => { setShowActions(false); setShowDeleteConfirm(true); }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
+                      >
+                        <Trash2 size={15} /> Eliminar proyecto
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8 max-w-4xl">
-        {/* Editing Toggle */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            {/* Completeness indicator */}
-            {(() => {
-              const fields = [
-                project?.name,
-                project?.phase,
-                productionData.projectType,
-                productionData.shootingDays,
-                productionData.shootingStartDate,
-              ];
-              const filled = fields.filter(Boolean).length;
-              const total = fields.length;
-              const percentage = Math.round((filled / total) * 100);
-              return (
-                <div className="flex items-center gap-3">
-                  <div className="w-24 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{ 
-                        width: `${percentage}%`,
-                        backgroundColor: percentage === 100 ? '#10b981' : '#2F52E0'
-                      }}
-                    />
-                  </div>
-                  <span className="text-xs text-slate-400">{percentage}% completo</span>
-                </div>
-              );
-            })()}
-          </div>
-          {!editingProject && !editingProduction && (
-            <button
-              onClick={() => { setEditingProject(true); setEditingProduction(true); }}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl transition-colors"
-              style={{ color: '#2F52E0', backgroundColor: 'rgba(47, 82, 224, 0.1)' }}
-            >
-              <Edit2 size={14} />
-              Editar todo
-            </button>
-          )}
-        </div>
-
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
         {!editingProject && !editingProduction ? (
           /* VIEW MODE */
           <div className="space-y-8">
