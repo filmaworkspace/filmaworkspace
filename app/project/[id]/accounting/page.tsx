@@ -223,7 +223,7 @@ export default function AccountingPage() {
                 <Link href={`/project/${id}/accounting/accountingconfig`}>
                   <button className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-white hover:text-slate-900 transition-colors">
                     <Settings size={16} />
-                    <span>Configuración</span>
+                    <span>Ajustes</span>
                   </button>
                 </Link>
               )}
@@ -254,9 +254,9 @@ export default function AccountingPage() {
         )}
 
         {/* Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
           {/* Recent POs */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1 lg:max-w-[50%]">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div className="flex items-center gap-3">
                 <div 
@@ -326,7 +326,7 @@ export default function AccountingPage() {
           </div>
 
           {/* Recent Invoices */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1 lg:max-w-[50%]">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div className="flex items-center gap-3">
                 <div 
@@ -413,4 +413,3 @@ export default function AccountingPage() {
     </div>
   );
 }
-
