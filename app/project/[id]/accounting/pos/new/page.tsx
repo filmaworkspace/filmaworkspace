@@ -46,6 +46,8 @@ import {
   ShieldAlert,
   Lock,
   ChevronDown,
+  Layers,
+  Percent,
 } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
@@ -78,6 +80,12 @@ interface SubAccount {
   accountDescription: string;
 }
 
+interface EpisodeDistribution {
+  episode: number;
+  amount: number;
+  percentage: number;
+}
+
 interface POItem {
   id: string;
   description: string;
@@ -93,6 +101,7 @@ interface POItem {
   irpfRate: number;
   irpfAmount: number;
   totalAmount: number;
+  episodes?: EpisodeDistribution[];
 }
 
 interface ApprovalStep {
@@ -193,6 +202,16 @@ export default function NewPOPage() {
   const [showCurrencyDropdown, setShowCurrencyDropdown] = useState(false);
   const departmentDropdownRef = useRef<HTMLDivElement>(null);
   const currencyDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Configuración de episodios
+  const [episodesEnabled, setEpisodesEnabled] = useState(false);
+  const [episodesRequired, setEpisodesRequired] = useState(false);
+  const [episodePrefix, setEpisodePrefix] = useState("Cap");
+  const [totalEpisodes, setTotalEpisodes] = useState(0);
+  const [showEpisodeModal, setShowEpisodeModal] = useState(false);
+  const [episodeItemIndex, setEpisodeItemIndex] = useState<number | null>(null);
+  const [episodeDistributionMode, setEpisodeDistributionMode] = useState<"equal" | "amount" | "percentage">("equal");
+  const [tempEpisodeDistribution, setTempEpisodeDistribution] = useState<EpisodeDistribution[]>([]);
 
   const [formData, setFormData] = useState({
     supplier: "",
@@ -305,6 +324,24 @@ export default function NewPOPage() {
         setApprovalConfig([
           { id: "default-1", order: 1, approverType: "role", roles: ["PM", "EP"], requireAll: false },
         ]);
+      }
+
+      // Cargar configuración de episodios
+      const productionDoc = await getDoc(doc(db, "projects/" + id + "/config/production"));
+      if (productionDoc.exists()) {
+        const prodData = productionDoc.data();
+        if (prodData.projectType === "serie") {
+          setTotalEpisodes(prodData.episodes || 0);
+          
+          // Cargar configuración de asignación de episodios
+          const projectConfigDoc = await getDoc(doc(db, "projects/" + id + "/config/project"));
+          if (projectConfigDoc.exists()) {
+            const configData = projectConfigDoc.data();
+            setEpisodesEnabled(configData.enableEpisodes || false);
+            setEpisodesRequired(configData.requireEpisodeAssignment || false);
+            setEpisodePrefix(configData.episodePrefix || "Cap");
+          }
+        }
       }
 
       const suppliersSnapshot = await getDocs(
@@ -485,6 +522,116 @@ export default function NewPOPage() {
     setCurrentItemIndex(null);
   };
 
+  // Funciones para manejo de episodios
+  const openEpisodeModal = (index: number) => {
+    setEpisodeItemIndex(index);
+    const item = items[index];
+    if (item.episodes && item.episodes.length > 0) {
+      setTempEpisodeDistribution([...item.episodes]);
+      // Detectar modo basado en distribución existente
+      const allEqual = item.episodes.every(e => Math.abs(e.percentage - item.episodes![0].percentage) < 0.01);
+      setEpisodeDistributionMode(allEqual ? "equal" : "amount");
+    } else {
+      setTempEpisodeDistribution([]);
+    }
+    setShowEpisodeModal(true);
+  };
+
+  const toggleEpisodeInDistribution = (episodeNum: number) => {
+    const item = episodeItemIndex !== null ? items[episodeItemIndex] : null;
+    if (!item) return;
+    
+    const existing = tempEpisodeDistribution.find(e => e.episode === episodeNum);
+    if (existing) {
+      setTempEpisodeDistribution(tempEpisodeDistribution.filter(e => e.episode !== episodeNum));
+    } else {
+      const newEp: EpisodeDistribution = { episode: episodeNum, amount: 0, percentage: 0 };
+      const newDist = [...tempEpisodeDistribution, newEp].sort((a, b) => a.episode - b.episode);
+      // Recalcular distribución
+      recalculateDistribution(newDist, item.baseAmount);
+    }
+  };
+
+  const recalculateDistribution = (dist: EpisodeDistribution[], totalAmount: number) => {
+    if (dist.length === 0) {
+      setTempEpisodeDistribution([]);
+      return;
+    }
+    
+    if (episodeDistributionMode === "equal") {
+      const equalPercentage = 100 / dist.length;
+      const equalAmount = totalAmount / dist.length;
+      setTempEpisodeDistribution(dist.map(e => ({
+        ...e,
+        percentage: equalPercentage,
+        amount: equalAmount,
+      })));
+    } else {
+      setTempEpisodeDistribution(dist);
+    }
+  };
+
+  const updateEpisodeAmount = (episodeNum: number, amount: number) => {
+    const item = episodeItemIndex !== null ? items[episodeItemIndex] : null;
+    if (!item) return;
+    
+    const newDist = tempEpisodeDistribution.map(e => {
+      if (e.episode === episodeNum) {
+        return { ...e, amount, percentage: (amount / item.baseAmount) * 100 };
+      }
+      return e;
+    });
+    setTempEpisodeDistribution(newDist);
+  };
+
+  const updateEpisodePercentage = (episodeNum: number, percentage: number) => {
+    const item = episodeItemIndex !== null ? items[episodeItemIndex] : null;
+    if (!item) return;
+    
+    const newDist = tempEpisodeDistribution.map(e => {
+      if (e.episode === episodeNum) {
+        return { ...e, percentage, amount: (percentage / 100) * item.baseAmount };
+      }
+      return e;
+    });
+    setTempEpisodeDistribution(newDist);
+  };
+
+  const applyEqualDistribution = () => {
+    const item = episodeItemIndex !== null ? items[episodeItemIndex] : null;
+    if (!item || tempEpisodeDistribution.length === 0) return;
+    
+    const equalPercentage = 100 / tempEpisodeDistribution.length;
+    const equalAmount = item.baseAmount / tempEpisodeDistribution.length;
+    setTempEpisodeDistribution(tempEpisodeDistribution.map(e => ({
+      ...e,
+      percentage: equalPercentage,
+      amount: equalAmount,
+    })));
+  };
+
+  const saveEpisodeDistribution = () => {
+    if (episodeItemIndex === null) return;
+    
+    const newItems = [...items];
+    newItems[episodeItemIndex] = {
+      ...newItems[episodeItemIndex],
+      episodes: tempEpisodeDistribution.length > 0 ? tempEpisodeDistribution : undefined,
+    };
+    setItems(newItems);
+    setShowEpisodeModal(false);
+    setEpisodeItemIndex(null);
+    setTempEpisodeDistribution([]);
+  };
+
+  const getTotalDistributedPercentage = () => {
+    return tempEpisodeDistribution.reduce((sum, e) => sum + e.percentage, 0);
+  };
+
+  const getTotalDistributedAmount = () => {
+    return tempEpisodeDistribution.reduce((sum, e) => sum + e.amount, 0);
+  };
+
   const validateForm = (silent = false) => {
     const newErrors: Record<string, string> = {};
     if (!formData.supplier) newErrors.supplier = "Selecciona un proveedor";
@@ -495,6 +642,10 @@ export default function NewPOPage() {
       if (!item.subAccountId) newErrors["item_" + index + "_account"] = "Obligatorio";
       if (item.quantity <= 0) newErrors["item_" + index + "_quantity"] = "Debe ser > 0";
       if (item.unitPrice <= 0) newErrors["item_" + index + "_unitPrice"] = "Debe ser > 0";
+      // Validar episodios si es obligatorio
+      if (episodesEnabled && episodesRequired && (!item.episodes || item.episodes.length === 0)) {
+        newErrors["item_" + index + "_episodes"] = "Asignar capítulo obligatorio";
+      }
     });
     if (!silent) setErrors(newErrors);
     else setErrors(newErrors);
@@ -593,6 +744,7 @@ export default function NewPOPage() {
         irpfRate: item.irpfRate,
         irpfAmount: item.irpfAmount,
         totalAmount: item.totalAmount,
+        ...(item.episodes && item.episodes.length > 0 && { episodes: item.episodes }),
       }));
 
       const poData: any = {
@@ -980,7 +1132,7 @@ export default function NewPOPage() {
                       value={formData.generalDescription}
                       onChange={(e) => setFormData({ ...formData, generalDescription: e.target.value.toUpperCase() })}
                       onBlur={() => handleBlur("generalDescription")}
-                      placeholder="Descripción general de la PO"
+                      placeholder="DESCRIBE EL PROPÓSITO DE ESTA ORDEN DE COMPRA"
                       rows={3}
                       className={cx(
                         "w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm pr-10 uppercase",
@@ -1093,6 +1245,45 @@ export default function NewPOPage() {
                             </div>
                           )}
                         </div>
+
+                        {/* Asignación de capítulos */}
+                        {episodesEnabled && totalEpisodes > 0 && (
+                          <div>
+                            <button
+                              onClick={() => openEpisodeModal(index)}
+                              className={cx(
+                                "w-full px-4 py-3 border rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white",
+                                episodesRequired && (!item.episodes || item.episodes.length === 0) ? "border-amber-300 bg-amber-50" : item.episodes && item.episodes.length > 0 ? "border-violet-200 bg-violet-50" : "border-slate-200"
+                              )}
+                            >
+                              {item.episodes && item.episodes.length > 0 ? (
+                                <div className="flex items-center gap-2">
+                                  <Layers size={14} className="text-violet-600" />
+                                  <span className="text-slate-900">
+                                    {item.episodes.length === 1 
+                                      ? `${episodePrefix} ${item.episodes[0].episode}`
+                                      : `${item.episodes.length} capítulos asignados`
+                                    }
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className={episodesRequired ? "text-amber-600" : "text-slate-400"}>
+                                  {episodesRequired ? "Asignar capítulo (obligatorio)" : "Asignar capítulo (opcional)"}
+                                </span>
+                              )}
+                              <Layers size={14} className="text-slate-400" />
+                            </button>
+                            {item.episodes && item.episodes.length > 1 && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {item.episodes.map((ep) => (
+                                  <span key={ep.episode} className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-lg">
+                                    {episodePrefix} {ep.episode}: {formatCurrency(ep.amount)} €
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         <div className="grid grid-cols-4 gap-3">
                           <div>
@@ -1593,6 +1784,168 @@ export default function NewPOPage() {
                   })
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de asignación de capítulos */}
+      {showEpisodeModal && episodeItemIndex !== null && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center">
+                  <Layers size={20} className="text-violet-600" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-slate-900">Asignar capítulos</h2>
+                  <p className="text-xs text-slate-500">Item {episodeItemIndex + 1}: {formatCurrency(items[episodeItemIndex].baseAmount)} €</p>
+                </div>
+              </div>
+              <button onClick={() => setShowEpisodeModal(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X size={20} className="text-slate-500" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 overflow-y-auto max-h-[60vh]">
+              {/* Modo de distribución */}
+              <div>
+                <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Modo de distribución</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setEpisodeDistributionMode("equal"); applyEqualDistribution(); }}
+                    className={cx(
+                      "flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                      episodeDistributionMode === "equal" ? "bg-violet-100 text-violet-700 border border-violet-200" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    )}
+                  >
+                    Partes iguales
+                  </button>
+                  <button
+                    onClick={() => setEpisodeDistributionMode("amount")}
+                    className={cx(
+                      "flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                      episodeDistributionMode === "amount" ? "bg-violet-100 text-violet-700 border border-violet-200" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    )}
+                  >
+                    Por importe
+                  </button>
+                  <button
+                    onClick={() => setEpisodeDistributionMode("percentage")}
+                    className={cx(
+                      "flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                      episodeDistributionMode === "percentage" ? "bg-violet-100 text-violet-700 border border-violet-200" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    )}
+                  >
+                    Por porcentaje
+                  </button>
+                </div>
+              </div>
+
+              {/* Selección de capítulos */}
+              <div>
+                <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Seleccionar capítulos</label>
+                <div className="flex flex-wrap gap-2">
+                  {Array.from({ length: totalEpisodes }, (_, i) => i + 1).map((epNum) => {
+                    const isSelected = tempEpisodeDistribution.some(e => e.episode === epNum);
+                    return (
+                      <button
+                        key={epNum}
+                        onClick={() => toggleEpisodeInDistribution(epNum)}
+                        className={cx(
+                          "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                          isSelected ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        )}
+                      >
+                        {episodePrefix} {epNum}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Distribución detallada */}
+              {tempEpisodeDistribution.length > 0 && episodeDistributionMode !== "equal" && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Distribución</label>
+                  <div className="space-y-2">
+                    {tempEpisodeDistribution.map((ep) => (
+                      <div key={ep.episode} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                        <span className="text-sm font-medium text-slate-700 w-16">{episodePrefix} {ep.episode}</span>
+                        {episodeDistributionMode === "amount" ? (
+                          <div className="flex-1 relative">
+                            <input
+                              type="number"
+                              value={ep.amount || ""}
+                              onChange={(e) => updateEpisodeAmount(ep.episode, parseFloat(e.target.value) || 0)}
+                              className="w-full pl-6 pr-3 py-2 border border-slate-200 rounded-lg text-sm"
+                              placeholder="0.00"
+                            />
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">€</span>
+                          </div>
+                        ) : (
+                          <div className="flex-1 relative">
+                            <input
+                              type="number"
+                              value={ep.percentage || ""}
+                              onChange={(e) => updateEpisodePercentage(ep.episode, parseFloat(e.target.value) || 0)}
+                              className="w-full pr-8 pl-3 py-2 border border-slate-200 rounded-lg text-sm"
+                              placeholder="0"
+                              min="0"
+                              max="100"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">%</span>
+                          </div>
+                        )}
+                        <span className="text-xs text-slate-500 w-20 text-right">
+                          {episodeDistributionMode === "amount" 
+                            ? `${ep.percentage.toFixed(1)}%`
+                            : `${formatCurrency(ep.amount)} €`
+                          }
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Resumen */}
+              {tempEpisodeDistribution.length > 0 && (
+                <div className={cx(
+                  "p-3 rounded-lg flex items-center justify-between",
+                  Math.abs(getTotalDistributedPercentage() - 100) < 0.1 ? "bg-emerald-50" : "bg-amber-50"
+                )}>
+                  <span className="text-sm font-medium text-slate-700">Total asignado:</span>
+                  <div className="text-right">
+                    <p className={cx(
+                      "text-sm font-semibold",
+                      Math.abs(getTotalDistributedPercentage() - 100) < 0.1 ? "text-emerald-700" : "text-amber-700"
+                    )}>
+                      {formatCurrency(getTotalDistributedAmount())} € ({getTotalDistributedPercentage().toFixed(1)}%)
+                    </p>
+                    {Math.abs(getTotalDistributedPercentage() - 100) >= 0.1 && (
+                      <p className="text-xs text-amber-600">Debe sumar 100%</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3">
+              <button
+                onClick={() => setShowEpisodeModal(false)}
+                className="flex-1 py-2.5 text-slate-600 hover:bg-slate-200 rounded-xl text-sm font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveEpisodeDistribution}
+                disabled={tempEpisodeDistribution.length > 0 && Math.abs(getTotalDistributedPercentage() - 100) >= 0.1}
+                className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {tempEpisodeDistribution.length === 0 ? "Sin asignar" : "Guardar"}
+              </button>
             </div>
           </div>
         </div>
