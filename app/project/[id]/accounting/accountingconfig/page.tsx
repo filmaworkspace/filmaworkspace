@@ -34,8 +34,6 @@ import {
   Edit2,
   Film,
   Layers,
-  FolderTree,
-  Tag,
 } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebase";
@@ -177,15 +175,6 @@ interface ProjectSettings {
   enableEpisodes: boolean;
   episodePrefix: string;
   requireEpisodeAssignment: boolean;
-  enableLocations: boolean;
-  requireLocationAssignment: boolean;
-  enableTags: boolean;
-  customTags: string[];
-  defaultCurrency: string;
-  requirePoForInvoice: boolean;
-  allowPartialInvoicing: boolean;
-  retentionPercentage: number;
-  enableRetention: boolean;
 }
 
 // Configuración de permisos por defecto
@@ -249,17 +238,7 @@ export default function AccountingConfigPage() {
     enableEpisodes: false,
     episodePrefix: "Cap",
     requireEpisodeAssignment: false,
-    enableLocations: false,
-    requireLocationAssignment: false,
-    enableTags: false,
-    customTags: [],
-    defaultCurrency: "EUR",
-    requirePoForInvoice: false,
-    allowPartialInvoicing: true,
-    retentionPercentage: 0,
-    enableRetention: false,
   });
-  const [newTag, setNewTag] = useState("");
   
   // Datos de empresa
   const [companyData, setCompanyData] = useState<CompanyData>(emptyCompanyData);
@@ -365,15 +344,6 @@ export default function AccountingConfigPage() {
           enableEpisodes: data.enableEpisodes || false,
           episodePrefix: data.episodePrefix || "Cap",
           requireEpisodeAssignment: data.requireEpisodeAssignment || false,
-          enableLocations: data.enableLocations || false,
-          requireLocationAssignment: data.requireLocationAssignment || false,
-          enableTags: data.enableTags || false,
-          customTags: data.customTags || [],
-          defaultCurrency: data.defaultCurrency || "EUR",
-          requirePoForInvoice: data.requirePoForInvoice || false,
-          allowPartialInvoicing: data.allowPartialInvoicing !== false,
-          retentionPercentage: data.retentionPercentage || 0,
-          enableRetention: data.enableRetention || false,
         });
       }
 
@@ -551,22 +521,6 @@ export default function AccountingConfigPage() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const addCustomTag = () => {
-    if (!newTag.trim() || projectSettings.customTags.includes(newTag.trim())) return;
-    setProjectSettings({
-      ...projectSettings,
-      customTags: [...projectSettings.customTags, newTag.trim()],
-    });
-    setNewTag("");
-  };
-
-  const removeCustomTag = (tag: string) => {
-    setProjectSettings({
-      ...projectSettings,
-      customTags: projectSettings.customTags.filter(t => t !== tag),
-    });
   };
 
   // Funciones de datos de empresa
@@ -1243,20 +1197,28 @@ export default function AccountingConfigPage() {
   const renderProjectSection = () => (
     <div className="space-y-6">
       {/* Info del tipo de proyecto */}
-      {projectType && (
+      {projectType ? (
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center gap-4">
           <Film size={20} className="text-slate-500" />
           <div>
             <p className="text-sm font-medium text-slate-900 capitalize">{projectType}</p>
             {projectType === "serie" && projectEpisodes > 0 && (
-              <p className="text-xs text-slate-500">{projectEpisodes} capítulos configurados</p>
+              <p className="text-xs text-slate-500">{projectEpisodes} capítulos configurados en el proyecto</p>
             )}
+          </div>
+        </div>
+      ) : (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-4">
+          <AlertCircle size={20} className="text-amber-600" />
+          <div>
+            <p className="text-sm font-medium text-amber-900">Tipo de proyecto no configurado</p>
+            <p className="text-xs text-amber-700">Configura el tipo de proyecto (película o serie) en Configuración General</p>
           </div>
         </div>
       )}
 
-      {/* Configuración de capítulos/episodios */}
-      {projectType === "serie" && (
+      {/* Configuración de capítulos/episodios - Solo para series */}
+      {projectType === "serie" ? (
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
             <Layers size={18} className="text-slate-400" />
@@ -1305,180 +1267,25 @@ export default function AccountingConfigPage() {
               </>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Configuración de localizaciones */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-          <FolderTree size={18} className="text-slate-400" />
-          <h2 className="font-semibold text-slate-900">Asignación por localización</h2>
-        </div>
-        <div className="p-6 space-y-4">
-          <label className="flex items-center justify-between p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-            <div>
-              <p className="text-sm font-medium text-slate-900">Habilitar asignación a localizaciones</p>
-              <p className="text-xs text-slate-500">Permite asignar POs y facturas a localizaciones de rodaje</p>
-            </div>
-            <input
-              type="checkbox"
-              checked={projectSettings.enableLocations}
-              onChange={(e) => setProjectSettings({ ...projectSettings, enableLocations: e.target.checked })}
-              className="w-5 h-5 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
-            />
-          </label>
           
-          {projectSettings.enableLocations && (
-            <label className="flex items-center justify-between p-4 bg-amber-50 rounded-xl cursor-pointer border border-amber-200">
-              <div>
-                <p className="text-sm font-medium text-amber-900">Requerir asignación obligatoria</p>
-                <p className="text-xs text-amber-700">No se podrán crear POs o facturas sin asignar una localización</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={projectSettings.requireLocationAssignment}
-                onChange={(e) => setProjectSettings({ ...projectSettings, requireLocationAssignment: e.target.checked })}
-                className="w-5 h-5 text-amber-600 border-amber-300 rounded focus:ring-amber-500"
-              />
-            </label>
-          )}
-        </div>
-      </div>
-
-      {/* Etiquetas personalizadas */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-          <Tag size={18} className="text-slate-400" />
-          <h2 className="font-semibold text-slate-900">Etiquetas personalizadas</h2>
-        </div>
-        <div className="p-6 space-y-4">
-          <label className="flex items-center justify-between p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-            <div>
-              <p className="text-sm font-medium text-slate-900">Habilitar etiquetas</p>
-              <p className="text-xs text-slate-500">Añade etiquetas personalizadas para categorizar documentos</p>
-            </div>
-            <input
-              type="checkbox"
-              checked={projectSettings.enableTags}
-              onChange={(e) => setProjectSettings({ ...projectSettings, enableTags: e.target.checked })}
-              className="w-5 h-5 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
-            />
-          </label>
-          
-          {projectSettings.enableTags && (
-            <div>
-              <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">Etiquetas</label>
-              <div className="flex flex-wrap gap-2 mb-3">
-                {projectSettings.customTags.map((tag) => (
-                  <span key={tag} className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 rounded-lg text-sm">
-                    {tag}
-                    <button onClick={() => removeCustomTag(tag)} className="text-slate-400 hover:text-slate-600">
-                      <X size={14} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomTag())}
-                  placeholder="Nueva etiqueta"
-                  className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                />
-                <button
-                  onClick={addCustomTag}
-                  disabled={!newTag.trim()}
-                  className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
-                >
-                  Añadir
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Configuración de facturación */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-          <Receipt size={18} className="text-slate-400" />
-          <h2 className="font-semibold text-slate-900">Facturación</h2>
-        </div>
-        <div className="p-6 space-y-4">
-          <label className="flex items-center justify-between p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-            <div>
-              <p className="text-sm font-medium text-slate-900">Requerir PO para facturas</p>
-              <p className="text-xs text-slate-500">Las facturas solo pueden crearse asociadas a una PO aprobada</p>
-            </div>
-            <input
-              type="checkbox"
-              checked={projectSettings.requirePoForInvoice}
-              onChange={(e) => setProjectSettings({ ...projectSettings, requirePoForInvoice: e.target.checked })}
-              className="w-5 h-5 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
-            />
-          </label>
-          
-          <label className="flex items-center justify-between p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-            <div>
-              <p className="text-sm font-medium text-slate-900">Permitir facturación parcial</p>
-              <p className="text-xs text-slate-500">Permite crear múltiples facturas contra una misma PO</p>
-            </div>
-            <input
-              type="checkbox"
-              checked={projectSettings.allowPartialInvoicing}
-              onChange={(e) => setProjectSettings({ ...projectSettings, allowPartialInvoicing: e.target.checked })}
-              className="w-5 h-5 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
-            />
-          </label>
-
-          <div className="border-t border-slate-100 pt-4">
-            <label className="flex items-center justify-between p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-              <div>
-                <p className="text-sm font-medium text-slate-900">Habilitar retenciones</p>
-                <p className="text-xs text-slate-500">Aplica un porcentaje de retención automático a facturas</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={projectSettings.enableRetention}
-                onChange={(e) => setProjectSettings({ ...projectSettings, enableRetention: e.target.checked })}
-                className="w-5 h-5 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
-              />
-            </label>
-            
-            {projectSettings.enableRetention && (
-              <div className="mt-3 pl-4">
-                <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">Porcentaje de retención</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={projectSettings.retentionPercentage}
-                    onChange={(e) => setProjectSettings({ ...projectSettings, retentionPercentage: parseFloat(e.target.value) || 0 })}
-                    min="0"
-                    max="100"
-                    step="0.5"
-                    className="w-24 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                  />
-                  <span className="text-sm text-slate-500">%</span>
-                </div>
-              </div>
-            )}
+          {/* Botón guardar */}
+          <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+            <button
+              onClick={handleSaveProjectSettings}
+              disabled={saving}
+              className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
+            >
+              <Save size={16} />
+              {saving ? "Guardando..." : "Guardar"}
+            </button>
           </div>
         </div>
-      </div>
-
-      {/* Botón guardar */}
-      <div className="flex justify-end">
-        <button
-          onClick={handleSaveProjectSettings}
-          disabled={saving}
-          className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
-        >
-          <Save size={16} />
-          {saving ? "Guardando..." : "Guardar configuración"}
-        </button>
-      </div>
+      ) : projectType === "pelicula" ? (
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center">
+          <Film size={32} className="mx-auto text-slate-300 mb-3" />
+          <p className="text-sm text-slate-500">Las películas no tienen configuración de capítulos</p>
+        </div>
+      ) : null}
     </div>
   );
 
