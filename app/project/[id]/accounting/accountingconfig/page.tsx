@@ -32,6 +32,10 @@ import {
   CreditCard,
   Star,
   Edit2,
+  Film,
+  Layers,
+  FolderTree,
+  Tag,
 } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebase";
@@ -143,6 +147,7 @@ const PRESET_THRESHOLDS = [1000, 2500, 5000, 10000, 25000, 50000];
 
 // Secciones de configuración
 const CONFIG_SECTIONS = [
+  { id: "project", label: "Proyecto", icon: Film, description: "Configuración específica del proyecto" },
   { id: "company", label: "Datos fiscales", icon: Building2, description: "Datos de la empresa y cuentas bancarias" },
   { id: "cost", label: "Coste", icon: TrendingUp, description: "Comportamiento del comprometido y realizado" },
   { id: "approvals", label: "Aprobaciones", icon: FileCheck, description: "Flujos de aprobación para POs y facturas" },
@@ -165,6 +170,22 @@ const ACTUAL_TRIGGERS = [
 interface CostSettings {
   poCommitmentTrigger: "on_create" | "on_approve" | "on_account";
   invoiceActualTrigger: "on_approve" | "on_paid" | "on_account";
+}
+
+// Configuración específica del proyecto para contabilidad
+interface ProjectSettings {
+  enableEpisodes: boolean;
+  episodePrefix: string;
+  requireEpisodeAssignment: boolean;
+  enableLocations: boolean;
+  requireLocationAssignment: boolean;
+  enableTags: boolean;
+  customTags: string[];
+  defaultCurrency: string;
+  requirePoForInvoice: boolean;
+  allowPartialInvoicing: boolean;
+  retentionPercentage: number;
+  enableRetention: boolean;
 }
 
 // Configuración de permisos por defecto
@@ -213,13 +234,32 @@ export default function AccountingConfigPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [hasAccess, setHasAccess] = useState(false);
   const [projectName, setProjectName] = useState("");
+  const [projectType, setProjectType] = useState<"pelicula" | "serie" | null>(null);
+  const [projectEpisodes, setProjectEpisodes] = useState<number>(0);
   const [members, setMembers] = useState<Member[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   
   // Sección activa
-  const [activeSection, setActiveSection] = useState("company");
+  const [activeSection, setActiveSection] = useState("project");
+  
+  // Configuración del proyecto
+  const [projectSettings, setProjectSettings] = useState<ProjectSettings>({
+    enableEpisodes: false,
+    episodePrefix: "Cap",
+    requireEpisodeAssignment: false,
+    enableLocations: false,
+    requireLocationAssignment: false,
+    enableTags: false,
+    customTags: [],
+    defaultCurrency: "EUR",
+    requirePoForInvoice: false,
+    allowPartialInvoicing: true,
+    retentionPercentage: 0,
+    enableRetention: false,
+  });
+  const [newTag, setNewTag] = useState("");
   
   // Datos de empresa
   const [companyData, setCompanyData] = useState<CompanyData>(emptyCompanyData);
@@ -311,6 +351,30 @@ export default function AccountingConfigPage() {
         const d = projectSnap.data();
         setProjectName(d.name);
         setDepartments(d.departments || []);
+        // Cargar tipo de proyecto y episodios
+        setProjectType(d.projectType || null);
+        setProjectEpisodes(d.episodes || 0);
+      }
+
+      // Cargar configuración del proyecto para contabilidad
+      const projectConfigRef = doc(db, `projects/${id}/config/project`);
+      const projectConfigSnap = await getDoc(projectConfigRef);
+      if (projectConfigSnap.exists()) {
+        const data = projectConfigSnap.data();
+        setProjectSettings({
+          enableEpisodes: data.enableEpisodes || false,
+          episodePrefix: data.episodePrefix || "Cap",
+          requireEpisodeAssignment: data.requireEpisodeAssignment || false,
+          enableLocations: data.enableLocations || false,
+          requireLocationAssignment: data.requireLocationAssignment || false,
+          enableTags: data.enableTags || false,
+          customTags: data.customTags || [],
+          defaultCurrency: data.defaultCurrency || "EUR",
+          requirePoForInvoice: data.requirePoForInvoice || false,
+          allowPartialInvoicing: data.allowPartialInvoicing !== false,
+          retentionPercentage: data.retentionPercentage || 0,
+          enableRetention: data.enableRetention || false,
+        });
       }
 
       const membersRef = collection(db, `projects/${id}/members`);
@@ -467,6 +531,42 @@ export default function AccountingConfigPage() {
     const reordered = current.map((s, i) => ({ ...s, order: i + 1 }));
     if (type === "po") setPoApprovals(reordered);
     else setInvoiceApprovals(reordered);
+  };
+
+  // Funciones de configuración del proyecto
+  const handleSaveProjectSettings = async () => {
+    if (!id) return;
+    setSaving(true);
+    try {
+      const dataToSave = {
+        ...projectSettings,
+        updatedAt: Timestamp.now(),
+        updatedBy: userId,
+      };
+      await setDoc(doc(db, `projects/${id}/config`, "project"), dataToSave);
+      setSuccessMessage("Configuración del proyecto guardada");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err) {
+      setErrorMessage("Error al guardar configuración del proyecto");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addCustomTag = () => {
+    if (!newTag.trim() || projectSettings.customTags.includes(newTag.trim())) return;
+    setProjectSettings({
+      ...projectSettings,
+      customTags: [...projectSettings.customTags, newTag.trim()],
+    });
+    setNewTag("");
+  };
+
+  const removeCustomTag = (tag: string) => {
+    setProjectSettings({
+      ...projectSettings,
+      customTags: projectSettings.customTags.filter(t => t !== tag),
+    });
   };
 
   // Funciones de datos de empresa
@@ -1139,6 +1239,249 @@ export default function AccountingConfigPage() {
   };
 
   // Render de la sección de datos de empresa
+  // Render de la sección de configuración del proyecto
+  const renderProjectSection = () => (
+    <div className="space-y-6">
+      {/* Info del tipo de proyecto */}
+      {projectType && (
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center gap-4">
+          <Film size={20} className="text-slate-500" />
+          <div>
+            <p className="text-sm font-medium text-slate-900 capitalize">{projectType}</p>
+            {projectType === "serie" && projectEpisodes > 0 && (
+              <p className="text-xs text-slate-500">{projectEpisodes} capítulos configurados</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Configuración de capítulos/episodios */}
+      {projectType === "serie" && (
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+            <Layers size={18} className="text-slate-400" />
+            <h2 className="font-semibold text-slate-900">Asignación por capítulos</h2>
+          </div>
+          <div className="p-6 space-y-4">
+            <label className="flex items-center justify-between p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+              <div>
+                <p className="text-sm font-medium text-slate-900">Habilitar asignación a capítulos</p>
+                <p className="text-xs text-slate-500">Permite asignar POs y facturas a capítulos específicos de la serie</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={projectSettings.enableEpisodes}
+                onChange={(e) => setProjectSettings({ ...projectSettings, enableEpisodes: e.target.checked })}
+                className="w-5 h-5 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
+              />
+            </label>
+            
+            {projectSettings.enableEpisodes && (
+              <>
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">Prefijo para capítulos</label>
+                  <input
+                    type="text"
+                    value={projectSettings.episodePrefix}
+                    onChange={(e) => setProjectSettings({ ...projectSettings, episodePrefix: e.target.value })}
+                    placeholder="Cap"
+                    className="w-32 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Ejemplo: {projectSettings.episodePrefix} 1, {projectSettings.episodePrefix} 2...</p>
+                </div>
+                
+                <label className="flex items-center justify-between p-4 bg-amber-50 rounded-xl cursor-pointer border border-amber-200">
+                  <div>
+                    <p className="text-sm font-medium text-amber-900">Requerir asignación obligatoria</p>
+                    <p className="text-xs text-amber-700">No se podrán crear POs o facturas sin asignar un capítulo</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={projectSettings.requireEpisodeAssignment}
+                    onChange={(e) => setProjectSettings({ ...projectSettings, requireEpisodeAssignment: e.target.checked })}
+                    className="w-5 h-5 text-amber-600 border-amber-300 rounded focus:ring-amber-500"
+                  />
+                </label>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Configuración de localizaciones */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+          <FolderTree size={18} className="text-slate-400" />
+          <h2 className="font-semibold text-slate-900">Asignación por localización</h2>
+        </div>
+        <div className="p-6 space-y-4">
+          <label className="flex items-center justify-between p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+            <div>
+              <p className="text-sm font-medium text-slate-900">Habilitar asignación a localizaciones</p>
+              <p className="text-xs text-slate-500">Permite asignar POs y facturas a localizaciones de rodaje</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={projectSettings.enableLocations}
+              onChange={(e) => setProjectSettings({ ...projectSettings, enableLocations: e.target.checked })}
+              className="w-5 h-5 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
+            />
+          </label>
+          
+          {projectSettings.enableLocations && (
+            <label className="flex items-center justify-between p-4 bg-amber-50 rounded-xl cursor-pointer border border-amber-200">
+              <div>
+                <p className="text-sm font-medium text-amber-900">Requerir asignación obligatoria</p>
+                <p className="text-xs text-amber-700">No se podrán crear POs o facturas sin asignar una localización</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={projectSettings.requireLocationAssignment}
+                onChange={(e) => setProjectSettings({ ...projectSettings, requireLocationAssignment: e.target.checked })}
+                className="w-5 h-5 text-amber-600 border-amber-300 rounded focus:ring-amber-500"
+              />
+            </label>
+          )}
+        </div>
+      </div>
+
+      {/* Etiquetas personalizadas */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+          <Tag size={18} className="text-slate-400" />
+          <h2 className="font-semibold text-slate-900">Etiquetas personalizadas</h2>
+        </div>
+        <div className="p-6 space-y-4">
+          <label className="flex items-center justify-between p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+            <div>
+              <p className="text-sm font-medium text-slate-900">Habilitar etiquetas</p>
+              <p className="text-xs text-slate-500">Añade etiquetas personalizadas para categorizar documentos</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={projectSettings.enableTags}
+              onChange={(e) => setProjectSettings({ ...projectSettings, enableTags: e.target.checked })}
+              className="w-5 h-5 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
+            />
+          </label>
+          
+          {projectSettings.enableTags && (
+            <div>
+              <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">Etiquetas</label>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {projectSettings.customTags.map((tag) => (
+                  <span key={tag} className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 rounded-lg text-sm">
+                    {tag}
+                    <button onClick={() => removeCustomTag(tag)} className="text-slate-400 hover:text-slate-600">
+                      <X size={14} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomTag())}
+                  placeholder="Nueva etiqueta"
+                  className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                />
+                <button
+                  onClick={addCustomTag}
+                  disabled={!newTag.trim()}
+                  className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
+                >
+                  Añadir
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Configuración de facturación */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+          <Receipt size={18} className="text-slate-400" />
+          <h2 className="font-semibold text-slate-900">Facturación</h2>
+        </div>
+        <div className="p-6 space-y-4">
+          <label className="flex items-center justify-between p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+            <div>
+              <p className="text-sm font-medium text-slate-900">Requerir PO para facturas</p>
+              <p className="text-xs text-slate-500">Las facturas solo pueden crearse asociadas a una PO aprobada</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={projectSettings.requirePoForInvoice}
+              onChange={(e) => setProjectSettings({ ...projectSettings, requirePoForInvoice: e.target.checked })}
+              className="w-5 h-5 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
+            />
+          </label>
+          
+          <label className="flex items-center justify-between p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+            <div>
+              <p className="text-sm font-medium text-slate-900">Permitir facturación parcial</p>
+              <p className="text-xs text-slate-500">Permite crear múltiples facturas contra una misma PO</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={projectSettings.allowPartialInvoicing}
+              onChange={(e) => setProjectSettings({ ...projectSettings, allowPartialInvoicing: e.target.checked })}
+              className="w-5 h-5 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
+            />
+          </label>
+
+          <div className="border-t border-slate-100 pt-4">
+            <label className="flex items-center justify-between p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+              <div>
+                <p className="text-sm font-medium text-slate-900">Habilitar retenciones</p>
+                <p className="text-xs text-slate-500">Aplica un porcentaje de retención automático a facturas</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={projectSettings.enableRetention}
+                onChange={(e) => setProjectSettings({ ...projectSettings, enableRetention: e.target.checked })}
+                className="w-5 h-5 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
+              />
+            </label>
+            
+            {projectSettings.enableRetention && (
+              <div className="mt-3 pl-4">
+                <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">Porcentaje de retención</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={projectSettings.retentionPercentage}
+                    onChange={(e) => setProjectSettings({ ...projectSettings, retentionPercentage: parseFloat(e.target.value) || 0 })}
+                    min="0"
+                    max="100"
+                    step="0.5"
+                    className="w-24 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  />
+                  <span className="text-sm text-slate-500">%</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Botón guardar */}
+      <div className="flex justify-end">
+        <button
+          onClick={handleSaveProjectSettings}
+          disabled={saving}
+          className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
+        >
+          <Save size={16} />
+          {saving ? "Guardando..." : "Guardar configuración"}
+        </button>
+      </div>
+    </div>
+  );
+
   const renderCompanySection = () => (
     <div className="space-y-6">
       {/* Datos fiscales */}
@@ -1853,87 +2196,77 @@ export default function AccountingConfigPage() {
         </div>
       </div>
 
+      {/* Toast */}
+      {successMessage && (
+        <div className="fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
+          <CheckCircle2 size={16} />
+          {successMessage}
+        </div>
+      )}
+      {errorMessage && hasAccess && (
+        <div className="fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
+          <AlertCircle size={16} />
+          {errorMessage}
+        </div>
+      )}
+
       <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
-        {/* Mensajes */}
-        {successMessage && (
-          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3">
-            <CheckCircle2 size={18} className="text-emerald-600" />
-            <span className="text-sm text-emerald-700 font-medium">{successMessage}</span>
-          </div>
-        )}
-
-        {errorMessage && hasAccess && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
-            <AlertCircle size={18} className="text-red-600" />
-            <span className="text-sm text-red-700">{errorMessage}</span>
-            <button onClick={() => setErrorMessage("")} className="ml-auto text-red-400 hover:text-red-600">
-              <X size={16} />
-            </button>
-          </div>
-        )}
-
         {/* Layout con sidebar de secciones */}
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Sidebar de secciones */}
-          <div className="lg:w-64 flex-shrink-0">
-            <nav className="flex lg:flex-col gap-2 lg:space-y-1 lg:sticky lg:top-24 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0">
-              {CONFIG_SECTIONS.map((section) => {
-                const Icon = section.icon;
-                const isActive = activeSection === section.id;
-                
-                return (
-                  <button
-                    key={section.id}
-                    onClick={() => setActiveSection(section.id)}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all whitespace-nowrap ${
-                      isActive
-                        ? "bg-slate-900 text-white"
-                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                    }`}
-                  >
-                    <Icon size={18} className={isActive ? "text-white" : "text-slate-400"} />
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium ${isActive ? "text-white" : ""}`}>{section.label}</p>
-                    </div>
-                    {!isActive && (
-                      <ChevronRight size={16} className="text-slate-300 hidden lg:block" />
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Sidebar de secciones - sticky que se mueve con el scroll */}
+          <div className="lg:w-52 flex-shrink-0">
+            <div className="lg:sticky lg:top-20">
+              <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 bg-white lg:bg-transparent">
+                {CONFIG_SECTIONS.map((section) => {
+                  const Icon = section.icon;
+                  const isActive = activeSection === section.id;
+                  
+                  return (
+                    <button
+                      key={section.id}
+                      onClick={() => setActiveSection(section.id)}
+                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all whitespace-nowrap ${
+                        isActive
+                          ? "bg-slate-900 text-white"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                      }`}
+                    >
+                      <Icon size={16} className={isActive ? "text-white" : "text-slate-400"} />
+                      <span className={`text-sm font-medium ${isActive ? "text-white" : ""}`}>{section.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+              
+              {/* Auditoría - Solo visible en desktop */}
+              {(auditLog.approvals || auditLog.permissions) && (
+                <div className="hidden lg:block mt-6 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock size={12} className="text-slate-400" />
+                    <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Últimos cambios</p>
+                  </div>
+                  <div className="space-y-2">
+                    {auditLog.approvals && (
+                      <div className="text-[11px]">
+                        <p className="text-slate-600 font-medium">Aprobaciones</p>
+                        <p className="text-slate-400">{formatRelativeDate(auditLog.approvals.updatedAt)}</p>
+                      </div>
                     )}
-                  </button>
-                );
-              })}
-            </nav>
-            
-            {/* Auditoría - Solo visible en desktop */}
-            {(auditLog.approvals || auditLog.permissions) && (
-              <div className="hidden lg:block mt-8 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <div className="flex items-center gap-2 mb-3">
-                  <Clock size={14} className="text-slate-400" />
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Últimos cambios</p>
+                    {auditLog.permissions && (
+                      <div className="text-[11px]">
+                        <p className="text-slate-600 font-medium">Permisos</p>
+                        <p className="text-slate-400">{formatRelativeDate(auditLog.permissions.updatedAt)}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="space-y-3">
-                  {auditLog.approvals && (
-                    <div className="text-xs">
-                      <p className="text-slate-600 font-medium">Aprobaciones</p>
-                      <p className="text-slate-500">
-                        {auditLog.approvals.updatedByName} · {formatRelativeDate(auditLog.approvals.updatedAt)}
-                      </p>
-                    </div>
-                  )}
-                  {auditLog.permissions && (
-                    <div className="text-xs">
-                      <p className="text-slate-600 font-medium">Permisos</p>
-                      <p className="text-slate-500">
-                        {auditLog.permissions.updatedByName} · {formatRelativeDate(auditLog.permissions.updatedAt)}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Contenido principal */}
           <div className="flex-1 min-w-0">
+            {activeSection === "project" && renderProjectSection()}
             {activeSection === "company" && renderCompanySection()}
             {activeSection === "cost" && renderCostSection()}
             {activeSection === "approvals" && renderApprovalsSection()}
