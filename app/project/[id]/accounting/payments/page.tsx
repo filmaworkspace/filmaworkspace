@@ -5,7 +5,7 @@ import { Inter } from "next/font/google";
 import { useState, useEffect, useRef } from "react";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, Timestamp } from "firebase/firestore";
-import { CreditCard, Plus, Search, Trash2, X, CheckCircle2, Calendar, FileText, MoreHorizontal, Receipt, GripVertical, Upload, Clock, Banknote, Shield, Landmark, ChevronRight, Eye, Edit3, Send, LayoutGrid, List, Wallet, PiggyBank, CircleDollarSign, FolderOpen, Download, ChevronDown, AlertTriangle, FileCheck, ExternalLink, Filter } from "lucide-react";
+import { CreditCard, Plus, Search, Trash2, X, CheckCircle2, Calendar, FileText, MoreHorizontal, Receipt, GripVertical, Upload, Clock, Banknote, Shield, Landmark, ChevronRight, Eye, Edit3, Send, LayoutGrid, List, Wallet, PiggyBank, CircleDollarSign, FolderOpen, Download, ChevronDown, AlertTriangle, FileCheck, ExternalLink, Filter, HelpCircle } from "lucide-react";
 import jsPDF from "jspdf";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
@@ -130,6 +130,17 @@ export default function PaymentsPage() {
   const [showDateDropdown, setShowDateDropdown] = useState(false);
   const [showInvoiceFilterDropdown, setShowInvoiceFilterDropdown] = useState(false);
   const [showInvoiceSortDropdown, setShowInvoiceSortDropdown] = useState(false);
+  
+  const [showInvoiceStatusSearch, setShowInvoiceStatusSearch] = useState(false);
+  const [invoiceStatusSearchTerm, setInvoiceStatusSearchTerm] = useState("");
+  const [invoiceStatusResult, setInvoiceStatusResult] = useState<{
+    found: boolean;
+    invoice?: any;
+    status?: string;
+    forecast?: PaymentForecast | null;
+    paidAmount?: number;
+    pendingAmount?: number;
+  } | null>(null);
   
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
@@ -310,6 +321,53 @@ export default function PaymentsPage() {
   const hasActiveInvoiceFilters = invoiceSearch || invoiceDueDateFilter !== "all";
   const clearInvoiceFilters = () => { setInvoiceSearch(""); setInvoiceDueDateFilter("all"); setInvoiceSortBy("dueDate"); };
 
+  const searchInvoiceStatus = async () => {
+    if (!invoiceStatusSearchTerm.trim()) return;
+    const searchLower = invoiceStatusSearchTerm.toLowerCase().trim();
+    
+    // Buscar en facturas disponibles (pendientes de asignar)
+    const foundAvailable = availableInvoices.find(inv => 
+      inv.number.toLowerCase().includes(searchLower) || 
+      (inv.displayNumber && inv.displayNumber.toLowerCase().includes(searchLower)) ||
+      inv.supplier.toLowerCase().includes(searchLower)
+    );
+    
+    if (foundAvailable) {
+      setInvoiceStatusResult({
+        found: true,
+        invoice: foundAvailable,
+        status: "pending_assignment",
+        forecast: null,
+        paidAmount: 0,
+        pendingAmount: foundAvailable.totalAmount
+      });
+      return;
+    }
+    
+    // Buscar en facturas asignadas a previsiones
+    for (const forecast of forecasts) {
+      const foundItem = forecast.items.find(item => 
+        item.invoiceNumber?.toLowerCase().includes(searchLower) ||
+        item.supplier.toLowerCase().includes(searchLower)
+      );
+      if (foundItem) {
+        const isPaid = foundItem.status === "completed";
+        setInvoiceStatusResult({
+          found: true,
+          invoice: foundItem,
+          status: isPaid ? "paid" : (forecast.status === "completed" ? "paid" : "scheduled"),
+          forecast: forecast,
+          paidAmount: isPaid ? foundItem.amount : 0,
+          pendingAmount: isPaid ? 0 : foundItem.amount
+        });
+        return;
+      }
+    }
+    
+    // No encontrada
+    setInvoiceStatusResult({ found: false });
+  };
+
   const handleCreateForecast = async () => {
     if (!newForecast.name.trim() || !newForecast.paymentDate) { showToast("error", "Completa todos los campos"); return; }
     try {
@@ -488,11 +546,22 @@ export default function PaymentsPage() {
               <CreditCard size={24} style={{ color: "#2F52E0" }} />
               <div>
                 <h1 className="text-2xl font-semibold text-slate-900">Previsiones de pago</h1>
+                <p className="text-sm text-slate-500 mt-0.5">{forecasts.length} previsiones · {formatCurrency(forecasts.reduce((s, f) => s + f.totalAmount, 0))} € total</p>
               </div>
             </div>
-            <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity" style={{ backgroundColor: "#2F52E0" }}>
-              <Plus size={18} />Nueva previsión
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => { setShowInvoiceStatusSearch(true); setInvoiceStatusSearchTerm(""); setInvoiceStatusResult(null); }}
+                className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                <HelpCircle size={16} />
+                Consultar factura
+              </button>
+              <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity" style={{ backgroundColor: "#2F52E0" }}>
+                <Plus size={16} strokeWidth={2.5} />
+                Nueva previsión
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -511,16 +580,16 @@ export default function PaymentsPage() {
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row gap-4 mb-6">
+        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center mb-6">
           <div className="flex-1 relative">
-            <Search size={18} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" />
-            <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar previsión o proveedor" className="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm" />
+            <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+            <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar previsión o proveedor" className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm" />
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2 flex-shrink-0">
             <div className="relative" ref={statusDropdownRef}>
-              <button onClick={() => setShowStatusDropdown(!showStatusDropdown)} className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white hover:border-slate-300 transition-colors min-w-[160px]">
-                <Filter size={15} className="text-slate-400" />
-                <span className="text-slate-700 flex-1 text-left">{STATUS_OPTIONS.find(o => o.value === statusFilter)?.label}</span>
+              <button onClick={() => setShowStatusDropdown(!showStatusDropdown)} className="flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-xl text-sm hover:border-slate-300 bg-white min-w-[160px]">
+                <Filter size={14} className="text-slate-400" />
+                <span className="flex-1 text-left text-xs text-slate-700">{STATUS_OPTIONS.find(o => o.value === statusFilter)?.label}</span>
                 <ChevronDown size={14} className={cx("text-slate-400 transition-transform", showStatusDropdown && "rotate-180")} />
               </button>
               {showStatusDropdown && (
@@ -533,9 +602,9 @@ export default function PaymentsPage() {
             </div>
 
             <div className="relative" ref={dateDropdownRef}>
-              <button onClick={() => setShowDateDropdown(!showDateDropdown)} className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white hover:border-slate-300 transition-colors min-w-[160px]">
-                <Calendar size={15} className="text-slate-400" />
-                <span className="text-slate-700 flex-1 text-left">{DATE_RANGE_OPTIONS.find(o => o.value === dateRange)?.label}</span>
+              <button onClick={() => setShowDateDropdown(!showDateDropdown)} className="flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-xl text-sm hover:border-slate-300 bg-white min-w-[160px]">
+                <Calendar size={14} className="text-slate-400" />
+                <span className="flex-1 text-left text-xs text-slate-700">{DATE_RANGE_OPTIONS.find(o => o.value === dateRange)?.label}</span>
                 <ChevronDown size={14} className={cx("text-slate-400 transition-transform", showDateDropdown && "rotate-180")} />
               </button>
               {showDateDropdown && (
@@ -548,13 +617,9 @@ export default function PaymentsPage() {
             </div>
 
             <div className="flex border border-slate-200 rounded-xl overflow-hidden bg-white">
-              <button onClick={() => setViewMode("kanban")} className={cx("px-4 py-2.5 text-sm transition-colors", viewMode === "kanban" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50")}><LayoutGrid size={18} /></button>
-              <button onClick={() => setViewMode("list")} className={cx("px-4 py-2.5 text-sm transition-colors border-l border-slate-200", viewMode === "list" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50")}><List size={18} /></button>
+              <button onClick={() => setViewMode("kanban")} className={cx("px-3 py-2.5 text-sm transition-colors", viewMode === "kanban" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50")}><LayoutGrid size={16} /></button>
+              <button onClick={() => setViewMode("list")} className={cx("px-3 py-2.5 text-sm transition-colors border-l border-slate-200", viewMode === "list" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50")}><List size={16} /></button>
             </div>
-
-            {(statusFilter !== "all" || dateRange !== "all" || searchTerm) && (
-              <button onClick={() => { setStatusFilter("all"); setDateRange("all"); setSearchTerm(""); }} className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2"><X size={14} />Limpiar</button>
-            )}
           </div>
         </div>
 
@@ -592,7 +657,7 @@ export default function PaymentsPage() {
                   <div className="p-3 border-b border-slate-100">
                     <div className="relative mb-2">
                       <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input type="text" value={invoiceSearch} onChange={(e) => setInvoiceSearch(e.target.value)} placeholder="Buscar factura" className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
+                      <input type="text" value={invoiceSearch} onChange={(e) => setInvoiceSearch(e.target.value)} placeholder="Buscar factura..." className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
                       {invoiceSearch && (<button onClick={() => setInvoiceSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600"><X size={12} /></button>)}
                     </div>
                     <div className="flex gap-2">
@@ -673,10 +738,7 @@ export default function PaymentsPage() {
               <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
                 <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><CreditCard size={28} className="text-slate-400" /></div>
                 <h3 className="text-lg font-semibold text-slate-900 mb-2">{searchTerm || statusFilter !== "all" || dateRange !== "all" ? "No se encontraron resultados" : "Sin previsiones de pago"}</h3>
-                <p className="text-slate-500 text-sm mb-6">{searchTerm || statusFilter !== "all" || dateRange !== "all" ? "Prueba a ajustar los filtros" : "Crea tu primera previsión para organizar los pagos"}</p>
-                {!searchTerm && statusFilter === "all" && dateRange === "all" && (
-                  <button onClick={() => setShowCreateModal(true)} className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity" style={{ backgroundColor: "#2F52E0" }}><Plus size={18} />Nueva previsión</button>
-                )}
+                <p className="text-slate-500 text-sm">{searchTerm || statusFilter !== "all" || dateRange !== "all" ? "Prueba a ajustar los filtros" : "Crea tu primera previsión para organizar los pagos"}</p>
               </div>
             ) : viewMode === "kanban" ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -1012,6 +1074,108 @@ export default function PaymentsPage() {
                 <button onClick={() => router.push("/project/" + id + "/accounting/payments/" + showForecastDetail.id + "/pay")} className="px-4 py-2 text-sm bg-slate-700 text-white hover:bg-slate-800 rounded-lg flex items-center gap-2"><Eye size={14} />Ver pagos</button>
               )}
               <button onClick={() => setShowForecastDetail(null)} className="px-4 py-2 text-sm border border-slate-200 text-slate-700 hover:bg-white rounded-lg">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de consulta de estado de factura */}
+      {showInvoiceStatusSearch && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowInvoiceStatusSearch(false)}>
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(47, 82, 224, 0.1)' }}>
+                  <HelpCircle size={20} style={{ color: '#2F52E0' }} />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900">Consultar estado de factura</h3>
+              </div>
+              <button onClick={() => setShowInvoiceStatusSearch(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+            </div>
+            <div className="p-6">
+              <div className="relative mb-4">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={invoiceStatusSearchTerm}
+                  onChange={(e) => { setInvoiceStatusSearchTerm(e.target.value); setInvoiceStatusResult(null); }}
+                  onKeyDown={(e) => e.key === "Enter" && searchInvoiceStatus()}
+                  placeholder="Número de factura o proveedor"
+                  className="w-full pl-9 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm"
+                  autoFocus
+                />
+              </div>
+              <button
+                onClick={searchInvoiceStatus}
+                disabled={!invoiceStatusSearchTerm.trim()}
+                className="w-full px-4 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                style={{ backgroundColor: '#2F52E0' }}
+              >
+                Buscar
+              </button>
+
+              {invoiceStatusResult && (
+                <div className="mt-6">
+                  {!invoiceStatusResult.found ? (
+                    <div className="text-center py-6">
+                      <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                        <Search size={20} className="text-slate-400" />
+                      </div>
+                      <p className="text-sm text-slate-500">No se encontró ninguna factura con ese criterio</p>
+                    </div>
+                  ) : (
+                    <div className="bg-slate-50 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-400 uppercase">Factura</span>
+                        <span className="text-sm font-semibold text-slate-900">{invoiceStatusResult.invoice?.invoiceNumber || invoiceStatusResult.invoice?.displayNumber || invoiceStatusResult.invoice?.number}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-400 uppercase">Proveedor</span>
+                        <span className="text-sm text-slate-700">{invoiceStatusResult.invoice?.supplier}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-400 uppercase">Importe</span>
+                        <span className="text-sm font-semibold text-slate-900">{formatCurrency(invoiceStatusResult.invoice?.totalAmount || invoiceStatusResult.invoice?.amount || 0)} €</span>
+                      </div>
+                      <div className="border-t border-slate-200 pt-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-slate-400 uppercase">Estado</span>
+                          {invoiceStatusResult.status === "paid" && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-semibold">
+                              <CheckCircle2 size={12} />
+                              Pagada
+                            </span>
+                          )}
+                          {invoiceStatusResult.status === "scheduled" && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 text-amber-700 rounded-lg text-xs font-semibold">
+                              <Clock size={12} />
+                              Programada
+                            </span>
+                          )}
+                          {invoiceStatusResult.status === "pending_assignment" && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold">
+                              <Receipt size={12} />
+                              Sin asignar
+                            </span>
+                          )}
+                        </div>
+                        {invoiceStatusResult.forecast && (
+                          <div className="mt-3 p-3 bg-white rounded-lg border border-slate-200">
+                            <p className="text-xs text-slate-500 mb-1">Asignada a previsión:</p>
+                            <p className="text-sm font-medium text-slate-900">{invoiceStatusResult.forecast.name}</p>
+                            <p className="text-xs text-slate-500 mt-1">
+                              Fecha de pago: {formatDate(invoiceStatusResult.forecast.paymentDate)}
+                            </p>
+                          </div>
+                        )}
+                        {invoiceStatusResult.status === "pending_assignment" && (
+                          <p className="text-xs text-slate-500 mt-3">Esta factura aún no ha sido asignada a ninguna previsión de pago.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
