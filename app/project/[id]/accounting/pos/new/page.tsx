@@ -207,7 +207,6 @@ export default function NewPOPage() {
   // Configuración de episodios
   const [episodesEnabled, setEpisodesEnabled] = useState(false);
   const [episodesRequired, setEpisodesRequired] = useState(false);
-  const [episodePrefix, setEpisodePrefix] = useState("Cap");
   const [totalEpisodes, setTotalEpisodes] = useState(0);
   const [showEpisodeModal, setShowEpisodeModal] = useState(false);
   const [episodeItemIndex, setEpisodeItemIndex] = useState<number | null>(null);
@@ -341,7 +340,6 @@ export default function NewPOPage() {
             const configData = projectConfigDoc.data();
             setEpisodesEnabled(configData.enableEpisodes || false);
             setEpisodesRequired(configData.requireEpisodeAssignment || false);
-            setEpisodePrefix(configData.episodePrefix || "Cap");
           }
         }
       }
@@ -1283,7 +1281,7 @@ export default function NewPOPage() {
                                   <Layers size={14} className="text-violet-600" />
                                   <span className="text-slate-900">
                                     {item.episodes.length === 1 
-                                      ? `${episodePrefix} ${item.episodes[0].episode}`
+                                      ? `${item.episodes[0].episode}`
                                       : `${item.episodes.length} capítulos`
                                     }
                                   </span>
@@ -1300,7 +1298,7 @@ export default function NewPOPage() {
                               <div className="mt-2 flex flex-wrap gap-1">
                                 {item.episodes.map((ep) => (
                                   <span key={ep.episode} className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-lg">
-                                    {episodePrefix} {ep.episode}: {formatCurrency(ep.amount)} €
+                                    {ep.episode}: {formatCurrency(ep.amount)} €
                                   </span>
                                 ))}
                               </div>
@@ -1934,7 +1932,7 @@ export default function NewPOPage() {
                               isSelected ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                             )}
                           >
-                            {episodePrefix} {epNum}
+                            {epNum}
                           </button>
                         );
                       })}
@@ -1948,7 +1946,7 @@ export default function NewPOPage() {
                       <div className="space-y-2">
                         {tempEpisodeDistribution.map((ep) => (
                           <div key={ep.episode} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                            <span className="text-sm font-medium text-slate-700 w-16">{episodePrefix} {ep.episode}</span>
+                            <span className="text-sm font-medium text-slate-700 w-16">Cap {ep.episode}</span>
                             {episodeDistributionMode === "amount" ? (
                               <div className="flex-1 relative">
                                 <input
