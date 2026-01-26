@@ -11,7 +11,6 @@ import { useUser } from "@/contexts/UserContext";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-// Secciones de configuración
 const CONFIG_SECTIONS = [
   { id: "profile", label: "Perfil", icon: User, description: "Información personal" },
   { id: "security", label: "Seguridad", icon: Shield, description: "Contraseña y acceso" },
@@ -29,10 +28,7 @@ export default function ProfilePage() {
   const [formData, setFormData] = useState({ name: "", email: "" });
   const [passwordData, setPasswordData] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [showPassword, setShowPassword] = useState({ current: false, new: false, confirm: false });
-  const [notifications, setNotifications] = useState({
-    accounting: true,
-    team: true,
-  });
+  const [notifications, setNotifications] = useState({ accounting: true, team: true });
 
   const showToast = (type: "success" | "error", message: string) => {
     setToast({ type, message });
@@ -127,7 +123,6 @@ export default function ProfilePage() {
     }
   };
 
-  // Render sección Perfil
   const renderProfileSection = () => (
     <div className="space-y-6">
       <div>
@@ -136,7 +131,17 @@ export default function ProfilePage() {
       </div>
 
       <form onSubmit={handleProfileSubmit} className="space-y-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-6">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-6">
+          <div className="flex items-center gap-4 pb-6 border-b border-slate-100">
+            <div className="w-16 h-16 rounded-full bg-slate-900 text-white flex items-center justify-center text-2xl font-semibold">
+              {formData.name?.[0]?.toUpperCase() || "U"}
+            </div>
+            <div>
+              <p className="font-semibold text-slate-900">{formData.name || "Usuario"}</p>
+              <p className="text-sm text-slate-500">{formData.email}</p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Nombre completo</label>
@@ -177,7 +182,6 @@ export default function ProfilePage() {
     </div>
   );
 
-  // Render sección Seguridad
   const renderSecuritySection = () => (
     <div className="space-y-6">
       <div>
@@ -186,7 +190,7 @@ export default function ProfilePage() {
       </div>
 
       <form onSubmit={handlePasswordSubmit} className="space-y-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-6">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-6">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Contraseña actual</label>
             <div className="relative">
@@ -266,7 +270,6 @@ export default function ProfilePage() {
     </div>
   );
 
-  // Render sección Notificaciones
   const renderNotificationsSection = () => (
     <div className="space-y-6">
       <div>
@@ -275,8 +278,7 @@ export default function ProfilePage() {
       </div>
 
       <form onSubmit={handleNotificationsSubmit} className="space-y-6">
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          {/* Notificaciones de Accounting */}
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
           <div className="p-4 flex items-center justify-between border-b border-slate-100 hover:bg-slate-50 transition-colors">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center">
@@ -290,20 +292,13 @@ export default function ProfilePage() {
             <div className="flex items-center gap-3">
               <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">Próximamente</span>
               <div className="relative opacity-50 pointer-events-none">
-                <input
-                  type="checkbox"
-                  checked={notifications.accounting}
-                  onChange={() => setNotifications({ ...notifications, accounting: !notifications.accounting })}
-                  className="sr-only peer"
-                  disabled
-                />
+                <input type="checkbox" checked={notifications.accounting} onChange={() => setNotifications({ ...notifications, accounting: !notifications.accounting })} className="sr-only peer" disabled />
                 <div className="w-11 h-6 bg-slate-200 rounded-full peer-checked:bg-slate-900 transition-colors" />
                 <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm peer-checked:translate-x-5 transition-transform" />
               </div>
             </div>
           </div>
 
-          {/* Notificaciones de Team */}
           <div className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
@@ -317,13 +312,7 @@ export default function ProfilePage() {
             <div className="flex items-center gap-3">
               <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">Próximamente</span>
               <div className="relative opacity-50 pointer-events-none">
-                <input
-                  type="checkbox"
-                  checked={notifications.team}
-                  onChange={() => setNotifications({ ...notifications, team: !notifications.team })}
-                  className="sr-only peer"
-                  disabled
-                />
+                <input type="checkbox" checked={notifications.team} onChange={() => setNotifications({ ...notifications, team: !notifications.team })} className="sr-only peer" disabled />
                 <div className="w-11 h-6 bg-slate-200 rounded-full peer-checked:bg-slate-900 transition-colors" />
                 <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm peer-checked:translate-x-5 transition-transform" />
               </div>
@@ -353,9 +342,9 @@ export default function ProfilePage() {
 
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
-      {/* Toast */}
+      {/* Toast bottom-right */}
       {toast && (
-        <div className={`fixed top-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 ${toast.type === "success" ? "bg-slate-900 text-white" : "bg-red-600 text-white"}`}>
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 ${toast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>
           {toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
           {toast.message}
         </div>
@@ -363,20 +352,17 @@ export default function ProfilePage() {
 
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="max-w-5xl mx-auto px-6 md:px-12 py-6">
-          {/* Breadcrumb */}
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="mb-4">
-            <Link href="/dashboard" className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium hover:bg-slate-200 transition-colors">
-              <ArrowLeft size={12} />
+            <Link href="/dashboard" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 text-sm transition-colors">
+              <ArrowLeft size={16} />
               Proyectos
             </Link>
           </div>
 
-          {/* Page header - mismo estilo que configuración de contabilidad */}
           <div className="flex items-center justify-between border-b border-slate-200 pb-6">
-            <div className="flex items-center gap-3">
-              {/* Avatar igual que en el header */}
-              <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-semibold">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-slate-900 text-white flex items-center justify-center text-xl font-semibold">
                 {userInitial}
               </div>
               <div>
@@ -387,7 +373,7 @@ export default function ProfilePage() {
 
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:text-red-600 hover:bg-red-50 border border-slate-200 rounded-xl text-sm font-medium transition-colors"
+              className="flex items-center gap-2 px-5 py-2.5 text-slate-600 hover:text-red-600 hover:bg-red-50 border border-slate-200 rounded-xl text-sm font-medium transition-colors"
             >
               <LogOut size={16} />
               Cerrar sesión
@@ -396,11 +382,11 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <main className="max-w-5xl mx-auto px-6 md:px-12 py-8">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
         <div className="flex gap-8">
-          {/* Sidebar - mismo estilo que configuración de contabilidad */}
-          <div className="w-64 flex-shrink-0">
-            <nav className="space-y-1">
+          {/* Sidebar sticky */}
+          <div className="lg:w-52 flex-shrink-0">
+            <nav className="sticky top-24 space-y-1">
               {CONFIG_SECTIONS.map((section) => {
                 const Icon = section.icon;
                 const isActive = activeSection === section.id;
@@ -409,9 +395,7 @@ export default function ProfilePage() {
                     key={section.id}
                     onClick={() => setActiveSection(section.id)}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all ${
-                      isActive
-                        ? "bg-slate-900 text-white"
-                        : "text-slate-600 hover:bg-slate-100"
+                      isActive ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"
                     }`}
                   >
                     <Icon size={18} className={isActive ? "text-white" : "text-slate-400"} />
@@ -428,7 +412,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Contenido principal */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 max-w-3xl">
             {activeSection === "profile" && renderProfileSection()}
             {activeSection === "security" && renderSecuritySection()}
             {activeSection === "notifications" && renderNotificationsSection()}
