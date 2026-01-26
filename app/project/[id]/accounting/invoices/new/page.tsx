@@ -271,6 +271,7 @@ export default function NewInvoicePage() {
   const searchParams = useSearchParams();
   const id = params?.id as string;
   const linkToId = searchParams.get("linkTo");
+  const preselectedPoId = searchParams.get("poId");
   const { loading: permissionsLoading, error: permissionsError, permissions } = useAccountingPermissions(id);
 
   // Estados básicos
@@ -492,6 +493,21 @@ export default function NewInvoicePage() {
           return false;
         });
         setPOs(filteredPOs);
+
+        // Preseleccionar PO si viene de po-detail
+        if (preselectedPoId) {
+          const preselectedPO = filteredPOs.find(po => po.id === preselectedPoId);
+          if (preselectedPO) {
+            setSelectedPO(preselectedPO);
+            setFormData(prev => ({
+              ...prev,
+              invoiceType: "with-po",
+              supplier: preselectedPO.supplierId,
+              supplierName: preselectedPO.supplier,
+              department: preselectedPO.department || "",
+            }));
+          }
+        }
       } catch (posErr) {
         console.error("Error loading POs:", posErr);
       }
