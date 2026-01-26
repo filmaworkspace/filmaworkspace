@@ -146,8 +146,7 @@ const PRESET_THRESHOLDS = [1000, 2500, 5000, 10000, 25000, 50000];
 // Secciones de configuración
 const CONFIG_SECTIONS = [
   { id: "company", label: "Datos fiscales", icon: Building2, description: "Datos de la empresa y cuentas bancarias" },
-  { id: "project", label: "Proyecto", icon: Film, description: "Configuración específica del proyecto" },
-  { id: "cost", label: "Coste", icon: TrendingUp, description: "Comportamiento del comprometido y realizado" },
+  { id: "cost", label: "Coste", icon: TrendingUp, description: "Comportamiento del comprometido, realizado y capítulos" },
   { id: "approvals", label: "Aprobaciones", icon: FileCheck, description: "Flujos de aprobación para POs y facturas" },
   { id: "permissions", label: "Permisos", icon: Shield, description: "Quién puede realizar cada acción" },
 ];
@@ -1196,90 +1195,6 @@ export default function AccountingConfigPage() {
   };
 
   // Render de la sección de datos de empresa
-  // Render de la sección de configuración del proyecto
-  const renderProjectSection = () => (
-    <div className="space-y-6">
-      {/* Info del tipo de proyecto */}
-      {projectType ? (
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center gap-4">
-          <Film size={20} className="text-slate-500" />
-          <div>
-            <p className="text-sm font-medium text-slate-900 capitalize">{projectType}</p>
-            {projectType === "serie" && projectEpisodes > 0 && (
-              <p className="text-xs text-slate-500">{projectEpisodes} capítulos configurados en el proyecto</p>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-4">
-          <AlertCircle size={20} className="text-amber-600" />
-          <div>
-            <p className="text-sm font-medium text-amber-900">Tipo de proyecto no configurado</p>
-            <p className="text-xs text-amber-700">Configura el tipo de proyecto (película o serie) en Configuración General</p>
-          </div>
-        </div>
-      )}
-
-      {/* Configuración de capítulos/episodios - Solo para series */}
-      {projectType === "serie" ? (
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-            <Layers size={18} className="text-slate-400" />
-            <h2 className="font-semibold text-slate-900">Asignación por capítulos</h2>
-          </div>
-          <div className="p-6 space-y-4">
-            <label className="flex items-center justify-between p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-              <div>
-                <p className="text-sm font-medium text-slate-900">Habilitar asignación a capítulos</p>
-                <p className="text-xs text-slate-500">Permite asignar POs y facturas a capítulos específicos de la serie</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={projectSettings.enableEpisodes}
-                onChange={(e) => setProjectSettings({ ...projectSettings, enableEpisodes: e.target.checked })}
-                className="w-5 h-5 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
-              />
-            </label>
-            
-            {projectSettings.enableEpisodes && (
-              <>
-                <label className="flex items-center justify-between p-4 bg-amber-50 rounded-xl cursor-pointer border border-amber-200">
-                  <div>
-                    <p className="text-sm font-medium text-amber-900">Requerir asignación obligatoria</p>
-                    <p className="text-xs text-amber-700">No se podrán crear POs o facturas sin asignar un capítulo</p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={projectSettings.requireEpisodeAssignment}
-                    onChange={(e) => setProjectSettings({ ...projectSettings, requireEpisodeAssignment: e.target.checked })}
-                    className="w-5 h-5 text-amber-600 border-amber-300 rounded focus:ring-amber-500"
-                  />
-                </label>
-              </>
-            )}
-          </div>
-          
-          {/* Botón guardar */}
-          <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
-            <button
-              onClick={handleSaveProjectSettings}
-              disabled={saving}
-              className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
-            >
-              <Save size={16} />
-              {saving ? "Guardando..." : "Guardar"}
-            </button>
-          </div>
-        </div>
-      ) : projectType === "pelicula" ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center">
-          <Film size={32} className="mx-auto text-slate-300 mb-3" />
-          <p className="text-sm text-slate-500">Las películas no tienen configuración de capítulos</p>
-        </div>
-      ) : null}
-    </div>
-  );
-
   const renderCompanySection = () => (
     <div className="space-y-6">
       {/* Datos fiscales */}
@@ -1615,6 +1530,73 @@ export default function AccountingConfigPage() {
           </div>
         </div>
       </div>
+
+      {/* Asignación por capítulos - Solo para series */}
+      {projectType === "serie" && (
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+            <Layers size={18} className="text-violet-500" />
+            <div>
+              <h2 className="font-semibold text-slate-900">Asignación por capítulos</h2>
+              <p className="text-sm text-slate-500">{projectEpisodes} capítulos configurados</p>
+            </div>
+          </div>
+          <div className="p-6 space-y-4">
+            <label className="flex items-center justify-between p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+              <div>
+                <p className="text-sm font-medium text-slate-900">Habilitar asignación a capítulos</p>
+                <p className="text-xs text-slate-500">Permite asignar POs y facturas a capítulos específicos de la serie</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={projectSettings.enableEpisodes}
+                onChange={(e) => setProjectSettings({ ...projectSettings, enableEpisodes: e.target.checked })}
+                className="w-5 h-5 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
+              />
+            </label>
+            
+            {projectSettings.enableEpisodes && (
+              <label className="flex items-center justify-between p-4 bg-amber-50 rounded-xl cursor-pointer border border-amber-200">
+                <div>
+                  <p className="text-sm font-medium text-amber-900">Requerir asignación obligatoria</p>
+                  <p className="text-xs text-amber-700">No se podrán crear POs o facturas sin asignar un capítulo</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={projectSettings.requireEpisodeAssignment}
+                  onChange={(e) => setProjectSettings({ ...projectSettings, requireEpisodeAssignment: e.target.checked })}
+                  className="w-5 h-5 text-amber-600 border-amber-300 rounded focus:ring-amber-500"
+                />
+              </label>
+            )}
+
+            <div className="p-4 bg-violet-50 border border-violet-200 rounded-xl">
+              <div className="flex gap-3">
+                <Info size={18} className="text-violet-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium text-violet-800">¿Cómo funciona?</p>
+                  <p className="text-violet-700 mt-1">
+                    Al crear POs o facturas, cada línea puede asignarse a capítulos específicos. 
+                    Si no se especifica, se considera "General" (capítulo 0) y se distribuye entre todos.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Botón guardar */}
+          <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+            <button
+              onClick={handleSaveProjectSettings}
+              disabled={saving}
+              className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
+            >
+              <Save size={16} />
+              {saving ? "Guardando..." : "Guardar capítulos"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -2064,7 +2046,6 @@ export default function AccountingConfigPage() {
 
           {/* Contenido principal */}
           <div className="flex-1 min-w-0">
-            {activeSection === "project" && renderProjectSection()}
             {activeSection === "company" && renderCompanySection()}
             {activeSection === "cost" && renderCostSection()}
             {activeSection === "approvals" && renderApprovalsSection()}
