@@ -145,8 +145,8 @@ const PRESET_THRESHOLDS = [1000, 2500, 5000, 10000, 25000, 50000];
 
 // Secciones de configuración
 const CONFIG_SECTIONS = [
-  { id: "project", label: "Proyecto", icon: Film, description: "Configuración específica del proyecto" },
   { id: "company", label: "Datos fiscales", icon: Building2, description: "Datos de la empresa y cuentas bancarias" },
+  { id: "project", label: "Proyecto", icon: Film, description: "Configuración específica del proyecto" },
   { id: "cost", label: "Coste", icon: TrendingUp, description: "Comportamiento del comprometido y realizado" },
   { id: "approvals", label: "Aprobaciones", icon: FileCheck, description: "Flujos de aprobación para POs y facturas" },
   { id: "permissions", label: "Permisos", icon: Shield, description: "Quién puede realizar cada acción" },
@@ -173,7 +173,6 @@ interface CostSettings {
 // Configuración específica del proyecto para contabilidad
 interface ProjectSettings {
   enableEpisodes: boolean;
-  episodePrefix: string;
   requireEpisodeAssignment: boolean;
 }
 
@@ -231,12 +230,11 @@ export default function AccountingConfigPage() {
   const [errorMessage, setErrorMessage] = useState("");
   
   // Sección activa
-  const [activeSection, setActiveSection] = useState("project");
+  const [activeSection, setActiveSection] = useState("company");
   
   // Configuración del proyecto
   const [projectSettings, setProjectSettings] = useState<ProjectSettings>({
     enableEpisodes: false,
-    episodePrefix: "Cap",
     requireEpisodeAssignment: false,
   });
   
@@ -348,7 +346,6 @@ export default function AccountingConfigPage() {
         const data = projectConfigSnap.data();
         setProjectSettings({
           enableEpisodes: data.enableEpisodes || false,
-          episodePrefix: data.episodePrefix || "Cap",
           requireEpisodeAssignment: data.requireEpisodeAssignment || false,
         });
       }
@@ -1246,18 +1243,6 @@ export default function AccountingConfigPage() {
             
             {projectSettings.enableEpisodes && (
               <>
-                <div>
-                  <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">Prefijo para capítulos</label>
-                  <input
-                    type="text"
-                    value={projectSettings.episodePrefix}
-                    onChange={(e) => setProjectSettings({ ...projectSettings, episodePrefix: e.target.value })}
-                    placeholder="Cap"
-                    className="w-32 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                  />
-                  <p className="text-xs text-slate-400 mt-1">Ejemplo: {projectSettings.episodePrefix} 1, {projectSettings.episodePrefix} 2...</p>
-                </div>
-                
                 <label className="flex items-center justify-between p-4 bg-amber-50 rounded-xl cursor-pointer border border-amber-200">
                   <div>
                     <p className="text-sm font-medium text-amber-900">Requerir asignación obligatoria</p>
