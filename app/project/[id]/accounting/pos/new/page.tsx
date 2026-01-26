@@ -102,6 +102,7 @@ interface POItem {
   irpfAmount: number;
   totalAmount: number;
   episodes?: EpisodeDistribution[];
+  episodeAssignment?: "general" | "specific"; // general = todos los caps, specific = caps específicos
 }
 
 interface ApprovalStep {
@@ -240,6 +241,7 @@ export default function NewPOPage() {
       irpfRate: 0,
       irpfAmount: 0,
       totalAmount: 0,
+      episodeAssignment: "general",
     },
   ]);
 
@@ -475,6 +477,7 @@ export default function NewPOPage() {
         irpfRate: 0,
         irpfAmount: 0,
         totalAmount: 0,
+        episodeAssignment: "general",
       },
     ]);
   };
@@ -610,13 +613,35 @@ export default function NewPOPage() {
     })));
   };
 
+  const selectAllEpisodes = () => {
+    const item = episodeItemIndex !== null ? items[episodeItemIndex] : null;
+    if (!item) return;
+    
+    const equalPercentage = 100 / totalEpisodes;
+    const equalAmount = item.baseAmount / totalEpisodes;
+    
+    const allEpisodes: EpisodeDistribution[] = Array.from({ length: totalEpisodes }, (_, i) => ({
+      episode: i + 1,
+      amount: equalAmount,
+      percentage: equalPercentage,
+    }));
+    
+    setTempEpisodeDistribution(allEpisodes);
+    setEpisodeDistributionMode("equal");
+  };
+
   const saveEpisodeDistribution = () => {
     if (episodeItemIndex === null) return;
     
     const newItems = [...items];
+    const isGeneral = tempEpisodeDistribution.length === 0 || tempEpisodeDistribution.length === totalEpisodes;
+    
     newItems[episodeItemIndex] = {
       ...newItems[episodeItemIndex],
-      episodes: tempEpisodeDistribution.length > 0 ? tempEpisodeDistribution : undefined,
+      episodeAssignment: isGeneral ? "general" : "specific",
+      episodes: tempEpisodeDistribution.length > 0 && tempEpisodeDistribution.length < totalEpisodes 
+        ? tempEpisodeDistribution 
+        : undefined,
     };
     setItems(newItems);
     setShowEpisodeModal(false);
@@ -642,10 +667,6 @@ export default function NewPOPage() {
       if (!item.subAccountId) newErrors["item_" + index + "_account"] = "Obligatorio";
       if (item.quantity <= 0) newErrors["item_" + index + "_quantity"] = "Debe ser > 0";
       if (item.unitPrice <= 0) newErrors["item_" + index + "_unitPrice"] = "Debe ser > 0";
-      // Validar episodios si es obligatorio
-      if (episodesEnabled && episodesRequired && (!item.episodes || item.episodes.length === 0)) {
-        newErrors["item_" + index + "_episodes"] = "Asignar capítulo obligatorio";
-      }
     });
     if (!silent) setErrors(newErrors);
     else setErrors(newErrors);
@@ -744,6 +765,7 @@ export default function NewPOPage() {
         irpfRate: item.irpfRate,
         irpfAmount: item.irpfAmount,
         totalAmount: item.totalAmount,
+        episodeAssignment: item.episodeAssignment || "general",
         ...(item.episodes && item.episodes.length > 0 && { episodes: item.episodes }),
       }));
 
@@ -1253,27 +1275,28 @@ export default function NewPOPage() {
                               onClick={() => openEpisodeModal(index)}
                               className={cx(
                                 "w-full px-4 py-3 border rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white",
-                                episodesRequired && (!item.episodes || item.episodes.length === 0) ? "border-amber-300 bg-amber-50" : item.episodes && item.episodes.length > 0 ? "border-violet-200 bg-violet-50" : "border-slate-200"
+                                item.episodeAssignment === "general" ? "border-slate-200" : "border-violet-200 bg-violet-50"
                               )}
                             >
-                              {item.episodes && item.episodes.length > 0 ? (
+                              {item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 0 ? (
                                 <div className="flex items-center gap-2">
                                   <Layers size={14} className="text-violet-600" />
                                   <span className="text-slate-900">
                                     {item.episodes.length === 1 
                                       ? `${episodePrefix} ${item.episodes[0].episode}`
-                                      : `${item.episodes.length} capítulos asignados`
+                                      : `${item.episodes.length} capítulos`
                                     }
                                   </span>
                                 </div>
                               ) : (
-                                <span className={episodesRequired ? "text-amber-600" : "text-slate-400"}>
-                                  {episodesRequired ? "Asignar capítulo (obligatorio)" : "Asignar capítulo (opcional)"}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  <Layers size={14} className="text-slate-400" />
+                                  <span className="text-slate-600">General (todos los capítulos)</span>
+                                </div>
                               )}
-                              <Layers size={14} className="text-slate-400" />
+                              <ChevronDown size={14} className="text-slate-400" />
                             </button>
-                            {item.episodes && item.episodes.length > 1 && (
+                            {item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 1 && (
                               <div className="mt-2 flex flex-wrap gap-1">
                                 {item.episodes.map((ep) => (
                                   <span key={ep.episode} className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-lg">
@@ -1809,125 +1832,180 @@ export default function NewPOPage() {
             </div>
 
             <div className="p-6 space-y-4 overflow-y-auto max-h-[60vh]">
-              {/* Modo de distribución */}
-              <div>
-                <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Modo de distribución</label>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => { setEpisodeDistributionMode("equal"); applyEqualDistribution(); }}
-                    className={cx(
-                      "flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                      episodeDistributionMode === "equal" ? "bg-violet-100 text-violet-700 border border-violet-200" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    )}
-                  >
-                    Partes iguales
-                  </button>
-                  <button
-                    onClick={() => setEpisodeDistributionMode("amount")}
-                    className={cx(
-                      "flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                      episodeDistributionMode === "amount" ? "bg-violet-100 text-violet-700 border border-violet-200" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    )}
-                  >
-                    Por importe
-                  </button>
-                  <button
-                    onClick={() => setEpisodeDistributionMode("percentage")}
-                    className={cx(
-                      "flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                      episodeDistributionMode === "percentage" ? "bg-violet-100 text-violet-700 border border-violet-200" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    )}
-                  >
-                    Por porcentaje
-                  </button>
+              {/* Opción General */}
+              <button
+                onClick={() => setTempEpisodeDistribution([])}
+                className={cx(
+                  "w-full px-4 py-4 rounded-xl text-sm font-medium transition-colors flex items-center gap-3 border-2",
+                  tempEpisodeDistribution.length === 0
+                    ? "bg-violet-50 border-violet-500 text-violet-700" 
+                    : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                )}
+              >
+                <div className={cx(
+                  "w-5 h-5 rounded-full border-2 flex items-center justify-center",
+                  tempEpisodeDistribution.length === 0 ? "border-violet-500 bg-violet-500" : "border-slate-300"
+                )}>
+                  {tempEpisodeDistribution.length === 0 && <CheckCircle2 size={12} className="text-white" />}
                 </div>
-              </div>
+                <div className="text-left">
+                  <p className="font-medium">General (todos los capítulos)</p>
+                  <p className="text-xs text-slate-500">El importe se reparte equitativamente entre todos</p>
+                </div>
+              </button>
 
-              {/* Selección de capítulos */}
-              <div>
-                <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Seleccionar capítulos</label>
-                <div className="flex flex-wrap gap-2">
-                  {Array.from({ length: totalEpisodes }, (_, i) => i + 1).map((epNum) => {
-                    const isSelected = tempEpisodeDistribution.some(e => e.episode === epNum);
-                    return (
+              {/* Opción Específico */}
+              <button
+                onClick={() => {
+                  if (tempEpisodeDistribution.length === 0) {
+                    // Seleccionar el primer capítulo por defecto
+                    const item = items[episodeItemIndex];
+                    setTempEpisodeDistribution([{ episode: 1, amount: item.baseAmount, percentage: 100 }]);
+                  }
+                }}
+                className={cx(
+                  "w-full px-4 py-4 rounded-xl text-sm font-medium transition-colors flex items-center gap-3 border-2",
+                  tempEpisodeDistribution.length > 0
+                    ? "bg-violet-50 border-violet-500 text-violet-700" 
+                    : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                )}
+              >
+                <div className={cx(
+                  "w-5 h-5 rounded-full border-2 flex items-center justify-center",
+                  tempEpisodeDistribution.length > 0 ? "border-violet-500 bg-violet-500" : "border-slate-300"
+                )}>
+                  {tempEpisodeDistribution.length > 0 && <CheckCircle2 size={12} className="text-white" />}
+                </div>
+                <div className="text-left">
+                  <p className="font-medium">Capítulos específicos</p>
+                  <p className="text-xs text-slate-500">Asignar a uno o varios capítulos concretos</p>
+                </div>
+              </button>
+
+              {/* Selección de capítulos específicos */}
+              {tempEpisodeDistribution.length > 0 && (
+                <div className="space-y-4 pt-2">
+                  {/* Modo de distribución */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Distribución</label>
+                    <div className="flex gap-2">
                       <button
-                        key={epNum}
-                        onClick={() => toggleEpisodeInDistribution(epNum)}
+                        onClick={() => { setEpisodeDistributionMode("equal"); applyEqualDistribution(); }}
                         className={cx(
-                          "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
-                          isSelected ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          "flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors",
+                          episodeDistributionMode === "equal" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                         )}
                       >
-                        {episodePrefix} {epNum}
+                        Partes iguales
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Distribución detallada */}
-              {tempEpisodeDistribution.length > 0 && episodeDistributionMode !== "equal" && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Distribución</label>
-                  <div className="space-y-2">
-                    {tempEpisodeDistribution.map((ep) => (
-                      <div key={ep.episode} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                        <span className="text-sm font-medium text-slate-700 w-16">{episodePrefix} {ep.episode}</span>
-                        {episodeDistributionMode === "amount" ? (
-                          <div className="flex-1 relative">
-                            <input
-                              type="number"
-                              value={ep.amount || ""}
-                              onChange={(e) => updateEpisodeAmount(ep.episode, parseFloat(e.target.value) || 0)}
-                              className="w-full pl-6 pr-3 py-2 border border-slate-200 rounded-lg text-sm"
-                              placeholder="0.00"
-                            />
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">€</span>
-                          </div>
-                        ) : (
-                          <div className="flex-1 relative">
-                            <input
-                              type="number"
-                              value={ep.percentage || ""}
-                              onChange={(e) => updateEpisodePercentage(ep.episode, parseFloat(e.target.value) || 0)}
-                              className="w-full pr-8 pl-3 py-2 border border-slate-200 rounded-lg text-sm"
-                              placeholder="0"
-                              min="0"
-                              max="100"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">%</span>
-                          </div>
+                      <button
+                        onClick={() => setEpisodeDistributionMode("amount")}
+                        className={cx(
+                          "flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors",
+                          episodeDistributionMode === "amount" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                         )}
-                        <span className="text-xs text-slate-500 w-20 text-right">
-                          {episodeDistributionMode === "amount" 
-                            ? `${ep.percentage.toFixed(1)}%`
-                            : `${formatCurrency(ep.amount)} €`
-                          }
-                        </span>
-                      </div>
-                    ))}
+                      >
+                        Por importe
+                      </button>
+                      <button
+                        onClick={() => setEpisodeDistributionMode("percentage")}
+                        className={cx(
+                          "flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors",
+                          episodeDistributionMode === "percentage" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        )}
+                      >
+                        Por porcentaje
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
 
-              {/* Resumen */}
-              {tempEpisodeDistribution.length > 0 && (
-                <div className={cx(
-                  "p-3 rounded-lg flex items-center justify-between",
-                  Math.abs(getTotalDistributedPercentage() - 100) < 0.1 ? "bg-emerald-50" : "bg-amber-50"
-                )}>
-                  <span className="text-sm font-medium text-slate-700">Total asignado:</span>
-                  <div className="text-right">
-                    <p className={cx(
-                      "text-sm font-semibold",
-                      Math.abs(getTotalDistributedPercentage() - 100) < 0.1 ? "text-emerald-700" : "text-amber-700"
-                    )}>
-                      {formatCurrency(getTotalDistributedAmount())} € ({getTotalDistributedPercentage().toFixed(1)}%)
-                    </p>
-                    {Math.abs(getTotalDistributedPercentage() - 100) >= 0.1 && (
-                      <p className="text-xs text-amber-600">Debe sumar 100%</p>
-                    )}
+                  {/* Selección de capítulos */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Capítulos</label>
+                    <div className="flex flex-wrap gap-2">
+                      {Array.from({ length: totalEpisodes }, (_, i) => i + 1).map((epNum) => {
+                        const isSelected = tempEpisodeDistribution.some(e => e.episode === epNum);
+                        return (
+                          <button
+                            key={epNum}
+                            onClick={() => toggleEpisodeInDistribution(epNum)}
+                            className={cx(
+                              "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                              isSelected ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                            )}
+                          >
+                            {episodePrefix} {epNum}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
+
+                  {/* Distribución detallada */}
+                  {tempEpisodeDistribution.length > 0 && episodeDistributionMode !== "equal" && (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Importes</label>
+                      <div className="space-y-2">
+                        {tempEpisodeDistribution.map((ep) => (
+                          <div key={ep.episode} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                            <span className="text-sm font-medium text-slate-700 w-16">{episodePrefix} {ep.episode}</span>
+                            {episodeDistributionMode === "amount" ? (
+                              <div className="flex-1 relative">
+                                <input
+                                  type="number"
+                                  value={ep.amount || ""}
+                                  onChange={(e) => updateEpisodeAmount(ep.episode, parseFloat(e.target.value) || 0)}
+                                  className="w-full pl-6 pr-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                  placeholder="0.00"
+                                />
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">€</span>
+                              </div>
+                            ) : (
+                              <div className="flex-1 relative">
+                                <input
+                                  type="number"
+                                  value={ep.percentage || ""}
+                                  onChange={(e) => updateEpisodePercentage(ep.episode, parseFloat(e.target.value) || 0)}
+                                  className="w-full pr-8 pl-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                  placeholder="0"
+                                  min="0"
+                                  max="100"
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">%</span>
+                              </div>
+                            )}
+                            <span className="text-xs text-slate-500 w-20 text-right">
+                              {episodeDistributionMode === "amount" 
+                                ? `${ep.percentage.toFixed(1)}%`
+                                : `${formatCurrency(ep.amount)} €`
+                              }
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Resumen */}
+                  {tempEpisodeDistribution.length > 0 && (
+                    <div className={cx(
+                      "p-3 rounded-lg flex items-center justify-between",
+                      Math.abs(getTotalDistributedPercentage() - 100) < 0.1 ? "bg-emerald-50" : "bg-amber-50"
+                    )}>
+                      <span className="text-sm font-medium text-slate-700">Total:</span>
+                      <div className="text-right">
+                        <p className={cx(
+                          "text-sm font-semibold",
+                          Math.abs(getTotalDistributedPercentage() - 100) < 0.1 ? "text-emerald-700" : "text-amber-700"
+                        )}>
+                          {formatCurrency(getTotalDistributedAmount())} € ({getTotalDistributedPercentage().toFixed(1)}%)
+                        </p>
+                        {Math.abs(getTotalDistributedPercentage() - 100) >= 0.1 && (
+                          <p className="text-xs text-amber-600">Debe sumar 100%</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1944,7 +2022,7 @@ export default function NewPOPage() {
                 disabled={tempEpisodeDistribution.length > 0 && Math.abs(getTotalDistributedPercentage() - 100) >= 0.1}
                 className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
               >
-                {tempEpisodeDistribution.length === 0 ? "Sin asignar" : "Guardar"}
+                Guardar
               </button>
             </div>
           </div>
