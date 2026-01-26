@@ -9,7 +9,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   FileText, ArrowLeft, Save, Send, Building2, AlertCircle, Info, Upload, X, Plus, Trash2,
   Search, Hash, FileUp, ShoppingCart, Package, Wrench, Shield, CheckCircle, CheckCircle2,
-  Clock, Users, ChevronRight, AlertTriangle, Circle, Eye, ShieldAlert, Lock
+  Clock, Users, ChevronRight, AlertTriangle, Circle, Eye, ShieldAlert, Lock, Layers, ChevronDown
 } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
@@ -17,7 +17,8 @@ const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] }
 
 interface Supplier { id: string; fiscalName: string; commercialName: string; country: string; taxId: string; paymentMethod: string; }
 interface SubAccount { id: string; code: string; description: string; budgeted: number; committed: number; actual: number; available: number; accountId: string; accountCode: string; accountDescription: string; }
-interface POItem { id: string; description: string; subAccountId: string; subAccountCode: string; subAccountDescription: string; date: string; quantity: number; unitPrice: number; baseAmount: number; vatRate: number; vatAmount: number; irpfRate: number; irpfAmount: number; totalAmount: number; }
+interface EpisodeDistribution { episode: number; amount: number; percentage: number; }
+interface POItem { id: string; description: string; subAccountId: string; subAccountCode: string; subAccountDescription: string; date: string; quantity: number; unitPrice: number; baseAmount: number; vatRate: number; vatAmount: number; irpfRate: number; irpfAmount: number; totalAmount: number; episodeAssignment?: "general" | "specific"; episodes?: EpisodeDistribution[]; }
 interface ApprovalStep { id: string; order: number; approverType: "fixed" | "role" | "hod" | "coordinator"; approvers?: string[]; roles?: string[]; department?: string; requireAll: boolean; }
 interface ApprovalStepStatus { id: string; order: number; approverType: "fixed" | "role" | "hod" | "coordinator"; approvers: string[]; approverNames: string[]; roles?: string[]; department?: string; approvedBy: string[]; rejectedBy: string[]; status: "pending" | "approved" | "rejected"; requireAll: boolean; }
 interface Member { userId: string; name?: string; email?: string; role?: string; department?: string; position?: string; }
@@ -80,6 +81,14 @@ export default function EditPOPage() {
   const [existingFileName, setExistingFileName] = useState("");
   const [isDragging, setIsDragging] = useState(false);
 
+  // Configuración de episodios
+  const [episodesEnabled, setEpisodesEnabled] = useState(false);
+  const [totalEpisodes, setTotalEpisodes] = useState(0);
+  const [showEpisodeModal, setShowEpisodeModal] = useState(false);
+  const [episodeItemIndex, setEpisodeItemIndex] = useState<number | null>(null);
+  const [episodeDistributionMode, setEpisodeDistributionMode] = useState<"equal" | "amount" | "percentage">("equal");
+  const [tempEpisodeDistribution, setTempEpisodeDistribution] = useState<EpisodeDistribution[]>([]);
+
   const [formData, setFormData] = useState({
     supplier: "", supplierName: "", department: "",
     poType: "service" as "rental" | "purchase" | "service" | "deposit",
@@ -89,7 +98,7 @@ export default function EditPOPage() {
   const [items, setItems] = useState<POItem[]>([{
     id: "1", description: "", subAccountId: "", subAccountCode: "", subAccountDescription: "",
     date: new Date().toISOString().split("T")[0], quantity: 1, unitPrice: 0, baseAmount: 0,
-    vatRate: 21, vatAmount: 0, irpfRate: 0, irpfAmount: 0, totalAmount: 0,
+    vatRate: 21, vatAmount: 0, irpfRate: 0, irpfAmount: 0, totalAmount: 0, episodeAssignment: "general",
   }]);
 
   const [totals, setTotals] = useState({ baseAmount: 0, vatAmount: 0, irpfAmount: 0, totalAmount: 0 });
@@ -150,10 +159,12 @@ export default function EditPOPage() {
         baseAmount: item.baseAmount || 0, vatRate: item.vatRate ?? 21,
         vatAmount: item.vatAmount || 0, irpfRate: item.irpfRate || 0,
         irpfAmount: item.irpfAmount || 0, totalAmount: item.totalAmount || 0,
+        episodeAssignment: item.episodeAssignment || "general",
+        episodes: item.episodes || undefined,
       }));
 
       if (loadedItems.length === 0) {
-        loadedItems.push({ id: "1", description: "", subAccountId: "", subAccountCode: "", subAccountDescription: "", date: new Date().toISOString().split("T")[0], quantity: 1, unitPrice: 0, baseAmount: 0, vatRate: 21, vatAmount: 0, irpfRate: 0, irpfAmount: 0, totalAmount: 0 });
+        loadedItems.push({ id: "1", description: "", subAccountId: "", subAccountCode: "", subAccountDescription: "", date: new Date().toISOString().split("T")[0], quantity: 1, unitPrice: 0, baseAmount: 0, vatRate: 21, vatAmount: 0, irpfRate: 0, irpfAmount: 0, totalAmount: 0, episodeAssignment: "general" });
       }
       setItems(loadedItems);
 
@@ -161,6 +172,20 @@ export default function EditPOPage() {
       if (projectDoc.exists()) {
         setProjectName(projectDoc.data().name || "Proyecto");
         setDepartments(projectDoc.data().departments || []);
+      }
+
+      // Cargar configuración de episodios
+      const productionDoc = await getDoc(doc(db, `projects/${id}/config/production`));
+      if (productionDoc.exists()) {
+        const prodData = productionDoc.data();
+        if (prodData.projectType === "serie") {
+          setTotalEpisodes(prodData.episodes || 0);
+          const projectConfigDoc = await getDoc(doc(db, `projects/${id}/config/project`));
+          if (projectConfigDoc.exists()) {
+            const configData = projectConfigDoc.data();
+            setEpisodesEnabled(configData.enableEpisodes || false);
+          }
+        }
       }
 
       const membersSnapshot = await getDocs(collection(db, `projects/${id}/members`));
@@ -246,10 +271,86 @@ export default function EditPOPage() {
   };
 
   const addItem = () => {
-    setItems([...items, { id: String(items.length + 1), description: "", subAccountId: "", subAccountCode: "", subAccountDescription: "", date: new Date().toISOString().split("T")[0], quantity: 1, unitPrice: 0, baseAmount: 0, vatRate: 21, vatAmount: 0, irpfRate: 0, irpfAmount: 0, totalAmount: 0 }]);
+    setItems([...items, { id: String(items.length + 1), description: "", subAccountId: "", subAccountCode: "", subAccountDescription: "", date: new Date().toISOString().split("T")[0], quantity: 1, unitPrice: 0, baseAmount: 0, vatRate: 21, vatAmount: 0, irpfRate: 0, irpfAmount: 0, totalAmount: 0, episodeAssignment: "general" }]);
   };
 
   const removeItem = (index: number) => { if (items.length === 1) return; setItems(items.filter((_, i) => i !== index)); };
+
+  // Funciones para manejo de episodios
+  const openEpisodeModal = (index: number) => {
+    setEpisodeItemIndex(index);
+    const item = items[index];
+    if (item.episodes && item.episodes.length > 0) {
+      setTempEpisodeDistribution([...item.episodes]);
+      const allEqual = item.episodes.every(e => Math.abs(e.percentage - item.episodes![0].percentage) < 0.01);
+      setEpisodeDistributionMode(allEqual ? "equal" : "amount");
+    } else {
+      setTempEpisodeDistribution([]);
+    }
+    setShowEpisodeModal(true);
+  };
+
+  const toggleEpisodeInDistribution = (episodeNum: number) => {
+    const item = episodeItemIndex !== null ? items[episodeItemIndex] : null;
+    if (!item) return;
+    const existing = tempEpisodeDistribution.find(e => e.episode === episodeNum);
+    if (existing) {
+      setTempEpisodeDistribution(tempEpisodeDistribution.filter(e => e.episode !== episodeNum));
+    } else {
+      const newEp: EpisodeDistribution = { episode: episodeNum, amount: 0, percentage: 0 };
+      const newDist = [...tempEpisodeDistribution, newEp].sort((a, b) => a.episode - b.episode);
+      recalculateDistribution(newDist, item.baseAmount);
+    }
+  };
+
+  const recalculateDistribution = (dist: EpisodeDistribution[], totalAmount: number) => {
+    if (dist.length === 0) { setTempEpisodeDistribution([]); return; }
+    if (episodeDistributionMode === "equal") {
+      const equalPercentage = 100 / dist.length;
+      const equalAmount = totalAmount / dist.length;
+      setTempEpisodeDistribution(dist.map(e => ({ ...e, percentage: equalPercentage, amount: equalAmount })));
+    } else {
+      setTempEpisodeDistribution(dist);
+    }
+  };
+
+  const updateEpisodeAmount = (episodeNum: number, amount: number) => {
+    const item = episodeItemIndex !== null ? items[episodeItemIndex] : null;
+    if (!item) return;
+    setTempEpisodeDistribution(tempEpisodeDistribution.map(e => e.episode === episodeNum ? { ...e, amount, percentage: (amount / item.baseAmount) * 100 } : e));
+  };
+
+  const updateEpisodePercentage = (episodeNum: number, percentage: number) => {
+    const item = episodeItemIndex !== null ? items[episodeItemIndex] : null;
+    if (!item) return;
+    setTempEpisodeDistribution(tempEpisodeDistribution.map(e => e.episode === episodeNum ? { ...e, percentage, amount: (percentage / 100) * item.baseAmount } : e));
+  };
+
+  const applyEqualDistribution = () => {
+    const item = episodeItemIndex !== null ? items[episodeItemIndex] : null;
+    if (!item || tempEpisodeDistribution.length === 0) return;
+    const equalPercentage = 100 / tempEpisodeDistribution.length;
+    const equalAmount = item.baseAmount / tempEpisodeDistribution.length;
+    setTempEpisodeDistribution(tempEpisodeDistribution.map(e => ({ ...e, percentage: equalPercentage, amount: equalAmount })));
+  };
+
+  const saveEpisodeDistribution = () => {
+    if (episodeItemIndex === null) return;
+    const newItems = [...items];
+    const isGeneral = tempEpisodeDistribution.length === 0 || tempEpisodeDistribution.length === totalEpisodes;
+    newItems[episodeItemIndex] = {
+      ...newItems[episodeItemIndex],
+      episodeAssignment: isGeneral ? "general" : "specific",
+      episodes: tempEpisodeDistribution.length > 0 && tempEpisodeDistribution.length < totalEpisodes ? tempEpisodeDistribution : undefined,
+    };
+    setItems(newItems);
+    setShowEpisodeModal(false);
+    setEpisodeItemIndex(null);
+    setTempEpisodeDistribution([]);
+  };
+
+  const getTotalDistributedPercentage = () => tempEpisodeDistribution.reduce((sum, e) => sum + e.percentage, 0);
+  const getTotalDistributedAmount = () => tempEpisodeDistribution.reduce((sum, e) => sum + e.amount, 0);
 
   const calculateTotals = () => {
     setTotals({
@@ -367,6 +468,8 @@ export default function EditPOPage() {
         date: item.date, quantity: item.quantity, unitPrice: item.unitPrice,
         baseAmount: item.baseAmount, vatRate: item.vatRate, vatAmount: item.vatAmount,
         irpfRate: item.irpfRate, irpfAmount: item.irpfAmount, totalAmount: item.totalAmount,
+        episodeAssignment: item.episodeAssignment || "general",
+        ...(item.episodes && item.episodes.length > 0 && { episodes: item.episodes }),
       }));
 
       const poData: any = {
@@ -703,6 +806,43 @@ export default function EditPOPage() {
                             </div>
                           )}
                         </div>
+
+                        {/* Asignación de capítulos */}
+                        {episodesEnabled && totalEpisodes > 0 && (
+                          <div>
+                            <button
+                              onClick={() => openEpisodeModal(index)}
+                              disabled={!canEdit()}
+                              className={`w-full px-4 py-3 border rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white disabled:bg-slate-50 disabled:cursor-not-allowed ${
+                                item.episodeAssignment === "general" ? "border-slate-200" : "border-violet-200 bg-violet-50"
+                              }`}
+                            >
+                              {item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 0 ? (
+                                <div className="flex items-center gap-2">
+                                  <Layers size={14} className="text-violet-600" />
+                                  <span className="text-slate-900">
+                                    {item.episodes.length === 1 ? `${item.episodes[0].episode}` : `${item.episodes.length} capítulos`}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <Layers size={14} className="text-slate-400" />
+                                  <span className="text-slate-600">General (todos los capítulos)</span>
+                                </div>
+                              )}
+                              <ChevronDown size={14} className="text-slate-400" />
+                            </button>
+                            {item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 1 && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {item.episodes.map((ep) => (
+                                  <span key={ep.episode} className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-lg">
+                                    {ep.episode}: {formatCurrency(ep.amount)} {getCurrencySymbol()}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         <div className="grid grid-cols-4 gap-3">
                           <div>
@@ -1078,6 +1218,115 @@ export default function EditPOPage() {
                   })
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de asignación de capítulos */}
+      {showEpisodeModal && episodeItemIndex !== null && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center">
+                  <Layers size={20} className="text-violet-600" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-slate-900">Asignar capítulos</h2>
+                  <p className="text-xs text-slate-500">Item {episodeItemIndex + 1}: {formatCurrency(items[episodeItemIndex].baseAmount)} {getCurrencySymbol()}</p>
+                </div>
+              </div>
+              <button onClick={() => setShowEpisodeModal(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X size={20} className="text-slate-500" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 overflow-y-auto max-h-[60vh]">
+              <button onClick={() => setTempEpisodeDistribution([])} className={`w-full px-4 py-4 rounded-xl text-sm font-medium transition-colors flex items-center gap-3 border-2 ${tempEpisodeDistribution.length === 0 ? "bg-violet-50 border-violet-500 text-violet-700" : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"}`}>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${tempEpisodeDistribution.length === 0 ? "border-violet-500 bg-violet-500" : "border-slate-300"}`}>
+                  {tempEpisodeDistribution.length === 0 && <CheckCircle2 size={12} className="text-white" />}
+                </div>
+                <div className="text-left">
+                  <p className="font-medium">General (todos los capítulos)</p>
+                  <p className="text-xs text-slate-500">El importe se reparte equitativamente entre todos</p>
+                </div>
+              </button>
+
+              <button onClick={() => { if (tempEpisodeDistribution.length === 0) { const item = items[episodeItemIndex]; setTempEpisodeDistribution([{ episode: 1, amount: item.baseAmount, percentage: 100 }]); }}} className={`w-full px-4 py-4 rounded-xl text-sm font-medium transition-colors flex items-center gap-3 border-2 ${tempEpisodeDistribution.length > 0 ? "bg-violet-50 border-violet-500 text-violet-700" : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"}`}>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${tempEpisodeDistribution.length > 0 ? "border-violet-500 bg-violet-500" : "border-slate-300"}`}>
+                  {tempEpisodeDistribution.length > 0 && <CheckCircle2 size={12} className="text-white" />}
+                </div>
+                <div className="text-left">
+                  <p className="font-medium">Capítulos específicos</p>
+                  <p className="text-xs text-slate-500">Asignar a uno o varios capítulos concretos</p>
+                </div>
+              </button>
+
+              {tempEpisodeDistribution.length > 0 && (
+                <div className="space-y-4 pt-2">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Distribución</label>
+                    <div className="flex gap-2">
+                      <button onClick={() => { setEpisodeDistributionMode("equal"); applyEqualDistribution(); }} className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${episodeDistributionMode === "equal" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Partes iguales</button>
+                      <button onClick={() => setEpisodeDistributionMode("amount")} className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${episodeDistributionMode === "amount" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Por importe</button>
+                      <button onClick={() => setEpisodeDistributionMode("percentage")} className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${episodeDistributionMode === "percentage" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Por porcentaje</button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Capítulos</label>
+                    <div className="flex flex-wrap gap-2">
+                      {Array.from({ length: totalEpisodes }, (_, i) => i + 1).map((epNum) => {
+                        const isSelected = tempEpisodeDistribution.some(e => e.episode === epNum);
+                        return (
+                          <button key={epNum} onClick={() => toggleEpisodeInDistribution(epNum)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isSelected ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{epNum}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {tempEpisodeDistribution.length > 0 && episodeDistributionMode !== "equal" && (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Importes</label>
+                      <div className="space-y-2">
+                        {tempEpisodeDistribution.map((ep) => (
+                          <div key={ep.episode} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                            <span className="text-sm font-medium text-slate-700 w-12">{ep.episode}</span>
+                            {episodeDistributionMode === "amount" ? (
+                              <div className="flex-1 relative">
+                                <input type="number" value={ep.amount || ""} onChange={(e) => updateEpisodeAmount(ep.episode, parseFloat(e.target.value) || 0)} className="w-full pl-6 pr-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="0.00" />
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">€</span>
+                              </div>
+                            ) : (
+                              <div className="flex-1 relative">
+                                <input type="number" value={ep.percentage || ""} onChange={(e) => updateEpisodePercentage(ep.episode, parseFloat(e.target.value) || 0)} className="w-full pr-8 pl-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="0" min="0" max="100" />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">%</span>
+                              </div>
+                            )}
+                            <span className="text-xs text-slate-500 w-20 text-right">{episodeDistributionMode === "amount" ? `${ep.percentage.toFixed(1)}%` : `${formatCurrency(ep.amount)} €`}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {tempEpisodeDistribution.length > 0 && (
+                    <div className={`p-3 rounded-lg flex items-center justify-between ${Math.abs(getTotalDistributedPercentage() - 100) < 0.1 ? "bg-emerald-50" : "bg-amber-50"}`}>
+                      <span className="text-sm font-medium text-slate-700">Total:</span>
+                      <div className="text-right">
+                        <p className={`text-sm font-semibold ${Math.abs(getTotalDistributedPercentage() - 100) < 0.1 ? "text-emerald-700" : "text-amber-700"}`}>{formatCurrency(getTotalDistributedAmount())} € ({getTotalDistributedPercentage().toFixed(1)}%)</p>
+                        {Math.abs(getTotalDistributedPercentage() - 100) >= 0.1 && <p className="text-xs text-amber-600">Debe sumar 100%</p>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3">
+              <button onClick={() => setShowEpisodeModal(false)} className="flex-1 py-2.5 text-slate-600 hover:bg-slate-200 rounded-xl text-sm font-medium transition-colors">Cancelar</button>
+              <button onClick={saveEpisodeDistribution} disabled={tempEpisodeDistribution.length > 0 && Math.abs(getTotalDistributedPercentage() - 100) >= 0.1} className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">Guardar</button>
             </div>
           </div>
         </div>
