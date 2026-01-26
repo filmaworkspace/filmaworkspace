@@ -7,7 +7,7 @@ import {
   Clock, User, Calendar, Building2, Eye, Check, X, AlertTriangle,
   MessageSquare, History, TrendingUp, DollarSign, Shield, FileCheck, Zap,
   ChevronDown, ChevronUp, ExternalLink, Send, Info, Flame, Award, Target,
-  PieChart, HelpCircle, Link as LinkIcon, ClipboardCheck,
+  PieChart, HelpCircle, Link as LinkIcon, ClipboardCheck, Layers,
 } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebase";
@@ -506,7 +506,35 @@ export default function ApprovalsPage() {
                       )}
 
                       {currentApproval.items && currentApproval.items.length > 0 && (
-                        <div className="mb-6"><p className="text-xs text-slate-500 mb-2">Items ({currentApproval.items.length})</p><div className="bg-slate-50 rounded-xl border border-slate-100 p-4 max-h-48 overflow-y-auto space-y-2">{currentApproval.items.map((item: any, index: number) => (<div key={index} className="flex items-start justify-between text-sm border-b border-slate-200 pb-2 last:border-0 last:pb-0"><div className="flex-1"><p className="font-medium text-slate-900">{item.description}</p><p className="text-xs text-slate-500">{item.subAccountCode && `${item.subAccountCode} · `}{item.quantity || 0} × {formatCurrency(item.unitPrice || 0)}</p></div><p className="font-medium text-slate-900">{formatCurrency(item.totalAmount || 0)}</p></div>))}</div></div>
+                        <div className="mb-6">
+                          <p className="text-xs text-slate-500 mb-2">Items ({currentApproval.items.length})</p>
+                          <div className="bg-slate-50 rounded-xl border border-slate-100 p-4 max-h-48 overflow-y-auto space-y-2">
+                            {currentApproval.items.map((item: any, index: number) => {
+                              const episodeLabel = item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 0
+                                ? item.episodes.length === 1 
+                                  ? item.episodes[0].episode.toString()
+                                  : item.episodes.map((e: any) => e.episode).join(", ")
+                                : null;
+                              return (
+                                <div key={index} className="flex items-start justify-between text-sm border-b border-slate-200 pb-2 last:border-0 last:pb-0">
+                                  <div className="flex-1">
+                                    <p className="font-medium text-slate-900">{item.description}</p>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <p className="text-xs text-slate-500">{item.subAccountCode && `${item.subAccountCode} · `}{item.quantity || 0} × {formatCurrency(item.unitPrice || 0)}</p>
+                                      {item.episodeAssignment && (
+                                        <span className="flex items-center gap-1 text-xs text-violet-600">
+                                          <Layers size={10} />
+                                          {episodeLabel || "General"}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <p className="font-medium text-slate-900">{formatCurrency(item.totalAmount || 0)}</p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
                       )}
 
                       <div className="mb-6"><p className="text-xs text-slate-500 mb-3">Progreso de aprobación</p><div className="space-y-2">{currentApproval.approvalSteps.map((step, index) => (<div key={step.id || index} className={`flex items-center gap-3 p-3 rounded-xl border ${index === currentApproval.currentApprovalStep ? "border-amber-200 bg-amber-50" : step.status === "approved" ? "border-emerald-200 bg-emerald-50" : "border-slate-100 bg-slate-50"}`}><div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${step.status === "approved" ? "bg-emerald-500 text-white" : index === currentApproval.currentApprovalStep ? "bg-amber-500 text-white" : "bg-slate-200 text-slate-600"}`}>{step.status === "approved" ? <Check size={12} /> : step.order}</div><div className="flex-1"><p className="text-sm font-medium text-slate-900">Nivel {step.order}{step.approverType === "role" && step.roles && (<span className="text-slate-500 font-normal"> ({step.roles.join(", ")})</span>)}{step.hasAmountThreshold && step.amountThreshold && (<span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">&gt;{step.amountThreshold.toLocaleString()}€</span>)}</p><p className="text-xs text-slate-500">{step.approverNames?.length ? step.approverNames.slice(0, 3).join(", ") + (step.approverNames.length > 3 ? ` +${step.approverNames.length - 3}` : "") : `${(step.approvedBy || []).length} aprobación${(step.approvedBy || []).length !== 1 ? "es" : ""}`}{step.requireAll && " (todos)"}</p></div>{step.status === "approved" && <CheckCircle size={16} className="text-emerald-500" />}{index === currentApproval.currentApprovalStep && step.status === "pending" && <Clock size={16} className="text-amber-500" />}</div>))}</div></div>
