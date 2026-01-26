@@ -42,6 +42,7 @@ export default function ApprovalsPage() {
   const [selectedApproval, setSelectedApproval] = useState<PendingApproval | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -292,7 +293,7 @@ export default function ApprovalsPage() {
 
   const handleApprove = async (approval: PendingApproval, withComment: boolean = false) => {
     if (withComment && !approvalComment.trim()) { setErrorMessage("Escribe un comentario"); return; }
-    if (!withComment && !confirm(`¿Aprobar ${approval.displayNumber}?`)) return;
+    setShowApprovalModal(false);
     setProcessing(true);
     try {
       const collectionName = approval.type === "po" ? "pos" : "invoices";
@@ -543,7 +544,7 @@ export default function ApprovalsPage() {
                         {showCommentInput ? (
                           <div className="space-y-3"><textarea value={approvalComment} onChange={(e) => setApprovalComment(e.target.value)} placeholder="Añade un comentario (opcional)..." rows={2} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none text-sm" /><div className="flex gap-3"><button onClick={() => { setShowCommentInput(false); setApprovalComment(""); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">Cancelar</button><button onClick={() => handleApprove(currentApproval, true)} disabled={processing} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">{processing ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send size={16} />}Aprobar con comentario</button></div></div>
                         ) : (
-                          <div className="space-y-3"><div className="flex gap-3"><button onClick={() => handleApprove(currentApproval)} disabled={processing} className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">{processing ? (<><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Procesando...</>) : (<><CheckCircle size={18} />Aprobar</>)}</button><button onClick={() => { setSelectedApproval(currentApproval); setShowRejectionModal(true); }} disabled={processing} className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"><XCircle size={18} />Rechazar</button></div><div className="flex gap-3"><button onClick={() => setShowCommentInput(true)} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"><MessageSquare size={16} />Aprobar con comentario</button><button onClick={() => { setSelectedApproval(currentApproval); setShowInfoRequestModal(true); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"><HelpCircle size={16} />Solicitar información</button></div></div>
+                          <div className="space-y-3"><div className="flex gap-3"><button onClick={() => { setSelectedApproval(currentApproval); setShowApprovalModal(true); }} disabled={processing} className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">{processing ? (<><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Procesando...</>) : (<><CheckCircle size={18} />Aprobar</>)}</button><button onClick={() => { setSelectedApproval(currentApproval); setShowRejectionModal(true); }} disabled={processing} className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"><XCircle size={18} />Rechazar</button></div><div className="flex gap-3"><button onClick={() => setShowCommentInput(true)} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"><MessageSquare size={16} />Aprobar con comentario</button><button onClick={() => { setSelectedApproval(currentApproval); setShowInfoRequestModal(true); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"><HelpCircle size={16} />Solicitar información</button></div></div>
                         )}
                       </div>
                     </div>
@@ -593,6 +594,48 @@ export default function ApprovalsPage() {
           </div>
         )}
       </main>
+
+      {/* Modal de confirmación de aprobación */}
+      {showApprovalModal && selectedApproval && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-900">Confirmar aprobación</h3>
+              <p className="text-sm text-slate-500">{selectedApproval.displayNumber}</p>
+            </div>
+            <div className="p-6">
+              <div className="flex items-center gap-4 p-4 bg-emerald-50 rounded-xl mb-6">
+                <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
+                  <CheckCircle size={24} className="text-emerald-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-slate-900">¿Aprobar este documento?</p>
+                  <p className="text-sm text-slate-600">{selectedApproval.supplier} · {formatCurrency(selectedApproval.totalAmount)}</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => { setShowApprovalModal(false); setSelectedApproval(null); }} 
+                  className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={() => handleApprove(selectedApproval)} 
+                  disabled={processing} 
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium disabled:opacity-50"
+                >
+                  {processing ? (
+                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Aprobando...</>
+                  ) : (
+                    <><CheckCircle size={16} />Confirmar aprobación</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showRejectionModal && selectedApproval && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
