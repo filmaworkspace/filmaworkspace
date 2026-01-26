@@ -6,12 +6,18 @@ import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { doc, getDoc, collection, getDocs, updateDoc, query, where, orderBy, Timestamp } from "firebase/firestore";
-import { FileText, ArrowLeft, Edit, Download, Receipt, Lock, Unlock, XCircle, CheckCircle, Clock, Ban, Archive, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, FileEdit, ExternalLink, MoreHorizontal } from "lucide-react";
+import { FileText, ArrowLeft, Edit, Download, Receipt, Lock, Unlock, XCircle, CheckCircle, Clock, Ban, Archive, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, FileEdit, ExternalLink, MoreHorizontal, Layers } from "lucide-react";
 import jsPDF from "jspdf";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 type POStatus = "draft" | "pending" | "approved" | "rejected" | "closed" | "cancelled";
+
+interface EpisodeDistribution {
+  episode: number;
+  amount: number;
+  percentage: number;
+}
 
 interface POItem {
   description: string;
@@ -27,6 +33,8 @@ interface POItem {
   irpfAmount: number;
   totalAmount: number;
   invoicedAmount?: number;
+  episodeAssignment?: "general" | "specific";
+  episodes?: EpisodeDistribution[];
 }
 
 interface Invoice {
@@ -677,6 +685,11 @@ export default function PODetailPage() {
                 {po.items.map((item, index) => {
                   const itemInvoiced = item.invoicedAmount || 0;
                   const itemProgress = item.baseAmount > 0 ? Math.min(100, (itemInvoiced / item.baseAmount) * 100) : 0;
+                  const episodeLabel = item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 0
+                    ? item.episodes.length === 1 
+                      ? item.episodes[0].episode.toString()
+                      : item.episodes.map(e => e.episode).join(", ")
+                    : "General";
                   return (
                     <div key={index} className="p-6">
                       <div className="flex items-start justify-between mb-3">
@@ -690,7 +703,22 @@ export default function PODetailPage() {
                         <span>{item.quantity} × {formatCurrency(item.unitPrice)} {getCurrencySymbol()}</span>
                         {item.vatRate > 0 && <span>IVA {item.vatRate}%</span>}
                         {item.irpfRate > 0 && <span className="text-red-500">IRPF {item.irpfRate}%</span>}
+                        {item.episodeAssignment && (
+                          <span className="flex items-center gap-1 text-violet-600">
+                            <Layers size={12} />
+                            {episodeLabel}
+                          </span>
+                        )}
                       </div>
+                      {item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 1 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {item.episodes.map((ep) => (
+                            <span key={ep.episode} className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-lg">
+                              {ep.episode}: {formatCurrency(ep.amount)} {getCurrencySymbol()}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       {po.status === "approved" && itemInvoiced > 0 && (
                         <div className="mt-3 pt-3 border-t border-slate-100">
                           <div className="flex items-center justify-between text-xs mb-1">
