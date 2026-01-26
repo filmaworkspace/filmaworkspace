@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { doc, getDoc, collection, getDocs, updateDoc, query, where, orderBy, Timestamp } from "firebase/firestore";
-import { Receipt, Edit, Download, XCircle, CheckCircle, Clock, Ban, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, ExternalLink, MoreHorizontal, CreditCard, FileText, Link as LinkIcon, Eye, EyeOff, Code, Save, X, Plus, Trash2, Search, RefreshCw, Percent, Euro, FileCheck, ZoomIn, ZoomOut, RotateCw } from "lucide-react";
+import { Receipt, Edit, Download, XCircle, CheckCircle, Clock, Ban, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, ExternalLink, MoreHorizontal, CreditCard, FileText, Link as LinkIcon, Eye, EyeOff, Code, Save, X, Plus, Trash2, Search, RefreshCw, Percent, Euro, FileCheck, ZoomIn, ZoomOut, RotateCw, Layers } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
@@ -14,7 +14,8 @@ const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] }
 type InvoiceStatus = "draft" | "pending" | "pending_approval" | "approved" | "rejected" | "paid" | "cancelled" | "coding";
 type DocumentType = "invoice" | "proforma" | "autonomo" | "ticket";
 
-interface InvoiceItem { description: string; subAccountId: string; subAccountCode: string; subAccountDescription: string; quantity: number; unitPrice: number; baseAmount: number; vatRate: number; vatAmount: number; irpfRate: number; irpfAmount: number; totalAmount: number; poItemId?: string; poItemIndex?: number; isNewItem?: boolean; }
+interface EpisodeDistribution { episode: number; amount: number; percentage: number; }
+interface InvoiceItem { description: string; subAccountId: string; subAccountCode: string; subAccountDescription: string; quantity: number; unitPrice: number; baseAmount: number; vatRate: number; vatAmount: number; irpfRate: number; irpfAmount: number; totalAmount: number; poItemId?: string; poItemIndex?: number; isNewItem?: boolean; episodeAssignment?: "general" | "specific"; episodes?: EpisodeDistribution[]; }
 interface Invoice { id: string; documentType: DocumentType; number: string; displayNumber: string; supplierNumber?: string; supplier: string; supplierId: string; supplierTaxId?: string; supplierIban?: string; supplierBic?: string; department?: string; description: string; notes?: string; items: InvoiceItem[]; baseAmount: number; vatAmount: number; irpfAmount: number; totalAmount: number; invoiceDate?: Date; dueDate: Date; status: InvoiceStatus; approvalStatus?: string; attachmentUrl?: string; attachmentFileName?: string; createdAt: Date; createdBy: string; createdByName: string; codedAt?: Date; codedBy?: string; codedByName?: string; approvedAt?: Date; approvedBy?: string; approvedByName?: string; paidAt?: Date; paidAmount?: number; paymentMethod?: string; paymentReference?: string; cancelledAt?: Date; cancelledByName?: string; cancellationReason?: string; poId?: string; poNumber?: string; requiresReplacement?: boolean; replacedByInvoiceId?: string; isReplacement?: boolean; replacesDocumentId?: string; replacesDocumentNumber?: string; currency?: string; accountingEntry?: string; isAsset?: boolean; assetCategory?: string; }
 interface LinkedPO { id: string; number: string; supplier: string; baseAmount: number; invoicedAmount: number; status: string; items?: any[]; }
 interface Supplier { id: string; name: string; taxId?: string; iban?: string; bic?: string; }
@@ -357,7 +358,7 @@ export default function InvoiceDetailPage() {
   if (codingMode) {
     return (
       <div className={`min-h-screen bg-slate-100 ${inter.className}`}>
-        {toast && <div className="fixed top-4 right-4 z-50"><div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"} text-white text-sm font-medium`}>{toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}{toast.message}</div></div>}
+        {toast && <div className="fixed bottom-4 right-4 z-50"><div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"} text-white text-sm font-medium`}>{toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}{toast.message}</div></div>}
         
         {/* Coding Header */}
         <div className="bg-violet-600 text-white px-6 py-3 flex items-center justify-between fixed top-0 left-0 right-0 z-50">
@@ -365,7 +366,7 @@ export default function InvoiceDetailPage() {
             <button onClick={() => setCodingMode(false)} className="p-2 hover:bg-violet-700 rounded-lg"><X size={20} /></button>
             <div className="flex items-center gap-3">
               <Code size={20} />
-              <span className="font-semibold">Codificar</span>
+              <span className="font-semibold">CODIFICAR</span>
               <span className="bg-violet-500 px-2 py-0.5 rounded text-sm">{invoice.displayNumber}</span>
             </div>
           </div>
@@ -680,7 +681,7 @@ export default function InvoiceDetailPage() {
   // Normal Detail View
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
-      {toast && <div className="fixed top-4 right-4 z-50"><div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"} text-white text-sm font-medium`}>{toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}{toast.message}</div></div>}
+      {toast && <div className="fixed bottom-4 right-4 z-50"><div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"} text-white text-sm font-medium`}>{toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}{toast.message}</div></div>}
       
       <div className="mt-[4.5rem]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
@@ -840,28 +841,50 @@ export default function InvoiceDetailPage() {
                 <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">{invoice.items.length} {invoice.items.length === 1 ? 'línea' : 'líneas'}</span>
               </div>
               <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
-                {invoice.items.map((item, i) => (
-                  <div key={i} className={`p-4 ${item.isNewItem ? "bg-amber-50/50" : ""}`}>
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-medium text-slate-900">{item.description || "Sin descripción"}</p>
-                          {item.isNewItem ? (
-                            <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-medium flex items-center gap-0.5"><Plus size={8} />Nuevo</span>
-                          ) : item.poItemIndex !== undefined && item.poItemIndex !== null ? (
-                            <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-medium flex items-center gap-0.5"><LinkIcon size={8} />PO #{item.poItemIndex + 1}</span>
-                          ) : null}
+                {invoice.items.map((item, i) => {
+                  const episodeLabel = item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 0
+                    ? item.episodes.length === 1 
+                      ? item.episodes[0].episode.toString()
+                      : item.episodes.map(e => e.episode).join(", ")
+                    : "General";
+                  return (
+                    <div key={i} className={`p-4 ${item.isNewItem ? "bg-amber-50/50" : ""}`}>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-medium text-slate-900">{item.description || "Sin descripción"}</p>
+                            {item.isNewItem ? (
+                              <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-medium flex items-center gap-0.5"><Plus size={8} />Nuevo</span>
+                            ) : item.poItemIndex !== undefined && item.poItemIndex !== null ? (
+                              <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-medium flex items-center gap-0.5"><LinkIcon size={8} />PO #{item.poItemIndex + 1}</span>
+                            ) : null}
+                          </div>
+                          <p className="text-sm text-slate-500">{item.subAccountCode} · {item.subAccountDescription}</p>
                         </div>
-                        <p className="text-sm text-slate-500">{item.subAccountCode} · {item.subAccountDescription}</p>
+                        <p className="font-bold text-slate-900">{formatCurrency(item.baseAmount)} €</p>
                       </div>
-                      <p className="font-bold text-slate-900">{formatCurrency(item.baseAmount)} €</p>
+                      <div className="flex items-center gap-3 text-xs text-slate-500">
+                        {item.vatRate > 0 && <span>IVA {item.vatRate}%</span>}
+                        {item.irpfRate > 0 && <span className="text-red-500">IRPF {item.irpfRate}%</span>}
+                        {item.episodeAssignment && (
+                          <span className="flex items-center gap-1 text-violet-600">
+                            <Layers size={10} />
+                            {episodeLabel}
+                          </span>
+                        )}
+                      </div>
+                      {item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 1 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {item.episodes.map((ep) => (
+                            <span key={ep.episode} className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-lg">
+                              {ep.episode}: {formatCurrency(ep.amount)} €
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-slate-500">
-                      {item.vatRate > 0 && <span>IVA {item.vatRate}%</span>}
-                      {item.irpfRate > 0 && <span className="text-red-500">IRPF {item.irpfRate}%</span>}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
