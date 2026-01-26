@@ -5,7 +5,7 @@ import { Inter } from "next/font/google";
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
-import { Download, FileText, Receipt, Building2, Wallet, Settings2, ChevronDown, Check, X, Save, Trash2, BookMarked, Layers, GripVertical, Plus, Minus, FileSpreadsheet } from "lucide-react";
+import { Download, FileText, Receipt, Building2, Wallet, Settings2, ChevronDown, Check, X, Save, Trash2, BookMarked, Layers, GripVertical, Plus, Minus, FileSpreadsheet, Film } from "lucide-react";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -66,6 +66,7 @@ const REPORT_COLUMNS: Record<ReportType, ReportColumn[]> = {
     { id: "supplier", label: "Proveedor", enabled: true },
     { id: "itemNumber", label: "Nº Ítem", enabled: true },
     { id: "itemDescription", label: "Descripción ítem", enabled: true },
+    { id: "episode", label: "Capítulo", enabled: true },
     { id: "accountCode", label: "Código cuenta", enabled: true },
     { id: "accountDescription", label: "Cuenta", enabled: false },
     { id: "subaccountCode", label: "Código subcuenta", enabled: true },
@@ -87,6 +88,7 @@ const REPORT_COLUMNS: Record<ReportType, ReportColumn[]> = {
     { id: "supplierTaxId", label: "NIF Proveedor", enabled: false },
     { id: "description", label: "Descripción", enabled: true },
     { id: "poNumber", label: "Nº PO asociada", enabled: true },
+    { id: "episode", label: "Capítulo", enabled: true },
     { id: "baseAmount", label: "Base imponible", enabled: true },
     { id: "taxAmount", label: "IVA", enabled: false },
     { id: "irpfAmount", label: "IRPF", enabled: false },
@@ -144,6 +146,11 @@ export default function ReportsPage() {
   const [expandedReport, setExpandedReport] = useState<ReportType | null>(null);
   const [exportFormat, setExportFormat] = useState<"csv" | "xlsx">("csv");
 
+  // Estados para episodios
+  const [episodesEnabled, setEpisodesEnabled] = useState(false);
+  const [totalEpisodes, setTotalEpisodes] = useState(0);
+  const [splitByEpisode, setSplitByEpisode] = useState(false);
+
   useEffect(() => {
     const savedPresets = localStorage.getItem(`report_presets_${id}`);
     if (savedPresets) setPresets(JSON.parse(savedPresets));
@@ -179,6 +186,25 @@ export default function ReportsPage() {
         getDocs(collection(db, `projects/${id}/accounts`)),
       ]);
       setCounts({ pos: posSnap.size, invoices: invoicesSnap.size, suppliers: suppliersSnap.size, accounts: accountsSnap.size });
+
+      // Cargar configuración de episodios
+      try {
+        const productionDoc = await getDoc(doc(db, `projects/${id}/config/production`));
+        if (productionDoc.exists()) {
+          const prodData = productionDoc.data();
+          if (prodData.projectType === "serie") {
+            setTotalEpisodes(prodData.episodes || 0);
+            
+            const projectConfigDoc = await getDoc(doc(db, `projects/${id}/config/project`));
+            if (projectConfigDoc.exists()) {
+              const configData = projectConfigDoc.data();
+              setEpisodesEnabled(configData.enableEpisodes || false);
+            }
+          }
+        }
+      } catch (epErr) {
+        console.error("Error loading episodes config:", epErr);
+      }
     } catch (error) { 
       console.error("Error cargando datos:", error); 
     } finally { 
@@ -482,8 +508,8 @@ export default function ReportsPage() {
         const items = poData.items || [];
         
         items.forEach((item: any, index: number) => {
-          const baseCommitted = item.amount || 0;
-          const taxRate = item.taxRate || 21;
+          const baseCommitted = item.baseAmount || item.amount || 0;
+          const taxRate = item.vatRate || item.taxRate || 21;
           const irpfRate = item.irpfRate || 0;
           const taxAmount = baseCommitted * (taxRate / 100);
           const irpfAmount = baseCommitted * (irpfRate / 100);
@@ -494,35 +520,85 @@ export default function ReportsPage() {
           
           const baseAvailable = baseCommitted - baseActual;
           const totalAvailable = totalCommitted - totalActual;
-          
-          const rowData: any = {
-            poNumber: poData.number || poData.displayNumber || "",
-            poDescription: poData.description || "",
-            supplier: poData.supplier || "",
-            itemNumber: index + 1,
-            itemDescription: item.description || "",
-            accountCode: item.accountCode || "",
-            accountDescription: item.accountDescription || "",
-            subaccountCode: item.subaccountCode || "",
-            subaccountDescription: item.subaccountDescription || "",
-            baseCommittedOriginal: baseCommitted,
-            totalCommittedOriginal: totalCommitted,
-            baseActual: baseActual,
-            totalActual: totalActual,
-            baseAvailable: baseAvailable,
-            totalAvailable: totalAvailable,
-            poStatus: poData.status || "",
-            isOpen: poData.isOpen !== false ? "Abierta" : "Cerrada",
-            taxRate: `${taxRate}%`,
-            irpfRate: `${irpfRate}%`,
-          };
-          
-          rows.push(columns.map(col => {
-            if (col.isBlank) return "";
-            const val = rowData[col.originalId];
-            if (typeof val === "number") return formatCurrency(val);
-            return val?.toString() || "";
-          }));
+
+          // Determinar capítulo(s)
+          const episodeAssignment = item.episodeAssignment || "general";
+          const episodes = item.episodes || [];
+
+          // Si splitByEpisode está activo y hay episodios específicos, crear una fila por cada uno
+          if (splitByEpisode && episodeAssignment === "specific" && episodes.length > 0) {
+            episodes.forEach((ep: any) => {
+              const epBaseCommitted = ep.amount || 0;
+              const epTaxAmount = epBaseCommitted * (taxRate / 100);
+              const epIrpfAmount = epBaseCommitted * (irpfRate / 100);
+              const epTotalCommitted = epBaseCommitted + epTaxAmount - epIrpfAmount;
+              
+              const rowData: any = {
+                poNumber: poData.number || poData.displayNumber || "",
+                poDescription: poData.generalDescription || poData.description || "",
+                supplier: poData.supplier || "",
+                itemNumber: index + 1,
+                itemDescription: item.description || "",
+                episode: ep.episode.toString(),
+                accountCode: item.accountCode || item.subAccountCode?.split(".")[0] || "",
+                accountDescription: item.accountDescription || "",
+                subaccountCode: item.subAccountCode || item.subaccountCode || "",
+                subaccountDescription: item.subAccountDescription || item.subaccountDescription || "",
+                baseCommittedOriginal: epBaseCommitted,
+                totalCommittedOriginal: epTotalCommitted,
+                baseActual: 0,
+                totalActual: 0,
+                baseAvailable: epBaseCommitted,
+                totalAvailable: epTotalCommitted,
+                poStatus: poData.status || "",
+                isOpen: poData.isOpen !== false ? "Abierta" : "Cerrada",
+                taxRate: `${taxRate}%`,
+                irpfRate: `${irpfRate}%`,
+              };
+              
+              rows.push(columns.map(col => {
+                if (col.isBlank) return "";
+                const val = rowData[col.originalId];
+                if (typeof val === "number") return formatCurrency(val);
+                return val?.toString() || "";
+              }));
+            });
+          } else {
+            // Fila única (general o sin desglose)
+            const episodeLabel = episodeAssignment === "general" ? "0" : 
+              episodes.length === 1 ? episodes[0].episode.toString() :
+              episodes.length > 1 ? episodes.map((e: any) => e.episode).join(", ") : "0";
+            
+            const rowData: any = {
+              poNumber: poData.number || poData.displayNumber || "",
+              poDescription: poData.generalDescription || poData.description || "",
+              supplier: poData.supplier || "",
+              itemNumber: index + 1,
+              itemDescription: item.description || "",
+              episode: episodeLabel,
+              accountCode: item.accountCode || item.subAccountCode?.split(".")[0] || "",
+              accountDescription: item.accountDescription || "",
+              subaccountCode: item.subAccountCode || item.subaccountCode || "",
+              subaccountDescription: item.subAccountDescription || item.subaccountDescription || "",
+              baseCommittedOriginal: baseCommitted,
+              totalCommittedOriginal: totalCommitted,
+              baseActual: baseActual,
+              totalActual: totalActual,
+              baseAvailable: baseAvailable,
+              totalAvailable: totalAvailable,
+              poStatus: poData.status || "",
+              isOpen: poData.isOpen !== false ? "Abierta" : "Cerrada",
+              taxRate: `${taxRate}%`,
+              irpfRate: `${irpfRate}%`,
+            };
+            
+            rows.push(columns.map(col => {
+              if (col.isBlank) return "";
+              const val = rowData[col.originalId];
+              if (typeof val === "number") return formatCurrency(val);
+              return val?.toString() || "";
+            }));
+          }
         });
       }
       
@@ -538,29 +614,94 @@ export default function ReportsPage() {
       
       invoicesSnapshot.docs.forEach((docSnap) => {
         const data = docSnap.data();
+        const items = data.items || [];
+
+        // Determinar capítulos de los items
+        let episodeLabel = "0";
+        const allEpisodes: number[] = [];
         
-        const rowData: any = {
-          number: data.number || data.displayNumber || "",
-          supplier: data.supplier || "",
-          supplierTaxId: data.supplierTaxId || "",
-          description: data.description || "",
-          poNumber: data.poNumber || "",
-          baseAmount: data.baseAmount || 0,
-          taxAmount: data.taxAmount || 0,
-          irpfAmount: data.irpfAmount || 0,
-          totalAmount: data.totalAmount || 0,
-          status: data.status || "",
-          dueDate: formatDate(data.dueDate),
-          createdAt: formatDate(data.createdAt),
-          paidAt: formatDate(data.paidAt),
-          accountCode: data.accountCode || "",
-        };
-        
-        rows.push(columns.map(col => {
-          if (col.isBlank) return "";
-          const val = rowData[col.originalId];
-          return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
-        }));
+        items.forEach((item: any) => {
+          const assignment = item.episodeAssignment || "general";
+          if (assignment === "specific" && item.episodes && item.episodes.length > 0) {
+            item.episodes.forEach((ep: any) => {
+              if (!allEpisodes.includes(ep.episode)) {
+                allEpisodes.push(ep.episode);
+              }
+            });
+          }
+        });
+
+        if (allEpisodes.length > 0) {
+          allEpisodes.sort((a, b) => a - b);
+          episodeLabel = allEpisodes.length === 1 ? allEpisodes[0].toString() : allEpisodes.join(", ");
+        }
+
+        // Si splitByEpisode, crear filas separadas por capítulo
+        if (splitByEpisode && allEpisodes.length > 1) {
+          // Calcular importe por capítulo
+          const amountByEpisode: Record<number, number> = {};
+          items.forEach((item: any) => {
+            const assignment = item.episodeAssignment || "general";
+            if (assignment === "specific" && item.episodes && item.episodes.length > 0) {
+              item.episodes.forEach((ep: any) => {
+                amountByEpisode[ep.episode] = (amountByEpisode[ep.episode] || 0) + (ep.amount || 0);
+              });
+            } else {
+              // General: se distribuye entre todos (ponemos en 0)
+              amountByEpisode[0] = (amountByEpisode[0] || 0) + (item.baseAmount || 0);
+            }
+          });
+
+          Object.entries(amountByEpisode).forEach(([epNum, amount]) => {
+            const rowData: any = {
+              number: data.number || data.displayNumber || "",
+              supplier: data.supplier || "",
+              supplierTaxId: data.supplierTaxId || "",
+              description: data.description || "",
+              poNumber: data.poNumber || "",
+              episode: epNum,
+              baseAmount: amount,
+              taxAmount: amount * 0.21, // Aproximación
+              irpfAmount: 0,
+              totalAmount: amount * 1.21,
+              status: data.status || "",
+              dueDate: formatDate(data.dueDate),
+              createdAt: formatDate(data.createdAt),
+              paidAt: formatDate(data.paidAt),
+              accountCode: data.accountCode || "",
+            };
+            
+            rows.push(columns.map(col => {
+              if (col.isBlank) return "";
+              const val = rowData[col.originalId];
+              return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
+            }));
+          });
+        } else {
+          const rowData: any = {
+            number: data.number || data.displayNumber || "",
+            supplier: data.supplier || "",
+            supplierTaxId: data.supplierTaxId || "",
+            description: data.description || "",
+            poNumber: data.poNumber || "",
+            episode: episodeLabel,
+            baseAmount: data.baseAmount || 0,
+            taxAmount: data.vatAmount || data.taxAmount || 0,
+            irpfAmount: data.irpfAmount || 0,
+            totalAmount: data.totalAmount || 0,
+            status: data.status || "",
+            dueDate: formatDate(data.dueDate),
+            createdAt: formatDate(data.createdAt),
+            paidAt: formatDate(data.paidAt),
+            accountCode: data.accountCode || "",
+          };
+          
+          rows.push(columns.map(col => {
+            if (col.isBlank) return "";
+            const val = rowData[col.originalId];
+            return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
+          }));
+        }
       });
       
       downloadFile(rows, `Facturas_${projectName}_${getCurrentDate()}.csv`);
@@ -681,6 +822,24 @@ export default function ReportsPage() {
                   Excel
                 </span>
               </button>
+
+              {/* Toggle desglosar por capítulos */}
+              {episodesEnabled && totalEpisodes > 0 && (
+                <>
+                  <div className="w-px h-6 bg-slate-200" />
+                  <button
+                    onClick={() => setSplitByEpisode(!splitByEpisode)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      splitByEpisode 
+                        ? "bg-violet-100 text-violet-700 border border-violet-200" 
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    <Film size={14} />
+                    Desglosar por capítulo
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
