@@ -411,13 +411,13 @@ export default function Dashboard() {
     const daysUntilClose = getDaysUntilClose(project.closingAt);
 
     return (
-      <div key={project.id} className="group bg-white border border-slate-200 rounded-2xl p-5 hover:border-slate-300 hover:shadow-lg">
-        {/* Aviso de cierre */}
+      <div key={project.id} className="group relative bg-white border border-slate-200 rounded-2xl p-5 hover:border-slate-300 hover:shadow-lg">
+        {/* Aviso de cierre - Badge absoluto */}
         {daysUntilClose !== null && (
-          <div className="mb-3 px-2.5 py-1.5 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
-            <Clock size={12} className="text-red-500" />
-            <span className="text-[10px] font-medium text-red-700">
-              Cierra en {daysUntilClose} día{daysUntilClose !== 1 ? "s" : ""}
+          <div className="absolute -top-2 -right-2 px-2 py-1 bg-red-500 text-white rounded-lg flex items-center gap-1 shadow-sm">
+            <Clock size={10} />
+            <span className="text-[10px] font-semibold">
+              {daysUntilClose}d
             </span>
           </div>
         )}
@@ -897,7 +897,7 @@ export default function Dashboard() {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-start">
                     {filteredProjects.map((project) => renderProjectCard(project))}
                   </div>
                 )}
@@ -925,7 +925,7 @@ export default function Dashboard() {
                 </button>
                 
                 {showArchived && (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-start">
                     {archivedProjects.map((project) => renderArchivedCard(project))}
                   </div>
                 )}
@@ -945,6 +945,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">Acceso a Configuración</h3>
+                <p className="text-xs text-slate-500">Confirma tu identidad para continuar</p>
               </div>
             </div>
             <div className="p-6">
