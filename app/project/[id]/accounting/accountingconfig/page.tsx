@@ -153,20 +153,19 @@ const CONFIG_SECTIONS = [
 
 // Opciones de comportamiento del presupuesto
 const COMMITMENT_TRIGGERS = [
-  { value: "on_create", label: "Al crear", description: "Se compromete en cuanto se crea el documento (borrador)" },
-  { value: "on_approve", label: "Al aprobar", description: "Se compromete cuando el documento es aprobado" },
-  { value: "on_account", label: "Al contabilizar", description: "Se compromete cuando se marca como contabilizado" },
+  { value: "on_create", label: "Al enviar a aprobación", description: "Se compromete cuando la PO se envía a aprobación (pendiente)" },
+  { value: "on_approve", label: "Al aprobar", description: "Se compromete cuando la PO es aprobada" },
 ];
 
 const ACTUAL_TRIGGERS = [
   { value: "on_approve", label: "Al aprobar factura", description: "Pasa a realizado cuando la factura es aprobada" },
+  { value: "on_account", label: "Al contabilizar", description: "Pasa a realizado cuando se marca como contabilizada" },
   { value: "on_paid", label: "Al pagar", description: "Pasa a realizado cuando la factura se marca como pagada" },
-  { value: "on_account", label: "Al contabilizar", description: "Pasa a realizado cuando se marca como contabilizado" },
 ];
 
 interface CostSettings {
-  poCommitmentTrigger: "on_create" | "on_approve" | "on_account";
-  invoiceActualTrigger: "on_approve" | "on_paid" | "on_account";
+  poCommitmentTrigger: "on_create" | "on_approve";
+  invoiceActualTrigger: "on_approve" | "on_account" | "on_paid";
 }
 
 // Configuración específica del proyecto para contabilidad
@@ -1466,19 +1465,6 @@ export default function AccountingConfigPage() {
               </label>
             ))}
           </div>
-
-          <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-            <div className="flex gap-3">
-              <Info size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium text-amber-800">¿Cómo funciona?</p>
-                <p className="text-amber-700 mt-1">
-                  Cuando una PO alcanza el estado seleccionado, su importe base se suma al "comprometido" de las partidas presupuestarias asociadas. 
-                  Esto reduce el presupuesto disponible sin afectar al realizado.
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -1514,19 +1500,6 @@ export default function AccountingConfigPage() {
                 </div>
               </label>
             ))}
-          </div>
-
-          <div className="mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
-            <div className="flex gap-3">
-              <Info size={18} className="text-emerald-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium text-emerald-800">¿Cómo funciona?</p>
-                <p className="text-emerald-700 mt-1">
-                  Cuando una factura alcanza el estado seleccionado, su importe se mueve de "comprometido" a "realizado". 
-                  El presupuesto disponible no cambia, solo la distribución entre comprometido y realizado.
-                </p>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -1569,19 +1542,6 @@ export default function AccountingConfigPage() {
                 />
               </label>
             )}
-
-            <div className="p-4 bg-violet-50 border border-violet-200 rounded-xl">
-              <div className="flex gap-3">
-                <Info size={18} className="text-violet-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm">
-                  <p className="font-medium text-violet-800">¿Cómo funciona?</p>
-                  <p className="text-violet-700 mt-1">
-                    Al crear POs o facturas, cada línea puede asignarse a capítulos específicos. 
-                    Si no se especifica, se considera "General" (capítulo 0) y se distribuye entre todos.
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
           
           {/* Botón guardar */}
