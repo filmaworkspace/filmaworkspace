@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { auth, db } from "@/lib/firebase";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { doc, getDoc, collection, getDocs, updateDoc, query, orderBy, Timestamp } from "firebase/firestore";
-import { FileText, Plus, Search, Eye, Edit, X, FileEdit, Download, Receipt, MoreHorizontal, Lock, Unlock, XCircle, ExternalLink, AlertTriangle, Clock, CheckCircle2, Ban, Archive, Calendar, Building2, Hash, KeyRound, AlertCircle, ShieldAlert, Filter, ChevronDown } from "lucide-react";
+import { FileText, Plus, Search, Eye, Edit, X, FileEdit, Download, Receipt, MoreHorizontal, Lock, Unlock, XCircle, ExternalLink, AlertTriangle, Clock, CheckCircle2, Ban, Archive, Calendar, Building2, Hash, KeyRound, AlertCircle, ShieldAlert, ArrowUpDown, ChevronDown } from "lucide-react";
 import jsPDF from "jspdf";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
@@ -751,7 +751,7 @@ export default function POsPage() {
                 onClick={() => setShowSortDropdown(!showSortDropdown)}
                 className="flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-xl text-sm hover:border-slate-300 bg-white min-w-[180px]"
               >
-                <Filter size={14} className="text-slate-400" />
+                <ArrowUpDown size={14} className="text-slate-400" />
                 <span className="flex-1 text-left text-xs text-slate-700">{getSortLabel()}</span>
                 <ChevronDown size={14} className={`text-slate-400 transition-transform ${showSortDropdown ? "rotate-180" : ""}`} />
               </button>
