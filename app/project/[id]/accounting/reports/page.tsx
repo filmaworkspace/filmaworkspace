@@ -71,10 +71,9 @@ const REPORT_COLUMNS: Record<ReportType, ReportColumn[]> = {
     { id: "accountDescription", label: "Cuenta", enabled: false },
     { id: "subaccountCode", label: "Código subcuenta", enabled: true },
     { id: "subaccountDescription", label: "Subcuenta", enabled: false },
-    { id: "baseCommittedOriginal", label: "Base comprometido orig.", enabled: true },
-    { id: "totalCommittedOriginal", label: "Total comprometido orig.", enabled: true },
-    { id: "baseActual", label: "Base realizado", enabled: true },
-    { id: "totalActual", label: "Total realizado", enabled: false },
+    { id: "baseCommitted", label: "Base comprometido", enabled: true },
+    { id: "totalCommitted", label: "Total comprometido", enabled: true },
+    { id: "baseInvoiced", label: "Base facturado", enabled: true },
     { id: "baseAvailable", label: "Base disponible", enabled: true },
     { id: "totalAvailable", label: "Total disponible", enabled: true },
     { id: "poStatus", label: "Estado PO", enabled: true },
@@ -151,6 +150,10 @@ export default function ReportsPage() {
   const [totalEpisodes, setTotalEpisodes] = useState(0);
   const [splitByEpisode, setSplitByEpisode] = useState(false);
 
+  // Configuración de coste
+  const [commitTrigger, setCommitTrigger] = useState<string>("on_approve");
+  const [actualTrigger, setActualTrigger] = useState<string>("on_paid");
+
   useEffect(() => {
     const savedPresets = localStorage.getItem(`report_presets_${id}`);
     if (savedPresets) setPresets(JSON.parse(savedPresets));
@@ -204,6 +207,18 @@ export default function ReportsPage() {
         }
       } catch (epErr) {
         console.error("Error loading episodes config:", epErr);
+      }
+
+      // Cargar configuración de costTracking
+      try {
+        const costTrackingDoc = await getDoc(doc(db, `projects/${id}/config/costTracking`));
+        if (costTrackingDoc.exists()) {
+          const costData = costTrackingDoc.data();
+          setCommitTrigger(costData.poCommitmentTrigger || "on_approve");
+          setActualTrigger(costData.invoiceActualTrigger || "on_paid");
+        }
+      } catch (ctErr) {
+        console.error("Error loading costTracking config:", ctErr);
       }
     } catch (error) { 
       console.error("Error cargando datos:", error); 
@@ -333,77 +348,56 @@ export default function ReportsPage() {
   const formatDate = (date: any) => date?.toDate ? new Date(date.toDate()).toLocaleDateString("es-ES") : "";
   const getCurrentDate = () => new Date().toISOString().split("T")[0];
 
-  const downloadFile = (rows: string[][], filename: string) => {
+  const downloadFile = async (rows: string[][], filename: string) => {
     if (exportFormat === "xlsx") {
-      downloadXLSX(rows, filename.replace(".csv", ".xlsx"));
+      await downloadXLSX(rows, filename.replace(".csv", ".xlsx"));
     } else {
       downloadCSV(rows, filename);
     }
   };
 
   const downloadCSV = (rows: string[][], filename: string) => {
-    const csvContent = rows.map(row => row.map(cell => `"${(cell || "").toString().replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const csvContent = rows.map(row => row.map(cell => {
+      const escaped = (cell || "").toString().replace(/"/g, '""');
+      return `"${escaped}"`;
+    }).join(";")).join("\n");
+    
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.setAttribute("href", URL.createObjectURL(blob));
-    link.setAttribute("download", filename);
+    link.setAttribute("download", filename.endsWith(".csv") ? filename : filename + ".csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const downloadXLSX = (rows: string[][], filename: string) => {
-    // Crear contenido XML para Excel
-    const escapeXml = (str: string) => str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-    
-    let sheetData = "";
-    rows.forEach((row, rowIndex) => {
-      sheetData += "<Row>";
-      row.forEach((cell) => {
-        const isNumber = !isNaN(parseFloat(cell.replace(/\./g, "").replace(",", "."))) && cell.trim() !== "";
-        const numericValue = parseFloat(cell.replace(/\./g, "").replace(",", "."));
-        
-        if (isNumber && !isNaN(numericValue)) {
-          sheetData += `<Cell><Data ss:Type="Number">${numericValue}</Data></Cell>`;
-        } else {
-          sheetData += `<Cell><Data ss:Type="String">${escapeXml(cell || "")}</Data></Cell>`;
-        }
+  const downloadXLSX = async (rows: string[][], filename: string) => {
+    try {
+      // Importar SheetJS dinámicamente
+      const XLSX = await import("xlsx");
+      
+      // Crear worksheet desde los datos
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      
+      // Ajustar anchos de columna automáticamente
+      const colWidths = rows[0].map((_, colIndex) => {
+        const maxLen = Math.max(...rows.map(row => (row[colIndex] || "").toString().length));
+        return { wch: Math.min(Math.max(maxLen + 2, 10), 50) };
       });
-      sheetData += "</Row>";
-    });
-
-    const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
-  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
-  <Styles>
-    <Style ss:ID="Header">
-      <Font ss:Bold="1"/>
-      <Interior ss:Color="#F1F5F9" ss:Pattern="Solid"/>
-    </Style>
-  </Styles>
-  <Worksheet ss:Name="Datos">
-    <Table>
-      ${rows[0] ? `<Row ss:StyleID="Header">${rows[0].map(cell => `<Cell><Data ss:Type="String">${escapeXml(cell || "")}</Data></Cell>`).join("")}</Row>` : ""}
-      ${rows.slice(1).map(row => `<Row>${row.map(cell => {
-        const isNumber = !isNaN(parseFloat(cell.replace(/\./g, "").replace(",", "."))) && cell.trim() !== "";
-        const numericValue = parseFloat(cell.replace(/\./g, "").replace(",", "."));
-        if (isNumber && !isNaN(numericValue)) {
-          return `<Cell><Data ss:Type="Number">${numericValue}</Data></Cell>`;
-        }
-        return `<Cell><Data ss:Type="String">${escapeXml(cell || "")}</Data></Cell>`;
-      }).join("")}</Row>`).join("\n")}
-    </Table>
-  </Worksheet>
-</Workbook>`;
-
-    const blob = new Blob([xmlContent], { type: "application/vnd.ms-excel" });
-    const link = document.createElement("a");
-    link.setAttribute("href", URL.createObjectURL(blob));
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      ws["!cols"] = colWidths;
+      
+      // Crear workbook
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Datos");
+      
+      // Generar archivo y descargar
+      XLSX.writeFile(wb, filename.endsWith(".xlsx") ? filename : filename + ".xlsx");
+    } catch (error) {
+      console.error("Error generando XLSX:", error);
+      // Fallback a CSV si falla
+      downloadCSV(rows, filename.replace(".xlsx", ".csv"));
+    }
   };
 
   const generateBudgetReport = async (columns: SelectedColumn[]) => {
@@ -456,7 +450,7 @@ export default function ReportsPage() {
         });
       }
       
-      downloadFile(rows, `Presupuesto_${projectName}_${getCurrentDate()}.csv`);
+      await downloadFile(rows, `Presupuesto_${projectName}_${getCurrentDate()}.csv`);
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
@@ -493,7 +487,7 @@ export default function ReportsPage() {
         }));
       }
       
-      downloadFile(rows, `POs_Listado_${projectName}_${getCurrentDate()}.csv`);
+      await downloadFile(rows, `POs_Listado_${projectName}_${getCurrentDate()}.csv`);
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
@@ -501,11 +495,53 @@ export default function ReportsPage() {
     setGenerating("pos_items");
     try {
       const posSnapshot = await getDocs(query(collection(db, `projects/${id}/pos`), orderBy("createdAt", "desc")));
+      const invoicesSnapshot = await getDocs(collection(db, `projects/${id}/invoices`));
+      
+      // Determinar estados válidos para comprometido según configuración
+      // on_create: cuando se envía a aprobación (pending y approved)
+      // on_approve: solo aprobadas
+      const validCommitStatuses = commitTrigger === "on_create" 
+        ? ["pending", "approved"] 
+        : ["approved"];
+      
+      // Determinar estados válidos para facturado según configuración
+      // on_approve: aprobadas, contabilizadas y pagadas
+      // on_account: contabilizadas y pagadas
+      // on_paid: solo pagadas
+      const validActualStatuses = actualTrigger === "on_approve" 
+        ? ["approved", "accounted", "paid"] 
+        : actualTrigger === "on_account" 
+          ? ["accounted", "paid"] 
+          : ["paid"];
+      
+      // Crear mapa de facturas por PO y calcular facturado por item (solo facturas con estado válido)
+      const invoicedByPOItem: Record<string, Record<number, number>> = {};
+      invoicesSnapshot.docs.forEach(invDoc => {
+        const invData = invDoc.data();
+        const invStatus = invData.status || "";
+        if (invData.poId && invStatus !== "cancelled" && invStatus !== "rejected" && validActualStatuses.includes(invStatus)) {
+          if (!invoicedByPOItem[invData.poId]) invoicedByPOItem[invData.poId] = {};
+          (invData.items || []).forEach((invItem: any) => {
+            const itemIndex = invItem.poItemIndex ?? -1;
+            if (itemIndex >= 0) {
+              invoicedByPOItem[invData.poId][itemIndex] = (invoicedByPOItem[invData.poId][itemIndex] || 0) + (invItem.baseAmount || 0);
+            }
+          });
+        }
+      });
+
       const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
       
       for (const docSnap of posSnapshot.docs) {
         const poData = docSnap.data();
+        const poStatus = poData.status || "";
+        
+        // Solo incluir POs con estado válido según configuración de comprometido
+        if (!validCommitStatuses.includes(poStatus)) continue;
+        
+        const poId = docSnap.id;
         const items = poData.items || [];
+        const poInvoiced = invoicedByPOItem[poId] || {};
         
         items.forEach((item: any, index: number) => {
           const baseCommitted = item.baseAmount || item.amount || 0;
@@ -515,11 +551,9 @@ export default function ReportsPage() {
           const irpfAmount = baseCommitted * (irpfRate / 100);
           const totalCommitted = baseCommitted + taxAmount - irpfAmount;
           
-          const baseActual = item.actualAmount || 0;
-          const totalActual = baseActual + (baseActual * taxRate / 100) - (baseActual * irpfRate / 100);
-          
-          const baseAvailable = baseCommitted - baseActual;
-          const totalAvailable = totalCommitted - totalActual;
+          const baseInvoiced = poInvoiced[index] || 0;
+          const baseAvailable = baseCommitted - baseInvoiced;
+          const totalAvailable = baseAvailable + (baseAvailable * taxRate / 100) - (baseAvailable * irpfRate / 100);
 
           // Determinar capítulo(s)
           const episodeAssignment = item.episodeAssignment || "general";
@@ -532,6 +566,11 @@ export default function ReportsPage() {
               const epTaxAmount = epBaseCommitted * (taxRate / 100);
               const epIrpfAmount = epBaseCommitted * (irpfRate / 100);
               const epTotalCommitted = epBaseCommitted + epTaxAmount - epIrpfAmount;
+              // Proporcionar el facturado según porcentaje del episodio
+              const epPercentage = baseCommitted > 0 ? epBaseCommitted / baseCommitted : 0;
+              const epBaseInvoiced = baseInvoiced * epPercentage;
+              const epBaseAvailable = epBaseCommitted - epBaseInvoiced;
+              const epTotalAvailable = epBaseAvailable + (epBaseAvailable * taxRate / 100) - (epBaseAvailable * irpfRate / 100);
               
               const rowData: any = {
                 poNumber: poData.number || poData.displayNumber || "",
@@ -544,12 +583,11 @@ export default function ReportsPage() {
                 accountDescription: item.accountDescription || "",
                 subaccountCode: item.subAccountCode || item.subaccountCode || "",
                 subaccountDescription: item.subAccountDescription || item.subaccountDescription || "",
-                baseCommittedOriginal: epBaseCommitted,
-                totalCommittedOriginal: epTotalCommitted,
-                baseActual: 0,
-                totalActual: 0,
-                baseAvailable: epBaseCommitted,
-                totalAvailable: epTotalCommitted,
+                baseCommitted: epBaseCommitted,
+                totalCommitted: epTotalCommitted,
+                baseInvoiced: epBaseInvoiced,
+                baseAvailable: epBaseAvailable,
+                totalAvailable: epTotalAvailable,
                 poStatus: poData.status || "",
                 isOpen: poData.isOpen !== false ? "Abierta" : "Cerrada",
                 taxRate: `${taxRate}%`,
@@ -580,10 +618,9 @@ export default function ReportsPage() {
               accountDescription: item.accountDescription || "",
               subaccountCode: item.subAccountCode || item.subaccountCode || "",
               subaccountDescription: item.subAccountDescription || item.subaccountDescription || "",
-              baseCommittedOriginal: baseCommitted,
-              totalCommittedOriginal: totalCommitted,
-              baseActual: baseActual,
-              totalActual: totalActual,
+              baseCommitted: baseCommitted,
+              totalCommitted: totalCommitted,
+              baseInvoiced: baseInvoiced,
               baseAvailable: baseAvailable,
               totalAvailable: totalAvailable,
               poStatus: poData.status || "",
@@ -602,7 +639,7 @@ export default function ReportsPage() {
         });
       }
       
-      downloadFile(rows, `POs_Items_${projectName}_${getCurrentDate()}.csv`);
+      await downloadFile(rows, `POs_Items_${projectName}_${getCurrentDate()}.csv`);
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
@@ -704,7 +741,7 @@ export default function ReportsPage() {
         }
       });
       
-      downloadFile(rows, `Facturas_${projectName}_${getCurrentDate()}.csv`);
+      await downloadFile(rows, `Facturas_${projectName}_${getCurrentDate()}.csv`);
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
@@ -741,7 +778,7 @@ export default function ReportsPage() {
         }));
       });
       
-      downloadFile(rows, `Proveedores_${projectName}_${getCurrentDate()}.csv`);
+      await downloadFile(rows, `Proveedores_${projectName}_${getCurrentDate()}.csv`);
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
