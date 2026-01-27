@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { UserCog, UserPlus, Search, Trash2, Shield, X, AlertCircle, CheckCircle2, UserCheck, UserX, Clock, Info, Edit, Building2, Users } from "lucide-react";
+import { UserCog, UserPlus, Search, Trash2, Shield, X, AlertCircle, CheckCircle2, UserCheck, UserX, Clock, Info, Edit, Briefcase, Users } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, updateDoc, query, where, Timestamp } from "firebase/firestore";
@@ -319,7 +319,7 @@ export default function AccountingUsersPage() {
             {Object.entries(departmentGroups).map(([deptName, deptMembers]) => (
               <div key={deptName}>
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center"><Building2 size={16} className="text-slate-600" /></div>
+                  <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center"><Briefcase size={16} className="text-slate-600" /></div>
                   <h2 className="text-sm font-semibold text-slate-900">{deptName}</h2>
                   <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{deptMembers.length}</span>
                 </div>
