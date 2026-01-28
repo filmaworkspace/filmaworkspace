@@ -345,7 +345,7 @@ export default function ProjectOverviewPage() {
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex-1 lg:max-w-[50%] w-full">
                 <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
                   <Shield size={16} className="text-slate-400" />
-                  <h3 className="font-semibold text-slate-900 text-sm">Roles de Proyecto</h3>
+                  <h3 className="font-semibold text-slate-900 text-sm">Roles de proyecto</h3>
                   <span className="ml-auto text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">{projectRoleMembers.length}</span>
                 </div>
                 <div className="divide-y divide-slate-100">
