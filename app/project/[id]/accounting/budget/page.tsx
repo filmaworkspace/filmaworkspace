@@ -12,6 +12,10 @@ const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] }
 interface SubAccount { id: string; code: string; description: string; budgeted: number; committed: number; actual: number; accountId: string; createdAt: Date; }
 interface Account { id: string; code: string; description: string; subAccounts: SubAccount[]; createdAt: Date; }
 interface BudgetSummary { totalBudgeted: number; totalCommitted: number; totalActual: number; totalAvailable: number; }
+interface CostTrackingConfig {
+  poCommitmentTrigger: "on_create" | "on_approve";
+  invoiceActualTrigger: "on_approve" | "on_account" | "on_paid";
+}
 
 export default function BudgetPage() {
   const params = useParams();
@@ -31,6 +35,10 @@ export default function BudgetPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
+  const [costConfig, setCostConfig] = useState<CostTrackingConfig>({
+    poCommitmentTrigger: "on_approve",
+    invoiceActualTrigger: "on_paid",
+  });
 
   const [formData, setFormData] = useState({ code: "", description: "", budgeted: 0 });
   const [summary, setSummary] = useState<BudgetSummary>({ totalBudgeted: 0, totalCommitted: 0, totalActual: 0, totalAvailable: 0 });
@@ -50,6 +58,63 @@ export default function BudgetPage() {
       const projectDoc = await getDoc(doc(db, "projects", id));
       if (projectDoc.exists()) setProjectName(projectDoc.data().name || "Proyecto");
 
+      // Cargar configuración de costTracking
+      let commitTrigger: "on_create" | "on_approve" = "on_approve";
+      let actualTrigger: "on_approve" | "on_account" | "on_paid" = "on_paid";
+      try {
+        const costConfigDoc = await getDoc(doc(db, `projects/${id}/config/costTracking`));
+        if (costConfigDoc.exists()) {
+          const configData = costConfigDoc.data();
+          commitTrigger = configData.poCommitmentTrigger || "on_approve";
+          actualTrigger = configData.invoiceActualTrigger || "on_paid";
+        }
+      } catch (e) {
+        console.error("Error loading cost config:", e);
+      }
+      setCostConfig({ poCommitmentTrigger: commitTrigger, invoiceActualTrigger: actualTrigger });
+
+      // Determinar estados válidos para comprometido
+      const validPOStatuses: string[] = commitTrigger === "on_create" 
+        ? ["pending", "approved"] 
+        : ["approved"];
+
+      // Determinar estados válidos para realizado
+      const validInvoiceStatuses: string[] = 
+        actualTrigger === "on_approve" ? ["approved", "accounted", "paid"] :
+        actualTrigger === "on_account" ? ["accounted", "paid"] :
+        ["paid"];
+
+      // Cargar POs y calcular committed por subcuenta
+      const committedBySubaccount: Record<string, number> = {};
+      const posSnapshot = await getDocs(collection(db, `projects/${id}/pos`));
+      posSnapshot.docs.forEach(poDoc => {
+        const poData = poDoc.data();
+        if (poData.status && validPOStatuses.includes(poData.status) && poData.items) {
+          poData.items.forEach((item: any) => {
+            if (item.subAccountCode) {
+              const key = item.subAccountCode;
+              committedBySubaccount[key] = (committedBySubaccount[key] || 0) + (item.baseAmount || 0);
+            }
+          });
+        }
+      });
+
+      // Cargar Facturas y calcular actual por subcuenta
+      const actualBySubaccount: Record<string, number> = {};
+      const invoicesSnapshot = await getDocs(collection(db, `projects/${id}/invoices`));
+      invoicesSnapshot.docs.forEach(invDoc => {
+        const invData = invDoc.data();
+        if (invData.status && validInvoiceStatuses.includes(invData.status) && invData.items) {
+          invData.items.forEach((item: any) => {
+            if (item.subAccountCode) {
+              const key = item.subAccountCode;
+              actualBySubaccount[key] = (actualBySubaccount[key] || 0) + (item.baseAmount || 0);
+            }
+          });
+        }
+      });
+
+      // Cargar cuentas y subcuentas
       const accountsRef = collection(db, `projects/${id}/accounts`);
       const accountsQuery = query(accountsRef, orderBy("code", "asc"));
       const accountsSnapshot = await getDocs(accountsQuery);
@@ -59,13 +124,20 @@ export default function BudgetPage() {
           const subAccountsRef = collection(db, `projects/${id}/accounts/${accountDoc.id}/subaccounts`);
           const subAccountsQuery = query(subAccountsRef, orderBy("code", "asc"));
           const subAccountsSnapshot = await getDocs(subAccountsQuery);
-          const subAccounts = subAccountsSnapshot.docs.map((subDoc) => ({
-            id: subDoc.id, ...subDoc.data(),
-            budgeted: subDoc.data().budgeted || 0,
-            committed: subDoc.data().committed || 0,
-            actual: subDoc.data().actual || 0,
-            createdAt: subDoc.data().createdAt?.toDate() || new Date(),
-          })) as SubAccount[];
+          const subAccounts = subAccountsSnapshot.docs.map((subDoc) => {
+            const subData = subDoc.data();
+            const subCode = subData.code || "";
+            return {
+              id: subDoc.id,
+              code: subCode,
+              description: subData.description || "",
+              budgeted: subData.budgeted || 0,
+              committed: committedBySubaccount[subCode] || 0,
+              actual: actualBySubaccount[subCode] || 0,
+              accountId: accountDoc.id,
+              createdAt: subData.createdAt?.toDate() || new Date(),
+            };
+          }) as SubAccount[];
           return {
             id: accountDoc.id,
             code: accountDoc.data().code || "",
