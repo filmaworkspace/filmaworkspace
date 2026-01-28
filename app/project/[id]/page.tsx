@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Inter } from "next/font/google";
 import {
   Settings, BarChart3, Users, Building2, Clock,
-  Film, Tv, Briefcase, ChevronRight, Shield
+  Film, Tv, Briefcase, ChevronRight, Shield, Copy, CheckCircle
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -56,6 +56,10 @@ export default function ProjectOverviewPage() {
   const [projectType, setProjectType] = useState<"pelicula" | "serie" | null>(null);
   const [episodes, setEpisodes] = useState<number>(0);
   const [daysUntilClose, setDaysUntilClose] = useState<number | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string>("");
+  const [currentUserPosition, setCurrentUserPosition] = useState<string>("");
+  const [currentUserDepartment, setCurrentUserDepartment] = useState<string>("");
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -86,6 +90,16 @@ export default function ProjectOverviewPage() {
         accounting: userProjectData.permissions?.accounting || false,
         team: userProjectData.permissions?.team || false,
       });
+
+      // Obtener datos del usuario actual en el proyecto
+      const currentMemberRef = doc(db, `projects/${id}/members`, userId!);
+      const currentMemberSnap = await getDoc(currentMemberRef);
+      if (currentMemberSnap.exists()) {
+        const currentMemberData = currentMemberSnap.data();
+        setCurrentUserRole(currentMemberData.role || "");
+        setCurrentUserPosition(currentMemberData.position || "");
+        setCurrentUserDepartment(currentMemberData.department || "");
+      }
 
       // Cargar datos del proyecto
       const projectRef = doc(db, "projects", id);
@@ -157,8 +171,37 @@ export default function ProjectOverviewPage() {
     });
   };
 
-  const projectRoleMembers = members.filter(m => PROJECT_ROLES.includes(m.role || ""));
-  const departmentMembers = members.filter(m => !PROJECT_ROLES.includes(m.role || "") && m.department);
+  const copyEmail = (email: string) => {
+    navigator.clipboard.writeText(email);
+    setCopiedEmail(email);
+    setTimeout(() => setCopiedEmail(null), 2000);
+  };
+
+  // Determinar si el usuario actual es rol de proyecto
+  const isProjectRole = PROJECT_ROLES.includes(currentUserRole);
+  
+  // Determinar si puede ver todos los usuarios (roles de proyecto ven todo)
+  const canViewAllMembers = isProjectRole;
+  
+  // Determinar si puede ver su departamento (HOD y Coordinator)
+  const canViewOwnDepartment = ["HOD", "Coordinator"].includes(currentUserPosition);
+
+  // Filtrar miembros según permisos
+  const getVisibleMembers = () => {
+    if (canViewAllMembers) {
+      return members;
+    }
+    if (canViewOwnDepartment && currentUserDepartment) {
+      // Solo ver miembros de su departamento
+      return members.filter(m => m.department === currentUserDepartment);
+    }
+    // Crew solo se ve a sí mismo
+    return members.filter(m => m.userId === userId);
+  };
+
+  const visibleMembers = getVisibleMembers();
+  const projectRoleMembers = visibleMembers.filter(m => PROJECT_ROLES.includes(m.role || ""));
+  const departmentMembers = visibleMembers.filter(m => !PROJECT_ROLES.includes(m.role || "") && m.department);
 
   if (loading) {
     return (
@@ -283,7 +326,7 @@ export default function ProjectOverviewPage() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Equipo ({members.length})
+              Equipo ({visibleMembers.length}{!canViewAllMembers && members.length > visibleMembers.length ? ` de ${members.length}` : ""})
             </h2>
             {userPermissions.config && (
               <Link 
@@ -307,7 +350,7 @@ export default function ProjectOverviewPage() {
                 </div>
                 <div className="divide-y divide-slate-100">
                   {projectRoleMembers.map((member) => (
-                    <div key={member.userId} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50/50">
+                    <div key={member.userId} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50/50 group">
                       <div className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center font-semibold text-sm flex-shrink-0">
                         {(member.name || "?").charAt(0).toUpperCase()}
                       </div>
@@ -317,8 +360,22 @@ export default function ProjectOverviewPage() {
                           <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600">
                             {member.role}
                           </span>
+                          {member.userId === userId && <span className="text-xs text-slate-400">(tú)</span>}
                         </div>
-                        <p className="text-xs text-slate-500 truncate">{member.email}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-xs text-slate-500 truncate">{member.email}</p>
+                          <button
+                            onClick={() => copyEmail(member.email)}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 rounded transition-all"
+                            title="Copiar email"
+                          >
+                            {copiedEmail === member.email ? (
+                              <CheckCircle size={12} className="text-emerald-500" />
+                            ) : (
+                              <Copy size={12} className="text-slate-400" />
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -336,7 +393,7 @@ export default function ProjectOverviewPage() {
                 </div>
                 <div className="divide-y divide-slate-100">
                   {departmentMembers.map((member) => (
-                    <div key={member.userId} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50/50">
+                    <div key={member.userId} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50/50 group">
                       <div className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center font-semibold text-sm flex-shrink-0">
                         {(member.name || "?").charAt(0).toUpperCase()}
                       </div>
@@ -351,8 +408,22 @@ export default function ProjectOverviewPage() {
                           {member.department && (
                             <span className="text-xs text-slate-400">{member.department}</span>
                           )}
+                          {member.userId === userId && <span className="text-xs text-slate-400">(tú)</span>}
                         </div>
-                        <p className="text-xs text-slate-500 truncate">{member.email}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-xs text-slate-500 truncate">{member.email}</p>
+                          <button
+                            onClick={() => copyEmail(member.email)}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 rounded transition-all"
+                            title="Copiar email"
+                          >
+                            {copiedEmail === member.email ? (
+                              <CheckCircle size={12} className="text-emerald-500" />
+                            ) : (
+                              <Copy size={12} className="text-slate-400" />
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -361,10 +432,12 @@ export default function ProjectOverviewPage() {
             )}
           </div>
 
-          {members.length === 0 && (
+          {visibleMembers.length === 0 && (
             <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-200">
               <Users size={32} className="text-slate-300 mx-auto mb-2" />
-              <p className="text-sm text-slate-500">No hay miembros en este proyecto</p>
+              <p className="text-sm text-slate-500">
+                {members.length === 0 ? "No hay miembros en este proyecto" : "No tienes acceso para ver otros miembros"}
+              </p>
             </div>
           )}
         </div>
