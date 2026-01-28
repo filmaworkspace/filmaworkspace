@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { doc, getDoc, collection, getDocs, updateDoc, query, where, orderBy, Timestamp } from "firebase/firestore";
-import { FileText, ArrowLeft, Edit, Download, Receipt, Lock, Unlock, XCircle, CheckCircle, Clock, Ban, Archive, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, FileEdit, ExternalLink, MoreHorizontal, Layers } from "lucide-react";
+import { FileText, ArrowLeft, Edit, Download, Receipt, Lock, Unlock, XCircle, CheckCircle, Clock, Ban, Archive, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, FileEdit, ExternalLink, MoreHorizontal, Layers, BookCheck, Wallet } from "lucide-react";
 import jsPDF from "jspdf";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
@@ -121,6 +121,7 @@ export default function PODetailPage() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showModifyModal, setShowModifyModal] = useState(false);
   const [showCloseItemModal, setShowCloseItemModal] = useState<number | null>(null);
+  const [showReopenItemModal, setShowReopenItemModal] = useState<number | null>(null);
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [cancellationReason, setCancellationReason] = useState("");
@@ -438,6 +439,60 @@ export default function PODetailPage() {
     } catch (error) {
       console.error("Error closing item:", error);
       alert("Error al cerrar el item");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleReopenItem = async (itemIndex: number) => {
+    if (!po || itemIndex < 0 || itemIndex >= po.items.length) return;
+    const verified = await verifyPassword();
+    if (!verified) return;
+    setProcessing(true);
+    try {
+      const item = po.items[itemIndex];
+      const itemInvoiced = item.invoicedAmount || 0;
+      const itemCommitted = item.baseAmount || 0;
+      const remainingToRestore = itemCommitted - itemInvoiced;
+
+      // Restaurar comprometido en la subcuenta
+      if (remainingToRestore > 0 && item.subAccountId) {
+        const accountsSnapshot = await getDocs(collection(db, `projects/${projectId}/accounts`));
+        for (const accountDoc of accountsSnapshot.docs) {
+          try {
+            const subAccountRef = doc(db, `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`, item.subAccountId);
+            const subAccountSnap = await getDoc(subAccountRef);
+            if (subAccountSnap.exists()) {
+              const currentCommitted = subAccountSnap.data().committed || 0;
+              await updateDoc(subAccountRef, {
+                committed: currentCommitted + remainingToRestore,
+              });
+              break;
+            }
+          } catch (e) {
+            console.error(`Error restoring committed for item ${itemIndex}:`, e);
+          }
+        }
+      }
+
+      // Actualizar el item como abierto
+      const updatedItems = [...po.items];
+      updatedItems[itemIndex] = {
+        ...updatedItems[itemIndex],
+        isClosed: false,
+        closedAt: undefined,
+      };
+
+      await updateDoc(doc(db, `projects/${projectId}/pos`, po.id), {
+        items: updatedItems,
+      });
+
+      setShowReopenItemModal(null);
+      resetModals();
+      await loadData();
+    } catch (error) {
+      console.error("Error reopening item:", error);
+      alert("Error al reabrir el item");
     } finally {
       setProcessing(false);
     }
@@ -794,20 +849,30 @@ export default function PODetailPage() {
                             />
                           </div>
                           
-                          {/* Info y botón cerrar */}
+                          {/* Info y botón cerrar/reabrir */}
                           <div className="flex items-center justify-between">
                             <p className="text-xs text-slate-500">
                               {Math.round(itemProgress)}% realizado
                               {isOverInvoiced && <span className="text-amber-600 ml-2">· Excedido en {formatCurrency(itemInvoiced - itemCommitted)} {getCurrencySymbol()}</span>}
                             </p>
-                            {!item.isClosed && itemRemaining > 0 && canEditPO(po) && (
-                              <button
-                                onClick={() => { setShowCloseItemModal(index); setPasswordInput(""); setPasswordError(""); }}
-                                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              >
-                                <Lock size={12} />
-                                Cerrar item
-                              </button>
+                            {canEditPO(po) && (
+                              item.isClosed ? (
+                                <button
+                                  onClick={() => { setShowReopenItemModal(index); setPasswordInput(""); setPasswordError(""); }}
+                                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                >
+                                  <Unlock size={12} />
+                                  Reabrir item
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => { setShowCloseItemModal(index); setPasswordInput(""); setPasswordError(""); }}
+                                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                >
+                                  <Lock size={12} />
+                                  Cerrar item
+                                </button>
+                              )
                             )}
                           </div>
                         </div>
@@ -827,9 +892,23 @@ export default function PODetailPage() {
                 <div className="divide-y divide-slate-100">
                   {invoices.map((invoice) => (
                     <Link key={invoice.id} href={`/project/${projectId}/accounting/invoices/${invoice.id}`} className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
-                      <div>
-                        <p className="font-medium text-slate-900">FAC-{invoice.number}</p>
-                        <p className="text-xs text-slate-500">{formatDate(invoice.createdAt)}</p>
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <p className="font-medium text-slate-900">FAC-{invoice.number}</p>
+                          <p className="text-xs text-slate-500">{formatDate(invoice.createdAt)}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {(invoice.status === "accounted" || invoice.status === "paid") && (
+                            <span className="flex items-center gap-1 px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded text-xs" title="Codificada">
+                              <BookCheck size={12} />
+                            </span>
+                          )}
+                          {invoice.status === "paid" && (
+                            <span className="flex items-center gap-1 px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs" title="Pagada">
+                              <Wallet size={12} />
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <p className="font-semibold text-slate-900">{formatCurrency(invoice.totalAmount)} {getCurrencySymbol()}</p>
@@ -1072,6 +1151,65 @@ export default function PODetailPage() {
                 </button>
                 <button onClick={() => handleCloseItem(showCloseItemModal)} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">
                   {processing ? "Cerrando..." : "Cerrar item"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reopen Item Modal */}
+      {showReopenItemModal !== null && po && po.items[showReopenItemModal] && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowReopenItemModal(null); resetModals(); }}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                <Unlock size={20} className="text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Reabrir item</h3>
+                <p className="text-xs text-slate-500">{po.items[showReopenItemModal].description}</p>
+              </div>
+            </div>
+            <div className="p-6">
+              {(() => {
+                const item = po.items[showReopenItemModal];
+                const itemRemaining = Math.max(0, (item.baseAmount || 0) - (item.invoicedAmount || 0));
+                return itemRemaining > 0 ? (
+                  <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
+                      <div className="text-sm text-amber-800">
+                        <p className="font-medium">Se restaurará el comprometido</p>
+                        <p className="text-xs mt-1">Comprometido original: {formatCurrency(item.baseAmount)} {getCurrencySymbol()}</p>
+                        <p className="text-xs">Facturado: {formatCurrency(item.invoicedAmount || 0)} {getCurrencySymbol()}</p>
+                        <p className="text-xs font-medium mt-1">Se volverán a comprometer: {formatCurrency(itemRemaining)} {getCurrencySymbol()}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null;
+              })()}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                  <KeyRound size={14} />
+                  Confirma tu contraseña
+                </label>
+                <input
+                  type="password"
+                  value={passwordInput}
+                  onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
+                  placeholder="Tu contraseña"
+                  className={`w-full px-4 py-3 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm`}
+                  autoFocus
+                />
+                {passwordError && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => { setShowReopenItemModal(null); resetModals(); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">
+                  Cancelar
+                </button>
+                <button onClick={() => handleReopenItem(showReopenItemModal)} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">
+                  {processing ? "Reabriendo..." : "Reabrir item"}
                 </button>
               </div>
             </div>
