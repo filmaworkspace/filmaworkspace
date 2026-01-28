@@ -33,6 +33,8 @@ interface POItem {
   irpfAmount: number;
   totalAmount: number;
   invoicedAmount?: number;
+  isClosed?: boolean;
+  closedAt?: Date;
   episodeAssignment?: "general" | "specific";
   episodes?: EpisodeDistribution[];
 }
@@ -118,6 +120,7 @@ export default function PODetailPage() {
   const [showReopenModal, setShowReopenModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showModifyModal, setShowModifyModal] = useState(false);
+  const [showCloseItemModal, setShowCloseItemModal] = useState<number | null>(null);
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [cancellationReason, setCancellationReason] = useState("");
@@ -381,6 +384,60 @@ export default function PODetailPage() {
       await loadData();
     } catch (error) {
       alert("Error al anular la PO");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleCloseItem = async (itemIndex: number) => {
+    if (!po || itemIndex < 0 || itemIndex >= po.items.length) return;
+    const verified = await verifyPassword();
+    if (!verified) return;
+    setProcessing(true);
+    try {
+      const item = po.items[itemIndex];
+      const itemInvoiced = item.invoicedAmount || 0;
+      const itemCommitted = item.baseAmount || 0;
+      const remainingToRelease = itemCommitted - itemInvoiced;
+
+      // Liberar comprometido pendiente en la subcuenta
+      if (remainingToRelease > 0 && item.subAccountId) {
+        const accountsSnapshot = await getDocs(collection(db, `projects/${projectId}/accounts`));
+        for (const accountDoc of accountsSnapshot.docs) {
+          try {
+            const subAccountRef = doc(db, `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`, item.subAccountId);
+            const subAccountSnap = await getDoc(subAccountRef);
+            if (subAccountSnap.exists()) {
+              const currentCommitted = subAccountSnap.data().committed || 0;
+              await updateDoc(subAccountRef, {
+                committed: Math.max(0, currentCommitted - remainingToRelease),
+              });
+              break;
+            }
+          } catch (e) {
+            console.error(`Error releasing committed for item ${itemIndex}:`, e);
+          }
+        }
+      }
+
+      // Actualizar el item como cerrado
+      const updatedItems = [...po.items];
+      updatedItems[itemIndex] = {
+        ...updatedItems[itemIndex],
+        isClosed: true,
+        closedAt: new Date(),
+      };
+
+      await updateDoc(doc(db, `projects/${projectId}/pos`, po.id), {
+        items: updatedItems,
+      });
+
+      setShowCloseItemModal(null);
+      resetModals();
+      await loadData();
+    } catch (error) {
+      console.error("Error closing item:", error);
+      alert("Error al cerrar el item");
     } finally {
       setProcessing(false);
     }
@@ -652,30 +709,6 @@ export default function PODetailPage() {
               </div>
             )}
 
-            {po.status === "approved" && (
-              <div className="bg-white border border-slate-200 rounded-2xl p-6">
-                <h3 className="font-semibold text-slate-900 mb-4">Control presupuestario</h3>
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  <div className="bg-slate-50 rounded-xl p-4 text-center">
-                    <p className="text-xs text-slate-500 mb-1">Comprometido</p>
-                    <p className="text-lg font-bold text-slate-900">{formatCurrency(po.baseAmount)} {getCurrencySymbol()}</p>
-                  </div>
-                  <div className="bg-emerald-50 rounded-xl p-4 text-center">
-                    <p className="text-xs text-emerald-600 mb-1">Facturado</p>
-                    <p className="text-lg font-bold text-emerald-700">{formatCurrency(po.invoicedAmount)} {getCurrencySymbol()}</p>
-                  </div>
-                  <div className="bg-amber-50 rounded-xl p-4 text-center">
-                    <p className="text-xs text-amber-600 mb-1">Pendiente</p>
-                    <p className="text-lg font-bold text-amber-700">{formatCurrency(remainingAmount)} {getCurrencySymbol()}</p>
-                  </div>
-                </div>
-                <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all" style={{ width: `${invoiceProgress}%` }} />
-                </div>
-                <p className="text-xs text-slate-500 mt-2 text-center">{Math.round(invoiceProgress)}% facturado</p>
-              </div>
-            )}
-
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                 <h3 className="font-semibold text-slate-900">Items</h3>
@@ -684,17 +717,28 @@ export default function PODetailPage() {
               <div className="divide-y divide-slate-100">
                 {po.items.map((item, index) => {
                   const itemInvoiced = item.invoicedAmount || 0;
-                  const itemProgress = item.baseAmount > 0 ? Math.min(100, (itemInvoiced / item.baseAmount) * 100) : 0;
+                  const itemCommitted = item.baseAmount || 0;
+                  const itemRemaining = item.isClosed ? 0 : Math.max(0, itemCommitted - itemInvoiced);
+                  const itemProgress = itemCommitted > 0 ? Math.min(100, (itemInvoiced / itemCommitted) * 100) : 0;
+                  const isOverInvoiced = itemInvoiced > itemCommitted;
                   const episodeLabel = item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 0
                     ? item.episodes.length === 1 
                       ? item.episodes[0].episode.toString()
                       : item.episodes.map(e => e.episode).join(", ")
                     : "General";
                   return (
-                    <div key={index} className="p-6">
+                    <div key={index} className={`p-6 ${item.isClosed ? "bg-slate-50" : ""}`}>
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
-                          <p className="font-medium text-slate-900">{item.description}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-slate-900">{item.description}</p>
+                            {item.isClosed && (
+                              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-lg text-xs font-medium flex items-center gap-1">
+                                <Lock size={10} />
+                                Cerrado
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-slate-500 mt-0.5">{item.subAccountCode} · {item.subAccountDescription}</p>
                         </div>
                         <p className="font-bold text-slate-900">{formatCurrency(item.totalAmount)} {getCurrencySymbol()}</p>
@@ -719,14 +763,52 @@ export default function PODetailPage() {
                           ))}
                         </div>
                       )}
-                      {po.status === "approved" && itemInvoiced > 0 && (
-                        <div className="mt-3 pt-3 border-t border-slate-100">
-                          <div className="flex items-center justify-between text-xs mb-1">
-                            <span className="text-slate-500">Facturado</span>
-                            <span className="text-emerald-600 font-medium">{formatCurrency(itemInvoiced)} / {formatCurrency(item.baseAmount)} {getCurrencySymbol()}</span>
+                      
+                      {/* Control presupuestario por item - solo si PO aprobada */}
+                      {po.status === "approved" && (
+                        <div className="mt-4 pt-4 border-t border-slate-100">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="flex-1 grid grid-cols-3 gap-2 text-xs">
+                              <div className="bg-slate-100 rounded-lg px-3 py-2">
+                                <p className="text-slate-500 mb-0.5">Comprometido</p>
+                                <p className="font-semibold text-slate-900">{formatCurrency(itemCommitted)} {getCurrencySymbol()}</p>
+                              </div>
+                              <div className={`rounded-lg px-3 py-2 ${isOverInvoiced ? "bg-amber-100" : "bg-emerald-50"}`}>
+                                <p className={`mb-0.5 ${isOverInvoiced ? "text-amber-600" : "text-emerald-600"}`}>Realizado</p>
+                                <p className={`font-semibold ${isOverInvoiced ? "text-amber-700" : "text-emerald-700"}`}>{formatCurrency(itemInvoiced)} {getCurrencySymbol()}</p>
+                              </div>
+                              <div className={`rounded-lg px-3 py-2 ${item.isClosed ? "bg-blue-50" : itemRemaining > 0 ? "bg-amber-50" : "bg-slate-50"}`}>
+                                <p className={`mb-0.5 ${item.isClosed ? "text-blue-600" : itemRemaining > 0 ? "text-amber-600" : "text-slate-500"}`}>Pendiente</p>
+                                <p className={`font-semibold ${item.isClosed ? "text-blue-700" : itemRemaining > 0 ? "text-amber-700" : "text-slate-600"}`}>
+                                  {item.isClosed ? "0,00" : formatCurrency(itemRemaining)} {getCurrencySymbol()}
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${itemProgress}%` }} />
+                          
+                          {/* Barra de progreso */}
+                          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-2">
+                            <div 
+                              className={`h-full rounded-full transition-all ${isOverInvoiced ? "bg-amber-500" : "bg-emerald-500"}`} 
+                              style={{ width: `${Math.min(100, itemProgress)}%` }} 
+                            />
+                          </div>
+                          
+                          {/* Info y botón cerrar */}
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs text-slate-500">
+                              {Math.round(itemProgress)}% realizado
+                              {isOverInvoiced && <span className="text-amber-600 ml-2">· Excedido en {formatCurrency(itemInvoiced - itemCommitted)} {getCurrencySymbol()}</span>}
+                            </p>
+                            {!item.isClosed && itemRemaining > 0 && canEditPO(po) && (
+                              <button
+                                onClick={() => { setShowCloseItemModal(index); setPasswordInput(""); setPasswordError(""); }}
+                                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              >
+                                <Lock size={12} />
+                                Cerrar item
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -931,6 +1013,65 @@ export default function PODetailPage() {
                 </button>
                 <button onClick={handleClosePO} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">
                   {processing ? "Cerrando..." : "Cerrar PO"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Close Item Modal */}
+      {showCloseItemModal !== null && po && po.items[showCloseItemModal] && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowCloseItemModal(null); resetModals(); }}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                <Lock size={20} className="text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Cerrar item</h3>
+                <p className="text-xs text-slate-500">{po.items[showCloseItemModal].description}</p>
+              </div>
+            </div>
+            <div className="p-6">
+              {(() => {
+                const item = po.items[showCloseItemModal];
+                const itemRemaining = Math.max(0, (item.baseAmount || 0) - (item.invoicedAmount || 0));
+                return itemRemaining > 0 ? (
+                  <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
+                      <div className="text-sm text-amber-800">
+                        <p className="font-medium">Este item tiene importe sin facturar</p>
+                        <p className="text-xs mt-1">Comprometido: {formatCurrency(item.baseAmount)} {getCurrencySymbol()}</p>
+                        <p className="text-xs">Realizado: {formatCurrency(item.invoicedAmount || 0)} {getCurrencySymbol()}</p>
+                        <p className="text-xs font-medium mt-1">Se liberarán: {formatCurrency(itemRemaining)} {getCurrencySymbol()}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null;
+              })()}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                  <KeyRound size={14} />
+                  Confirma tu contraseña
+                </label>
+                <input
+                  type="password"
+                  value={passwordInput}
+                  onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
+                  placeholder="Tu contraseña"
+                  className={`w-full px-4 py-3 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm`}
+                  autoFocus
+                />
+                {passwordError && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => { setShowCloseItemModal(null); resetModals(); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">
+                  Cancelar
+                </button>
+                <button onClick={() => handleCloseItem(showCloseItemModal)} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">
+                  {processing ? "Cerrando..." : "Cerrar item"}
                 </button>
               </div>
             </div>
