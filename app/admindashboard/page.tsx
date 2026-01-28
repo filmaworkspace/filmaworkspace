@@ -354,6 +354,16 @@ export default function AdminDashboard() {
     showToast("success", "Datos actualizados");
   };
 
+  // Generar ID corto de 6 caracteres
+  const generateShortId = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let result = '';
+    for (let i = 0; i < 6; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
   const handleCreateProject = async () => {
     if (!newProject.name.trim()) {
       showToast("error", "El nombre es obligatorio");
@@ -361,7 +371,8 @@ export default function AdminDashboard() {
     }
     setSaving(true);
     try {
-      const projectRef = doc(collection(db, "projects"));
+      const projectId = generateShortId();
+      const projectRef = doc(db, "projects", projectId);
       await setDoc(projectRef, {
         name: newProject.name.trim(),
         description: newProject.description.trim(),
@@ -370,7 +381,7 @@ export default function AdminDashboard() {
         createdAt: serverTimestamp(),
       });
       for (const dept of DEFAULT_DEPARTMENTS) {
-        const deptRef = doc(collection(db, `projects/${projectRef.id}/departments`));
+        const deptRef = doc(collection(db, `projects/${projectId}/departments`));
         await setDoc(deptRef, { name: dept.name, color: dept.color, createdAt: serverTimestamp() });
       }
       setNewProject({ name: "", description: "", phase: "Desarrollo", producers: [] });
@@ -720,7 +731,7 @@ export default function AdminDashboard() {
     <div className={"min-h-screen bg-white " + inter.className}>
       {/* Toast */}
       {toast && (
-        <div className="fixed top-20 right-6 z-50">
+        <div className="fixed bottom-4 right-4 z-50">
           <div
             className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg ${
               toast.type === "success" ? "bg-emerald-600" : "bg-red-600"
@@ -823,7 +834,7 @@ export default function AdminDashboard() {
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Buscar proyectos"
+                    placeholder="Buscar proyectos..."
                     value={projectSearch}
                     onChange={(e) => setProjectSearch(e.target.value)}
                     className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white"
@@ -832,7 +843,7 @@ export default function AdminDashboard() {
                 <select
                   value={projectPhaseFilter}
                   onChange={(e) => setProjectPhaseFilter(e.target.value)}
-                  className="px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none text-sm bg-white"
+                  className="px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white appearance-none cursor-pointer pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-[length:16px] bg-[right_12px_center] bg-no-repeat"
                 >
                   <option value="all">Todas las fases</option>
                   {PHASES.map((phase) => (
@@ -1119,7 +1130,7 @@ export default function AdminDashboard() {
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Buscar usuarios"
+                  placeholder="Buscar usuarios..."
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                   className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white"
@@ -1128,7 +1139,7 @@ export default function AdminDashboard() {
               <select
                 value={userRoleFilter}
                 onChange={(e) => setUserRoleFilter(e.target.value)}
-                className="px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none text-sm bg-white"
+                className="px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white appearance-none cursor-pointer pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-[length:16px] bg-[right_12px_center] bg-no-repeat"
               >
                 <option value="all">Todos los roles</option>
                 <option value="admin">Administradores</option>
@@ -1213,7 +1224,7 @@ export default function AdminDashboard() {
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Buscar productoras"
+                  placeholder="Buscar productoras..."
                   value={producerSearch}
                   onChange={(e) => setProducerSearch(e.target.value)}
                   className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white"
@@ -1498,7 +1509,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={producerModalSearch}
                     onChange={(e) => setProducerModalSearch(e.target.value)}
-                    placeholder="Buscar productora"
+                    placeholder="Buscar productora..."
                     className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none text-sm"
                   />
                 </div>
@@ -1628,7 +1639,7 @@ export default function AdminDashboard() {
                 <select
                   value={assignUserForm.odId}
                   onChange={(e) => setAssignUserForm({ ...assignUserForm, odId: e.target.value })}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none text-sm"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white appearance-none cursor-pointer pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-[length:16px] bg-[right_12px_center] bg-no-repeat"
                 >
                   <option value="">Seleccionar usuario...</option>
                   {users.map((user) => (
@@ -1891,7 +1902,7 @@ export default function AdminDashboard() {
                         type="text"
                         value={projectSearchInMessage}
                         onChange={(e) => setProjectSearchInMessage(e.target.value)}
-                        placeholder="Buscar proyectos"
+                        placeholder="Buscar proyectos..."
                         className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none text-sm"
                       />
                     </div>
