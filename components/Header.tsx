@@ -197,7 +197,12 @@ export default function Header() {
     return (
       <div className="hidden md:flex items-center gap-2 text-xs">
         <span className="text-slate-300">·</span>
-        <span className="text-slate-600 font-medium uppercase">{projectName}</span>
+        <Link 
+          href={`/project/${projectId}`}
+          className="text-slate-600 font-medium uppercase hover:text-slate-900 transition-colors"
+        >
+          {projectName}
+        </Link>
       </div>
     );
   };
@@ -369,7 +374,13 @@ export default function Header() {
               <>
                 <div className="px-3 py-2 mb-1">
                   <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
-                    <span className="text-slate-900 font-semibold uppercase">{projectName}</span>
+                    <Link 
+                      href={`/project/${projectId}`}
+                      onClick={() => setMenuOpen(false)}
+                      className="text-slate-900 font-semibold uppercase hover:text-slate-700"
+                    >
+                      {projectName}
+                    </Link>
                     <span className="text-slate-300">·</span>
                     <div className="flex items-center gap-1">
                       {permissions.config && (
