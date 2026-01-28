@@ -230,16 +230,6 @@ export default function ProjectOverviewPage() {
         
         {/* Header del proyecto */}
         <div className="mb-10">
-          {/* Aviso de cierre - inline con título */}
-          {daysUntilClose !== null && (
-            <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg">
-              <Clock size={14} className="text-red-500" />
-              <span className="text-sm font-medium text-red-700">
-                Cierra en {daysUntilClose} día{daysUntilClose !== 1 ? "s" : ""} · {project.closingAt ? formatDate(project.closingAt) : ""}
-              </span>
-            </div>
-          )}
-
           <div className="flex items-center gap-3 mb-3">
             <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
               {projectType === "serie" ? (
@@ -264,12 +254,23 @@ export default function ProjectOverviewPage() {
               </div>
             </div>
           </div>
-          
-          {project.producerNames && project.producerNames.length > 0 && (
-            <div className="flex items-center gap-2 mt-3 text-sm text-slate-500">
-              <Building2 size={14} />
-              <span>{project.producerNames.join(", ")}</span>
+
+          {/* Aviso de cierre - debajo del título */}
+          {daysUntilClose !== null && (
+            <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg">
+              <Clock size={14} className="text-red-500" />
+              <span className="text-sm font-medium text-red-700">
+                Cierra en {daysUntilClose} día{daysUntilClose !== 1 ? "s" : ""} · {project.closingAt ? formatDate(project.closingAt) : ""}
+              </span>
             </div>
+          )}
+          
+          {/* Productoras */}
+          {project.producerNames && project.producerNames.length > 0 && (
+            <p className="flex items-center gap-1.5 mt-4 text-sm text-slate-500">
+              <Building2 size={14} className="text-slate-400" />
+              {project.producerNames.join(", ")}
+            </p>
           )}
 
           {project.description && (
@@ -345,7 +346,7 @@ export default function ProjectOverviewPage() {
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex-1 lg:max-w-[50%] w-full">
                 <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
                   <Shield size={16} className="text-slate-400" />
-                  <h3 className="font-semibold text-slate-900 text-sm">Roles de proyecto</h3>
+                  <h3 className="font-semibold text-slate-900 text-sm">Roles de Proyecto</h3>
                   <span className="ml-auto text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">{projectRoleMembers.length}</span>
                 </div>
                 <div className="divide-y divide-slate-100">
