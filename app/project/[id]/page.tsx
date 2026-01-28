@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Inter } from "next/font/google";
 import {
   Settings, BarChart3, Users, Building2, Clock,
-  Film, Tv, Briefcase, Crown, ChevronRight, Mail, Shield
+  Film, Tv, Briefcase, ChevronRight, Shield
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -14,16 +14,6 @@ import { doc, getDoc, collection, getDocs, Timestamp } from "firebase/firestore"
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
 const PROJECT_ROLES = ["EP", "PM", "Controller", "PC"];
-
-const ROLE_LABELS: Record<string, string> = {
-  EP: "Executive Producer",
-  PM: "Production Manager",
-  Controller: "Controller",
-  PC: "Production Coordinator",
-  HOD: "Head of Department",
-  Coordinator: "Coordinator",
-  Crew: "Crew",
-};
 
 interface Member {
   userId: string;
@@ -168,15 +158,7 @@ export default function ProjectOverviewPage() {
   };
 
   const projectRoleMembers = members.filter(m => PROJECT_ROLES.includes(m.role || ""));
-  const departmentMembers = members.filter(m => !PROJECT_ROLES.includes(m.role || ""));
-
-  // Agrupar por departamento
-  const membersByDepartment = departmentMembers.reduce((acc, member) => {
-    const dept = member.department || "Sin departamento";
-    if (!acc[dept]) acc[dept] = [];
-    acc[dept].push(member);
-    return acc;
-  }, {} as Record<string, Member[]>);
+  const departmentMembers = members.filter(m => !PROJECT_ROLES.includes(m.role || "") && m.department);
 
   if (loading) {
     return (
@@ -314,25 +296,29 @@ export default function ProjectOverviewPage() {
             )}
           </div>
 
-          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
-            {/* Dirección de Producción */}
+          <div className="flex flex-col lg:flex-row gap-4 items-start">
+            {/* Roles de Proyecto */}
             {projectRoleMembers.length > 0 && (
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="px-4 py-3 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
-                  <Crown size={14} className="text-amber-600" />
-                  <span className="text-xs font-semibold text-amber-800 uppercase tracking-wider">Producción</span>
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex-1 lg:max-w-[50%] w-full">
+                <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
+                  <Shield size={16} className="text-slate-400" />
+                  <h3 className="font-semibold text-slate-900 text-sm">Roles de Proyecto</h3>
+                  <span className="ml-auto text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">{projectRoleMembers.length}</span>
                 </div>
-                <div className="p-2">
+                <div className="divide-y divide-slate-100">
                   {projectRoleMembers.map((member) => (
-                    <div key={member.userId} className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50">
-                      <div className="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-semibold text-slate-600">
-                          {(member.name || "?").charAt(0).toUpperCase()}
-                        </span>
+                    <div key={member.userId} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50/50">
+                      <div className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center font-semibold text-sm flex-shrink-0">
+                        {(member.name || "?").charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">{member.name}</p>
-                        <p className="text-xs text-slate-500">{ROLE_LABELS[member.role || ""] || member.role}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-slate-900 text-sm">{member.name}</p>
+                          <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600">
+                            {member.role}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 truncate">{member.email}</p>
                       </div>
                     </div>
                   ))}
@@ -341,34 +327,38 @@ export default function ProjectOverviewPage() {
             )}
 
             {/* Departamentos */}
-            {Object.entries(membersByDepartment).map(([dept, deptMembers]) => (
-              <div key={dept} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Briefcase size={14} className="text-slate-400" />
-                    <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">{dept}</span>
-                  </div>
-                  <span className="text-xs text-slate-400">{deptMembers.length}</span>
+            {departmentMembers.length > 0 && (
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex-1 lg:max-w-[50%] w-full">
+                <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
+                  <Briefcase size={16} className="text-slate-400" />
+                  <h3 className="font-semibold text-slate-900 text-sm">Departamentos</h3>
+                  <span className="ml-auto text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">{departmentMembers.length}</span>
                 </div>
-                <div className="p-2">
-                  {deptMembers.map((member) => (
-                    <div key={member.userId} className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50">
-                      <div className="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-semibold text-slate-600">
-                          {(member.name || "?").charAt(0).toUpperCase()}
-                        </span>
+                <div className="divide-y divide-slate-100">
+                  {departmentMembers.map((member) => (
+                    <div key={member.userId} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50/50">
+                      <div className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center font-semibold text-sm flex-shrink-0">
+                        {(member.name || "?").charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">{member.name}</p>
-                        {member.position && (
-                          <p className="text-xs text-slate-500">{ROLE_LABELS[member.position] || member.position}</p>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-slate-900 text-sm">{member.name}</p>
+                          {member.position && (
+                            <span className="px-2 py-0.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-600">
+                              {member.position}
+                            </span>
+                          )}
+                          {member.department && (
+                            <span className="text-xs text-slate-400">{member.department}</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 truncate">{member.email}</p>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
-            ))}
+            )}
           </div>
 
           {members.length === 0 && (
