@@ -4,8 +4,8 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
 import {
-  Settings, BarChart3, Users, Building2, Clock, AlertTriangle,
-  Film, Tv, Briefcase, Crown, ChevronRight
+  Settings, BarChart3, Users, Building2, Clock,
+  Film, Tv, Briefcase, Crown, ChevronRight, Mail, Shield
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -203,25 +203,18 @@ export default function ProjectOverviewPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-24 pb-12">
         
-        {/* Aviso de cierre */}
-        {daysUntilClose !== null && (
-          <div className="mb-8 p-5 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-4">
-            <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
-              <AlertTriangle size={24} className="text-red-600" />
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-red-800 text-lg">
-                Este proyecto cierra en {daysUntilClose} día{daysUntilClose !== 1 ? "s" : ""}
-              </p>
-              <p className="text-sm text-red-600 mt-0.5">
-                Fecha de cierre: {project.closingAt ? formatDate(project.closingAt) : ""}
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* Header del proyecto */}
         <div className="mb-10">
+          {/* Aviso de cierre - inline con título */}
+          {daysUntilClose !== null && (
+            <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg">
+              <Clock size={14} className="text-red-500" />
+              <span className="text-sm font-medium text-red-700">
+                Cierra en {daysUntilClose} día{daysUntilClose !== 1 ? "s" : ""} · {project.closingAt ? formatDate(project.closingAt) : ""}
+              </span>
+            </div>
+          )}
+
           <div className="flex items-center gap-3 mb-3">
             <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
               {projectType === "serie" ? (
@@ -310,7 +303,7 @@ export default function ProjectOverviewPage() {
             </h2>
             {userPermissions.config && (
               <Link 
-                href={`/project/${id}/config/team`}
+                href={`/project/${id}/config/users`}
                 className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"
               >
                 Gestionar
