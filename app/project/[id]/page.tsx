@@ -255,40 +255,42 @@ export default function ProjectOverviewPage() {
         {/* Módulos - Estilo Dashboard */}
         <div className="mb-12">
           <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Módulos</h2>
-          <div className="flex gap-3 flex-wrap">
+          <div className="flex gap-2">
             {userPermissions.config && (
               <Link href={`/project/${id}/config`}>
-                <div className="flex items-center justify-center gap-2 px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 hover:border-slate-300 transition-colors cursor-pointer">
-                  <Settings size={16} className="text-slate-600" />
-                  <span className="text-sm font-medium text-slate-700">Config</span>
+                <div className="flex items-center justify-center gap-1.5 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 text-slate-600 text-xs font-medium transition-colors">
+                  <Settings size={12} />
+                  Config
                 </div>
               </Link>
             )}
             {userPermissions.accounting && (
               <Link href={`/project/${id}/accounting`}>
                 <div 
-                  className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl border transition-colors cursor-pointer"
+                  className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium border transition-colors"
                   style={{ 
                     backgroundColor: 'rgba(47, 82, 224, 0.1)',
                     borderColor: 'rgba(47, 82, 224, 0.3)',
+                    color: '#2F52E0'
                   }}
                 >
-                  <BarChart3 size={16} style={{ color: '#2F52E0' }} />
-                  <span className="text-sm font-medium" style={{ color: '#2F52E0' }}>Accounting</span>
+                  <BarChart3 size={12} />
+                  Accounting
                 </div>
               </Link>
             )}
             {userPermissions.team && (
               <Link href={`/project/${id}/team`}>
                 <div 
-                  className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl border transition-colors cursor-pointer"
+                  className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium border transition-colors"
                   style={{ 
                     backgroundColor: 'rgba(137, 211, 34, 0.15)',
                     borderColor: 'rgba(137, 211, 34, 0.4)',
+                    color: '#6BA319'
                   }}
                 >
-                  <Users size={16} style={{ color: '#6BA319' }} />
-                  <span className="text-sm font-medium" style={{ color: '#6BA319' }}>Team</span>
+                  <Users size={12} />
+                  Team
                 </div>
               </Link>
             )}
