@@ -78,6 +78,7 @@ const REPORT_COLUMNS: Record<ReportType, ReportColumn[]> = {
     { id: "totalAvailable", label: "Total disponible", enabled: true },
     { id: "poStatus", label: "Estado PO", enabled: true },
     { id: "isOpen", label: "Abierta/Cerrada", enabled: true },
+    { id: "itemClosed", label: "Item cerrado", enabled: false },
     { id: "taxRate", label: "% IVA", enabled: false },
     { id: "irpfRate", label: "% IRPF", enabled: false },
   ],
@@ -544,7 +545,10 @@ export default function ReportsPage() {
         const poInvoiced = invoicedByPOItem[poId] || {};
         
         items.forEach((item: any, index: number) => {
-          const baseCommitted = item.baseAmount || item.amount || 0;
+          // Si el item está cerrado, el comprometido es solo lo facturado
+          const itemIsClosed = item.isClosed || false;
+          const rawBaseCommitted = item.baseAmount || item.amount || 0;
+          const baseCommitted = itemIsClosed ? (poInvoiced[index] || 0) : rawBaseCommitted;
           const taxRate = item.vatRate || item.taxRate || 21;
           const irpfRate = item.irpfRate || 0;
           const taxAmount = baseCommitted * (taxRate / 100);
@@ -552,7 +556,7 @@ export default function ReportsPage() {
           const totalCommitted = baseCommitted + taxAmount - irpfAmount;
           
           const baseInvoiced = poInvoiced[index] || 0;
-          const baseAvailable = baseCommitted - baseInvoiced;
+          const baseAvailable = itemIsClosed ? 0 : Math.max(0, baseCommitted - baseInvoiced);
           const totalAvailable = baseAvailable + (baseAvailable * taxRate / 100) - (baseAvailable * irpfRate / 100);
 
           // Determinar capítulo(s)
@@ -562,14 +566,15 @@ export default function ReportsPage() {
           // Si splitByEpisode está activo y hay episodios específicos, crear una fila por cada uno
           if (splitByEpisode && episodeAssignment === "specific" && episodes.length > 0) {
             episodes.forEach((ep: any) => {
-              const epBaseCommitted = ep.amount || 0;
+              const rawEpBaseCommitted = ep.amount || 0;
+              // Si item cerrado, proporcionar el comprometido según lo facturado
+              const epPercentage = rawBaseCommitted > 0 ? rawEpBaseCommitted / rawBaseCommitted : 0;
+              const epBaseCommitted = itemIsClosed ? (baseInvoiced * epPercentage) : rawEpBaseCommitted;
               const epTaxAmount = epBaseCommitted * (taxRate / 100);
               const epIrpfAmount = epBaseCommitted * (irpfRate / 100);
               const epTotalCommitted = epBaseCommitted + epTaxAmount - epIrpfAmount;
-              // Proporcionar el facturado según porcentaje del episodio
-              const epPercentage = baseCommitted > 0 ? epBaseCommitted / baseCommitted : 0;
               const epBaseInvoiced = baseInvoiced * epPercentage;
-              const epBaseAvailable = epBaseCommitted - epBaseInvoiced;
+              const epBaseAvailable = itemIsClosed ? 0 : Math.max(0, epBaseCommitted - epBaseInvoiced);
               const epTotalAvailable = epBaseAvailable + (epBaseAvailable * taxRate / 100) - (epBaseAvailable * irpfRate / 100);
               
               const rowData: any = {
@@ -590,6 +595,7 @@ export default function ReportsPage() {
                 totalAvailable: epTotalAvailable,
                 poStatus: poData.status || "",
                 isOpen: poData.isOpen !== false ? "Abierta" : "Cerrada",
+                itemClosed: itemIsClosed ? "Sí" : "No",
                 taxRate: `${taxRate}%`,
                 irpfRate: `${irpfRate}%`,
               };
@@ -625,6 +631,7 @@ export default function ReportsPage() {
               totalAvailable: totalAvailable,
               poStatus: poData.status || "",
               isOpen: poData.isOpen !== false ? "Abierta" : "Cerrada",
+              itemClosed: itemIsClosed ? "Sí" : "No",
               taxRate: `${taxRate}%`,
               irpfRate: `${irpfRate}%`,
             };
