@@ -1,0 +1,638 @@
+"use client";
+import { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { Inter } from "next/font/google";
+import {
+  ArrowLeft,
+  FileText,
+  Receipt,
+  FileCheck,
+  Search,
+  Building2,
+  Calendar,
+  Hash,
+  CheckCircle,
+  Clock,
+  Wallet,
+  BookCheck,
+  AlertCircle,
+  Upload,
+  X,
+  ChevronRight,
+  RefreshCw,
+  AlertTriangle,
+} from "lucide-react";
+import { auth, db, storage } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import {
+  collection,
+  getDocs,
+  getDoc,
+  doc,
+  updateDoc,
+  query,
+  orderBy,
+  Timestamp,
+} from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
+
+const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+
+const DOCUMENT_TYPES = {
+  proforma: {
+    code: "PRF",
+    label: "Proforma",
+    icon: FileText,
+    bgColor: "bg-violet-50",
+    textColor: "text-violet-700",
+    borderColor: "border-violet-200",
+  },
+  budget: {
+    code: "PRS",
+    label: "Presupuesto",
+    icon: FileCheck,
+    bgColor: "bg-amber-50",
+    textColor: "text-amber-700",
+    borderColor: "border-amber-200",
+  },
+};
+
+const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; icon: typeof Clock }> = {
+  pending: { label: "Pendiente", bg: "bg-amber-50", text: "text-amber-700", icon: Clock },
+  approved: { label: "Aprobada", bg: "bg-emerald-50", text: "text-emerald-700", icon: CheckCircle },
+  accounted: { label: "Codificada", bg: "bg-violet-50", text: "text-violet-700", icon: BookCheck },
+  paid: { label: "Pagada", bg: "bg-blue-50", text: "text-blue-700", icon: Wallet },
+};
+
+type DocumentType = keyof typeof DOCUMENT_TYPES;
+
+interface PendingDocument {
+  id: string;
+  documentType: DocumentType;
+  number: string;
+  displayNumber: string;
+  supplier: string;
+  supplierName: string;
+  supplierId: string;
+  department?: string;
+  totalAmount: number;
+  baseAmount: number;
+  vatAmount: number;
+  irpfAmount: number;
+  status: string;
+  description: string;
+  createdAt: Date;
+  paidAt?: Date;
+  poId?: string;
+  poNumber?: string;
+  items: any[];
+  currency: string;
+  invoiceNumber?: string;
+  invoiceDate?: string;
+  dueDate?: string;
+  notes?: string;
+  attachmentUrl?: string;
+  attachmentFileName?: string;
+}
+
+export default function ReplaceDocumentPage() {
+  const params = useParams();
+  const router = useRouter();
+  const projectId = params?.id as string;
+
+  const { loading: permissionsLoading, permissions } = useAccountingPermissions(projectId);
+
+  const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState("");
+  const [documents, setDocuments] = useState<PendingDocument[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterType, setFilterType] = useState<string>("all");
+
+  // Modal de sustitución
+  const [selectedDoc, setSelectedDoc] = useState<PendingDocument | null>(null);
+  const [showReplaceModal, setShowReplaceModal] = useState(false);
+  const [newInvoiceNumber, setNewInvoiceNumber] = useState("");
+  const [newInvoiceDate, setNewInvoiceDate] = useState("");
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) router.push("/");
+      else setUserId(user.uid);
+    });
+    return () => unsubscribe();
+  }, [router]);
+
+  useEffect(() => {
+    if (userId && projectId && !permissionsLoading) loadData();
+  }, [userId, projectId, permissionsLoading]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+
+      // Cargar nombre del proyecto
+      const projectDoc = await getDoc(doc(db, "projects", projectId));
+      if (projectDoc.exists()) {
+        setProjectName(projectDoc.data().name || "Proyecto");
+      }
+
+      // Cargar documentos provisionales (proformas y presupuestos)
+      const invoicesSnapshot = await getDocs(
+        query(collection(db, `projects/${projectId}/invoices`), orderBy("createdAt", "desc"))
+      );
+
+      const docsData: PendingDocument[] = [];
+
+      invoicesSnapshot.docs.forEach((docSnap) => {
+        const data = docSnap.data();
+        const docType = data.documentType as DocumentType;
+
+        // Solo proformas y presupuestos que NO han sido reemplazados
+        if ((docType === "proforma" || docType === "budget") && !data.replacedBy) {
+          docsData.push({
+            id: docSnap.id,
+            documentType: docType,
+            number: data.number || "",
+            displayNumber: data.displayNumber || `${DOCUMENT_TYPES[docType]?.code || "DOC"}-${data.number}`,
+            supplier: data.supplier || "",
+            supplierName: data.supplierName || data.supplier || "",
+            supplierId: data.supplierId || "",
+            department: data.department,
+            totalAmount: data.totalAmount || 0,
+            baseAmount: data.baseAmount || 0,
+            vatAmount: data.vatAmount || 0,
+            irpfAmount: data.irpfAmount || 0,
+            status: data.status || "pending",
+            description: data.description || "",
+            createdAt: data.createdAt?.toDate() || new Date(),
+            paidAt: data.paidAt?.toDate(),
+            poId: data.poId,
+            poNumber: data.poNumber,
+            items: data.items || [],
+            currency: data.currency || "EUR",
+            invoiceNumber: data.invoiceNumber,
+            invoiceDate: data.invoiceDate,
+            dueDate: data.dueDate,
+            notes: data.notes,
+            attachmentUrl: data.attachmentUrl,
+            attachmentFileName: data.attachmentFileName,
+          });
+        }
+      });
+
+      setDocuments(docsData);
+    } catch (error) {
+      console.error("Error loading data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
+
+  const formatDate = (date: Date | undefined) => {
+    if (!date) return "-";
+    return new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" }).format(date);
+  };
+
+  const getCurrencySymbol = (currency: string) => {
+    const symbols: Record<string, string> = { EUR: "€", USD: "$", GBP: "£" };
+    return symbols[currency] || "€";
+  };
+
+  const openReplaceModal = (doc: PendingDocument) => {
+    setSelectedDoc(doc);
+    setNewInvoiceNumber(doc.invoiceNumber || "");
+    setNewInvoiceDate(doc.invoiceDate || new Date().toISOString().split("T")[0]);
+    setUploadedFile(null);
+    setError("");
+    setShowReplaceModal(true);
+  };
+
+  const closeReplaceModal = () => {
+    setShowReplaceModal(false);
+    setSelectedDoc(null);
+    setNewInvoiceNumber("");
+    setNewInvoiceDate("");
+    setUploadedFile(null);
+    setError("");
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        setError("El archivo no puede superar 10MB");
+        return;
+      }
+      setUploadedFile(file);
+      setError("");
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        setError("El archivo no puede superar 10MB");
+        return;
+      }
+      setUploadedFile(file);
+      setError("");
+    }
+  };
+
+  const handleReplace = async () => {
+    if (!selectedDoc || !newInvoiceNumber.trim() || !newInvoiceDate) {
+      setError("Completa el número y fecha de la factura");
+      return;
+    }
+
+    setProcessing(true);
+    setError("");
+
+    try {
+      let attachmentUrl = selectedDoc.attachmentUrl || "";
+      let attachmentFileName = selectedDoc.attachmentFileName || "";
+
+      // Subir nuevo archivo si hay uno
+      if (uploadedFile) {
+        const fileRef = ref(storage, `projects/${projectId}/invoices/${selectedDoc.id}_replaced_${uploadedFile.name}`);
+        await uploadBytes(fileRef, uploadedFile);
+        attachmentUrl = await getDownloadURL(fileRef);
+        attachmentFileName = uploadedFile.name;
+      }
+
+      // Actualizar el documento: cambiar tipo a factura, mantener número correlativo
+      const newDisplayNumber = `FAC-${selectedDoc.number}`;
+
+      await updateDoc(doc(db, `projects/${projectId}/invoices`, selectedDoc.id), {
+        documentType: "invoice",
+        displayNumber: newDisplayNumber,
+        invoiceNumber: newInvoiceNumber.trim(),
+        invoiceDate: newInvoiceDate,
+        replacedFromType: selectedDoc.documentType,
+        replacedAt: Timestamp.now(),
+        replacedBy: userId,
+        attachmentUrl,
+        attachmentFileName,
+      });
+
+      closeReplaceModal();
+      await loadData();
+    } catch (error) {
+      console.error("Error replacing document:", error);
+      setError("Error al sustituir el documento");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Filtrar documentos
+  const filteredDocs = documents.filter((doc) => {
+    const matchesSearch =
+      doc.displayNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doc.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doc.description.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus = filterStatus === "all" || doc.status === filterStatus;
+    const matchesType = filterType === "all" || doc.documentType === filterType;
+
+    return matchesSearch && matchesStatus && matchesType;
+  });
+
+  if (loading || permissionsLoading) {
+    return (
+      <div className={`${inter.className} min-h-screen bg-slate-50 flex items-center justify-center`}>
+        <div className="w-8 h-8 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${inter.className} min-h-screen bg-slate-50`}>
+      {/* Header */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link
+              href={`/project/${projectId}/accounting/invoices`}
+              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+            >
+              <ArrowLeft size={20} />
+            </Link>
+            <div>
+              <h1 className="text-lg font-semibold text-slate-900">Sustituir documento</h1>
+              <p className="text-xs text-slate-500">{projectName} · Convertir proformas/presupuestos a factura</p>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-6 py-8">
+        {/* Info */}
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <RefreshCw size={18} className="text-blue-600 mt-0.5" />
+            <div className="text-sm text-blue-800">
+              <p className="font-medium mb-1">¿Cómo funciona?</p>
+              <p className="text-blue-700">
+                Selecciona una proforma o presupuesto para convertirlo en factura definitiva. 
+                El número correlativo se mantiene (ej: PRF-0012 → FAC-0012) y puedes adjuntar el documento fiscal.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Filtros */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-6">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar por número, proveedor o descripción..."
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm"
+              />
+            </div>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+            >
+              <option value="all">Todos los tipos</option>
+              <option value="proforma">Proformas</option>
+              <option value="budget">Presupuestos</option>
+            </select>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+            >
+              <option value="all">Todos los estados</option>
+              <option value="pending">Pendiente</option>
+              <option value="approved">Aprobada</option>
+              <option value="accounted">Codificada</option>
+              <option value="paid">Pagada</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Lista de documentos */}
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 className="font-semibold text-slate-900">Documentos pendientes de sustitución</h2>
+            <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">
+              {filteredDocs.length}
+            </span>
+          </div>
+
+          {filteredDocs.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <FileText size={28} className="text-slate-400" />
+              </div>
+              <p className="text-slate-500 mb-2">No hay documentos pendientes</p>
+              <p className="text-sm text-slate-400">
+                Las proformas y presupuestos aparecerán aquí para ser sustituidos por facturas
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {filteredDocs.map((doc) => {
+                const docType = DOCUMENT_TYPES[doc.documentType];
+                const DocIcon = docType.icon;
+                const statusConfig = STATUS_CONFIG[doc.status] || STATUS_CONFIG.pending;
+                const StatusIcon = statusConfig.icon;
+
+                return (
+                  <div
+                    key={doc.id}
+                    className="p-6 hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-4 flex-1">
+                        <div className={`w-12 h-12 ${docType.bgColor} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                          <DocIcon size={20} className={docType.textColor} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-semibold text-slate-900">{doc.displayNumber}</p>
+                            <span className={`px-2 py-0.5 ${docType.bgColor} ${docType.textColor} rounded text-xs font-medium`}>
+                              {docType.label}
+                            </span>
+                            <span className={`px-2 py-0.5 ${statusConfig.bg} ${statusConfig.text} rounded text-xs font-medium flex items-center gap-1`}>
+                              <StatusIcon size={10} />
+                              {statusConfig.label}
+                            </span>
+                          </div>
+                          <p className="text-sm text-slate-600 mb-2">{doc.description}</p>
+                          <div className="flex items-center gap-4 text-xs text-slate-500">
+                            <span className="flex items-center gap-1">
+                              <Building2 size={12} />
+                              {doc.supplierName}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Calendar size={12} />
+                              {formatDate(doc.createdAt)}
+                            </span>
+                            {doc.poNumber && (
+                              <span className="flex items-center gap-1">
+                                <Hash size={12} />
+                                PO-{doc.poNumber}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="font-bold text-slate-900">
+                            {formatCurrency(doc.totalAmount)} {getCurrencySymbol(doc.currency)}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            Base: {formatCurrency(doc.baseAmount)} {getCurrencySymbol(doc.currency)}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => openReplaceModal(doc)}
+                          className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors"
+                        >
+                          <RefreshCw size={14} />
+                          Sustituir
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* Modal de sustitución */}
+      {showReplaceModal && selectedDoc && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeReplaceModal}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                  <Receipt size={20} className="text-emerald-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Sustituir por factura</h2>
+                  <p className="text-xs text-slate-500">{selectedDoc.displayNumber} → FAC-{selectedDoc.number}</p>
+                </div>
+              </div>
+              <button onClick={closeReplaceModal} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Resumen del documento original */}
+              <div className="bg-slate-50 rounded-xl p-4">
+                <p className="text-xs text-slate-500 mb-2">Documento original</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-slate-900">{selectedDoc.supplierName}</p>
+                    <p className="text-sm text-slate-500">{selectedDoc.description}</p>
+                  </div>
+                  <p className="font-bold text-slate-900">
+                    {formatCurrency(selectedDoc.totalAmount)} {getCurrencySymbol(selectedDoc.currency)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Número de factura del proveedor */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Nº factura del proveedor *
+                </label>
+                <input
+                  type="text"
+                  value={newInvoiceNumber}
+                  onChange={(e) => setNewInvoiceNumber(e.target.value)}
+                  placeholder="Ej: 2024/001234"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm"
+                />
+              </div>
+
+              {/* Fecha de la factura */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Fecha de la factura *
+                </label>
+                <input
+                  type="date"
+                  value={newInvoiceDate}
+                  onChange={(e) => setNewInvoiceDate(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm"
+                />
+              </div>
+
+              {/* Subir archivo */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Adjuntar factura (opcional)
+                </label>
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={handleDrop}
+                  className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
+                    isDragging ? "border-slate-400 bg-slate-50" : "border-slate-200"
+                  }`}
+                >
+                  {uploadedFile ? (
+                    <div className="flex items-center justify-center gap-3">
+                      <FileText size={20} className="text-emerald-600" />
+                      <span className="text-sm text-slate-700">{uploadedFile.name}</span>
+                      <button
+                        onClick={() => setUploadedFile(null)}
+                        className="p-1 text-slate-400 hover:text-red-500"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload size={24} className="text-slate-400 mx-auto mb-2" />
+                      <p className="text-sm text-slate-500 mb-1">Arrastra el archivo o</p>
+                      <label className="text-sm text-slate-900 font-medium cursor-pointer hover:underline">
+                        selecciona desde tu equipo
+                        <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} />
+                      </label>
+                      <p className="text-xs text-slate-400 mt-2">PDF, JPG o PNG (máx. 10MB)</p>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Error */}
+              {error && (
+                <div className="flex items-center gap-2 text-red-600 text-sm">
+                  <AlertCircle size={14} />
+                  {error}
+                </div>
+              )}
+
+              {/* Aviso */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle size={14} className="text-amber-600 mt-0.5" />
+                  <p className="text-xs text-amber-800">
+                    Esta acción convertirá el documento en factura definitiva. El número interno 
+                    se mantendrá ({selectedDoc.number}) pero el prefijo cambiará a FAC.
+                  </p>
+                </div>
+              </div>
+
+              {/* Botones */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={closeReplaceModal}
+                  className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleReplace}
+                  disabled={processing || !newInvoiceNumber.trim() || !newInvoiceDate}
+                  className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {processing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle size={16} />
+                      Convertir a factura
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
