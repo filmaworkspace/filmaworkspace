@@ -5,7 +5,7 @@ import { Inter } from "next/font/google";
 import { useState, useEffect, useRef } from "react";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, deleteDoc, query, orderBy, updateDoc, Timestamp } from "firebase/firestore";
-import { Receipt, Plus, Search, Download, Trash2, X, CheckCircle, XCircle, Calendar, FileText, Eye, MoreHorizontal, Shield, FileCheck, AlertTriangle, Link as LinkIcon, Clock, Building2, ShieldAlert, User, ChevronDown, Filter, HelpCircle, Upload, Code } from "lucide-react";
+import { Receipt, Plus, Search, Download, Trash2, X, CheckCircle, XCircle, Calendar, FileText, Eye, MoreHorizontal, Shield, FileCheck, AlertTriangle, Link as LinkIcon, Clock, Building2, ShieldAlert, User, ChevronDown, Filter, HelpCircle, Upload, Code, RefreshCw } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
@@ -186,7 +186,8 @@ export default function InvoicesPage() {
           await updateDoc(doc(db, `projects/${id}/invoices`, invoice.id), { status: "overdue" });
           invoice.status = "overdue";
         }
-        if (invoice.requiresReplacement && invoice.status === "paid" && !invoice.replacedByInvoiceId) pendingCount++;
+        // Contar proformas y presupuestos que no han sido reemplazados
+        if (invoice.requiresReplacement && !invoice.replacedByInvoiceId && !invoice.replacedBy) pendingCount++;
       }
       setPendingReplacementCount(pendingCount);
       setInvoices(invoicesData);
@@ -626,11 +627,12 @@ export default function InvoicesPage() {
                 <h3 className="font-semibold text-amber-900">
                   {pendingReplacementCount} documento{pendingReplacementCount > 1 ? "s" : ""} pendiente{pendingReplacementCount > 1 ? "s" : ""} de factura definitiva
                 </h3>
-                <p className="text-sm text-amber-700 mt-1">Hay proformas o presupuestos pagados que necesitan su factura definitiva del proveedor.</p>
+                <p className="text-sm text-amber-700 mt-1">Hay proformas o presupuestos que necesitan ser sustituidos por su factura definitiva.</p>
               </div>
               {permissions.canCreatePO && (
-                <Link href={`/project/${id}/accounting/invoices/new`} className="px-4 py-2 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 flex-shrink-0">
-                  Subir factura
+                <Link href={`/project/${id}/accounting/invoices/replace`} className="px-4 py-2 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 flex-shrink-0 flex items-center gap-2">
+                  <RefreshCw size={14} />
+                  Sustituir
                 </Link>
               )}
             </div>
