@@ -2,12 +2,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
-import { Folder, Search, Users, Settings, Clock, Mail, Check, X as XIcon, Building2, Sparkles, BarChart3, Archive, ChevronDown, FolderOpen, Filter, ArrowUpDown, KeyRound, AlertCircle, Bell, Info, AlertTriangle, CheckCircle, MessageSquare } from "lucide-react";
+import { Folder, Search, Users, Settings, Clock, Mail, Check, X as XIcon, Building2, Sparkles, BarChart3, Archive, ChevronDown, FolderOpen, Filter, ArrowUpDown, Bell, Info, AlertTriangle, CheckCircle, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { db, auth } from "@/lib/firebase";
 import { useUser } from "@/contexts/UserContext";
 import { collection, getDocs, getDoc, doc, query, where, updateDoc, setDoc, Timestamp, DocumentData, QueryDocumentSnapshot, orderBy, deleteDoc } from "firebase/firestore";
-import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -93,10 +92,6 @@ export default function Dashboard() {
   const [showArchived, setShowArchived] = useState(false);
   const [showPhaseDropdown, setShowPhaseDropdown] = useState(false);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [passwordInput, setPasswordInput] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-  const [pendingConfigProjectId, setPendingConfigProjectId] = useState<string | null>(null);
   const [expandedMessage, setExpandedMessage] = useState<string | null>(null);
   const phaseDropdownRef = useRef<HTMLDivElement>(null);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
@@ -350,50 +345,6 @@ export default function Dashboard() {
     return opt?.label || "Recientes";
   };
 
-  const handleConfigClick = (e: React.MouseEvent, projectId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setPendingConfigProjectId(projectId);
-    setShowPasswordModal(true);
-    setPasswordInput("");
-    setPasswordError("");
-  };
-
-  const verifyPasswordAndNavigate = async () => {
-    if (!passwordInput.trim()) {
-      setPasswordError("Introduce tu contraseña");
-      return;
-    }
-    const currentUser = auth.currentUser;
-    if (!currentUser || !currentUser.email) {
-      setPasswordError("No hay usuario autenticado");
-      return;
-    }
-    try {
-      const credential = EmailAuthProvider.credential(currentUser.email, passwordInput);
-      await reauthenticateWithCredential(currentUser, credential);
-      setShowPasswordModal(false);
-      setPasswordInput("");
-      setPasswordError("");
-      if (pendingConfigProjectId) {
-        router.push("/project/" + pendingConfigProjectId + "/config");
-      }
-    } catch (error: any) {
-      if (error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
-        setPasswordError("Contraseña incorrecta");
-      } else {
-        setPasswordError("Error de autenticación");
-      }
-    }
-  };
-
-  const closePasswordModal = () => {
-    setShowPasswordModal(false);
-    setPasswordInput("");
-    setPasswordError("");
-    setPendingConfigProjectId(null);
-  };
-
   // Helper para calcular días hasta el cierre
   const getDaysUntilClose = (closingAt: Timestamp | null | undefined) => {
     if (!closingAt) return null;
@@ -451,12 +402,12 @@ export default function Dashboard() {
         {/* Botones */}
         <div className="flex gap-2 pt-3 border-t border-slate-100">
           {hasConfig && (
-            <button onClick={(e) => handleConfigClick(e, project.id)} className="flex-1">
+            <Link href={`/project/${project.id}/config`} className="flex-1">
               <div className="flex items-center justify-center gap-1.5 p-2 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 text-slate-600 text-xs font-medium">
                 <Settings size={12} />
                 Config
               </div>
-            </button>
+            </Link>
           )}
           {hasAccounting && (
             <Link href={`/project/${project.id}/accounting`} className="flex-1">
@@ -532,12 +483,12 @@ export default function Dashboard() {
         {/* Botones */}
         <div className="flex gap-2 pt-3 border-t border-slate-200">
           {hasConfig && (
-            <button onClick={(e) => handleConfigClick(e, project.id)} className="flex-1">
+            <Link href={`/project/${project.id}/config`} className="flex-1">
               <div className="flex items-center justify-center gap-1.5 p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-slate-500 text-xs font-medium">
                 <Settings size={12} />
                 Config
               </div>
-            </button>
+            </Link>
           )}
           {hasAccounting && (
             <Link href={`/project/${project.id}/accounting`} className="flex-1">
@@ -934,62 +885,6 @@ export default function Dashboard() {
           </>
         )}
       </main>
-
-      {/* Modal de contraseña para Config */}
-      {showPasswordModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={closePasswordModal}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
-                <Settings size={20} className="text-slate-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">Acceso a Configuración</h3>
-                <p className="text-xs text-slate-500">Confirma tu identidad para continuar</p>
-              </div>
-            </div>
-            <div className="p-6">
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
-                  <KeyRound size={14} />
-                  Confirma tu contraseña
-                </label>
-                <input
-                  type="password"
-                  value={passwordInput}
-                  onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
-                  onKeyDown={(e) => { if (e.key === "Enter") verifyPasswordAndNavigate(); }}
-                  placeholder="Tu contraseña de usuario"
-                  className={"w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm " + (passwordError ? "border-red-300 bg-red-50" : "border-slate-200")}
-                  autoFocus
-                />
-                {passwordError && (
-                  <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1">
-                    <AlertCircle size={12} />
-                    {passwordError}
-                  </p>
-                )}
-                <p className="text-xs text-slate-500 mt-2">Usuario: {userEmail}</p>
-              </div>
-              <div className="flex gap-3">
-                <button 
-                  onClick={closePasswordModal} 
-                  className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  onClick={verifyPasswordAndNavigate} 
-                  disabled={!passwordInput.trim()} 
-                  className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium transition-opacity disabled:opacity-50 hover:bg-slate-800"
-                >
-                  Acceder
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
