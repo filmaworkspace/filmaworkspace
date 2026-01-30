@@ -1722,7 +1722,7 @@ export default function NewInvoicePage() {
                     onClick={() => setShowPOModal(true)}
                     onBlur={() => handleBlur("po")}
                     className={cx(
-                      "w-full px-4 py-3 border rounded-xl hover:border-slate-300 transition-colors text-left flex items-center justify-between",
+                      "w-full px-4 py-2.5 border rounded-xl hover:border-slate-300 transition-colors text-left flex items-center justify-between",
                       hasError("po") ? "border-red-300 bg-red-50" : selectedPO ? "border-emerald-300 bg-emerald-50" : "border-slate-200"
                     )}
                   >
@@ -1815,7 +1815,7 @@ export default function NewInvoicePage() {
                     onClick={() => setShowSupplierModal(true)}
                     onBlur={() => handleBlur("supplier")}
                     className={cx(
-                      "w-full px-4 py-3 border rounded-xl hover:border-slate-300 transition-colors text-left flex items-center justify-between",
+                      "w-full px-4 py-2.5 border rounded-xl hover:border-slate-300 transition-colors text-left flex items-center justify-between",
                       hasError("supplier") ? "border-red-300 bg-red-50" : formData.supplier ? "border-emerald-300 bg-emerald-50" : "border-slate-200"
                     )}
                   >
@@ -1949,7 +1949,7 @@ export default function NewInvoicePage() {
                       placeholder={"Concepto " + currentDocType.article + " " + currentDocType.label.charAt(0).toLowerCase() + currentDocType.label.slice(1).toLowerCase()}
                       rows={2}
                       className={cx(
-                        "w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none text-sm pr-10 uppercase",
+                        "w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none text-sm pr-10 uppercase",
                         hasError("description")
                           ? "border-red-300 bg-red-50"
                           : formData.description.trim()
@@ -2001,7 +2001,7 @@ export default function NewInvoicePage() {
                           onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
                           onBlur={() => handleBlur("dueDate")}
                           className={cx(
-                            "w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm",
+                            "w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm",
                             hasError("dueDate") ? "border-red-300 bg-red-50" : formData.dueDate ? "border-emerald-300 bg-emerald-50" : "border-slate-200"
                           )}
                         />
@@ -2111,7 +2111,7 @@ export default function NewInvoicePage() {
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     placeholder="Notas opcionales"
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm"
                   />
                 </div>
               </div>
@@ -2169,7 +2169,7 @@ export default function NewInvoicePage() {
                           placeholder="Explica por qué hay diferencia"
                           rows={2}
                           className={cx(
-                            "w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none text-sm",
+                            "w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none text-sm",
                             hasError("differenceReason")
                               ? "border-red-300 bg-red-50"
                               : differenceReason.trim()
@@ -2263,7 +2263,7 @@ export default function NewInvoicePage() {
                               onBlur={() => handleBlur("item_" + index + "_description")}
                               placeholder="Descripción"
                               className={cx(
-                                "w-full px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white",
+                                "w-full px-4 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white",
                                 hasError("item_" + index + "_description") ? "border-red-300 bg-red-50" : item.description.trim() ? "border-emerald-200" : "border-slate-200"
                               )}
                             />
@@ -2274,7 +2274,7 @@ export default function NewInvoicePage() {
                                   setShowAccountModal(true);
                                 }}
                                 className={cx(
-                                  "w-full px-4 py-3 border rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 bg-white",
+                                  "w-full px-4 py-2.5 border rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 bg-white",
                                   hasError("item_" + index + "_account")
                                     ? "border-red-300 bg-red-50"
                                     : item.subAccountCode
@@ -2295,7 +2295,7 @@ export default function NewInvoicePage() {
                                 <Search size={14} className="text-slate-400" />
                               </button>
                             ) : (
-                              <div className="px-4 py-3 bg-slate-100 rounded-xl text-sm flex items-center gap-2">
+                              <div className="px-4 py-2.5 bg-slate-100 rounded-xl text-sm flex items-center gap-2">
                                 <CheckCircle2 size={14} className="text-emerald-600" />
                                 <span className="font-mono text-slate-700">
                                   {item.subAccountCode} - {item.subAccountDescription}
@@ -2309,7 +2309,7 @@ export default function NewInvoicePage() {
                                 <button
                                   onClick={() => openEpisodeModal(index)}
                                   className={cx(
-                                    "w-full px-4 py-3 border rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white",
+                                    "w-full px-4 py-2.5 border rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white",
                                     item.episodeAssignment === "general" ? "border-slate-200" : "border-violet-200 bg-violet-50"
                                   )}
                                 >
@@ -2692,7 +2692,7 @@ export default function NewInvoicePage() {
                   value={poSearch}
                   onChange={(e) => setPOSearch(e.target.value)}
                   placeholder="Buscar por número o proveedor"
-                  className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm"
+                  className="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm"
                   autoFocus
                 />
               </div>
@@ -2826,7 +2826,7 @@ export default function NewInvoicePage() {
                   value={supplierSearch}
                   onChange={(e) => setSupplierSearch(e.target.value)}
                   placeholder="Buscar por nombre o NIF"
-                  className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm"
+                  className="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm"
                   autoFocus
                 />
               </div>
@@ -2898,7 +2898,7 @@ export default function NewInvoicePage() {
                   value={accountSearch}
                   onChange={(e) => setAccountSearch(e.target.value)}
                   placeholder="Buscar por código o descripción"
-                  className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm"
+                  className="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm"
                   autoFocus
                 />
               </div>
