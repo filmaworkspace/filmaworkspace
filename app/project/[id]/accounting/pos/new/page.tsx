@@ -192,11 +192,14 @@ export default function NewPOPage() {
 
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showCreateSupplierModal, setShowCreateSupplierModal] = useState(false);
   const [supplierSearch, setSupplierSearch] = useState("");
   const [accountSearch, setAccountSearch] = useState("");
   const [currentItemIndex, setCurrentItemIndex] = useState<number | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [creatingSupplier, setCreatingSupplier] = useState(false);
+  const [newSupplierData, setNewSupplierData] = useState({ fiscalName: "", taxId: "" });
 
   // Dropdowns custom
   const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
@@ -217,7 +220,7 @@ export default function NewPOPage() {
     supplier: "",
     supplierName: "",
     department: "",
-    poType: "service" as "rental" | "purchase" | "service" | "deposit",
+    poType: "rental" as "rental" | "purchase" | "service" | "deposit",
     currency: "EUR",
     generalDescription: "",
     paymentTerms: "",
@@ -504,6 +507,55 @@ export default function NewPOPage() {
     setTouched((prev) => ({ ...prev, supplier: true }));
     setShowSupplierModal(false);
     setSupplierSearch("");
+  };
+
+  const createQuickSupplier = async () => {
+    if (!newSupplierData.fiscalName.trim() || !newSupplierData.taxId.trim()) return;
+    setCreatingSupplier(true);
+    try {
+      const newSupplier = {
+        fiscalName: newSupplierData.fiscalName.trim(),
+        commercialName: "",
+        country: "España",
+        taxId: newSupplierData.taxId.trim().toUpperCase(),
+        address: { street: "", number: "", city: "", province: "", postalCode: "" },
+        contact: { name: "", email: "", phone: "" },
+        paymentMethod: "",
+        bankAccount: "",
+        bic: "",
+        certificates: {
+          bankOwnership: { uploaded: false, expiryDate: null, fileName: "", verified: false },
+          contractorsCertificate: { uploaded: false, expiryDate: null, fileName: "", verified: false, aeatVerified: false },
+        },
+        createdAt: Timestamp.now(),
+        createdBy: permissions.userId || "",
+        hasAssignedPOs: false,
+        hasAssignedInvoices: false,
+      };
+      const docRef = await addDoc(collection(db, `projects/${projectId}/suppliers`), newSupplier);
+      
+      // Seleccionar el nuevo proveedor
+      setFormData({
+        ...formData,
+        supplier: docRef.id,
+        supplierName: newSupplierData.fiscalName.trim(),
+        paymentTerms: "",
+      });
+      setTouched((prev) => ({ ...prev, supplier: true }));
+      
+      // Añadir a la lista local
+      setSuppliers([...suppliers, { id: docRef.id, ...newSupplier } as Supplier]);
+      
+      // Cerrar modales
+      setShowCreateSupplierModal(false);
+      setShowSupplierModal(false);
+      setNewSupplierData({ fiscalName: "", taxId: "" });
+      setSupplierSearch("");
+    } catch (error) {
+      console.error("Error creating supplier:", error);
+    } finally {
+      setCreatingSupplier(false);
+    }
   };
 
   const selectAccount = (subAccount: SubAccount) => {
@@ -1093,7 +1145,7 @@ export default function NewPOPage() {
                             key={type.value}
                             onClick={() => setFormData({ ...formData, poType: type.value as any })}
                             className={cx(
-                              "px-3 py-2.5 rounded-xl border transition-all flex items-center gap-2 text-sm",
+                              "px-4 py-3 rounded-xl border transition-all flex items-center gap-2 text-sm",
                               isSelected ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 hover:border-slate-300 text-slate-600 bg-white"
                             )}
                             title={type.description}
@@ -1661,16 +1713,25 @@ export default function NewPOPage() {
             </div>
 
             <div className="p-6">
-              <div className="relative mb-4">
-                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={supplierSearch}
-                  onChange={(e) => setSupplierSearch(e.target.value)}
-                  placeholder="Buscar por nombre o NIF"
-                  className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm"
-                  autoFocus
-                />
+              <div className="flex gap-2 mb-4">
+                <div className="relative flex-1">
+                  <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={supplierSearch}
+                    onChange={(e) => setSupplierSearch(e.target.value)}
+                    placeholder="Buscar por nombre o NIF"
+                    className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm"
+                    autoFocus
+                  />
+                </div>
+                <button
+                  onClick={() => setShowCreateSupplierModal(true)}
+                  className="px-4 py-3 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-colors flex items-center gap-2 text-sm font-medium"
+                >
+                  <Plus size={16} />
+                  Nuevo
+                </button>
               </div>
 
               <div className="max-h-80 overflow-y-auto space-y-2">
@@ -1679,7 +1740,13 @@ export default function NewPOPage() {
                     <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3">
                       <Building2 size={20} className="text-slate-400" />
                     </div>
-                    <p className="text-sm text-slate-500">No se encontraron proveedores</p>
+                    <p className="text-sm text-slate-500 mb-3">No se encontraron proveedores</p>
+                    <button
+                      onClick={() => setShowCreateSupplierModal(true)}
+                      className="text-sm text-slate-900 font-medium hover:underline"
+                    >
+                      Crear nuevo proveedor
+                    </button>
                   </div>
                 ) : (
                   filteredSuppliers.map((supplier) => (
@@ -1705,6 +1772,67 @@ export default function NewPOPage() {
                     </button>
                   ))
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Supplier Modal */}
+      {showCreateSupplierModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-slate-200">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+                  <Building2 size={20} className="text-slate-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Nuevo proveedor</h2>
+                  <p className="text-xs text-slate-500">Datos básicos · Completa el resto en Proveedores</p>
+                </div>
+              </div>
+              <button onClick={() => { setShowCreateSupplierModal(false); setNewSupplierData({ fiscalName: "", taxId: "" }); }} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Nombre fiscal *</label>
+                <input
+                  type="text"
+                  value={newSupplierData.fiscalName}
+                  onChange={(e) => setNewSupplierData({ ...newSupplierData, fiscalName: e.target.value })}
+                  placeholder="Nombre o razón social"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">NIF/CIF *</label>
+                <input
+                  type="text"
+                  value={newSupplierData.taxId}
+                  onChange={(e) => setNewSupplierData({ ...newSupplierData, taxId: e.target.value })}
+                  placeholder="B12345678"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => { setShowCreateSupplierModal(false); setNewSupplierData({ fiscalName: "", taxId: "" }); }}
+                  className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={createQuickSupplier}
+                  disabled={creatingSupplier || !newSupplierData.fiscalName.trim() || !newSupplierData.taxId.trim()}
+                  className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium disabled:opacity-50"
+                >
+                  {creatingSupplier ? "Creando..." : "Crear y seleccionar"}
+                </button>
               </div>
             </div>
           </div>
