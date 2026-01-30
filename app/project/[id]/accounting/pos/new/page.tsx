@@ -1145,7 +1145,7 @@ export default function NewPOPage() {
                             key={type.value}
                             onClick={() => setFormData({ ...formData, poType: type.value as any })}
                             className={cx(
-                              "px-4 py-3 rounded-xl border transition-all flex items-center gap-2 text-sm",
+                              "px-3 py-2 rounded-xl border transition-all flex items-center justify-center gap-2 text-sm",
                               isSelected ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 hover:border-slate-300 text-slate-600 bg-white"
                             )}
                             title={type.description}
