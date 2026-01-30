@@ -5,10 +5,10 @@ import Link from "next/link";
 import { Inter } from "next/font/google";
 import {
   Settings, BarChart3, Users, Building2, Clock,
-  Film, Tv, Briefcase, ChevronRight, Shield, Copy, CheckCircle, KeyRound, AlertCircle
+  Film, Tv, Briefcase, ChevronRight, Shield, Copy, CheckCircle
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, collection, getDocs, Timestamp } from "firebase/firestore";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
@@ -50,7 +50,6 @@ export default function ProjectOverviewPage() {
 
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
-  const [userEmail, setUserEmail] = useState<string>("");
   const [project, setProject] = useState<ProjectData | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [userPermissions, setUserPermissions] = useState<UserPermissions>({ config: false, accounting: false, team: false });
@@ -61,19 +60,11 @@ export default function ProjectOverviewPage() {
   const [currentUserPosition, setCurrentUserPosition] = useState<string>("");
   const [currentUserDepartment, setCurrentUserDepartment] = useState<string>("");
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
-  
-  // Estados para modal de contraseña
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [passwordInput, setPasswordInput] = useState("");
-  const [passwordError, setPasswordError] = useState("");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) router.push("/");
-      else {
-        setUserId(user.uid);
-        setUserEmail(user.email || "");
-      }
+      else setUserId(user.uid);
     });
     return () => unsubscribe();
   }, [router]);
@@ -186,47 +177,6 @@ export default function ProjectOverviewPage() {
     setTimeout(() => setCopiedEmail(null), 2000);
   };
 
-  // Funciones para modal de contraseña
-  const handleConfigClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setShowPasswordModal(true);
-    setPasswordInput("");
-    setPasswordError("");
-  };
-
-  const verifyPasswordAndNavigate = async () => {
-    if (!passwordInput.trim()) {
-      setPasswordError("Introduce tu contraseña");
-      return;
-    }
-    const currentUser = auth.currentUser;
-    if (!currentUser || !currentUser.email) {
-      setPasswordError("No hay usuario autenticado");
-      return;
-    }
-    try {
-      const credential = EmailAuthProvider.credential(currentUser.email, passwordInput);
-      await reauthenticateWithCredential(currentUser, credential);
-      setShowPasswordModal(false);
-      setPasswordInput("");
-      setPasswordError("");
-      router.push(`/project/${id}/config`);
-    } catch (error: any) {
-      if (error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
-        setPasswordError("Contraseña incorrecta");
-      } else {
-        setPasswordError("Error de autenticación");
-      }
-    }
-  };
-
-  const closePasswordModal = () => {
-    setShowPasswordModal(false);
-    setPasswordInput("");
-    setPasswordError("");
-  };
-
   // Determinar si el usuario actual es rol de proyecto
   const isProjectRole = PROJECT_ROLES.includes(currentUserRole);
   
@@ -333,12 +283,12 @@ export default function ProjectOverviewPage() {
           <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Módulos</h2>
           <div className="flex gap-2">
             {userPermissions.config && (
-              <button onClick={handleConfigClick}>
+              <Link href={`/project/${id}/config`}>
                 <div className="flex items-center justify-center gap-1.5 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 text-slate-600 text-xs font-medium transition-colors">
                   <Settings size={12} />
                   Config
                 </div>
-              </button>
+              </Link>
             )}
             {userPermissions.accounting && (
               <Link href={`/project/${id}/accounting`}>
@@ -493,62 +443,6 @@ export default function ProjectOverviewPage() {
           )}
         </div>
       </div>
-
-      {/* Modal de contraseña para Config */}
-      {showPasswordModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={closePasswordModal}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
-                <Settings size={20} className="text-slate-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">Acceso a Configuración</h3>
-                <p className="text-xs text-slate-500">Confirma tu identidad para continuar</p>
-              </div>
-            </div>
-            <div className="p-6">
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
-                  <KeyRound size={14} />
-                  Confirma tu contraseña
-                </label>
-                <input
-                  type="password"
-                  value={passwordInput}
-                  onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
-                  onKeyDown={(e) => { if (e.key === "Enter") verifyPasswordAndNavigate(); }}
-                  placeholder="Tu contraseña de usuario"
-                  className={"w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm " + (passwordError ? "border-red-300 bg-red-50" : "border-slate-200")}
-                  autoFocus
-                />
-                {passwordError && (
-                  <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1">
-                    <AlertCircle size={12} />
-                    {passwordError}
-                  </p>
-                )}
-                <p className="text-xs text-slate-500 mt-2">Usuario: {userEmail}</p>
-              </div>
-              <div className="flex gap-3">
-                <button 
-                  onClick={closePasswordModal} 
-                  className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  onClick={verifyPasswordAndNavigate} 
-                  disabled={!passwordInput.trim()} 
-                  className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium transition-opacity disabled:opacity-50 hover:bg-slate-800"
-                >
-                  Acceder
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
