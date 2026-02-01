@@ -69,12 +69,22 @@ export default function AccountingUsersPage() {
         if (!userProjectSnap.exists()) { setErrorMessage("No tienes acceso a este proyecto"); setLoading(false); return; }
         const userProjectData = userProjectSnap.data();
         const hasAccounting = userProjectData.permissions?.accounting || false;
+        const accountingLevel = userProjectData.accountingAccessLevel;
         setHasAccountingAccess(hasAccounting);
-        if (!hasAccounting) { setErrorMessage("No tienes permisos para acceder a contabilidad"); setLoading(false); return; }
 
         const memberRef = doc(db, `projects/${id}/members/${userId}`);
         const memberSnap = await getDoc(memberRef);
-        if (memberSnap.exists()) { const memberData = memberSnap.data(); setIsProjectRole(PROJECT_ROLES.includes(memberData.role || "")); }
+        const memberData = memberSnap.exists() ? memberSnap.data() : null;
+        const isEPorPM = memberData && ["EP", "PM"].includes(memberData.role || "");
+        setIsProjectRole(isEPorPM || false);
+        
+        // Solo accounting_extended o EP/PM pueden acceder a esta página
+        const hasExtendedAccess = accountingLevel === "accounting_extended";
+        if (!hasAccounting || (!isEPorPM && !hasExtendedAccess)) { 
+          setErrorMessage("No tienes permisos para gestionar usuarios de contabilidad"); 
+          setLoading(false); 
+          return; 
+        }
 
         const projectRef = doc(db, "projects", id as string);
         const projectSnap = await getDoc(projectRef);
