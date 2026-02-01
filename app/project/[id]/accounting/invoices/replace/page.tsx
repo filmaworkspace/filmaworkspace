@@ -314,174 +314,225 @@ export default function ReplaceDocumentPage() {
 
   if (loading || permissionsLoading) {
     return (
-      <div className={`${inter.className} min-h-screen bg-slate-50 flex items-center justify-center`}>
+      <div className={`${inter.className} min-h-screen bg-white flex items-center justify-center`}>
         <div className="w-8 h-8 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className={`${inter.className} min-h-screen bg-slate-50`}>
+    <div className={`${inter.className} min-h-screen bg-white`}>
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link
-              href={`/project/${projectId}/accounting/invoices`}
-              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
-            >
-              <ArrowLeft size={20} />
-            </Link>
-            <div>
-              <h1 className="text-lg font-semibold text-slate-900">Sustituir documento</h1>
-              <p className="text-xs text-slate-500">{projectName} · Convertir proformas/presupuestos a factura</p>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-5xl mx-auto px-6 py-8">
-        {/* Info */}
-        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6">
-          <div className="flex items-start gap-3">
-            <RefreshCw size={18} className="text-blue-600 mt-0.5" />
-            <div className="text-sm text-blue-800">
-              <p className="font-medium mb-1">¿Cómo funciona?</p>
-              <p className="text-blue-700">
-                Selecciona una proforma o presupuesto para convertirlo en factura definitiva. 
-                El número correlativo se mantiene (ej: PRF-0012 → FAC-0012) y puedes adjuntar el documento fiscal.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Filtros */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-6">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar por número, proveedor o descripción"
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm"
-              />
-            </div>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
-            >
-              <option value="all">Todos los tipos</option>
-              <option value="proforma">Proformas</option>
-              <option value="budget">Presupuestos</option>
-            </select>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
-            >
-              <option value="all">Todos los estados</option>
-              <option value="pending">Pendiente</option>
-              <option value="approved">Aprobada</option>
-              <option value="accounted">Codificada</option>
-              <option value="paid">Pagada</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Lista de documentos */}
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="font-semibold text-slate-900">Documentos pendientes de sustitución</h2>
-            <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">
-              {filteredDocs.length}
-            </span>
-          </div>
-
-          {filteredDocs.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <FileText size={28} className="text-slate-400" />
+      <div className="mt-[4.5rem]">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
+            <div className="flex items-center gap-4">
+              <Link
+                href={`/project/${projectId}/accounting/invoices`}
+                className="w-10 h-10 rounded-xl flex items-center justify-center border border-slate-200 hover:bg-slate-50 transition-colors"
+              >
+                <ArrowLeft size={18} className="text-slate-600" />
+              </Link>
+              <RefreshCw size={24} style={{ color: "#2F52E0" }} />
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-semibold text-slate-900">Sustituir documento</h1>
+                <span className="px-2.5 py-1 bg-violet-100 text-violet-700 rounded-lg text-xs font-medium">
+                  Proformas y presupuestos
+                </span>
               </div>
-              <p className="text-slate-500 mb-2">No hay documentos pendientes</p>
-              <p className="text-sm text-slate-400">
-                Las proformas y presupuestos aparecerán aquí para ser sustituidos por facturas
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Columna principal - Lista de documentos */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Filtros */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Buscar por número, proveedor o descripción..."
+                    className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm bg-white"
+                  />
+                </div>
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                >
+                  <option value="all">Todos los tipos</option>
+                  <option value="proforma">Proformas</option>
+                  <option value="budget">Presupuestos</option>
+                </select>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                >
+                  <option value="all">Todos los estados</option>
+                  <option value="pending">Pendiente</option>
+                  <option value="approved">Aprobada</option>
+                  <option value="accounted">Codificada</option>
+                  <option value="paid">Pagada</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Lista de documentos */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-white">
+                <h2 className="font-semibold text-slate-900">Documentos pendientes de sustitución</h2>
+                <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">
+                  {filteredDocs.length}
+                </span>
+              </div>
+
+              {filteredDocs.length === 0 ? (
+                <div className="text-center py-16 bg-white">
+                  <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <FileText size={28} className="text-slate-400" />
+                  </div>
+                  <p className="text-slate-500 mb-2">No hay documentos pendientes</p>
+                  <p className="text-sm text-slate-400">
+                    Las proformas y presupuestos aparecerán aquí para ser sustituidos
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {filteredDocs.map((doc) => {
+                    const docType = DOCUMENT_TYPES[doc.documentType];
+                    const DocIcon = docType.icon;
+                    const statusConfig = STATUS_CONFIG[doc.status] || STATUS_CONFIG.pending;
+                    const StatusIcon = statusConfig.icon;
+
+                    return (
+                      <div
+                        key={doc.id}
+                        className="p-6 bg-white hover:bg-slate-50 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-4 flex-1">
+                            <div className={`w-12 h-12 ${docType.bgColor} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                              <DocIcon size={20} className={docType.textColor} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="font-semibold text-slate-900">{doc.displayNumber}</p>
+                                <span className={`px-2 py-0.5 ${docType.bgColor} ${docType.textColor} rounded text-xs font-medium`}>
+                                  {docType.label}
+                                </span>
+                                <span className={`px-2 py-0.5 ${statusConfig.bg} ${statusConfig.text} rounded text-xs font-medium flex items-center gap-1`}>
+                                  <StatusIcon size={10} />
+                                  {statusConfig.label}
+                                </span>
+                              </div>
+                              <p className="text-sm text-slate-600 mb-2">{doc.description}</p>
+                              <div className="flex items-center gap-4 text-xs text-slate-500">
+                                <span className="flex items-center gap-1">
+                                  <Building2 size={12} />
+                                  {doc.supplierName}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Calendar size={12} />
+                                  {formatDate(doc.createdAt)}
+                                </span>
+                                {doc.poNumber && (
+                                  <span className="flex items-center gap-1">
+                                    <Hash size={12} />
+                                    PO-{doc.poNumber}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <p className="font-bold text-slate-900">
+                                {formatCurrency(doc.totalAmount)} {getCurrencySymbol(doc.currency)}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                Base: {formatCurrency(doc.baseAmount)} {getCurrencySymbol(doc.currency)}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => openReplaceModal(doc)}
+                              className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+                              style={{ backgroundColor: "#2F52E0" }}
+                            >
+                              <RefreshCw size={14} />
+                              Sustituir
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Columna lateral - Info */}
+          <div className="space-y-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <RefreshCw size={18} className="text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-blue-900 mb-2">¿Cómo funciona?</h3>
+                  <ul className="text-sm text-blue-800 space-y-2">
+                    <li className="flex items-start gap-2">
+                      <ChevronRight size={14} className="mt-0.5 flex-shrink-0" />
+                      <span>Selecciona una proforma o presupuesto</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ChevronRight size={14} className="mt-0.5 flex-shrink-0" />
+                      <span>Introduce el nº de factura del proveedor</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ChevronRight size={14} className="mt-0.5 flex-shrink-0" />
+                      <span>Adjunta el documento fiscal (opcional)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ChevronRight size={14} className="mt-0.5 flex-shrink-0" />
+                      <span>El número correlativo se mantiene</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
+              <h3 className="font-semibold text-slate-900 mb-3">Ejemplo de conversión</h3>
+              <div className="flex items-center justify-center gap-3 py-4">
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-violet-100 rounded-xl flex items-center justify-center mx-auto mb-2">
+                    <FileText size={20} className="text-violet-600" />
+                  </div>
+                  <p className="text-sm font-mono font-medium text-slate-700">PRF-0012</p>
+                </div>
+                <ChevronRight size={20} className="text-slate-400" />
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mx-auto mb-2">
+                    <Receipt size={20} className="text-emerald-600" />
+                  </div>
+                  <p className="text-sm font-mono font-medium text-slate-700">FAC-0012</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 text-center">
+                El número interno se mantiene, solo cambia el prefijo
               </p>
             </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {filteredDocs.map((doc) => {
-                const docType = DOCUMENT_TYPES[doc.documentType];
-                const DocIcon = docType.icon;
-                const statusConfig = STATUS_CONFIG[doc.status] || STATUS_CONFIG.pending;
-                const StatusIcon = statusConfig.icon;
-
-                return (
-                  <div
-                    key={doc.id}
-                    className="p-6 hover:bg-slate-50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-4 flex-1">
-                        <div className={`w-12 h-12 ${docType.bgColor} rounded-xl flex items-center justify-center flex-shrink-0`}>
-                          <DocIcon size={20} className={docType.textColor} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="font-semibold text-slate-900">{doc.displayNumber}</p>
-                            <span className={`px-2 py-0.5 ${docType.bgColor} ${docType.textColor} rounded text-xs font-medium`}>
-                              {docType.label}
-                            </span>
-                            <span className={`px-2 py-0.5 ${statusConfig.bg} ${statusConfig.text} rounded text-xs font-medium flex items-center gap-1`}>
-                              <StatusIcon size={10} />
-                              {statusConfig.label}
-                            </span>
-                          </div>
-                          <p className="text-sm text-slate-600 mb-2">{doc.description}</p>
-                          <div className="flex items-center gap-4 text-xs text-slate-500">
-                            <span className="flex items-center gap-1">
-                              <Building2 size={12} />
-                              {doc.supplierName}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar size={12} />
-                              {formatDate(doc.createdAt)}
-                            </span>
-                            {doc.poNumber && (
-                              <span className="flex items-center gap-1">
-                                <Hash size={12} />
-                                PO-{doc.poNumber}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="font-bold text-slate-900">
-                            {formatCurrency(doc.totalAmount)} {getCurrencySymbol(doc.currency)}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            Base: {formatCurrency(doc.baseAmount)} {getCurrencySymbol(doc.currency)}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => openReplaceModal(doc)}
-                          className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors"
-                        >
-                          <RefreshCw size={14} />
-                          Sustituir
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          </div>
         </div>
       </main>
 
