@@ -278,9 +278,9 @@ export default function ProjectOverviewPage() {
           )}
         </div>
 
-        {/* Módulos - Estilo Dashboard */}
+        {/* Entornos - Estilo Dashboard */}
         <div className="mb-12">
-          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Módulos</h2>
+          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Entornos</h2>
           <div className="flex gap-2">
             {userPermissions.config && (
               <Link href={`/project/${id}/config`}>
