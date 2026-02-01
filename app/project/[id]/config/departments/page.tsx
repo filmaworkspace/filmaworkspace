@@ -195,13 +195,13 @@ export default function ConfigDepartments() {
           </div>
         )}
 
-        {/* Departments Grid */}
+        {/* Departments List */}
         {departmentsData.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="space-y-3">
             {departmentsData.map((dept) => {
               const isExpanded = expandedDept === dept.name;
               return (
-                <div key={dept.name} className="bg-white rounded-2xl border border-slate-200 overflow-visible">
+                <div key={dept.name} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                   <div 
                     className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/50 transition-colors cursor-pointer group" 
                     onClick={() => setExpandedDept(isExpanded ? null : dept.name)}
@@ -250,15 +250,15 @@ export default function ConfigDepartments() {
                   {isExpanded && (
                     <div className="px-6 pb-5 pt-2 border-t border-slate-100 bg-slate-50/30">
                       {dept.members.length > 0 ? (
-                        <div className="space-y-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                           {dept.members.map((m) => (
                             <div key={m.userId} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100">
-                              <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-semibold text-sm">
+                              <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-semibold text-sm flex-shrink-0">
                                 {m.name?.[0]?.toUpperCase()}
                               </div>
                               <div className="min-w-0 flex-1">
                                 <p className="font-medium text-slate-900 text-sm truncate">{m.name}</p>
-                                {m.position && <p className="text-xs text-slate-500">{m.position}</p>}
+                                {m.position && <p className="text-xs text-slate-500 truncate">{m.position}</p>}
                               </div>
                             </div>
                           ))}
