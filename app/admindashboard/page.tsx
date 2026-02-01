@@ -373,17 +373,17 @@ export default function AdminDashboard() {
     try {
       const projectId = generateShortId();
       const projectRef = doc(db, "projects", projectId);
+      
+      // Crear proyecto con departamentos como array (igual que el resto de la app)
       await setDoc(projectRef, {
         name: newProject.name.trim(),
         description: newProject.description.trim(),
         phase: newProject.phase,
         producers: newProject.producers,
+        departments: DEFAULT_DEPARTMENTS.map(d => d.name),
         createdAt: serverTimestamp(),
       });
-      for (const dept of DEFAULT_DEPARTMENTS) {
-        const deptRef = doc(collection(db, `projects/${projectId}/departments`));
-        await setDoc(deptRef, { name: dept.name, color: dept.color, createdAt: serverTimestamp() });
-      }
+      
       setNewProject({ name: "", description: "", phase: "Desarrollo", producers: [] });
       setShowCreateProject(false);
       showToast("success", "Proyecto creado correctamente");
@@ -423,15 +423,14 @@ export default function AdminDashboard() {
     if (!confirm(`¿Eliminar "${project.name}"? Esta acción no se puede deshacer.`)) return;
     setSaving(true);
     try {
+      // Eliminar miembros del proyecto y sus referencias en userProjects
       const membersSnap = await getDocs(collection(db, `projects/${projectId}/members`));
       for (const memberDoc of membersSnap.docs) {
         await deleteDoc(doc(db, `userProjects/${memberDoc.id}/projects/${projectId}`));
         await deleteDoc(memberDoc.ref);
       }
-      const deptsSnap = await getDocs(collection(db, `projects/${projectId}/departments`));
-      for (const deptDoc of deptsSnap.docs) {
-        await deleteDoc(deptDoc.ref);
-      }
+      
+      // Eliminar el proyecto
       await deleteDoc(doc(db, "projects", projectId));
       showToast("success", "Proyecto eliminado");
       setActiveMenu(null);
