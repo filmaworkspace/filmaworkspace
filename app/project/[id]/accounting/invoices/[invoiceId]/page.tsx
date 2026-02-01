@@ -366,7 +366,7 @@ export default function InvoiceDetailPage() {
             <button onClick={() => setCodingMode(false)} className="p-2 hover:bg-violet-700 rounded-lg"><X size={20} /></button>
             <div className="flex items-center gap-3">
               <Code size={20} />
-              <span className="font-semibold">Codificar</span>
+              <span className="font-semibold">CODIFICAR</span>
               <span className="bg-violet-500 px-2 py-0.5 rounded text-sm">{invoice.displayNumber}</span>
             </div>
           </div>
@@ -996,20 +996,24 @@ export default function InvoiceDetailPage() {
             )}
 
             {/* Pending Replacement Alert */}
-            {invoice.requiresReplacement && invoice.status === "paid" && !invoice.replacedByInvoiceId && (
+            {invoice.requiresReplacement && !invoice.replacedByInvoiceId && (
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <AlertTriangle size={20} className="text-amber-600" />
+                    <RefreshCw size={20} className="text-amber-600" />
                   </div>
                   <div className="flex-1">
                     <p className="font-semibold text-amber-900">Pendiente de factura definitiva</p>
-                    <p className="text-sm text-amber-700 mt-1">Este documento ha sido pagado. Recuerda subir la factura definitiva del proveedor.</p>
+                    <p className="text-sm text-amber-700 mt-1">
+                      {invoice.status === "paid" 
+                        ? "Este documento ha sido pagado. Recuerda subir la factura definitiva del proveedor."
+                        : "Este documento provisional deberá ser sustituido por la factura definitiva del proveedor."}
+                    </p>
                     <Link
-                      href={`/project/${projectId}/accounting/invoices/new?linkTo=${invoice.id}`}
+                      href={`/project/${projectId}/accounting/invoices/replace?docId=${invoice.id}`}
                       className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl text-sm font-medium hover:bg-amber-700 transition-colors"
                     >
-                      <FileUp size={16} />
+                      <RefreshCw size={16} />
                       Subir factura definitiva
                     </Link>
                   </div>
