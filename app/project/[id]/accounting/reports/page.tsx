@@ -1,11 +1,11 @@
 "use client";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
 import { useState, useEffect } from "react";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
-import { Download, FileText, Receipt, Building2, Wallet, Settings2, ChevronDown, Check, X, Save, Trash2, BookMarked, Layers, GripVertical, Plus, Minus, FileSpreadsheet, Film } from "lucide-react";
+import { Download, FileText, Receipt, Building2, Wallet, Settings2, ChevronDown, Check, X, Save, Trash2, BookMarked, Layers, GripVertical, Plus, Minus, FileSpreadsheet, Film, ShieldAlert, ArrowLeft } from "lucide-react";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -127,11 +127,15 @@ const REPORT_INFO: Record<ReportType, { title: string; description: string; icon
 
 export default function ReportsPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
   const [projectName, setProjectName] = useState("");
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState<string | null>(null);
   const [counts, setCounts] = useState({ pos: 0, invoices: 0, suppliers: 0, accounts: 0 });
+  const [userId, setUserId] = useState<string | null>(null);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [accessError, setAccessError] = useState("");
   
   const [showConfig, setShowConfig] = useState(false);
   const [configReportType, setConfigReportType] = useState<ReportType | null>(null);
@@ -175,11 +179,46 @@ export default function ReportsPage() {
     setPresets(newPresets);
   };
 
-  useEffect(() => { loadData(); }, [id]);
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (!user) router.push("/");
+      else setUserId(user.uid);
+    });
+    return () => unsubscribe();
+  }, [router]);
+
+  useEffect(() => { if (userId && id) loadData(); }, [userId, id]);
 
   const loadData = async () => {
     try {
       setLoading(true);
+      
+      // Verificar acceso: accounting o accounting_extended, o EP/PM
+      const userProjectRef = doc(db, `userProjects/${userId}/projects/${id}`);
+      const userProjectSnap = await getDoc(userProjectRef);
+      if (!userProjectSnap.exists()) {
+        setAccessError("No tienes acceso a este proyecto");
+        setLoading(false);
+        return;
+      }
+      
+      const userProjectData = userProjectSnap.data();
+      const hasAccountingAccess = userProjectData.permissions?.accounting || false;
+      const accountingLevel = userProjectData.accountingAccessLevel;
+      
+      const memberRef = doc(db, `projects/${id}/members`, userId!);
+      const memberSnap = await getDoc(memberRef);
+      const memberData = memberSnap.exists() ? memberSnap.data() : null;
+      const isEPorPM = memberData && ["EP", "PM"].includes(memberData.role);
+      const hasReportsAccess = accountingLevel === "accounting_extended" || accountingLevel === "accounting";
+      
+      if (!hasAccountingAccess || (!isEPorPM && !hasReportsAccess)) {
+        setAccessError("No tienes permisos para acceder a los informes");
+        setLoading(false);
+        return;
+      }
+      setHasAccess(true);
+      
       const projectDoc = await getDoc(doc(db, "projects", id));
       if (projectDoc.exists()) setProjectName(projectDoc.data().name || "Proyecto");
       
@@ -827,6 +866,28 @@ export default function ReportsPage() {
     return (
       <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
         <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (accessError || !hasAccess) {
+    return (
+      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <ShieldAlert size={28} className="text-red-500" />
+          </div>
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
+          <p className="text-slate-500 mb-6">{accessError || "No tienes permisos para acceder a esta página"}</p>
+          <Link
+            href={`/project/${id}/accounting`}
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90"
+            style={{ backgroundColor: "#2F52E0" }}
+          >
+            <ArrowLeft size={16} />
+            Volver al panel
+          </Link>
+        </div>
       </div>
     );
   }
