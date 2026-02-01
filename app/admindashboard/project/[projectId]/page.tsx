@@ -203,18 +203,14 @@ export default function AdminProjectPage() {
       setMembers(membersData);
 
       // Departments - cargar del documento del proyecto (array departments)
-      const projectDoc = await getDoc(doc(db, "projects", projectId));
-      if (projectDoc.exists()) {
-        const projectData = projectDoc.data();
-        const depts = projectData.departments || [];
-        const deptsWithCount = depts.map((deptName: string) => ({
-          id: deptName,
-          name: deptName,
-          color: "#6B7280",
-          memberCount: membersData.filter((m) => m.department === deptName).length,
-        }));
-        setDepartments(deptsWithCount);
-      }
+      const depts = projectData.departments || [];
+      const deptsWithCount = depts.map((deptName: string) => ({
+        id: deptName,
+        name: deptName,
+        color: "#6B7280",
+        memberCount: membersData.filter((m) => m.department === deptName).length,
+      }));
+      setDepartments(deptsWithCount);
 
       // All users for adding members
       const usersSnap = await getDocs(collection(db, "users"));
