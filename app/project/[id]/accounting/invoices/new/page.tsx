@@ -1946,7 +1946,11 @@ export default function NewInvoicePage() {
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value.toUpperCase() })}
                       onBlur={() => handleBlur("description")}
-                      placeholder={"Concepto " + currentDocType.article + " " + currentDocType.label.charAt(0).toLowerCase() + currentDocType.label.slice(1).toLowerCase()}
+                      placeholder={
+                        "Concepto " +
+                        currentDocType.article.toLowerCase() + " " +
+                        currentDocType.label.toLowerCase()
+                      }
                       rows={2}
                       className={cx(
                         "w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none text-sm pr-10 uppercase",
