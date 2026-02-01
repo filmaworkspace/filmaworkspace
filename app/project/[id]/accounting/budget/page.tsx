@@ -1,11 +1,11 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, Timestamp } from "firebase/firestore";
-import { Plus, ChevronDown, ChevronRight, Edit, Trash2, X, Search, Upload, AlertCircle, CheckCircle, FileSpreadsheet, Eye, EyeOff, Wallet } from "lucide-react";
+import { Plus, ChevronDown, ChevronRight, Edit, Trash2, X, Search, Upload, AlertCircle, CheckCircle, FileSpreadsheet, Eye, EyeOff, Wallet, ShieldAlert, ArrowLeft } from "lucide-react";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -19,10 +19,13 @@ interface CostTrackingConfig {
 
 export default function BudgetPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
   const [projectName, setProjectName] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [accessError, setAccessError] = useState("");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
   const [showModal, setShowModal] = useState(false);
@@ -55,6 +58,33 @@ export default function BudgetPage() {
     try {
       setLoading(true);
       setErrorMessage("");
+      
+      // Verificar acceso: solo accounting_extended o EP/PM
+      const userProjectRef = doc(db, `userProjects/${userId}/projects/${id}`);
+      const userProjectSnap = await getDoc(userProjectRef);
+      if (!userProjectSnap.exists()) {
+        setAccessError("No tienes acceso a este proyecto");
+        setLoading(false);
+        return;
+      }
+      
+      const userProjectData = userProjectSnap.data();
+      const hasAccountingAccess = userProjectData.permissions?.accounting || false;
+      const accountingLevel = userProjectData.accountingAccessLevel;
+      
+      const memberRef = doc(db, `projects/${id}/members`, userId!);
+      const memberSnap = await getDoc(memberRef);
+      const memberData = memberSnap.exists() ? memberSnap.data() : null;
+      const isEPorPM = memberData && ["EP", "PM"].includes(memberData.role);
+      const hasExtendedAccess = accountingLevel === "accounting_extended";
+      
+      if (!hasAccountingAccess || (!isEPorPM && !hasExtendedAccess)) {
+        setAccessError("No tienes permisos para acceder al presupuesto");
+        setLoading(false);
+        return;
+      }
+      setHasAccess(true);
+      
       const projectDoc = await getDoc(doc(db, "projects", id));
       if (projectDoc.exists()) setProjectName(projectDoc.data().name || "Proyecto");
 
@@ -334,6 +364,28 @@ export default function BudgetPage() {
 
   if (loading) {
     return (<div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}><div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" /></div>);
+  }
+
+  if (accessError || !hasAccess) {
+    return (
+      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <ShieldAlert size={28} className="text-red-500" />
+          </div>
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
+          <p className="text-slate-500 mb-6">{accessError || "No tienes permisos para acceder a esta página"}</p>
+          <Link
+            href={`/project/${id}/accounting`}
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90"
+            style={{ backgroundColor: "#2F52E0" }}
+          >
+            <ArrowLeft size={16} />
+            Volver al panel
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
