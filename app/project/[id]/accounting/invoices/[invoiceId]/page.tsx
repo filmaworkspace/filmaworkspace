@@ -16,7 +16,7 @@ type DocumentType = "invoice" | "proforma" | "autonomo" | "ticket";
 
 interface EpisodeDistribution { episode: number; amount: number; percentage: number; }
 interface InvoiceItem { description: string; subAccountId: string; subAccountCode: string; subAccountDescription: string; quantity: number; unitPrice: number; baseAmount: number; vatRate: number; vatAmount: number; irpfRate: number; irpfAmount: number; totalAmount: number; poItemId?: string; poItemIndex?: number; isNewItem?: boolean; episodeAssignment?: "general" | "specific"; episodes?: EpisodeDistribution[]; }
-interface Invoice { id: string; documentType: DocumentType; number: string; displayNumber: string; supplierNumber?: string; supplier: string; supplierId: string; supplierTaxId?: string; supplierIban?: string; supplierBic?: string; department?: string; description: string; notes?: string; items: InvoiceItem[]; baseAmount: number; vatAmount: number; irpfAmount: number; totalAmount: number; invoiceDate?: Date; dueDate: Date; status: InvoiceStatus; approvalStatus?: string; attachmentUrl?: string; attachmentFileName?: string; createdAt: Date; createdBy: string; createdByName: string; codedAt?: Date; codedBy?: string; codedByName?: string; approvedAt?: Date; approvedBy?: string; approvedByName?: string; paidAt?: Date; paidAmount?: number; paymentMethod?: string; paymentReference?: string; cancelledAt?: Date; cancelledByName?: string; cancellationReason?: string; poId?: string; poNumber?: string; requiresReplacement?: boolean; replacedByInvoiceId?: string; isReplacement?: boolean; replacesDocumentId?: string; replacesDocumentNumber?: string; currency?: string; accountingEntry?: string; isAsset?: boolean; assetCategory?: string; }
+interface Invoice { id: string; documentType: DocumentType; number: string; displayNumber: string; supplierNumber?: string; supplier: string; supplierId: string; supplierTaxId?: string; supplierIban?: string; supplierBic?: string; department?: string; description: string; notes?: string; items: InvoiceItem[]; baseAmount: number; vatAmount: number; irpfAmount: number; totalAmount: number; invoiceDate?: Date; dueDate: Date; status: InvoiceStatus; approvalStatus?: string; attachmentUrl?: string; attachmentFileName?: string; createdAt: Date; createdBy: string; createdByName: string; codedAt?: Date; codedBy?: string; codedByName?: string; approvedAt?: Date; approvedBy?: string; approvedByName?: string; paidAt?: Date; paidAmount?: number; paymentMethod?: string; paymentReference?: string; cancelledAt?: Date; cancelledByName?: string; cancellationReason?: string; poId?: string; poNumber?: string; requiresReplacement?: boolean; replacedByInvoiceId?: string; isReplacement?: boolean; replacesDocumentId?: string; replacesDocumentNumber?: string; currency?: string; accountingEntry?: string; isAsset?: boolean; assetCategory?: string; replacedFromType?: string; replacedAt?: Date; originalAttachmentUrl?: string; originalAttachmentFileName?: string; }
 interface LinkedPO { id: string; number: string; supplier: string; baseAmount: number; invoicedAmount: number; status: string; items?: any[]; }
 interface Supplier { id: string; name: string; taxId?: string; iban?: string; bic?: string; }
 interface SubAccount { id: string; code: string; description: string; accountId: string; committed: number; actual: number; budgeted: number; }
@@ -73,6 +73,7 @@ export default function InvoiceDetailPage() {
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [showOriginalDoc, setShowOriginalDoc] = useState(false);
   
   // Coding mode states
   const [codingMode, setCodingMode] = useState(false);
@@ -114,6 +115,8 @@ export default function InvoiceDetailPage() {
         replacedByInvoiceId: data.replacedByInvoiceId, isReplacement: data.isReplacement,
         replacesDocumentId: data.replacesDocumentId, replacesDocumentNumber: data.replacesDocumentNumber,
         currency: data.currency || "EUR", accountingEntry: data.accountingEntry, isAsset: data.isAsset, assetCategory: data.assetCategory,
+        replacedFromType: data.replacedFromType, replacedAt: data.replacedAt?.toDate(),
+        originalAttachmentUrl: data.originalAttachmentUrl, originalAttachmentFileName: data.originalAttachmentFileName,
       };
       setInvoice(invoiceData);
 
@@ -366,7 +369,7 @@ export default function InvoiceDetailPage() {
             <button onClick={() => setCodingMode(false)} className="p-2 hover:bg-violet-700 rounded-lg"><X size={20} /></button>
             <div className="flex items-center gap-3">
               <Code size={20} />
-              <span className="font-semibold">CODIFICAR</span>
+              <span className="font-semibold">Codificar</span>
               <span className="bg-violet-500 px-2 py-0.5 rounded text-sm">{invoice.displayNumber}</span>
             </div>
           </div>
@@ -383,24 +386,47 @@ export default function InvoiceDetailPage() {
           {/* Left: Document Preview */}
           <div className="w-1/2 bg-slate-800 p-4 flex flex-col">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-slate-400 text-sm">Vista previa del documento</span>
+              <div className="flex items-center gap-3">
+                <span className="text-slate-400 text-sm">Vista previa del documento</span>
+                {invoice.replacedFromType && invoice.originalAttachmentUrl && (
+                  <button
+                    onClick={() => setShowOriginalDoc(!showOriginalDoc)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${showOriginalDoc ? "bg-violet-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"}`}
+                  >
+                    {showOriginalDoc ? "Ver factura" : `Ver ${invoice.replacedFromType === "proforma" ? "proforma" : "presupuesto"} original`}
+                  </button>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => setZoomLevel(Math.max(50, zoomLevel - 25))} className="p-1.5 bg-slate-700 text-slate-300 rounded hover:bg-slate-600"><ZoomOut size={16} /></button>
                 <span className="text-slate-400 text-xs w-12 text-center">{zoomLevel}%</span>
                 <button onClick={() => setZoomLevel(Math.min(200, zoomLevel + 25))} className="p-1.5 bg-slate-700 text-slate-300 rounded hover:bg-slate-600"><ZoomIn size={16} /></button>
-                {invoice.attachmentUrl && <a href={invoice.attachmentUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-slate-700 text-slate-300 rounded hover:bg-slate-600"><ExternalLink size={16} /></a>}
+                {(showOriginalDoc ? invoice.originalAttachmentUrl : invoice.attachmentUrl) && (
+                  <a href={showOriginalDoc ? invoice.originalAttachmentUrl : invoice.attachmentUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-slate-700 text-slate-300 rounded hover:bg-slate-600"><ExternalLink size={16} /></a>
+                )}
               </div>
             </div>
+            {showOriginalDoc && invoice.originalAttachmentUrl && (
+              <div className="bg-violet-600/20 border border-violet-500/30 rounded-lg px-3 py-2 mb-3 flex items-center gap-2">
+                <FileText size={14} className="text-violet-400" />
+                <span className="text-violet-300 text-xs">
+                  Mostrando {invoice.replacedFromType === "proforma" ? "proforma" : "presupuesto"} original
+                </span>
+              </div>
+            )}
             <div className="flex-1 bg-slate-900 rounded-xl overflow-auto">
-              {invoice.attachmentUrl ? (
-                isPDF(invoice.attachmentUrl) ? (
-                  <iframe src={`${invoice.attachmentUrl}#toolbar=0`} className="w-full h-full" style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: "top left", width: `${100 / (zoomLevel / 100)}%`, height: `${100 / (zoomLevel / 100)}%` }} />
+              {(() => {
+                const currentUrl = showOriginalDoc ? invoice.originalAttachmentUrl : invoice.attachmentUrl;
+                return currentUrl ? (
+                  isPDF(currentUrl) ? (
+                    <iframe src={`${currentUrl}#toolbar=0`} className="w-full h-full" style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: "top left", width: `${100 / (zoomLevel / 100)}%`, height: `${100 / (zoomLevel / 100)}%` }} />
+                  ) : (
+                    <img src={currentUrl} alt="Documento" className="max-w-full" style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: "top left" }} />
+                  )
                 ) : (
-                  <img src={invoice.attachmentUrl} alt="Documento" className="max-w-full" style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: "top left" }} />
-                )
-              ) : (
-                <div className="h-full flex items-center justify-center text-slate-500"><FileUp size={48} className="mb-2" /><p>Sin documento</p></div>
-              )}
+                  <div className="h-full flex items-center justify-center text-slate-500"><FileUp size={48} className="mb-2" /><p>Sin documento</p></div>
+                );
+              })()}
             </div>
           </div>
 
@@ -785,9 +811,19 @@ export default function InvoiceDetailPage() {
             {/* Document Preview with actions */}
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="font-semibold text-slate-900">Documento</h3>
+                <div className="flex items-center gap-3">
+                  <h3 className="font-semibold text-slate-900">Documento</h3>
+                  {invoice.replacedFromType && invoice.originalAttachmentUrl && (
+                    <button
+                      onClick={() => setShowOriginalDoc(!showOriginalDoc)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${showOriginalDoc ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                    >
+                      {showOriginalDoc ? "Ver factura" : `Ver ${invoice.replacedFromType === "proforma" ? "proforma" : "presupuesto"}`}
+                    </button>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
-                  {canEdit() && (
+                  {canEdit() && !invoice.replacedFromType && (
                     <Link 
                       href={`/project/${projectId}/accounting/invoices/${invoice.id}/edit?replaceDoc=true`}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg font-medium"
@@ -796,36 +832,47 @@ export default function InvoiceDetailPage() {
                       Sustituir
                     </Link>
                   )}
-                  {invoice.attachmentUrl && (
-                    <a href={invoice.attachmentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg">
+                  {(showOriginalDoc ? invoice.originalAttachmentUrl : invoice.attachmentUrl) && (
+                    <a href={showOriginalDoc ? invoice.originalAttachmentUrl : invoice.attachmentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg">
                       <ExternalLink size={12} />
                       Abrir
                     </a>
                   )}
                 </div>
               </div>
+              {showOriginalDoc && invoice.originalAttachmentUrl && (
+                <div className="bg-violet-50 border-b border-violet-100 px-6 py-2 flex items-center gap-2">
+                  <FileText size={14} className="text-violet-600" />
+                  <span className="text-violet-700 text-xs font-medium">
+                    Mostrando {invoice.replacedFromType === "proforma" ? "proforma" : "presupuesto"} original
+                  </span>
+                </div>
+              )}
               <div className="p-4">
-                {invoice.attachmentUrl ? (
-                  isPDF(invoice.attachmentUrl) ? (
-                    <iframe src={`${invoice.attachmentUrl}#toolbar=0`} className="w-full h-[600px] rounded-xl border border-slate-200" />
+                {(() => {
+                  const currentUrl = showOriginalDoc ? invoice.originalAttachmentUrl : invoice.attachmentUrl;
+                  return currentUrl ? (
+                    isPDF(currentUrl) ? (
+                      <iframe src={`${currentUrl}#toolbar=0`} className="w-full h-[600px] rounded-xl border border-slate-200" />
+                    ) : (
+                      <img src={currentUrl} alt="Doc" className="w-full rounded-xl border border-slate-200" />
+                    )
                   ) : (
-                    <img src={invoice.attachmentUrl} alt="Doc" className="w-full rounded-xl border border-slate-200" />
-                  )
-                ) : (
-                  <div className="h-[300px] bg-slate-50 rounded-xl flex flex-col items-center justify-center gap-3">
-                    <FileUp size={32} className="text-slate-300" />
-                    <p className="text-sm text-slate-400">Sin documento adjunto</p>
-                    {canEdit() && (
-                      <Link 
-                        href={`/project/${projectId}/accounting/invoices/${invoice.id}/edit?addDoc=true`}
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
-                      >
-                        <FileUp size={14} />
-                        Añadir documento
-                      </Link>
-                    )}
-                  </div>
-                )}
+                    <div className="h-[300px] bg-slate-50 rounded-xl flex flex-col items-center justify-center gap-3">
+                      <FileUp size={32} className="text-slate-300" />
+                      <p className="text-sm text-slate-400">Sin documento adjunto</p>
+                      {canEdit() && (
+                        <Link 
+                          href={`/project/${projectId}/accounting/invoices/${invoice.id}/edit?addDoc=true`}
+                          className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
+                        >
+                          <FileUp size={14} />
+                          Añadir documento
+                        </Link>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
@@ -995,8 +1042,35 @@ export default function InvoiceDetailPage() {
               </div>
             )}
 
+            {/* Replaced Document Alert - factura definitiva subida */}
+            {invoice.replacedFromType && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <CheckCircle size={20} className="text-emerald-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-emerald-900">Factura definitiva subida</p>
+                    <p className="text-sm text-emerald-700 mt-1">
+                      Este documento era {invoice.replacedFromType === "proforma" ? "una proforma" : "un presupuesto"} y ha sido sustituido por la factura definitiva.
+                      {invoice.replacedAt && ` Sustituido el ${formatDate(invoice.replacedAt)}.`}
+                    </p>
+                    {invoice.originalAttachmentUrl && (
+                      <button
+                        onClick={() => setShowOriginalDoc(true)}
+                        className="mt-2 text-sm text-emerald-700 hover:text-emerald-900 font-medium flex items-center gap-1"
+                      >
+                        <FileText size={14} />
+                        Ver {invoice.replacedFromType === "proforma" ? "proforma" : "presupuesto"} original
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Pending Replacement Alert */}
-            {invoice.requiresReplacement && !invoice.replacedByInvoiceId && (
+            {invoice.requiresReplacement && !invoice.replacedFromType && (
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
