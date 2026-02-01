@@ -1311,7 +1311,6 @@ export default function DocumentCenterPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-slate-900">Configurar exportación</h3>
-                  <p className="text-xs text-slate-500">Personaliza el nombre del archivo</p>
                 </div>
               </div>
               <button onClick={() => setShowConfigPanel(false)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg">
