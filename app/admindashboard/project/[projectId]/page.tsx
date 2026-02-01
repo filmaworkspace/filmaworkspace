@@ -202,14 +202,16 @@ export default function AdminProjectPage() {
       });
       setMembers(membersData);
 
-      // Departments
-      const configDoc = await getDoc(doc(db, `projects/${projectId}/config`, "departments"));
-      if (configDoc.exists()) {
-        const depts = configDoc.data().list || [];
-        const deptsWithCount = depts.map((dept: { name: string; color: string }) => ({
-          ...dept,
-          id: dept.name,
-          memberCount: membersData.filter((m) => m.department === dept.name).length,
+      // Departments - cargar del documento del proyecto (array departments)
+      const projectDoc = await getDoc(doc(db, "projects", projectId));
+      if (projectDoc.exists()) {
+        const projectData = projectDoc.data();
+        const depts = projectData.departments || [];
+        const deptsWithCount = depts.map((deptName: string) => ({
+          id: deptName,
+          name: deptName,
+          color: "#6B7280",
+          memberCount: membersData.filter((m) => m.department === deptName).length,
         }));
         setDepartments(deptsWithCount);
       }
@@ -462,7 +464,7 @@ export default function AdminProjectPage() {
     <div className={"min-h-screen bg-white " + inter.className}>
       {/* Toast */}
       {toast && (
-        <div className="fixed top-20 right-6 z-50">
+        <div className="fixed bottom-4 right-4 z-50">
           <div
             className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg ${
               toast.type === "success" ? "bg-emerald-600" : "bg-red-600"
