@@ -292,6 +292,10 @@ export default function ReplaceDocumentPage() {
         replacedFromType: selectedDoc.documentType,
         replacedAt: Timestamp.now(),
         replacedBy: userId,
+        // Guardar archivo original para poder verlo después
+        originalAttachmentUrl: selectedDoc.attachmentUrl || null,
+        originalAttachmentFileName: selectedDoc.attachmentFileName || null,
+        // Nuevo archivo de factura definitiva
         attachmentUrl,
         attachmentFileName: uploadedFile.name,
         // Descodificar para que se vuelva a codificar
