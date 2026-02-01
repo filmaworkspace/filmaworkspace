@@ -599,7 +599,7 @@ export default function ConfigUsers() {
                   <div>
                     <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Departamento</label>
                     <select value={inviteForm.department} onChange={(e) => setInviteForm({ ...inviteForm, department: e.target.value })} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm">
-                      <option value="">Seleccionar...</option>
+                      <option value="">Seleccionar</option>
                       {departments.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
                     </select>
                   </div>
