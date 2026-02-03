@@ -21,6 +21,7 @@ import {
   FileText,
   Receipt,
   FileSpreadsheet,
+  ArrowLeftRight,
 } from "lucide-react";
 import { Inter } from "next/font/google";
 import { auth, db } from "@/lib/firebase";
@@ -36,6 +37,7 @@ const inter = Inter({
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [envSwitcherOpen, setEnvSwitcherOpen] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>("");
   const [permissions, setPermissions] = useState({
@@ -315,8 +317,61 @@ export default function Header() {
           )}
         </nav>
 
-        {/* Right side: Profile */}
-        <div className="relative flex items-center gap-1">
+        {/* Right side: Environment Switcher + Profile */}
+        <div className="relative flex items-center gap-2">
+          {/* Environment Switcher - Solo visible si estamos en un proyecto y hay más de un entorno disponible */}
+          {isInProjectSection && projectId && (() => {
+            const availableEnvs = [
+              permissions.config && { key: "config", label: "Config", icon: Settings, href: `/project/${projectId}/config`, color: "text-slate-600", bg: "bg-slate-100" },
+              permissions.accounting && { key: "accounting", label: "Accounting", icon: Wallet, href: `/project/${projectId}/accounting`, color: "text-blue-600", bg: "bg-blue-50" },
+              permissions.team && { key: "team", label: "Team", icon: Users, href: `/project/${projectId}/team`, color: "text-emerald-600", bg: "bg-emerald-50" },
+            ].filter(Boolean) as { key: string; label: string; icon: any; href: string; color: string; bg: string }[];
+            
+            // Solo mostrar si hay más de un entorno disponible
+            if (availableEnvs.length <= 1) return null;
+            
+            const otherEnvs = availableEnvs.filter(env => env.key !== currentSection);
+            if (otherEnvs.length === 0) return null;
+
+            return (
+              <div className="relative hidden md:block">
+                <button
+                  onClick={() => setEnvSwitcherOpen(!envSwitcherOpen)}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  title="Cambiar entorno"
+                >
+                  <ArrowLeftRight size={16} />
+                </button>
+                
+                {envSwitcherOpen && <div className="fixed inset-0 z-40" onClick={() => setEnvSwitcherOpen(false)}></div>}
+                
+                {envSwitcherOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 w-40 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 text-xs z-50 animate-fadeIn">
+                    <div className="px-3 py-1.5 text-[10px] text-slate-400 uppercase tracking-wide font-medium">
+                      Cambiar a
+                    </div>
+                    {otherEnvs.map((env) => {
+                      const Icon = env.icon;
+                      return (
+                        <Link
+                          key={env.key}
+                          href={env.href}
+                          onClick={() => setEnvSwitcherOpen(false)}
+                          className="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors"
+                        >
+                          <div className={`w-6 h-6 rounded-lg ${env.bg} flex items-center justify-center`}>
+                            <Icon size={12} className={env.color} />
+                          </div>
+                          <span className="text-slate-700 font-medium">{env.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Profile Avatar */}
           <button
             onClick={() => setProfileOpen(!profileOpen)}
