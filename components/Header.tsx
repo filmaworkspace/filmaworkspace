@@ -22,6 +22,7 @@ import {
   Receipt,
   FileSpreadsheet,
   ArrowLeftRight,
+  BarChart3,
 } from "lucide-react";
 import { Inter } from "next/font/google";
 import { auth, db } from "@/lib/firebase";
@@ -322,10 +323,31 @@ export default function Header() {
           {/* Environment Switcher - Solo visible si estamos en un proyecto y hay más de un entorno disponible */}
           {isInProjectSection && projectId && (() => {
             const availableEnvs = [
-              permissions.config && { key: "config", label: "Config", icon: Settings, href: `/project/${projectId}/config`, color: "text-slate-600", bg: "bg-slate-100" },
-              permissions.accounting && { key: "accounting", label: "Accounting", icon: Wallet, href: `/project/${projectId}/accounting`, color: "text-blue-600", bg: "bg-blue-50" },
-              permissions.team && { key: "team", label: "Team", icon: Users, href: `/project/${projectId}/team`, color: "text-emerald-600", bg: "bg-emerald-50" },
-            ].filter(Boolean) as { key: string; label: string; icon: any; href: string; color: string; bg: string }[];
+              permissions.config && { 
+                key: "config", 
+                icon: Settings, 
+                href: `/project/${projectId}/config`, 
+                bg: "bg-slate-100", 
+                color: "text-slate-600",
+                hoverBg: "hover:bg-slate-200"
+              },
+              permissions.accounting && { 
+                key: "accounting", 
+                icon: BarChart3, 
+                href: `/project/${projectId}/accounting`, 
+                bg: "bg-[rgba(47,82,224,0.1)]", 
+                color: "text-[#2F52E0]",
+                hoverBg: "hover:bg-[rgba(47,82,224,0.15)]"
+              },
+              permissions.team && { 
+                key: "team", 
+                icon: Users, 
+                href: `/project/${projectId}/team`, 
+                bg: "bg-[rgba(137,211,34,0.15)]", 
+                color: "text-[#6BA319]",
+                hoverBg: "hover:bg-[rgba(137,211,34,0.25)]"
+              },
+            ].filter(Boolean) as { key: string; icon: any; href: string; bg: string; color: string; hoverBg: string }[];
             
             // Solo mostrar si hay más de un entorno disponible
             if (availableEnvs.length <= 1) return null;
@@ -337,19 +359,16 @@ export default function Header() {
               <div className="relative hidden md:block">
                 <button
                   onClick={() => setEnvSwitcherOpen(!envSwitcherOpen)}
-                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                   title="Cambiar entorno"
                 >
-                  <ArrowLeftRight size={16} />
+                  <ArrowLeftRight size={15} />
                 </button>
                 
                 {envSwitcherOpen && <div className="fixed inset-0 z-40" onClick={() => setEnvSwitcherOpen(false)}></div>}
                 
                 {envSwitcherOpen && (
-                  <div className="absolute right-0 top-full mt-1.5 w-40 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 text-xs z-50 animate-fadeIn">
-                    <div className="px-3 py-1.5 text-[10px] text-slate-400 uppercase tracking-wide font-medium">
-                      Cambiar a
-                    </div>
+                  <div className="absolute right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg p-1.5 z-50 flex gap-1">
                     {otherEnvs.map((env) => {
                       const Icon = env.icon;
                       return (
@@ -357,12 +376,10 @@ export default function Header() {
                           key={env.key}
                           href={env.href}
                           onClick={() => setEnvSwitcherOpen(false)}
-                          className="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors"
+                          className={`w-8 h-8 rounded-lg ${env.bg} ${env.hoverBg} flex items-center justify-center transition-colors`}
+                          title={env.key.charAt(0).toUpperCase() + env.key.slice(1)}
                         >
-                          <div className={`w-6 h-6 rounded-lg ${env.bg} flex items-center justify-center`}>
-                            <Icon size={12} className={env.color} />
-                          </div>
-                          <span className="text-slate-700 font-medium">{env.label}</span>
+                          <Icon size={14} className={env.color} />
                         </Link>
                       );
                     })}
