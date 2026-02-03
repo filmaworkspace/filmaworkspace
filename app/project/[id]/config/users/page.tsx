@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
 import {
@@ -18,6 +18,7 @@ import {
   Briefcase,
   Edit,
   Settings,
+  ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebase";
@@ -73,6 +74,8 @@ export default function ConfigUsers() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [editPermissions, setEditPermissions] = useState({ config: false, accounting: false, team: false });
+  const [departmentDropdownOpen, setDepartmentDropdownOpen] = useState(false);
+  const departmentDropdownRef = useRef<HTMLDivElement>(null);
   const [inviteForm, setInviteForm] = useState({
     email: "",
     name: "",
@@ -82,6 +85,17 @@ export default function ConfigUsers() {
     position: "",
     permissions: { config: false, accounting: false, team: false }
   });
+
+  // Cerrar dropdown al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (departmentDropdownRef.current && !departmentDropdownRef.current.contains(event.target as Node)) {
+        setDepartmentDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const showToast = (type: "success" | "error", message: string) => {
     setToast({ type, message });
@@ -598,10 +612,39 @@ export default function ConfigUsers() {
                 <>
                   <div>
                     <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Departamento</label>
-                    <select value={inviteForm.department} onChange={(e) => setInviteForm({ ...inviteForm, department: e.target.value })} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm">
-                      <option value="">Seleccionar</option>
-                      {departments.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
-                    </select>
+                    <div className="relative" ref={departmentDropdownRef}>
+                      <button
+                        type="button"
+                        onClick={() => setDepartmentDropdownOpen(!departmentDropdownOpen)}
+                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 transition-colors"
+                      >
+                        <span className={inviteForm.department ? "text-slate-900" : "text-slate-400"}>
+                          {inviteForm.department || "Seleccionar"}
+                        </span>
+                        <ChevronDown size={16} className={`text-slate-400 transition-transform ${departmentDropdownOpen ? "rotate-180" : ""}`} />
+                      </button>
+                      {departmentDropdownOpen && (
+                        <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                          {departments.length > 0 ? (
+                            departments.map((d) => (
+                              <button
+                                key={d.name}
+                                type="button"
+                                onClick={() => {
+                                  setInviteForm({ ...inviteForm, department: d.name });
+                                  setDepartmentDropdownOpen(false);
+                                }}
+                                className={`w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 transition-colors ${inviteForm.department === d.name ? "bg-slate-50 text-slate-900 font-medium" : "text-slate-600"}`}
+                              >
+                                {d.name}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-3 text-sm text-slate-400 text-center">Sin departamentos</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Posición</label>
