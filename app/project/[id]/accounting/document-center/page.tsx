@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Inter } from "next/font/google";
 import { 
   FolderOpen, FileText, Download, ChevronRight, ArrowLeft,
-  Building2, Receipt, ShoppingCart, Search, File, CheckCircle,
+  Building2, Receipt, Search, File, CheckCircle,
   Clock, XCircle, CreditCard, Ban, Loader2, Archive,
   Calendar, Hash, ShieldAlert
 } from "lucide-react";
@@ -743,7 +743,7 @@ export default function DocumentsPage() {
               )}
               <h1 className="text-2xl font-semibold text-slate-900">
                 {currentFolder === "root" 
-                  ? "Documentos" 
+                  ? "Centro de documentación" 
                   : currentFolder === "suppliers" 
                     ? "Proveedores" 
                     : currentFolder === "pos" 
@@ -792,7 +792,7 @@ export default function DocumentsPage() {
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
-                    <ShoppingCart size={24} className="text-blue-600" />
+                    <FileText size={24} className="text-blue-600" />
                   </div>
                   <span className="text-2xl font-bold text-slate-900">{pos.length}</span>
                 </div>
