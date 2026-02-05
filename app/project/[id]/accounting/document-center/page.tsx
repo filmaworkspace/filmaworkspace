@@ -723,38 +723,31 @@ export default function DocumentsPage() {
   // ==================== RENDER ====================
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
-      {/* Header */}
-      <div className="border-b border-slate-200">
-        <div className="mt-[4.5rem] px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
-          <div className="flex items-center justify-between">
-            {/* Título con icono */}
+      <div className="mt-[4.5rem]">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+          {/* Page header */}
+          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
-              {currentFolder !== "root" && (
+              {currentFolder !== "root" ? (
                 <button
                   onClick={() => {
                     setCurrentFolder("root");
                     setSearchTerm("");
                   }}
-                  className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+                  className="p-2 -ml-2 hover:bg-slate-100 rounded-xl transition-colors"
                 >
                   <ArrowLeft size={20} className="text-slate-600" />
                 </button>
+              ) : (
+                <FolderOpen size={24} style={{ color: "#2F52E0" }} />
               )}
-              {currentFolder === "root" && (
-                <div 
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ backgroundColor: "#2F52E0" }}
-                >
-                  <FolderOpen size={20} className="text-white" />
-                </div>
-              )}
-              <h1 className="text-xl font-semibold text-slate-900">
+              <h1 className="text-2xl font-semibold text-slate-900">
                 {currentFolder === "root" 
                   ? "Documentos" 
                   : currentFolder === "suppliers" 
                     ? "Proveedores" 
                     : currentFolder === "pos" 
-                      ? "Órdenes de Compra" 
+                      ? "Órdenes de compra" 
                       : "Facturas"}
               </h1>
             </div>
@@ -773,83 +766,78 @@ export default function DocumentsPage() {
               </div>
             )}
           </div>
-        </div>
-      </div>
 
-      {/* Contenido */}
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
-        
-        {/* ==================== VISTA ROOT ==================== */}
-        {currentFolder === "root" && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Carpeta Proveedores */}
-            <button
-              onClick={() => setCurrentFolder("suppliers")}
-              className="bg-white border border-slate-200 rounded-2xl p-6 hover:border-slate-300 hover:shadow-sm transition-all text-left"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center">
-                  <Building2 size={24} className="text-amber-600" />
-                </div>
-                <span className="text-2xl font-bold text-slate-900">{suppliers.length}</span>
-              </div>
-              <h3 className="text-base font-semibold text-slate-900 mb-1">Proveedores</h3>
-              <p className="text-sm text-slate-500">Listado completo</p>
-            </button>
-
-            {/* Carpeta POs */}
-            <button
-              onClick={() => setCurrentFolder("pos")}
-              className="bg-white border border-slate-200 rounded-2xl p-6 hover:border-slate-300 hover:shadow-sm transition-all text-left"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
-                  <ShoppingCart size={24} className="text-blue-600" />
-                </div>
-                <span className="text-2xl font-bold text-slate-900">{pos.length}</span>
-              </div>
-              <h3 className="text-base font-semibold text-slate-900 mb-1">Órdenes de Compra</h3>
-              <p className="text-sm text-slate-500">Carátulas y adjuntos</p>
-            </button>
-
-            {/* Carpeta Facturas */}
-            <button
-              onClick={() => setCurrentFolder("invoices")}
-              className="bg-white border border-slate-200 rounded-2xl p-6 hover:border-slate-300 hover:shadow-sm transition-all text-left"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
-                  <Receipt size={24} className="text-emerald-600" />
-                </div>
-                <span className="text-2xl font-bold text-slate-900">{invoices.length}</span>
-              </div>
-              <h3 className="text-base font-semibold text-slate-900 mb-1">Facturas</h3>
-              <p className="text-sm text-slate-500">Carátulas y adjuntos</p>
-            </button>
-          </div>
-        )}
-
-        {/* ==================== VISTA PROVEEDORES ==================== */}
-        {currentFolder === "suppliers" && (
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <span className="text-sm text-slate-500">
-                {filteredSuppliers.length} proveedores
-              </span>
+          {/* ==================== VISTA ROOT ==================== */}
+          {currentFolder === "root" && (
+            <div className="grid grid-cols-3 gap-4 mt-6">
+              {/* Carpeta Proveedores */}
               <button
-                onClick={generateSuppliersPDF}
-                disabled={generating === "suppliers-list"}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                onClick={() => setCurrentFolder("suppliers")}
+                className="bg-white border border-slate-200 rounded-2xl p-6 hover:border-slate-300 hover:shadow-sm transition-all text-left"
               >
-                {generating === "suppliers-list" ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Download size={14} />
-                )}
-                Descargar PDF
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center">
+                    <Building2 size={24} className="text-amber-600" />
+                  </div>
+                  <span className="text-2xl font-bold text-slate-900">{suppliers.length}</span>
+                </div>
+                <h3 className="text-base font-semibold text-slate-900 mb-1">Proveedores</h3>
+                <p className="text-sm text-slate-500">Listado completo</p>
+              </button>
+
+              {/* Carpeta POs */}
+              <button
+                onClick={() => setCurrentFolder("pos")}
+                className="bg-white border border-slate-200 rounded-2xl p-6 hover:border-slate-300 hover:shadow-sm transition-all text-left"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <ShoppingCart size={24} className="text-blue-600" />
+                  </div>
+                  <span className="text-2xl font-bold text-slate-900">{pos.length}</span>
+                </div>
+                <h3 className="text-base font-semibold text-slate-900 mb-1">Órdenes de compra</h3>
+                <p className="text-sm text-slate-500">Carátulas y adjuntos</p>
+              </button>
+
+              {/* Carpeta Facturas */}
+              <button
+                onClick={() => setCurrentFolder("invoices")}
+                className="bg-white border border-slate-200 rounded-2xl p-6 hover:border-slate-300 hover:shadow-sm transition-all text-left"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+                    <Receipt size={24} className="text-emerald-600" />
+                  </div>
+                  <span className="text-2xl font-bold text-slate-900">{invoices.length}</span>
+                </div>
+                <h3 className="text-base font-semibold text-slate-900 mb-1">Facturas</h3>
+                <p className="text-sm text-slate-500">Carátulas y adjuntos</p>
               </button>
             </div>
+          )}
+
+          {/* ==================== VISTA PROVEEDORES ==================== */}
+          {currentFolder === "suppliers" && (
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden mt-6">
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <span className="text-sm text-slate-500">
+                  {filteredSuppliers.length} proveedores
+                </span>
+                <button
+                  onClick={generateSuppliersPDF}
+                  disabled={generating === "suppliers-list"}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                >
+                  {generating === "suppliers-list" ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Download size={14} />
+                  )}
+                  Descargar PDF
+                </button>
+              </div>
             
             {/* Lista */}
             <div className="divide-y divide-slate-100">
@@ -883,27 +871,27 @@ export default function DocumentsPage() {
           </div>
         )}
 
-        {/* ==================== VISTA POs ==================== */}
-        {currentFolder === "pos" && (
-          <div className="space-y-3">
-            {/* Header */}
-            <div className="bg-white border border-slate-200 rounded-2xl px-6 py-4 flex items-center justify-between">
-              <span className="text-sm text-slate-500">
-                {filteredPOs.length} órdenes de compra
-              </span>
-              <button
-                onClick={generatePOsPDF}
-                disabled={generating === "pos-list"}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors"
-              >
-                {generating === "pos-list" ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Download size={14} />
-                )}
-                Descargar listado PDF
-              </button>
-            </div>
+          {/* ==================== VISTA POs ==================== */}
+          {currentFolder === "pos" && (
+            <div className="space-y-3 mt-6">
+              {/* Header */}
+              <div className="bg-white border border-slate-200 rounded-2xl px-6 py-4 flex items-center justify-between">
+                <span className="text-sm text-slate-500">
+                  {filteredPOs.length} órdenes de compra
+                </span>
+                <button
+                  onClick={generatePOsPDF}
+                  disabled={generating === "pos-list"}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                >
+                  {generating === "pos-list" ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Download size={14} />
+                  )}
+                  Descargar listado PDF
+                </button>
+              </div>
 
             {/* Lista */}
             {filteredPOs.length === 0 ? (
@@ -994,27 +982,27 @@ export default function DocumentsPage() {
           </div>
         )}
 
-        {/* ==================== VISTA FACTURAS ==================== */}
-        {currentFolder === "invoices" && (
-          <div className="space-y-3">
-            {/* Header */}
-            <div className="bg-white border border-slate-200 rounded-2xl px-6 py-4 flex items-center justify-between">
-              <span className="text-sm text-slate-500">
-                {filteredInvoices.length} facturas
-              </span>
-              <button
-                onClick={generateInvoicesPDF}
-                disabled={generating === "invoices-list"}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors"
-              >
-                {generating === "invoices-list" ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Download size={14} />
-                )}
-                Descargar listado PDF
-              </button>
-            </div>
+          {/* ==================== VISTA FACTURAS ==================== */}
+          {currentFolder === "invoices" && (
+            <div className="space-y-3 mt-6">
+              {/* Header */}
+              <div className="bg-white border border-slate-200 rounded-2xl px-6 py-4 flex items-center justify-between">
+                <span className="text-sm text-slate-500">
+                  {filteredInvoices.length} facturas
+                </span>
+                <button
+                  onClick={generateInvoicesPDF}
+                  disabled={generating === "invoices-list"}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                >
+                  {generating === "invoices-list" ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Download size={14} />
+                  )}
+                  Descargar listado PDF
+                </button>
+              </div>
 
             {/* Lista */}
             {filteredInvoices.length === 0 ? (
@@ -1130,7 +1118,8 @@ export default function DocumentsPage() {
             )}
           </div>
         )}
-      </main>
+        </div>
+      </div>
     </div>
   );
 }
