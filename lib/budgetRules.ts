@@ -1,19 +1,70 @@
-import { initializeApp, getApps } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+export interface CostSettings {
+  poCommitmentTrigger: "on_create" | "on_approve";
+  invoiceActualTrigger: "on_approve" | "on_paid";
+}
+
+const DEFAULT_SETTINGS: CostSettings = {
+  poCommitmentTrigger: "on_approve",
+  invoiceActualTrigger: "on_paid",
 };
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+export async function getCostSettings(projectId: string): Promise<CostSettings> {
+  try {
+    const costConfigRef = doc(db, `projects/${projectId}/config/cost`);
+    const costConfigSnap = await getDoc(costConfigRef);
+    
+    if (costConfigSnap.exists()) {
+      const data = costConfigSnap.data();
+      return {
+        poCommitmentTrigger: data.poCommitmentTrigger || DEFAULT_SETTINGS.poCommitmentTrigger,
+        invoiceActualTrigger: data.invoiceActualTrigger || DEFAULT_SETTINGS.invoiceActualTrigger,
+      };
+    }
+    
+    return DEFAULT_SETTINGS;
+  } catch (error) {
+    console.error("Error loading cost settings:", error);
+    return DEFAULT_SETTINGS;
+  }
+}
 
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+/**
+ * Determina si una PO debe comprometer presupuesto según su estado y la configuración
+ */
+export function shouldCommitPO(
+  poStatus: string,
+  costSettings: CostSettings
+): boolean {
+  if (poStatus === "draft" || poStatus === "rejected" || poStatus === "cancelled") {
+    return false;
+  }
+  
+  if (costSettings.poCommitmentTrigger === "on_create") {
+    return poStatus === "pending" || poStatus === "approved";
+  }
+  
+  // on_approve
+  return poStatus === "approved";
+}
+
+/**
+ * Determina si una factura debe pasar a realizado según su estado y la configuración
+ */
+export function shouldRealizeInvoice(
+  invoiceStatus: string,
+  costSettings: CostSettings
+): boolean {
+  if (invoiceStatus === "draft" || invoiceStatus === "rejected" || invoiceStatus === "void") {
+    return false;
+  }
+  
+  if (costSettings.invoiceActualTrigger === "on_approve") {
+    return invoiceStatus === "approved" || invoiceStatus === "paid";
+  }
+  
+  // on_paid
+  return invoiceStatus === "paid";
+}
