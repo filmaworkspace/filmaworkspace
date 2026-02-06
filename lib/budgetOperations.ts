@@ -1,19 +1,66 @@
-import { initializeApp, getApps } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import { doc, getDoc, getDocs, collection, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { getCostSettings, shouldRealizeInvoice } from "./budgetRules";
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
+/**
+ * Mueve importe de comprometido → realizado cuando una factura cambia de estado
+ */
+export async function realizeInvoice(
+  projectId: string,
+  invoiceItems: Array<{ subAccountId: string; baseAmount: number }>
+) {
+  const amountsByAccount: Record<string, number> = {};
+  
+  for (const item of invoiceItems) {
+    if (item.subAccountId && item.baseAmount > 0) {
+      amountsByAccount[item.subAccountId] = 
+        (amountsByAccount[item.subAccountId] || 0) + item.baseAmount;
+    }
+  }
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+  const accountsSnapshot = await getDocs(collection(db, `projects/${projectId}/accounts`));
+  
+  for (const [subAccountId, amount] of Object.entries(amountsByAccount)) {
+    for (const accountDoc of accountsSnapshot.docs) {
+      try {
+        const subAccountRef = doc(
+          db,
+          `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`,
+          subAccountId
+        );
+        const subAccountSnap = await getDoc(subAccountRef);
+        
+        if (subAccountSnap.exists()) {
+          const data = subAccountSnap.data();
+          const currentCommitted = data.committed || 0;
+          const currentActual = data.actual || 0;
+          
+          // Mover de comprometido → realizado
+          await updateDoc(subAccountRef, {
+            committed: Math.max(0, currentCommitted - amount),
+            actual: currentActual + amount,
+          });
+          break;
+        }
+      } catch (e) {
+        console.error(`Error updating subaccount ${subAccountId}:`, e);
+      }
+    }
+  }
+}
 
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+/**
+ * Llama a esto cuando una factura cambie de estado
+ */
+export async function handleInvoiceStatusChange(
+  projectId: string,
+  invoiceId: string,
+  newStatus: string,
+  invoiceItems: Array<{ subAccountId: string; baseAmount: number }>
+) {
+  const costSettings = await getCostSettings(projectId);
+  
+  if (shouldRealizeInvoice(newStatus, costSettings)) {
+    await realizeInvoice(projectId, invoiceItems);
+  }
+}
