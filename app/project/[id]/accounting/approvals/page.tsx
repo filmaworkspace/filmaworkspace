@@ -13,7 +13,7 @@ import Link from "next/link";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
-import { handlePOStatusChange, handleInvoiceStatusChange } from "@/lib/budgetOperations";
+import { handlePOStatusChange, handleInvoiceStatusChange, updatePOItemsInvoiced } from "@/lib/budgetOperations";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -342,23 +342,33 @@ export default function ApprovalsPage() {
           
         } else {
           // Factura
-          updates.status = "pending";
+          updates.status = "pending"; // Pasa a "pendiente de pago" (aprobada)
           updates.approvalStatus = "approved";
           updates.approvedAt = Timestamp.now();
           updates.approvedBy = userId;
           updates.approvedByName = userName;
           
           // Preparar items para budgetOperations
-          const budgetItems: Array<{ subAccountId: string; baseAmount: number }> = [];
+          const budgetItems: Array<{ subAccountId: string; baseAmount: number; poItemIndex?: number }> = [];
           for (const item of (approval.items || [])) {
             const itemBaseAmount = item.baseAmount || (item.quantity && item.unitPrice ? item.quantity * item.unitPrice : item.totalAmount ? item.totalAmount / 1.21 : 0);
             if (item.subAccountId) {
-              budgetItems.push({ subAccountId: item.subAccountId, baseAmount: itemBaseAmount });
+              budgetItems.push({ 
+                subAccountId: item.subAccountId, 
+                baseAmount: itemBaseAmount,
+                poItemIndex: item.poItemIndex 
+              });
             }
           }
           
+          // El estado real de la factura será "pending" (aprobada, pendiente de pago)
           // Usar budgetOperations para manejar el realizado (si corresponde según config)
-          await handleInvoiceStatusChange(approval.projectId, oldStatus, "approved", budgetItems);
+          await handleInvoiceStatusChange(approval.projectId, oldStatus, "pending", budgetItems);
+          
+          // Si tiene PO vinculada, actualizar los invoicedAmount de cada item de la PO
+          if (approval.poId) {
+            await updatePOItemsInvoiced(approval.projectId, approval.poId, budgetItems, "add");
+          }
         }
       }
       await updateDoc(docRef, updates);
