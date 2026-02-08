@@ -9,6 +9,8 @@ import { doc, getDoc, collection, getDocs, updateDoc, query, where, orderBy, Tim
 import { FileText, ArrowLeft, Edit, Download, Receipt, Lock, Unlock, XCircle, CheckCircle, Clock, Ban, Archive, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, FileEdit, ExternalLink, MoreHorizontal, Layers, BookCheck, Wallet } from "lucide-react";
 import jsPDF from "jspdf";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
+import { getCostSettings, shouldCommitPO } from "@/lib/budgetRules";
+import { uncommitPO, closePoItem, reopenPoItem } from "@/lib/budgetOperations";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 type POStatus = "draft" | "pending" | "approved" | "rejected" | "closed" | "cancelled";
@@ -222,74 +224,58 @@ export default function PODetailPage() {
   };
 
   const releaseRemainingCommitted = async (poToClose: PO) => {
-    const baseAmount = poToClose.baseAmount || 0;
-    const invoicedAmount = poToClose.invoicedAmount || 0;
-    const remainingToRelease = baseAmount - invoicedAmount;
-
-    if (remainingToRelease <= 0) return;
-
-    const accountsSnapshot = await getDocs(collection(db, `projects/${projectId}/accounts`));
-
+    // Preparar items con el importe restante a liberar por cada uno
+    const itemsToRelease: Array<{ subAccountId: string; baseAmount: number }> = [];
+    
     for (const item of poToClose.items) {
-      if (item.subAccountId) {
-        const itemBaseAmount = item.baseAmount || item.quantity * item.unitPrice || 0;
-        const itemProportion = baseAmount > 0 ? itemBaseAmount / baseAmount : 0;
-        const itemRemainingToRelease = remainingToRelease * itemProportion;
-
-        if (itemRemainingToRelease > 0) {
-          for (const accountDoc of accountsSnapshot.docs) {
-            try {
-              const subAccountRef = doc(db, `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`, item.subAccountId);
-              const subAccountSnap = await getDoc(subAccountRef);
-              if (subAccountSnap.exists()) {
-                const currentCommitted = subAccountSnap.data().committed || 0;
-                await updateDoc(subAccountRef, {
-                  committed: Math.max(0, currentCommitted - itemRemainingToRelease),
-                });
-                break;
-              }
-            } catch (e) {
-              console.error(`Error releasing committed for subaccount ${item.subAccountId}:`, e);
-            }
-          }
+      if (item.subAccountId && !item.isClosed) {
+        const itemInvoiced = item.invoicedAmount || 0;
+        const itemCommitted = item.baseAmount || 0;
+        const remainingToRelease = itemCommitted - itemInvoiced;
+        
+        if (remainingToRelease > 0) {
+          itemsToRelease.push({
+            subAccountId: item.subAccountId,
+            baseAmount: remainingToRelease,
+          });
         }
       }
+    }
+    
+    // Usar uncommitPO para liberar todo de una vez
+    if (itemsToRelease.length > 0) {
+      await uncommitPO(projectId, itemsToRelease);
     }
   };
 
   const restoreCommittedOnReopen = async (poToReopen: PO) => {
-    const baseAmount = poToReopen.baseAmount || 0;
-    const invoicedAmount = poToReopen.invoicedAmount || 0;
-    const remainingToRestore = baseAmount - invoicedAmount;
-
-    if (remainingToRestore <= 0) return;
-
-    const accountsSnapshot = await getDocs(collection(db, `projects/${projectId}/accounts`));
-
+    // Verificar configuración - solo restaurar si la PO debería estar comprometida
+    const costSettings = await getCostSettings(projectId);
+    if (!shouldCommitPO("approved", costSettings)) return;
+    
+    // Preparar items con el importe restante a restaurar por cada uno
+    const itemsToRestore: Array<{ subAccountId: string; baseAmount: number }> = [];
+    
     for (const item of poToReopen.items) {
-      if (item.subAccountId) {
-        const itemBaseAmount = item.baseAmount || item.quantity * item.unitPrice || 0;
-        const itemProportion = baseAmount > 0 ? itemBaseAmount / baseAmount : 0;
-        const itemRemainingToRestore = remainingToRestore * itemProportion;
-
-        if (itemRemainingToRestore > 0) {
-          for (const accountDoc of accountsSnapshot.docs) {
-            try {
-              const subAccountRef = doc(db, `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`, item.subAccountId);
-              const subAccountSnap = await getDoc(subAccountRef);
-              if (subAccountSnap.exists()) {
-                const currentCommitted = subAccountSnap.data().committed || 0;
-                await updateDoc(subAccountRef, {
-                  committed: currentCommitted + itemRemainingToRestore,
-                });
-                break;
-              }
-            } catch (e) {
-              console.error(`Error restoring committed for subaccount ${item.subAccountId}:`, e);
-            }
-          }
+      if (item.subAccountId && !item.isClosed) {
+        const itemInvoiced = item.invoicedAmount || 0;
+        const itemCommitted = item.baseAmount || 0;
+        const remainingToRestore = itemCommitted - itemInvoiced;
+        
+        if (remainingToRestore > 0) {
+          itemsToRestore.push({
+            subAccountId: item.subAccountId,
+            baseAmount: remainingToRestore,
+          });
         }
       }
+    }
+    
+    // Usar commitPO para restaurar (importamos uncommitPO pero usamos la lógica inversa)
+    if (itemsToRestore.length > 0) {
+      // Restaurar = sumar a committed, así que usamos la función de budgetOperations
+      const { commitPO } = await import("@/lib/budgetOperations");
+      await commitPO(projectId, itemsToRestore);
     }
   };
 
@@ -352,25 +338,25 @@ export default function PODetailPage() {
     if (!verified) return;
     setProcessing(true);
     try {
-      if (po.status === "approved") {
-        for (const item of po.items) {
-          if (item.subAccountId) {
-            const accountsSnap = await getDocs(collection(db, `projects/${projectId}/accounts`));
-            for (const accountDoc of accountsSnap.docs) {
-              try {
-                const subAccountRef = doc(db, `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`, item.subAccountId);
-                const subAccountSnap = await getDoc(subAccountRef);
-                if (subAccountSnap.exists()) {
-                  await updateDoc(subAccountRef, { committed: Math.max(0, (subAccountSnap.data().committed || 0) - (item.baseAmount || 0)) });
-                  break;
-                }
-              } catch (e) {
-                continue;
-              }
-            }
-          }
+      // Verificar si la PO estaba comprometida según la configuración
+      const costSettings = await getCostSettings(projectId);
+      const wasCommitted = shouldCommitPO(po.status, costSettings);
+      
+      // Si estaba comprometida, liberar el presupuesto
+      if (wasCommitted) {
+        const itemsToUncommit = po.items
+          .filter(item => item.subAccountId && !item.isClosed)
+          .map(item => ({
+            subAccountId: item.subAccountId,
+            baseAmount: (item.baseAmount || 0) - (item.invoicedAmount || 0),
+          }))
+          .filter(item => item.baseAmount > 0);
+        
+        if (itemsToUncommit.length > 0) {
+          await uncommitPO(projectId, itemsToUncommit);
         }
       }
+      
       await updateDoc(doc(db, `projects/${projectId}/pos`, po.id), {
         status: "cancelled",
         cancelledAt: Timestamp.now(),
@@ -401,24 +387,9 @@ export default function PODetailPage() {
       const itemCommitted = item.baseAmount || 0;
       const remainingToRelease = itemCommitted - itemInvoiced;
 
-      // Liberar comprometido pendiente en la subcuenta
+      // Liberar comprometido pendiente usando budgetOperations
       if (remainingToRelease > 0 && item.subAccountId) {
-        const accountsSnapshot = await getDocs(collection(db, `projects/${projectId}/accounts`));
-        for (const accountDoc of accountsSnapshot.docs) {
-          try {
-            const subAccountRef = doc(db, `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`, item.subAccountId);
-            const subAccountSnap = await getDoc(subAccountRef);
-            if (subAccountSnap.exists()) {
-              const currentCommitted = subAccountSnap.data().committed || 0;
-              await updateDoc(subAccountRef, {
-                committed: Math.max(0, currentCommitted - remainingToRelease),
-              });
-              break;
-            }
-          } catch (e) {
-            console.error(`Error releasing committed for item ${itemIndex}:`, e);
-          }
-        }
+        await closePoItem(projectId, item.subAccountId, remainingToRelease);
       }
 
       // Actualizar el item como cerrado
@@ -455,24 +426,9 @@ export default function PODetailPage() {
       const itemCommitted = item.baseAmount || 0;
       const remainingToRestore = itemCommitted - itemInvoiced;
 
-      // Restaurar comprometido en la subcuenta
+      // Restaurar comprometido usando budgetOperations
       if (remainingToRestore > 0 && item.subAccountId) {
-        const accountsSnapshot = await getDocs(collection(db, `projects/${projectId}/accounts`));
-        for (const accountDoc of accountsSnapshot.docs) {
-          try {
-            const subAccountRef = doc(db, `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`, item.subAccountId);
-            const subAccountSnap = await getDoc(subAccountRef);
-            if (subAccountSnap.exists()) {
-              const currentCommitted = subAccountSnap.data().committed || 0;
-              await updateDoc(subAccountRef, {
-                committed: currentCommitted + remainingToRestore,
-              });
-              break;
-            }
-          } catch (e) {
-            console.error(`Error restoring committed for item ${itemIndex}:`, e);
-          }
-        }
+        await reopenPoItem(projectId, item.subAccountId, remainingToRestore);
       }
 
       // Actualizar el item como abierto
