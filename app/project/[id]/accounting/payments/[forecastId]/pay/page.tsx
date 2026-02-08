@@ -473,7 +473,7 @@ export default function PaymentPayPage() {
           <button onClick={() => router.push(`/project/${id}/accounting/payments`)} className="p-2 hover:bg-emerald-700 rounded-lg"><X size={20} /></button>
           <div className="flex items-center gap-3">
             <CreditCard size={20} />
-            <span className="font-semibold">PAGAR REMESA</span>
+            <span className="font-semibold">Pagar remesa</span>
             <span className="bg-emerald-500 px-2 py-0.5 rounded text-sm">{forecast.name}</span>
           </div>
         </div>
