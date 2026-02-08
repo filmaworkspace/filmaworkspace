@@ -57,12 +57,12 @@ const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] }
 
 const PHASES = ["Desarrollo", "Preproducción", "Rodaje", "Postproducción", "Finalizado"];
 
-const phaseConfig: Record<string, { bg: string; text: string; border: string; dot: string; icon: typeof Clock }> = {
-  Desarrollo: { bg: "bg-sky-50", text: "text-sky-700", border: "border-sky-200", dot: "bg-sky-500", icon: Sparkles },
-  Preproducción: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", dot: "bg-amber-500", icon: Clock },
-  Rodaje: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200", dot: "bg-rose-500", icon: Clapperboard },
-  Postproducción: { bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200", dot: "bg-violet-500", icon: Film },
-  Finalizado: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500", icon: CheckCircle },
+const phaseConfig: Record<string, { bg: string; text: string; border: string; dot: string }> = {
+  Desarrollo: { bg: "bg-sky-50", text: "text-sky-700", border: "border-sky-200", dot: "bg-sky-500" },
+  Preproducción: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", dot: "bg-amber-500" },
+  Rodaje: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200", dot: "bg-rose-500" },
+  Postproducción: { bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200", dot: "bg-violet-500" },
+  Finalizado: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" },
 };
 
 const PROJECT_ROLES = ["EP", "PM", "Controller", "PC", "Supervisor"];
@@ -833,7 +833,7 @@ export default function AdminDashboard() {
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Buscar proyectos..."
+                    placeholder="Buscar proyectos"
                     value={projectSearch}
                     onChange={(e) => setProjectSearch(e.target.value)}
                     className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white"
@@ -1129,7 +1129,7 @@ export default function AdminDashboard() {
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Buscar usuarios..."
+                  placeholder="Buscar usuarios"
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                   className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white"
@@ -1223,7 +1223,7 @@ export default function AdminDashboard() {
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Buscar productoras..."
+                  placeholder="Buscar productoras"
                   value={producerSearch}
                   onChange={(e) => setProducerSearch(e.target.value)}
                   className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white"
@@ -1439,7 +1439,7 @@ export default function AdminDashboard() {
                 <textarea
                   value={newProject.description}
                   onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
-                  placeholder="Descripción del proyecto..."
+                  placeholder="Descripción del proyecto"
                   rows={3}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm resize-none transition-all"
                 />
@@ -1508,7 +1508,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={producerModalSearch}
                     onChange={(e) => setProducerModalSearch(e.target.value)}
-                    placeholder="Buscar productora..."
+                    placeholder="Buscar productora"
                     className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none text-sm"
                   />
                 </div>
@@ -1835,7 +1835,7 @@ export default function AdminDashboard() {
                 <textarea
                   value={messageForm.content}
                   onChange={(e) => setMessageForm({ ...messageForm, content: e.target.value })}
-                  placeholder="Escribe el contenido del mensaje..."
+                  placeholder="Escribe el contenido del mensaje"
                   rows={4}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm resize-none"
                 />
@@ -1901,7 +1901,7 @@ export default function AdminDashboard() {
                         type="text"
                         value={projectSearchInMessage}
                         onChange={(e) => setProjectSearchInMessage(e.target.value)}
-                        placeholder="Buscar proyectos..."
+                        placeholder="Buscar proyectos"
                         className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none text-sm"
                       />
                     </div>
