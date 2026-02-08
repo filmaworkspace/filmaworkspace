@@ -56,7 +56,7 @@ import {
 } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
-import { realizeInvoice } from "@/lib/budgetOperations";
+import { realizeInvoice, updatePOItemsInvoiced } from "@/lib/budgetOperations";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -1216,21 +1216,10 @@ export default function NewInvoicePage() {
     }
   };
 
-  const updatePOInvoicedAmount = async (poId: string, invoiceBaseAmount: number) => {
+  const updatePOInvoicedAmount = async (poId: string, invoiceItems: typeof items) => {
     try {
-      const poRef = doc(db, "projects/" + id + "/pos", poId);
-      const poSnap = await getDoc(poRef);
-
-      if (poSnap.exists()) {
-        const currentInvoiced = poSnap.data().invoicedAmount || 0;
-        const poBaseAmount = poSnap.data().baseAmount || poSnap.data().totalAmount || 0;
-        const newInvoiced = currentInvoiced + invoiceBaseAmount;
-
-        await updateDoc(poRef, {
-          invoicedAmount: newInvoiced,
-          remainingAmount: Math.max(0, poBaseAmount - newInvoiced),
-        });
-      }
+      // Usar la función centralizada que actualiza items individuales
+      await updatePOItemsInvoiced(id, poId, invoiceItems, "add");
     } catch (err) {
       console.error("Error updating PO:", err);
     }
@@ -1360,7 +1349,7 @@ export default function NewInvoicePage() {
       if (shouldRealizeInvoice(finalStatus, costSettings)) {
         await updateSubAccountsBudget(items, !!selectedPO);
         if (selectedPO) {
-          await updatePOInvoicedAmount(selectedPO.id, totals.baseAmount);
+          await updatePOInvoicedAmount(selectedPO.id, items);
         }
       }
 
