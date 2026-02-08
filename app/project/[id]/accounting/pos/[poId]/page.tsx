@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { doc, getDoc, collection, getDocs, updateDoc, query, where, orderBy, Timestamp } from "firebase/firestore";
-import { FileText, ArrowLeft, Edit, Download, Receipt, Lock, Unlock, XCircle, CheckCircle, Clock, Ban, Archive, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, FileEdit, ExternalLink, MoreHorizontal, Layers, BookCheck, Wallet } from "lucide-react";
+import { FileText, ArrowLeft, Edit, Download, Receipt, Lock, Unlock, XCircle, CheckCircle, Clock, Ban, Archive, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, FileEdit, ExternalLink, MoreHorizontal, Layers, BookCheck, Wallet, Info } from "lucide-react";
 import jsPDF from "jspdf";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldCommitPO } from "@/lib/budgetRules";
@@ -124,6 +124,7 @@ export default function PODetailPage() {
   const [showModifyModal, setShowModifyModal] = useState(false);
   const [showCloseItemModal, setShowCloseItemModal] = useState<number | null>(null);
   const [showReopenItemModal, setShowReopenItemModal] = useState<number | null>(null);
+  const [showItemInfoPopover, setShowItemInfoPopover] = useState<number | null>(null);
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [cancellationReason, setCancellationReason] = useState("");
@@ -749,6 +750,104 @@ export default function PODetailPage() {
                                 Cerrado
                               </span>
                             )}
+                            {/* Icono de info con popover */}
+                            {po.status === "approved" && (
+                              <div className="relative">
+                                <button
+                                  onClick={() => setShowItemInfoPopover(showItemInfoPopover === index ? null : index)}
+                                  className={`p-1 rounded-full transition-colors ${
+                                    item.isClosed 
+                                      ? "text-blue-500 hover:bg-blue-100" 
+                                      : itemRemaining > 0 
+                                        ? "text-amber-500 hover:bg-amber-100" 
+                                        : "text-emerald-500 hover:bg-emerald-100"
+                                  }`}
+                                  title="Ver estado del item"
+                                >
+                                  <Info size={16} />
+                                </button>
+                                
+                                {/* Popover */}
+                                {showItemInfoPopover === index && (
+                                  <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setShowItemInfoPopover(null)} />
+                                    <div className="absolute left-0 top-full mt-2 z-50 w-72 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden">
+                                      <div className={`px-4 py-3 ${item.isClosed ? "bg-blue-50" : itemRemaining > 0 ? "bg-amber-50" : "bg-emerald-50"}`}>
+                                        <p className={`font-semibold text-sm ${item.isClosed ? "text-blue-800" : itemRemaining > 0 ? "text-amber-800" : "text-emerald-800"}`}>
+                                          {item.isClosed ? "Item cerrado" : itemRemaining > 0 ? "Pendiente de facturar" : "Completamente facturado"}
+                                        </p>
+                                      </div>
+                                      <div className="p-4 space-y-3">
+                                        <div className="grid grid-cols-2 gap-3 text-sm">
+                                          <div>
+                                            <p className="text-slate-500 text-xs">Comprometido</p>
+                                            <p className="font-semibold text-slate-900">{formatCurrency(itemCommitted)} {getCurrencySymbol()}</p>
+                                          </div>
+                                          <div>
+                                            <p className="text-slate-500 text-xs">Facturado</p>
+                                            <p className={`font-semibold ${isOverInvoiced ? "text-amber-600" : "text-emerald-600"}`}>{formatCurrency(itemInvoiced)} {getCurrencySymbol()}</p>
+                                          </div>
+                                        </div>
+                                        <div className={`p-3 rounded-lg ${item.isClosed ? "bg-blue-50" : itemRemaining > 0 ? "bg-amber-50" : "bg-slate-50"}`}>
+                                          <p className="text-xs text-slate-500 mb-1">Pendiente</p>
+                                          <p className={`font-bold text-lg ${item.isClosed ? "text-blue-700" : itemRemaining > 0 ? "text-amber-700" : "text-slate-600"}`}>
+                                            {item.isClosed ? "0,00" : formatCurrency(itemRemaining)} {getCurrencySymbol()}
+                                          </p>
+                                          {!item.isClosed && itemRemaining > 0 && (
+                                            <p className="text-xs text-amber-600 mt-1">Este importe se liberará al cerrar</p>
+                                          )}
+                                        </div>
+                                        {/* Barra de progreso */}
+                                        <div>
+                                          <div className="flex justify-between text-xs text-slate-500 mb-1">
+                                            <span>Progreso</span>
+                                            <span>{Math.round(itemProgress)}%</span>
+                                          </div>
+                                          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                            <div 
+                                              className={`h-full rounded-full ${isOverInvoiced ? "bg-amber-500" : "bg-emerald-500"}`} 
+                                              style={{ width: `${Math.min(100, itemProgress)}%` }} 
+                                            />
+                                          </div>
+                                        </div>
+                                        {/* Botón de acción */}
+                                        {canEditPO(po) && (
+                                          <div className="pt-2 border-t border-slate-100">
+                                            {item.isClosed ? (
+                                              <button
+                                                onClick={() => {
+                                                  setShowItemInfoPopover(null);
+                                                  setShowReopenItemModal(index);
+                                                  setPasswordInput("");
+                                                  setPasswordError("");
+                                                }}
+                                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition-colors"
+                                              >
+                                                <Unlock size={14} />
+                                                Reabrir item
+                                              </button>
+                                            ) : (
+                                              <button
+                                                onClick={() => {
+                                                  setShowItemInfoPopover(null);
+                                                  setShowCloseItemModal(index);
+                                                  setPasswordInput("");
+                                                  setPasswordError("");
+                                                }}
+                                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors"
+                                              >
+                                                <Lock size={14} />
+                                                Cerrar item {itemRemaining > 0 && `(liberar ${formatCurrency(itemRemaining)} ${getCurrencySymbol()})`}
+                                              </button>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <p className="text-sm text-slate-500 mt-0.5">{item.subAccountCode} · {item.subAccountDescription}</p>
                         </div>
@@ -1314,7 +1413,7 @@ export default function PODetailPage() {
                 <textarea
                   value={modificationReason}
                   onChange={(e) => setModificationReason(e.target.value)}
-                  placeholder="Explica por qué se modifica..."
+                  placeholder="Explica por qué se modifica"
                   rows={4}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none text-sm"
                 />
