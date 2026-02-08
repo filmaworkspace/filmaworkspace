@@ -152,8 +152,6 @@ export default function AdminDashboard() {
   const [producerSearch, setProducerSearch] = useState("");
   const [producerModalSearch, setProducerModalSearch] = useState("");
 
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [showCreateProducer, setShowCreateProducer] = useState(false);
   const [showEditProducer, setShowEditProducer] = useState<string | null>(null);
@@ -909,7 +907,7 @@ export default function AdminDashboard() {
                   Crear proyecto
                 </button>
               </div>
-            ) : viewMode === "grid" ? (
+            ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {filteredProjects.map((project) => {
                   const phase = phaseConfig[project.phase] || phaseConfig["Desarrollo"];
