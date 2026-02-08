@@ -752,9 +752,12 @@ export default function PODetailPage() {
                             )}
                             {/* Icono de info con popover */}
                             {po.status === "approved" && (
-                              <div className="relative">
+                              <>
                                 <button
-                                  onClick={() => setShowItemInfoPopover(showItemInfoPopover === index ? null : index)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowItemInfoPopover(showItemInfoPopover === index ? null : index);
+                                  }}
                                   className={`p-1 rounded-full transition-colors ${
                                     item.isClosed 
                                       ? "text-blue-500 hover:bg-blue-100" 
@@ -767,15 +770,16 @@ export default function PODetailPage() {
                                   <Info size={16} />
                                 </button>
                                 
-                                {/* Popover */}
+                                {/* Popover como modal centrado */}
                                 {showItemInfoPopover === index && (
-                                  <>
-                                    <div className="fixed inset-0 z-40" onClick={() => setShowItemInfoPopover(null)} />
-                                    <div className="absolute left-0 top-full mt-2 z-50 w-72 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden">
+                                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowItemInfoPopover(null)}>
+                                    <div className="absolute inset-0 bg-black/20" />
+                                    <div className="relative w-80 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
                                       <div className={`px-4 py-3 ${item.isClosed ? "bg-blue-50" : itemRemaining > 0 ? "bg-amber-50" : "bg-emerald-50"}`}>
                                         <p className={`font-semibold text-sm ${item.isClosed ? "text-blue-800" : itemRemaining > 0 ? "text-amber-800" : "text-emerald-800"}`}>
                                           {item.isClosed ? "Item cerrado" : itemRemaining > 0 ? "Pendiente de facturar" : "Completamente facturado"}
                                         </p>
+                                        <p className="text-xs text-slate-600 mt-0.5">{item.description}</p>
                                       </div>
                                       <div className="p-4 space-y-3">
                                         <div className="grid grid-cols-2 gap-3 text-sm">
@@ -844,9 +848,9 @@ export default function PODetailPage() {
                                         )}
                                       </div>
                                     </div>
-                                  </>
+                                  </div>
                                 )}
-                              </div>
+                              </>
                             )}
                           </div>
                           <p className="text-sm text-slate-500 mt-0.5">{item.subAccountCode} · {item.subAccountDescription}</p>
@@ -1413,7 +1417,7 @@ export default function PODetailPage() {
                 <textarea
                   value={modificationReason}
                   onChange={(e) => setModificationReason(e.target.value)}
-                  placeholder="Explica por qué se modifica"
+                  placeholder="Explica por qué se modifica..."
                   rows={4}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none text-sm"
                 />
