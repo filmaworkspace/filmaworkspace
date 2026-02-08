@@ -50,6 +50,8 @@ import {
   Percent,
 } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
+import { getCostSettings, shouldCommitPO } from "@/lib/budgetRules";
+import { commitPO } from "@/lib/budgetOperations";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -746,38 +748,16 @@ export default function NewPOPage() {
   }, []);
 
   const updateSubAccountsCommitted = async (itemsToCommit: POItem[]) => {
-    const commitmentsByAccount: Record<string, number> = {};
+    // Preparar items para commitPO
+    const budgetItems = itemsToCommit
+      .filter(item => item.subAccountId && item.baseAmount > 0)
+      .map(item => ({
+        subAccountId: item.subAccountId,
+        baseAmount: item.baseAmount,
+      }));
     
-    for (const item of itemsToCommit) {
-      if (item.subAccountId && item.baseAmount > 0) {
-        commitmentsByAccount[item.subAccountId] = 
-          (commitmentsByAccount[item.subAccountId] || 0) + item.baseAmount;
-      }
-    }
-
-    const accountsSnapshot = await getDocs(collection(db, "projects/" + id + "/accounts"));
-    
-    for (const [subAccountId, amountToAdd] of Object.entries(commitmentsByAccount)) {
-      for (const accountDoc of accountsSnapshot.docs) {
-        try {
-          const subAccountRef = doc(
-            db,
-            "projects/" + id + "/accounts/" + accountDoc.id + "/subaccounts",
-            subAccountId
-          );
-          const subAccountSnap = await getDoc(subAccountRef);
-          
-          if (subAccountSnap.exists()) {
-            const currentCommitted = subAccountSnap.data().committed || 0;
-            await updateDoc(subAccountRef, {
-              committed: currentCommitted + amountToAdd,
-            });
-            break;
-          }
-        } catch (e) {
-          console.error("Error updating subaccount " + subAccountId + ":", e);
-        }
-      }
+    if (budgetItems.length > 0) {
+      await commitPO(id, budgetItems);
     }
   };
 
@@ -785,6 +765,9 @@ export default function NewPOPage() {
     if (status === "pending" && !validateForm()) return;
     setSaving(true);
     try {
+      // Obtener configuración de costes
+      const costSettings = await getCostSettings(id);
+      
       // Obtener siguiente número correlativo global
       const posSnapshot = await getDocs(collection(db, "projects/" + id + "/pos"));
       let maxNumber = 0;
@@ -856,6 +839,11 @@ export default function NewPOPage() {
           poData.status = "pending";
           poData.approvalSteps = approvalSteps;
           poData.currentApprovalStep = 0;
+          // Si la configuración es on_create, también comprometer en pending
+          if (costSettings.poCommitmentTrigger === "on_create") {
+            poData.committedAmount = totals.baseAmount;
+            poData.remainingAmount = totals.baseAmount;
+          }
         }
       } else {
         poData.status = "draft";
@@ -863,7 +851,9 @@ export default function NewPOPage() {
 
       await addDoc(collection(db, "projects/" + id + "/pos"), poData);
 
-      if (poData.status === "approved") {
+      // Comprometer según la configuración
+      const finalStatus = poData.status;
+      if (shouldCommitPO(finalStatus, costSettings)) {
         await updateSubAccountsCommitted(items);
       }
 
@@ -1204,7 +1194,7 @@ export default function NewPOPage() {
                       value={formData.generalDescription}
                       onChange={(e) => setFormData({ ...formData, generalDescription: e.target.value.toUpperCase() })}
                       onBlur={() => handleBlur("generalDescription")}
-                      placeholder="Concepto de la orden de compra"
+                      placeholder="DESCRIBE EL PROPÓSITO DE ESTA ORDEN DE COMPRA"
                       rows={3}
                       className={cx(
                         "w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm pr-10 uppercase",
