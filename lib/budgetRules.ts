@@ -3,7 +3,7 @@ import { db } from "@/lib/firebase";
 
 export interface CostSettings {
   poCommitmentTrigger: "on_create" | "on_approve";
-  invoiceActualTrigger: "on_approve" | "on_paid";
+  invoiceActualTrigger: "on_approve" | "on_account" | "on_paid";
 }
 
 const DEFAULT_SETTINGS: CostSettings = {
@@ -102,8 +102,13 @@ export function shouldRealizeInvoice(
   }
   
   if (costSettings.invoiceActualTrigger === "on_approve") {
-    // Realizar cuando se aprueba o cuando se paga
-    return invoiceStatus === "approved" || invoiceStatus === "paid";
+    // Realizar cuando se aprueba, contabiliza o paga
+    return invoiceStatus === "approved" || invoiceStatus === "accounted" || invoiceStatus === "paid";
+  }
+  
+  if (costSettings.invoiceActualTrigger === "on_account") {
+    // Realizar cuando se contabiliza o paga
+    return invoiceStatus === "accounted" || invoiceStatus === "paid";
   }
   
   // on_paid: solo realizar cuando está pagada
