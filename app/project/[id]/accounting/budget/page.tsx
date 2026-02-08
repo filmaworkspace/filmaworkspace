@@ -6,16 +6,13 @@ import { Inter } from "next/font/google";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, Timestamp } from "firebase/firestore";
 import { Plus, ChevronDown, ChevronRight, Edit, Trash2, X, Search, Upload, AlertCircle, CheckCircle, FileSpreadsheet, Eye, EyeOff, Wallet, ShieldAlert, ArrowLeft, Download } from "lucide-react";
+import { getCostSettings, shouldCommitPO, shouldRealizeInvoice, CostSettings } from "@/lib/budgetRules";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
 interface SubAccount { id: string; code: string; description: string; budgeted: number; committed: number; actual: number; accountId: string; createdAt: Date; }
 interface Account { id: string; code: string; description: string; subAccounts: SubAccount[]; createdAt: Date; }
 interface BudgetSummary { totalBudgeted: number; totalCommitted: number; totalActual: number; totalAvailable: number; }
-interface CostTrackingConfig {
-  poCommitmentTrigger: "on_create" | "on_approve";
-  invoiceActualTrigger: "on_approve" | "on_account" | "on_paid";
-}
 
 export default function BudgetPage() {
   const params = useParams();
@@ -38,7 +35,7 @@ export default function BudgetPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
-  const [costConfig, setCostConfig] = useState<CostTrackingConfig>({
+  const [costConfig, setCostConfig] = useState<CostSettings>({
     poCommitmentTrigger: "on_approve",
     invoiceActualTrigger: "on_paid",
   });
@@ -88,31 +85,9 @@ export default function BudgetPage() {
       const projectDoc = await getDoc(doc(db, "projects", id));
       if (projectDoc.exists()) setProjectName(projectDoc.data().name || "Proyecto");
 
-      // Cargar configuración de costTracking
-      let commitTrigger: "on_create" | "on_approve" = "on_approve";
-      let actualTrigger: "on_approve" | "on_account" | "on_paid" = "on_paid";
-      try {
-        const costConfigDoc = await getDoc(doc(db, `projects/${id}/config/costTracking`));
-        if (costConfigDoc.exists()) {
-          const configData = costConfigDoc.data();
-          commitTrigger = configData.poCommitmentTrigger || "on_approve";
-          actualTrigger = configData.invoiceActualTrigger || "on_paid";
-        }
-      } catch (e) {
-        console.error("Error loading cost config:", e);
-      }
-      setCostConfig({ poCommitmentTrigger: commitTrigger, invoiceActualTrigger: actualTrigger });
-
-      // Determinar estados válidos para comprometido
-      const validPOStatuses: string[] = commitTrigger === "on_create" 
-        ? ["pending", "approved"] 
-        : ["approved"];
-
-      // Determinar estados válidos para realizado
-      const validInvoiceStatuses: string[] = 
-        actualTrigger === "on_approve" ? ["approved", "accounted", "paid"] :
-        actualTrigger === "on_account" ? ["accounted", "paid"] :
-        ["paid"];
+      // Cargar configuración de costes usando budgetRules
+      const loadedCostConfig = await getCostSettings(id);
+      setCostConfig(loadedCostConfig);
 
       // Cargar POs y calcular committed por subcuenta
       // Items cerrados: solo cuenta el invoicedAmount (el resto se liberó)
@@ -121,7 +96,8 @@ export default function BudgetPage() {
       const posSnapshot = await getDocs(collection(db, `projects/${id}/pos`));
       posSnapshot.docs.forEach(poDoc => {
         const poData = poDoc.data();
-        if (poData.status && validPOStatuses.includes(poData.status) && poData.items) {
+        // Usar shouldCommitPO de budgetRules para determinar si cuenta
+        if (poData.status && shouldCommitPO(poData.status, loadedCostConfig) && poData.items) {
           poData.items.forEach((item: any) => {
             if (item.subAccountCode) {
               const key = item.subAccountCode;
@@ -140,7 +116,8 @@ export default function BudgetPage() {
       const invoicesSnapshot = await getDocs(collection(db, `projects/${id}/invoices`));
       invoicesSnapshot.docs.forEach(invDoc => {
         const invData = invDoc.data();
-        if (invData.status && validInvoiceStatuses.includes(invData.status) && invData.items) {
+        // Usar shouldRealizeInvoice de budgetRules para determinar si cuenta
+        if (invData.status && shouldRealizeInvoice(invData.status, loadedCostConfig) && invData.items) {
           invData.items.forEach((item: any) => {
             if (item.subAccountCode) {
               const key = item.subAccountCode;
