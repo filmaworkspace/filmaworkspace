@@ -91,19 +91,30 @@ export function shouldCommitOnStatusChange(
 
 /**
  * Determina si una factura debe pasar a realizado según su estado y la configuración
+ * 
+ * Estados de factura:
+ * - draft: borrador (nunca realiza)
+ * - pending_approval: pendiente de aprobación (nunca realiza)
+ * - pending: aprobada, pendiente de pago (realiza si config es on_approve)
+ * - approved: aprobada (realiza si config es on_approve) - estado alternativo
+ * - accounted: contabilizada (realiza si config es on_approve o on_account)
+ * - paid: pagada (siempre realiza)
+ * - cancelled/rejected/void: anulada/rechazada (nunca realiza)
  */
 export function shouldRealizeInvoice(
   invoiceStatus: string,
   costSettings: CostSettings
 ): boolean {
   // Nunca realizar en estos estados
-  if (invoiceStatus === "draft" || invoiceStatus === "rejected" || invoiceStatus === "void" || invoiceStatus === "cancelled") {
+  if (invoiceStatus === "draft" || invoiceStatus === "pending_approval" || 
+      invoiceStatus === "rejected" || invoiceStatus === "void" || invoiceStatus === "cancelled") {
     return false;
   }
   
   if (costSettings.invoiceActualTrigger === "on_approve") {
-    // Realizar cuando se aprueba, contabiliza o paga
-    return invoiceStatus === "approved" || invoiceStatus === "accounted" || invoiceStatus === "paid";
+    // Realizar cuando se aprueba (pending = aprobada pendiente de pago), contabiliza o paga
+    return invoiceStatus === "pending" || invoiceStatus === "approved" || 
+           invoiceStatus === "accounted" || invoiceStatus === "paid";
   }
   
   if (costSettings.invoiceActualTrigger === "on_account") {
