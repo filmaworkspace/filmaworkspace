@@ -9,7 +9,7 @@ import { doc, getDoc, collection, getDocs, updateDoc, query, where, orderBy, Tim
 import { Receipt, Edit, Download, XCircle, CheckCircle, Clock, Ban, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, ExternalLink, MoreHorizontal, CreditCard, FileText, Link as LinkIcon, Eye, EyeOff, Code, Save, X, Plus, Trash2, Search, RefreshCw, Percent, Euro, FileCheck, ZoomIn, ZoomOut, RotateCw, Layers } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
-import { unrealizeInvoice } from "@/lib/budgetOperations";
+import { unrealizeInvoice, updatePOItemsInvoiced } from "@/lib/budgetOperations";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -251,6 +251,7 @@ export default function InvoiceDetailPage() {
         return { ...item, baseAmount: t.base, vatAmount: t.vat, irpfAmount: t.irpf, totalAmount: t.total };
       });
 
+      // Guardar datos de la factura
       await updateDoc(doc(db, `projects/${projectId}/invoices`, invoice.id), {
         supplierNumber: codingForm.supplierNumber, invoiceDate: codingForm.invoiceDate ? Timestamp.fromDate(new Date(codingForm.invoiceDate)) : null,
         dueDate: Timestamp.fromDate(new Date(codingForm.dueDate)), description: codingForm.description,
@@ -261,6 +262,23 @@ export default function InvoiceDetailPage() {
         status: invoice.status === "draft" ? "pending_approval" : invoice.status,
         codedAt: Timestamp.now(), codedBy: permissions.userId, codedByName: permissions.userName,
       });
+
+      // Si hay PO vinculada, actualizar los invoicedAmount de cada item de la PO
+      // Solo si la factura ya está en un estado que cuenta como realizado
+      if (invoice.poId) {
+        const costSettings = await getCostSettings(projectId);
+        const currentStatus = invoice.status === "draft" ? "pending_approval" : invoice.status;
+        
+        // Si la factura ya estaba realizada, actualizar los items de la PO
+        if (shouldRealizeInvoice(currentStatus, costSettings)) {
+          // Primero restar los valores antiguos
+          if (invoice.items && invoice.items.length > 0) {
+            await updatePOItemsInvoiced(projectId, invoice.poId, invoice.items, "subtract");
+          }
+          // Luego sumar los nuevos valores
+          await updatePOItemsInvoiced(projectId, invoice.poId, items, "add");
+        }
+      }
 
       showToast("success", "Factura codificada correctamente");
       setCodingMode(false);
@@ -300,15 +318,9 @@ export default function InvoiceDetailPage() {
           await unrealizeInvoice(projectId, budgetItems);
         }
         
-        // Actualizar PO si existe
+        // Actualizar PO si existe - restar de cada item individual
         if (invoice.poId) {
-          const poRef = doc(db, `projects/${projectId}/pos`, invoice.poId);
-          const poSnap = await getDoc(poRef);
-          if (poSnap.exists()) {
-            await updateDoc(poRef, { 
-              invoicedAmount: Math.max(0, (poSnap.data().invoicedAmount || 0) - invoice.baseAmount) 
-            });
-          }
+          await updatePOItemsInvoiced(projectId, invoice.poId, invoice.items, "subtract");
         }
       }
       
