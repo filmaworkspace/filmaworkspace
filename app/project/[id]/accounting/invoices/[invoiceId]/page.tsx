@@ -9,7 +9,7 @@ import { doc, getDoc, collection, getDocs, updateDoc, query, where, orderBy, Tim
 import { Receipt, Edit, Download, XCircle, CheckCircle, Clock, Ban, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, ExternalLink, MoreHorizontal, CreditCard, FileText, Link as LinkIcon, Eye, EyeOff, Code, Save, X, Plus, Trash2, Search, RefreshCw, Percent, Euro, FileCheck, ZoomIn, ZoomOut, RotateCw, Layers } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
-import { unrealizeInvoice, updatePOItemsInvoiced } from "@/lib/budgetOperations";
+import { unrealizeInvoice, updatePOItemsInvoiced, realizeInvoice } from "@/lib/budgetOperations";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -251,6 +251,9 @@ export default function InvoiceDetailPage() {
         return { ...item, baseAmount: t.base, vatAmount: t.vat, irpfAmount: t.irpf, totalAmount: t.total };
       });
 
+      // Determinar el nuevo estado
+      const newStatus = invoice.status === "draft" ? "pending_approval" : invoice.status;
+      
       // Guardar datos de la factura
       await updateDoc(doc(db, `projects/${projectId}/invoices`, invoice.id), {
         supplierNumber: codingForm.supplierNumber, invoiceDate: codingForm.invoiceDate ? Timestamp.fromDate(new Date(codingForm.invoiceDate)) : null,
@@ -259,24 +262,40 @@ export default function InvoiceDetailPage() {
         paymentMethod: codingForm.paymentMethod, currency: codingForm.currency, accountingEntry: codingForm.accountingEntry,
         isAsset: codingForm.isAsset, assetCategory: codingForm.assetCategory, notes: codingForm.notes,
         items, baseAmount: totals.base, vatAmount: totals.vat, irpfAmount: totals.irpf, totalAmount: totals.total,
-        status: invoice.status === "draft" ? "pending_approval" : invoice.status,
+        status: newStatus,
         codedAt: Timestamp.now(), codedBy: permissions.userId, codedByName: permissions.userName,
       });
 
-      // Si hay PO vinculada, actualizar los invoicedAmount de cada item de la PO
-      // Solo si la factura ya está en un estado que cuenta como realizado
-      if (invoice.poId) {
+      // Solo actualizar presupuesto y PO si la factura YA ESTABA realizada (re-codificación)
+      // NO tocar nada si es la primera codificación (draft → pending_approval)
+      if (invoice.poId && invoice.status !== "draft") {
         const costSettings = await getCostSettings(projectId);
-        const currentStatus = invoice.status === "draft" ? "pending_approval" : invoice.status;
+        const wasRealized = shouldRealizeInvoice(invoice.status, costSettings);
         
-        // Si la factura ya estaba realizada, actualizar los items de la PO
-        if (shouldRealizeInvoice(currentStatus, costSettings)) {
+        if (wasRealized) {
+          // Re-codificación de factura ya realizada: actualizar items de PO
           // Primero restar los valores antiguos
           if (invoice.items && invoice.items.length > 0) {
             await updatePOItemsInvoiced(projectId, invoice.poId, invoice.items, "subtract");
           }
           // Luego sumar los nuevos valores
           await updatePOItemsInvoiced(projectId, invoice.poId, items, "add");
+          
+          // También actualizar el presupuesto (committed/actual) si los items cambiaron
+          const oldBudgetItems = invoice.items
+            .filter((i: any) => i.subAccountId && i.baseAmount > 0)
+            .map((i: any) => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
+          const newBudgetItems = items
+            .filter(i => i.subAccountId && i.baseAmount > 0)
+            .map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
+          
+          // Revertir el realizado antiguo y aplicar el nuevo
+          if (oldBudgetItems.length > 0) {
+            await unrealizeInvoice(projectId, oldBudgetItems);
+          }
+          if (newBudgetItems.length > 0) {
+            await realizeInvoice(projectId, newBudgetItems);
+          }
         }
       }
 
@@ -400,7 +419,7 @@ export default function InvoiceDetailPage() {
             <button onClick={() => setCodingMode(false)} className="p-2 hover:bg-violet-700 rounded-lg"><X size={20} /></button>
             <div className="flex items-center gap-3">
               <Code size={20} />
-              <span className="font-semibold">CODIFICAR</span>
+              <span className="font-semibold">Codificar</span>
               <span className="bg-violet-500 px-2 py-0.5 rounded text-sm">{invoice.displayNumber}</span>
             </div>
           </div>
