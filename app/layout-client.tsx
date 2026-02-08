@@ -1,6 +1,6 @@
 "use client";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
@@ -15,7 +15,6 @@ export default function ClientLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
 
   // Páginas sin header ni footer (páginas de autenticación)
   const isAuthPage =
@@ -52,29 +51,10 @@ export default function ClientLayout({
           console.error("Error verificando rol:", error);
         }
       }
-
-      setLoading(false);
     });
 
     return () => unsubscribe();
   }, [pathname, router, requiresAuth, isAdminPage]);
-
-  // Loading state para páginas que requieren autenticación
-  if (loading && requiresAuth) {
-    return (
-      <UserProvider>
-        <div className="flex flex-col min-h-screen bg-white">
-          {!isAuthPage && <Header />}
-          <main className="flex-grow flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-16 h-16 border-4 border-slate-200 border-t-slate-700 rounded-full animate-spin mx-auto mb-4"></div>
-            </div>
-          </main>
-          {!isAuthPage && <Footer />}
-        </div>
-      </UserProvider>
-    );
-  }
 
   return (
     <UserProvider>
