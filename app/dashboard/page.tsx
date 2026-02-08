@@ -546,10 +546,10 @@ export default function Dashboard() {
                 {expandedMessage === "panel" && (
                   <>
                     <div 
-                      className="fixed inset-0 z-40" 
+                      className="fixed inset-0 z-[55]" 
                       onClick={() => setExpandedMessage(null)}
                     />
-                    <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-lg z-50 overflow-hidden">
+                    <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-lg z-[60] overflow-hidden">
                       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                         <span className="text-sm font-semibold text-slate-900">Notificaciones</span>
                         {unreadMessagesCount > 0 && (
