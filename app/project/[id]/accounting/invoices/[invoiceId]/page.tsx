@@ -8,6 +8,8 @@ import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { doc, getDoc, collection, getDocs, updateDoc, query, where, orderBy, Timestamp } from "firebase/firestore";
 import { Receipt, Edit, Download, XCircle, CheckCircle, Clock, Ban, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, ExternalLink, MoreHorizontal, CreditCard, FileText, Link as LinkIcon, Eye, EyeOff, Code, Save, X, Plus, Trash2, Search, RefreshCw, Percent, Euro, FileCheck, ZoomIn, ZoomOut, RotateCw, Layers } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
+import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
+import { unrealizeInvoice } from "@/lib/budgetOperations";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -281,34 +283,51 @@ export default function InvoiceDetailPage() {
     if (!(await verifyPassword())) return;
     setProcessing(true);
     try {
-      if (["approved", "paid", "pending"].includes(invoice.status)) {
-        const accountsSnap = await getDocs(collection(db, `projects/${projectId}/accounts`));
-        for (const item of invoice.items) {
-          if (item.subAccountId) {
-            for (const acc of accountsSnap.docs) {
-              const subRef = doc(db, `projects/${projectId}/accounts/${acc.id}/subaccounts`, item.subAccountId);
-              const subSnap = await getDoc(subRef);
-              if (subSnap.exists()) {
-                const updates: any = { actual: Math.max(0, (subSnap.data().actual || 0) - (item.baseAmount || 0)) };
-                if (invoice.poId) updates.committed = (subSnap.data().committed || 0) + (item.baseAmount || 0);
-                await updateDoc(subRef, updates);
-                break;
-              }
-            }
-          }
+      // Verificar si la factura estaba realizada según la configuración
+      const costSettings = await getCostSettings(projectId);
+      const wasRealized = shouldRealizeInvoice(invoice.status, costSettings);
+      
+      // Si estaba realizada, revertir el presupuesto
+      if (wasRealized) {
+        const budgetItems = invoice.items
+          .filter(item => item.subAccountId && item.baseAmount > 0)
+          .map(item => ({
+            subAccountId: item.subAccountId,
+            baseAmount: item.baseAmount,
+          }));
+        
+        if (budgetItems.length > 0) {
+          await unrealizeInvoice(projectId, budgetItems);
         }
+        
+        // Actualizar PO si existe
         if (invoice.poId) {
           const poRef = doc(db, `projects/${projectId}/pos`, invoice.poId);
           const poSnap = await getDoc(poRef);
-          if (poSnap.exists()) await updateDoc(poRef, { invoicedAmount: Math.max(0, (poSnap.data().invoicedAmount || 0) - invoice.baseAmount) });
+          if (poSnap.exists()) {
+            await updateDoc(poRef, { 
+              invoicedAmount: Math.max(0, (poSnap.data().invoicedAmount || 0) - invoice.baseAmount) 
+            });
+          }
         }
       }
+      
       await updateDoc(doc(db, `projects/${projectId}/invoices`, invoice.id), {
-        status: "cancelled", cancelledAt: Timestamp.now(), cancelledBy: permissions.userId, cancelledByName: permissions.userName, cancellationReason: cancellationReason.trim(),
+        status: "cancelled", 
+        cancelledAt: Timestamp.now(), 
+        cancelledBy: permissions.userId, 
+        cancelledByName: permissions.userName, 
+        cancellationReason: cancellationReason.trim(),
       });
-      setShowCancelModal(false); setPasswordInput(""); setCancellationReason("");
+      setShowCancelModal(false); 
+      setPasswordInput(""); 
+      setCancellationReason("");
       await loadData();
-    } catch (e) { showToast("error", "Error al anular"); } finally { setProcessing(false); }
+    } catch (e) { 
+      showToast("error", "Error al anular"); 
+    } finally { 
+      setProcessing(false); 
+    }
   };
 
   const navigateInvoice = (dir: "prev" | "next") => {
@@ -369,7 +388,7 @@ export default function InvoiceDetailPage() {
             <button onClick={() => setCodingMode(false)} className="p-2 hover:bg-violet-700 rounded-lg"><X size={20} /></button>
             <div className="flex items-center gap-3">
               <Code size={20} />
-              <span className="font-semibold">Codificar</span>
+              <span className="font-semibold">CODIFICAR</span>
               <span className="bg-violet-500 px-2 py-0.5 rounded text-sm">{invoice.displayNumber}</span>
             </div>
           </div>
