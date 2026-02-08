@@ -12,6 +12,8 @@ import {
   Clock, Users, ChevronRight, AlertTriangle, Circle, Eye, ShieldAlert, Lock, Layers, ChevronDown
 } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
+import { getCostSettings, shouldCommitPO } from "@/lib/budgetRules";
+import { commitPO } from "@/lib/budgetOperations";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -411,38 +413,16 @@ export default function EditPOPage() {
   }, []);
 
   const updateSubAccountsCommitted = async (itemsToCommit: POItem[]) => {
-    const commitmentsByAccount: Record<string, number> = {};
+    // Preparar items para commitPO
+    const budgetItems = itemsToCommit
+      .filter(item => item.subAccountId && item.baseAmount > 0)
+      .map(item => ({
+        subAccountId: item.subAccountId,
+        baseAmount: item.baseAmount,
+      }));
     
-    for (const item of itemsToCommit) {
-      if (item.subAccountId && item.baseAmount > 0) {
-        commitmentsByAccount[item.subAccountId] = 
-          (commitmentsByAccount[item.subAccountId] || 0) + item.baseAmount;
-      }
-    }
-
-    const accountsSnapshot = await getDocs(collection(db, `projects/${id}/accounts`));
-    
-    for (const [subAccountId, amountToAdd] of Object.entries(commitmentsByAccount)) {
-      for (const accountDoc of accountsSnapshot.docs) {
-        try {
-          const subAccountRef = doc(
-            db,
-            `projects/${id}/accounts/${accountDoc.id}/subaccounts`,
-            subAccountId
-          );
-          const subAccountSnap = await getDoc(subAccountRef);
-          
-          if (subAccountSnap.exists()) {
-            const currentCommitted = subAccountSnap.data().committed || 0;
-            await updateDoc(subAccountRef, {
-              committed: currentCommitted + amountToAdd,
-            });
-            break;
-          }
-        } catch (e) {
-          console.error(`Error updating subaccount ${subAccountId}:`, e);
-        }
-      }
+    if (budgetItems.length > 0) {
+      await commitPO(id, budgetItems);
     }
   };
 
@@ -452,6 +432,9 @@ export default function EditPOPage() {
 
     setSaving(true);
     try {
+      // Obtener configuración de costes
+      const costSettings = await getCostSettings(id);
+      
       let fileUrl = existingFileUrl;
       let fileName = existingFileName;
 
@@ -497,6 +480,11 @@ export default function EditPOPage() {
           poData.status = "pending";
           poData.approvalSteps = approvalSteps;
           poData.currentApprovalStep = 0;
+          // Si la configuración es on_create, también comprometer en pending
+          if (costSettings.poCommitmentTrigger === "on_create") {
+            poData.committedAmount = totals.baseAmount;
+            poData.remainingAmount = totals.baseAmount;
+          }
         }
       } else {
         poData.status = "draft";
@@ -504,7 +492,9 @@ export default function EditPOPage() {
 
       await updateDoc(doc(db, `projects/${id}/pos`, poId), poData);
 
-      if (poData.status === "approved") {
+      // Comprometer según la configuración
+      const finalStatus = poData.status;
+      if (shouldCommitPO(finalStatus, costSettings)) {
         await updateSubAccountsCommitted(items);
       }
 
