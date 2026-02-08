@@ -5,8 +5,11 @@ import { Inter } from "next/font/google";
 import { auth, db, storage } from "@/lib/firebase";
 import { doc, getDoc, getDocs, collection, updateDoc, Timestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { CheckCircle2, AlertCircle, Receipt, FileText, Wallet, PiggyBank, Shield, CircleDollarSign, Download, Upload, X, Clock, Banknote, FileCheck, ExternalLink, AlertTriangle, Landmark, Trash2, Info, Euro, FileUp, CheckCircle, XCircle, CreditCard, Undo2, ChevronDown, ChevronUp, MoreHorizontal } from "lucide-react";
+import { CheckCircle2, AlertCircle, Receipt, FileText, Wallet, PiggyBank, Shield, CircleDollarSign, Download, Upload, X, Clock, Banknote, FileCheck, ExternalLink, AlertTriangle, Landmark, Trash2, Info, Euro, FileUp, CheckCircle, XCircle, CreditCard, Undo2, ChevronDown, ChevronUp, MoreHorizontal, ShieldAlert, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { getCostSettings, shouldRealizeInvoice, shouldRealizeOnStatusChange } from "@/lib/budgetRules";
+import { realizeInvoice, unrealizeInvoice } from "@/lib/budgetOperations";
+import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -31,10 +34,14 @@ export default function PaymentPayPage() {
   const id = params?.id as string;
   const forecastId = params?.forecastId as string;
 
+  const {
+    loading: permissionsLoading,
+    error: permissionsError,
+    permissions,
+  } = useAccountingPermissions(id);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [userName, setUserName] = useState("");
   const [forecast, setForecast] = useState<PaymentForecast | null>(null);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [selectedBankAccount, setSelectedBankAccount] = useState<BankAccount | null>(null);
@@ -52,10 +59,8 @@ export default function PaymentPayPage() {
   const formatCurrency = (a: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(a || 0);
   const formatDate = (d: Date) => d ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" }).format(d) : "-";
 
-  useEffect(() => { const unsub = auth.onAuthStateChanged((u) => { if (!u) router.push("/"); else { setUserId(u.uid); setUserName(u.displayName || u.email || "Usuario"); } }); return () => unsub(); }, [router]);
-
   useEffect(() => {
-    if (!userId || !id || !forecastId) return;
+    if (!permissions.userId || !id || !forecastId || permissionsLoading) return;
     const loadData = async () => {
       try {
         const forecastSnap = await getDoc(doc(db, `projects/${id}/paymentForecasts`, forecastId));
@@ -82,7 +87,7 @@ export default function PaymentPayPage() {
       } catch (error) { console.error("Error:", error); showToast("error", "Error al cargar datos"); setLoading(false); }
     };
     loadData();
-  }, [userId, id, forecastId, router]);
+  }, [permissions.userId, id, forecastId, router, permissionsLoading]);
 
   const pendingItems = forecast?.items.filter((i) => i.status === "pending") || [];
   const completedItems = forecast?.items.filter((i) => i.status === "completed") || [];
@@ -99,6 +104,9 @@ export default function PaymentPayPage() {
     if (withoutReceipt.length > 0) { showToast("warning", `${withoutReceipt.length} pago(s) sin justificante`); return; }
     setSaving(true);
     try {
+      // Obtener configuración de costes
+      const costSettings = await getCostSettings(id);
+      
       const updatedItems = [...forecast.items];
       const newPendingItems: PaymentItem[] = [];
       
@@ -126,8 +134,8 @@ export default function PaymentPayPage() {
           receiptUrl, 
           receiptName, 
           completedAt: new Date(), 
-          completedBy: userId || "", 
-          completedByName: userName 
+          completedBy: permissions.userId || "", 
+          completedByName: permissions.userName 
         };
         
         // If partial payment, create a new pending item for the remaining amount
@@ -151,14 +159,39 @@ export default function PaymentPayPage() {
           newPendingItems.push(newItem);
         }
         
-        // Update invoice status
-        if (item.invoiceId) { 
-          await updateDoc(doc(db, `projects/${id}/invoices`, item.invoiceId), { 
-            status: isPartialPayment ? "partial_paid" : "paid", 
+        // Update invoice status and handle budget realization
+        if (item.invoiceId) {
+          const newStatus = isPartialPayment ? "partial_paid" : "paid";
+          
+          // Obtener estado anterior de la factura
+          const invoiceRef = doc(db, `projects/${id}/invoices`, item.invoiceId);
+          const invoiceSnap = await getDoc(invoiceRef);
+          const oldStatus = invoiceSnap.exists() ? invoiceSnap.data().status : "pending";
+          
+          // Actualizar estado de la factura
+          await updateDoc(invoiceRef, { 
+            status: newStatus, 
             paidAmount: payingAmount, 
             paidAt: Timestamp.now(), 
             paymentForecastId: forecastId 
-          }); 
+          });
+          
+          // Si corresponde realizar según configuración, mover de committed a actual
+          if (!isPartialPayment && shouldRealizeOnStatusChange(oldStatus, newStatus, costSettings)) {
+            const invoiceData = invoiceSnap.data();
+            if (invoiceData?.items) {
+              const budgetItems = invoiceData.items
+                .filter((i: any) => i.subAccountId && i.baseAmount > 0)
+                .map((i: any) => ({
+                  subAccountId: i.subAccountId,
+                  baseAmount: i.baseAmount,
+                }));
+              
+              if (budgetItems.length > 0) {
+                await realizeInvoice(id, budgetItems);
+              }
+            }
+          }
         }
       }
       
@@ -198,6 +231,9 @@ export default function PaymentPayPage() {
     if (!forecast) return;
     setSaving(true);
     try {
+      // Obtener configuración de costes
+      const costSettings = await getCostSettings(id);
+      
       let updatedItems = [...forecast.items];
       const idx = updatedItems.findIndex((i) => i.id === itemId);
       if (idx === -1) { setSaving(false); return; }
@@ -249,26 +285,49 @@ export default function PaymentPayPage() {
           const invoiceSnap = await getDoc(invoiceRef);
           
           if (invoiceSnap.exists()) {
+            const invoiceData = invoiceSnap.data();
+            const oldStatus = invoiceData.status;
+            
             // Check if there are other completed payments for this invoice
             const otherPaymentsForInvoice = updatedItems.filter(
               (i) => i.invoiceId === item.invoiceId && i.status === "completed" && i.id !== itemId
             );
             
+            let newStatus: string;
             if (otherPaymentsForInvoice.length > 0) {
               // There are still other payments, calculate total paid
               const totalPaid = otherPaymentsForInvoice.reduce((sum, i) => sum + (i.partialAmount || i.amount), 0);
+              newStatus = "partial_paid";
               await updateDoc(invoiceRef, { 
-                status: "partial_paid", 
+                status: newStatus, 
                 paidAmount: totalPaid
               });
             } else {
               // No other payments, reset to pending
+              newStatus = "pending";
               await updateDoc(invoiceRef, { 
-                status: "pending", 
+                status: newStatus, 
                 paidAmount: 0, 
                 paidAt: null, 
                 paymentForecastId: null 
               });
+            }
+            
+            // Si la factura estaba realizada (paid) y ahora no lo está, revertir presupuesto
+            const wasRealized = shouldRealizeInvoice(oldStatus, costSettings);
+            const isStillRealized = shouldRealizeInvoice(newStatus, costSettings);
+            
+            if (wasRealized && !isStillRealized && invoiceData.items) {
+              const budgetItems = invoiceData.items
+                .filter((i: any) => i.subAccountId && i.baseAmount > 0)
+                .map((i: any) => ({
+                  subAccountId: i.subAccountId,
+                  baseAmount: i.baseAmount,
+                }));
+              
+              if (budgetItems.length > 0) {
+                await unrealizeInvoice(id, budgetItems);
+              }
             }
           }
         } catch (invoiceError) {
@@ -360,8 +419,49 @@ export default function PaymentPayPage() {
 
   const isPDF = (url?: string) => url?.toLowerCase().includes(".pdf") || url?.toLowerCase().includes("application/pdf");
 
-  if (loading) return <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}><div className="w-10 h-10 border-4 border-slate-200 border-t-emerald-600 rounded-full animate-spin" /></div>;
-  if (!forecast) return <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}><div className="text-center"><AlertCircle size={48} className="text-slate-300 mx-auto mb-4" /><p className="text-slate-500">Previsión no encontrada</p><Link href={`/project/${id}/accounting/payments`} className="text-sm text-emerald-600 hover:underline mt-2 inline-block">Volver</Link></div></div>;
+  // Loading
+  if (permissionsLoading || loading) {
+    return (
+      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
+        <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Acceso denegado
+  if (permissionsError || !permissions.hasAccountingAccess) {
+    return (
+      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <ShieldAlert size={28} className="text-red-500" />
+          </div>
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
+          <p className="text-slate-500 mb-6">{permissionsError || "No tienes permisos para acceder a esta página"}</p>
+          <Link 
+            href={`/project/${id}/accounting/payments`} 
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
+          >
+            <ArrowLeft size={16} />
+            Volver a pagos
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Previsión no encontrada
+  if (!forecast) {
+    return (
+      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
+        <div className="text-center">
+          <AlertCircle size={48} className="text-slate-300 mx-auto mb-4" />
+          <p className="text-slate-500">Previsión no encontrada</p>
+          <Link href={`/project/${id}/accounting/payments`} className="text-sm text-emerald-600 hover:underline mt-2 inline-block">Volver</Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen bg-slate-100 ${inter.className}`}>
