@@ -117,7 +117,7 @@ export default function AdminProjectPage() {
     config: false,
     accounting: false,
     team: false,
-    accountingAccessLevel: "user" as "user" | "accounting" | "accounting_extended",
+    accountingAccessLevel: "accounting_extended" as "user" | "accounting" | "accounting_extended",
   });
 
   // Message form
@@ -404,6 +404,7 @@ export default function AdminProjectPage() {
 
     setSaving(true);
     try {
+      const hasAccounting = ["EP", "PM", "Controller", "PC"].includes(addMemberForm.role);
       const memberData = {
         odId: addMemberForm.odId,
         name: selectedUser.name,
@@ -411,9 +412,10 @@ export default function AdminProjectPage() {
         role: addMemberForm.role,
         permissions: {
           config: ["EP", "PM"].includes(addMemberForm.role),
-          accounting: ["EP", "PM", "Controller", "PC"].includes(addMemberForm.role),
+          accounting: hasAccounting,
           team: ["EP", "PM"].includes(addMemberForm.role),
         },
+        accountingAccessLevel: hasAccounting ? "accounting_extended" : "user",
         addedAt: serverTimestamp(),
         addedBy: contextUser?.uid,
       };
@@ -424,6 +426,7 @@ export default function AdminProjectPage() {
         projectId,
         role: addMemberForm.role,
         permissions: memberData.permissions,
+        accountingAccessLevel: memberData.accountingAccessLevel,
         addedAt: serverTimestamp(),
       });
 
@@ -874,7 +877,7 @@ export default function AdminProjectPage() {
                 <textarea
                   value={messageForm.content}
                   onChange={(e) => setMessageForm({ ...messageForm, content: e.target.value })}
-                  placeholder="Escribe tu mensaje..."
+                  placeholder="Escribe tu mensaje"
                   rows={4}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm resize-none"
                 />
@@ -1077,7 +1080,7 @@ export default function AdminProjectPage() {
                   type="text"
                   value={addMemberForm.searchQuery}
                   onChange={(e) => setAddMemberForm({ ...addMemberForm, searchQuery: e.target.value, odId: "" })}
-                  placeholder="Buscar por nombre o email..."
+                  placeholder="Buscar por nombre o email"
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
                 />
                 {addMemberForm.searchQuery && (
