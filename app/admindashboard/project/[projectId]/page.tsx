@@ -37,6 +37,8 @@ import {
   Settings,
   FolderOpen,
   Building2,
+  Layers,
+  ChevronDown,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 
@@ -77,6 +79,7 @@ interface MemberData {
     accounting?: boolean;
     team?: boolean;
   };
+  accountingAccessLevel?: "user" | "accounting" | "accounting_extended";
 }
 
 interface DepartmentData {
@@ -107,6 +110,15 @@ export default function AdminProjectPage() {
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [showEditMemberModal, setShowEditMemberModal] = useState<MemberData | null>(null);
+
+  // Edit member permissions form
+  const [editMemberForm, setEditMemberForm] = useState({
+    config: false,
+    accounting: false,
+    team: false,
+    accountingAccessLevel: "user" as "user" | "accounting" | "accounting_extended",
+  });
 
   // Message form
   const [messageForm, setMessageForm] = useState({
@@ -198,6 +210,7 @@ export default function AdminProjectPage() {
           position: data.position,
           department: data.department,
           permissions: data.permissions || {},
+          accountingAccessLevel: data.accountingAccessLevel || "user",
         };
       });
       setMembers(membersData);
@@ -421,6 +434,39 @@ export default function AdminProjectPage() {
     } catch (error) {
       console.error(error);
       showToast("error", "Error al añadir miembro");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpdateMemberPermissions = async () => {
+    if (!showEditMemberModal) return;
+    setSaving(true);
+    try {
+      const updatedPermissions = {
+        config: editMemberForm.config,
+        accounting: editMemberForm.accounting,
+        team: editMemberForm.team,
+      };
+
+      // Actualizar en members del proyecto
+      await updateDoc(doc(db, `projects/${projectId}/members`, showEditMemberModal.id), {
+        permissions: updatedPermissions,
+        accountingAccessLevel: editMemberForm.accounting ? editMemberForm.accountingAccessLevel : "user",
+      });
+
+      // Actualizar en userProjects
+      await updateDoc(doc(db, `userProjects/${showEditMemberModal.id}/projects`, projectId), {
+        permissions: updatedPermissions,
+        accountingAccessLevel: editMemberForm.accounting ? editMemberForm.accountingAccessLevel : "user",
+      });
+
+      setShowEditMemberModal(null);
+      showToast("success", "Permisos actualizados");
+      await loadData();
+    } catch (error) {
+      console.error(error);
+      showToast("error", "Error al actualizar permisos");
     } finally {
       setSaving(false);
     }
@@ -656,7 +702,7 @@ export default function AdminProjectPage() {
               ) : (
                 <div className="divide-y divide-slate-100">
                   {members.map((member) => (
-                    <div key={member.id} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50">
+                    <div key={member.id} className="px-5 py-4 flex items-center justify-between hover:bg-slate-50">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600 text-sm font-medium">
                           {member.name.charAt(0).toUpperCase()}
@@ -666,29 +712,64 @@ export default function AdminProjectPage() {
                           <p className="text-xs text-slate-500">{member.email}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {member.role && (
-                          <span className="text-xs bg-slate-900 text-white px-2 py-0.5 rounded">
-                            {member.role}
-                          </span>
-                        )}
-                        {member.department && (
-                          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
-                            {member.department}
-                          </span>
-                        )}
-                        {member.permissions.accounting && (
-                          <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">
-                            Accounting
-                          </span>
-                        )}
-                        <button
-                          onClick={() => handleRemoveMember(member.id, member.name)}
-                          disabled={saving}
-                          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                      <div className="flex items-center gap-3">
+                        {/* Badges */}
+                        <div className="flex items-center gap-1.5">
+                          {member.role && (
+                            <span className="text-xs bg-slate-900 text-white px-2 py-0.5 rounded">
+                              {member.role}
+                            </span>
+                          )}
+                          {member.department && (
+                            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                              {member.department}
+                            </span>
+                          )}
+                        </div>
+                        {/* Access badges */}
+                        <div className="flex items-center gap-1">
+                          {member.permissions.config && (
+                            <span className="text-[10px] bg-violet-50 text-violet-700 px-1.5 py-0.5 rounded" title="Acceso a Config">
+                              Config
+                            </span>
+                          )}
+                          {member.permissions.accounting && (
+                            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded" title={`Nivel: ${member.accountingAccessLevel === "accounting_extended" ? "Avanzado" : member.accountingAccessLevel === "accounting" ? "Contabilidad" : "Usuario"}`}>
+                              {member.accountingAccessLevel === "accounting_extended" ? "Acc+" : member.accountingAccessLevel === "accounting" ? "Acc" : "Acc·U"}
+                            </span>
+                          )}
+                          {member.permissions.team && (
+                            <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded" title="Acceso a Team">
+                              Team
+                            </span>
+                          )}
+                        </div>
+                        {/* Actions */}
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => {
+                              setShowEditMemberModal(member);
+                              setEditMemberForm({
+                                config: member.permissions.config || false,
+                                accounting: member.permissions.accounting || false,
+                                team: member.permissions.team || false,
+                                accountingAccessLevel: member.accountingAccessLevel || "user",
+                              });
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
+                            title="Editar permisos"
+                          >
+                            <Shield size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleRemoveMember(member.id, member.name)}
+                            disabled={saving}
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                            title="Eliminar miembro"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -701,6 +782,7 @@ export default function AdminProjectPage() {
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden mt-6">
                 <div className="px-5 py-4 border-b border-slate-100">
                   <div className="flex items-center gap-2">
+                    <Layers size={16} className="text-slate-400" />
                     <h2 className="text-sm font-semibold text-slate-900">Departamentos</h2>
                     <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
                       {departments.length}
@@ -1059,6 +1141,135 @@ export default function AdminProjectPage() {
                 className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
               >
                 {saving ? "Añadiendo..." : "Añadir"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Member Permissions Modal */}
+      {showEditMemberModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Editar permisos</h3>
+                <p className="text-sm text-slate-500">{showEditMemberModal.name}</p>
+              </div>
+              <button
+                onClick={() => setShowEditMemberModal(null)}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* Acceso a entornos */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-3">Acceso a entornos</label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      checked={editMemberForm.config}
+                      onChange={(e) => setEditMemberForm({ ...editMemberForm, config: e.target.checked })}
+                      className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-slate-900">Config</p>
+                      <p className="text-xs text-slate-500">Configuración del proyecto</p>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      checked={editMemberForm.team}
+                      onChange={(e) => setEditMemberForm({ ...editMemberForm, team: e.target.checked })}
+                      className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-slate-900">Team</p>
+                      <p className="text-xs text-slate-500">Gestión de equipo</p>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      checked={editMemberForm.accounting}
+                      onChange={(e) => setEditMemberForm({ ...editMemberForm, accounting: e.target.checked })}
+                      className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-slate-900">Accounting</p>
+                      <p className="text-xs text-slate-500">Contabilidad del proyecto</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Nivel de acceso Accounting */}
+              {editMemberForm.accounting && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-3">Nivel de acceso en Accounting</label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
+                      <input
+                        type="radio"
+                        name="accountingLevel"
+                        checked={editMemberForm.accountingAccessLevel === "user"}
+                        onChange={() => setEditMemberForm({ ...editMemberForm, accountingAccessLevel: "user" })}
+                        className="w-4 h-4 border-slate-300 text-slate-900 focus:ring-slate-900"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-slate-900">Usuario</p>
+                        <p className="text-xs text-slate-500">Solo visualización</p>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
+                      <input
+                        type="radio"
+                        name="accountingLevel"
+                        checked={editMemberForm.accountingAccessLevel === "accounting"}
+                        onChange={() => setEditMemberForm({ ...editMemberForm, accountingAccessLevel: "accounting" })}
+                        className="w-4 h-4 border-slate-300 text-slate-900 focus:ring-slate-900"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-slate-900">Contabilidad</p>
+                        <p className="text-xs text-slate-500">Crear y gestionar facturas y pagos</p>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
+                      <input
+                        type="radio"
+                        name="accountingLevel"
+                        checked={editMemberForm.accountingAccessLevel === "accounting_extended"}
+                        onChange={() => setEditMemberForm({ ...editMemberForm, accountingAccessLevel: "accounting_extended" })}
+                        className="w-4 h-4 border-slate-300 text-slate-900 focus:ring-slate-900"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-slate-900">Contabilidad avanzada</p>
+                        <p className="text-xs text-slate-500">Acceso completo incluyendo anulaciones</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3">
+              <button
+                onClick={() => setShowEditMemberModal(null)}
+                className="flex-1 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleUpdateMemberPermissions}
+                disabled={saving}
+                className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
+              >
+                {saving ? "Guardando..." : "Guardar"}
               </button>
             </div>
           </div>
