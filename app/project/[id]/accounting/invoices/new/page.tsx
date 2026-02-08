@@ -55,6 +55,8 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
+import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
+import { realizeInvoice } from "@/lib/budgetOperations";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -1199,44 +1201,18 @@ export default function NewInvoicePage() {
 
   // Funciones de actualización de presupuesto
   const updateSubAccountsBudget = async (invoiceItems: InvoiceItem[], hasPO: boolean) => {
-    const updatesBySubAccount: Record<string, { baseAmount: number }> = {};
-
-    for (const item of invoiceItems) {
-      if (item.subAccountId && item.baseAmount > 0) {
-        if (!updatesBySubAccount[item.subAccountId]) {
-          updatesBySubAccount[item.subAccountId] = { baseAmount: 0 };
-        }
-        updatesBySubAccount[item.subAccountId].baseAmount += item.baseAmount;
-      }
-    }
-
-    const accountsSnapshot = await getDocs(collection(db, "projects/" + id + "/accounts"));
-
-    for (const entry of Object.entries(updatesBySubAccount)) {
-      const subAccountId = entry[0];
-      const data = entry[1];
-
-      for (const accountDoc of accountsSnapshot.docs) {
-        try {
-          const subAccountRef = doc(db, "projects/" + id + "/accounts/" + accountDoc.id + "/subaccounts", subAccountId);
-          const subAccountSnap = await getDoc(subAccountRef);
-
-          if (subAccountSnap.exists()) {
-            const currentCommitted = subAccountSnap.data().committed || 0;
-            const currentActual = subAccountSnap.data().actual || 0;
-            const updates: { committed?: number; actual: number } = {
-              actual: currentActual + data.baseAmount,
-            };
-            if (hasPO) {
-              updates.committed = Math.max(0, currentCommitted - data.baseAmount);
-            }
-            await updateDoc(subAccountRef, updates);
-            break;
-          }
-        } catch (err) {
-          console.error("Error updating budget:", err);
-        }
-      }
+    // Preparar items para realizeInvoice
+    const budgetItems = invoiceItems
+      .filter(item => item.subAccountId && item.baseAmount > 0)
+      .map(item => ({
+        subAccountId: item.subAccountId,
+        baseAmount: item.baseAmount,
+      }));
+    
+    if (budgetItems.length > 0) {
+      // realizeInvoice mueve de committed -> actual si hay PO
+      // o simplemente suma a actual si no hay PO
+      await realizeInvoice(id, budgetItems);
     }
   };
 
@@ -1376,10 +1352,13 @@ export default function NewInvoicePage() {
       // Guardar factura
       const docRef = await addDoc(collection(db, "projects/" + id + "/invoices"), invoiceData);
 
-      // Actualizar presupuesto si se aprueba automáticamente
-      if (invoiceData.autoApproved || documentType === "invoice") {
-        const hasPO = !!selectedPO;
-        await updateSubAccountsBudget(items, hasPO);
+      // Obtener configuración de costes
+      const costSettings = await getCostSettings(id);
+      const finalStatus = invoiceData.status;
+      
+      // Actualizar presupuesto solo si corresponde según configuración
+      if (shouldRealizeInvoice(finalStatus, costSettings)) {
+        await updateSubAccountsBudget(items, !!selectedPO);
         if (selectedPO) {
           await updatePOInvoicedAmount(selectedPO.id, totals.baseAmount);
         }
@@ -1946,11 +1925,7 @@ export default function NewInvoicePage() {
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value.toUpperCase() })}
                       onBlur={() => handleBlur("description")}
-                      placeholder={
-                        "Concepto " +
-                        currentDocType.article.toLowerCase() + " " +
-                        currentDocType.label.toLowerCase()
-                      }
+                      placeholder={"Concepto " + currentDocType.article + " " + currentDocType.label.charAt(0).toLowerCase() + currentDocType.label.slice(1).toLowerCase()}
                       rows={2}
                       className={cx(
                         "w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none text-sm pr-10 uppercase",
