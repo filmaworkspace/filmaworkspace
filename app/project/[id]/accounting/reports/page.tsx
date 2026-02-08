@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
 import { Download, FileText, Receipt, Building2, Wallet, Settings2, ChevronDown, Check, X, Save, Trash2, BookMarked, Layers, GripVertical, Plus, Minus, FileSpreadsheet, Film, ShieldAlert, ArrowLeft } from "lucide-react";
+import { getCostSettings, shouldCommitPO, shouldRealizeInvoice, CostSettings } from "@/lib/budgetRules";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -156,8 +157,10 @@ export default function ReportsPage() {
   const [splitByEpisode, setSplitByEpisode] = useState(false);
 
   // Configuración de coste
-  const [commitTrigger, setCommitTrigger] = useState<string>("on_approve");
-  const [actualTrigger, setActualTrigger] = useState<string>("on_paid");
+  const [costConfig, setCostConfig] = useState<CostSettings>({
+    poCommitmentTrigger: "on_approve",
+    invoiceActualTrigger: "on_paid",
+  });
 
   useEffect(() => {
     const savedPresets = localStorage.getItem(`report_presets_${id}`);
@@ -249,16 +252,12 @@ export default function ReportsPage() {
         console.error("Error loading episodes config:", epErr);
       }
 
-      // Cargar configuración de costTracking
+      // Cargar configuración de costes usando budgetRules
       try {
-        const costTrackingDoc = await getDoc(doc(db, `projects/${id}/config/costTracking`));
-        if (costTrackingDoc.exists()) {
-          const costData = costTrackingDoc.data();
-          setCommitTrigger(costData.poCommitmentTrigger || "on_approve");
-          setActualTrigger(costData.invoiceActualTrigger || "on_paid");
-        }
+        const loadedCostConfig = await getCostSettings(id);
+        setCostConfig(loadedCostConfig);
       } catch (ctErr) {
-        console.error("Error loading costTracking config:", ctErr);
+        console.error("Error loading cost config:", ctErr);
       }
     } catch (error) { 
       console.error("Error cargando datos:", error); 
@@ -537,29 +536,13 @@ export default function ReportsPage() {
       const posSnapshot = await getDocs(query(collection(db, `projects/${id}/pos`), orderBy("createdAt", "desc")));
       const invoicesSnapshot = await getDocs(collection(db, `projects/${id}/invoices`));
       
-      // Determinar estados válidos para comprometido según configuración
-      // on_create: cuando se envía a aprobación (pending y approved)
-      // on_approve: solo aprobadas
-      const validCommitStatuses = commitTrigger === "on_create" 
-        ? ["pending", "approved"] 
-        : ["approved"];
-      
-      // Determinar estados válidos para facturado según configuración
-      // on_approve: aprobadas, contabilizadas y pagadas
-      // on_account: contabilizadas y pagadas
-      // on_paid: solo pagadas
-      const validActualStatuses = actualTrigger === "on_approve" 
-        ? ["approved", "accounted", "paid"] 
-        : actualTrigger === "on_account" 
-          ? ["accounted", "paid"] 
-          : ["paid"];
-      
-      // Crear mapa de facturas por PO y calcular facturado por item (solo facturas con estado válido)
+      // Crear mapa de facturas por PO y calcular facturado por item (solo facturas con estado válido según config)
       const invoicedByPOItem: Record<string, Record<number, number>> = {};
       invoicesSnapshot.docs.forEach(invDoc => {
         const invData = invDoc.data();
         const invStatus = invData.status || "";
-        if (invData.poId && invStatus !== "cancelled" && invStatus !== "rejected" && validActualStatuses.includes(invStatus)) {
+        // Usar shouldRealizeInvoice para determinar si la factura cuenta
+        if (invData.poId && invStatus !== "cancelled" && invStatus !== "rejected" && shouldRealizeInvoice(invStatus, costConfig)) {
           if (!invoicedByPOItem[invData.poId]) invoicedByPOItem[invData.poId] = {};
           (invData.items || []).forEach((invItem: any) => {
             const itemIndex = invItem.poItemIndex ?? -1;
@@ -576,8 +559,8 @@ export default function ReportsPage() {
         const poData = docSnap.data();
         const poStatus = poData.status || "";
         
-        // Solo incluir POs con estado válido según configuración de comprometido
-        if (!validCommitStatuses.includes(poStatus)) continue;
+        // Usar shouldCommitPO para determinar si la PO cuenta
+        if (!shouldCommitPO(poStatus, costConfig)) continue;
         
         const poId = docSnap.id;
         const items = poData.items || [];
