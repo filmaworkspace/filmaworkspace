@@ -521,106 +521,108 @@ export default function Dashboard() {
 
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
-      {/* Notification Bell - Fixed position (siempre visible) */}
-      <div className="fixed top-[5.5rem] right-6 md:right-8 lg:right-12 xl:right-16 2xl:right-24 z-40">
-        <div className="relative">
-          <button
-            onClick={() => setExpandedMessage(expandedMessage ? null : "panel")}
-            className="relative p-3 bg-white border border-slate-200 rounded-xl shadow-lg hover:bg-slate-50"
-          >
-            <Bell size={20} className="text-slate-600" />
-            {unreadMessagesCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                {unreadMessagesCount > 9 ? "9+" : unreadMessagesCount}
-              </span>
-            )}
-          </button>
-
-          {/* Dropdown panel */}
-          {expandedMessage === "panel" && (
-            <>
-              <div 
-                className="fixed inset-0 z-40" 
-                onClick={() => setExpandedMessage(null)}
-              />
-              <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-slate-900">Notificaciones</span>
+      {/* Header con título y notificaciones */}
+      <div className="mt-[4.5rem]">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
+          <div className="flex items-center justify-center relative">
+            <h1 className="text-3xl font-bold text-slate-900">Panel de proyectos</h1>
+            
+            {/* Notification Bell */}
+            <div className="absolute right-0 top-1/2 -translate-y-1/2">
+              <div className="relative">
+                <button
+                  onClick={() => setExpandedMessage(expandedMessage ? null : "panel")}
+                  className="relative p-2 hover:bg-slate-100 rounded-xl transition-colors"
+                >
+                  <Bell size={20} className="text-slate-500" />
                   {unreadMessagesCount > 0 && (
-                    <span className="text-xs text-slate-500">{unreadMessagesCount} sin leer</span>
+                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                      {unreadMessagesCount > 9 ? "9+" : unreadMessagesCount}
+                    </span>
                   )}
-                </div>
-                {messages.length === 0 ? (
-                  <div className="px-4 py-8 text-center">
-                    <Bell size={24} className="text-slate-300 mx-auto mb-2" />
-                    <p className="text-sm text-slate-500">No hay notificaciones</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="max-h-80 overflow-y-auto">
-                      {messages.map((message) => {
-                        const config = getMessageConfig(message.type);
-                        const Icon = config.icon;
+                </button>
 
-                        return (
-                          <div
-                            key={message.id}
-                            className={`px-4 py-3 border-b border-slate-50 last:border-0 ${!message.read ? "bg-blue-50/50" : ""}`}
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${config.bg}`}>
-                                <Icon size={14} className={config.text} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <p className="text-sm font-medium text-slate-900 truncate">{message.title}</p>
-                                  {!message.read && (
-                                    <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />
-                                  )}
+                {/* Dropdown panel */}
+                {expandedMessage === "panel" && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setExpandedMessage(null)}
+                    />
+                    <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-lg z-50 overflow-hidden">
+                      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                        <span className="text-sm font-semibold text-slate-900">Notificaciones</span>
+                        {unreadMessagesCount > 0 && (
+                          <span className="text-xs text-slate-500">{unreadMessagesCount} sin leer</span>
+                        )}
+                      </div>
+                      {messages.length === 0 ? (
+                        <div className="px-4 py-8 text-center">
+                          <Bell size={24} className="text-slate-300 mx-auto mb-2" />
+                          <p className="text-sm text-slate-500">No hay notificaciones</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="max-h-80 overflow-y-auto">
+                            {messages.map((message) => {
+                              const config = getMessageConfig(message.type);
+                              const Icon = config.icon;
+
+                              return (
+                                <div
+                                  key={message.id}
+                                  className={`px-4 py-3 border-b border-slate-50 last:border-0 ${!message.read ? "bg-blue-50/50" : ""}`}
+                                >
+                                  <div className="flex items-start gap-3">
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${config.bg}`}>
+                                      <Icon size={14} className={config.text} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-sm font-medium text-slate-900 truncate">{message.title}</p>
+                                        {!message.read && (
+                                          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />
+                                        )}
+                                      </div>
+                                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{message.content}</p>
+                                      <div className="flex items-center justify-between mt-2">
+                                        <span className="text-[10px] text-slate-400">{message.sentByName}</span>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDismissMessage(message.id);
+                                          }}
+                                          className="text-[10px] text-slate-400 hover:text-red-500"
+                                        >
+                                          Descartar
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
-                                <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{message.content}</p>
-                                <div className="flex items-center justify-between mt-2">
-                                  <span className="text-[10px] text-slate-400">{message.sentByName}</span>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDismissMessage(message.id);
-                                    }}
-                                    className="text-[10px] text-slate-400 hover:text-red-500"
-                                  >
-                                    Descartar
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
+                              );
+                            })}
                           </div>
-                        );
-                      })}
-                    </div>
-                    <div className="px-4 py-2 border-t border-slate-100 bg-slate-50">
-                      <button
-                        onClick={() => {
-                          messages.forEach((m) => {
-                            if (!m.read) handleMarkMessageAsRead(m.id);
-                          });
-                        }}
-                        className="text-xs text-slate-500 hover:text-slate-700 w-full text-center"
-                      >
-                        Marcar todas como leídas
-                      </button>
+                          <div className="px-4 py-2 border-t border-slate-100 bg-slate-50">
+                            <button
+                              onClick={() => {
+                                messages.forEach((m) => {
+                                  if (!m.read) handleMarkMessageAsRead(m.id);
+                                });
+                              }}
+                              className="text-xs text-slate-500 hover:text-slate-700 w-full text-center"
+                            >
+                              Marcar todas como leídas
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </>
                 )}
               </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Header con título centrado */}
-      <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
-          <h1 className="text-3xl font-bold text-slate-900 text-center">Panel de proyectos</h1>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -692,21 +694,12 @@ export default function Dashboard() {
 
         {/* Empty state */}
         {projects.length === 0 && invitations.length === 0 ? (
-          <div className="border-2 border-dashed border-slate-200 rounded-2xl">
-            <div className="flex items-center justify-center py-20">
-              <div className="text-center max-w-md">
-                <div className="w-20 h-20 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <Sparkles size={32} className="text-slate-400" />
-                </div>
-                <h2 className="text-xl font-semibold text-slate-900 mb-2">Bienvenido a tu espacio de trabajo</h2>
-                <p className="text-sm text-slate-600 leading-relaxed mb-6">
-                  Aún no tienes proyectos asignados. Cuando un administrador te añada a un proyecto, aparecerá aquí automáticamente.
-                </p>
-                <div className="flex items-center justify-center gap-2 text-xs text-slate-500 bg-slate-50 rounded-xl p-4 border border-slate-200">
-                  <Clock size={14} />
-                  <span>Las invitaciones a proyectos también aparecerán aquí</span>
-                </div>
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Folder size={28} className="text-slate-400" />
               </div>
+              <p className="text-slate-500">No tienes proyectos asignados</p>
             </div>
           </div>
         ) : (
