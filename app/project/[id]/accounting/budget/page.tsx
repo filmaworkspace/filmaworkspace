@@ -90,8 +90,8 @@ export default function BudgetPage() {
       setCostConfig(loadedCostConfig);
 
       // Cargar POs y calcular committed por subcuenta
-      // Items cerrados: solo cuenta el invoicedAmount (el resto se liberó)
-      // Items abiertos: cuenta el baseAmount completo
+      // Comprometido = baseAmount - invoicedAmount (lo pendiente de facturar)
+      // Si item cerrado: committed = 0 (se liberó el resto)
       const committedBySubaccount: Record<string, number> = {};
       const posSnapshot = await getDocs(collection(db, `projects/${id}/pos`));
       posSnapshot.docs.forEach(poDoc => {
@@ -101,10 +101,13 @@ export default function BudgetPage() {
           poData.items.forEach((item: any) => {
             if (item.subAccountCode) {
               const key = item.subAccountCode;
-              // Si el item está cerrado, solo cuenta lo facturado como comprometido
+              // Si el item está cerrado, no hay comprometido pendiente
+              // Si está abierto, el comprometido es lo que falta por facturar
+              const itemInvoiced = item.invoicedAmount || 0;
+              const itemBase = item.baseAmount || 0;
               const itemCommitted = item.isClosed 
-                ? (item.invoicedAmount || 0) 
-                : (item.baseAmount || 0);
+                ? 0 
+                : Math.max(0, itemBase - itemInvoiced);
               committedBySubaccount[key] = (committedBySubaccount[key] || 0) + itemCommitted;
             }
           });
