@@ -13,6 +13,7 @@ import Link from "next/link";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
+import { handlePOStatusChange, handleInvoiceStatusChange } from "@/lib/budgetOperations";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -313,12 +314,51 @@ export default function ApprovalsPage() {
       if (approvalComment.trim()) { const comments = docData.comments || []; comments.push({ id: `comment-${Date.now()}`, userId, userName, text: approvalComment.trim(), createdAt: Timestamp.now(), type: "approval" }); updates.comments = comments; }
       if (isStepComplete && !isLastStep) updates.currentApprovalStep = currentStepIndex + 1;
       else if (allStepsComplete) {
-        if (approval.type === "po") updates.status = "approved"; else { updates.status = "pending"; updates.approvalStatus = "approved"; }
-        updates.approvedAt = Timestamp.now(); updates.approvedBy = userId; updates.approvedByName = userName;
-        if (approval.type === "po" && approval.items) {
+        const oldStatus = docData.status || "pending";
+        
+        if (approval.type === "po") {
+          updates.status = "approved";
+          updates.approvedAt = Timestamp.now();
+          updates.approvedBy = userId;
+          updates.approvedByName = userName;
+          
+          // Calcular totales para la PO
           let totalBaseAmount = 0;
-          for (const item of approval.items) { let itemBaseAmount = item.baseAmount || (item.quantity && item.unitPrice ? item.quantity * item.unitPrice : item.totalAmount ? item.totalAmount / 1.21 : 0); totalBaseAmount += itemBaseAmount; if (item.subAccountId) { const accountsSnap = await getDocs(collection(db, `projects/${approval.projectId}/accounts`)); for (const accountDoc of accountsSnap.docs) { try { const subAccountRef = doc(db, `projects/${approval.projectId}/accounts/${accountDoc.id}/subaccounts`, item.subAccountId); const subAccountSnap = await getDoc(subAccountRef); if (subAccountSnap.exists()) { await updateDoc(subAccountRef, { committed: (subAccountSnap.data().committed || 0) + itemBaseAmount }); break; } } catch (e) {} } } }
-          updates.committedAmount = totalBaseAmount; updates.remainingAmount = totalBaseAmount;
+          const budgetItems: Array<{ subAccountId: string; baseAmount: number }> = [];
+          
+          for (const item of (approval.items || [])) {
+            const itemBaseAmount = item.baseAmount || (item.quantity && item.unitPrice ? item.quantity * item.unitPrice : item.totalAmount ? item.totalAmount / 1.21 : 0);
+            totalBaseAmount += itemBaseAmount;
+            if (item.subAccountId) {
+              budgetItems.push({ subAccountId: item.subAccountId, baseAmount: itemBaseAmount });
+            }
+          }
+          
+          updates.committedAmount = totalBaseAmount;
+          updates.remainingAmount = totalBaseAmount;
+          
+          // Usar budgetOperations para manejar el comprometido
+          await handlePOStatusChange(approval.projectId, oldStatus, "approved", budgetItems);
+          
+        } else {
+          // Factura
+          updates.status = "pending";
+          updates.approvalStatus = "approved";
+          updates.approvedAt = Timestamp.now();
+          updates.approvedBy = userId;
+          updates.approvedByName = userName;
+          
+          // Preparar items para budgetOperations
+          const budgetItems: Array<{ subAccountId: string; baseAmount: number }> = [];
+          for (const item of (approval.items || [])) {
+            const itemBaseAmount = item.baseAmount || (item.quantity && item.unitPrice ? item.quantity * item.unitPrice : item.totalAmount ? item.totalAmount / 1.21 : 0);
+            if (item.subAccountId) {
+              budgetItems.push({ subAccountId: item.subAccountId, baseAmount: itemBaseAmount });
+            }
+          }
+          
+          // Usar budgetOperations para manejar el realizado (si corresponde según config)
+          await handleInvoiceStatusChange(approval.projectId, oldStatus, "approved", budgetItems);
         }
       }
       await updateDoc(docRef, updates);
@@ -335,7 +375,38 @@ export default function ApprovalsPage() {
     setProcessing(true);
     try {
       const collectionName = selectedApproval.type === "po" ? "pos" : "invoices";
-      await updateDoc(doc(db, `projects/${selectedApproval.projectId}/${collectionName}`, selectedApproval.documentId), { status: "rejected", rejectedAt: Timestamp.now(), rejectedBy: userId, rejectedByName: userName, rejectionReason: rejectionReason.trim() });
+      const docRef = doc(db, `projects/${selectedApproval.projectId}/${collectionName}`, selectedApproval.documentId);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        const docData = docSnap.data();
+        const oldStatus = docData.status || "pending";
+        
+        // Preparar items para budgetOperations
+        const budgetItems: Array<{ subAccountId: string; baseAmount: number }> = [];
+        for (const item of (selectedApproval.items || [])) {
+          const itemBaseAmount = item.baseAmount || (item.quantity && item.unitPrice ? item.quantity * item.unitPrice : item.totalAmount ? item.totalAmount / 1.21 : 0);
+          if (item.subAccountId) {
+            budgetItems.push({ subAccountId: item.subAccountId, baseAmount: itemBaseAmount });
+          }
+        }
+        
+        // Manejar el presupuesto según tipo de documento
+        if (selectedApproval.type === "po") {
+          await handlePOStatusChange(selectedApproval.projectId, oldStatus, "rejected", budgetItems);
+        } else {
+          await handleInvoiceStatusChange(selectedApproval.projectId, oldStatus, "rejected", budgetItems);
+        }
+      }
+      
+      await updateDoc(docRef, { 
+        status: "rejected", 
+        rejectedAt: Timestamp.now(), 
+        rejectedBy: userId, 
+        rejectedByName: userName, 
+        rejectionReason: rejectionReason.trim() 
+      });
+      
       setPendingApprovals(pendingApprovals.filter((a) => a.id !== selectedApproval.id));
       setSuccessMessage(`${selectedApproval.displayNumber} rechazado`);
       setTimeout(() => setSuccessMessage(""), 3000);
