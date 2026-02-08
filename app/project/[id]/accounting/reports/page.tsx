@@ -567,19 +567,22 @@ export default function ReportsPage() {
         const poInvoiced = invoicedByPOItem[poId] || {};
         
         items.forEach((item: any, index: number) => {
-          // Si el item está cerrado, el comprometido es solo lo facturado
           const itemIsClosed = item.isClosed || false;
-          const rawBaseCommitted = item.baseAmount || item.amount || 0;
-          const baseCommitted = itemIsClosed ? (poInvoiced[index] || 0) : rawBaseCommitted;
+          const rawBaseAmount = item.baseAmount || item.amount || 0;
+          const baseInvoiced = poInvoiced[index] || 0;
           const taxRate = item.vatRate || item.taxRate || 21;
           const irpfRate = item.irpfRate || 0;
+          
+          // Comprometido = lo pendiente de facturar (baseAmount - invoicedAmount)
+          // Si item cerrado: comprometido = 0 (se liberó el resto)
+          const baseCommitted = itemIsClosed ? 0 : Math.max(0, rawBaseAmount - baseInvoiced);
           const taxAmount = baseCommitted * (taxRate / 100);
           const irpfAmount = baseCommitted * (irpfRate / 100);
           const totalCommitted = baseCommitted + taxAmount - irpfAmount;
           
-          const baseInvoiced = poInvoiced[index] || 0;
-          const baseAvailable = itemIsClosed ? 0 : Math.max(0, baseCommitted - baseInvoiced);
-          const totalAvailable = baseAvailable + (baseAvailable * taxRate / 100) - (baseAvailable * irpfRate / 100);
+          // Disponible = comprometido (ya que comprometido es lo pendiente)
+          const baseAvailable = baseCommitted;
+          const totalAvailable = totalCommitted;
 
           // Determinar capítulo(s)
           const episodeAssignment = item.episodeAssignment || "general";
@@ -588,16 +591,17 @@ export default function ReportsPage() {
           // Si splitByEpisode está activo y hay episodios específicos, crear una fila por cada uno
           if (splitByEpisode && episodeAssignment === "specific" && episodes.length > 0) {
             episodes.forEach((ep: any) => {
-              const rawEpBaseCommitted = ep.amount || 0;
-              // Si item cerrado, proporcionar el comprometido según lo facturado
-              const epPercentage = rawBaseCommitted > 0 ? rawEpBaseCommitted / rawBaseCommitted : 0;
-              const epBaseCommitted = itemIsClosed ? (baseInvoiced * epPercentage) : rawEpBaseCommitted;
+              const rawEpBaseAmount = ep.amount || 0;
+              const epPercentage = rawBaseAmount > 0 ? rawEpBaseAmount / rawBaseAmount : 0;
+              const epBaseInvoiced = baseInvoiced * epPercentage;
+              
+              // Comprometido del episodio = pendiente de facturar
+              const epBaseCommitted = itemIsClosed ? 0 : Math.max(0, rawEpBaseAmount - epBaseInvoiced);
               const epTaxAmount = epBaseCommitted * (taxRate / 100);
               const epIrpfAmount = epBaseCommitted * (irpfRate / 100);
               const epTotalCommitted = epBaseCommitted + epTaxAmount - epIrpfAmount;
-              const epBaseInvoiced = baseInvoiced * epPercentage;
-              const epBaseAvailable = itemIsClosed ? 0 : Math.max(0, epBaseCommitted - epBaseInvoiced);
-              const epTotalAvailable = epBaseAvailable + (epBaseAvailable * taxRate / 100) - (epBaseAvailable * irpfRate / 100);
+              const epBaseAvailable = epBaseCommitted;
+              const epTotalAvailable = epTotalCommitted;
               
               const rowData: any = {
                 poNumber: poData.number || poData.displayNumber || "",
