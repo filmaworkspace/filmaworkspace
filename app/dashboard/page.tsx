@@ -556,7 +556,7 @@ export default function Dashboard() {
             className="fixed inset-0 z-[100]" 
             onClick={() => setExpandedMessage(null)}
           />
-          <div className="fixed top-32 right-6 md:right-8 lg:right-12 xl:right-16 2xl:right-24 w-80 bg-white border border-slate-200 rounded-2xl shadow-lg z-[101] overflow-hidden">
+          <div className="fixed top-40 right-6 md:right-8 lg:right-12 xl:right-16 2xl:right-24 w-80 bg-white border border-slate-200 rounded-2xl shadow-lg z-[101] overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
               <span className="text-sm font-semibold text-slate-900">Notificaciones</span>
               {unreadMessagesCount > 0 && (
