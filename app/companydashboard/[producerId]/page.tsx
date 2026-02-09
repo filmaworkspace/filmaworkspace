@@ -21,6 +21,7 @@ import {
   ExternalLink,
   Eye,
   Clock,
+  ClipboardList,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 
@@ -238,6 +239,13 @@ export default function CompanyDashboardPage() {
                           >
                             <Eye size={12} />
                             Ver proyecto
+                          </Link>
+                          <Link
+                            href={`/companydashboard/${producerId}/accounts/${project.id}`}
+                            className="p-2 border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-50"
+                            title="Contabilidad"
+                          >
+                            <ClipboardList size={12} />
                           </Link>
                           {isAdmin && (
                             <Link
