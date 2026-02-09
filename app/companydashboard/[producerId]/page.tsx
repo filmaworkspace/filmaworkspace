@@ -1,0 +1,321 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { Inter } from "next/font/google";
+import { db } from "@/lib/firebase";
+import {
+  collection,
+  getDocs,
+  getDoc,
+  doc,
+  query,
+  where,
+  Timestamp,
+} from "firebase/firestore";
+import {
+  ArrowLeft,
+  Building2,
+  Users,
+  FolderOpen,
+  ExternalLink,
+  RefreshCw,
+  Eye,
+  Clock,
+  Calendar,
+} from "lucide-react";
+import { useUser } from "@/contexts/UserContext";
+
+const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+
+const PHASES = ["Desarrollo", "Preproducción", "Rodaje", "Postproducción", "Finalizado"];
+
+const phaseConfig: Record<string, { bg: string; text: string; dot: string }> = {
+  Desarrollo: { bg: "bg-sky-50", text: "text-sky-700", dot: "bg-sky-500" },
+  Preproducción: { bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" },
+  Rodaje: { bg: "bg-rose-50", text: "text-rose-700", dot: "bg-rose-500" },
+  Postproducción: { bg: "bg-violet-50", text: "text-violet-700", dot: "bg-violet-500" },
+  Finalizado: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
+};
+
+interface Project {
+  id: string;
+  name: string;
+  phase: string;
+  description?: string;
+  memberCount: number;
+  createdAt: Timestamp;
+}
+
+interface Producer {
+  id: string;
+  name: string;
+}
+
+export default function CompanyDashboardPage() {
+  const params = useParams();
+  const router = useRouter();
+  const producerId = params?.producerId as string;
+  const { user: contextUser, isLoading: userLoading } = useUser();
+
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [producer, setProducer] = useState<Producer | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+
+  const isAdmin = contextUser?.role === "admin";
+  const isCompanyUser = contextUser?.companyId === producerId;
+  const hasAccess = isAdmin || isCompanyUser;
+
+  useEffect(() => {
+    if (!userLoading && !hasAccess) {
+      router.push("/dashboard");
+    }
+  }, [contextUser, userLoading, router, hasAccess]);
+
+  useEffect(() => {
+    if (producerId && hasAccess) loadData();
+  }, [producerId, hasAccess]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+
+      // Get producer info
+      const producerDoc = await getDoc(doc(db, "producers", producerId));
+      if (!producerDoc.exists()) {
+        router.push("/admindashboard");
+        return;
+      }
+      setProducer({
+        id: producerDoc.id,
+        name: producerDoc.data().name,
+      });
+
+      // Get all projects that have this producer
+      const projectsSnap = await getDocs(collection(db, "projects"));
+      const producerProjects: Project[] = [];
+
+      for (const projectDoc of projectsSnap.docs) {
+        const data = projectDoc.data();
+        const producers = data.producers || [];
+        
+        if (producers.includes(producerId)) {
+          // Get member count
+          const membersSnap = await getDocs(collection(db, `projects/${projectDoc.id}/members`));
+          
+          producerProjects.push({
+            id: projectDoc.id,
+            name: data.name,
+            phase: data.phase || "Desarrollo",
+            description: data.description,
+            memberCount: membersSnap.size,
+            createdAt: data.createdAt,
+          });
+        }
+      }
+
+      // Sort by createdAt desc
+      producerProjects.sort((a, b) => {
+        if (!a.createdAt || !b.createdAt) return 0;
+        return b.createdAt.toMillis() - a.createdAt.toMillis();
+      });
+
+      setProjects(producerProjects);
+    } catch (error) {
+      console.error("Error loading data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
+
+  // Stats
+  const activeProjects = projects.filter((p) => p.phase !== "Finalizado").length;
+  const finishedProjects = projects.filter((p) => p.phase === "Finalizado").length;
+  const totalMembers = projects.reduce((acc, p) => acc + p.memberCount, 0);
+
+  // Group by phase
+  const projectsByPhase = PHASES.reduce((acc, phase) => {
+    acc[phase] = projects.filter((p) => p.phase === phase);
+    return acc;
+  }, {} as Record<string, Project[]>);
+
+  if (loading || userLoading) {
+    return (
+      <div className={"min-h-screen bg-white flex items-center justify-center " + inter.className}>
+        <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!producer) return null;
+
+  return (
+    <div className={"min-h-screen bg-white " + inter.className}>
+      {/* Header */}
+      <header className="sticky top-0 bg-white border-b border-slate-200 z-40">
+        <div className="px-6 md:px-8 lg:px-12 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {isAdmin && (
+                <Link
+                  href="/admindashboard"
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
+                >
+                  <ArrowLeft size={20} />
+                </Link>
+              )}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+                  <Building2 size={20} className="text-slate-600" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-slate-900">{producer.name}</h1>
+                  <p className="text-sm text-slate-500">Panel de productora</p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl disabled:opacity-50"
+            >
+              <RefreshCw size={18} className={refreshing ? "animate-spin" : ""} />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="px-6 md:px-8 lg:px-12 py-8">
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                <FolderOpen size={18} className="text-blue-600" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-slate-900">{projects.length}</p>
+            <p className="text-sm text-slate-500">Proyectos totales</p>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-5">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
+                <Clock size={18} className="text-amber-600" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-slate-900">{activeProjects}</p>
+            <p className="text-sm text-slate-500">En curso</p>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-5">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
+                <Calendar size={18} className="text-emerald-600" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-slate-900">{finishedProjects}</p>
+            <p className="text-sm text-slate-500">Finalizados</p>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-5">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center">
+                <Users size={18} className="text-violet-600" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-slate-900">{totalMembers}</p>
+            <p className="text-sm text-slate-500">Miembros totales</p>
+          </div>
+        </div>
+
+        {/* Projects */}
+        {projects.length === 0 ? (
+          <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
+            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <FolderOpen size={28} className="text-slate-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">Sin proyectos</h3>
+            <p className="text-slate-500 text-sm">Esta productora no tiene proyectos asignados</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {PHASES.map((phase) => {
+              const phaseProjects = projectsByPhase[phase];
+              if (phaseProjects.length === 0) return null;
+
+              const config = phaseConfig[phase];
+
+              return (
+                <div key={phase}>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className={`w-2 h-2 rounded-full ${config.dot}`} />
+                    <h2 className="text-sm font-semibold text-slate-900">{phase}</h2>
+                    <span className="text-xs text-slate-400">({phaseProjects.length})</span>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {phaseProjects.map((project) => (
+                      <div
+                        key={project.id}
+                        className="group bg-white border border-slate-200 rounded-2xl p-5 hover:shadow-md hover:border-slate-300 transition-all"
+                      >
+                        {/* Phase badge */}
+                        <div className="flex items-center justify-between mb-3">
+                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-lg ${config.bg} ${config.text}`}>
+                            {phase}
+                          </span>
+                        </div>
+
+                        {/* Name */}
+                        <h3 className="font-semibold text-slate-900 mb-2 line-clamp-1">{project.name}</h3>
+
+                        {/* Info */}
+                        <div className="space-y-1.5 text-xs text-slate-500 mb-4">
+                          {project.description && (
+                            <p className="line-clamp-2">{project.description}</p>
+                          )}
+                          <div className="flex items-center gap-1.5">
+                            <Users size={12} className="text-slate-400" />
+                            <span>{project.memberCount} miembros</span>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-2 pt-3 border-t border-slate-100">
+                          <Link
+                            href={`/project/${project.id}`}
+                            className="flex-1 flex items-center justify-center gap-1.5 p-2 bg-slate-900 text-white rounded-xl text-xs font-medium hover:bg-slate-800"
+                          >
+                            <Eye size={12} />
+                            Ver proyecto
+                          </Link>
+                          {isAdmin && (
+                            <Link
+                              href={`/admindashboard/project/${project.id}`}
+                              className="p-2 border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-50"
+                              title="Gestionar"
+                            >
+                              <ExternalLink size={12} />
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
