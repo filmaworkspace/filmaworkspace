@@ -528,7 +528,7 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold text-slate-900">Panel de proyectos</h1>
             
             {/* Notification Bell */}
-            <div className="absolute right-0 top-1/2 -translate-y-1/2">
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 z-[60]">
               <div className="relative">
                 <button
                   onClick={() => setExpandedMessage(expandedMessage ? null : "panel")}
@@ -546,10 +546,10 @@ export default function Dashboard() {
                 {expandedMessage === "panel" && (
                   <>
                     <div 
-                      className="fixed inset-0 z-[55]" 
+                      className="fixed inset-0 z-[60]" 
                       onClick={() => setExpandedMessage(null)}
                     />
-                    <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-lg z-[60] overflow-hidden">
+                    <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-lg z-[70] overflow-hidden">
                       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                         <span className="text-sm font-semibold text-slate-900">Notificaciones</span>
                         {unreadMessagesCount > 0 && (
@@ -738,7 +738,7 @@ export default function Dashboard() {
                         <ChevronDown size={14} className={`transition-transform ${showPhaseDropdown ? "rotate-180" : ""} ${selectedPhase !== "all" ? "text-white" : "text-slate-400"}`} />
                       </button>
                       {showPhaseDropdown && (
-                        <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden min-w-full">
+                        <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-40 py-1 overflow-hidden min-w-full">
                           {PHASE_OPTIONS.map((option) => (
                             <button
                               key={option.value}
@@ -771,7 +771,7 @@ export default function Dashboard() {
                         <ChevronDown size={14} className={`text-slate-400 transition-transform ${showSortDropdown ? "rotate-180" : ""}`} />
                       </button>
                       {showSortDropdown && (
-                        <div className="absolute top-full right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden min-w-full">
+                        <div className="absolute top-full right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-40 py-1 overflow-hidden min-w-full">
                           {SORT_OPTIONS.map((option) => (
                             <button
                               key={option.value}
