@@ -119,6 +119,10 @@ export default function Dashboard() {
       return;
     }
     if (!userLoading && user?.role === "admin") router.push("/admindashboard");
+    // Redirigir usuarios de productora a companydashboard
+    if (!userLoading && user?.companyId) {
+      router.push(`/companydashboard/${user.companyId}`);
+    }
   }, [user, userLoading, router]);
 
   useEffect(() => {
@@ -708,7 +712,7 @@ export default function Dashboard() {
           <>
             {/* Barra de filtros */}
             {activeProjectsCount > 0 && (
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6 relative z-30">
                 <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
                   {/* Buscador */}
                   <div className="relative flex-1">
