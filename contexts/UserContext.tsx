@@ -9,6 +9,7 @@ interface UserData {
   email: string | null;
   name: string;
   role: "admin" | "user";
+  companyId: string | null;
   isLoading: boolean;
 }
 
@@ -39,6 +40,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         email: firebaseUser.email,
         name: firebaseUser.displayName || userData?.name || firebaseUser.email?.split("@")[0] || "Usuario",
         role: userData?.role || "user",
+        companyId: userData?.companyId || null,
         isLoading: false,
       });
     } catch (error) {
@@ -48,6 +50,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         email: firebaseUser.email,
         name: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "Usuario",
         role: "user",
+        companyId: null,
         isLoading: false,
       });
     }
