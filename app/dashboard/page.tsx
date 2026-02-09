@@ -531,38 +531,38 @@ export default function Dashboard() {
           <div className="flex items-center justify-center relative">
             <h1 className="text-3xl font-bold text-slate-900">Panel de proyectos</h1>
             
-            {/* Backdrop para cerrar notificaciones */}
-            {expandedMessage === "panel" && (
-              <div 
-                className="fixed inset-0 z-[55]" 
-                onClick={() => setExpandedMessage(null)}
-              />
-            )}
-            
             {/* Notification Bell */}
             <div className="absolute right-0 top-1/2 -translate-y-1/2">
-              <div className="relative">
-                <button
-                  onClick={() => setExpandedMessage(expandedMessage ? null : "panel")}
-                  className="relative p-2 hover:bg-slate-100 rounded-xl transition-colors"
-                >
-                  <Bell size={20} className="text-slate-500" />
-                  {unreadMessagesCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                      {unreadMessagesCount > 9 ? "9+" : unreadMessagesCount}
-                    </span>
-                  )}
-                </button>
+              <button
+                onClick={() => setExpandedMessage(expandedMessage ? null : "panel")}
+                className="relative p-2 hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                <Bell size={20} className="text-slate-500" />
+                {unreadMessagesCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    {unreadMessagesCount > 9 ? "9+" : unreadMessagesCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
-                {/* Dropdown panel */}
-                {expandedMessage === "panel" && (
-                  <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-lg z-[60] overflow-hidden">
-                      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                        <span className="text-sm font-semibold text-slate-900">Notificaciones</span>
-                        {unreadMessagesCount > 0 && (
-                          <span className="text-xs text-slate-500">{unreadMessagesCount} sin leer</span>
-                        )}
-                      </div>
+      {/* Notification Panel - Fixed position fuera del flow */}
+      {expandedMessage === "panel" && (
+        <>
+          <div 
+            className="fixed inset-0 z-[100]" 
+            onClick={() => setExpandedMessage(null)}
+          />
+          <div className="fixed top-32 right-6 md:right-8 lg:right-12 xl:right-16 2xl:right-24 w-80 bg-white border border-slate-200 rounded-2xl shadow-lg z-[101] overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <span className="text-sm font-semibold text-slate-900">Notificaciones</span>
+              {unreadMessagesCount > 0 && (
+                <span className="text-xs text-slate-500">{unreadMessagesCount} sin leer</span>
+              )}
+            </div>
                       {messages.length === 0 ? (
                         <div className="px-4 py-8 text-center">
                           <Bell size={24} className="text-slate-300 mx-auto mb-2" />
@@ -625,12 +625,8 @@ export default function Dashboard() {
                         </>
                       )}
                     </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+                </>
+              )}
 
       <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
         {/* Invitaciones */}
