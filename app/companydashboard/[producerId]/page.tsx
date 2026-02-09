@@ -15,15 +15,12 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import {
-  ArrowLeft,
   Building2,
   Users,
   FolderOpen,
   ExternalLink,
-  RefreshCw,
   Eye,
   Clock,
-  Calendar,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 
@@ -60,7 +57,6 @@ export default function CompanyDashboardPage() {
   const { user: contextUser, isLoading: userLoading } = useUser();
 
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [producer, setProducer] = useState<Producer | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
 
@@ -130,12 +126,6 @@ export default function CompanyDashboardPage() {
     }
   };
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  };
-
   // Stats
   const activeProjects = projects.filter((p) => p.phase !== "Finalizado").length;
   const finishedProjects = projects.filter((p) => p.phase === "Finalizado").length;
@@ -160,79 +150,28 @@ export default function CompanyDashboardPage() {
   return (
     <div className={"min-h-screen bg-white " + inter.className}>
       {/* Header */}
-      <header className="sticky top-0 bg-white border-b border-slate-200 z-40">
-        <div className="px-6 md:px-8 lg:px-12 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {isAdmin && (
-                <Link
-                  href="/admindashboard"
-                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
-                >
-                  <ArrowLeft size={20} />
-                </Link>
-              )}
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
-                  <Building2 size={20} className="text-slate-600" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-slate-900">{producer.name}</h1>
-                  <p className="text-sm text-slate-500">Panel de productora</p>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl disabled:opacity-50"
-            >
-              <RefreshCw size={18} className={refreshing ? "animate-spin" : ""} />
-            </button>
-          </div>
+      <div className="mt-[4.5rem]">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
+          <h1 className="text-3xl font-bold text-slate-900 text-center">{producer.name}</h1>
         </div>
-      </header>
+      </div>
 
-      {/* Main Content */}
-      <main className="px-6 md:px-8 lg:px-12 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white border border-slate-200 rounded-2xl p-5">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-                <FolderOpen size={18} className="text-blue-600" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-slate-900">{projects.length}</p>
-            <p className="text-sm text-slate-500">Proyectos totales</p>
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        {/* Stats row - minimal */}
+        <div className="flex flex-wrap items-center justify-center gap-6 mb-8 text-sm">
+          <div className="flex items-center gap-2">
+            <FolderOpen size={16} className="text-slate-400" />
+            <span className="text-slate-600">{projects.length} proyectos</span>
+            <span className="text-slate-400">·</span>
+            <span className="text-blue-600">{activeProjects} activos</span>
           </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-5">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
-                <Clock size={18} className="text-amber-600" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-slate-900">{activeProjects}</p>
-            <p className="text-sm text-slate-500">En curso</p>
+          <div className="flex items-center gap-2">
+            <Clock size={16} className="text-slate-400" />
+            <span className="text-emerald-600">{finishedProjects} finalizados</span>
           </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-5">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
-                <Calendar size={18} className="text-emerald-600" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-slate-900">{finishedProjects}</p>
-            <p className="text-sm text-slate-500">Finalizados</p>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-5">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center">
-                <Users size={18} className="text-violet-600" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-slate-900">{totalMembers}</p>
-            <p className="text-sm text-slate-500">Miembros totales</p>
+          <div className="flex items-center gap-2">
+            <Users size={16} className="text-slate-400" />
+            <span className="text-slate-600">{totalMembers} miembros</span>
           </div>
         </div>
 
