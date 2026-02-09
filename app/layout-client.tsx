@@ -46,34 +46,50 @@ export default function ClientLayout({
           
           const userData = userDoc.data();
           const role = userData.role || "user";
-          const companyId = userData.companyId;
+          const companyId = userData.companyId || null;
+          const isAdmin = role === "admin";
+          const isCompanyUser = !!companyId;
 
-          // Si es usuario de productora y está en dashboard, redirigir a companydashboard
-          if (companyId && isDashboardPage) {
-            router.push(`/companydashboard/${companyId}`);
+          // ADMIN: puede ir a cualquier sitio, no redirigir
+          if (isAdmin) {
             return;
           }
 
-          // Si es usuario de productora y está en admindashboard, redirigir a companydashboard
-          if (companyId && isAdminPage && role !== "admin") {
-            router.push(`/companydashboard/${companyId}`);
+          // USUARIO DE PRODUCTORA (no admin)
+          if (isCompanyUser) {
+            // Si intenta ir a dashboard normal, redirigir a companydashboard
+            if (isDashboardPage) {
+              router.push(`/companydashboard/${companyId}`);
+              return;
+            }
+            // Si intenta ir a admindashboard, redirigir a companydashboard
+            if (isAdminPage) {
+              router.push(`/companydashboard/${companyId}`);
+              return;
+            }
+            // Si intenta ir a otro companydashboard que no es el suyo, redirigir al suyo
+            if (isCompanyPage) {
+              const companyIdFromUrl = pathname.split("/")[2];
+              if (companyId !== companyIdFromUrl) {
+                router.push(`/companydashboard/${companyId}`);
+                return;
+              }
+            }
             return;
           }
 
-          // Si es admin dashboard, verificar que sea admin
-          if (isAdminPage && role !== "admin") {
+          // USUARIO NORMAL (sin companyId, no admin)
+          // Si intenta ir a admindashboard, redirigir a dashboard
+          if (isAdminPage) {
+            router.push("/dashboard");
+            return;
+          }
+          // Si intenta ir a companydashboard, redirigir a dashboard
+          if (isCompanyPage) {
             router.push("/dashboard");
             return;
           }
 
-          // Si es companydashboard, verificar que sea usuario de esa productora o admin
-          if (isCompanyPage && role !== "admin") {
-            const companyIdFromUrl = pathname.split("/")[2];
-            if (companyId !== companyIdFromUrl) {
-              router.push(companyId ? `/companydashboard/${companyId}` : "/dashboard");
-              return;
-            }
-          }
         } catch (error) {
           console.error("Error verificando usuario:", error);
         }
