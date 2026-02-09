@@ -314,7 +314,7 @@ export default function CompanyAccountsPage() {
 
   if (loading || userLoading) {
     return (
-      <div className={"min-h-screen bg-slate-50 flex items-center justify-center " + inter.className}>
+      <div className={"min-h-screen bg-white flex items-center justify-center " + inter.className}>
         <div className="w-8 h-8 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
       </div>
     );
@@ -323,7 +323,7 @@ export default function CompanyAccountsPage() {
   if (!producer || !project) return null;
 
   return (
-    <div className={"min-h-screen bg-slate-50 " + inter.className}>
+    <div className={"min-h-screen bg-white " + inter.className}>
       {toast && (
         <div className="fixed bottom-4 right-4 z-50">
           <div className={`flex items-center gap-2 px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium ${
@@ -335,7 +335,7 @@ export default function CompanyAccountsPage() {
         </div>
       )}
 
-      <div className="mt-[4.5rem]">
+      <div className="mt-16">
         <div className="bg-white border-b border-slate-200 px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -453,6 +453,7 @@ export default function CompanyAccountsPage() {
                     <th className="px-3 py-2">Nº Factura</th>
                     <th className="px-3 py-2">Proveedor</th>
                     <th className="px-3 py-2">Fecha</th>
+                    <th className="px-3 py-2">Cuenta</th>
                     <th className="px-3 py-2 text-right">Base</th>
                     <th className="px-3 py-2 text-right">IVA</th>
                     <th className="px-3 py-2 text-right">Total</th>
@@ -466,6 +467,8 @@ export default function CompanyAccountsPage() {
                     const isCoded = isInvoiceCoded(invoice);
                     const canBeAccounted = isCoded && ["approved", "pending", "paid"].includes(invoice.status);
                     const statusConf = STATUS_CONFIG[invoice.status] || STATUS_CONFIG.pending;
+                    // Obtener cuentas únicas de los items
+                    const accountCodes = [...new Set(invoice.items.map((item: any) => item.subAccountCode).filter(Boolean))];
 
                     return (
                       <tr key={invoice.id} className="hover:bg-slate-50">
@@ -495,6 +498,23 @@ export default function CompanyAccountsPage() {
 
                         <td className="px-3 py-2 text-slate-500 text-xs">
                           {formatDate(invoice.invoiceDate || invoice.createdAt)}
+                        </td>
+
+                        <td className="px-3 py-2">
+                          {accountCodes.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {accountCodes.slice(0, 2).map((code, idx) => (
+                                <span key={idx} className="font-mono text-[10px] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
+                                  {code}
+                                </span>
+                              ))}
+                              {accountCodes.length > 2 && (
+                                <span className="text-[10px] text-slate-400">+{accountCodes.length - 2}</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
                         </td>
 
                         <td className="px-3 py-2 text-right font-mono text-xs text-slate-700">
