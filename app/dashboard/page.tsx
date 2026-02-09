@@ -528,7 +528,7 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold text-slate-900">Panel de proyectos</h1>
             
             {/* Notification Bell */}
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 z-[60]">
+            <div className={`absolute right-0 top-1/2 -translate-y-1/2 ${expandedMessage ? "z-[60]" : ""}`}>
               <div className="relative">
                 <button
                   onClick={() => setExpandedMessage(expandedMessage ? null : "panel")}
