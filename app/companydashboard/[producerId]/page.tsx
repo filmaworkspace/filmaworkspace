@@ -81,7 +81,7 @@ export default function CompanyDashboardPage() {
       // Get producer info
       const producerDoc = await getDoc(doc(db, "producers", producerId));
       if (!producerDoc.exists()) {
-        router.push("/admindashboard");
+        router.push(isAdmin ? "/admindashboard" : "/");
         return;
       }
       setProducer({
@@ -89,27 +89,30 @@ export default function CompanyDashboardPage() {
         name: producerDoc.data().name,
       });
 
-      // Get all projects that have this producer
-      const projectsSnap = await getDocs(collection(db, "projects"));
+      // Get projects from companyProjects collection (seguridad estricta)
+      const companyProjectsSnap = await getDocs(collection(db, `companyProjects/${producerId}/projects`));
       const producerProjects: Project[] = [];
 
-      for (const projectDoc of projectsSnap.docs) {
-        const data = projectDoc.data();
-        const producers = data.producers || [];
+      for (const cpDoc of companyProjectsSnap.docs) {
+        const projectId = cpDoc.id;
         
-        if (producers.includes(producerId)) {
-          // Get member count
-          const membersSnap = await getDocs(collection(db, `projects/${projectDoc.id}/members`));
-          
-          producerProjects.push({
-            id: projectDoc.id,
-            name: data.name,
-            phase: data.phase || "Desarrollo",
-            description: data.description,
-            memberCount: membersSnap.size,
-            createdAt: data.createdAt,
-          });
-        }
+        // Get full project data
+        const projectDoc = await getDoc(doc(db, "projects", projectId));
+        if (!projectDoc.exists()) continue;
+        
+        const data = projectDoc.data();
+        
+        // Get member count
+        const membersSnap = await getDocs(collection(db, `projects/${projectId}/members`));
+        
+        producerProjects.push({
+          id: projectId,
+          name: data.name,
+          phase: data.phase || "Desarrollo",
+          description: data.description,
+          memberCount: membersSnap.size,
+          createdAt: data.createdAt,
+        });
       }
 
       // Sort by createdAt desc
