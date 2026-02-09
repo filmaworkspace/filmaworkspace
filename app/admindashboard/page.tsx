@@ -1504,7 +1504,6 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {PHASES.map((phase) => {
                     const config = phaseConfig[phase];
-                    const PhaseIcon = config.icon;
                     return (
                       <button
                         key={phase}
@@ -1515,7 +1514,7 @@ export default function AdminDashboard() {
                             : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                         }`}
                       >
-                        <PhaseIcon size={14} />
+                        <div className={`w-2 h-2 rounded-full ${config.dot}`} />
                         {phase}
                       </button>
                     );
