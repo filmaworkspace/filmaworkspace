@@ -231,13 +231,6 @@ export default function ProjectOverviewPage() {
         {/* Header del proyecto */}
         <div className="mb-10">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
-              {projectType === "serie" ? (
-                <Tv size={24} className="text-slate-600" />
-              ) : (
-                <Film size={24} className="text-slate-600" />
-              )}
-            </div>
             <div>
               <h1 className="text-3xl font-bold text-slate-900">{project.name}</h1>
               <div className="flex items-center gap-3 mt-1">
