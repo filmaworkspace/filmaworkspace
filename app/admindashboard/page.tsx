@@ -402,6 +402,16 @@ export default function AdminDashboard() {
         departments: DEFAULT_DEPARTMENTS.map(d => d.name),
         createdAt: serverTimestamp(),
       });
+
+      // Sincronizar companyProjects para cada productora asignada
+      for (const producerId of newProject.producers) {
+        await setDoc(doc(db, `companyProjects/${producerId}/projects`, projectId), {
+          projectId,
+          name: newProject.name.trim(),
+          phase: newProject.phase,
+          addedAt: serverTimestamp(),
+        });
+      }
       
       setNewProject({ name: "", description: "", phase: "Desarrollo", producers: [] });
       setShowCreateProject(false);
@@ -419,12 +429,35 @@ export default function AdminDashboard() {
     if (!showEditProject) return;
     setSaving(true);
     try {
+      const oldProject = projects.find(p => p.id === showEditProject);
+      const oldProducers = oldProject?.producers || [];
+      const newProducers = newProject.producers;
+
       await updateDoc(doc(db, "projects", showEditProject), {
         name: newProject.name.trim(),
         description: newProject.description.trim(),
         phase: newProject.phase,
         producers: newProject.producers,
       });
+
+      // Sincronizar companyProjects
+      // Eliminar de productoras que ya no están asignadas
+      for (const producerId of oldProducers) {
+        if (!newProducers.includes(producerId)) {
+          await deleteDoc(doc(db, `companyProjects/${producerId}/projects`, showEditProject));
+        }
+      }
+      
+      // Añadir/actualizar en productoras asignadas
+      for (const producerId of newProducers) {
+        await setDoc(doc(db, `companyProjects/${producerId}/projects`, showEditProject), {
+          projectId: showEditProject,
+          name: newProject.name.trim(),
+          phase: newProject.phase,
+          addedAt: serverTimestamp(),
+        });
+      }
+
       setShowEditProject(null);
       showToast("success", "Proyecto actualizado");
       await loadData();
@@ -447,6 +480,11 @@ export default function AdminDashboard() {
       for (const memberDoc of membersSnap.docs) {
         await deleteDoc(doc(db, `userProjects/${memberDoc.id}/projects/${projectId}`));
         await deleteDoc(memberDoc.ref);
+      }
+      
+      // Eliminar de companyProjects de cada productora
+      for (const producerId of project.producers || []) {
+        await deleteDoc(doc(db, `companyProjects/${producerId}/projects`, projectId));
       }
       
       // Eliminar el proyecto
