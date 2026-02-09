@@ -15,6 +15,7 @@ import {
   query,
   orderBy,
 } from "firebase/firestore";
+import { handleInvoiceStatusChange, unrealizeInvoice } from "@/lib/budgetOperations";
 import {
   ArrowLeft,
   Building2,
@@ -232,6 +233,10 @@ export default function CompanyAccountsPage() {
 
     setSaving(true);
     try {
+      const oldStatus = showAccountingModal.status;
+      const newStatus = "accounted";
+
+      // Actualizar la factura
       await updateDoc(doc(db, `projects/${projectId}/invoices`, showAccountingModal.id), {
         accounted: true,
         accountedAt: new Date(),
@@ -239,8 +244,16 @@ export default function CompanyAccountsPage() {
         accountedByName: contextUser?.name,
         accountingEntryNumber: accountingForm.entryNumber.trim(),
         accountingAccount: accountingForm.accountingAccount.trim() || null,
-        status: "accounted",
+        status: newStatus,
       });
+
+      // Ejecutar operaciones de presupuesto según budgetRules
+      // Si la config es "on_account", esto realizará la factura (moverá de committed a actual)
+      const invoiceItems = showAccountingModal.items.map((item: any) => ({
+        subAccountId: item.subAccountId,
+        baseAmount: item.baseAmount || 0,
+      }));
+      await handleInvoiceStatusChange(projectId, oldStatus, newStatus, invoiceItems);
 
       setShowAccountingModal(null);
       setAccountingForm({ entryNumber: "", accountingAccount: "" });
@@ -259,10 +272,21 @@ export default function CompanyAccountsPage() {
 
     setSaving(true);
     try {
+      const oldStatus = invoice.status; // "accounted"
+      const newStatus = "approved"; // Vuelve a aprobada
+
       await updateDoc(doc(db, `projects/${projectId}/invoices`, invoice.id), {
         accounted: false,
-        status: "approved", // Vuelve a aprobada para que puedan editarla
+        status: newStatus,
       });
+
+      // Revertir operaciones de presupuesto según budgetRules
+      // Si la config es "on_account", esto des-realizará la factura (moverá de actual a committed)
+      const invoiceItems = invoice.items.map((item: any) => ({
+        subAccountId: item.subAccountId,
+        baseAmount: item.baseAmount || 0,
+      }));
+      await handleInvoiceStatusChange(projectId, oldStatus, newStatus, invoiceItems);
 
       showToast("success", "Factura desbloqueada");
       await loadData();
