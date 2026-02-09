@@ -694,12 +694,12 @@ export default function Dashboard() {
 
         {/* Empty state */}
         {projects.length === 0 && invitations.length === 0 ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Folder size={28} className="text-slate-400" />
+          <div className="border-2 border-dashed border-slate-200 rounded-2xl">
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center">
+                <Folder size={32} className="text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500">No tienes proyectos asignados</p>
               </div>
-              <p className="text-slate-500">No tienes proyectos asignados</p>
             </div>
           </div>
         ) : (
