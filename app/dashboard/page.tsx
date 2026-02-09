@@ -527,8 +527,16 @@ export default function Dashboard() {
           <div className="flex items-center justify-center relative">
             <h1 className="text-3xl font-bold text-slate-900">Panel de proyectos</h1>
             
+            {/* Backdrop para cerrar notificaciones */}
+            {expandedMessage === "panel" && (
+              <div 
+                className="fixed inset-0 z-[55]" 
+                onClick={() => setExpandedMessage(null)}
+              />
+            )}
+            
             {/* Notification Bell */}
-            <div className={`absolute right-0 top-1/2 -translate-y-1/2 ${expandedMessage ? "z-[60]" : ""}`}>
+            <div className="absolute right-0 top-1/2 -translate-y-1/2">
               <div className="relative">
                 <button
                   onClick={() => setExpandedMessage(expandedMessage ? null : "panel")}
@@ -544,12 +552,7 @@ export default function Dashboard() {
 
                 {/* Dropdown panel */}
                 {expandedMessage === "panel" && (
-                  <>
-                    <div 
-                      className="fixed inset-0 z-[60]" 
-                      onClick={() => setExpandedMessage(null)}
-                    />
-                    <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-lg z-[70] overflow-hidden">
+                  <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-lg z-[60] overflow-hidden">
                       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                         <span className="text-sm font-semibold text-slate-900">Notificaciones</span>
                         {unreadMessagesCount > 0 && (
@@ -618,7 +621,6 @@ export default function Dashboard() {
                         </>
                       )}
                     </div>
-                  </>
                 )}
               </div>
             </div>
