@@ -24,11 +24,12 @@ export default function ClientLayout({
     pathname === "/forgot-password";
 
   // Páginas que requieren autenticación
-  const isDashboardPage = pathname.startsWith("/dashboard");
+  const isDashboardPage = pathname === "/dashboard";
   const isAdminPage = pathname.startsWith("/admin");
   const isProjectPage = pathname.startsWith("/project");
   const isProfilePage = pathname.startsWith("/profile");
-  const requiresAuth = isDashboardPage || isAdminPage || isProjectPage || isProfilePage;
+  const isCompanyPage = pathname.startsWith("/companydashboard");
+  const requiresAuth = isDashboardPage || isAdminPage || isProjectPage || isProfilePage || isCompanyPage;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -38,23 +39,49 @@ export default function ClientLayout({
         return;
       }
 
-      // Si es admin dashboard, verificar que sea admin
-      if (user && isAdminPage) {
+      if (user) {
         try {
           const userDoc = await getDoc(doc(db, "users", user.uid));
-          const role = userDoc.exists() ? userDoc.data().role : "user";
-          if (role !== "admin") {
+          if (!userDoc.exists()) return;
+          
+          const userData = userDoc.data();
+          const role = userData.role || "user";
+          const companyId = userData.companyId;
+
+          // Si es usuario de productora y está en dashboard, redirigir a companydashboard
+          if (companyId && isDashboardPage) {
+            router.push(`/companydashboard/${companyId}`);
+            return;
+          }
+
+          // Si es usuario de productora y está en admindashboard, redirigir a companydashboard
+          if (companyId && isAdminPage && role !== "admin") {
+            router.push(`/companydashboard/${companyId}`);
+            return;
+          }
+
+          // Si es admin dashboard, verificar que sea admin
+          if (isAdminPage && role !== "admin") {
             router.push("/dashboard");
             return;
           }
+
+          // Si es companydashboard, verificar que sea usuario de esa productora o admin
+          if (isCompanyPage && role !== "admin") {
+            const companyIdFromUrl = pathname.split("/")[2];
+            if (companyId !== companyIdFromUrl) {
+              router.push(companyId ? `/companydashboard/${companyId}` : "/dashboard");
+              return;
+            }
+          }
         } catch (error) {
-          console.error("Error verificando rol:", error);
+          console.error("Error verificando usuario:", error);
         }
       }
     });
 
     return () => unsubscribe();
-  }, [pathname, router, requiresAuth, isAdminPage]);
+  }, [pathname, router, requiresAuth, isAdminPage, isDashboardPage, isCompanyPage]);
 
   return (
     <UserProvider>
