@@ -329,9 +329,10 @@ export default function CompanyAccountsPage() {
         </div>
       )}
 
-      {/* Header compacto */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="px-4 py-3">
+      {/* Content area con margen para el header global */}
+      <div className="mt-[4.5rem]">
+        {/* Breadcrumb bar */}
+        <div className="bg-white border-b border-slate-200 px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Link
@@ -358,9 +359,8 @@ export default function CompanyAccountsPage() {
             </button>
           </div>
         </div>
-      </header>
 
-      {/* Stats bar compacta */}
+        {/* Stats bar compacta */}
       <div className="bg-white border-b border-slate-200 px-4 py-2">
         <div className="flex items-center gap-6 text-xs">
           <div className="flex items-center gap-1.5">
