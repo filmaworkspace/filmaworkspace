@@ -117,6 +117,7 @@ interface Producer {
   name: string;
   createdAt: Timestamp;
   projectCount: number;
+  users?: { id: string; name: string; email: string }[];
 }
 
 export default function AdminDashboard() {
@@ -160,6 +161,8 @@ export default function AdminDashboard() {
   const [showEditProject, setShowEditProject] = useState<string | null>(null);
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [showAssignCompanyUser, setShowAssignCompanyUser] = useState<string | null>(null);
+  const [companyUserSearch, setCompanyUserSearch] = useState("");
 
   const [newProject, setNewProject] = useState({ name: "", description: "", phase: "Desarrollo", producers: [] as string[] });
   const [newProducer, setNewProducer] = useState({ name: "" });
@@ -256,7 +259,6 @@ export default function AdminDashboard() {
         p.projectCount = projectsData.filter((pr) => pr.producers?.includes(p.id)).length;
       });
       setProjects(projectsData);
-      setProducers(producersData);
 
       const usersSnap = await getDocs(collection(db, "users"));
       const usersData: User[] = await Promise.all(
@@ -286,6 +288,17 @@ export default function AdminDashboard() {
         })
       );
       setUsers(usersData);
+
+      // Assign users to producers based on companyId
+      producersData.forEach((p) => {
+        p.users = usersData
+          .filter((u) => {
+            const userData = usersSnap.docs.find((d) => d.id === u.id)?.data();
+            return userData?.companyId === p.id;
+          })
+          .map((u) => ({ id: u.id, name: u.name, email: u.email }));
+      });
+      setProducers(producersData);
 
       // Load active messages from all users
       const messagesMap = new Map<string, {
@@ -578,6 +591,37 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error(error);
       showToast("error", "Error al actualizar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAssignCompanyUser = async (odId: string, producerId: string) => {
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, "users", odId), { companyId: producerId });
+      setShowAssignCompanyUser(null);
+      setCompanyUserSearch("");
+      showToast("success", "Usuario asignado a productora");
+      await loadData();
+    } catch (error) {
+      console.error(error);
+      showToast("error", "Error al asignar usuario");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveCompanyUser = async (odId: string) => {
+    if (!confirm("¿Quitar este usuario de la productora?")) return;
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, "users", odId), { companyId: null });
+      showToast("success", "Usuario eliminado de productora");
+      await loadData();
+    } catch (error) {
+      console.error(error);
+      showToast("error", "Error al eliminar usuario");
     } finally {
       setSaving(false);
     }
@@ -1188,36 +1232,78 @@ export default function AdminDashboard() {
                   {filteredProducers.map((producer) => (
                     <div
                       key={producer.id}
-                      className="flex items-center justify-between px-5 py-4 hover:bg-slate-50"
+                      className="px-5 py-4 hover:bg-slate-50"
                     >
-                      <div className="flex items-center gap-3">
-                        <Building2 size={16} className="text-slate-400" />
-                        <div>
-                          <h3 className="text-sm font-medium text-slate-900">{producer.name}</h3>
-                          <p className="text-xs text-slate-500">
-                            {producer.projectCount} proyecto{producer.projectCount !== 1 ? "s" : ""}
-                          </p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Building2 size={16} className="text-slate-400" />
+                          <div>
+                            <h3 className="text-sm font-medium text-slate-900">{producer.name}</h3>
+                            <p className="text-xs text-slate-500">
+                              {producer.projectCount} proyecto{producer.projectCount !== 1 ? "s" : ""}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Link
+                            href={`/companydashboard/${producer.id}`}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                            title="Ver panel de productora"
+                          >
+                            <Eye size={14} />
+                          </Link>
+                          <button
+                            onClick={() => setShowAssignCompanyUser(producer.id)}
+                            className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                            title="Añadir usuario de productora"
+                          >
+                            <UserPlus size={14} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setNewProducer({ name: producer.name });
+                              setShowEditProducer(producer.id);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProducer(producer.id)}
+                            disabled={saving || producer.projectCount > 0}
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={producer.projectCount > 0 ? "Tiene proyectos" : "Eliminar"}
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => {
-                            setNewProducer({ name: producer.name });
-                            setShowEditProducer(producer.id);
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteProducer(producer.id)}
-                          disabled={saving || producer.projectCount > 0}
-                          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                          title={producer.projectCount > 0 ? "Tiene proyectos" : "Eliminar"}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      
+                      {/* Usuarios de productora */}
+                      {producer.users && producer.users.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-slate-100">
+                          <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mb-2">Usuarios de productora</p>
+                          <div className="flex flex-wrap gap-2">
+                            {producer.users.map((user) => (
+                              <div
+                                key={user.id}
+                                className="flex items-center gap-2 px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg group"
+                              >
+                                <div className="w-5 h-5 bg-emerald-100 rounded flex items-center justify-center text-emerald-700 text-[10px] font-medium">
+                                  {user.name.charAt(0).toUpperCase()}
+                                </div>
+                                <span className="text-xs text-emerald-700">{user.name}</span>
+                                <button
+                                  onClick={() => handleRemoveCompanyUser(user.id)}
+                                  className="p-0.5 text-emerald-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1531,6 +1617,85 @@ export default function AdminDashboard() {
               >
                 {saving ? "Guardando..." : showEditProducer ? "Guardar cambios" : "Crear productora"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Company User Modal */}
+      {showAssignCompanyUser && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                  <Building2 size={20} className="text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Añadir usuario de productora</h3>
+                  <p className="text-xs text-slate-500">
+                    {producers.find((p) => p.id === showAssignCompanyUser)?.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAssignCompanyUser(null);
+                  setCompanyUserSearch("");
+                }}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-slate-500 mb-4">
+                Este usuario podrá acceder al panel de la productora y ver todos sus proyectos.
+              </p>
+              <div className="relative mb-4">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar usuario"
+                  value={companyUserSearch}
+                  onChange={(e) => setCompanyUserSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
+                />
+              </div>
+              <div className="max-h-64 overflow-y-auto space-y-1">
+                {users
+                  .filter((u) => {
+                    // Exclude users already assigned to any company
+                    const userData = u;
+                    const hasCompany = producers.some((p) => p.users?.some((pu) => pu.id === u.id));
+                    if (hasCompany) return false;
+                    // Filter by search
+                    if (!companyUserSearch) return true;
+                    return (
+                      u.name.toLowerCase().includes(companyUserSearch.toLowerCase()) ||
+                      u.email.toLowerCase().includes(companyUserSearch.toLowerCase())
+                    );
+                  })
+                  .map((user) => (
+                    <button
+                      key={user.id}
+                      onClick={() => handleAssignCompanyUser(user.id, showAssignCompanyUser)}
+                      disabled={saving}
+                      className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 rounded-xl text-left transition-colors disabled:opacity-50"
+                    >
+                      <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600 text-sm font-medium">
+                        {user.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">{user.name}</p>
+                        <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                      </div>
+                    </button>
+                  ))}
+                {users.filter((u) => !producers.some((p) => p.users?.some((pu) => pu.id === u.id))).length === 0 && (
+                  <p className="text-sm text-slate-500 text-center py-4">No hay usuarios disponibles</p>
+                )}
+              </div>
             </div>
           </div>
         </div>
