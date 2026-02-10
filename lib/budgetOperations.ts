@@ -111,14 +111,25 @@ export async function uncommitPO(
  * Maneja el cambio de estado de una PO
  * - Si pasa a estado que debe comprometer → suma a committed
  * - Si pasa a rejected/cancelled → resta de committed
+ * - Si tiene previousCommittedItems (edición de PO aprobada), hace la diferencia
  */
 export async function handlePOStatusChange(
   projectId: string,
   oldStatus: string,
   newStatus: string,
-  poItems: BudgetItem[]
+  poItems: BudgetItem[],
+  previousCommittedItems?: BudgetItem[] | null
 ): Promise<void> {
   const costSettings = await getCostSettings(projectId);
+  
+  // Caso especial: edición de PO que tenía comprometido anterior
+  if (previousCommittedItems && previousCommittedItems.length > 0 && newStatus === "approved") {
+    // Descomprometer los items anteriores
+    await uncommitPO(projectId, previousCommittedItems);
+    // Comprometer los nuevos items
+    await commitPO(projectId, poItems);
+    return;
+  }
   
   // ¿Hay que comprometer?
   if (shouldCommitOnStatusChange(oldStatus, newStatus, costSettings)) {
