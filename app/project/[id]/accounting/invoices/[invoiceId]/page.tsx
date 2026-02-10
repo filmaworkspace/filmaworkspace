@@ -827,84 +827,53 @@ export default function InvoiceDetailPage() {
       </div>
 
       <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
-        {/* Datos fiscales - Mostrar prominentemente cuando está codificada */}
-        {invoice.codedAt && (
-          <div className="mb-8 bg-white border border-slate-200 rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <FileCheck size={18} className="text-violet-600" />
-                <h3 className="font-semibold text-slate-900">Datos fiscales</h3>
-              </div>
-              {canCode() && (
-                <button onClick={() => setCodingMode(true)} className="text-xs text-violet-600 hover:text-violet-800 font-medium">
-                  Editar
-                </button>
-              )}
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              <div>
-                <p className="text-xs text-slate-500 mb-1">Nº Factura proveedor</p>
-                <p className="font-mono font-semibold text-slate-900">{invoice.supplierNumber || "-"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 mb-1">Fecha factura</p>
-                <p className="font-medium text-slate-900">{invoice.invoiceDate ? formatDate(invoice.invoiceDate) : "-"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 mb-1">Fecha vencimiento</p>
-                <p className="font-medium text-slate-900">{invoice.dueDate ? formatDate(invoice.dueDate) : "-"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 mb-1">CIF/NIF proveedor</p>
-                <p className="font-mono font-medium text-slate-900">{invoice.supplierTaxId || "-"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 mb-1">IBAN</p>
-                <p className="font-mono text-sm text-slate-900">{invoice.supplierIban || "-"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 mb-1">Codificada por</p>
-                <p className="text-sm text-slate-700">{invoice.codedByName} · {formatDateTime(invoice.codedAt)}</p>
-              </div>
-            </div>
+        {/* Descripción siempre primero */}
+        {invoice.description && (
+          <div className="mb-6 bg-slate-50 border border-slate-200 rounded-xl px-5 py-4">
+            <p className="text-slate-700">{invoice.description}</p>
           </div>
         )}
 
-        {/* Info de contabilización */}
-        {invoice.accounted && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Lock size={18} className="text-emerald-600" />
-              <h3 className="font-semibold text-emerald-900">Factura contabilizada</h3>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-xs text-emerald-600 mb-1">Nº Asiento</p>
-                <p className="font-mono font-semibold text-emerald-900">{invoice.accountingEntryNumber || "-"}</p>
-              </div>
-              {invoice.accountingAccount && (
-                <div>
-                  <p className="text-xs text-emerald-600 mb-1">Cuenta contable</p>
-                  <p className="font-mono font-medium text-emerald-900">{invoice.accountingAccount}</p>
-                </div>
-              )}
-              <div>
-                <p className="text-xs text-emerald-600 mb-1">Contabilizada por</p>
-                <p className="text-sm text-emerald-800">{invoice.accountedByName || "-"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-emerald-600 mb-1">Fecha contabilización</p>
-                <p className="text-sm text-emerald-800">{invoice.accountedAt ? formatDateTime(invoice.accountedAt) : "-"}</p>
-              </div>
-            </div>
+        {/* Info compacta de codificación y contabilización */}
+        {(invoice.codedAt || invoice.accounted) && (
+          <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-slate-500">
+            {invoice.codedAt && (
+              <>
+                <span className="flex items-center gap-1.5">
+                  <FileCheck size={12} className="text-violet-500" />
+                  <span>Codificada por {invoice.codedByName}</span>
+                </span>
+                {invoice.supplierNumber && (
+                  <span>Nº prov: <span className="font-mono text-slate-700">{invoice.supplierNumber}</span></span>
+                )}
+                {invoice.supplierTaxId && (
+                  <span>CIF: <span className="font-mono text-slate-700">{invoice.supplierTaxId}</span></span>
+                )}
+                {invoice.supplierIban && (
+                  <span>IBAN: <span className="font-mono text-slate-700">{invoice.supplierIban}</span></span>
+                )}
+                {canCode() && (
+                  <button onClick={() => setCodingMode(true)} className="text-violet-600 hover:text-violet-800 font-medium">
+                    Editar
+                  </button>
+                )}
+              </>
+            )}
+            {invoice.accounted && (
+              <>
+                <span className="flex items-center gap-1.5">
+                  <Lock size={12} className="text-emerald-500" />
+                  <span>Asiento: <span className="font-mono text-emerald-700 font-medium">{invoice.accountingEntryNumber}</span></span>
+                </span>
+                <span className="text-slate-400">por {invoice.accountedByName}</span>
+              </>
+            )}
           </div>
         )}
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           {/* Left: Document Preview */}
           <div className="space-y-6">
-            {invoice.description && <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6"><h3 className="font-semibold text-slate-900 mb-2">Descripción</h3><p className="text-slate-700">{invoice.description}</p></div>}
-            
             {/* Document Preview with actions */}
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
