@@ -127,7 +127,6 @@ export default function CompanyAccountsPage() {
   const [showDocument, setShowDocument] = useState(false);
   const [accountingForm, setAccountingForm] = useState({
     entryNumber: "",
-    accountingAccount: "",
   });
 
   const isAdmin = contextUser?.role === "admin";
@@ -245,7 +244,6 @@ export default function CompanyAccountsPage() {
         accountedBy: contextUser?.uid,
         accountedByName: contextUser?.name,
         accountingEntryNumber: accountingForm.entryNumber.trim(),
-        accountingAccount: accountingForm.accountingAccount.trim() || null,
         status: newStatus,
       });
 
@@ -256,7 +254,7 @@ export default function CompanyAccountsPage() {
       await handleInvoiceStatusChange(projectId, oldStatus, newStatus, invoiceItems);
 
       showToast("success", "Factura contabilizada");
-      setAccountingForm({ entryNumber: "", accountingAccount: "" });
+      setAccountingForm({ entryNumber: "" });
       await loadData();
       
       // Navegar a la siguiente
@@ -326,7 +324,7 @@ export default function CompanyAccountsPage() {
     if (currentIndex > 0) {
       const prev = filteredInvoices[currentIndex - 1];
       setSelectedInvoice(prev);
-      setAccountingForm({ entryNumber: prev.accountingEntryNumber || "", accountingAccount: prev.accountingAccount || "" });
+      setAccountingForm({ entryNumber: prev.accountingEntryNumber || "" });
     }
   };
 
@@ -334,7 +332,7 @@ export default function CompanyAccountsPage() {
     if (currentIndex < filteredInvoices.length - 1) {
       const next = filteredInvoices[currentIndex + 1];
       setSelectedInvoice(next);
-      setAccountingForm({ entryNumber: next.accountingEntryNumber || "", accountingAccount: next.accountingAccount || "" });
+      setAccountingForm({ entryNumber: next.accountingEntryNumber || "" });
     } else {
       setSelectedInvoice(null);
     }
@@ -355,7 +353,6 @@ export default function CompanyAccountsPage() {
     setShowDocument(false);
     setAccountingForm({
       entryNumber: invoice.accountingEntryNumber || "",
-      accountingAccount: invoice.accountingAccount || "",
     });
   };
 
@@ -771,31 +768,17 @@ export default function CompanyAccountsPage() {
                 <div className="border-t border-slate-200 pt-4 space-y-3">
                   <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Contabilizar</h4>
                   
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">
-                        Nº Asiento <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={accountingForm.entryNumber}
-                        onChange={(e) => setAccountingForm({ ...accountingForm, entryNumber: e.target.value })}
-                        placeholder="A-2024-001"
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-400 outline-none font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">
-                        Cuenta contable
-                      </label>
-                      <input
-                        type="text"
-                        value={accountingForm.accountingAccount}
-                        onChange={(e) => setAccountingForm({ ...accountingForm, accountingAccount: e.target.value })}
-                        placeholder="6230001"
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-400 outline-none font-mono"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Nº Asiento <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={accountingForm.entryNumber}
+                      onChange={(e) => setAccountingForm({ ...accountingForm, entryNumber: e.target.value })}
+                      placeholder="A-2024-001"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-400 outline-none font-mono"
+                    />
                   </div>
 
                   <button
@@ -819,9 +802,6 @@ export default function CompanyAccountsPage() {
                     </div>
                     <div className="text-xs text-emerald-600 space-y-1">
                       <p>Nº Asiento: <span className="font-mono font-medium">{selectedInvoice.accountingEntryNumber}</span></p>
-                      {selectedInvoice.accountingAccount && (
-                        <p>Cuenta: <span className="font-mono font-medium">{selectedInvoice.accountingAccount}</span></p>
-                      )}
                       {selectedInvoice.accountedByName && (
                         <p>Por: {selectedInvoice.accountedByName}</p>
                       )}
