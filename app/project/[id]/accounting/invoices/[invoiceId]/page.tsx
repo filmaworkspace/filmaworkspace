@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { doc, getDoc, collection, getDocs, updateDoc, query, where, orderBy, Timestamp } from "firebase/firestore";
-import { Receipt, Edit, Download, XCircle, CheckCircle, Clock, Ban, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, ExternalLink, MoreHorizontal, CreditCard, FileText, Link as LinkIcon, Eye, EyeOff, Code, Save, X, Plus, Trash2, Search, RefreshCw, Percent, Euro, FileCheck, ZoomIn, ZoomOut, RotateCw, Layers } from "lucide-react";
+import { Receipt, Edit, Download, XCircle, CheckCircle, Clock, Ban, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, ExternalLink, MoreHorizontal, CreditCard, FileText, Link as LinkIcon, Eye, EyeOff, Code, Save, X, Plus, Trash2, Search, RefreshCw, Percent, Euro, FileCheck, ZoomIn, ZoomOut, RotateCw, Layers, Lock } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
 import { unrealizeInvoice, updatePOItemsInvoiced, realizeInvoice } from "@/lib/budgetOperations";
@@ -18,7 +18,7 @@ type DocumentType = "invoice" | "proforma" | "autonomo" | "ticket";
 
 interface EpisodeDistribution { episode: number; amount: number; percentage: number; }
 interface InvoiceItem { description: string; subAccountId: string; subAccountCode: string; subAccountDescription: string; quantity: number; unitPrice: number; baseAmount: number; vatRate: number; vatAmount: number; irpfRate: number; irpfAmount: number; totalAmount: number; poItemId?: string; poItemIndex?: number; isNewItem?: boolean; episodeAssignment?: "general" | "specific"; episodes?: EpisodeDistribution[]; }
-interface Invoice { id: string; documentType: DocumentType; number: string; displayNumber: string; supplierNumber?: string; supplier: string; supplierId: string; supplierTaxId?: string; supplierIban?: string; supplierBic?: string; department?: string; description: string; notes?: string; items: InvoiceItem[]; baseAmount: number; vatAmount: number; irpfAmount: number; totalAmount: number; invoiceDate?: Date; dueDate: Date; status: InvoiceStatus; approvalStatus?: string; attachmentUrl?: string; attachmentFileName?: string; createdAt: Date; createdBy: string; createdByName: string; codedAt?: Date; codedBy?: string; codedByName?: string; approvedAt?: Date; approvedBy?: string; approvedByName?: string; paidAt?: Date; paidAmount?: number; paymentMethod?: string; paymentReference?: string; cancelledAt?: Date; cancelledByName?: string; cancellationReason?: string; poId?: string; poNumber?: string; requiresReplacement?: boolean; replacedByInvoiceId?: string; isReplacement?: boolean; replacesDocumentId?: string; replacesDocumentNumber?: string; currency?: string; accountingEntry?: string; isAsset?: boolean; assetCategory?: string; replacedFromType?: string; replacedAt?: Date; originalAttachmentUrl?: string; originalAttachmentFileName?: string; }
+interface Invoice { id: string; documentType: DocumentType; number: string; displayNumber: string; supplierNumber?: string; supplier: string; supplierId: string; supplierTaxId?: string; supplierIban?: string; supplierBic?: string; department?: string; description: string; notes?: string; items: InvoiceItem[]; baseAmount: number; vatAmount: number; irpfAmount: number; totalAmount: number; invoiceDate?: Date; dueDate: Date; status: InvoiceStatus; approvalStatus?: string; attachmentUrl?: string; attachmentFileName?: string; createdAt: Date; createdBy: string; createdByName: string; codedAt?: Date; codedBy?: string; codedByName?: string; approvedAt?: Date; approvedBy?: string; approvedByName?: string; paidAt?: Date; paidAmount?: number; paymentMethod?: string; paymentReference?: string; cancelledAt?: Date; cancelledByName?: string; cancellationReason?: string; poId?: string; poNumber?: string; requiresReplacement?: boolean; replacedByInvoiceId?: string; isReplacement?: boolean; replacesDocumentId?: string; replacesDocumentNumber?: string; currency?: string; accountingEntry?: string; isAsset?: boolean; assetCategory?: string; replacedFromType?: string; replacedAt?: Date; originalAttachmentUrl?: string; originalAttachmentFileName?: string; accounted?: boolean; accountedAt?: Date; accountedBy?: string; accountedByName?: string; accountingEntryNumber?: string; accountingAccount?: string; }
 interface LinkedPO { id: string; number: string; supplier: string; baseAmount: number; invoicedAmount: number; status: string; items?: any[]; }
 interface Supplier { id: string; name: string; taxId?: string; iban?: string; bic?: string; }
 interface SubAccount { id: string; code: string; description: string; accountId: string; committed: number; actual: number; budgeted: number; }
@@ -119,6 +119,8 @@ export default function InvoiceDetailPage() {
         currency: data.currency || "EUR", accountingEntry: data.accountingEntry, isAsset: data.isAsset, assetCategory: data.assetCategory,
         replacedFromType: data.replacedFromType, replacedAt: data.replacedAt?.toDate(),
         originalAttachmentUrl: data.originalAttachmentUrl, originalAttachmentFileName: data.originalAttachmentFileName,
+        accounted: data.accounted || false, accountedAt: data.accountedAt?.toDate(), accountedBy: data.accountedBy,
+        accountedByName: data.accountedByName, accountingEntryNumber: data.accountingEntryNumber, accountingAccount: data.accountingAccount,
       };
       setInvoice(invoiceData);
 
@@ -366,9 +368,18 @@ export default function InvoiceDetailPage() {
     if (idx >= 0 && idx < allInvoiceIds.length) router.push(`/project/${projectId}/accounting/invoices/${allInvoiceIds[idx]}`);
   };
 
-  const canCode = () => permissions.accountingAccessLevel === "accounting" || permissions.accountingAccessLevel === "accounting_extended";
-  const canCancel = () => invoice && !["cancelled", "paid"].includes(invoice.status) && permissions.isProjectRole;
-  const canEdit = () => invoice && ["draft", "rejected"].includes(invoice.status);
+  const canCode = () => {
+    if (invoice?.accounted) return false; // Bloqueada si está contabilizada
+    return permissions.accountingAccessLevel === "accounting" || permissions.accountingAccessLevel === "accounting_extended";
+  };
+  const canCancel = () => {
+    if (invoice?.accounted) return false; // Bloqueada si está contabilizada
+    return invoice && !["cancelled", "paid"].includes(invoice.status) && permissions.isProjectRole;
+  };
+  const canEdit = () => {
+    if (invoice?.accounted) return false; // Bloqueada si está contabilizada
+    return invoice && ["draft", "rejected"].includes(invoice.status);
+  };
   const isPDF = (url?: string) => url?.toLowerCase().includes(".pdf") || url?.toLowerCase().includes("application/pdf");
 
   if (permissionsLoading || loading) {
@@ -419,7 +430,7 @@ export default function InvoiceDetailPage() {
             <button onClick={() => setCodingMode(false)} className="p-2 hover:bg-violet-700 rounded-lg"><X size={20} /></button>
             <div className="flex items-center gap-3">
               <Code size={20} />
-              <span className="font-semibold">Codificar</span>
+              <span className="font-semibold">CODIFICAR</span>
               <span className="bg-violet-500 px-2 py-0.5 rounded text-sm">{invoice.displayNumber}</span>
             </div>
           </div>
@@ -769,7 +780,12 @@ export default function InvoiceDetailPage() {
                   <h1 className="text-2xl font-semibold text-slate-900">{docConfig.label}</h1>
                   <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm font-mono">{invoice.displayNumber}</span>
                   <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium text-sm ${config.bg} ${config.text}`}><StatusIcon size={14} />{config.label}</span>
-                  {invoice.codedAt && (
+                  {invoice.accounted && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg font-medium text-sm">
+                      <Lock size={14} />Contabilizada
+                    </span>
+                  )}
+                  {invoice.codedAt && !invoice.accounted && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-violet-100 text-violet-700 rounded-lg font-medium text-sm">
                       <FileCheck size={14} />Codificada
                     </span>
