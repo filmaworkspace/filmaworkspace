@@ -21,6 +21,8 @@ import {
   Search,
   Filter,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Eye,
   CheckCircle,
   Clock,
@@ -33,6 +35,10 @@ import {
   CheckSquare,
   AlertCircle,
   RefreshCw,
+  Calendar,
+  CreditCard,
+  FileText,
+  ExternalLink,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 
@@ -62,6 +68,8 @@ interface Invoice {
   accountedByName?: string;
   accountingEntryNumber?: string;
   accountingAccount?: string;
+  paidAt?: Date;
+  paidAmount?: number;
 }
 
 interface Project {
@@ -114,7 +122,8 @@ export default function CompanyAccountsPage() {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
 
-  const [showAccountingModal, setShowAccountingModal] = useState<Invoice | null>(null);
+  // Panel lateral
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [accountingForm, setAccountingForm] = useState({
     entryNumber: "",
     accountingAccount: "",
@@ -204,6 +213,8 @@ export default function CompanyAccountsPage() {
           accountedByName: data.accountedByName,
           accountingEntryNumber: data.accountingEntryNumber,
           accountingAccount: data.accountingAccount,
+          paidAt: data.paidAt?.toDate?.(),
+          paidAmount: data.paidAmount,
         };
       });
 
@@ -217,17 +228,17 @@ export default function CompanyAccountsPage() {
   };
 
   const handleMarkAsAccounted = async () => {
-    if (!showAccountingModal || !accountingForm.entryNumber.trim()) {
+    if (!selectedInvoice || !accountingForm.entryNumber.trim()) {
       showToast("error", "El número de asiento es obligatorio");
       return;
     }
 
     setSaving(true);
     try {
-      const oldStatus = showAccountingModal.status;
+      const oldStatus = selectedInvoice.status;
       const newStatus = "accounted";
 
-      await updateDoc(doc(db, `projects/${projectId}/invoices`, showAccountingModal.id), {
+      await updateDoc(doc(db, `projects/${projectId}/invoices`, selectedInvoice.id), {
         accounted: true,
         accountedAt: new Date(),
         accountedBy: contextUser?.uid,
@@ -237,16 +248,18 @@ export default function CompanyAccountsPage() {
         status: newStatus,
       });
 
-      const invoiceItems = showAccountingModal.items.map((item: any) => ({
+      const invoiceItems = selectedInvoice.items.map((item: any) => ({
         subAccountId: item.subAccountId,
         baseAmount: item.baseAmount || 0,
       }));
       await handleInvoiceStatusChange(projectId, oldStatus, newStatus, invoiceItems);
 
-      setShowAccountingModal(null);
-      setAccountingForm({ entryNumber: "", accountingAccount: "" });
       showToast("success", "Factura contabilizada");
+      setAccountingForm({ entryNumber: "", accountingAccount: "" });
       await loadData();
+      
+      // Navegar a la siguiente
+      goToNextInvoice();
     } catch (error) {
       console.error(error);
       showToast("error", "Error al contabilizar");
@@ -255,20 +268,21 @@ export default function CompanyAccountsPage() {
     }
   };
 
-  const handleUnmarkAsAccounted = async (invoice: Invoice) => {
-    if (!confirm("¿Desmarcar como contabilizada? Los usuarios podrán volver a editar la factura.")) return;
+  const handleUnmarkAsAccounted = async () => {
+    if (!selectedInvoice) return;
+    if (!confirm("¿Desmarcar como contabilizada?")) return;
 
     setSaving(true);
     try {
-      const oldStatus = invoice.status;
+      const oldStatus = selectedInvoice.status;
       const newStatus = "approved";
 
-      await updateDoc(doc(db, `projects/${projectId}/invoices`, invoice.id), {
+      await updateDoc(doc(db, `projects/${projectId}/invoices`, selectedInvoice.id), {
         accounted: false,
         status: newStatus,
       });
 
-      const invoiceItems = invoice.items.map((item: any) => ({
+      const invoiceItems = selectedInvoice.items.map((item: any) => ({
         subAccountId: item.subAccountId,
         baseAmount: item.baseAmount || 0,
       }));
@@ -284,6 +298,7 @@ export default function CompanyAccountsPage() {
     }
   };
 
+  // Filtrado
   const filteredInvoices = invoices.filter((inv) => {
     const matchesSearch =
       inv.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -303,19 +318,49 @@ export default function CompanyAccountsPage() {
     return matchesSearch && matchesStatus;
   });
 
+  // Navegación
+  const currentIndex = selectedInvoice ? filteredInvoices.findIndex(i => i.id === selectedInvoice.id) : -1;
+  
+  const goToPrevInvoice = () => {
+    if (currentIndex > 0) {
+      const prev = filteredInvoices[currentIndex - 1];
+      setSelectedInvoice(prev);
+      setAccountingForm({ entryNumber: prev.accountingEntryNumber || "", accountingAccount: prev.accountingAccount || "" });
+    }
+  };
+
+  const goToNextInvoice = () => {
+    if (currentIndex < filteredInvoices.length - 1) {
+      const next = filteredInvoices[currentIndex + 1];
+      setSelectedInvoice(next);
+      setAccountingForm({ entryNumber: next.accountingEntryNumber || "", accountingAccount: next.accountingAccount || "" });
+    } else {
+      setSelectedInvoice(null);
+    }
+  };
+
+  // Stats
   const totalInvoices = invoices.length;
   const pendingAccounting = invoices.filter((i) => !i.accounted && ["approved", "pending", "paid"].includes(i.status)).length;
   const accountedCount = invoices.filter((i) => i.accounted).length;
-  const totalAmount = invoices.reduce((acc, i) => acc + i.totalAmount, 0);
+  const totalBaseAmount = invoices.reduce((acc, i) => acc + i.baseAmount, 0);
 
   const isInvoiceCoded = (invoice: Invoice) => {
     return invoice.items && invoice.items.length > 0 && invoice.items.every((item) => item.subAccountId);
   };
 
+  const openInvoicePanel = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setAccountingForm({
+      entryNumber: invoice.accountingEntryNumber || "",
+      accountingAccount: invoice.accountingAccount || "",
+    });
+  };
+
   if (loading || userLoading) {
     return (
       <div className={"min-h-screen bg-white flex items-center justify-center " + inter.className}>
-        <div className="w-8 h-8 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+        <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-600 rounded-full animate-spin" />
       </div>
     );
   }
@@ -335,360 +380,435 @@ export default function CompanyAccountsPage() {
         </div>
       )}
 
-      <div className="mt-16">
-        <div className="bg-white border-b border-slate-200 px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Link
-                href={`/companydashboard/${producerId}`}
+      <div className="mt-16 flex">
+        {/* Main content */}
+        <div className={`flex-1 transition-all ${selectedInvoice ? "mr-[50%]" : ""}`}>
+          {/* Breadcrumb */}
+          <div className="bg-white border-b border-slate-200 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Link
+                  href={`/companydashboard/${producerId}`}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
+                >
+                  <ArrowLeft size={18} />
+                </Link>
+                <div className="flex items-center gap-2 text-sm">
+                  <Building2 size={16} className="text-slate-400" />
+                  <span className="font-medium text-slate-600">{producer.name}</span>
+                  <span className="text-slate-300">/</span>
+                  <span className="font-semibold text-slate-900">{project.name}</span>
+                  <span className="text-slate-300">·</span>
+                  <span className="text-xs text-slate-500">Contabilidad</span>
+                </div>
+              </div>
+              <button
+                onClick={loadData}
+                disabled={loading}
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
               >
-                <ArrowLeft size={18} />
-              </Link>
-              <div className="flex items-center gap-2 text-sm">
-                <Building2 size={16} className="text-slate-400" />
-                <span className="font-medium text-slate-600">{producer.name}</span>
-                <span className="text-slate-300">/</span>
-                <span className="font-semibold text-slate-900">{project.name}</span>
-                <span className="text-slate-300">·</span>
-                <span className="text-xs text-slate-500">Contabilidad</span>
-              </div>
-            </div>
-            <button
-              onClick={loadData}
-              disabled={loading}
-              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
-            >
-              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-            </button>
-          </div>
-        </div>
-
-        <div className="bg-white border-b border-slate-200 px-4 py-2">
-          <div className="flex items-center gap-6 text-xs">
-            <div className="flex items-center gap-1.5">
-              <span className="text-slate-500">Total:</span>
-              <span className="font-semibold text-slate-900">{totalInvoices}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-              <span className="text-slate-500">Pte. contab.:</span>
-              <span className="font-semibold text-amber-600">{pendingAccounting}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span className="text-slate-500">Contabilizadas:</span>
-              <span className="font-semibold text-emerald-600">{accountedCount}</span>
-            </div>
-            <div className="flex items-center gap-1.5 ml-auto">
-              <Euro size={12} className="text-slate-400" />
-              <span className="text-slate-500">Importe total:</span>
-              <span className="font-semibold text-slate-900">{formatCurrency(totalAmount)} €</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white border-b border-slate-200 px-4 py-2">
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-xs">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Buscar factura, proveedor, asiento..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-400 focus:border-slate-400 outline-none"
-              />
-            </div>
-
-            <div className="relative" ref={filterRef}>
-              <button
-                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-lg ${
-                  statusFilter !== "all"
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                <Filter size={14} />
-                {FILTER_OPTIONS.find((o) => o.value === statusFilter)?.label || "Filtrar"}
-                <ChevronDown size={14} />
+                <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
               </button>
-              {showFilterDropdown && (
-                <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1 min-w-[160px]">
-                  {FILTER_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => {
-                        setStatusFilter(option.value);
-                        setShowFilterDropdown(false);
-                      }}
-                      className={`w-full text-left px-3 py-1.5 text-sm ${
-                        statusFilter === option.value
-                          ? "bg-slate-100 text-slate-900 font-medium"
-                          : "text-slate-600 hover:bg-slate-50"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
+          </div>
+
+          {/* Stats */}
+          <div className="bg-white border-b border-slate-200 px-4 py-2">
+            <div className="flex items-center gap-6 text-xs">
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-500">Total:</span>
+                <span className="font-semibold text-slate-900">{totalInvoices}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                <span className="text-slate-500">Pte. contab.:</span>
+                <span className="font-semibold text-amber-600">{pendingAccounting}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="text-slate-500">Contabilizadas:</span>
+                <span className="font-semibold text-emerald-600">{accountedCount}</span>
+              </div>
+              <div className="flex items-center gap-1.5 ml-auto">
+                <Euro size={12} className="text-slate-400" />
+                <span className="text-slate-500">Base total:</span>
+                <span className="font-semibold text-slate-900">{formatCurrency(totalBaseAmount)} €</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Toolbar */}
+          <div className="bg-white border-b border-slate-200 px-4 py-2">
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1 max-w-xs">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-400 focus:border-slate-400 outline-none"
+                />
+              </div>
+
+              <div className="relative" ref={filterRef}>
+                <button
+                  onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-lg ${
+                    statusFilter !== "all"
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <Filter size={14} />
+                  {FILTER_OPTIONS.find((o) => o.value === statusFilter)?.label || "Filtrar"}
+                  <ChevronDown size={14} />
+                </button>
+                {showFilterDropdown && (
+                  <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1 min-w-[160px]">
+                    {FILTER_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          setStatusFilter(option.value);
+                          setShowFilterDropdown(false);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 text-sm ${
+                          statusFilter === option.value
+                            ? "bg-slate-100 text-slate-900 font-medium"
+                            : "text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="p-4">
+            {filteredInvoices.length === 0 ? (
+              <div className="bg-white border border-slate-200 rounded-lg p-8 text-center">
+                <Receipt size={24} className="text-slate-300 mx-auto mb-2" />
+                <p className="text-sm text-slate-500">No hay facturas</p>
+              </div>
+            ) : (
+              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      <th className="px-3 py-2 w-8"></th>
+                      <th className="px-3 py-2">Nº Factura</th>
+                      <th className="px-3 py-2">Proveedor</th>
+                      <th className="px-3 py-2">Fecha</th>
+                      <th className="px-3 py-2">Cuenta</th>
+                      <th className="px-3 py-2 text-right">Base</th>
+                      <th className="px-3 py-2">Estado</th>
+                      <th className="px-3 py-2">Nº Asiento</th>
+                      <th className="px-3 py-2 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredInvoices.map((invoice) => {
+                      const isCoded = isInvoiceCoded(invoice);
+                      const statusConf = STATUS_CONFIG[invoice.status] || STATUS_CONFIG.pending;
+                      const accountCodes = [...new Set(invoice.items.map((item: any) => item.subAccountCode).filter(Boolean))];
+                      const isSelected = selectedInvoice?.id === invoice.id;
+
+                      return (
+                        <tr 
+                          key={invoice.id} 
+                          className={`hover:bg-slate-50 cursor-pointer ${isSelected ? "bg-blue-50" : ""}`}
+                          onClick={() => openInvoicePanel(invoice)}
+                        >
+                          <td className="px-3 py-2">
+                            {invoice.accounted ? (
+                              <div className="w-5 h-5 bg-emerald-100 rounded flex items-center justify-center">
+                                <Lock size={12} className="text-emerald-600" />
+                              </div>
+                            ) : isCoded ? (
+                              <div className="w-5 h-5 bg-amber-50 rounded flex items-center justify-center">
+                                <Clock size={12} className="text-amber-500" />
+                              </div>
+                            ) : (
+                              <div className="w-5 h-5 bg-slate-100 rounded flex items-center justify-center">
+                                <AlertTriangle size={12} className="text-slate-400" />
+                              </div>
+                            )}
+                          </td>
+
+                          <td className="px-3 py-2">
+                            <span className="font-mono text-xs font-medium text-slate-900">{invoice.displayNumber}</span>
+                          </td>
+
+                          <td className="px-3 py-2">
+                            <span className="text-slate-700 text-xs truncate max-w-[120px] block">{invoice.supplier}</span>
+                          </td>
+
+                          <td className="px-3 py-2 text-slate-500 text-xs">
+                            {formatDate(invoice.invoiceDate || invoice.createdAt)}
+                          </td>
+
+                          <td className="px-3 py-2">
+                            {accountCodes.length > 0 ? (
+                              <span className="font-mono text-[10px] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
+                                {accountCodes[0]}{accountCodes.length > 1 && ` +${accountCodes.length - 1}`}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 text-xs">—</span>
+                            )}
+                          </td>
+
+                          <td className="px-3 py-2 text-right font-mono text-xs font-medium text-slate-900">
+                            {formatCurrency(invoice.baseAmount)}
+                          </td>
+
+                          <td className="px-3 py-2">
+                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${statusConf.bg} ${statusConf.text}`}>
+                              {statusConf.label}
+                            </span>
+                          </td>
+
+                          <td className="px-3 py-2">
+                            {invoice.accountingEntryNumber ? (
+                              <span className="font-mono text-xs text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                {invoice.accountingEntryNumber}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 text-xs">—</span>
+                            )}
+                          </td>
+
+                          <td className="px-3 py-2">
+                            <Eye size={14} className="text-slate-400" />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="p-4">
-          {filteredInvoices.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-lg p-8 text-center">
-              <Receipt size={24} className="text-slate-300 mx-auto mb-2" />
-              <p className="text-sm text-slate-500">No hay facturas</p>
-            </div>
-          ) : (
-            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    <th className="px-3 py-2 w-8"></th>
-                    <th className="px-3 py-2">Nº Factura</th>
-                    <th className="px-3 py-2">Proveedor</th>
-                    <th className="px-3 py-2">Fecha</th>
-                    <th className="px-3 py-2">Cuenta</th>
-                    <th className="px-3 py-2 text-right">Base</th>
-                    <th className="px-3 py-2 text-right">IVA</th>
-                    <th className="px-3 py-2 text-right">Total</th>
-                    <th className="px-3 py-2">Estado</th>
-                    <th className="px-3 py-2">Nº Asiento</th>
-                    <th className="px-3 py-2 text-center">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredInvoices.map((invoice) => {
-                    const isCoded = isInvoiceCoded(invoice);
-                    const canBeAccounted = isCoded && ["approved", "pending", "paid"].includes(invoice.status);
-                    const statusConf = STATUS_CONFIG[invoice.status] || STATUS_CONFIG.pending;
-                    // Obtener cuentas únicas de los items
-                    const accountCodes = [...new Set(invoice.items.map((item: any) => item.subAccountCode).filter(Boolean))];
-
-                    return (
-                      <tr key={invoice.id} className="hover:bg-slate-50">
-                        <td className="px-3 py-2">
-                          {invoice.accounted ? (
-                            <div className="w-5 h-5 bg-emerald-100 rounded flex items-center justify-center" title="Contabilizada">
-                              <Lock size={12} className="text-emerald-600" />
-                            </div>
-                          ) : canBeAccounted ? (
-                            <div className="w-5 h-5 bg-amber-50 rounded flex items-center justify-center" title="Pendiente contabilizar">
-                              <Clock size={12} className="text-amber-500" />
-                            </div>
-                          ) : (
-                            <div className="w-5 h-5 bg-slate-100 rounded flex items-center justify-center" title={!isCoded ? "Sin codificar" : "No apta"}>
-                              <AlertTriangle size={12} className="text-slate-400" />
-                            </div>
-                          )}
-                        </td>
-
-                        <td className="px-3 py-2">
-                          <span className="font-mono text-xs font-medium text-slate-900">{invoice.displayNumber}</span>
-                        </td>
-
-                        <td className="px-3 py-2">
-                          <span className="text-slate-700 truncate max-w-[150px] block">{invoice.supplier}</span>
-                        </td>
-
-                        <td className="px-3 py-2 text-slate-500 text-xs">
-                          {formatDate(invoice.invoiceDate || invoice.createdAt)}
-                        </td>
-
-                        <td className="px-3 py-2">
-                          {accountCodes.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {accountCodes.slice(0, 2).map((code, idx) => (
-                                <span key={idx} className="font-mono text-[10px] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
-                                  {code}
-                                </span>
-                              ))}
-                              {accountCodes.length > 2 && (
-                                <span className="text-[10px] text-slate-400">+{accountCodes.length - 2}</span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-slate-300">—</span>
-                          )}
-                        </td>
-
-                        <td className="px-3 py-2 text-right font-mono text-xs text-slate-700">
-                          {formatCurrency(invoice.baseAmount)}
-                        </td>
-
-                        <td className="px-3 py-2 text-right font-mono text-xs text-slate-500">
-                          {formatCurrency(invoice.vatAmount)}
-                        </td>
-
-                        <td className="px-3 py-2 text-right font-mono text-xs font-medium text-slate-900">
-                          {formatCurrency(invoice.totalAmount)}
-                        </td>
-
-                        <td className="px-3 py-2">
-                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${statusConf.bg} ${statusConf.text}`}>
-                            {statusConf.label}
-                          </span>
-                        </td>
-
-                        <td className="px-3 py-2">
-                          {invoice.accountingEntryNumber ? (
-                            <span className="font-mono text-xs text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
-                              {invoice.accountingEntryNumber}
-                            </span>
-                          ) : (
-                            <span className="text-slate-300">—</span>
-                          )}
-                        </td>
-
-                        <td className="px-3 py-2">
-                          <div className="flex items-center justify-center gap-1">
-                            <Link
-                              href={`/project/${projectId}/invoices/${invoice.id}`}
-                              className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded"
-                              title="Ver factura"
-                            >
-                              <Eye size={14} />
-                            </Link>
-
-                            {invoice.accounted ? (
-                              <button
-                                onClick={() => handleUnmarkAsAccounted(invoice)}
-                                disabled={saving}
-                                className="p-1 text-emerald-500 hover:text-amber-600 hover:bg-amber-50 rounded disabled:opacity-50"
-                                title="Desbloquear factura"
-                              >
-                                <Unlock size={14} />
-                              </button>
-                            ) : canBeAccounted ? (
-                              <button
-                                onClick={() => {
-                                  setShowAccountingModal(invoice);
-                                  setAccountingForm({
-                                    entryNumber: "",
-                                    accountingAccount: invoice.accountingAccount || "",
-                                  });
-                                }}
-                                disabled={saving}
-                                className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded disabled:opacity-50"
-                                title="Contabilizar"
-                              >
-                                <CheckSquare size={14} />
-                              </button>
-                            ) : !isCoded ? (
-                              <span className="p-1 text-slate-300" title="Factura sin codificar">
-                                <AlertTriangle size={14} />
-                              </span>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {showAccountingModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-slate-900">Contabilizar factura</h3>
-                <p className="text-xs text-slate-500">{showAccountingModal.displayNumber} · {showAccountingModal.supplier}</p>
+        {/* Panel lateral */}
+        {selectedInvoice && (
+          <div className="fixed right-0 top-16 bottom-0 w-1/2 bg-white border-l border-slate-200 shadow-xl z-30 overflow-y-auto">
+            {/* Header del panel */}
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={goToPrevInvoice}
+                  disabled={currentIndex <= 0}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-30"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <span className="text-xs text-slate-500">{currentIndex + 1} / {filteredInvoices.length}</span>
+                <button
+                  onClick={goToNextInvoice}
+                  disabled={currentIndex >= filteredInvoices.length - 1}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-30"
+                >
+                  <ChevronRight size={18} />
+                </button>
               </div>
               <button
-                onClick={() => setShowAccountingModal(null)}
+                onClick={() => setSelectedInvoice(null)}
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
               >
                 <X size={18} />
               </button>
             </div>
-            <div className="p-5 space-y-4">
-              <div className="bg-slate-50 rounded-lg p-3 text-sm">
-                <div className="flex justify-between mb-1">
-                  <span className="text-slate-500">Base imponible</span>
-                  <span className="font-mono">{formatCurrency(showAccountingModal.baseAmount)} €</span>
-                </div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-slate-500">IVA</span>
-                  <span className="font-mono">{formatCurrency(showAccountingModal.vatAmount)} €</span>
-                </div>
-                {showAccountingModal.irpfAmount > 0 && (
-                  <div className="flex justify-between mb-1">
-                    <span className="text-slate-500">IRPF</span>
-                    <span className="font-mono text-red-600">-{formatCurrency(showAccountingModal.irpfAmount)} €</span>
+
+            {/* Contenido del panel */}
+            <div className="p-4 space-y-4">
+              {/* Info básica */}
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-mono text-lg font-bold text-slate-900">{selectedInvoice.displayNumber}</span>
+                    {selectedInvoice.accounted && (
+                      <span className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                        <Lock size={10} />
+                        Contabilizada
+                      </span>
+                    )}
                   </div>
-                )}
-                <div className="flex justify-between pt-2 border-t border-slate-200 font-medium">
-                  <span>Total</span>
-                  <span className="font-mono">{formatCurrency(showAccountingModal.totalAmount)} €</span>
+                  <p className="text-sm text-slate-600">{selectedInvoice.supplier}</p>
+                </div>
+                <Link
+                  href={`/project/${projectId}/invoices/${selectedInvoice.id}`}
+                  target="_blank"
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
+                  title="Abrir en nueva pestaña"
+                >
+                  <ExternalLink size={16} />
+                </Link>
+              </div>
+
+              {/* Fechas y estado de pago */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-slate-50 rounded-lg p-3">
+                  <div className="flex items-center gap-1.5 text-slate-500 text-xs mb-1">
+                    <Calendar size={12} />
+                    Fecha factura
+                  </div>
+                  <p className="text-sm font-medium text-slate-900">
+                    {formatDate(selectedInvoice.invoiceDate || selectedInvoice.createdAt)}
+                  </p>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-3">
+                  <div className="flex items-center gap-1.5 text-slate-500 text-xs mb-1">
+                    <Clock size={12} />
+                    Vencimiento
+                  </div>
+                  <p className="text-sm font-medium text-slate-900">
+                    {formatDate(selectedInvoice.dueDate)}
+                  </p>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-3">
+                  <div className="flex items-center gap-1.5 text-slate-500 text-xs mb-1">
+                    <CreditCard size={12} />
+                    Pago
+                  </div>
+                  <p className={`text-sm font-medium ${selectedInvoice.status === "paid" ? "text-emerald-600" : "text-amber-600"}`}>
+                    {selectedInvoice.status === "paid" ? "Pagada" : "Pendiente"}
+                  </p>
                 </div>
               </div>
 
+              {/* Desglose de items */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Número de asiento <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={accountingForm.entryNumber}
-                  onChange={(e) => setAccountingForm({ ...accountingForm, entryNumber: e.target.value })}
-                  placeholder="Ej: A-2024-00123"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-400 focus:border-slate-400 outline-none font-mono"
-                />
+                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Desglose</h4>
+                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead className="bg-slate-50">
+                      <tr className="text-left text-slate-500">
+                        <th className="px-3 py-2 font-medium">Descripción</th>
+                        <th className="px-3 py-2 font-medium">Cuenta</th>
+                        <th className="px-3 py-2 text-right font-medium">Base</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {selectedInvoice.items.map((item: any, idx: number) => (
+                        <tr key={idx}>
+                          <td className="px-3 py-2 text-slate-700">{item.description || "—"}</td>
+                          <td className="px-3 py-2">
+                            {item.subAccountCode ? (
+                              <span className="font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
+                                {item.subAccountCode}
+                              </span>
+                            ) : (
+                              <span className="text-red-500">Sin cuenta</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono text-slate-900">
+                            {formatCurrency(item.baseAmount || 0)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-slate-50 border-t border-slate-200">
+                      <tr className="font-medium">
+                        <td className="px-3 py-2 text-slate-700" colSpan={2}>Total base</td>
+                        <td className="px-3 py-2 text-right font-mono text-slate-900">
+                          {formatCurrency(selectedInvoice.baseAmount)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Cuenta contable <span className="text-slate-400 font-normal">(opcional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={accountingForm.accountingAccount}
-                  onChange={(e) => setAccountingForm({ ...accountingForm, accountingAccount: e.target.value })}
-                  placeholder="Ej: 6230001"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-400 focus:border-slate-400 outline-none font-mono"
-                />
-              </div>
-
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-                <div className="flex items-start gap-2">
+              {/* Aviso si no está codificada */}
+              {!isInvoiceCoded(selectedInvoice) && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 flex items-start gap-2">
                   <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
-                  <span>Una vez contabilizada, la factura quedará bloqueada y los usuarios no podrán editarla ni anularla.</span>
+                  <span>Esta factura no está codificada. Todos los items deben tener cuenta analítica asignada.</span>
                 </div>
-              </div>
-            </div>
-            <div className="px-5 py-4 border-t border-slate-200 flex gap-3">
-              <button
-                onClick={() => setShowAccountingModal(null)}
-                className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleMarkAsAccounted}
-                disabled={saving || !accountingForm.entryNumber.trim()}
-                className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {saving ? (
-                  <RefreshCw size={14} className="animate-spin" />
-                ) : (
-                  <CheckCircle size={14} />
-                )}
-                Contabilizar
-              </button>
+              )}
+
+              {/* Formulario de contabilización */}
+              {isInvoiceCoded(selectedInvoice) && !selectedInvoice.accounted && ["approved", "pending", "paid"].includes(selectedInvoice.status) && (
+                <div className="border-t border-slate-200 pt-4 space-y-3">
+                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Contabilizar</h4>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">
+                        Nº Asiento <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={accountingForm.entryNumber}
+                        onChange={(e) => setAccountingForm({ ...accountingForm, entryNumber: e.target.value })}
+                        placeholder="A-2024-001"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-400 outline-none font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">
+                        Cuenta contable
+                      </label>
+                      <input
+                        type="text"
+                        value={accountingForm.accountingAccount}
+                        onChange={(e) => setAccountingForm({ ...accountingForm, accountingAccount: e.target.value })}
+                        placeholder="6230001"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-400 outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleMarkAsAccounted}
+                    disabled={saving || !accountingForm.entryNumber.trim()}
+                    className="w-full py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {saving ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                    Contabilizar y siguiente
+                  </button>
+                </div>
+              )}
+
+              {/* Si ya está contabilizada */}
+              {selectedInvoice.accounted && (
+                <div className="border-t border-slate-200 pt-4 space-y-3">
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-emerald-700 text-sm font-medium mb-2">
+                      <CheckCircle size={16} />
+                      Factura contabilizada
+                    </div>
+                    <div className="text-xs text-emerald-600 space-y-1">
+                      <p>Nº Asiento: <span className="font-mono font-medium">{selectedInvoice.accountingEntryNumber}</span></p>
+                      {selectedInvoice.accountingAccount && (
+                        <p>Cuenta: <span className="font-mono font-medium">{selectedInvoice.accountingAccount}</span></p>
+                      )}
+                      {selectedInvoice.accountedByName && (
+                        <p>Por: {selectedInvoice.accountedByName}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleUnmarkAsAccounted}
+                    disabled={saving}
+                    className="w-full py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    <Unlock size={14} />
+                    Desbloquear para edición
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
