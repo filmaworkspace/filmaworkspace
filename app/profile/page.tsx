@@ -322,8 +322,8 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className={`min-h-screen bg-slate-50 flex items-center justify-center ${inter.className}`}>
-        <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-600 rounded-full animate-spin" />
+      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
+        <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
       </div>
     );
   }
@@ -333,7 +333,7 @@ export default function ProfilePage() {
   const archivedProjects = projects.filter(p => p.archived).length;
 
   return (
-    <div className={`min-h-screen bg-slate-50 ${inter.className}`}>
+    <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Toast */}
       {toast && (
         <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 ${toast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>
@@ -342,19 +342,19 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Header compacto */}
-      <div className="mt-16 bg-white border-b border-slate-200">
-        <div className="px-6 md:px-8 lg:px-12 py-6">
+      {/* Header */}
+      <div className="mt-16 border-b border-slate-200">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link href="/dashboard" className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                 <ArrowLeft size={20} />
               </Link>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-900 text-white flex items-center justify-center text-xl font-bold shadow-lg">
+              <div className="w-14 h-14 rounded-full bg-slate-900 text-white flex items-center justify-center text-xl font-semibold">
                 {userInitial}
               </div>
               <div>
-                <h1 className="text-xl font-bold text-slate-900">{formData.name || "Usuario"}</h1>
+                <h1 className="text-xl font-semibold text-slate-900">{formData.name || "Usuario"}</h1>
                 <p className="text-sm text-slate-500">{formData.email}</p>
               </div>
             </div>
@@ -393,7 +393,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 py-8">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
         {/* TAB: MI CUENTA */}
         {activeTab === "account" && (
           <div className="max-w-3xl">
@@ -422,7 +422,7 @@ export default function ProfilePage() {
               <form onSubmit={handleProfileSubmit} className="space-y-6">
                 <div className="bg-white border border-slate-200 rounded-2xl p-6">
                   <div className="flex items-center gap-5 pb-6 border-b border-slate-100">
-                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-900 text-white flex items-center justify-center text-3xl font-bold">
+                    <div className="w-20 h-20 rounded-full bg-slate-900 text-white flex items-center justify-center text-3xl font-semibold">
                       {userInitial}
                     </div>
                     <div className="flex-1">
