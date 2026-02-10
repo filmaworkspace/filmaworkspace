@@ -108,6 +108,10 @@ export default function EditPOPage() {
   
   // Estado para rastrear facturas asociadas a cada item (por índice)
   const [itemInvoiceStatus, setItemInvoiceStatus] = useState<Record<number, ItemInvoiceStatus>>({});
+  
+  // Items originales comprometidos (para mantener comprometido durante edición)
+  const [originalCommittedItems, setOriginalCommittedItems] = useState<{subAccountId: string; baseAmount: number}[] | null>(null);
+  const [wasApprovedBefore, setWasApprovedBefore] = useState(false);
 
   useEffect(() => {
     if (!permissionsLoading && permissions.userId && id && poId) loadData();
@@ -147,6 +151,17 @@ export default function EditPOPage() {
       setPOStatus(poData.status || "draft");
       setExistingFileUrl(poData.attachmentUrl || "");
       setExistingFileName(poData.attachmentFileName || "");
+      
+      // Guardar si la PO fue aprobada antes (tiene items comprometidos)
+      // Puede estar en draft/rejected después de editar una aprobada
+      const hadCommittedItems = poData.previousCommittedItems || (poData.status === "approved" ? poData.items : null);
+      if (hadCommittedItems) {
+        setOriginalCommittedItems(hadCommittedItems.map((item: any) => ({
+          subAccountId: item.subAccountId,
+          baseAmount: item.baseAmount || 0,
+        })).filter((item: any) => item.subAccountId && item.baseAmount > 0));
+        setWasApprovedBefore(true);
+      }
 
       setFormData({
         supplier: poData.supplierId || "", supplierName: poData.supplier || "",
@@ -494,6 +509,11 @@ export default function EditPOPage() {
         updatedAt: Timestamp.now(), updatedBy: permissions.userId, updatedByName: permissions.userName,
       };
 
+      // Si la PO tenía items comprometidos anteriormente, guardarlos para el cálculo de diferencia al aprobar
+      if (wasApprovedBefore && originalCommittedItems && originalCommittedItems.length > 0) {
+        poData.previousCommittedItems = originalCommittedItems;
+      }
+
       if (sendForApproval) {
         const approvalSteps = generateApprovalSteps(formData.department);
         if (shouldAutoApprove(approvalSteps)) {
@@ -504,15 +524,19 @@ export default function EditPOPage() {
           poData.autoApproved = true;
           poData.committedAmount = totals.baseAmount;
           poData.remainingAmount = totals.baseAmount;
+          // Limpiar previousCommittedItems ya que se va a aprobar directamente
+          poData.previousCommittedItems = null;
         } else {
           poData.status = "pending";
           poData.approvalSteps = approvalSteps;
           poData.currentApprovalStep = 0;
           // Si la configuración es on_create, también comprometer en pending
-          if (costSettings.poCommitmentTrigger === "on_create") {
+          if (costSettings.poCommitmentTrigger === "on_create" && !wasApprovedBefore) {
+            // Solo comprometer si NO tenía comprometido anterior (nuevo PO)
             poData.committedAmount = totals.baseAmount;
             poData.remainingAmount = totals.baseAmount;
           }
+          // Si ya tenía comprometido, mantener el anterior hasta aprobar
         }
       } else {
         poData.status = "draft";
@@ -522,9 +546,20 @@ export default function EditPOPage() {
 
       // Comprometer según la configuración
       const finalStatus = poData.status;
-      if (shouldCommitPO(finalStatus, costSettings)) {
+      
+      // Si se auto-aprueba y había items anteriores, hacer la diferencia
+      if (finalStatus === "approved" && wasApprovedBefore && originalCommittedItems) {
+        // Descomprometer los items anteriores
+        await uncommitPOItems(originalCommittedItems);
+        // Comprometer los nuevos items
         await updateSubAccountsCommitted(items);
+      } else if (finalStatus === "approved" && !wasApprovedBefore) {
+        // Nueva PO aprobada, comprometer normalmente
+        if (shouldCommitPO(finalStatus, costSettings)) {
+          await updateSubAccountsCommitted(items);
+        }
       }
+      // Si status es "pending" y había items anteriores, NO tocar el comprometido (se mantiene)
 
       setSuccessMessage(poData.status === "approved" ? "PO aprobada automáticamente" : poData.status === "pending" ? "PO enviada para aprobación" : "Borrador guardado");
       setTimeout(() => router.push(`/project/${id}/accounting/pos`), 1500);
@@ -532,6 +567,25 @@ export default function EditPOPage() {
       alert(`Error: ${error.message}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Helper para descomprometer items específicos
+  const uncommitPOItems = async (itemsToUncommit: {subAccountId: string; baseAmount: number}[]) => {
+    const accountsSnapshot = await getDocs(collection(db, `projects/${id}/accounts`));
+    for (const item of itemsToUncommit) {
+      if (!item.subAccountId || item.baseAmount <= 0) continue;
+      for (const accountDoc of accountsSnapshot.docs) {
+        const subAccountsSnapshot = await getDocs(collection(db, `projects/${id}/accounts/${accountDoc.id}/subaccounts`));
+        for (const subDoc of subAccountsSnapshot.docs) {
+          if (subDoc.id === item.subAccountId) {
+            const currentCommitted = subDoc.data().committed || 0;
+            await updateDoc(doc(db, `projects/${id}/accounts/${accountDoc.id}/subaccounts`, subDoc.id), {
+              committed: Math.max(0, currentCommitted - item.baseAmount),
+            });
+          }
+        }
+      }
     }
   };
 
