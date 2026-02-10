@@ -337,8 +337,14 @@ export default function ApprovalsPage() {
           updates.committedAmount = totalBaseAmount;
           updates.remainingAmount = totalBaseAmount;
           
+          // Verificar si hay items comprometidos anteriores (edición de PO aprobada)
+          const previousCommittedItems = docData.previousCommittedItems || null;
+          
           // Usar budgetOperations para manejar el comprometido
-          await handlePOStatusChange(approval.projectId, oldStatus, "approved", budgetItems);
+          await handlePOStatusChange(approval.projectId, oldStatus, "approved", budgetItems, previousCommittedItems);
+          
+          // Limpiar previousCommittedItems después de aprobar
+          updates.previousCommittedItems = null;
           
         } else {
           // Factura
@@ -392,19 +398,34 @@ export default function ApprovalsPage() {
         const docData = docSnap.data();
         const oldStatus = docData.status || "pending";
         
-        // Preparar items para budgetOperations
-        const budgetItems: Array<{ subAccountId: string; baseAmount: number }> = [];
-        for (const item of (selectedApproval.items || [])) {
-          const itemBaseAmount = item.baseAmount || (item.quantity && item.unitPrice ? item.quantity * item.unitPrice : item.totalAmount ? item.totalAmount / 1.21 : 0);
-          if (item.subAccountId) {
-            budgetItems.push({ subAccountId: item.subAccountId, baseAmount: itemBaseAmount });
-          }
-        }
-        
         // Manejar el presupuesto según tipo de documento
         if (selectedApproval.type === "po") {
-          await handlePOStatusChange(selectedApproval.projectId, oldStatus, "rejected", budgetItems);
+          // Verificar si hay items comprometidos anteriores (edición de PO aprobada)
+          const previousCommittedItems = docData.previousCommittedItems;
+          
+          if (previousCommittedItems && previousCommittedItems.length > 0) {
+            // Si había items anteriores comprometidos, descomprometer esos (no los nuevos)
+            await handlePOStatusChange(selectedApproval.projectId, "approved", "rejected", previousCommittedItems);
+          } else {
+            // Preparar items actuales para budgetOperations
+            const budgetItems: Array<{ subAccountId: string; baseAmount: number }> = [];
+            for (const item of (selectedApproval.items || [])) {
+              const itemBaseAmount = item.baseAmount || (item.quantity && item.unitPrice ? item.quantity * item.unitPrice : item.totalAmount ? item.totalAmount / 1.21 : 0);
+              if (item.subAccountId) {
+                budgetItems.push({ subAccountId: item.subAccountId, baseAmount: itemBaseAmount });
+              }
+            }
+            await handlePOStatusChange(selectedApproval.projectId, oldStatus, "rejected", budgetItems);
+          }
         } else {
+          // Factura
+          const budgetItems: Array<{ subAccountId: string; baseAmount: number }> = [];
+          for (const item of (selectedApproval.items || [])) {
+            const itemBaseAmount = item.baseAmount || (item.quantity && item.unitPrice ? item.quantity * item.unitPrice : item.totalAmount ? item.totalAmount / 1.21 : 0);
+            if (item.subAccountId) {
+              budgetItems.push({ subAccountId: item.subAccountId, baseAmount: itemBaseAmount });
+            }
+          }
           await handleInvoiceStatusChange(selectedApproval.projectId, oldStatus, "rejected", budgetItems);
         }
       }
@@ -414,7 +435,8 @@ export default function ApprovalsPage() {
         rejectedAt: Timestamp.now(), 
         rejectedBy: userId, 
         rejectedByName: userName, 
-        rejectionReason: rejectionReason.trim() 
+        rejectionReason: rejectionReason.trim(),
+        previousCommittedItems: null // Limpiar al rechazar
       });
       
       setPendingApprovals(pendingApprovals.filter((a) => a.id !== selectedApproval.id));
