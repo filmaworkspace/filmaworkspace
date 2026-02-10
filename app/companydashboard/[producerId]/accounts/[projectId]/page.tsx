@@ -95,12 +95,10 @@ const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string }>
 };
 
 const FILTER_OPTIONS = [
-  { value: "all", label: "Todas" },
   { value: "pending_accounting", label: "Pte. contabilizar" },
   { value: "accounted", label: "Contabilizadas" },
-  { value: "approved", label: "Aprobadas" },
-  { value: "pending", label: "Pte. pago" },
-  { value: "paid", label: "Pagadas" },
+  { value: "not_coded", label: "Sin codificar" },
+  { value: "all", label: "Todas" },
 ];
 
 export default function CompanyAccountsPage() {
@@ -118,7 +116,7 @@ export default function CompanyAccountsPage() {
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("pending_accounting");
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
 
@@ -297,6 +295,11 @@ export default function CompanyAccountsPage() {
     }
   };
 
+  // Helper para verificar si está codificada
+  const isInvoiceCoded = (invoice: Invoice) => {
+    return invoice.items && invoice.items.length > 0 && invoice.items.every((item) => item.subAccountId);
+  };
+
   // Filtrado
   const filteredInvoices = invoices.filter((inv) => {
     const matchesSearch =
@@ -306,10 +309,16 @@ export default function CompanyAccountsPage() {
       (inv.accountingEntryNumber || "").toLowerCase().includes(searchTerm.toLowerCase());
 
     let matchesStatus = true;
+    const isCoded = isInvoiceCoded(inv);
+    
     if (statusFilter === "pending_accounting") {
-      matchesStatus = !inv.accounted && ["approved", "pending", "paid"].includes(inv.status);
+      // Solo facturas codificadas, no contabilizadas, con estado válido para contabilizar
+      matchesStatus = isCoded && !inv.accounted && ["approved", "pending", "paid"].includes(inv.status);
     } else if (statusFilter === "accounted") {
       matchesStatus = inv.accounted === true;
+    } else if (statusFilter === "not_coded") {
+      // Facturas sin codificar
+      matchesStatus = !isCoded;
     } else if (statusFilter !== "all") {
       matchesStatus = inv.status === statusFilter;
     }
@@ -340,13 +349,11 @@ export default function CompanyAccountsPage() {
 
   // Stats
   const totalInvoices = invoices.length;
-  const pendingAccounting = invoices.filter((i) => !i.accounted && ["approved", "pending", "paid"].includes(i.status)).length;
+  const codedInvoices = invoices.filter((i) => isInvoiceCoded(i));
+  const pendingAccounting = codedInvoices.filter((i) => !i.accounted && ["approved", "pending", "paid"].includes(i.status)).length;
   const accountedCount = invoices.filter((i) => i.accounted).length;
-  const totalBaseAmount = invoices.reduce((acc, i) => acc + i.baseAmount, 0);
-
-  const isInvoiceCoded = (invoice: Invoice) => {
-    return invoice.items && invoice.items.length > 0 && invoice.items.every((item) => item.subAccountId);
-  };
+  const notCodedCount = invoices.filter((i) => !isInvoiceCoded(i)).length;
+  const totalBaseAmount = codedInvoices.reduce((acc, i) => acc + i.baseAmount, 0);
 
   const openInvoicePanel = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
@@ -415,10 +422,6 @@ export default function CompanyAccountsPage() {
           <div className="bg-white border-b border-slate-200 px-4 py-2">
             <div className="flex items-center gap-6 text-xs">
               <div className="flex items-center gap-1.5">
-                <span className="text-slate-500">Total:</span>
-                <span className="font-semibold text-slate-900">{totalInvoices}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                 <span className="text-slate-500">Pte. contab.:</span>
                 <span className="font-semibold text-amber-600">{pendingAccounting}</span>
@@ -428,6 +431,13 @@ export default function CompanyAccountsPage() {
                 <span className="text-slate-500">Contabilizadas:</span>
                 <span className="font-semibold text-emerald-600">{accountedCount}</span>
               </div>
+              {notCodedCount > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                  <span className="text-slate-500">Sin codificar:</span>
+                  <span className="font-semibold text-slate-500">{notCodedCount}</span>
+                </div>
+              )}
               <div className="flex items-center gap-1.5 ml-auto">
                 <Euro size={12} className="text-slate-400" />
                 <span className="text-slate-500">Base total:</span>
