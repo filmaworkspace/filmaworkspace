@@ -584,11 +584,11 @@ export default function ConfigUsers() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Tipo</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button onClick={() => setInviteForm({ ...inviteForm, roleType: "project", department: "", position: "" })} className={`p-3 rounded-xl border text-sm font-medium transition-all ${inviteForm.roleType === "project" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
+                <div className="flex gap-2">
+                  <button onClick={() => setInviteForm({ ...inviteForm, roleType: "project", department: "", position: "" })} className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-all ${inviteForm.roleType === "project" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
                     Proyecto
                   </button>
-                  <button onClick={() => setInviteForm({ ...inviteForm, roleType: "department", role: "" })} className={`p-3 rounded-xl border text-sm font-medium transition-all ${inviteForm.roleType === "department" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
+                  <button onClick={() => setInviteForm({ ...inviteForm, roleType: "department", role: "" })} className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-all ${inviteForm.roleType === "department" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
                     Departamento
                   </button>
                 </div>
@@ -596,11 +596,11 @@ export default function ConfigUsers() {
               {inviteForm.roleType === "project" && (
                 <div>
                   <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Rol</label>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="flex gap-2">
                     {PROJECT_ROLES.map((r) => {
                       const isSelected = inviteForm.role === r;
                       return (
-                        <button key={r} onClick={() => setInviteForm({ ...inviteForm, role: r })} className={`py-2.5 rounded-xl text-xs font-bold border transition-all ${isSelected ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>
+                        <button key={r} onClick={() => setInviteForm({ ...inviteForm, role: r })} className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all ${isSelected ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
                           {r}
                         </button>
                       );
@@ -648,9 +648,9 @@ export default function ConfigUsers() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Posición</label>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="flex gap-2">
                       {DEPARTMENT_POSITIONS.map((p) => (
-                        <button key={p} onClick={() => setInviteForm({ ...inviteForm, position: p })} className={`py-2.5 rounded-xl text-sm font-medium border transition-all ${inviteForm.position === p ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
+                        <button key={p} onClick={() => setInviteForm({ ...inviteForm, position: p })} className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all ${inviteForm.position === p ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
                           {p}
                         </button>
                       ))}
@@ -660,28 +660,25 @@ export default function ConfigUsers() {
               )}
               <div>
                 <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Permisos</label>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex gap-2">
                   <label 
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer transition-all"
-                    style={inviteForm.permissions.config ? { backgroundColor: 'rgba(100, 116, 139, 0.15)', borderColor: 'rgba(100, 116, 139, 0.4)' } : {}}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border cursor-pointer transition-all ${inviteForm.permissions.config ? "border-slate-400 bg-slate-100" : "border-slate-200 hover:border-slate-300"}`}
                   >
                     <input type="checkbox" checked={inviteForm.permissions.config} onChange={(e) => setInviteForm({ ...inviteForm, permissions: { ...inviteForm.permissions, config: e.target.checked } })} className="sr-only" />
-                    <Shield size={14} style={inviteForm.permissions.config ? { color: '#475569' } : { color: '#94a3b8' }} />
-                    <span className="text-sm font-medium" style={inviteForm.permissions.config ? { color: '#475569' } : { color: '#64748b' }}>Config</span>
+                    <Shield size={14} className={inviteForm.permissions.config ? "text-slate-600" : "text-slate-400"} />
+                    <span className={`text-sm font-medium ${inviteForm.permissions.config ? "text-slate-700" : "text-slate-500"}`}>Config</span>
                   </label>
                   <label 
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer transition-all"
-                    style={inviteForm.permissions.accounting ? { backgroundColor: 'rgba(47, 82, 224, 0.1)', borderColor: 'rgba(47, 82, 224, 0.3)' } : {}}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border cursor-pointer transition-all ${inviteForm.permissions.accounting ? "border-[#2F52E0]/40 bg-[#2F52E0]/10" : "border-slate-200 hover:border-slate-300"}`}
                   >
                     <input type="checkbox" checked={inviteForm.permissions.accounting} onChange={(e) => setInviteForm({ ...inviteForm, permissions: { ...inviteForm.permissions, accounting: e.target.checked } })} className="sr-only" />
-                    <span className="text-sm font-medium" style={inviteForm.permissions.accounting ? { color: '#2F52E0' } : { color: '#64748b' }}>Accounting</span>
+                    <span className={`text-sm font-medium ${inviteForm.permissions.accounting ? "text-[#2F52E0]" : "text-slate-500"}`}>Accounting</span>
                   </label>
                   <label 
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer transition-all"
-                    style={inviteForm.permissions.team ? { backgroundColor: 'rgba(137, 211, 34, 0.15)', borderColor: 'rgba(137, 211, 34, 0.4)' } : {}}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border cursor-pointer transition-all ${inviteForm.permissions.team ? "border-[#6BA319]/40 bg-[#6BA319]/10" : "border-slate-200 hover:border-slate-300"}`}
                   >
                     <input type="checkbox" checked={inviteForm.permissions.team} onChange={(e) => setInviteForm({ ...inviteForm, permissions: { ...inviteForm.permissions, team: e.target.checked } })} className="sr-only" />
-                    <span className="text-sm font-medium" style={inviteForm.permissions.team ? { color: '#6BA319' } : { color: '#64748b' }}>Team</span>
+                    <span className={`text-sm font-medium ${inviteForm.permissions.team ? "text-[#6BA319]" : "text-slate-500"}`}>Team</span>
                   </label>
                 </div>
               </div>
