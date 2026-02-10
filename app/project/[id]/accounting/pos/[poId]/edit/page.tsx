@@ -24,6 +24,7 @@ interface POItem { id: string; description: string; subAccountId: string; subAcc
 interface ApprovalStep { id: string; order: number; approverType: "fixed" | "role" | "hod" | "coordinator"; approvers?: string[]; roles?: string[]; department?: string; requireAll: boolean; }
 interface ApprovalStepStatus { id: string; order: number; approverType: "fixed" | "role" | "hod" | "coordinator"; approvers: string[]; approverNames: string[]; roles?: string[]; department?: string; approvedBy: string[]; rejectedBy: string[]; status: "pending" | "approved" | "rejected"; requireAll: boolean; }
 interface Member { userId: string; name?: string; email?: string; role?: string; department?: string; position?: string; }
+interface ItemInvoiceStatus { hasInvoices: boolean; hasAccountedInvoices: boolean; invoiceNumbers: string[]; }
 
 const PO_TYPES = [
   { value: "rental", label: "Alquiler", icon: ShoppingCart, description: "Equipos, vehículos, espacios" },
@@ -104,6 +105,9 @@ export default function EditPOPage() {
   }]);
 
   const [totals, setTotals] = useState({ baseAmount: 0, vatAmount: 0, irpfAmount: 0, totalAmount: 0 });
+  
+  // Estado para rastrear facturas asociadas a cada item (por índice)
+  const [itemInvoiceStatus, setItemInvoiceStatus] = useState<Record<number, ItemInvoiceStatus>>({});
 
   useEffect(() => {
     if (!permissionsLoading && permissions.userId && id && poId) loadData();
@@ -225,6 +229,30 @@ export default function EditPOPage() {
         });
       }
       setSubAccounts(allSubAccounts);
+
+      // Cargar facturas asociadas a esta PO para verificar items con facturas contabilizadas
+      const invoicesSnapshot = await getDocs(collection(db, `projects/${id}/invoices`));
+      const invoiceStatusByItem: Record<number, ItemInvoiceStatus> = {};
+      
+      invoicesSnapshot.docs.forEach((invDoc) => {
+        const invData = invDoc.data();
+        if (invData.poId === poId && invData.items) {
+          invData.items.forEach((invItem: any) => {
+            if (invItem.poItemIndex !== undefined && invItem.poItemIndex !== null) {
+              const idx = invItem.poItemIndex;
+              if (!invoiceStatusByItem[idx]) {
+                invoiceStatusByItem[idx] = { hasInvoices: false, hasAccountedInvoices: false, invoiceNumbers: [] };
+              }
+              invoiceStatusByItem[idx].hasInvoices = true;
+              invoiceStatusByItem[idx].invoiceNumbers.push(invData.displayNumber || invData.number);
+              if (invData.accounted) {
+                invoiceStatusByItem[idx].hasAccountedInvoices = true;
+              }
+            }
+          });
+        }
+      });
+      setItemInvoiceStatus(invoiceStatusByItem);
 
     } catch (error) {
       console.error("Error:", error);
@@ -770,10 +798,40 @@ export default function EditPOPage() {
                         <input type="text" value={item.description} onChange={(e) => updateItem(index, "description", e.target.value)} onBlur={() => handleBlur(`item_${index}_description`)} disabled={!canEdit()} placeholder="Descripción del item..." className={`w-full px-4 py-3 border ${hasError(`item_${index}_description`) ? "border-red-300 bg-red-50" : item.description.trim() ? "border-emerald-200" : "border-slate-200"} rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white disabled:bg-slate-50 disabled:cursor-not-allowed`} />
 
                         <div>
-                          <button onClick={() => { setCurrentItemIndex(index); setShowAccountModal(true); }} disabled={!canEdit()} className={`w-full px-4 py-3 border ${hasError(`item_${index}_account`) ? "border-red-300 bg-red-50" : item.subAccountCode ? "border-emerald-200 bg-emerald-50" : "border-slate-200"} rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white disabled:bg-slate-50 disabled:cursor-not-allowed`}>
+                          {/* Aviso si tiene facturas contabilizadas */}
+                          {itemInvoiceStatus[index]?.hasAccountedInvoices && (
+                            <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+                              <Lock size={12} className="text-red-500 flex-shrink-0 mt-0.5" />
+                              <span className="text-xs text-red-700">Este item tiene facturas contabilizadas ({itemInvoiceStatus[index].invoiceNumbers.join(", ")}). No se puede cambiar la cuenta.</span>
+                            </div>
+                          )}
+                          {/* Aviso si tiene facturas codificadas pero no contabilizadas */}
+                          {itemInvoiceStatus[index]?.hasInvoices && !itemInvoiceStatus[index]?.hasAccountedInvoices && (
+                            <div className="mb-2 p-2 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+                              <AlertTriangle size={12} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                              <span className="text-xs text-amber-700">Este item tiene facturas asignadas ({itemInvoiceStatus[index].invoiceNumbers.join(", ")}). Cambiar la cuenta las afectará.</span>
+                            </div>
+                          )}
+                          <button 
+                            onClick={() => { 
+                              if (itemInvoiceStatus[index]?.hasAccountedInvoices) {
+                                return; // Bloqueado
+                              }
+                              if (itemInvoiceStatus[index]?.hasInvoices && !confirm("Este item tiene facturas asignadas. ¿Deseas cambiar la cuenta analítica? Esto afectará a las facturas vinculadas.")) {
+                                return;
+                              }
+                              setCurrentItemIndex(index); 
+                              setShowAccountModal(true); 
+                            }} 
+                            disabled={!canEdit() || itemInvoiceStatus[index]?.hasAccountedInvoices} 
+                            className={`w-full px-4 py-3 border ${hasError(`item_${index}_account`) ? "border-red-300 bg-red-50" : itemInvoiceStatus[index]?.hasAccountedInvoices ? "border-red-200 bg-red-50" : item.subAccountCode ? "border-emerald-200 bg-emerald-50" : "border-slate-200"} rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white disabled:bg-slate-50 disabled:cursor-not-allowed`}>
                             {item.subAccountCode ? (
                               <div className="flex items-center gap-2">
-                                <CheckCircle2 size={14} className="text-emerald-600" />
+                                {itemInvoiceStatus[index]?.hasAccountedInvoices ? (
+                                  <Lock size={14} className="text-red-500" />
+                                ) : (
+                                  <CheckCircle2 size={14} className="text-emerald-600" />
+                                )}
                                 <span className="font-mono text-slate-900">{item.subAccountCode} - {item.subAccountDescription}</span>
                               </div>
                             ) : (
@@ -801,22 +859,38 @@ export default function EditPOPage() {
                         {episodesEnabled && totalEpisodes > 0 && (
                           <div>
                             <button
-                              onClick={() => openEpisodeModal(index)}
-                              disabled={!canEdit()}
+                              onClick={() => {
+                                if (itemInvoiceStatus[index]?.hasAccountedInvoices) {
+                                  return; // Bloqueado
+                                }
+                                if (itemInvoiceStatus[index]?.hasInvoices && !confirm("Este item tiene facturas asignadas. ¿Deseas cambiar los capítulos? Esto afectará a las facturas vinculadas.")) {
+                                  return;
+                                }
+                                openEpisodeModal(index);
+                              }}
+                              disabled={!canEdit() || itemInvoiceStatus[index]?.hasAccountedInvoices}
                               className={`w-full px-4 py-3 border rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white disabled:bg-slate-50 disabled:cursor-not-allowed ${
-                                item.episodeAssignment === "general" ? "border-slate-200" : "border-violet-200 bg-violet-50"
+                                itemInvoiceStatus[index]?.hasAccountedInvoices ? "border-red-200 bg-red-50" : item.episodeAssignment === "general" ? "border-slate-200" : "border-violet-200 bg-violet-50"
                               }`}
                             >
                               {item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 0 ? (
                                 <div className="flex items-center gap-2">
-                                  <Layers size={14} className="text-violet-600" />
+                                  {itemInvoiceStatus[index]?.hasAccountedInvoices ? (
+                                    <Lock size={14} className="text-red-500" />
+                                  ) : (
+                                    <Layers size={14} className="text-violet-600" />
+                                  )}
                                   <span className="text-slate-900">
-                                    {item.episodes.length === 1 ? `${item.episodes[0].episode}` : `${item.episodes.length} capítulos`}
+                                    {item.episodes.length === 1 ? `Cap. ${item.episodes[0].episode}` : `${item.episodes.length} capítulos`}
                                   </span>
                                 </div>
                               ) : (
                                 <div className="flex items-center gap-2">
-                                  <Layers size={14} className="text-slate-400" />
+                                  {itemInvoiceStatus[index]?.hasAccountedInvoices ? (
+                                    <Lock size={14} className="text-red-500" />
+                                  ) : (
+                                    <Layers size={14} className="text-slate-400" />
+                                  )}
                                   <span className="text-slate-600">General (todos los capítulos)</span>
                                 </div>
                               )}
