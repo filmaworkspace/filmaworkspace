@@ -13,7 +13,7 @@ import { unrealizeInvoice, updatePOItemsInvoiced, realizeInvoice } from "@/lib/b
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-type InvoiceStatus = "draft" | "pending" | "pending_approval" | "approved" | "rejected" | "paid" | "cancelled" | "coding";
+type InvoiceStatus = "draft" | "pending" | "pending_approval" | "approved" | "rejected" | "paid" | "cancelled" | "coding" | "accounted";
 type DocumentType = "invoice" | "proforma" | "autonomo" | "ticket";
 
 interface EpisodeDistribution { episode: number; amount: number; percentage: number; }
@@ -30,6 +30,7 @@ const STATUS_CONFIG: Record<InvoiceStatus, { bg: string; text: string; label: st
   pending: { bg: "bg-amber-50", text: "text-amber-700", label: "Pendiente pago", icon: Clock },
   pending_approval: { bg: "bg-amber-50", text: "text-amber-700", label: "Pend. aprobación", icon: Clock },
   approved: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Aprobada", icon: CheckCircle },
+  accounted: { bg: "bg-teal-50", text: "text-teal-700", label: "Contabilizada", icon: Lock },
   rejected: { bg: "bg-red-50", text: "text-red-700", label: "Rechazada", icon: XCircle },
   paid: { bg: "bg-blue-50", text: "text-blue-700", label: "Pagada", icon: CreditCard },
   cancelled: { bg: "bg-red-50", text: "text-red-700", label: "Anulada", icon: Ban },
@@ -864,6 +865,36 @@ export default function InvoiceDetailPage() {
               <div>
                 <p className="text-xs text-slate-500 mb-1">Codificada por</p>
                 <p className="text-sm text-slate-700">{invoice.codedByName} · {formatDateTime(invoice.codedAt)}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Info de contabilización */}
+        {invoice.accounted && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Lock size={18} className="text-emerald-600" />
+              <h3 className="font-semibold text-emerald-900">Factura contabilizada</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-xs text-emerald-600 mb-1">Nº Asiento</p>
+                <p className="font-mono font-semibold text-emerald-900">{invoice.accountingEntryNumber || "-"}</p>
+              </div>
+              {invoice.accountingAccount && (
+                <div>
+                  <p className="text-xs text-emerald-600 mb-1">Cuenta contable</p>
+                  <p className="font-mono font-medium text-emerald-900">{invoice.accountingAccount}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-xs text-emerald-600 mb-1">Contabilizada por</p>
+                <p className="text-sm text-emerald-800">{invoice.accountedByName || "-"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-emerald-600 mb-1">Fecha contabilización</p>
+                <p className="text-sm text-emerald-800">{invoice.accountedAt ? formatDateTime(invoice.accountedAt) : "-"}</p>
               </div>
             </div>
           </div>
