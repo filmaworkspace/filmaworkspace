@@ -835,29 +835,20 @@ export default function InvoiceDetailPage() {
         )}
 
         {/* Info compacta de codificación y contabilización */}
-        {(invoice.codedAt || invoice.accounted) && (
+        {invoice.codedAt && (
           <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-slate-500">
-            {invoice.codedAt && (
-              <>
-                <span className="flex items-center gap-1.5">
-                  <FileCheck size={12} className="text-violet-500" />
-                  <span>Codificada por {invoice.codedByName}</span>
-                </span>
-                {invoice.supplierNumber && (
-                  <span>Nº prov: <span className="font-mono text-slate-700">{invoice.supplierNumber}</span></span>
-                )}
-                {invoice.supplierTaxId && (
-                  <span>CIF: <span className="font-mono text-slate-700">{invoice.supplierTaxId}</span></span>
-                )}
-                {invoice.supplierIban && (
-                  <span>IBAN: <span className="font-mono text-slate-700">{invoice.supplierIban}</span></span>
-                )}
-                {canCode() && (
-                  <button onClick={() => setCodingMode(true)} className="text-violet-600 hover:text-violet-800 font-medium">
-                    Editar
-                  </button>
-                )}
-              </>
+            <span className="flex items-center gap-1.5">
+              <FileCheck size={12} className="text-violet-500" />
+              <span>Codificada por {invoice.codedByName}</span>
+            </span>
+            {invoice.supplierNumber && (
+              <span>Nº prov: <span className="font-mono text-slate-700">{invoice.supplierNumber}</span></span>
+            )}
+            {invoice.supplierTaxId && (
+              <span>CIF: <span className="font-mono text-slate-700">{invoice.supplierTaxId}</span></span>
+            )}
+            {invoice.supplierIban && (
+              <span>IBAN: <span className="font-mono text-slate-700">{invoice.supplierIban}</span></span>
             )}
             {invoice.accounted && (
               <>
@@ -867,6 +858,11 @@ export default function InvoiceDetailPage() {
                 </span>
                 <span className="text-slate-400">por {invoice.accountedByName}</span>
               </>
+            )}
+            {canCode() && (
+              <button onClick={() => setCodingMode(true)} className="text-violet-600 hover:text-violet-800 font-medium">
+                Editar
+              </button>
             )}
           </div>
         )}
