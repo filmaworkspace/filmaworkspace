@@ -780,15 +780,20 @@ export default function InvoiceDetailPage() {
                 <div className="flex items-center gap-3 flex-wrap">
                   <h1 className="text-2xl font-semibold text-slate-900">{docConfig.label}</h1>
                   <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm font-mono">{invoice.displayNumber}</span>
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium text-sm ${config.bg} ${config.text}`}><StatusIcon size={14} />{config.label}</span>
+                  {/* Estado - no mostrar si es "accounted" para evitar duplicar */}
+                  {invoice.status !== "accounted" && (
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium text-sm ${config.bg} ${config.text}`}><StatusIcon size={14} />{config.label}</span>
+                  )}
+                  {/* Codificada - siempre mostrar si está codificada */}
+                  {invoice.codedAt && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-violet-100 text-violet-700 rounded-lg font-medium text-sm">
+                      <FileCheck size={14} />Codificada
+                    </span>
+                  )}
+                  {/* Contabilizada */}
                   {invoice.accounted && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg font-medium text-sm">
                       <Lock size={14} />Contabilizada
-                    </span>
-                  )}
-                  {invoice.codedAt && !invoice.accounted && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-violet-100 text-violet-700 rounded-lg font-medium text-sm">
-                      <FileCheck size={14} />Codificada
                     </span>
                   )}
                   {invoice.poNumber && <Link href={`/project/${projectId}/accounting/pos/${invoice.poId}`} className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-100"><LinkIcon size={12} />PO-{invoice.poNumber}</Link>}
