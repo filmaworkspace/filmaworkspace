@@ -124,6 +124,7 @@ export default function CompanyAccountsPage() {
 
   // Panel lateral
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [showDocument, setShowDocument] = useState(false);
   const [accountingForm, setAccountingForm] = useState({
     entryNumber: "",
     accountingAccount: "",
@@ -351,6 +352,7 @@ export default function CompanyAccountsPage() {
 
   const openInvoicePanel = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
+    setShowDocument(false);
     setAccountingForm({
       entryNumber: invoice.accountingEntryNumber || "",
       accountingAccount: invoice.accountingAccount || "",
@@ -597,9 +599,9 @@ export default function CompanyAccountsPage() {
 
         {/* Panel lateral */}
         {selectedInvoice && (
-          <div className="fixed right-0 top-16 bottom-0 w-1/2 bg-white border-l border-slate-200 shadow-xl z-30 overflow-y-auto">
+          <div className="fixed right-0 top-16 bottom-0 w-1/2 bg-white border-l border-slate-200 shadow-xl z-30 flex flex-col">
             {/* Header del panel */}
-            <div className="sticky top-0 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+            <div className="flex-shrink-0 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <button
                   onClick={goToPrevInvoice}
@@ -617,6 +619,28 @@ export default function CompanyAccountsPage() {
                   <ChevronRight size={18} />
                 </button>
               </div>
+              
+              {/* Tabs */}
+              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
+                <button
+                  onClick={() => setShowDocument(false)}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                    !showDocument ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  Datos
+                </button>
+                <button
+                  onClick={() => setShowDocument(true)}
+                  disabled={!selectedInvoice.attachmentUrl}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                    showDocument ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  } disabled:opacity-40 disabled:cursor-not-allowed`}
+                >
+                  Documento
+                </button>
+              </div>
+
               <button
                 onClick={() => setSelectedInvoice(null)}
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
@@ -626,7 +650,16 @@ export default function CompanyAccountsPage() {
             </div>
 
             {/* Contenido del panel */}
-            <div className="p-4 space-y-4">
+            {showDocument && selectedInvoice.attachmentUrl ? (
+              <div className="flex-1 bg-slate-100">
+                <iframe
+                  src={selectedInvoice.attachmentUrl}
+                  className="w-full h-full"
+                  title="Documento"
+                />
+              </div>
+            ) : (
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Info básica */}
               <div className="flex items-start justify-between">
                 <div>
@@ -806,6 +839,7 @@ export default function CompanyAccountsPage() {
                 </div>
               )}
             </div>
+            )}
           </div>
         )}
       </div>
