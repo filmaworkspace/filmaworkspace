@@ -5,7 +5,7 @@ import { Inter } from "next/font/google";
 import { useState, useEffect, useRef } from "react";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, deleteDoc, query, orderBy, updateDoc, Timestamp } from "firebase/firestore";
-import { Receipt, Plus, Search, Download, Trash2, X, CheckCircle, XCircle, Calendar, FileText, Eye, MoreHorizontal, Shield, FileCheck, AlertTriangle, Link as LinkIcon, Clock, Building2, ShieldAlert, User, ChevronDown, Filter, HelpCircle, Upload, Code, RefreshCw } from "lucide-react";
+import { Receipt, Plus, Search, Download, Trash2, X, CheckCircle, XCircle, Calendar, FileText, Eye, MoreHorizontal, Shield, FileCheck, AlertTriangle, Link as LinkIcon, Clock, Building2, ShieldAlert, User, ChevronDown, Filter, HelpCircle, Upload, Code, RefreshCw, Lock } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
@@ -80,6 +80,8 @@ interface Invoice {
   linkedDocumentId?: string;
   codedAt?: Date;
   codedByName?: string;
+  accounted?: boolean;
+  accountingEntryNumber?: string;
 }
 
 interface CompanyData {
@@ -169,6 +171,8 @@ export default function InvoicesPage() {
           rejectedAt: data.rejectedAt?.toDate(),
           codedAt: data.codedAt?.toDate(),
           codedByName: data.codedByName,
+          accounted: data.accounted || false,
+          accountingEntryNumber: data.accountingEntryNumber,
         };
       }) as Invoice[];
 
@@ -223,6 +227,7 @@ export default function InvoicesPage() {
   };
 
   const canEditInvoice = (invoice: Invoice): boolean => {
+    if (invoice.accounted) return false; // Bloqueada si está contabilizada
     if (invoice.status === "paid" || invoice.status === "cancelled") return false;
     if (permissions.canEditAllPOs) return true;
     if (permissions.canEditDepartmentPOs && invoice.department === permissions.department) return true;
@@ -231,6 +236,7 @@ export default function InvoicesPage() {
   };
 
   const canDeleteInvoice = (invoice: Invoice): boolean => {
+    if (invoice.accounted) return false; // Bloqueada si está contabilizada
     if (invoice.status !== "pending_approval" && invoice.status !== "rejected") return false;
     return canEditInvoice(invoice);
   };
@@ -737,7 +743,12 @@ export default function InvoicesPage() {
                             <div className="flex items-center gap-2">
                               {getDocumentTypeBadge(invoice.documentType)}
                               <p className="font-semibold text-slate-900 font-mono group-hover/inv:text-[#2F52E0] transition-colors">{invoice.displayNumber}</p>
-                              {invoice.codedAt && (
+                              {invoice.accounted && (
+                                <span className="flex items-center gap-1 text-xs text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded" title={`Contabilizada - Asiento: ${invoice.accountingEntryNumber}`}>
+                                  <Lock size={10} />
+                                </span>
+                              )}
+                              {invoice.codedAt && !invoice.accounted && (
                                 <span className="flex items-center gap-1 text-xs text-violet-600 bg-violet-100 px-1.5 py-0.5 rounded" title={`Codificada por ${invoice.codedByName}`}>
                                   <FileCheck size={10} />
                                 </span>
