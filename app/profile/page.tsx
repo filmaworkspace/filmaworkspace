@@ -93,7 +93,8 @@ export default function ProfilePage() {
     if (!user?.uid) return;
     setLoadingProjects(true);
     try {
-      const userProjectsSnap = await getDocs(collection(db, `users/${user.uid}/projects`));
+      // Los proyectos están en userProjects/{uid}/projects
+      const userProjectsSnap = await getDocs(collection(db, `userProjects/${user.uid}/projects`));
       const projectsData: ProjectMembership[] = [];
 
       for (const upDoc of userProjectsSnap.docs) {
@@ -192,7 +193,7 @@ export default function ProfilePage() {
     if (!project) return;
 
     try {
-      await updateDoc(doc(db, `users/${user.uid}/projects`, projectId), {
+      await updateDoc(doc(db, `userProjects/${user.uid}/projects`, projectId), {
         archived: !project.archived,
       });
       setProjects(projects.map(p => 
@@ -211,7 +212,7 @@ export default function ProfilePage() {
     if (!project) return;
 
     try {
-      await updateDoc(doc(db, `users/${user.uid}/projects`, projectId), {
+      await updateDoc(doc(db, `userProjects/${user.uid}/projects`, projectId), {
         favorite: !project.favorite,
       });
       setProjects(projects.map(p => 
@@ -229,7 +230,7 @@ export default function ProfilePage() {
 
     try {
       const newNotifications = { ...project.notifications, [notificationType]: value };
-      await updateDoc(doc(db, `users/${user.uid}/projects`, projectId), {
+      await updateDoc(doc(db, `userProjects/${user.uid}/projects`, projectId), {
         notifications: newNotifications,
       });
       setProjects(projects.map(p => 
@@ -250,7 +251,7 @@ export default function ProfilePage() {
         invoices: enable,
         team: enable,
       };
-      await updateDoc(doc(db, `users/${user.uid}/projects`, projectId), {
+      await updateDoc(doc(db, `userProjects/${user.uid}/projects`, projectId), {
         notifications: newNotifications,
       });
       setProjects(projects.map(p => 
@@ -396,7 +397,7 @@ export default function ProfilePage() {
       <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
         {/* TAB: MI CUENTA */}
         {activeTab === "account" && (
-          <div className="max-w-3xl">
+          <div className="max-w-3xl mx-auto">
             {/* Sub-navigation */}
             <div className="flex gap-6 mb-8 border-b border-slate-200">
               <button
@@ -557,7 +558,7 @@ export default function ProfilePage() {
 
         {/* TAB: MIS PROYECTOS */}
         {activeTab === "projects" && (
-          <div className="max-w-4xl">
+          <div className="max-w-4xl mx-auto">
             {/* Filtros */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex gap-2">
