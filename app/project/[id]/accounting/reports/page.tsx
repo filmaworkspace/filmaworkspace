@@ -10,7 +10,7 @@ import { getCostSettings, shouldCommitPO, shouldRealizeInvoice, CostSettings } f
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-type ReportType = "budget" | "pos_list" | "pos_items" | "invoices" | "suppliers";
+type ReportType = "budget" | "pos_list" | "pos_items" | "invoices" | "invoices_accounting" | "suppliers" | "payments" | "cost_report";
 
 interface ReportColumn {
   id: string;
@@ -85,20 +85,46 @@ const REPORT_COLUMNS: Record<ReportType, ReportColumn[]> = {
   ],
   invoices: [
     { id: "number", label: "Nº Factura", enabled: true, locked: true },
+    { id: "supplierNumber", label: "Nº Factura proveedor", enabled: true },
     { id: "supplier", label: "Proveedor", enabled: true },
     { id: "supplierTaxId", label: "NIF Proveedor", enabled: false },
     { id: "description", label: "Descripción", enabled: true },
     { id: "poNumber", label: "Nº PO asociada", enabled: true },
     { id: "episode", label: "Capítulo", enabled: true },
+    { id: "accountCode", label: "Cuenta contable", enabled: true },
     { id: "baseAmount", label: "Base imponible", enabled: true },
-    { id: "taxAmount", label: "IVA", enabled: false },
+    { id: "taxAmount", label: "IVA", enabled: true },
     { id: "irpfAmount", label: "IRPF", enabled: false },
     { id: "totalAmount", label: "Total", enabled: true },
     { id: "status", label: "Estado", enabled: true },
+    { id: "coded", label: "Codificada", enabled: true },
+    { id: "accounted", label: "Contabilizada", enabled: true },
+    { id: "invoiceDate", label: "Fecha factura", enabled: true },
     { id: "dueDate", label: "Vencimiento", enabled: true },
-    { id: "createdAt", label: "Fecha registro", enabled: true },
+    { id: "createdAt", label: "Fecha registro", enabled: false },
     { id: "paidAt", label: "Fecha pago", enabled: false },
-    { id: "accountCode", label: "Cuenta", enabled: false },
+  ],
+  invoices_accounting: [
+    { id: "accountingEntryNumber", label: "Nº Asiento", enabled: true, locked: true },
+    { id: "number", label: "Nº Factura", enabled: true },
+    { id: "supplierNumber", label: "Nº Factura proveedor", enabled: true },
+    { id: "invoiceDate", label: "Fecha factura", enabled: true },
+    { id: "supplier", label: "Proveedor", enabled: true },
+    { id: "supplierTaxId", label: "NIF Proveedor", enabled: true },
+    { id: "supplierIban", label: "IBAN", enabled: false },
+    { id: "description", label: "Concepto", enabled: true },
+    { id: "accountCode", label: "Cuenta contable", enabled: true },
+    { id: "baseAmount", label: "Base imponible", enabled: true },
+    { id: "taxRate", label: "% IVA", enabled: true },
+    { id: "taxAmount", label: "Cuota IVA", enabled: true },
+    { id: "irpfRate", label: "% IRPF", enabled: false },
+    { id: "irpfAmount", label: "Retención IRPF", enabled: false },
+    { id: "totalAmount", label: "Total factura", enabled: true },
+    { id: "dueDate", label: "Vencimiento", enabled: true },
+    { id: "status", label: "Estado pago", enabled: true },
+    { id: "paidAt", label: "Fecha pago", enabled: false },
+    { id: "accountedAt", label: "Fecha contabilización", enabled: true },
+    { id: "accountedBy", label: "Contabilizado por", enabled: false },
   ],
   suppliers: [
     { id: "fiscalName", label: "Nombre fiscal", enabled: true, locked: true },
@@ -116,14 +142,44 @@ const REPORT_COLUMNS: Record<ReportType, ReportColumn[]> = {
     { id: "totalPOs", label: "Total POs", enabled: false },
     { id: "totalInvoiced", label: "Total facturado", enabled: false },
   ],
+  payments: [
+    { id: "paymentNumber", label: "Nº Pago", enabled: true, locked: true },
+    { id: "invoiceNumber", label: "Nº Factura", enabled: true },
+    { id: "supplierNumber", label: "Nº Factura proveedor", enabled: true },
+    { id: "supplier", label: "Proveedor", enabled: true },
+    { id: "supplierTaxId", label: "NIF Proveedor", enabled: true },
+    { id: "supplierIban", label: "IBAN", enabled: true },
+    { id: "description", label: "Concepto", enabled: true },
+    { id: "baseAmount", label: "Base imponible", enabled: true },
+    { id: "totalAmount", label: "Total pagado", enabled: true },
+    { id: "paymentMethod", label: "Método pago", enabled: true },
+    { id: "paidAt", label: "Fecha pago", enabled: true },
+    { id: "paidBy", label: "Pagado por", enabled: false },
+    { id: "accountingEntryNumber", label: "Nº Asiento", enabled: true },
+  ],
+  cost_report: [
+    { id: "accountCode", label: "Cuenta", enabled: true, locked: true },
+    { id: "accountDescription", label: "Descripción cuenta", enabled: true },
+    { id: "budgeted", label: "Presupuestado", enabled: true },
+    { id: "committed", label: "Comprometido", enabled: true },
+    { id: "invoiced", label: "Facturado", enabled: true },
+    { id: "paid", label: "Pagado", enabled: true },
+    { id: "pendingPayment", label: "Pendiente pago", enabled: true },
+    { id: "available", label: "Disponible", enabled: true },
+    { id: "percentExecuted", label: "% Ejecutado", enabled: true },
+    { id: "deviation", label: "Desviación", enabled: false },
+  ],
 };
 
 const REPORT_INFO: Record<ReportType, { title: string; description: string; icon: any; color: string }> = {
   budget: { title: "Presupuesto", description: "Cuentas, subcuentas y ejecución presupuestaria", icon: Wallet, color: "bg-slate-100 text-slate-600" },
   pos_list: { title: "Listado de POs", description: "Órdenes de compra con totales", icon: FileText, color: "bg-slate-100 text-slate-600" },
   pos_items: { title: "POs por ítems", description: "Desglose detallado de cada ítem de PO", icon: Layers, color: "bg-slate-100 text-slate-600" },
-  invoices: { title: "Facturas", description: "Listado de facturas recibidas", icon: Receipt, color: "bg-slate-100 text-slate-600" },
+  invoices: { title: "Facturas", description: "Listado completo de facturas recibidas", icon: Receipt, color: "bg-slate-100 text-slate-600" },
+  invoices_accounting: { title: "Libro de facturas", description: "Facturas contabilizadas con nº de asiento", icon: BookMarked, color: "bg-emerald-100 text-emerald-600" },
   suppliers: { title: "Proveedores", description: "Directorio completo de proveedores", icon: Building2, color: "bg-slate-100 text-slate-600" },
+  payments: { title: "Registro de pagos", description: "Histórico de pagos realizados", icon: Wallet, color: "bg-blue-100 text-blue-600" },
+  cost_report: { title: "Informe de costes", description: "Resumen de ejecución por cuenta contable", icon: FileSpreadsheet, color: "bg-violet-100 text-violet-600" },
 };
 
 export default function ReportsPage() {
@@ -748,22 +804,29 @@ export default function ReportsPage() {
             }));
           });
         } else {
+          // Obtener cuenta contable del primer item
+          const accountCode = items.length > 0 ? (items[0].subAccountCode || "") : "";
+          
           const rowData: any = {
             number: data.number || data.displayNumber || "",
+            supplierNumber: data.supplierNumber || "",
             supplier: data.supplier || "",
             supplierTaxId: data.supplierTaxId || "",
             description: data.description || "",
             poNumber: data.poNumber || "",
             episode: episodeLabel,
+            accountCode: accountCode,
             baseAmount: data.baseAmount || 0,
             taxAmount: data.vatAmount || data.taxAmount || 0,
             irpfAmount: data.irpfAmount || 0,
             totalAmount: data.totalAmount || 0,
             status: data.status || "",
+            coded: data.codedAt ? "Sí" : "No",
+            accounted: data.accounted ? "Sí" : "No",
+            invoiceDate: formatDate(data.invoiceDate),
             dueDate: formatDate(data.dueDate),
             createdAt: formatDate(data.createdAt),
             paidAt: formatDate(data.paidAt),
-            accountCode: data.accountCode || "",
           };
           
           rows.push(columns.map(col => {
@@ -815,6 +878,176 @@ export default function ReportsPage() {
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
+  const generateInvoicesAccountingReport = async (columns: SelectedColumn[]) => {
+    setGenerating("invoices_accounting");
+    try {
+      const invoicesSnapshot = await getDocs(query(collection(db, `projects/${id}/invoices`), orderBy("accountedAt", "desc")));
+      const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
+      
+      // Solo facturas contabilizadas
+      const accountedInvoices = invoicesSnapshot.docs.filter(doc => doc.data().accounted === true);
+      
+      accountedInvoices.forEach((docSnap) => {
+        const data = docSnap.data();
+        const items = data.items || [];
+        
+        // Obtener cuenta contable del primer item
+        const accountCode = items.length > 0 ? (items[0].subAccountCode || "") : "";
+        
+        // Calcular tasa de IVA
+        const taxRate = data.baseAmount > 0 ? Math.round((data.vatAmount / data.baseAmount) * 100) : 21;
+        const irpfRate = data.baseAmount > 0 ? Math.round((data.irpfAmount / data.baseAmount) * 100) : 0;
+        
+        const rowData: any = {
+          accountingEntryNumber: data.accountingEntryNumber || "",
+          number: data.number || data.displayNumber || "",
+          supplierNumber: data.supplierNumber || "",
+          invoiceDate: formatDate(data.invoiceDate),
+          supplier: data.supplier || "",
+          supplierTaxId: data.supplierTaxId || "",
+          supplierIban: data.supplierIban || "",
+          description: data.description || "",
+          accountCode: accountCode,
+          baseAmount: data.baseAmount || 0,
+          taxRate: `${taxRate}%`,
+          taxAmount: data.vatAmount || 0,
+          irpfRate: `${irpfRate}%`,
+          irpfAmount: data.irpfAmount || 0,
+          totalAmount: data.totalAmount || 0,
+          dueDate: formatDate(data.dueDate),
+          status: data.status === "paid" ? "Pagada" : "Pendiente",
+          paidAt: formatDate(data.paidAt),
+          accountedAt: formatDate(data.accountedAt),
+          accountedBy: data.accountedByName || "",
+        };
+        
+        rows.push(columns.map(col => {
+          if (col.isBlank) return "";
+          const val = rowData[col.originalId];
+          return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
+        }));
+      });
+      
+      await downloadFile(rows, `Libro_Facturas_${projectName}_${getCurrentDate()}.csv`);
+    } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
+  };
+
+  const generatePaymentsReport = async (columns: SelectedColumn[]) => {
+    setGenerating("payments");
+    try {
+      const invoicesSnapshot = await getDocs(query(collection(db, `projects/${id}/invoices`), orderBy("paidAt", "desc")));
+      const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
+      
+      // Solo facturas pagadas
+      const paidInvoices = invoicesSnapshot.docs.filter(doc => doc.data().status === "paid" && doc.data().paidAt);
+      
+      let paymentCounter = 1;
+      paidInvoices.forEach((docSnap) => {
+        const data = docSnap.data();
+        
+        const rowData: any = {
+          paymentNumber: `PAG-${String(paymentCounter).padStart(4, "0")}`,
+          invoiceNumber: data.number || data.displayNumber || "",
+          supplierNumber: data.supplierNumber || "",
+          supplier: data.supplier || "",
+          supplierTaxId: data.supplierTaxId || "",
+          supplierIban: data.supplierIban || "",
+          description: data.description || "",
+          baseAmount: data.baseAmount || 0,
+          totalAmount: data.totalAmount || 0,
+          paymentMethod: data.paymentMethod || "Transferencia",
+          paidAt: formatDate(data.paidAt),
+          paidBy: data.paidByName || "",
+          accountingEntryNumber: data.accountingEntryNumber || "",
+        };
+        
+        rows.push(columns.map(col => {
+          if (col.isBlank) return "";
+          const val = rowData[col.originalId];
+          return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
+        }));
+        
+        paymentCounter++;
+      });
+      
+      await downloadFile(rows, `Pagos_${projectName}_${getCurrentDate()}.csv`);
+    } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
+  };
+
+  const generateCostReport = async (columns: SelectedColumn[]) => {
+    setGenerating("cost_report");
+    try {
+      const accountsSnapshot = await getDocs(query(collection(db, `projects/${id}/accounts`), orderBy("code", "asc")));
+      const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
+      
+      for (const accountDoc of accountsSnapshot.docs) {
+        const accountData = accountDoc.data();
+        
+        // Obtener subcuentas
+        const subAccountsSnapshot = await getDocs(query(
+          collection(db, `projects/${id}/accounts/${accountDoc.id}/subaccounts`),
+          orderBy("code", "asc")
+        ));
+        
+        // Sumar valores de todas las subcuentas
+        let totalBudgeted = 0;
+        let totalCommitted = 0;
+        let totalActual = 0;
+        
+        subAccountsSnapshot.docs.forEach((subDoc) => {
+          const subData = subDoc.data();
+          totalBudgeted += subData.budgeted || 0;
+          totalCommitted += subData.committed || 0;
+          totalActual += subData.actual || 0;
+        });
+        
+        // Obtener facturas pagadas para esta cuenta
+        const invoicesSnapshot = await getDocs(collection(db, `projects/${id}/invoices`));
+        let totalPaid = 0;
+        let totalPending = 0;
+        
+        invoicesSnapshot.docs.forEach((invDoc) => {
+          const invData = invDoc.data();
+          const items = invData.items || [];
+          items.forEach((item: any) => {
+            if (item.subAccountCode?.startsWith(accountData.code)) {
+              if (invData.status === "paid") {
+                totalPaid += item.baseAmount || 0;
+              } else if (["approved", "pending", "accounted"].includes(invData.status)) {
+                totalPending += item.baseAmount || 0;
+              }
+            }
+          });
+        });
+        
+        const available = totalBudgeted - totalCommitted;
+        const percentExecuted = totalBudgeted > 0 ? Math.round((totalActual / totalBudgeted) * 100) : 0;
+        const deviation = totalActual - totalBudgeted;
+        
+        const rowData: any = {
+          accountCode: accountData.code || "",
+          accountDescription: accountData.description || "",
+          budgeted: totalBudgeted,
+          committed: totalCommitted,
+          invoiced: totalActual,
+          paid: totalPaid,
+          pendingPayment: totalPending,
+          available: available,
+          percentExecuted: `${percentExecuted}%`,
+          deviation: deviation,
+        };
+        
+        rows.push(columns.map(col => {
+          if (col.isBlank) return "";
+          const val = rowData[col.originalId];
+          return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
+        }));
+      }
+      
+      await downloadFile(rows, `Informe_Costes_${projectName}_${getCurrentDate()}.csv`);
+    } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
+  };
+
   const generateReport = (reportType: ReportType, columns?: SelectedColumn[]) => {
     const cols = columns || getDefaultColumns(reportType);
     switch (reportType) {
@@ -822,7 +1055,10 @@ export default function ReportsPage() {
       case "pos_list": return generatePOsListReport(cols);
       case "pos_items": return generatePOsItemsReport(cols);
       case "invoices": return generateInvoicesReport(cols);
+      case "invoices_accounting": return generateInvoicesAccountingReport(cols);
       case "suppliers": return generateSuppliersReport(cols);
+      case "payments": return generatePaymentsReport(cols);
+      case "cost_report": return generateCostReport(cols);
     }
   };
 
@@ -839,15 +1075,18 @@ export default function ReportsPage() {
 
   const getReportCount = (reportType: ReportType) => {
     switch (reportType) {
-      case "budget": return counts.accounts;
+      case "budget": 
+      case "cost_report": return counts.accounts;
       case "pos_list": 
       case "pos_items": return counts.pos;
-      case "invoices": return counts.invoices;
+      case "invoices": 
+      case "invoices_accounting":
+      case "payments": return counts.invoices;
       case "suppliers": return counts.suppliers;
     }
   };
 
-  const reportTypes: ReportType[] = ["budget", "pos_list", "pos_items", "invoices", "suppliers"];
+  const reportTypes: ReportType[] = ["budget", "cost_report", "pos_list", "pos_items", "invoices", "invoices_accounting", "payments", "suppliers"];
 
   if (loading) {
     return (
