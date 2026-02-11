@@ -609,7 +609,7 @@ export default function ProfilePage() {
                 {filteredProjects.map((project) => (
                   <div
                     key={project.projectId}
-                    className={`bg-white border rounded-2xl overflow-hidden transition-all ${
+                    className={`bg-white border rounded-2xl transition-all ${
                       project.archived ? "border-slate-200 opacity-60" : "border-slate-200 hover:border-slate-300"
                     }`}
                   >
