@@ -112,6 +112,9 @@ export default function EditPOPage() {
   // Items originales comprometidos (para mantener comprometido durante edición)
   const [originalCommittedItems, setOriginalCommittedItems] = useState<{subAccountId: string; baseAmount: number}[] | null>(null);
   const [wasApprovedBefore, setWasApprovedBefore] = useState(false);
+  
+  // Items originales con todas sus propiedades (para detectar cambios de cuenta)
+  const [originalItems, setOriginalItems] = useState<{subAccountId: string; subAccountCode: string; subAccountDescription: string}[]>([]);
 
   useEffect(() => {
     if (!permissionsLoading && permissions.userId && id && poId) loadData();
@@ -188,6 +191,13 @@ export default function EditPOPage() {
         loadedItems.push({ id: "1", description: "", subAccountId: "", subAccountCode: "", subAccountDescription: "", date: new Date().toISOString().split("T")[0], quantity: 1, unitPrice: 0, baseAmount: 0, vatRate: 21, vatAmount: 0, irpfRate: 0, irpfAmount: 0, totalAmount: 0, episodeAssignment: "general" });
       }
       setItems(loadedItems);
+      
+      // Guardar items originales para detectar cambios de cuenta
+      setOriginalItems(loadedItems.map((item: any) => ({
+        subAccountId: item.subAccountId || "",
+        subAccountCode: item.subAccountCode || "",
+        subAccountDescription: item.subAccountDescription || "",
+      })));
 
       const projectDoc = await getDoc(doc(db, "projects", id));
       if (projectDoc.exists()) {
@@ -544,6 +554,9 @@ export default function EditPOPage() {
 
       await updateDoc(doc(db, `projects/${id}/pos`, poId), poData);
 
+      // Actualizar facturas vinculadas si cambiaron las cuentas de los items
+      await updateLinkedInvoicesAccounts();
+
       // Comprometer según la configuración
       const finalStatus = poData.status;
       
@@ -585,6 +598,57 @@ export default function EditPOPage() {
             });
           }
         }
+      }
+    }
+  };
+
+  // Helper para actualizar facturas vinculadas cuando cambian las cuentas de los items de la PO
+  const updateLinkedInvoicesAccounts = async () => {
+    // Detectar qué items cambiaron de cuenta
+    const changedItems: { index: number; newSubAccountId: string; newSubAccountCode: string; newSubAccountDescription: string }[] = [];
+    
+    items.forEach((item, index) => {
+      const original = originalItems[index];
+      if (original && original.subAccountId !== item.subAccountId) {
+        changedItems.push({
+          index,
+          newSubAccountId: item.subAccountId,
+          newSubAccountCode: item.subAccountCode,
+          newSubAccountDescription: item.subAccountDescription,
+        });
+      }
+    });
+
+    if (changedItems.length === 0) return;
+
+    // Buscar facturas vinculadas a esta PO
+    const invoicesSnapshot = await getDocs(collection(db, `projects/${id}/invoices`));
+    
+    for (const invDoc of invoicesSnapshot.docs) {
+      const invData = invDoc.data();
+      if (invData.poId !== poId) continue;
+      
+      // Verificar si algún item de la factura está afectado
+      let needsUpdate = false;
+      const updatedInvoiceItems = (invData.items || []).map((invItem: any) => {
+        const changedItem = changedItems.find(ci => ci.index === invItem.poItemIndex);
+        if (changedItem) {
+          needsUpdate = true;
+          return {
+            ...invItem,
+            subAccountId: changedItem.newSubAccountId,
+            subAccountCode: changedItem.newSubAccountCode,
+            subAccountDescription: changedItem.newSubAccountDescription,
+          };
+        }
+        return invItem;
+      });
+
+      if (needsUpdate) {
+        await updateDoc(doc(db, `projects/${id}/invoices`, invDoc.id), {
+          items: updatedInvoiceItems,
+          updatedAt: Timestamp.now(),
+        });
       }
     }
   };
