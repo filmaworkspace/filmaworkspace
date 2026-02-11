@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Fragment } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
@@ -42,6 +42,14 @@ export default function BudgetPage() {
 
   const [formData, setFormData] = useState({ code: "", description: "", budgeted: 0 });
   const [summary, setSummary] = useState<BudgetSummary>({ totalBudgeted: 0, totalCommitted: 0, totalActual: 0, totalAvailable: 0 });
+
+  // Estados para el importador mejorado
+  const [importStep, setImportStep] = useState<"upload" | "preview" | "importing" | "done">("upload");
+  const [importData, setImportData] = useState<{ code: string; description: string; type: string; budgeted: number; valid: boolean; error?: string }[]>([]);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importResults, setImportResults] = useState<{ accounts: number; subaccounts: number; errors: number }>({ accounts: 0, subaccounts: 0, errors: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [importFileName, setImportFileName] = useState("");
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => { if (user) setUserId(user.uid); });
@@ -277,37 +285,177 @@ export default function BudgetPage() {
     const link = document.createElement("a"); link.setAttribute("href", URL.createObjectURL(blob)); link.setAttribute("download", "plantilla_presupuesto.csv"); link.click();
   };
 
-  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]; if (!file) return;
-    setSaving(true); setErrorMessage("");
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const text = e.target?.result as string;
-      const lines = text.split("\n").slice(1);
-      try {
-        const accountsMap = new Map<string, string>();
-        let accountsCreated = 0, subAccountsCreated = 0;
-        for (const line of lines) {
-          const [code, description, type, budgeted] = line.split(",").map((s) => s.trim());
-          if (!code || !description || !type) continue;
-          if (type.toUpperCase() === "CUENTA") {
-            const accountRef = await addDoc(collection(db, `projects/${id}/accounts`), { code: code.trim(), description, createdAt: Timestamp.now(), createdBy: userId || "" });
-            accountsMap.set(code, accountRef.id); accountsCreated++;
-          } else if (type.toUpperCase() === "SUBCUENTA") {
-            const accountCode = code.split(/[.\-]/)[0];
-            let accountId = accountsMap.get(accountCode);
-            if (!accountId) { const existingAccount = accounts.find(a => a.code === accountCode); if (existingAccount) accountId = existingAccount.id; }
-            if (accountId) {
-              await addDoc(collection(db, `projects/${id}/accounts/${accountId}/subaccounts`), { code: code.trim(), description, budgeted: parseFloat(budgeted) || 0, committed: 0, actual: 0, accountId, createdAt: Timestamp.now(), createdBy: userId || "" });
-              subAccountsCreated++;
-            }
-          }
+  const parseImportFile = (text: string): { code: string; description: string; type: string; budgeted: number; valid: boolean; error?: string }[] => {
+    const lines = text.split("\n").slice(1); // Skip header
+    const data: { code: string; description: string; type: string; budgeted: number; valid: boolean; error?: string }[] = [];
+    
+    lines.forEach((line, index) => {
+      if (!line.trim()) return;
+      const [code, description, type, budgeted] = line.split(",").map((s) => s.trim().replace(/^"|"$/g, ""));
+      
+      let valid = true;
+      let error = "";
+      
+      if (!code) { valid = false; error = "Código vacío"; }
+      else if (!description) { valid = false; error = "Descripción vacía"; }
+      else if (!type || !["CUENTA", "SUBCUENTA"].includes(type.toUpperCase())) { 
+        valid = false; 
+        error = "Tipo debe ser CUENTA o SUBCUENTA"; 
+      }
+      else if (type.toUpperCase() === "SUBCUENTA") {
+        const accountCode = code.split(/[.\-]/)[0];
+        const hasParentInData = data.some(d => d.code === accountCode && d.type.toUpperCase() === "CUENTA");
+        const hasParentInExisting = accounts.some(a => a.code === accountCode);
+        if (!hasParentInData && !hasParentInExisting) {
+          valid = false;
+          error = `Cuenta padre ${accountCode} no existe`;
         }
-        setSuccessMessage(`Importación completada: ${accountsCreated} cuentas y ${subAccountsCreated} subcuentas`);
-        setTimeout(() => setSuccessMessage(""), 5000); setShowImportModal(false); await loadData();
-      } catch (error: any) { setErrorMessage(`Error al importar: ${error.message}`); } finally { setSaving(false); }
+      }
+      
+      data.push({
+        code: code || "",
+        description: description || "",
+        type: type?.toUpperCase() || "",
+        budgeted: parseFloat(budgeted) || 0,
+        valid,
+        error,
+      });
+    });
+    
+    return data;
+  };
+
+  const handleFileSelect = (file: File) => {
+    if (!file) return;
+    setImportFileName(file.name);
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const parsed = parseImportFile(text);
+      setImportData(parsed);
+      setImportStep("preview");
     };
     reader.readAsText(file);
+  };
+
+  const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) handleFileSelect(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.name.endsWith(".csv")) {
+      handleFileSelect(file);
+    } else {
+      setErrorMessage("Por favor, sube un archivo CSV");
+    }
+  };
+
+  const executeImport = async () => {
+    setImportStep("importing");
+    setImportProgress(0);
+    setSaving(true);
+    
+    const validItems = importData.filter(d => d.valid);
+    const total = validItems.length;
+    let processed = 0;
+    let accountsCreated = 0;
+    let subAccountsCreated = 0;
+    let errors = 0;
+    
+    const accountsMap = new Map<string, string>();
+    
+    try {
+      // First pass: Create accounts
+      for (const item of validItems) {
+        if (item.type === "CUENTA") {
+          try {
+            const accountRef = await addDoc(collection(db, `projects/${id}/accounts`), {
+              code: item.code,
+              description: item.description,
+              createdAt: Timestamp.now(),
+              createdBy: userId || "",
+            });
+            accountsMap.set(item.code, accountRef.id);
+            accountsCreated++;
+          } catch (err) {
+            errors++;
+          }
+        }
+        processed++;
+        setImportProgress(Math.round((processed / total) * 100));
+      }
+      
+      // Second pass: Create subaccounts
+      for (const item of validItems) {
+        if (item.type === "SUBCUENTA") {
+          try {
+            const accountCode = item.code.split(/[.\-]/)[0];
+            let accountId = accountsMap.get(accountCode);
+            if (!accountId) {
+              const existingAccount = accounts.find(a => a.code === accountCode);
+              if (existingAccount) accountId = existingAccount.id;
+            }
+            
+            if (accountId) {
+              await addDoc(collection(db, `projects/${id}/accounts/${accountId}/subaccounts`), {
+                code: item.code,
+                description: item.description,
+                budgeted: item.budgeted,
+                committed: 0,
+                actual: 0,
+                accountId,
+                createdAt: Timestamp.now(),
+                createdBy: userId || "",
+              });
+              subAccountsCreated++;
+            } else {
+              errors++;
+            }
+          } catch (err) {
+            errors++;
+          }
+        }
+        processed++;
+        setImportProgress(Math.round((processed / total) * 100));
+      }
+      
+      setImportResults({ accounts: accountsCreated, subaccounts: subAccountsCreated, errors });
+      setImportStep("done");
+      await loadData();
+    } catch (error: any) {
+      setErrorMessage(`Error al importar: ${error.message}`);
+      setImportStep("preview");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetImport = () => {
+    setImportStep("upload");
+    setImportData([]);
+    setImportProgress(0);
+    setImportResults({ accounts: 0, subaccounts: 0, errors: 0 });
+    setImportFileName("");
+  };
+
+  const closeImportModal = () => {
+    setShowImportModal(false);
+    resetImport();
   };
 
   const filteredAccounts = accounts.filter((account) => {
@@ -632,44 +780,315 @@ export default function BudgetPage() {
         </div>
       )}
 
-      {/* Import Modal */}
+      {/* Import Modal - Super Guay */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowImportModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Importar presupuesto</h2>
-              <button onClick={() => setShowImportModal(false)} className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              <div>
-                <h3 className="font-medium text-slate-900 mb-2">1. Descarga la plantilla</h3>
-                <p className="text-sm text-slate-500 mb-3">La plantilla incluye ejemplos de formato.</p>
-                <button onClick={downloadTemplate} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800">
-                  <Download size={16} />Descargar plantilla
-                </button>
-              </div>
-
-              <div>
-                <h3 className="font-medium text-slate-900 mb-2">2. Sube tu archivo</h3>
-                <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center">
-                  <FileSpreadsheet size={32} className="text-slate-400 mx-auto mb-2" />
-                  <label className="cursor-pointer">
-                    <span className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800">
-                      <Upload size={16} />{saving ? "Importando..." : "Seleccionar archivo"}
-                    </span>
-                    <input type="file" accept=".csv" onChange={handleImportCSV} disabled={saving} className="hidden" />
-                  </label>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeImportModal}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+                  <Upload size={20} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Importar presupuesto</h2>
+                  <p className="text-xs text-slate-500">
+                    {importStep === "upload" && "Sube un archivo CSV con tu presupuesto"}
+                    {importStep === "preview" && `${importData.length} filas encontradas`}
+                    {importStep === "importing" && "Importando datos..."}
+                    {importStep === "done" && "¡Importación completada!"}
+                  </p>
                 </div>
               </div>
+              <button onClick={closeImportModal} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                <p className="text-sm text-blue-800"><strong>Formato libre:</strong> Puedes usar códigos como 01, 01.01, A1, etc.</p>
+            {/* Progress Steps */}
+            <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex-shrink-0">
+              <div className="flex items-center justify-center gap-2">
+                {[
+                  { step: "upload", label: "Subir" },
+                  { step: "preview", label: "Revisar" },
+                  { step: "importing", label: "Importar" },
+                  { step: "done", label: "Listo" },
+                ].map((s, index) => (
+                  <React.Fragment key={s.step}>
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      importStep === s.step 
+                        ? "bg-emerald-100 text-emerald-700" 
+                        : ["preview", "importing", "done"].indexOf(importStep) >= ["preview", "importing", "done"].indexOf(s.step as any)
+                          ? "bg-emerald-500 text-white"
+                          : "bg-slate-200 text-slate-500"
+                    }`}>
+                      {["preview", "importing", "done"].indexOf(importStep) > ["preview", "importing", "done"].indexOf(s.step as any) ? (
+                        <CheckCircle size={14} />
+                      ) : (
+                        <span className="w-5 h-5 rounded-full bg-current/20 flex items-center justify-center text-xs">{index + 1}</span>
+                      )}
+                      {s.label}
+                    </div>
+                    {index < 3 && <ChevronRight size={16} className="text-slate-300" />}
+                  </React.Fragment>
+                ))}
               </div>
             </div>
 
-            <div className="px-6 pb-6">
-              <button onClick={() => setShowImportModal(false)} className="w-full px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium">Cerrar</button>
+            {/* Content */}
+            <div className="flex-1 overflow-auto">
+              {/* Step 1: Upload */}
+              {importStep === "upload" && (
+                <div className="p-6 space-y-6">
+                  {/* Drag & Drop Zone */}
+                  <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`relative border-2 border-dashed rounded-2xl p-10 text-center transition-all ${
+                      isDragging 
+                        ? "border-emerald-500 bg-emerald-50" 
+                        : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className={`w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center transition-colors ${
+                      isDragging ? "bg-emerald-100" : "bg-slate-100"
+                    }`}>
+                      <FileSpreadsheet size={32} className={isDragging ? "text-emerald-600" : "text-slate-400"} />
+                    </div>
+                    <p className="text-lg font-medium text-slate-900 mb-1">
+                      {isDragging ? "¡Suelta el archivo aquí!" : "Arrastra tu archivo CSV aquí"}
+                    </p>
+                    <p className="text-sm text-slate-500 mb-4">o haz clic para seleccionar</p>
+                    <label className="cursor-pointer">
+                      <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors">
+                        <Upload size={16} />
+                        Seleccionar archivo
+                      </span>
+                      <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
+                    </label>
+                  </div>
+
+                  {/* Template Download */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-5">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <Download size={24} className="text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-slate-900 mb-1">¿Primera vez importando?</h3>
+                        <p className="text-sm text-slate-600 mb-3">
+                          Descarga nuestra plantilla con el formato correcto y ejemplos incluidos.
+                        </p>
+                        <button 
+                          onClick={downloadTemplate}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                        >
+                          <Download size={14} />
+                          Descargar plantilla CSV
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Format Info */}
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <h4 className="font-medium text-slate-900 mb-2 text-sm">Formato esperado:</h4>
+                    <div className="font-mono text-xs bg-white border border-slate-200 rounded-lg p-3 overflow-x-auto">
+                      <div className="text-slate-500">Código, Descripción, Tipo, Presupuesto</div>
+                      <div className="text-slate-700">01, Producción, CUENTA, 0</div>
+                      <div className="text-slate-700">01.01, Equipo técnico, SUBCUENTA, 50000</div>
+                      <div className="text-slate-700">01.02, Material, SUBCUENTA, 25000</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Preview */}
+              {importStep === "preview" && (
+                <div className="p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+                        <FileSpreadsheet size={16} className="text-slate-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-slate-900 text-sm">{importFileName}</p>
+                        <p className="text-xs text-slate-500">{importData.length} filas · {importData.filter(d => d.valid).length} válidas</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={resetImport}
+                      className="text-sm text-slate-500 hover:text-slate-700"
+                    >
+                      Cambiar archivo
+                    </button>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-bold text-blue-700">{importData.filter(d => d.type === "CUENTA").length}</p>
+                      <p className="text-xs text-blue-600">Cuentas</p>
+                    </div>
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-bold text-emerald-700">{importData.filter(d => d.type === "SUBCUENTA").length}</p>
+                      <p className="text-xs text-emerald-600">Subcuentas</p>
+                    </div>
+                    <div className={`border rounded-xl p-3 text-center ${importData.filter(d => !d.valid).length > 0 ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-200"}`}>
+                      <p className={`text-2xl font-bold ${importData.filter(d => !d.valid).length > 0 ? "text-red-700" : "text-slate-400"}`}>
+                        {importData.filter(d => !d.valid).length}
+                      </p>
+                      <p className={`text-xs ${importData.filter(d => !d.valid).length > 0 ? "text-red-600" : "text-slate-500"}`}>Errores</p>
+                    </div>
+                  </div>
+
+                  {/* Table Preview */}
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="max-h-64 overflow-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50 sticky top-0">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Estado</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Código</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Descripción</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Tipo</th>
+                            <th className="px-3 py-2 text-right text-xs font-medium text-slate-500 uppercase">Presupuesto</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {importData.map((row, index) => (
+                            <tr key={index} className={row.valid ? "bg-white" : "bg-red-50"}>
+                              <td className="px-3 py-2">
+                                {row.valid ? (
+                                  <CheckCircle size={16} className="text-emerald-500" />
+                                ) : (
+                                  <div className="group relative">
+                                    <AlertCircle size={16} className="text-red-500" />
+                                    <div className="absolute left-6 top-0 bg-red-600 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-10">
+                                      {row.error}
+                                    </div>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 font-mono text-slate-900">{row.code}</td>
+                              <td className="px-3 py-2 text-slate-700 truncate max-w-[200px]">{row.description}</td>
+                              <td className="px-3 py-2">
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                  row.type === "CUENTA" ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"
+                                }`}>
+                                  {row.type}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-right font-medium text-slate-900">
+                                {row.budgeted > 0 ? formatCurrency(row.budgeted) : "-"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {importData.filter(d => !d.valid).length > 0 && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+                      <AlertCircle size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-amber-900 text-sm">Hay {importData.filter(d => !d.valid).length} filas con errores</p>
+                        <p className="text-xs text-amber-700 mt-1">Las filas con errores serán ignoradas durante la importación.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 3: Importing */}
+              {importStep === "importing" && (
+                <div className="p-12 text-center">
+                  <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6 relative">
+                    <div className="absolute inset-0 rounded-full border-4 border-emerald-200">
+                      <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                        <circle
+                          cx="50" cy="50" r="46"
+                          fill="none"
+                          stroke="#10b981"
+                          strokeWidth="8"
+                          strokeDasharray={`${importProgress * 2.89} 289`}
+                          className="transition-all duration-300"
+                        />
+                      </svg>
+                    </div>
+                    <span className="text-2xl font-bold text-emerald-700">{importProgress}%</span>
+                  </div>
+                  <h3 className="text-lg font-semibold text-slate-900 mb-2">Importando datos...</h3>
+                  <p className="text-sm text-slate-500">Por favor, no cierres esta ventana</p>
+                </div>
+              )}
+
+              {/* Step 4: Done */}
+              {importStep === "done" && (
+                <div className="p-12 text-center">
+                  <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6">
+                    <CheckCircle size={40} className="text-emerald-600" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-slate-900 mb-2">¡Importación completada!</h3>
+                  <p className="text-slate-500 mb-6">Tu presupuesto ha sido importado correctamente</p>
+                  
+                  <div className="flex items-center justify-center gap-4">
+                    <div className="text-center px-6 py-4 bg-blue-50 rounded-xl">
+                      <p className="text-3xl font-bold text-blue-700">{importResults.accounts}</p>
+                      <p className="text-sm text-blue-600">Cuentas creadas</p>
+                    </div>
+                    <div className="text-center px-6 py-4 bg-emerald-50 rounded-xl">
+                      <p className="text-3xl font-bold text-emerald-700">{importResults.subaccounts}</p>
+                      <p className="text-sm text-emerald-600">Subcuentas creadas</p>
+                    </div>
+                    {importResults.errors > 0 && (
+                      <div className="text-center px-6 py-4 bg-red-50 rounded-xl">
+                        <p className="text-3xl font-bold text-red-700">{importResults.errors}</p>
+                        <p className="text-sm text-red-600">Errores</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between flex-shrink-0 bg-slate-50">
+              {importStep === "upload" && (
+                <button onClick={closeImportModal} className="px-4 py-2.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                  Cancelar
+                </button>
+              )}
+              {importStep === "preview" && (
+                <>
+                  <button onClick={resetImport} className="px-4 py-2.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                    ← Volver
+                  </button>
+                  <button
+                    onClick={executeImport}
+                    disabled={importData.filter(d => d.valid).length === 0}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Upload size={16} />
+                    Importar {importData.filter(d => d.valid).length} filas
+                  </button>
+                </>
+              )}
+              {importStep === "importing" && (
+                <div className="w-full text-center text-sm text-slate-500">
+                  Procesando...
+                </div>
+              )}
+              {importStep === "done" && (
+                <button
+                  onClick={closeImportModal}
+                  className="w-full px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors"
+                >
+                  Cerrar
+                </button>
+              )}
             </div>
           </div>
         </div>
