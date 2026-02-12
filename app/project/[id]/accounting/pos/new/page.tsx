@@ -112,9 +112,14 @@ interface ApprovalStep {
   order: number;
   approverType: "fixed" | "role" | "hod" | "coordinator";
   approvers?: string[];
+  approverNames?: string[];
   roles?: string[];
   department?: string;
   requireAll: boolean;
+  hasAmountThreshold?: boolean;
+  amountThreshold?: number;
+  amountCondition?: "above" | "below" | "between";
+  amountThresholdMax?: number;
 }
 
 interface ApprovalStepStatus {
@@ -129,6 +134,10 @@ interface ApprovalStepStatus {
   rejectedBy: string[];
   status: "pending" | "approved" | "rejected";
   requireAll: boolean;
+  hasAmountThreshold?: boolean;
+  amountThreshold?: number;
+  amountCondition?: "above" | "below" | "between";
+  amountThresholdMax?: number;
 }
 
 interface Member {
@@ -397,28 +406,34 @@ export default function NewPOPage() {
 
   const resolveApprovers = (step: ApprovalStep, dept?: string): { ids: string[]; names: string[] } => {
     let approverIds: string[] = [];
+    let approverNames: string[] = [];
+    
     switch (step.approverType) {
       case "fixed":
         approverIds = step.approvers || [];
+        // Si ya tenemos los nombres guardados, usarlos; sino, buscarlos en members
+        approverNames = approverIds.map((uid) => {
+          const member = members.find((m) => m.userId === uid);
+          return member?.name || member?.email || uid;
+        });
         break;
       case "role":
-        approverIds = members.filter((m) => m.role && step.roles?.includes(m.role)).map((m) => m.userId);
+        const roleMembers = members.filter((m) => m.role && step.roles?.includes(m.role));
+        approverIds = roleMembers.map((m) => m.userId);
+        approverNames = roleMembers.map((m) => m.name || m.email || m.userId);
         break;
       case "hod":
-        approverIds = members
-          .filter((m) => m.position === "HOD" && m.department === (step.department || dept))
-          .map((m) => m.userId);
+        const hodMembers = members.filter((m) => m.position === "HOD" && m.department === (step.department || dept));
+        approverIds = hodMembers.map((m) => m.userId);
+        approverNames = hodMembers.map((m) => m.name || m.email || m.userId);
         break;
       case "coordinator":
-        approverIds = members
-          .filter((m) => m.position === "Coordinator" && m.department === (step.department || dept))
-          .map((m) => m.userId);
+        const coordMembers = members.filter((m) => m.position === "Coordinator" && m.department === (step.department || dept));
+        approverIds = coordMembers.map((m) => m.userId);
+        approverNames = coordMembers.map((m) => m.name || m.email || m.userId);
         break;
     }
-    const approverNames = approverIds.map((uid) => {
-      const member = members.find((m) => m.userId === uid);
-      return member?.name || member?.email || uid;
-    });
+    
     return { ids: approverIds, names: approverNames };
   };
 
@@ -429,7 +444,7 @@ export default function NewPOPage() {
       return {
         id: step.id || "",
         order: step.order || 0,
-        approverType: step.approverType || "fixed",
+        approverType: step.approverType || "role",
         approvers: ids,
         approverNames: names,
         roles: step.roles || [],
@@ -438,6 +453,10 @@ export default function NewPOPage() {
         rejectedBy: [],
         status: "pending" as const,
         requireAll: step.requireAll ?? false,
+        hasAmountThreshold: step.hasAmountThreshold || false,
+        amountThreshold: step.amountThreshold,
+        amountCondition: step.amountCondition,
+        amountThresholdMax: step.amountThresholdMax,
       };
     });
   };
@@ -1194,7 +1213,7 @@ export default function NewPOPage() {
                       value={formData.generalDescription}
                       onChange={(e) => setFormData({ ...formData, generalDescription: e.target.value.toUpperCase() })}
                       onBlur={() => handleBlur("generalDescription")}
-                      placeholder="CONCEPTO DE LA ORDEN DE COMPRA"
+                      placeholder="DESCRIBE EL PROPÓSITO DE ESTA ORDEN DE COMPRA"
                       rows={3}
                       className={cx(
                         "w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm pr-10 uppercase",
