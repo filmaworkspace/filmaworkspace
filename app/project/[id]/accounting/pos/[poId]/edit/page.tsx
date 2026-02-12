@@ -21,8 +21,8 @@ interface Supplier { id: string; fiscalName: string; commercialName: string; cou
 interface SubAccount { id: string; code: string; description: string; budgeted: number; committed: number; actual: number; available: number; accountId: string; accountCode: string; accountDescription: string; }
 interface EpisodeDistribution { episode: number; amount: number; percentage: number; }
 interface POItem { id: string; description: string; subAccountId: string; subAccountCode: string; subAccountDescription: string; date: string; quantity: number; unitPrice: number; baseAmount: number; vatRate: number; vatAmount: number; irpfRate: number; irpfAmount: number; totalAmount: number; episodeAssignment?: "general" | "specific"; episodes?: EpisodeDistribution[]; }
-interface ApprovalStep { id: string; order: number; approverType: "fixed" | "role" | "hod" | "coordinator"; approvers?: string[]; roles?: string[]; department?: string; requireAll: boolean; }
-interface ApprovalStepStatus { id: string; order: number; approverType: "fixed" | "role" | "hod" | "coordinator"; approvers: string[]; approverNames: string[]; roles?: string[]; department?: string; approvedBy: string[]; rejectedBy: string[]; status: "pending" | "approved" | "rejected"; requireAll: boolean; }
+interface ApprovalStep { id: string; order: number; approverType: "fixed" | "role" | "hod" | "coordinator"; approvers?: string[]; approverNames?: string[]; roles?: string[]; department?: string; requireAll: boolean; hasAmountThreshold?: boolean; amountThreshold?: number; amountCondition?: "above" | "below" | "between"; amountThresholdMax?: number; }
+interface ApprovalStepStatus { id: string; order: number; approverType: "fixed" | "role" | "hod" | "coordinator"; approvers: string[]; approverNames: string[]; roles?: string[]; department?: string; approvedBy: string[]; rejectedBy: string[]; status: "pending" | "approved" | "rejected"; requireAll: boolean; hasAmountThreshold?: boolean; amountThreshold?: number; amountCondition?: "above" | "below" | "between"; amountThresholdMax?: number; }
 interface Member { userId: string; name?: string; email?: string; role?: string; department?: string; position?: string; }
 interface ItemInvoiceStatus { hasInvoices: boolean; hasAccountedInvoices: boolean; invoiceNumbers: string[]; }
 
@@ -303,7 +303,23 @@ export default function EditPOPage() {
     if (approvalConfig.length === 0) return [];
     return approvalConfig.map((step) => {
       const { ids, names } = resolveApprovers(step, dept);
-      return { id: step.id || "", order: step.order || 0, approverType: step.approverType || "fixed", approvers: ids, approverNames: names, roles: step.roles || [], department: step.department || "", approvedBy: [], rejectedBy: [], status: "pending" as const, requireAll: step.requireAll ?? false };
+      return { 
+        id: step.id || "", 
+        order: step.order || 0, 
+        approverType: step.approverType || "role", 
+        approvers: ids, 
+        approverNames: names, 
+        roles: step.roles || [], 
+        department: step.department || "", 
+        approvedBy: [], 
+        rejectedBy: [], 
+        status: "pending" as const, 
+        requireAll: step.requireAll ?? false,
+        hasAmountThreshold: step.hasAmountThreshold || false,
+        amountThreshold: step.amountThreshold,
+        amountCondition: step.amountCondition,
+        amountThresholdMax: step.amountThresholdMax,
+      };
     });
   };
 
