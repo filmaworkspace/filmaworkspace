@@ -18,7 +18,6 @@ import {
   ChevronRight,
   ChevronDown,
   Users,
-  Cloud,
   UserCheck,
   Briefcase,
   Shield,
@@ -150,7 +149,6 @@ const CONFIG_SECTIONS = [
   { id: "cost", label: "Coste", icon: TrendingUp, description: "Comportamiento del comprometido, realizado y capítulos" },
   { id: "approvals", label: "Aprobaciones", icon: FileCheck, description: "Flujos de aprobación para POs y facturas" },
   { id: "permissions", label: "Permisos", icon: Shield, description: "Quién puede realizar cada acción" },
-  { id: "cloud", label: "Almacenamiento en nube", icon: Cloud, description: "Conectar Google Drive, Dropbox u OneDrive" },
 ];
 
 // Opciones de comportamiento del presupuesto
@@ -266,20 +264,6 @@ export default function AccountingConfigPage() {
   // Permisos
   const [permissionSettings, setPermissionSettings] = useState<PermissionSettings>({});
   const [expandedPermissions, setExpandedPermissions] = useState<Set<string>>(new Set());
-  
-  // Cloud storage
-  const [cloudConfig, setCloudConfig] = useState<{
-    provider: "google_drive" | "dropbox" | "onedrive" | null;
-    connected: boolean;
-    folderName: string;
-    folderStructure: "by_type" | "by_supplier" | "by_department" | "flat";
-  }>({
-    provider: null,
-    connected: false,
-    folderName: "",
-    folderStructure: "by_type",
-  });
-  const [savingCloud, setSavingCloud] = useState(false);
   
   // Auditoría
   const [auditLog, setAuditLog] = useState<{
@@ -443,19 +427,6 @@ export default function AccountingConfigPage() {
           };
         });
         setPermissionSettings(defaultSettings);
-      }
-
-      // Cargar configuración de nube
-      const cloudConfigRef = doc(db, `projects/${id}/config/cloud`);
-      const cloudConfigSnap = await getDoc(cloudConfigRef);
-      if (cloudConfigSnap.exists()) {
-        const cloudData = cloudConfigSnap.data();
-        setCloudConfig({
-          provider: cloudData.provider || null,
-          connected: cloudData.connected || false,
-          folderName: cloudData.folderName || "",
-          folderStructure: cloudData.folderStructure || "by_type",
-        });
       }
 
       // Cargar datos de empresa
@@ -1923,185 +1894,6 @@ export default function AccountingConfigPage() {
     );
   };
 
-  const renderCloudSection = () => {
-    const CLOUD_PROVIDERS = [
-      { id: "google_drive", name: "Google Drive", color: "bg-blue-500", icon: "🔵" },
-      { id: "dropbox", name: "Dropbox", color: "bg-blue-600", icon: "📦" },
-      { id: "onedrive", name: "OneDrive", color: "bg-sky-500", icon: "☁️" },
-    ];
-
-    const FOLDER_STRUCTURES = [
-      { id: "by_type", label: "Por tipo de documento", description: "POs/ y Facturas/ en carpetas separadas" },
-      { id: "by_supplier", label: "Por proveedor", description: "Una carpeta por cada proveedor" },
-      { id: "by_department", label: "Por departamento", description: "Una carpeta por cada departamento" },
-      { id: "flat", label: "Sin estructura", description: "Todos los archivos en la carpeta raíz" },
-    ];
-
-    const handleConnectCloud = async (provider: "google_drive" | "dropbox" | "onedrive") => {
-      // Por ahora, solo simular conexión
-      // En producción, aquí iría OAuth
-      setCloudConfig({ ...cloudConfig, provider, connected: true });
-      setSuccessMessage(`${provider === "google_drive" ? "Google Drive" : provider === "dropbox" ? "Dropbox" : "OneDrive"} conectado correctamente`);
-      setTimeout(() => setSuccessMessage(""), 3000);
-    };
-
-    const handleDisconnect = () => {
-      setCloudConfig({ provider: null, connected: false, folderName: "", folderStructure: "by_type" });
-    };
-
-    const handleSaveCloudConfig = async () => {
-      setSavingCloud(true);
-      try {
-        await setDoc(doc(db, `projects/${id}/config/cloud`), {
-          ...cloudConfig,
-          updatedAt: serverTimestamp(),
-          updatedBy: userId,
-        });
-        setSuccessMessage("Configuración de nube guardada");
-        setTimeout(() => setSuccessMessage(""), 3000);
-      } catch (error) {
-        setErrorMessage("Error al guardar la configuración");
-        setTimeout(() => setErrorMessage(""), 3000);
-      } finally {
-        setSavingCloud(false);
-      }
-    };
-
-    return (
-      <div className="space-y-6">
-        {/* Conexión */}
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100">
-            <h2 className="font-semibold text-slate-900">Almacenamiento en la nube</h2>
-            <p className="text-sm text-slate-500 mt-1">
-              Conecta una cuenta de almacenamiento para subir automáticamente los archivos adjuntos
-            </p>
-          </div>
-
-          <div className="p-6">
-            {!cloudConfig.connected ? (
-              <div className="grid grid-cols-3 gap-4">
-                {CLOUD_PROVIDERS.map((provider) => (
-                  <button
-                    key={provider.id}
-                    onClick={() => handleConnectCloud(provider.id as any)}
-                    className="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-slate-200 rounded-xl hover:border-slate-400 hover:bg-slate-50 transition-all group"
-                  >
-                    <span className="text-4xl">{provider.icon}</span>
-                    <span className="font-medium text-slate-700 group-hover:text-slate-900">{provider.name}</span>
-                    <span className="text-xs text-slate-500">Click para conectar</span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Cuenta conectada */}
-                <div className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
-                      <Cloud size={20} className="text-emerald-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-emerald-900">
-                        {cloudConfig.provider === "google_drive" && "Google Drive"}
-                        {cloudConfig.provider === "dropbox" && "Dropbox"}
-                        {cloudConfig.provider === "onedrive" && "OneDrive"}
-                      </p>
-                      <p className="text-sm text-emerald-700">Conectado correctamente</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleDisconnect}
-                    className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    Desconectar
-                  </button>
-                </div>
-
-                {/* Nombre de carpeta */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Nombre de la carpeta del proyecto
-                  </label>
-                  <input
-                    type="text"
-                    value={cloudConfig.folderName}
-                    onChange={(e) => setCloudConfig({ ...cloudConfig, folderName: e.target.value })}
-                    placeholder={projectName || "Nombre del proyecto"}
-                    className="w-full max-w-md px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">Se creará esta carpeta en la raíz de tu almacenamiento</p>
-                </div>
-
-                {/* Estructura de carpetas */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-3">
-                    Estructura de carpetas
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {FOLDER_STRUCTURES.map((structure) => (
-                      <label
-                        key={structure.id}
-                        className={`flex items-start gap-3 p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                          cloudConfig.folderStructure === structure.id
-                            ? "border-slate-900 bg-slate-50"
-                            : "border-slate-200 hover:border-slate-300"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="folderStructure"
-                          value={structure.id}
-                          checked={cloudConfig.folderStructure === structure.id}
-                          onChange={(e) => setCloudConfig({ ...cloudConfig, folderStructure: e.target.value as any })}
-                          className="mt-1"
-                        />
-                        <div>
-                          <p className="font-medium text-slate-900">{structure.label}</p>
-                          <p className="text-xs text-slate-500">{structure.description}</p>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Guardar */}
-                <div className="pt-4 border-t border-slate-100">
-                  <button
-                    onClick={handleSaveCloudConfig}
-                    disabled={savingCloud}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
-                  >
-                    {savingCloud ? (
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <Save size={16} />
-                    )}
-                    Guardar configuración
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Info */}
-        <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
-          <div className="flex gap-3">
-            <Info size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-blue-800">
-              <p className="font-medium">¿Cómo funciona?</p>
-              <p className="mt-1">
-                Cuando adjuntes un archivo a una PO o Factura, se subirá automáticamente a tu cuenta de almacenamiento 
-                en la estructura de carpetas configurada. Podrás ver todos los documentos en el <strong>Document Center</strong>.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   if (loading)
     return (
       <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
@@ -2235,7 +2027,6 @@ export default function AccountingConfigPage() {
             {activeSection === "cost" && renderCostSection()}
             {activeSection === "approvals" && renderApprovalsSection()}
             {activeSection === "permissions" && renderPermissionsSection()}
-            {activeSection === "cloud" && renderCloudSection()}
           </div>
         </div>
       </main>
