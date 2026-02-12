@@ -171,15 +171,15 @@ const REPORT_COLUMNS: Record<ReportType, ReportColumn[]> = {
   ],
 };
 
-const REPORT_INFO: Record<ReportType, { title: string; description: string; icon: any; color: string }> = {
-  budget: { title: "Presupuesto", description: "Cuentas, subcuentas y ejecución presupuestaria", icon: Wallet, color: "bg-slate-100 text-slate-600" },
-  pos_list: { title: "Listado de POs", description: "Órdenes de compra con totales", icon: FileText, color: "bg-slate-100 text-slate-600" },
-  pos_items: { title: "POs por ítems", description: "Desglose detallado de cada ítem de PO", icon: Layers, color: "bg-slate-100 text-slate-600" },
-  invoices: { title: "Facturas", description: "Listado completo de facturas recibidas", icon: Receipt, color: "bg-slate-100 text-slate-600" },
-  invoices_accounting: { title: "Libro de facturas", description: "Facturas contabilizadas con nº de asiento", icon: BookMarked, color: "bg-emerald-100 text-emerald-600" },
-  suppliers: { title: "Proveedores", description: "Directorio completo de proveedores", icon: Building2, color: "bg-slate-100 text-slate-600" },
-  payments: { title: "Registro de pagos", description: "Histórico de pagos realizados", icon: Wallet, color: "bg-blue-100 text-blue-600" },
-  cost_report: { title: "Informe de costes", description: "Resumen de ejecución por cuenta contable", icon: FileSpreadsheet, color: "bg-violet-100 text-violet-600" },
+const REPORT_INFO: Record<ReportType, { title: string; description: string; icon: any }> = {
+  budget: { title: "Presupuesto", description: "Cuentas, subcuentas y ejecución presupuestaria", icon: Wallet },
+  pos_list: { title: "Listado de POs", description: "Órdenes de compra con totales", icon: FileText },
+  pos_items: { title: "POs por ítems", description: "Desglose detallado de cada ítem de PO", icon: Layers },
+  invoices: { title: "Facturas", description: "Listado completo de facturas recibidas", icon: Receipt },
+  invoices_accounting: { title: "Libro de facturas", description: "Facturas contabilizadas con nº de asiento", icon: BookMarked },
+  suppliers: { title: "Proveedores", description: "Directorio completo de proveedores", icon: Building2 },
+  payments: { title: "Registro de pagos", description: "Histórico de pagos realizados", icon: Wallet },
+  cost_report: { title: "Informe de costes", description: "Resumen de ejecución por cuenta contable", icon: FileSpreadsheet },
 };
 
 export default function ReportsPage() {
@@ -1177,7 +1177,7 @@ export default function ReportsPage() {
       </div>
 
       <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
-        <div className="space-y-4">
+        <div className="space-y-2">
           {reportTypes.map((reportType) => {
             const info = REPORT_INFO[reportType];
             const Icon = info.icon;
@@ -1186,48 +1186,48 @@ export default function ReportsPage() {
             const count = getReportCount(reportType);
             
             return (
-              <div key={reportType} className="bg-white border border-slate-200 rounded-2xl overflow-hidden hover:border-slate-300 transition-all">
-                <div className="p-5">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${info.color}`}>
-                      <Icon size={22} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-slate-900">{info.title}</h3>
-                      <p className="text-sm text-slate-500">{info.description}</p>
-                      <p className="text-xs text-slate-400 mt-1">{count} registros</p>
-                    </div>
+              <div key={reportType} className="bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-all">
+                <div className="px-4 py-3 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                    <Icon size={18} className="text-slate-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
+                      <h3 className="font-medium text-slate-900 text-sm">{info.title}</h3>
+                      <span className="text-xs text-slate-400">{count}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 truncate">{info.description}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => openConfig(reportType)}
+                      className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                      title="Configurar columnas"
+                    >
+                      <Settings2 size={16} />
+                    </button>
+                    <button
+                      onClick={() => generateReport(reportType)}
+                      disabled={generating !== null}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
+                    >
+                      {generating === reportType ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download size={12} />
+                          Exportar
+                        </>
+                      )}
+                    </button>
+                    {reportPresets.length > 0 && (
                       <button
-                        onClick={() => openConfig(reportType)}
-                        className="p-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
-                        title="Configurar columnas"
+                        onClick={() => setExpandedReport(isExpanded ? null : reportType)}
+                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                       >
-                        <Settings2 size={18} />
-                      </button>
-                      <button
-                        onClick={() => generateReport(reportType)}
-                        disabled={generating !== null}
-                        className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-                        style={{ backgroundColor: '#2F52E0' }}
-                      >
-                        {generating === reportType ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            Generando
-                          </>
-                        ) : (
-                          <>
-                            <Download size={14} />
-                            Exportar
-                          </>
-                        )}
-                      </button>
-                      {reportPresets.length > 0 && (
-                        <button
-                          onClick={() => setExpandedReport(isExpanded ? null : reportType)}
-                          className="p-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
-                        >
                           <ChevronDown size={18} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                         </button>
                       )}
@@ -1236,32 +1236,27 @@ export default function ReportsPage() {
                 </div>
 
                 {isExpanded && reportPresets.length > 0 && (
-                  <div className="px-5 pb-5 pt-0">
-                    <div className="border-t border-slate-100 pt-4">
-                      <p className="text-xs font-medium text-slate-500 mb-3 flex items-center gap-1.5">
-                        <BookMarked size={12} />
-                        Plantillas guardadas
-                      </p>
-                      <div className="space-y-2">
+                  <div className="px-4 pb-3 pt-0">
+                    <div className="border-t border-slate-100 pt-3">
+                      <p className="text-xs text-slate-400 mb-2">Plantillas guardadas</p>
+                      <div className="space-y-1">
                         {reportPresets.map((preset) => (
-                          <div key={preset.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl group">
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-slate-700">{preset.name}</p>
-                              <p className="text-xs text-slate-400">{preset.columns.length} columnas</p>
+                          <div key={preset.id} className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg group">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-slate-700 truncate">{preset.name}</p>
                             </div>
                             <button
                               onClick={() => generateFromPreset(preset)}
                               disabled={generating !== null}
-                              className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
+                              className="px-2 py-1 bg-white border border-slate-200 text-slate-600 rounded text-xs hover:bg-slate-50 transition-colors disabled:opacity-50"
                             >
-                              <Download size={12} className="inline mr-1" />
                               Usar
                             </button>
                             <button
                               onClick={() => deletePreset(preset.id)}
-                              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                              className="p-1 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={12} />
                             </button>
                           </div>
                         ))}
