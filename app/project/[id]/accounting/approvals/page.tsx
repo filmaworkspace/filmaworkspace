@@ -641,7 +641,48 @@ export default function ApprovalsPage() {
                         </div>
                       )}
 
-                      <div className="mb-6"><p className="text-xs text-slate-500 mb-3">Progreso de aprobación</p><div className="space-y-2">{currentApproval.approvalSteps.map((step, index) => (<div key={step.id || index} className={`flex items-center gap-3 p-3 rounded-xl border ${index === currentApproval.currentApprovalStep ? "border-amber-200 bg-amber-50" : step.status === "approved" ? "border-emerald-200 bg-emerald-50" : "border-slate-100 bg-slate-50"}`}><div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${step.status === "approved" ? "bg-emerald-500 text-white" : index === currentApproval.currentApprovalStep ? "bg-amber-500 text-white" : "bg-slate-200 text-slate-600"}`}>{step.status === "approved" ? <Check size={12} /> : step.order}</div><div className="flex-1"><p className="text-sm font-medium text-slate-900">Nivel {step.order}{step.approverType === "role" && step.roles && (<span className="text-slate-500 font-normal"> ({step.roles.join(", ")})</span>)}{step.hasAmountThreshold && step.amountThreshold && (<span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">&gt;{step.amountThreshold.toLocaleString()}€</span>)}</p><p className="text-xs text-slate-500">{step.approverNames?.length ? step.approverNames.slice(0, 3).join(", ") + (step.approverNames.length > 3 ? ` +${step.approverNames.length - 3}` : "") : `${(step.approvedBy || []).length} aprobación${(step.approvedBy || []).length !== 1 ? "es" : ""}`}{step.requireAll && " (todos)"}</p></div>{step.status === "approved" && <CheckCircle size={16} className="text-emerald-500" />}{index === currentApproval.currentApprovalStep && step.status === "pending" && <Clock size={16} className="text-amber-500" />}</div>))}</div></div>
+                      <div className="mb-6">
+                        <p className="text-xs text-slate-500 mb-3">Progreso de aprobación</p>
+                        <div className="space-y-2">
+                          {currentApproval.approvalSteps.map((step, index) => (
+                            <div key={step.id || index} className={`flex items-center gap-3 p-3 rounded-xl border ${index === currentApproval.currentApprovalStep ? "border-amber-200 bg-amber-50" : step.status === "approved" ? "border-emerald-200 bg-emerald-50" : "border-slate-100 bg-slate-50"}`}>
+                              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${step.status === "approved" ? "bg-emerald-500 text-white" : index === currentApproval.currentApprovalStep ? "bg-amber-500 text-white" : "bg-slate-200 text-slate-600"}`}>
+                                {step.status === "approved" ? <Check size={12} /> : step.order}
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-slate-900">
+                                  Nivel {step.order}
+                                  {step.approverType === "fixed" && (
+                                    <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Usuario específico</span>
+                                  )}
+                                  {step.approverType === "role" && step.roles && (
+                                    <span className="text-slate-500 font-normal"> ({step.roles.join(", ")})</span>
+                                  )}
+                                  {step.approverType === "hod" && (
+                                    <span className="text-slate-500 font-normal"> (HOD{step.department ? ` ${step.department}` : ""})</span>
+                                  )}
+                                  {step.approverType === "coordinator" && (
+                                    <span className="text-slate-500 font-normal"> (Coord.{step.department ? ` ${step.department}` : ""})</span>
+                                  )}
+                                  {step.hasAmountThreshold && step.amountThreshold && (
+                                    <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">&gt;{step.amountThreshold.toLocaleString()}€</span>
+                                  )}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  {step.approverNames?.length ? (
+                                    step.approverNames.slice(0, 3).join(", ") + (step.approverNames.length > 3 ? ` +${step.approverNames.length - 3}` : "")
+                                  ) : (
+                                    `${(step.approvedBy || []).length} aprobación${(step.approvedBy || []).length !== 1 ? "es" : ""}`
+                                  )}
+                                  {step.requireAll && " (todos)"}
+                                </p>
+                              </div>
+                              {step.status === "approved" && <CheckCircle size={16} className="text-emerald-500" />}
+                              {index === currentApproval.currentApprovalStep && step.status === "pending" && <Clock size={16} className="text-amber-500" />}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
 
                       <div className="pt-6 border-t border-slate-200">
                         {showCommentInput ? (
