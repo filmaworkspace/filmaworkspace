@@ -1119,7 +1119,7 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className={`min-h-screen bg-white ${inter.className}`}>
+    <div className={"min-h-screen bg-white " + inter.className}>
       {/* Header */}
       <div className="mt-[4.5rem]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
