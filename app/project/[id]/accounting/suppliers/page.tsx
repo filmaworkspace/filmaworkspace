@@ -367,18 +367,39 @@ export default function SuppliersPage() {
         bic: formData.bic.trim().toUpperCase(),
       };
 
-      const bankOwnershipUpdate: any = { ...selectedSupplier.certificates.bankOwnership };
+      // Función para limpiar undefined de objetos
+      const cleanUndefined = (obj: any) => {
+        const cleaned: any = {};
+        for (const key in obj) {
+          if (obj[key] !== undefined) {
+            cleaned[key] = obj[key];
+          }
+        }
+        return cleaned;
+      };
+
+      const bankOwnershipUpdate: any = cleanUndefined({ ...selectedSupplier.certificates.bankOwnership });
+      // Convertir Date a Timestamp si existe
+      if (bankOwnershipUpdate.expiryDate instanceof Date) {
+        bankOwnershipUpdate.expiryDate = Timestamp.fromDate(bankOwnershipUpdate.expiryDate);
+      }
       if (certificates.bankOwnership.file) { bankOwnershipUpdate.uploaded = true; bankOwnershipUpdate.fileName = certificates.bankOwnership.file.name; }
       if (certificates.bankOwnership.expiryDate) bankOwnershipUpdate.expiryDate = Timestamp.fromDate(new Date(certificates.bankOwnership.expiryDate));
+      else if (!bankOwnershipUpdate.expiryDate) bankOwnershipUpdate.expiryDate = null;
       if (canVerifyCertificates && certificates.bankOwnership.verified !== selectedSupplier.certificates.bankOwnership.verified) {
         bankOwnershipUpdate.verified = certificates.bankOwnership.verified;
         if (certificates.bankOwnership.verified) { bankOwnershipUpdate.verifiedBy = userId; bankOwnershipUpdate.verifiedByName = userName; bankOwnershipUpdate.verifiedAt = Timestamp.now(); }
         else { bankOwnershipUpdate.verifiedBy = null; bankOwnershipUpdate.verifiedByName = null; bankOwnershipUpdate.verifiedAt = null; }
       }
 
-      const contractorsCertUpdate: any = { ...selectedSupplier.certificates.contractorsCertificate };
+      const contractorsCertUpdate: any = cleanUndefined({ ...selectedSupplier.certificates.contractorsCertificate });
+      // Convertir Date a Timestamp si existe
+      if (contractorsCertUpdate.expiryDate instanceof Date) {
+        contractorsCertUpdate.expiryDate = Timestamp.fromDate(contractorsCertUpdate.expiryDate);
+      }
       if (certificates.contractorsCertificate.file) { contractorsCertUpdate.uploaded = true; contractorsCertUpdate.fileName = certificates.contractorsCertificate.file.name; }
       if (certificates.contractorsCertificate.expiryDate) contractorsCertUpdate.expiryDate = Timestamp.fromDate(new Date(certificates.contractorsCertificate.expiryDate));
+      else if (!contractorsCertUpdate.expiryDate) contractorsCertUpdate.expiryDate = null;
       if (canVerifyCertificates && certificates.contractorsCertificate.verified !== selectedSupplier.certificates.contractorsCertificate.verified) {
         contractorsCertUpdate.verified = certificates.contractorsCertificate.verified;
         if (certificates.contractorsCertificate.verified) { contractorsCertUpdate.verifiedBy = userId; contractorsCertUpdate.verifiedByName = userName; contractorsCertUpdate.verifiedAt = Timestamp.now(); }
