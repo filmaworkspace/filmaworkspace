@@ -241,10 +241,6 @@ export default function AccountingUsersPage() {
       </div>
 
       <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
-        {/* Messages */}
-        {successMessage && (<div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3 text-emerald-700"><CheckCircle2 size={20} /><span>{successMessage}</span></div>)}
-        {errorMessage && hasAccountingAccess && (<div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700"><AlertCircle size={20} /><span>{errorMessage}</span><button onClick={() => setErrorMessage("")} className="ml-auto"><X size={16} /></button></div>)}
-
         {/* Pending Invitations */}
         {pendingInvitations.length > 0 && (
           <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
@@ -510,6 +506,23 @@ export default function AccountingUsersPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast notifications */}
+      {successMessage && (
+        <div className="fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
+          <CheckCircle2 size={16} />
+          {successMessage}
+        </div>
+      )}
+      {errorMessage && hasAccountingAccess && (
+        <div className="fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
+          <AlertCircle size={16} />
+          {errorMessage}
+          <button onClick={() => setErrorMessage("")} className="ml-2 hover:bg-white/20 rounded p-0.5">
+            <X size={14} />
+          </button>
         </div>
       )}
     </div>
