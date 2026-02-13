@@ -570,19 +570,6 @@ export default function BudgetPage() {
       </div>
 
       <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
-        {/* Messages */}
-        {errorMessage && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700 text-sm">
-            <AlertCircle size={18} /><span className="flex-1">{errorMessage}</span>
-            <button onClick={() => setErrorMessage("")}><X size={14} /></button>
-          </div>
-        )}
-        {successMessage && (
-          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3 text-emerald-700 text-sm">
-            <CheckCircle size={18} /><span>{successMessage}</span>
-          </div>
-        )}
-
         {/* Filters */}
         <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center mb-4">
           <div className="flex-1 relative">
@@ -738,12 +725,6 @@ export default function BudgetPage() {
             </div>
 
             <div className="p-6">
-              {errorMessage && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center gap-2">
-                  <AlertCircle size={16} />{errorMessage}
-                </div>
-              )}
-
               {modalMode === "subaccount" && selectedAccount && (
                 <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-xl">
                   <p className="text-xs text-slate-500">Cuenta padre</p>
@@ -1091,6 +1072,23 @@ export default function BudgetPage() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast notifications */}
+      {successMessage && (
+        <div className="fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
+          <CheckCircle size={16} />
+          {successMessage}
+        </div>
+      )}
+      {errorMessage && (
+        <div className="fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
+          <AlertCircle size={16} />
+          {errorMessage}
+          <button onClick={() => setErrorMessage("")} className="ml-2 hover:bg-white/20 rounded p-0.5">
+            <X size={14} />
+          </button>
         </div>
       )}
     </div>
