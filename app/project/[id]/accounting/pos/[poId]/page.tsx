@@ -5,8 +5,8 @@ import { Inter } from "next/font/google";
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-import { doc, getDoc, collection, getDocs, updateDoc, query, where, orderBy, Timestamp } from "firebase/firestore";
-import { FileText, ArrowLeft, Edit, Download, Receipt, Lock, Unlock, XCircle, CheckCircle, Clock, Ban, Archive, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, FileEdit, ExternalLink, MoreHorizontal, Layers, BookCheck, Wallet, Info } from "lucide-react";
+import { doc, getDoc, collection, getDocs, updateDoc, deleteDoc, query, where, orderBy, Timestamp } from "firebase/firestore";
+import { FileText, ArrowLeft, Edit, Download, Receipt, Lock, Unlock, XCircle, CheckCircle, Clock, Ban, Archive, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, FileEdit, ExternalLink, MoreHorizontal, Layers, BookCheck, Wallet, Info, Trash2 } from "lucide-react";
 import jsPDF from "jspdf";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldCommitPO } from "@/lib/budgetRules";
@@ -131,6 +131,7 @@ export default function PODetailPage() {
   const [modificationReason, setModificationReason] = useState("");
   const [processing, setProcessing] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     if (projectId && poId && !permissionsLoading) loadData();
@@ -211,6 +212,25 @@ export default function PODetailPage() {
     setCancellationReason("");
     setModificationReason("");
   };
+
+  // Función para eliminar borrador (solo si es versión 1 y status draft)
+  const handleDeleteDraft = async () => {
+    if (!po || po.status !== "draft" || (po.version && po.version > 1)) return;
+    
+    setProcessing(true);
+    try {
+      await deleteDoc(doc(db, `projects/${projectId}/pos`, poId));
+      router.push(`/project/${projectId}/accounting/pos`);
+    } catch (error) {
+      console.error("Error eliminando borrador:", error);
+      setPasswordError("Error al eliminar el borrador");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Verificar si se puede eliminar (borrador sin versión anterior)
+  const canDeleteDraft = po?.status === "draft" && (!po.version || po.version === 1) && poPerms.canEdit;
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
   const formatDate = (date: Date) => (date ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "long", year: "numeric" }).format(date) : "-");
@@ -700,6 +720,20 @@ export default function PODetailPage() {
                               </button>
                             </>
                           )}
+                        </>
+                      )}
+
+                      {/* Opción de eliminar para borradores sin versión anterior */}
+                      {canDeleteDraft && (
+                        <>
+                          <div className="border-t border-slate-100 my-1" />
+                          <button 
+                            onClick={() => { setShowDeleteModal(true); setShowActionsMenu(false); }} 
+                            className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
+                          >
+                            <Trash2 size={16} className="text-red-400" />
+                            Eliminar borrador
+                          </button>
                         </>
                       )}
                     </div>
@@ -1357,7 +1391,7 @@ export default function PODetailPage() {
                 <textarea
                   value={cancellationReason}
                   onChange={(e) => setCancellationReason(e.target.value)}
-                  placeholder="Explica por qué se anula esta PO"
+                  placeholder="Explica por qué se anula esta PO..."
                   rows={3}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none text-sm"
                 />
@@ -1428,6 +1462,48 @@ export default function PODetailPage() {
                 </button>
                 <button onClick={handleModifyPO} disabled={processing || !modificationReason.trim()} className="flex-1 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium disabled:opacity-50">
                   {processing ? "Modificando..." : "Modificar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Eliminar Borrador */}
+      {showDeleteModal && po && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDeleteModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={28} className="text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-900 text-center mb-2">Eliminar borrador</h3>
+              <p className="text-slate-500 text-center mb-6">
+                ¿Estás seguro de que quieres eliminar el borrador <strong>PO-{po.number}</strong>? Esta acción no se puede deshacer.
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowDeleteModal(false)} 
+                  className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleDeleteDraft} 
+                  disabled={processing} 
+                  className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {processing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Eliminando...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={16} />
+                      Eliminar
+                    </>
+                  )}
                 </button>
               </div>
             </div>
