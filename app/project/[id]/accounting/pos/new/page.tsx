@@ -48,6 +48,8 @@ import {
   ChevronDown,
   Layers,
   Percent,
+  FileBox,
+  RotateCcw,
 } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldCommitPO } from "@/lib/budgetRules";
@@ -199,7 +201,24 @@ export default function NewPOPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [approvalConfig, setApprovalConfig] = useState<ApprovalStep[]>([]);
+
+  // Sistema de borradores
+  interface Draft {
+    id: string;
+    name: string;
+    savedAt: Date;
+    formData: typeof formData;
+    items: POItem[];
+    uploadedFileName?: string;
+  }
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [showDraftsPanel, setShowDraftsPanel] = useState(false);
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -293,6 +312,185 @@ export default function NewPOPage() {
   useEffect(() => {
     calculateTotals();
   }, [items]);
+
+  // Cargar borradores desde localStorage al inicio
+  useEffect(() => {
+    if (id) {
+      const savedDrafts = localStorage.getItem(`po_drafts_${id}`);
+      if (savedDrafts) {
+        try {
+          const parsed = JSON.parse(savedDrafts);
+          setDrafts(parsed.map((d: any) => ({ ...d, savedAt: new Date(d.savedAt) })));
+        } catch (e) {
+          console.error("Error loading drafts:", e);
+        }
+      }
+      // Verificar si hay un borrador automático
+      const autoDraft = localStorage.getItem(`po_autodraft_${id}`);
+      if (autoDraft) {
+        try {
+          const parsed = JSON.parse(autoDraft);
+          if (parsed.formData && parsed.items) {
+            setShowDraftsPanel(true);
+          }
+        } catch (e) {}
+      }
+    }
+  }, [id]);
+
+  // Auto-guardar cuando hay cambios
+  useEffect(() => {
+    if (!id || loading) return;
+    
+    const hasContent = formData.supplier || formData.generalDescription || 
+                       items.some(item => item.description || item.unitPrice > 0);
+    
+    if (hasContent) {
+      setHasUnsavedChanges(true);
+      
+      // Debounce auto-save
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+      
+      autoSaveTimeoutRef.current = setTimeout(() => {
+        const autoDraft = {
+          formData,
+          items,
+          uploadedFileName: uploadedFile?.name,
+          savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(`po_autodraft_${id}`, JSON.stringify(autoDraft));
+        setLastAutoSave(new Date());
+        setHasUnsavedChanges(false);
+      }, 2000);
+    }
+    
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [formData, items, id, loading, uploadedFile]);
+
+  // Guardar borrador antes de cerrar la página
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const hasContent = formData.supplier || formData.generalDescription || 
+                         items.some(item => item.description || item.unitPrice > 0);
+      if (hasContent && hasUnsavedChanges) {
+        const autoDraft = {
+          formData,
+          items,
+          uploadedFileName: uploadedFile?.name,
+          savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(`po_autodraft_${id}`, JSON.stringify(autoDraft));
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [formData, items, id, hasUnsavedChanges, uploadedFile]);
+
+  // Funciones de borradores
+  const saveDraft = (name?: string) => {
+    const draftName = name || `Borrador ${new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`;
+    const newDraft: Draft = {
+      id: currentDraftId || `draft_${Date.now()}`,
+      name: draftName,
+      savedAt: new Date(),
+      formData,
+      items,
+      uploadedFileName: uploadedFile?.name,
+    };
+    
+    const updatedDrafts = currentDraftId 
+      ? drafts.map(d => d.id === currentDraftId ? newDraft : d)
+      : [...drafts, newDraft];
+    
+    setDrafts(updatedDrafts);
+    setCurrentDraftId(newDraft.id);
+    localStorage.setItem(`po_drafts_${id}`, JSON.stringify(updatedDrafts));
+    localStorage.removeItem(`po_autodraft_${id}`);
+    setSuccessMessage("Borrador guardado");
+    setTimeout(() => setSuccessMessage(""), 2000);
+  };
+
+  const loadDraft = (draft: Draft) => {
+    setFormData(draft.formData);
+    setItems(draft.items);
+    setCurrentDraftId(draft.id);
+    setShowDraftsPanel(false);
+    localStorage.removeItem(`po_autodraft_${id}`);
+    setSuccessMessage("Borrador cargado");
+    setTimeout(() => setSuccessMessage(""), 2000);
+  };
+
+  const loadAutoDraft = () => {
+    const autoDraft = localStorage.getItem(`po_autodraft_${id}`);
+    if (autoDraft) {
+      try {
+        const parsed = JSON.parse(autoDraft);
+        setFormData(parsed.formData);
+        setItems(parsed.items);
+        localStorage.removeItem(`po_autodraft_${id}`);
+        setShowDraftsPanel(false);
+        setSuccessMessage("Sesión anterior restaurada");
+        setTimeout(() => setSuccessMessage(""), 2000);
+      } catch (e) {}
+    }
+  };
+
+  const deleteDraft = (draftId: string) => {
+    const updatedDrafts = drafts.filter(d => d.id !== draftId);
+    setDrafts(updatedDrafts);
+    localStorage.setItem(`po_drafts_${id}`, JSON.stringify(updatedDrafts));
+    if (currentDraftId === draftId) {
+      setCurrentDraftId(null);
+    }
+  };
+
+  const discardAutoDraft = () => {
+    localStorage.removeItem(`po_autodraft_${id}`);
+    setShowDraftsPanel(false);
+  };
+
+  const clearForm = () => {
+    setFormData({
+      supplier: "",
+      supplierName: "",
+      department: permissions.fixedDepartment || "",
+      poType: "rental",
+      currency: "EUR",
+      generalDescription: "",
+      paymentTerms: "",
+      notes: "",
+    });
+    setItems([{
+      id: "1",
+      description: "",
+      subAccountId: "",
+      subAccountCode: "",
+      subAccountDescription: "",
+      date: new Date().toISOString().split("T")[0],
+      quantity: 1,
+      unitPrice: 0,
+      baseAmount: 0,
+      vatRate: 21,
+      vatAmount: 0,
+      irpfRate: 0,
+      irpfAmount: 0,
+      totalAmount: 0,
+      episodeAssignment: "general",
+    }]);
+    setUploadedFile(null);
+    setCurrentDraftId(null);
+    setTouched({});
+    setErrors({});
+  };
 
   useEffect(() => {
     if (Object.keys(touched).length > 0) {
@@ -1001,10 +1199,140 @@ export default function NewPOPage() {
                     </span>
                   )}
                 </div>
+                {lastAutoSave && (
+                  <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                    <Clock size={10} />
+                    Guardado automático {lastAutoSave.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                )}
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              {/* Botón de borradores */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowDraftsPanel(!showDraftsPanel)}
+                  className={cx(
+                    "flex items-center gap-2 px-3 py-2.5 border rounded-xl text-sm font-medium transition-colors",
+                    showDraftsPanel || drafts.length > 0 || localStorage.getItem(`po_autodraft_${id}`)
+                      ? "border-amber-300 bg-amber-50 text-amber-700"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  )}
+                >
+                  <FileBox size={16} />
+                  {drafts.length > 0 && (
+                    <span className="w-5 h-5 bg-amber-500 text-white text-xs rounded-full flex items-center justify-center">
+                      {drafts.length}
+                    </span>
+                  )}
+                </button>
+
+                {/* Panel de borradores */}
+                {showDraftsPanel && (
+                  <div className="absolute right-0 top-12 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
+                      <h3 className="font-semibold text-slate-900 text-sm">Borradores</h3>
+                    </div>
+                    
+                    <div className="max-h-80 overflow-y-auto">
+                      {/* Borrador automático */}
+                      {localStorage.getItem(`po_autodraft_${id}`) && (
+                        <div className="p-3 border-b border-slate-100 bg-amber-50">
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                              <RotateCcw size={14} className="text-amber-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-amber-900">Sesión anterior</p>
+                              <p className="text-xs text-amber-700">Recuperar trabajo no guardado</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 mt-2 ml-11">
+                            <button
+                              onClick={loadAutoDraft}
+                              className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700"
+                            >
+                              Restaurar
+                            </button>
+                            <button
+                              onClick={discardAutoDraft}
+                              className="px-3 py-1.5 text-amber-700 hover:bg-amber-100 rounded-lg text-xs font-medium"
+                            >
+                              Descartar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Lista de borradores guardados */}
+                      {drafts.length > 0 ? (
+                        drafts.map((draft) => (
+                          <div 
+                            key={draft.id} 
+                            className={cx(
+                              "p-3 border-b border-slate-100 hover:bg-slate-50 transition-colors group",
+                              currentDraftId === draft.id && "bg-blue-50"
+                            )}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                <FileText size={14} className="text-slate-500" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-slate-900 truncate">{draft.name}</p>
+                                <p className="text-xs text-slate-500">
+                                  {draft.formData.supplierName || "Sin proveedor"} · {draft.items.length} items
+                                </p>
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                  {new Date(draft.savedAt).toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                                </p>
+                              </div>
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => loadDraft(draft)}
+                                  className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded"
+                                >
+                                  <FileUp size={14} />
+                                </button>
+                                <button
+                                  onClick={() => deleteDraft(draft.id)}
+                                  className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : !localStorage.getItem(`po_autodraft_${id}`) && (
+                        <div className="p-6 text-center">
+                          <FileBox size={24} className="text-slate-300 mx-auto mb-2" />
+                          <p className="text-sm text-slate-500">No hay borradores guardados</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="px-3 py-2 border-t border-slate-100 bg-slate-50 flex gap-2">
+                      <button
+                        onClick={() => saveDraft()}
+                        className="flex-1 px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800"
+                      >
+                        Guardar borrador
+                      </button>
+                      {currentDraftId && (
+                        <button
+                          onClick={clearForm}
+                          className="px-3 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-xs font-medium"
+                        >
+                          Nuevo
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button
                 onClick={() => savePO("draft")}
                 disabled={saving}
@@ -1037,13 +1365,6 @@ export default function NewPOPage() {
       </div>
 
       <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
-        {successMessage && (
-          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3">
-            <CheckCircle size={18} className="text-emerald-600" />
-            <span className="text-sm text-emerald-700 font-medium">{successMessage}</span>
-          </div>
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Form */}
           <div className="lg:col-span-2 space-y-6">
@@ -1213,7 +1534,7 @@ export default function NewPOPage() {
                       value={formData.generalDescription}
                       onChange={(e) => setFormData({ ...formData, generalDescription: e.target.value.toUpperCase() })}
                       onBlur={() => handleBlur("generalDescription")}
-                      placeholder="CONCEPTO DE ESTA ORDEN DE COMPRA"
+                      placeholder="DESCRIBE EL PROPÓSITO DE ESTA ORDEN DE COMPRA"
                       rows={3}
                       className={cx(
                         "w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm pr-10 uppercase",
@@ -2161,6 +2482,23 @@ export default function NewPOPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast notifications */}
+      {successMessage && (
+        <div className="fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
+          <CheckCircle size={16} />
+          {successMessage}
+        </div>
+      )}
+      {errorMessage && (
+        <div className="fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
+          <AlertCircle size={16} />
+          {errorMessage}
+          <button onClick={() => setErrorMessage("")} className="ml-2 hover:bg-white/20 rounded p-0.5">
+            <X size={14} />
+          </button>
         </div>
       )}
     </div>
