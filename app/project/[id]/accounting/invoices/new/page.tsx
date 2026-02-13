@@ -3,7 +3,7 @@ import React from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { db, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
@@ -53,6 +53,10 @@ import {
   Euro,
   Layers,
   ChevronDown,
+  FileBox,
+  RotateCcw,
+  Save,
+  FileUp,
 } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
@@ -284,6 +288,24 @@ export default function NewInvoicePage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  // Sistema de borradores
+  interface Draft {
+    id: string;
+    name: string;
+    savedAt: Date;
+    formData: typeof formData;
+    items: InvoiceItem[];
+    selectedPOId?: string;
+    uploadedFileName?: string;
+  }
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [showDraftsPanel, setShowDraftsPanel] = useState(false);
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Estados de datos
   const [members, setMembers] = useState<Member[]>([]);
@@ -421,6 +443,168 @@ export default function NewInvoicePage() {
       })));
     }
   }, [totals.totalAmount]);
+
+  // Cargar borradores desde localStorage al inicio
+  useEffect(() => {
+    if (id) {
+      const savedDrafts = localStorage.getItem(`invoice_drafts_${id}`);
+      if (savedDrafts) {
+        try {
+          const parsed = JSON.parse(savedDrafts);
+          setDrafts(parsed.map((d: any) => ({ ...d, savedAt: new Date(d.savedAt) })));
+        } catch (e) {}
+      }
+      const autoDraft = localStorage.getItem(`invoice_autodraft_${id}`);
+      if (autoDraft) {
+        try {
+          const parsed = JSON.parse(autoDraft);
+          if (parsed.formData && parsed.items) {
+            setShowDraftsPanel(true);
+          }
+        } catch (e) {}
+      }
+    }
+  }, [id]);
+
+  // Auto-guardar cuando hay cambios
+  useEffect(() => {
+    if (!id || loading) return;
+    
+    const hasContent = formData.supplier || formData.description || 
+                       items.some(item => item.description || item.unitPrice > 0);
+    
+    if (hasContent) {
+      setHasUnsavedChanges(true);
+      
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+      
+      autoSaveTimeoutRef.current = setTimeout(() => {
+        const autoDraft = {
+          formData,
+          items,
+          selectedPOId: selectedPO?.id,
+          uploadedFileName: uploadedFile?.name,
+          savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(`invoice_autodraft_${id}`, JSON.stringify(autoDraft));
+        setLastAutoSave(new Date());
+        setHasUnsavedChanges(false);
+      }, 2000);
+    }
+    
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [formData, items, id, loading, uploadedFile, selectedPO]);
+
+  // Guardar borrador antes de cerrar la página
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const hasContent = formData.supplier || formData.description || 
+                         items.some(item => item.description || item.unitPrice > 0);
+      if (hasContent && hasUnsavedChanges) {
+        const autoDraft = {
+          formData,
+          items,
+          selectedPOId: selectedPO?.id,
+          uploadedFileName: uploadedFile?.name,
+          savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(`invoice_autodraft_${id}`, JSON.stringify(autoDraft));
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [formData, items, id, hasUnsavedChanges, uploadedFile, selectedPO]);
+
+  // Funciones de borradores
+  const saveDraft = (name?: string) => {
+    const draftName = name || `Borrador ${new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`;
+    const newDraft: Draft = {
+      id: currentDraftId || `draft_${Date.now()}`,
+      name: draftName,
+      savedAt: new Date(),
+      formData,
+      items,
+      selectedPOId: selectedPO?.id,
+      uploadedFileName: uploadedFile?.name,
+    };
+    
+    const updatedDrafts = currentDraftId 
+      ? drafts.map(d => d.id === currentDraftId ? newDraft : d)
+      : [...drafts, newDraft];
+    
+    setDrafts(updatedDrafts);
+    setCurrentDraftId(newDraft.id);
+    localStorage.setItem(`invoice_drafts_${id}`, JSON.stringify(updatedDrafts));
+    localStorage.removeItem(`invoice_autodraft_${id}`);
+    setSuccessMessage("Borrador guardado");
+    setTimeout(() => setSuccessMessage(""), 2000);
+  };
+
+  const loadDraft = (draft: Draft) => {
+    setFormData(draft.formData);
+    setItems(draft.items);
+    setCurrentDraftId(draft.id);
+    setShowDraftsPanel(false);
+    localStorage.removeItem(`invoice_autodraft_${id}`);
+    setSuccessMessage("Borrador cargado");
+    setTimeout(() => setSuccessMessage(""), 2000);
+  };
+
+  const loadAutoDraft = () => {
+    const autoDraft = localStorage.getItem(`invoice_autodraft_${id}`);
+    if (autoDraft) {
+      try {
+        const parsed = JSON.parse(autoDraft);
+        setFormData(parsed.formData);
+        setItems(parsed.items);
+        localStorage.removeItem(`invoice_autodraft_${id}`);
+        setShowDraftsPanel(false);
+        setSuccessMessage("Sesión anterior restaurada");
+        setTimeout(() => setSuccessMessage(""), 2000);
+      } catch (e) {}
+    }
+  };
+
+  const deleteDraft = (draftId: string) => {
+    const updatedDrafts = drafts.filter(d => d.id !== draftId);
+    setDrafts(updatedDrafts);
+    localStorage.setItem(`invoice_drafts_${id}`, JSON.stringify(updatedDrafts));
+    if (currentDraftId === draftId) {
+      setCurrentDraftId(null);
+    }
+  };
+
+  const discardAutoDraft = () => {
+    localStorage.removeItem(`invoice_autodraft_${id}`);
+    setShowDraftsPanel(false);
+  };
+
+  const clearInvoiceForm = () => {
+    setFormData({
+      invoiceType: "with-po",
+      supplier: "",
+      supplierName: "",
+      department: "",
+      description: "",
+      dueDate: "",
+      notes: "",
+    });
+    setItems([]);
+    setUploadedFile(null);
+    setSelectedPO(null);
+    setCurrentDraftId(null);
+    setTouched({});
+    setErrors({});
+  };
 
   // Estado para trackear si ya se procesó el linkTo
   const [linkToProcessed, setLinkToProcessed] = useState(false);
@@ -1469,30 +1653,162 @@ export default function NewInvoicePage() {
                 <ArrowLeft size={18} className="text-slate-600" />
               </Link>
               <DocIcon size={24} style={{ color: "#2F52E0" }} />
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-semibold text-slate-900">
-                  {replaceMode ? "Factura definitiva" : "Subir " + currentDocType.label.toLowerCase()}
-                </h1>
-                <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm font-mono font-medium">
-                  {getDocumentNumber()}
-                </span>
-                {replaceMode && (
-                  <span className="px-2.5 py-1 bg-violet-100 text-violet-700 rounded-lg text-xs font-medium flex items-center gap-1.5">
-                    <RefreshCw size={12} />
-                    Sustitución
+              <div>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-2xl font-semibold text-slate-900">
+                    {replaceMode ? "Factura definitiva" : "Subir " + currentDocType.label.toLowerCase()}
+                  </h1>
+                  <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm font-mono font-medium">
+                    {getDocumentNumber()}
                   </span>
-                )}
-                {permissions.fixedDepartment && (
-                  <span
-                    className="px-2 py-1 rounded-lg text-xs font-medium"
-                    style={{ backgroundColor: "rgba(47, 82, 224, 0.1)", color: "#2F52E0" }}
-                  >
-                    {permissions.fixedDepartment}
-                  </span>
+                  {replaceMode && (
+                    <span className="px-2.5 py-1 bg-violet-100 text-violet-700 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                      <RefreshCw size={12} />
+                      Sustitución
+                    </span>
+                  )}
+                  {permissions.fixedDepartment && (
+                    <span
+                      className="px-2 py-1 rounded-lg text-xs font-medium"
+                      style={{ backgroundColor: "rgba(47, 82, 224, 0.1)", color: "#2F52E0" }}
+                    >
+                      {permissions.fixedDepartment}
+                    </span>
+                  )}
+                </div>
+                {lastAutoSave && (
+                  <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                    <Clock size={10} />
+                    Guardado automático {lastAutoSave.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                  </p>
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              {/* Botón de borradores */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowDraftsPanel(!showDraftsPanel)}
+                  className={cx(
+                    "flex items-center gap-2 px-3 py-2.5 border rounded-xl text-sm font-medium transition-colors",
+                    showDraftsPanel || drafts.length > 0 || localStorage.getItem(`invoice_autodraft_${id}`)
+                      ? "border-amber-300 bg-amber-50 text-amber-700"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  )}
+                >
+                  <FileBox size={16} />
+                  {drafts.length > 0 && (
+                    <span className="w-5 h-5 bg-amber-500 text-white text-xs rounded-full flex items-center justify-center">
+                      {drafts.length}
+                    </span>
+                  )}
+                </button>
+
+                {/* Panel de borradores */}
+                {showDraftsPanel && (
+                  <div className="absolute right-0 top-12 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
+                      <h3 className="font-semibold text-slate-900 text-sm">Borradores</h3>
+                    </div>
+                    
+                    <div className="max-h-80 overflow-y-auto">
+                      {/* Borrador automático */}
+                      {localStorage.getItem(`invoice_autodraft_${id}`) && (
+                        <div className="p-3 border-b border-slate-100 bg-amber-50">
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                              <RotateCcw size={14} className="text-amber-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-amber-900">Sesión anterior</p>
+                              <p className="text-xs text-amber-700">Recuperar trabajo no guardado</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 mt-2 ml-11">
+                            <button
+                              onClick={loadAutoDraft}
+                              className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700"
+                            >
+                              Restaurar
+                            </button>
+                            <button
+                              onClick={discardAutoDraft}
+                              className="px-3 py-1.5 text-amber-700 hover:bg-amber-100 rounded-lg text-xs font-medium"
+                            >
+                              Descartar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Lista de borradores guardados */}
+                      {drafts.length > 0 ? (
+                        drafts.map((draft) => (
+                          <div 
+                            key={draft.id} 
+                            className={cx(
+                              "p-3 border-b border-slate-100 hover:bg-slate-50 transition-colors group",
+                              currentDraftId === draft.id && "bg-blue-50"
+                            )}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                <Receipt size={14} className="text-slate-500" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-slate-900 truncate">{draft.name}</p>
+                                <p className="text-xs text-slate-500">
+                                  {draft.formData.supplierName || "Sin proveedor"} · {draft.items.length} items
+                                </p>
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                  {new Date(draft.savedAt).toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                                </p>
+                              </div>
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => loadDraft(draft)}
+                                  className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded"
+                                >
+                                  <FileUp size={14} />
+                                </button>
+                                <button
+                                  onClick={() => deleteDraft(draft.id)}
+                                  className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : !localStorage.getItem(`invoice_autodraft_${id}`) && (
+                        <div className="p-6 text-center">
+                          <FileBox size={24} className="text-slate-300 mx-auto mb-2" />
+                          <p className="text-sm text-slate-500">No hay borradores guardados</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="px-3 py-2 border-t border-slate-100 bg-slate-50 flex gap-2">
+                      <button
+                        onClick={() => saveDraft()}
+                        className="flex-1 px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800"
+                      >
+                        Guardar borrador
+                      </button>
+                      {currentDraftId && (
+                        <button
+                          onClick={clearInvoiceForm}
+                          className="px-3 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-xs font-medium"
+                        >
+                          Nuevo
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {replaceMode && (
                 <button
                   onClick={cancelReplacement}
@@ -1527,13 +1843,6 @@ export default function NewInvoicePage() {
 
       {/* Main Content */}
       <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
-        {/* Success Message */}
-        {successMessage && (
-          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3">
-            <CheckCircle size={18} className="text-emerald-600" />
-            <span className="text-sm text-emerald-700 font-medium">{successMessage}</span>
-          </div>
-        )}
 
         {/* Replace Mode Banner */}
         {replaceMode && selectedPendingDoc && (
@@ -3150,6 +3459,23 @@ export default function NewInvoicePage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast notifications */}
+      {successMessage && (
+        <div className="fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
+          <CheckCircle size={16} />
+          {successMessage}
+        </div>
+      )}
+      {errorMessage && (
+        <div className="fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
+          <AlertCircle size={16} />
+          {errorMessage}
+          <button onClick={() => setErrorMessage("")} className="ml-2 hover:bg-white/20 rounded p-0.5">
+            <X size={14} />
+          </button>
         </div>
       )}
     </div>
