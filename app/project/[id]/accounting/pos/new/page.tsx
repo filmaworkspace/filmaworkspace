@@ -204,21 +204,16 @@ export default function NewPOPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [approvalConfig, setApprovalConfig] = useState<ApprovalStep[]>([]);
 
-  // Sistema de borradores
+  // Sistema de borradores (localStorage)
   interface Draft {
     id: string;
     name: string;
-    savedAt: Date;
-    formData: typeof formData;
+    savedAt: string;
+    formData: any;
     items: POItem[];
-    uploadedFileName?: string;
   }
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [showDraftsPanel, setShowDraftsPanel] = useState(false);
-  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
-  const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -313,183 +308,56 @@ export default function NewPOPage() {
     calculateTotals();
   }, [items]);
 
-  // Cargar borradores desde localStorage al inicio
+  // Cargar borradores desde localStorage
   useEffect(() => {
     if (id) {
       const savedDrafts = localStorage.getItem(`po_drafts_${id}`);
       if (savedDrafts) {
         try {
-          const parsed = JSON.parse(savedDrafts);
-          setDrafts(parsed.map((d: any) => ({ ...d, savedAt: new Date(d.savedAt) })));
-        } catch (e) {
-          console.error("Error loading drafts:", e);
-        }
-      }
-      // Verificar si hay un borrador automático
-      const autoDraft = localStorage.getItem(`po_autodraft_${id}`);
-      if (autoDraft) {
-        try {
-          const parsed = JSON.parse(autoDraft);
-          if (parsed.formData && parsed.items) {
-            setShowDraftsPanel(true);
-          }
+          setDrafts(JSON.parse(savedDrafts));
         } catch (e) {}
       }
     }
   }, [id]);
 
-  // Auto-guardar cuando hay cambios
-  useEffect(() => {
-    if (!id || loading) return;
-    
+  // Funciones de borradores
+  const saveDraft = () => {
     const hasContent = formData.supplier || formData.generalDescription || 
                        items.some(item => item.description || item.unitPrice > 0);
-    
-    if (hasContent) {
-      setHasUnsavedChanges(true);
-      
-      // Debounce auto-save
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current);
-      }
-      
-      autoSaveTimeoutRef.current = setTimeout(() => {
-        const autoDraft = {
-          formData,
-          items,
-          uploadedFileName: uploadedFile?.name,
-          savedAt: new Date().toISOString(),
-        };
-        localStorage.setItem(`po_autodraft_${id}`, JSON.stringify(autoDraft));
-        setLastAutoSave(new Date());
-        setHasUnsavedChanges(false);
-      }, 2000);
+    if (!hasContent) {
+      setErrorMessage("No hay contenido para guardar");
+      setTimeout(() => setErrorMessage(""), 2000);
+      return;
     }
-    
-    return () => {
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current);
-      }
-    };
-  }, [formData, items, id, loading, uploadedFile]);
 
-  // Guardar borrador antes de cerrar la página
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      const hasContent = formData.supplier || formData.generalDescription || 
-                         items.some(item => item.description || item.unitPrice > 0);
-      if (hasContent && hasUnsavedChanges) {
-        const autoDraft = {
-          formData,
-          items,
-          uploadedFileName: uploadedFile?.name,
-          savedAt: new Date().toISOString(),
-        };
-        localStorage.setItem(`po_autodraft_${id}`, JSON.stringify(autoDraft));
-        e.preventDefault();
-        e.returnValue = "";
-      }
-    };
-    
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [formData, items, id, hasUnsavedChanges, uploadedFile]);
-
-  // Funciones de borradores
-  const saveDraft = (name?: string) => {
-    const draftName = name || `Borrador ${new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`;
     const newDraft: Draft = {
-      id: currentDraftId || `draft_${Date.now()}`,
-      name: draftName,
-      savedAt: new Date(),
+      id: `draft_${Date.now()}`,
+      name: formData.supplierName || formData.generalDescription || `Borrador ${drafts.length + 1}`,
+      savedAt: new Date().toISOString(),
       formData,
       items,
-      uploadedFileName: uploadedFile?.name,
     };
     
-    const updatedDrafts = currentDraftId 
-      ? drafts.map(d => d.id === currentDraftId ? newDraft : d)
-      : [...drafts, newDraft];
-    
+    const updatedDrafts = [...drafts, newDraft];
     setDrafts(updatedDrafts);
-    setCurrentDraftId(newDraft.id);
     localStorage.setItem(`po_drafts_${id}`, JSON.stringify(updatedDrafts));
-    localStorage.removeItem(`po_autodraft_${id}`);
     setSuccessMessage("Borrador guardado");
     setTimeout(() => setSuccessMessage(""), 2000);
+    setShowDraftsPanel(false);
   };
 
   const loadDraft = (draft: Draft) => {
     setFormData(draft.formData);
     setItems(draft.items);
-    setCurrentDraftId(draft.id);
     setShowDraftsPanel(false);
-    localStorage.removeItem(`po_autodraft_${id}`);
     setSuccessMessage("Borrador cargado");
     setTimeout(() => setSuccessMessage(""), 2000);
-  };
-
-  const loadAutoDraft = () => {
-    const autoDraft = localStorage.getItem(`po_autodraft_${id}`);
-    if (autoDraft) {
-      try {
-        const parsed = JSON.parse(autoDraft);
-        setFormData(parsed.formData);
-        setItems(parsed.items);
-        localStorage.removeItem(`po_autodraft_${id}`);
-        setShowDraftsPanel(false);
-        setSuccessMessage("Sesión anterior restaurada");
-        setTimeout(() => setSuccessMessage(""), 2000);
-      } catch (e) {}
-    }
   };
 
   const deleteDraft = (draftId: string) => {
     const updatedDrafts = drafts.filter(d => d.id !== draftId);
     setDrafts(updatedDrafts);
     localStorage.setItem(`po_drafts_${id}`, JSON.stringify(updatedDrafts));
-    if (currentDraftId === draftId) {
-      setCurrentDraftId(null);
-    }
-  };
-
-  const discardAutoDraft = () => {
-    localStorage.removeItem(`po_autodraft_${id}`);
-    setShowDraftsPanel(false);
-  };
-
-  const clearForm = () => {
-    setFormData({
-      supplier: "",
-      supplierName: "",
-      department: permissions.fixedDepartment || "",
-      poType: "rental",
-      currency: "EUR",
-      generalDescription: "",
-      paymentTerms: "",
-      notes: "",
-    });
-    setItems([{
-      id: "1",
-      description: "",
-      subAccountId: "",
-      subAccountCode: "",
-      subAccountDescription: "",
-      date: new Date().toISOString().split("T")[0],
-      quantity: 1,
-      unitPrice: 0,
-      baseAmount: 0,
-      vatRate: 21,
-      vatAmount: 0,
-      irpfRate: 0,
-      irpfAmount: 0,
-      totalAmount: 0,
-      episodeAssignment: "general",
-    }]);
-    setUploadedFile(null);
-    setCurrentDraftId(null);
-    setTouched({});
-    setErrors({});
   };
 
   useEffect(() => {
@@ -1187,23 +1055,12 @@ export default function NewPOPage() {
                 <ArrowLeft size={18} className="text-slate-600" />
               </Link>
               <FileText size={24} style={{ color: "#2F52E0" }} />
-              <div>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-semibold text-slate-900">Nueva orden de compra</h1>
-                  <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm font-mono font-medium">
-                    PO-{nextPONumber}
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-semibold text-slate-900">Nueva orden de compra</h1>
+                {permissions.fixedDepartment && (
+                  <span className="px-2 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: "rgba(47, 82, 224, 0.1)", color: "#2F52E0" }}>
+                    {permissions.fixedDepartment}
                   </span>
-                  {permissions.fixedDepartment && (
-                    <span className="px-2 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: "rgba(47, 82, 224, 0.1)", color: "#2F52E0" }}>
-                      {permissions.fixedDepartment}
-                    </span>
-                  )}
-                </div>
-                {lastAutoSave && (
-                  <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
-                    <Clock size={10} />
-                    Guardado automático {lastAutoSave.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
-                  </p>
                 )}
               </div>
             </div>
@@ -1215,7 +1072,7 @@ export default function NewPOPage() {
                   onClick={() => setShowDraftsPanel(!showDraftsPanel)}
                   className={cx(
                     "flex items-center gap-2 px-3 py-2.5 border rounded-xl text-sm font-medium transition-colors",
-                    showDraftsPanel || drafts.length > 0 || localStorage.getItem(`po_autodraft_${id}`)
+                    drafts.length > 0
                       ? "border-amber-300 bg-amber-50 text-amber-700"
                       : "border-slate-200 text-slate-600 hover:bg-slate-50"
                   )}
@@ -1230,117 +1087,57 @@ export default function NewPOPage() {
 
                 {/* Panel de borradores */}
                 {showDraftsPanel && (
-                  <div className="absolute right-0 top-12 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
-                    <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-                      <h3 className="font-semibold text-slate-900 text-sm">Borradores</h3>
-                    </div>
-                    
-                    <div className="max-h-80 overflow-y-auto">
-                      {/* Borrador automático */}
-                      {localStorage.getItem(`po_autodraft_${id}`) && (
-                        <div className="p-3 border-b border-slate-100 bg-amber-50">
-                          <div className="flex items-start gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
-                              <RotateCcw size={14} className="text-amber-600" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-amber-900">Sesión anterior</p>
-                              <p className="text-xs text-amber-700">Recuperar trabajo no guardado</p>
-                            </div>
-                          </div>
-                          <div className="flex gap-2 mt-2 ml-11">
-                            <button
-                              onClick={loadAutoDraft}
-                              className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700"
-                            >
-                              Restaurar
-                            </button>
-                            <button
-                              onClick={discardAutoDraft}
-                              className="px-3 py-1.5 text-amber-700 hover:bg-amber-100 rounded-lg text-xs font-medium"
-                            >
-                              Descartar
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Lista de borradores guardados */}
-                      {drafts.length > 0 ? (
-                        drafts.map((draft) => (
-                          <div 
-                            key={draft.id} 
-                            className={cx(
-                              "p-3 border-b border-slate-100 hover:bg-slate-50 transition-colors group",
-                              currentDraftId === draft.id && "bg-blue-50"
-                            )}
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                <FileText size={14} className="text-slate-500" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-slate-900 truncate">{draft.name}</p>
-                                <p className="text-xs text-slate-500">
-                                  {draft.formData.supplierName || "Sin proveedor"} · {draft.items.length} items
-                                </p>
-                                <p className="text-xs text-slate-400 mt-0.5">
-                                  {new Date(draft.savedAt).toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                                </p>
-                              </div>
-                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  onClick={() => loadDraft(draft)}
-                                  className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded"
-                                >
-                                  <FileUp size={14} />
-                                </button>
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowDraftsPanel(false)} />
+                    <div className="absolute right-0 top-12 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                        <h3 className="font-semibold text-slate-900 text-sm">Borradores</h3>
+                        <button onClick={() => setShowDraftsPanel(false)} className="text-slate-400 hover:text-slate-600">
+                          <X size={16} />
+                        </button>
+                      </div>
+                      
+                      <div className="max-h-64 overflow-y-auto">
+                        {drafts.length > 0 ? (
+                          drafts.map((draft) => (
+                            <div key={draft.id} className="p-3 border-b border-slate-100 hover:bg-slate-50 group">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => loadDraft(draft)}>
+                                  <p className="text-sm font-medium text-slate-900 truncate">{draft.name}</p>
+                                  <p className="text-xs text-slate-400">
+                                    {new Date(draft.savedAt).toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                                  </p>
+                                </div>
                                 <button
                                   onClick={() => deleteDraft(draft.id)}
-                                  className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded"
+                                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100"
                                 >
                                   <Trash2 size={14} />
                                 </button>
                               </div>
                             </div>
+                          ))
+                        ) : (
+                          <div className="p-6 text-center">
+                            <FileBox size={24} className="text-slate-300 mx-auto mb-2" />
+                            <p className="text-sm text-slate-500">No hay borradores</p>
                           </div>
-                        ))
-                      ) : !localStorage.getItem(`po_autodraft_${id}`) && (
-                        <div className="p-6 text-center">
-                          <FileBox size={24} className="text-slate-300 mx-auto mb-2" />
-                          <p className="text-sm text-slate-500">No hay borradores guardados</p>
-                        </div>
-                      )}
-                    </div>
+                        )}
+                      </div>
 
-                    <div className="px-3 py-2 border-t border-slate-100 bg-slate-50 flex gap-2">
-                      <button
-                        onClick={() => saveDraft()}
-                        className="flex-1 px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800"
-                      >
-                        Guardar borrador
-                      </button>
-                      {currentDraftId && (
+                      <div className="px-3 py-2 border-t border-slate-100 bg-slate-50">
                         <button
-                          onClick={clearForm}
-                          className="px-3 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-xs font-medium"
+                          onClick={saveDraft}
+                          className="w-full px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800"
                         >
-                          Nuevo
+                          Guardar como borrador
                         </button>
-                      )}
+                      </div>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
 
-              <button
-                onClick={() => savePO("draft")}
-                disabled={saving}
-                className="flex items-center gap-2 px-5 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                <Save size={16} />
-                Borrador
-              </button>
               <button
                 onClick={() => savePO("pending")}
                 disabled={saving}
@@ -1534,7 +1331,7 @@ export default function NewPOPage() {
                       value={formData.generalDescription}
                       onChange={(e) => setFormData({ ...formData, generalDescription: e.target.value.toUpperCase() })}
                       onBlur={() => handleBlur("generalDescription")}
-                      placeholder="CONCEPTO DE LA ORDEN DE COMPRA"
+                      placeholder="DESCRIBE EL PROPÓSITO DE ESTA ORDEN DE COMPRA"
                       rows={3}
                       className={cx(
                         "w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm pr-10 uppercase",
