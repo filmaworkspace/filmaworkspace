@@ -10,10 +10,37 @@ import {
   ChevronRight, ArrowLeft, ShieldAlert, Download, Calendar,
   Filter, Users, Layers
 } from "lucide-react";
-import * as XLSX from "xlsx";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
+// Helper para generar CSV y descargar
+const downloadCSV = (data: any[][], filename: string) => {
+  const csvContent = data.map(row => 
+    row.map(cell => {
+      if (cell === null || cell === undefined) return "";
+      if (cell instanceof Date) {
+        return cell.toLocaleDateString("es-ES");
+      }
+      const str = String(cell);
+      // Escapar comillas y envolver en comillas si contiene coma, comilla o salto de línea
+      if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    }).join(";") // Usar ; como separador para mejor compatibilidad con Excel español
+  ).join("\n");
+
+  // Añadir BOM para UTF-8
+  const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename.endsWith(".csv") ? filename : filename + ".csv";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
 interface Supplier {
   id: string;
   fiscalName: string;
@@ -246,7 +273,6 @@ export default function ReportsPage() {
   const generateSupplierReport = async () => {
     setGenerating("supplier");
     try {
-      const wb = XLSX.utils.book_new();
       const today = new Date();
       const weekNum = getWeekNumber(today);
 
@@ -323,16 +349,7 @@ export default function ReportsPage() {
 
       data.push(["", "", "", "", "", "", "", "", "Total.-", grandTotal]);
 
-      const ws = XLSX.utils.aoa_to_sheet(data);
-      
-      // Set column widths
-      ws["!cols"] = [
-        { wch: 5 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 25 },
-        { wch: 35 }, { wch: 28 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }
-      ];
-
-      XLSX.utils.book_append_sheet(wb, ws, `SEM ${weekNum}`);
-      XLSX.writeFile(wb, `Proveedor_${projectName.replace(/\s+/g, "_")}_SEM${weekNum}.xlsx`);
+      downloadCSV(data, `Proveedor_${projectName.replace(/\s+/g, "_")}_SEM${weekNum}.csv`);
     } catch (error) {
       console.error("Error generating report:", error);
     } finally {
@@ -344,7 +361,6 @@ export default function ReportsPage() {
   const generatePaymentsReport = async () => {
     setGenerating("pending_payments");
     try {
-      const wb = XLSX.utils.book_new();
       const today = new Date();
       const weekNum = getWeekNumber(today);
 
@@ -376,7 +392,7 @@ export default function ReportsPage() {
       data.push([]);
       data.push([`TRANSFERENCIAS SEM. ${weekNum}`]);
       data.push([]);
-      data.push(["#", "Factura ID", "Factura", "Proveedor", "Contratistas", "Descripción", "IBAN (certificado titularidad)", "Fecha vcto.", "Importe"]);
+      data.push(["#", "Factura ID", "Factura", "Proveedor", "Contratistas", "Descripción", "IBAN", "Fecha vcto.", "Importe"]);
 
       let rowNum = 1;
       let total = 0;
@@ -402,14 +418,7 @@ export default function ReportsPage() {
       data.push([]);
       data.push(["", "", "", "", "", "", "", "Total.-", total]);
 
-      const ws = XLSX.utils.aoa_to_sheet(data);
-      ws["!cols"] = [
-        { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 25 }, { wch: 15 },
-        { wch: 35 }, { wch: 28 }, { wch: 12 }, { wch: 12 }
-      ];
-
-      XLSX.utils.book_append_sheet(wb, ws, `SEM ${weekNum}`);
-      XLSX.writeFile(wb, `Prevision_Pagos_${projectName.replace(/\s+/g, "_")}_SEM${weekNum}.xlsx`);
+      downloadCSV(data, `Prevision_Pagos_${projectName.replace(/\s+/g, "_")}_SEM${weekNum}.csv`);
     } catch (error) {
       console.error("Error generating report:", error);
     } finally {
@@ -421,7 +430,6 @@ export default function ReportsPage() {
   const generateInvoicesReport = async () => {
     setGenerating("invoices_list");
     try {
-      const wb = XLSX.utils.book_new();
       const today = new Date();
 
       let filteredInvoices = [...invoices];
@@ -486,14 +494,7 @@ export default function ReportsPage() {
       data.push([]);
       data.push(["", "", "", "", "", "", "TOTALES:", "", totalBase, totalVat, totalAmount, "", ""]);
 
-      const ws = XLSX.utils.aoa_to_sheet(data);
-      ws["!cols"] = [
-        { wch: 5 }, { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 25 },
-        { wch: 12 }, { wch: 30 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }
-      ];
-
-      XLSX.utils.book_append_sheet(wb, ws, "Facturas");
-      XLSX.writeFile(wb, `Libro_Facturas_${projectName.replace(/\s+/g, "_")}.xlsx`);
+      downloadCSV(data, `Libro_Facturas_${projectName.replace(/\s+/g, "_")}.csv`);
     } catch (error) {
       console.error("Error generating report:", error);
     } finally {
@@ -505,7 +506,6 @@ export default function ReportsPage() {
   const generatePOsReport = async () => {
     setGenerating("pos_list");
     try {
-      const wb = XLSX.utils.book_new();
       const today = new Date();
 
       let filteredPOs = [...pos];
@@ -560,14 +560,7 @@ export default function ReportsPage() {
       data.push([]);
       data.push(["", "", "", "", "", "TOTALES:", "", totalBase, totalAmount]);
 
-      const ws = XLSX.utils.aoa_to_sheet(data);
-      ws["!cols"] = [
-        { wch: 5 }, { wch: 10 }, { wch: 25 }, { wch: 35 }, { wch: 15 },
-        { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }
-      ];
-
-      XLSX.utils.book_append_sheet(wb, ws, "POs");
-      XLSX.writeFile(wb, `Listado_POs_${projectName.replace(/\s+/g, "_")}.xlsx`);
+      downloadCSV(data, `Listado_POs_${projectName.replace(/\s+/g, "_")}.csv`);
     } catch (error) {
       console.error("Error generating report:", error);
     } finally {
@@ -579,7 +572,6 @@ export default function ReportsPage() {
   const generatePOsItemsReport = async () => {
     setGenerating("pos_items");
     try {
-      const wb = XLSX.utils.book_new();
       const today = new Date();
 
       let filteredPOs = [...pos];
@@ -646,7 +638,6 @@ export default function ReportsPage() {
             rowNum++;
           });
         } else {
-          // PO sin items, mostrar totales de la PO
           data.push([
             rowNum,
             po.displayNumber,
@@ -671,14 +662,7 @@ export default function ReportsPage() {
       data.push([]);
       data.push(["", "", "", "", "", "", "", "TOTALES:", totalBase, totalVat, totalIrpf, totalAmount, ""]);
 
-      const ws = XLSX.utils.aoa_to_sheet(data);
-      ws["!cols"] = [
-        { wch: 5 }, { wch: 10 }, { wch: 20 }, { wch: 25 }, { wch: 5 },
-        { wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 }
-      ];
-
-      XLSX.utils.book_append_sheet(wb, ws, "POs Items");
-      XLSX.writeFile(wb, `POs_Items_${projectName.replace(/\s+/g, "_")}.xlsx`);
+      downloadCSV(data, `POs_Items_${projectName.replace(/\s+/g, "_")}.csv`);
     } catch (error) {
       console.error("Error generating report:", error);
     } finally {
@@ -690,7 +674,6 @@ export default function ReportsPage() {
   const generateDepartmentReport = async () => {
     setGenerating("cost_by_department");
     try {
-      const wb = XLSX.utils.book_new();
       const today = new Date();
 
       // Group invoices by department
@@ -735,13 +718,7 @@ export default function ReportsPage() {
 
       data.push(["", "", "", "", "TOTAL GENERAL:", grandTotal]);
 
-      const ws = XLSX.utils.aoa_to_sheet(data);
-      ws["!cols"] = [
-        { wch: 5 }, { wch: 12 }, { wch: 25 }, { wch: 35 }, { wch: 12 }, { wch: 14 }
-      ];
-
-      XLSX.utils.book_append_sheet(wb, ws, "Departamentos");
-      XLSX.writeFile(wb, `Costes_Departamento_${projectName.replace(/\s+/g, "_")}.xlsx`);
+      downloadCSV(data, `Costes_Departamento_${projectName.replace(/\s+/g, "_")}.csv`);
     } catch (error) {
       console.error("Error generating report:", error);
     } finally {
