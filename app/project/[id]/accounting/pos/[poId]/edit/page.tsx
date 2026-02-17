@@ -2,7 +2,7 @@
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { auth, db, storage } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, updateDoc, query, orderBy, Timestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -92,6 +92,10 @@ export default function EditPOPage() {
   const [episodeDistributionMode, setEpisodeDistributionMode] = useState<"equal" | "amount" | "percentage">("equal");
   const [tempEpisodeDistribution, setTempEpisodeDistribution] = useState<EpisodeDistribution[]>([]);
 
+  // Dropdown de departamento
+  const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
+  const departmentDropdownRef = useRef<HTMLDivElement>(null);
+
   const [formData, setFormData] = useState({
     supplier: "", supplierName: "", department: "",
     poType: "service" as "rental" | "purchase" | "service" | "deposit",
@@ -122,6 +126,16 @@ export default function EditPOPage() {
 
   useEffect(() => { calculateTotals(); }, [items]);
   useEffect(() => { if (Object.keys(touched).length > 0) validateForm(true); }, [formData, items]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (departmentDropdownRef.current && !departmentDropdownRef.current.contains(event.target as Node)) {
+        setShowDepartmentDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const loadData = async () => {
     try {
@@ -830,22 +844,36 @@ export default function EditPOPage() {
                         <span className="ml-2 text-xs text-slate-400 font-normal">(asignado)</span>
                       )}
                     </label>
-                    <div className="relative">
-                      <select
-                        value={formData.department}
-                        onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                    <div className="relative" ref={departmentDropdownRef}>
+                      <button
+                        type="button"
+                        onClick={() => { if (canEdit() && !permissions.fixedDepartment) setShowDepartmentDropdown(!showDepartmentDropdown); }}
                         onBlur={() => handleBlur("department")}
                         disabled={!canEdit() || !!permissions.fixedDepartment}
-                        className={`w-full px-4 py-3 border ${hasError("department") ? "border-red-300 bg-red-50" : isValid("department") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"} rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white disabled:bg-slate-50 text-sm pr-10 disabled:cursor-not-allowed`}
+                        className={`w-full px-4 py-3 border ${hasError("department") ? "border-red-300 bg-red-50" : isValid("department") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"} rounded-xl text-left flex items-center justify-between bg-white disabled:bg-slate-50 text-sm disabled:cursor-not-allowed hover:border-slate-300 transition-colors`}
                       >
-                        <option value="">Seleccionar...</option>
-                        {availableDepartments.map((dept) => <option key={dept} value={dept}>{dept}</option>)}
-                      </select>
-                      {permissions.fixedDepartment && (
-                        <Lock size={14} className="absolute right-10 top-1/2 -translate-y-1/2 text-slate-400" />
-                      )}
-                      {isValid("department") && !permissions.fixedDepartment && (
-                        <CheckCircle2 size={16} className="absolute right-10 top-1/2 -translate-y-1/2 text-emerald-600" />
+                        <span className={formData.department ? "text-slate-900" : "text-slate-400"}>
+                          {formData.department || "Seleccionar..."}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {permissions.fixedDepartment && <Lock size={14} className="text-slate-400" />}
+                          {isValid("department") && !permissions.fixedDepartment && <CheckCircle2 size={16} className="text-emerald-600" />}
+                          <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showDepartmentDropdown ? "rotate-180" : "")} />
+                        </div>
+                      </button>
+                      {showDepartmentDropdown && (
+                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                          {availableDepartments.map((dept) => (
+                            <button
+                              key={dept}
+                              type="button"
+                              onClick={() => { setFormData({ ...formData, department: dept }); setShowDepartmentDropdown(false); handleBlur("department"); }}
+                              className={"w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 transition-colors " + (formData.department === dept ? "bg-slate-50 text-slate-900 font-medium" : "text-slate-600")}
+                            >
+                              {dept}
+                            </button>
+                          ))}
+                        </div>
                       )}
                     </div>
                     {hasError("department") && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{errors.department}</p>}
