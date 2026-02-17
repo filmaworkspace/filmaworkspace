@@ -1090,7 +1090,7 @@ export default function ReportsPage() {
 
   if (loading) {
     return (
-      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
+      <div className={"min-h-screen bg-white flex items-center justify-center " + inter.className}>
         <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
       </div>
     );
@@ -1098,7 +1098,7 @@ export default function ReportsPage() {
 
   if (accessError || !hasAccess) {
     return (
-      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
+      <div className={"min-h-screen bg-white flex items-center justify-center " + inter.className}>
         <div className="text-center max-w-md">
           <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <ShieldAlert size={28} className="text-red-500" />
@@ -1119,13 +1119,13 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className={`min-h-screen bg-white ${inter.className}`}>
+    <div className={"min-h-screen bg-white " + inter.className}>
       {/* Header */}
       <div className="mt-[4.5rem]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
-              <FileSpreadsheet size={24} className="text-slate-600" />
+              <FileSpreadsheet size={24} style={{ color: '#2F52E0' }} />
               <h1 className="text-2xl font-semibold text-slate-900">Informes</h1>
             </div>
             
@@ -1228,10 +1228,9 @@ export default function ReportsPage() {
                         onClick={() => setExpandedReport(isExpanded ? null : reportType)}
                         className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                       >
-                          <ChevronDown size={18} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                        </button>
-                      )}
-                    </div>
+                        <ChevronDown size={18} className={"transition-transform " + (isExpanded ? "rotate-180" : "")} />
+                      </button>
+                    )}
                   </div>
                 </div>
 
