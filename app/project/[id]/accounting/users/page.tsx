@@ -1,9 +1,9 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { UserCog, UserPlus, Search, Trash2, Shield, X, AlertCircle, CheckCircle2, UserCheck, UserX, Clock, Info, Edit, Briefcase, Users } from "lucide-react";
+import { UserCog, UserPlus, Search, Trash2, Shield, X, AlertCircle, CheckCircle2, UserCheck, UserX, Clock, Info, Edit, Briefcase, Users, ChevronDown } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, updateDoc, query, where, Timestamp } from "firebase/firestore";
@@ -52,6 +52,16 @@ export default function AccountingUsersPage() {
     accountingAccessLevel: "user" as "visitor" | "user" | "accounting" | "accounting_extended",
   });
 
+  // Dropdowns personalizados
+  const [showRoleTypeDropdown, setShowRoleTypeDropdown] = useState(false);
+  const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+  const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
+  const [showPositionDropdown, setShowPositionDropdown] = useState(false);
+  const roleTypeDropdownRef = useRef<HTMLDivElement>(null);
+  const roleDropdownRef = useRef<HTMLDivElement>(null);
+  const departmentDropdownRef = useRef<HTMLDivElement>(null);
+  const positionDropdownRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) router.push("/");
@@ -59,6 +69,18 @@ export default function AccountingUsersPage() {
     });
     return () => unsubscribe();
   }, [router]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (roleTypeDropdownRef.current && !roleTypeDropdownRef.current.contains(target)) setShowRoleTypeDropdown(false);
+      if (roleDropdownRef.current && !roleDropdownRef.current.contains(target)) setShowRoleDropdown(false);
+      if (departmentDropdownRef.current && !departmentDropdownRef.current.contains(target)) setShowDepartmentDropdown(false);
+      if (positionDropdownRef.current && !positionDropdownRef.current.contains(target)) setShowPositionDropdown(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (!userId || !id) return;
@@ -469,36 +491,79 @@ export default function AccountingUsersPage() {
                     ))}
                   </div>
                 </div>
-                <div>
+                <div ref={roleTypeDropdownRef} className="relative">
                   <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de rol</label>
-                  <select value={inviteForm.roleType} onChange={(e) => setInviteForm({ ...inviteForm, roleType: e.target.value as "project" | "department" })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50">
-                    <option value="project">Rol de proyecto</option>
-                    <option value="department">Rol de departamento</option>
-                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowRoleTypeDropdown(!showRoleTypeDropdown)}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between bg-slate-50 hover:border-slate-300 transition-colors"
+                  >
+                    <span className="text-slate-900">{inviteForm.roleType === "project" ? "Rol de proyecto" : "Rol de departamento"}</span>
+                    <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showRoleTypeDropdown ? "rotate-180" : "")} />
+                  </button>
+                  {showRoleTypeDropdown && (
+                    <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1">
+                      <button type="button" onClick={() => { setInviteForm({ ...inviteForm, roleType: "project" }); setShowRoleTypeDropdown(false); }} className={"w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 " + (inviteForm.roleType === "project" ? "bg-slate-50 font-medium" : "")}>Rol de proyecto</button>
+                      <button type="button" onClick={() => { setInviteForm({ ...inviteForm, roleType: "department" }); setShowRoleTypeDropdown(false); }} className={"w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 " + (inviteForm.roleType === "department" ? "bg-slate-50 font-medium" : "")}>Rol de departamento</button>
+                    </div>
+                  )}
                 </div>
                 {inviteForm.roleType === "project" ? (
-                  <div>
+                  <div ref={roleDropdownRef} className="relative">
                     <label className="block text-sm font-medium text-slate-700 mb-2">Rol de proyecto</label>
-                    <select value={inviteForm.role} onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50">
-                      <option value="">Seleccionar</option>
-                      {PROJECT_ROLES.map((role) => (<option key={role} value={role}>{role}</option>))}
-                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowRoleDropdown(!showRoleDropdown)}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between bg-slate-50 hover:border-slate-300 transition-colors"
+                    >
+                      <span className={inviteForm.role ? "text-slate-900" : "text-slate-400"}>{inviteForm.role || "Seleccionar"}</span>
+                      <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showRoleDropdown ? "rotate-180" : "")} />
+                    </button>
+                    {showRoleDropdown && (
+                      <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                        {PROJECT_ROLES.map((role) => (
+                          <button key={role} type="button" onClick={() => { setInviteForm({ ...inviteForm, role }); setShowRoleDropdown(false); }} className={"w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 " + (inviteForm.role === role ? "bg-slate-50 font-medium" : "")}>{role}</button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <>
-                    <div>
+                    <div ref={departmentDropdownRef} className="relative">
                       <label className="block text-sm font-medium text-slate-700 mb-2">Departamento</label>
-                      <select value={inviteForm.department} onChange={(e) => setInviteForm({ ...inviteForm, department: e.target.value })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50">
-                        <option value="">Seleccionar</option>
-                        {departments.map((dept) => (<option key={dept.name} value={dept.name}>{dept.name}</option>))}
-                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowDepartmentDropdown(!showDepartmentDropdown)}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between bg-slate-50 hover:border-slate-300 transition-colors"
+                      >
+                        <span className={inviteForm.department ? "text-slate-900" : "text-slate-400"}>{inviteForm.department || "Seleccionar"}</span>
+                        <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showDepartmentDropdown ? "rotate-180" : "")} />
+                      </button>
+                      {showDepartmentDropdown && (
+                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                          {departments.map((dept) => (
+                            <button key={dept.name} type="button" onClick={() => { setInviteForm({ ...inviteForm, department: dept.name }); setShowDepartmentDropdown(false); }} className={"w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 " + (inviteForm.department === dept.name ? "bg-slate-50 font-medium" : "")}>{dept.name}</button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div>
+                    <div ref={positionDropdownRef} className="relative">
                       <label className="block text-sm font-medium text-slate-700 mb-2">Posición</label>
-                      <select value={inviteForm.position} onChange={(e) => setInviteForm({ ...inviteForm, position: e.target.value })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50">
-                        <option value="">Seleccionar</option>
-                        {DEPARTMENT_POSITIONS.map((pos) => (<option key={pos} value={pos}>{pos}</option>))}
-                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowPositionDropdown(!showPositionDropdown)}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between bg-slate-50 hover:border-slate-300 transition-colors"
+                      >
+                        <span className={inviteForm.position ? "text-slate-900" : "text-slate-400"}>{inviteForm.position || "Seleccionar"}</span>
+                        <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showPositionDropdown ? "rotate-180" : "")} />
+                      </button>
+                      {showPositionDropdown && (
+                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                          {DEPARTMENT_POSITIONS.map((pos) => (
+                            <button key={pos} type="button" onClick={() => { setInviteForm({ ...inviteForm, position: pos }); setShowPositionDropdown(false); }} className={"w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 " + (inviteForm.position === pos ? "bg-slate-50 font-medium" : "")}>{pos}</button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
