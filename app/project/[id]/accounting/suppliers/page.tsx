@@ -130,9 +130,11 @@ export default function SuppliersPage() {
   const [userAccountingLevel, setUserAccountingLevel] = useState<string>("");
   const [taxIdError, setTaxIdError] = useState("");
 
-  // Dropdown personalizado
+  // Dropdowns personalizados
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const [showPaymentMethodDropdown, setShowPaymentMethodDropdown] = useState(false);
+  const paymentMethodDropdownRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
     fiscalName: "", commercialName: "", country: "ES", taxId: "",
@@ -169,6 +171,9 @@ export default function SuppliersPage() {
     const handleClickOutside = (event: MouseEvent) => {
       if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
         setShowStatusDropdown(false);
+      }
+      if (paymentMethodDropdownRef.current && !paymentMethodDropdownRef.current.contains(event.target as Node)) {
+        setShowPaymentMethodDropdown(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -760,11 +765,30 @@ export default function SuppliersPage() {
                 <div>
                   <h3 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-wider flex items-center gap-2"><CreditCard size={14} />Información de pago</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
+                    <div ref={paymentMethodDropdownRef} className="relative">
                       <label className="block text-sm font-medium text-slate-700 mb-2">Método de pago</label>
-                      <select value={formData.paymentMethod} onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value as PaymentMethod })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900">
-                        {PAYMENT_METHODS.map((method) => (<option key={method.value} value={method.value}>{method.label}</option>))}
-                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowPaymentMethodDropdown(!showPaymentMethodDropdown)}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between hover:border-slate-300 transition-colors"
+                      >
+                        <span className="text-slate-900">{PAYMENT_METHODS.find(m => m.value === formData.paymentMethod)?.label}</span>
+                        <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showPaymentMethodDropdown ? "rotate-180" : "")} />
+                      </button>
+                      {showPaymentMethodDropdown && (
+                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                          {PAYMENT_METHODS.map((method) => (
+                            <button
+                              key={method.value}
+                              type="button"
+                              onClick={() => { setFormData({ ...formData, paymentMethod: method.value }); setShowPaymentMethodDropdown(false); }}
+                              className={"w-full px-4 py-2 text-left text-sm hover:bg-slate-50 transition-colors " + (formData.paymentMethod === method.value ? "bg-slate-50 text-slate-900 font-medium" : "text-slate-600")}
+                            >
+                              {method.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">Cuenta bancaria (IBAN)</label>
