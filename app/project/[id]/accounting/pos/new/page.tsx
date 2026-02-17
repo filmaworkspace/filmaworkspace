@@ -603,11 +603,11 @@ export default function NewPOPage() {
       const newSupplier = {
         fiscalName: newSupplierData.fiscalName.trim(),
         commercialName: "",
-        country: "España",
+        country: "ES",
         taxId: newSupplierData.taxId.trim().toUpperCase(),
         address: { street: "", number: "", city: "", province: "", postalCode: "" },
         contact: { name: "", email: "", phone: "" },
-        paymentMethod: "",
+        paymentMethod: "transferencia",
         bankAccount: "",
         bic: "",
         certificates: {
@@ -621,12 +621,12 @@ export default function NewPOPage() {
       };
       const docRef = await addDoc(collection(db, `projects/${projectId}/suppliers`), newSupplier);
       
-      // Seleccionar el nuevo proveedor
+      // Seleccionar el nuevo proveedor y poner su método de pago por defecto
       setFormData({
         ...formData,
         supplier: docRef.id,
         supplierName: newSupplierData.fiscalName.trim(),
-        paymentTerms: "",
+        paymentTerms: "transferencia",
       });
       setTouched((prev) => ({ ...prev, supplier: true }));
       
@@ -1331,7 +1331,7 @@ export default function NewPOPage() {
                       value={formData.generalDescription}
                       onChange={(e) => setFormData({ ...formData, generalDescription: e.target.value.toUpperCase() })}
                       onBlur={() => handleBlur("generalDescription")}
-                      placeholder="CONCEPTO DE LA ORDEN DE COMPRA"
+                      placeholder="DESCRIBE EL PROPÓSITO DE ESTA ORDEN DE COMPRA"
                       rows={3}
                       className={cx(
                         "w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm pr-10 uppercase",
@@ -2034,11 +2034,7 @@ export default function NewPOPage() {
                           </div>
                         </div>
                         {permissions.isProjectRole && (
-                          <div className="grid grid-cols-4 gap-3 text-xs">
-                            <div className="bg-slate-50 rounded-lg p-2">
-                              <p className="text-slate-500">Presupuestado</p>
-                              <p className="font-semibold text-slate-900">{formatCurrency(subAccount.budgeted)} €</p>
-                            </div>
+                          <div className="grid grid-cols-3 gap-3 text-xs">
                             <div className="bg-amber-50 rounded-lg p-2">
                               <p className="text-amber-600">Comprometido</p>
                               <p className="font-semibold text-amber-700">{formatCurrency(subAccount.committed)} €</p>
