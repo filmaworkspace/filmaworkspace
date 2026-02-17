@@ -4,902 +4,1451 @@ import Link from "next/link";
 import { Inter } from "next/font/google";
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs, query, orderBy, where } from "firebase/firestore";
-import { 
-  FileSpreadsheet, Building2, Receipt, FileText, Wallet, 
-  ChevronRight, ArrowLeft, ShieldAlert, Download, Calendar,
-  Filter, Users, Layers
-} from "lucide-react";
+import { doc, getDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
+import { Download, FileText, Receipt, Building2, Wallet, Settings2, ChevronDown, Check, X, Save, Trash2, BookMarked, Layers, GripVertical, Plus, Minus, FileSpreadsheet, Film, ShieldAlert, ArrowLeft } from "lucide-react";
+import { getCostSettings, shouldCommitPO, shouldRealizeInvoice, CostSettings } from "@/lib/budgetRules";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-// Helper para generar CSV y descargar
-const downloadCSV = (data: any[][], filename: string) => {
-  const csvContent = data.map(row => 
-    row.map(cell => {
-      if (cell === null || cell === undefined) return "";
-      if (cell instanceof Date) {
-        return cell.toLocaleDateString("es-ES");
-      }
-      const str = String(cell);
-      // Escapar comillas y envolver en comillas si contiene coma, comilla o salto de línea
-      if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-        return `"${str.replace(/"/g, '""')}"`;
-      }
-      return str;
-    }).join(";") // Usar ; como separador para mejor compatibilidad con Excel español
-  ).join("\n");
+type ReportType = "budget" | "pos_list" | "pos_items" | "invoices" | "invoices_accounting" | "suppliers" | "payments" | "cost_report";
 
-  // Añadir BOM para UTF-8
-  const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename.endsWith(".csv") ? filename : filename + ".csv";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+interface ReportColumn {
+  id: string;
+  label: string;
+  enabled: boolean;
+  locked?: boolean;
+  isBlank?: boolean;
+}
+
+interface SelectedColumn {
+  id: string;
+  originalId: string;
+  label: string;
+  isBlank?: boolean;
+}
+
+interface ReportPreset {
+  id: string;
+  name: string;
+  reportType: ReportType;
+  columns: { id: string; isBlank?: boolean }[];
+  createdAt: string;
+}
+
+const REPORT_COLUMNS: Record<ReportType, ReportColumn[]> = {
+  budget: [
+    { id: "code", label: "Código", enabled: true, locked: true },
+    { id: "description", label: "Descripción", enabled: true },
+    { id: "type", label: "Tipo", enabled: true },
+    { id: "budgeted", label: "Presupuestado", enabled: true },
+    { id: "committed", label: "Comprometido", enabled: true },
+    { id: "actual", label: "Realizado", enabled: true },
+    { id: "available", label: "Disponible", enabled: true },
+    { id: "percentUsed", label: "% Utilizado", enabled: false },
+  ],
+  pos_list: [
+    { id: "number", label: "Nº PO", enabled: true, locked: true },
+    { id: "supplier", label: "Proveedor", enabled: true },
+    { id: "description", label: "Descripción", enabled: true },
+    { id: "baseAmount", label: "Base imponible", enabled: true },
+    { id: "taxAmount", label: "IVA", enabled: false },
+    { id: "totalAmount", label: "Total", enabled: true },
+    { id: "status", label: "Estado", enabled: true },
+    { id: "isOpen", label: "Abierta/Cerrada", enabled: true },
+    { id: "createdAt", label: "Fecha creación", enabled: true },
+    { id: "createdBy", label: "Creado por", enabled: false },
+    { id: "approvedAt", label: "Fecha aprobación", enabled: false },
+    { id: "approvedBy", label: "Aprobado por", enabled: false },
+    { id: "itemCount", label: "Nº ítems", enabled: false },
+  ],
+  pos_items: [
+    { id: "poNumber", label: "Nº PO", enabled: true, locked: true },
+    { id: "poDescription", label: "Descripción PO", enabled: true },
+    { id: "supplier", label: "Proveedor", enabled: true },
+    { id: "itemNumber", label: "Nº Ítem", enabled: true },
+    { id: "itemDescription", label: "Descripción ítem", enabled: true },
+    { id: "episode", label: "Capítulo", enabled: true },
+    { id: "accountCode", label: "Código cuenta", enabled: true },
+    { id: "accountDescription", label: "Cuenta", enabled: false },
+    { id: "subaccountCode", label: "Código subcuenta", enabled: true },
+    { id: "subaccountDescription", label: "Subcuenta", enabled: false },
+    { id: "baseCommitted", label: "Base comprometido", enabled: true },
+    { id: "totalCommitted", label: "Total comprometido", enabled: true },
+    { id: "baseInvoiced", label: "Base facturado", enabled: true },
+    { id: "baseAvailable", label: "Base disponible", enabled: true },
+    { id: "totalAvailable", label: "Total disponible", enabled: true },
+    { id: "poStatus", label: "Estado PO", enabled: true },
+    { id: "isOpen", label: "Abierta/Cerrada", enabled: true },
+    { id: "itemClosed", label: "Item cerrado", enabled: false },
+    { id: "taxRate", label: "% IVA", enabled: false },
+    { id: "irpfRate", label: "% IRPF", enabled: false },
+  ],
+  invoices: [
+    { id: "number", label: "Nº Factura", enabled: true, locked: true },
+    { id: "supplierNumber", label: "Nº Factura proveedor", enabled: true },
+    { id: "supplier", label: "Proveedor", enabled: true },
+    { id: "supplierTaxId", label: "NIF Proveedor", enabled: false },
+    { id: "description", label: "Descripción", enabled: true },
+    { id: "poNumber", label: "Nº PO asociada", enabled: true },
+    { id: "episode", label: "Capítulo", enabled: true },
+    { id: "accountCode", label: "Cuenta contable", enabled: true },
+    { id: "baseAmount", label: "Base imponible", enabled: true },
+    { id: "taxAmount", label: "IVA", enabled: true },
+    { id: "irpfAmount", label: "IRPF", enabled: false },
+    { id: "totalAmount", label: "Total", enabled: true },
+    { id: "status", label: "Estado", enabled: true },
+    { id: "coded", label: "Codificada", enabled: true },
+    { id: "accounted", label: "Contabilizada", enabled: true },
+    { id: "invoiceDate", label: "Fecha factura", enabled: true },
+    { id: "dueDate", label: "Vencimiento", enabled: true },
+    { id: "createdAt", label: "Fecha registro", enabled: false },
+    { id: "paidAt", label: "Fecha pago", enabled: false },
+  ],
+  invoices_accounting: [
+    { id: "accountingEntryNumber", label: "Nº Asiento", enabled: true, locked: true },
+    { id: "number", label: "Nº Factura", enabled: true },
+    { id: "supplierNumber", label: "Nº Factura proveedor", enabled: true },
+    { id: "invoiceDate", label: "Fecha factura", enabled: true },
+    { id: "supplier", label: "Proveedor", enabled: true },
+    { id: "supplierTaxId", label: "NIF Proveedor", enabled: true },
+    { id: "supplierIban", label: "IBAN", enabled: false },
+    { id: "description", label: "Concepto", enabled: true },
+    { id: "accountCode", label: "Cuenta contable", enabled: true },
+    { id: "baseAmount", label: "Base imponible", enabled: true },
+    { id: "taxRate", label: "% IVA", enabled: true },
+    { id: "taxAmount", label: "Cuota IVA", enabled: true },
+    { id: "irpfRate", label: "% IRPF", enabled: false },
+    { id: "irpfAmount", label: "Retención IRPF", enabled: false },
+    { id: "totalAmount", label: "Total factura", enabled: true },
+    { id: "dueDate", label: "Vencimiento", enabled: true },
+    { id: "status", label: "Estado pago", enabled: true },
+    { id: "paidAt", label: "Fecha pago", enabled: false },
+    { id: "accountedAt", label: "Fecha contabilización", enabled: true },
+    { id: "accountedBy", label: "Contabilizado por", enabled: false },
+  ],
+  suppliers: [
+    { id: "fiscalName", label: "Nombre fiscal", enabled: true, locked: true },
+    { id: "commercialName", label: "Nombre comercial", enabled: true },
+    { id: "taxId", label: "NIF/CIF", enabled: true },
+    { id: "contactName", label: "Contacto", enabled: true },
+    { id: "contactEmail", label: "Email", enabled: true },
+    { id: "contactPhone", label: "Teléfono", enabled: true },
+    { id: "address", label: "Dirección", enabled: false },
+    { id: "city", label: "Ciudad", enabled: false },
+    { id: "postalCode", label: "CP", enabled: false },
+    { id: "paymentMethod", label: "Método pago", enabled: true },
+    { id: "iban", label: "IBAN", enabled: true },
+    { id: "paymentTerms", label: "Plazo pago", enabled: false },
+    { id: "totalPOs", label: "Total POs", enabled: false },
+    { id: "totalInvoiced", label: "Total facturado", enabled: false },
+  ],
+  payments: [
+    { id: "paymentNumber", label: "Nº Pago", enabled: true, locked: true },
+    { id: "invoiceNumber", label: "Nº Factura", enabled: true },
+    { id: "supplierNumber", label: "Nº Factura proveedor", enabled: true },
+    { id: "supplier", label: "Proveedor", enabled: true },
+    { id: "supplierTaxId", label: "NIF Proveedor", enabled: true },
+    { id: "supplierIban", label: "IBAN", enabled: true },
+    { id: "description", label: "Concepto", enabled: true },
+    { id: "baseAmount", label: "Base imponible", enabled: true },
+    { id: "totalAmount", label: "Total pagado", enabled: true },
+    { id: "paymentMethod", label: "Método pago", enabled: true },
+    { id: "paidAt", label: "Fecha pago", enabled: true },
+    { id: "paidBy", label: "Pagado por", enabled: false },
+    { id: "accountingEntryNumber", label: "Nº Asiento", enabled: true },
+  ],
+  cost_report: [
+    { id: "accountCode", label: "Cuenta", enabled: true, locked: true },
+    { id: "accountDescription", label: "Descripción cuenta", enabled: true },
+    { id: "budgeted", label: "Presupuestado", enabled: true },
+    { id: "committed", label: "Comprometido", enabled: true },
+    { id: "invoiced", label: "Facturado", enabled: true },
+    { id: "paid", label: "Pagado", enabled: true },
+    { id: "pendingPayment", label: "Pendiente pago", enabled: true },
+    { id: "available", label: "Disponible", enabled: true },
+    { id: "percentExecuted", label: "% Ejecutado", enabled: true },
+    { id: "deviation", label: "Desviación", enabled: false },
+  ],
 };
-interface Supplier {
-  id: string;
-  fiscalName: string;
-  taxId?: string;
-  iban?: string;
-}
 
-interface PO {
-  id: string;
-  number: string;
-  displayNumber: string;
-  supplier: string;
-  supplierId: string;
-  description: string;
-  department?: string;
-  status: string;
-  baseAmount: number;
-  totalAmount: number;
-  createdAt: Date;
-  approvedAt?: Date;
-  items: any[];
-}
-
-interface Invoice {
-  id: string;
-  number: string;
-  displayNumber: string;
-  documentType: string;
-  supplier: string;
-  supplierId: string;
-  supplierNumber?: string;
-  description: string;
-  department?: string;
-  linkedPOId?: string;
-  linkedPONumber?: string;
-  status: string;
-  baseAmount: number;
-  vatAmount: number;
-  totalAmount: number;
-  createdAt: Date;
-  invoiceDate?: Date;
-  dueDate?: Date;
-  paidAt?: Date;
-  items: any[];
-}
-
-const REPORTS = [
-  {
-    id: "supplier",
-    title: "Informe por Proveedor",
-    description: "Facturas agrupadas por proveedor con totales",
-    icon: Building2,
-    color: "amber",
-  },
-  {
-    id: "pending_payments",
-    title: "Previsión de Pagos",
-    description: "Facturas pendientes de pago por vencimiento",
-    icon: Wallet,
-    color: "blue",
-  },
-  {
-    id: "invoices_list",
-    title: "Libro de Facturas",
-    description: "Listado completo de facturas recibidas",
-    icon: Receipt,
-    color: "emerald",
-  },
-  {
-    id: "pos_list",
-    title: "Listado de POs",
-    description: "Órdenes de compra con estado y totales",
-    icon: FileText,
-    color: "violet",
-  },
-  {
-    id: "pos_items",
-    title: "POs por Items",
-    description: "Desglose de items con cuentas contables",
-    icon: FileText,
-    color: "indigo",
-  },
-  {
-    id: "cost_by_department",
-    title: "Costes por Departamento",
-    description: "Desglose de gastos por departamento",
-    icon: Layers,
-    color: "rose",
-  },
-];
+const REPORT_INFO: Record<ReportType, { title: string; description: string; icon: any }> = {
+  budget: { title: "Presupuesto", description: "Cuentas, subcuentas y ejecución presupuestaria", icon: Wallet },
+  pos_list: { title: "Listado de POs", description: "Órdenes de compra con totales", icon: FileText },
+  pos_items: { title: "POs por ítems", description: "Desglose detallado de cada ítem de PO", icon: Layers },
+  invoices: { title: "Facturas", description: "Listado completo de facturas recibidas", icon: Receipt },
+  invoices_accounting: { title: "Libro de facturas", description: "Facturas contabilizadas con nº de asiento", icon: BookMarked },
+  suppliers: { title: "Proveedores", description: "Directorio completo de proveedores", icon: Building2 },
+  payments: { title: "Registro de pagos", description: "Histórico de pagos realizados", icon: Wallet },
+  cost_report: { title: "Informe de costes", description: "Resumen de ejecución por cuenta contable", icon: FileSpreadsheet },
+};
 
 export default function ReportsPage() {
   const params = useParams();
   const router = useRouter();
-  const projectId = params?.id as string;
-
+  const id = params?.id as string;
+  const [projectName, setProjectName] = useState("");
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState<string | null>(null);
-  const [projectName, setProjectName] = useState("");
-  const [hasAccess, setHasAccess] = useState(false);
-  const [accessError, setAccessError] = useState<string | null>(null);
+  const [counts, setCounts] = useState({ pos: 0, invoices: 0, suppliers: 0, accounts: 0 });
   const [userId, setUserId] = useState<string | null>(null);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [accessError, setAccessError] = useState("");
+  
+  const [showConfig, setShowConfig] = useState(false);
+  const [configReportType, setConfigReportType] = useState<ReportType | null>(null);
+  const [availableColumns, setAvailableColumns] = useState<ReportColumn[]>([]);
+  const [selectedColumns, setSelectedColumns] = useState<SelectedColumn[]>([]);
+  const [draggedItem, setDraggedItem] = useState<number | null>(null);
+  const [dragOverItem, setDragOverItem] = useState<number | null>(null);
+  
+  const [presets, setPresets] = useState<ReportPreset[]>([]);
+  const [showSavePreset, setShowSavePreset] = useState(false);
+  const [newPresetName, setNewPresetName] = useState("");
+  const [expandedReport, setExpandedReport] = useState<ReportType | null>(null);
+  const [exportFormat, setExportFormat] = useState<"csv" | "xlsx">("csv");
 
-  // Data
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [pos, setPos] = useState<PO[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  // Estados para episodios
+  const [episodesEnabled, setEpisodesEnabled] = useState(false);
+  const [totalEpisodes, setTotalEpisodes] = useState(0);
+  const [splitByEpisode, setSplitByEpisode] = useState(false);
 
-  // Filters
-  const [selectedSupplier, setSelectedSupplier] = useState<string>("all");
-  const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
-  const [dateFrom, setDateFrom] = useState<string>("");
-  const [dateTo, setDateTo] = useState<string>("");
+  // Configuración de coste
+  const [costConfig, setCostConfig] = useState<CostSettings>({
+    poCommitmentTrigger: "on_approve",
+    invoiceActualTrigger: "on_paid",
+  });
 
-  const [departments, setDepartments] = useState<string[]>([]);
+  useEffect(() => {
+    const savedPresets = localStorage.getItem(`report_presets_${id}`);
+    if (savedPresets) setPresets(JSON.parse(savedPresets));
+    
+    // Cargar formato de exportación guardado
+    const savedFormat = localStorage.getItem(`report_export_format`) as "csv" | "xlsx" | null;
+    if (savedFormat) setExportFormat(savedFormat);
+  }, [id]);
+
+  const toggleExportFormat = () => {
+    const newFormat = exportFormat === "csv" ? "xlsx" : "csv";
+    setExportFormat(newFormat);
+    localStorage.setItem(`report_export_format`, newFormat);
+  };
+
+  const savePresetsToStorage = (newPresets: ReportPreset[]) => {
+    localStorage.setItem(`report_presets_${id}`, JSON.stringify(newPresets));
+    setPresets(newPresets);
+  };
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) setUserId(user.uid);
-      else router.push("/login");
+      if (!user) router.push("/");
+      else setUserId(user.uid);
     });
     return () => unsubscribe();
   }, [router]);
 
-  useEffect(() => {
-    if (userId && projectId) loadData();
-  }, [userId, projectId]);
+  useEffect(() => { if (userId && id) loadData(); }, [userId, id]);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const projectDoc = await getDoc(doc(db, "projects", projectId));
-      if (!projectDoc.exists()) {
-        setAccessError("Proyecto no encontrado");
+      
+      // Verificar acceso: accounting o accounting_extended, o EP/PM
+      const userProjectRef = doc(db, `userProjects/${userId}/projects/${id}`);
+      const userProjectSnap = await getDoc(userProjectRef);
+      if (!userProjectSnap.exists()) {
+        setAccessError("No tienes acceso a este proyecto");
+        setLoading(false);
         return;
       }
-      setProjectName(projectDoc.data().name || "Proyecto");
+      
+      const userProjectData = userProjectSnap.data();
+      const hasAccountingAccess = userProjectData.permissions?.accounting || false;
+      const accountingLevel = userProjectData.accountingAccessLevel;
+      
+      const memberRef = doc(db, `projects/${id}/members`, userId!);
+      const memberSnap = await getDoc(memberRef);
+      const memberData = memberSnap.exists() ? memberSnap.data() : null;
+      const isEPorPM = memberData && ["EP", "PM"].includes(memberData.role);
+      const hasReportsAccess = accountingLevel === "accounting_extended" || accountingLevel === "accounting";
+      
+      if (!hasAccountingAccess || (!isEPorPM && !hasReportsAccess)) {
+        setAccessError("No tienes permisos para acceder a los informes");
+        setLoading(false);
+        return;
+      }
       setHasAccess(true);
+      
+      const projectDoc = await getDoc(doc(db, "projects", id));
+      if (projectDoc.exists()) setProjectName(projectDoc.data().name || "Proyecto");
+      
+      const [posSnap, invoicesSnap, suppliersSnap, accountsSnap] = await Promise.all([
+        getDocs(collection(db, `projects/${id}/pos`)),
+        getDocs(collection(db, `projects/${id}/invoices`)),
+        getDocs(collection(db, `projects/${id}/suppliers`)),
+        getDocs(collection(db, `projects/${id}/accounts`)),
+      ]);
+      setCounts({ pos: posSnap.size, invoices: invoicesSnap.size, suppliers: suppliersSnap.size, accounts: accountsSnap.size });
 
-      // Load suppliers
-      const suppSnap = await getDocs(query(collection(db, `projects/${projectId}/suppliers`), orderBy("fiscalName")));
-      setSuppliers(suppSnap.docs.map(d => ({
-        id: d.id,
-        fiscalName: d.data().fiscalName || "",
-        taxId: d.data().taxId,
-        iban: d.data().iban,
-      })));
+      // Cargar configuración de episodios
+      try {
+        const productionDoc = await getDoc(doc(db, `projects/${id}/config/production`));
+        if (productionDoc.exists()) {
+          const prodData = productionDoc.data();
+          if (prodData.projectType === "serie") {
+            setTotalEpisodes(prodData.episodes || 0);
+            
+            const projectConfigDoc = await getDoc(doc(db, `projects/${id}/config/project`));
+            if (projectConfigDoc.exists()) {
+              const configData = projectConfigDoc.data();
+              setEpisodesEnabled(configData.enableEpisodes || false);
+            }
+          }
+        }
+      } catch (epErr) {
+        console.error("Error loading episodes config:", epErr);
+      }
 
-      // Load POs
-      const posSnap = await getDocs(query(collection(db, `projects/${projectId}/pos`), orderBy("createdAt", "desc")));
-      const posData = posSnap.docs.map(d => {
-        const data = d.data();
-        return {
-          id: d.id,
-          number: data.number || "",
-          displayNumber: data.displayNumber || `PO-${data.number}`,
-          supplier: data.supplier || "",
-          supplierId: data.supplierId || "",
-          description: data.generalDescription || "",
-          department: data.department,
-          status: data.status || "pending",
-          baseAmount: data.baseAmount || 0,
-          totalAmount: data.totalAmount || 0,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          approvedAt: data.approvedAt?.toDate(),
-          items: data.items || [],
-        };
-      });
-      setPos(posData);
-
-      // Load invoices
-      const invSnap = await getDocs(query(collection(db, `projects/${projectId}/invoices`), orderBy("createdAt", "desc")));
-      const invData = invSnap.docs.map(d => {
-        const data = d.data();
-        return {
-          id: d.id,
-          number: data.number || "",
-          displayNumber: data.displayNumber || `FAC-${data.number}`,
-          documentType: data.documentType || "invoice",
-          supplier: data.supplier || "",
-          supplierId: data.supplierId || "",
-          supplierNumber: data.supplierNumber,
-          description: data.description || "",
-          department: data.department,
-          linkedPOId: data.linkedPOId,
-          linkedPONumber: data.linkedPONumber,
-          status: data.status || "pending",
-          baseAmount: data.baseAmount || 0,
-          vatAmount: data.vatAmount || 0,
-          totalAmount: data.totalAmount || 0,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          invoiceDate: data.invoiceDate?.toDate(),
-          dueDate: data.dueDate?.toDate(),
-          paidAt: data.paidAt?.toDate(),
-          items: data.items || [],
-        };
-      });
-      setInvoices(invData);
-
-      // Extract departments
-      const depts = new Set<string>();
-      posData.forEach(p => p.department && depts.add(p.department));
-      invData.forEach(i => i.department && depts.add(i.department));
-      setDepartments(Array.from(depts).sort());
-
-    } catch (error) {
-      console.error("Error loading data:", error);
-    } finally {
-      setLoading(false);
+      // Cargar configuración de costes usando budgetRules
+      try {
+        const loadedCostConfig = await getCostSettings(id);
+        setCostConfig(loadedCostConfig);
+      } catch (ctErr) {
+        console.error("Error loading cost config:", ctErr);
+      }
+    } catch (error) { 
+      console.error("Error cargando datos:", error); 
+    } finally { 
+      setLoading(false); 
     }
   };
 
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
+  const openConfig = (reportType: ReportType) => {
+    setConfigReportType(reportType);
+    const cols = REPORT_COLUMNS[reportType];
+    setAvailableColumns(cols.filter(c => !c.enabled));
+    setSelectedColumns(
+      cols.filter(c => c.enabled).map((c, i) => ({
+        id: `${c.id}_${i}`,
+        originalId: c.id,
+        label: c.label,
+      }))
+    );
+    setShowConfig(true);
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+  const addColumn = (column: ReportColumn) => {
+    const newCol: SelectedColumn = {
+      id: `${column.id}_${Date.now()}`,
+      originalId: column.id,
+      label: column.label,
+    };
+    setSelectedColumns([...selectedColumns, newCol]);
+    setAvailableColumns(availableColumns.filter(c => c.id !== column.id));
   };
 
-  const getWeekNumber = (date: Date) => {
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  const removeColumn = (columnId: string, originalId: string) => {
+    const colDef = REPORT_COLUMNS[configReportType!].find(c => c.id === originalId);
+    if (colDef?.locked) return;
+    
+    setSelectedColumns(selectedColumns.filter(c => c.id !== columnId));
+    if (!colDef?.isBlank) {
+      const original = REPORT_COLUMNS[configReportType!].find(c => c.id === originalId);
+      if (original && !availableColumns.find(c => c.id === originalId)) {
+        setAvailableColumns([...availableColumns, original]);
+      }
+    }
   };
 
-  // ==================== INFORME POR PROVEEDOR ====================
-  const generateSupplierReport = async () => {
-    setGenerating("supplier");
+  const addBlankColumn = () => {
+    const blankCol: SelectedColumn = {
+      id: `blank_${Date.now()}`,
+      originalId: "blank",
+      label: "(Columna vacía)",
+      isBlank: true,
+    };
+    setSelectedColumns([...selectedColumns, blankCol]);
+  };
+
+  const handleDragStart = (index: number) => {
+    setDraggedItem(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOverItem(index);
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedItem === null) return;
+    
+    const newColumns = [...selectedColumns];
+    const draggedColumn = newColumns[draggedItem];
+    newColumns.splice(draggedItem, 1);
+    newColumns.splice(dropIndex, 0, draggedColumn);
+    
+    setSelectedColumns(newColumns);
+    setDraggedItem(null);
+    setDragOverItem(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+    setDragOverItem(null);
+  };
+
+  const getDefaultColumns = (reportType: ReportType): SelectedColumn[] => {
+    return REPORT_COLUMNS[reportType]
+      .filter(c => c.enabled)
+      .map((c, i) => ({
+        id: `${c.id}_${i}`,
+        originalId: c.id,
+        label: c.label,
+      }));
+  };
+
+  const savePreset = () => {
+    if (!newPresetName.trim() || !configReportType) return;
+    const newPreset: ReportPreset = {
+      id: `preset_${Date.now()}`,
+      name: newPresetName.trim(),
+      reportType: configReportType,
+      columns: selectedColumns.map(c => ({ id: c.originalId, isBlank: c.isBlank })),
+      createdAt: new Date().toISOString(),
+    };
+    savePresetsToStorage([...presets, newPreset]);
+    setNewPresetName("");
+    setShowSavePreset(false);
+  };
+
+  const deletePreset = (presetId: string) => {
+    savePresetsToStorage(presets.filter(p => p.id !== presetId));
+  };
+
+  const loadPreset = (preset: ReportPreset) => {
+    const cols = preset.columns.map((c, i) => {
+      if (c.isBlank) {
+        return { id: `blank_${i}`, originalId: "blank", label: "(Columna vacía)", isBlank: true };
+      }
+      const original = REPORT_COLUMNS[preset.reportType].find(col => col.id === c.id);
+      return { id: `${c.id}_${i}`, originalId: c.id, label: original?.label || c.id };
+    });
+    setSelectedColumns(cols);
+    
+    const usedIds = cols.filter(c => !c.isBlank).map(c => c.originalId);
+    setAvailableColumns(REPORT_COLUMNS[preset.reportType].filter(c => !usedIds.includes(c.id)));
+  };
+
+  const formatCurrency = (amount: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
+  const formatDate = (date: any) => date?.toDate ? new Date(date.toDate()).toLocaleDateString("es-ES") : "";
+  const getCurrentDate = () => new Date().toISOString().split("T")[0];
+
+  const downloadFile = async (rows: string[][], filename: string) => {
+    if (exportFormat === "xlsx") {
+      await downloadXLSX(rows, filename.replace(".csv", ".xlsx"));
+    } else {
+      downloadCSV(rows, filename);
+    }
+  };
+
+  const downloadCSV = (rows: string[][], filename: string) => {
+    const csvContent = rows.map(row => row.map(cell => {
+      const escaped = (cell || "").toString().replace(/"/g, '""');
+      return `"${escaped}"`;
+    }).join(";")).join("\n");
+    
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.setAttribute("href", URL.createObjectURL(blob));
+    link.setAttribute("download", filename.endsWith(".csv") ? filename : filename + ".csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const downloadXLSX = async (rows: string[][], filename: string) => {
     try {
-      const today = new Date();
-      const weekNum = getWeekNumber(today);
-
-      // Filter invoices
-      let filteredInvoices = invoices;
-      if (selectedSupplier !== "all") {
-        filteredInvoices = filteredInvoices.filter(i => i.supplierId === selectedSupplier);
-      }
-      if (selectedDepartment !== "all") {
-        filteredInvoices = filteredInvoices.filter(i => i.department === selectedDepartment);
-      }
-      if (dateFrom) {
-        const from = new Date(dateFrom);
-        filteredInvoices = filteredInvoices.filter(i => i.invoiceDate && i.invoiceDate >= from);
-      }
-      if (dateTo) {
-        const to = new Date(dateTo);
-        filteredInvoices = filteredInvoices.filter(i => i.invoiceDate && i.invoiceDate <= to);
-      }
-
-      // Group by supplier
-      const bySupplier: Record<string, Invoice[]> = {};
-      filteredInvoices.forEach(inv => {
-        const key = inv.supplierId || inv.supplier;
-        if (!bySupplier[key]) bySupplier[key] = [];
-        bySupplier[key].push(inv);
-      });
-
-      // Create data array
-      const data: any[][] = [];
+      // Importar SheetJS dinámicamente
+      const XLSX = await import("xlsx");
       
-      // Header
-      data.push([projectName, "", "", "", "", "", "", "", "", "PROVEEDOR"]);
-      data.push([]);
-      data.push(["", "", "Fecha informe:", today, "N.º informe:", "-"]);
-      data.push(["", "", "Semana:", `SEM. ${weekNum}`, "Solicitante:", ""]);
-      data.push(["", "", "", "", "Departamento:", selectedDepartment === "all" ? "Todos" : selectedDepartment]);
-      data.push([]);
-      data.push([]);
-      data.push(["PROVEEDORES"]);
-      data.push([]);
-      data.push(["#", "PO #", "FCT #", "N.º FCT.", "Proveedor", "Descripción", "IBAN", "Fecha FCT.", "Fecha vcto.", "Importe", "Dpto."]);
+      // Crear worksheet desde los datos
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      
+      // Ajustar anchos de columna automáticamente
+      const colWidths = rows[0].map((_, colIndex) => {
+        const maxLen = Math.max(...rows.map(row => (row[colIndex] || "").toString().length));
+        return { wch: Math.min(Math.max(maxLen + 2, 10), 50) };
+      });
+      ws["!cols"] = colWidths;
+      
+      // Crear workbook
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Datos");
+      
+      // Generar archivo y descargar
+      XLSX.writeFile(wb, filename.endsWith(".xlsx") ? filename : filename + ".xlsx");
+    } catch (error) {
+      console.error("Error generando XLSX:", error);
+      // Fallback a CSV si falla
+      downloadCSV(rows, filename.replace(".xlsx", ".csv"));
+    }
+  };
 
-      let rowNum = 1;
-      let grandTotal = 0;
-
-      Object.entries(bySupplier).forEach(([supplierId, invs]) => {
-        const supplier = suppliers.find(s => s.id === supplierId);
-        let supplierTotal = 0;
-
-        invs.forEach(inv => {
-          const po = pos.find(p => p.id === inv.linkedPOId);
-          data.push([
-            rowNum.toString().padStart(2, "0"),
-            po?.number || "",
-            inv.number || "",
-            inv.supplierNumber || "",
-            inv.supplier,
-            inv.description,
-            supplier?.iban || "",
-            inv.invoiceDate || "",
-            inv.dueDate || "",
-            inv.totalAmount,
-            inv.department || ""
-          ]);
-          supplierTotal += inv.totalAmount;
-          rowNum++;
+  const generateBudgetReport = async (columns: SelectedColumn[]) => {
+    setGenerating("budget");
+    try {
+      const accountsSnapshot = await getDocs(query(collection(db, `projects/${id}/accounts`), orderBy("code", "asc")));
+      const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
+      
+      for (const accountDoc of accountsSnapshot.docs) {
+        const accountData = accountDoc.data();
+        const subAccountsSnapshot = await getDocs(query(collection(db, `projects/${id}/accounts/${accountDoc.id}/subaccounts`), orderBy("code", "asc")));
+        
+        let accountBudgeted = 0, accountCommitted = 0, accountActual = 0;
+        const subRows: any[] = [];
+        
+        subAccountsSnapshot.docs.forEach((subDoc) => {
+          const subData = subDoc.data();
+          const budgeted = subData.budgeted || 0, committed = subData.committed || 0, actual = subData.actual || 0;
+          accountBudgeted += budgeted; accountCommitted += committed; accountActual += actual;
+          const available = budgeted - committed - actual;
+          const percentUsed = budgeted > 0 ? ((committed + actual) / budgeted * 100).toFixed(1) : "0";
+          
+          subRows.push({
+            code: subData.code, description: subData.description, type: "SUBCUENTA",
+            budgeted, committed, actual, available, percentUsed: `${percentUsed}%`
+          });
         });
-
-        data.push(["", "", "", "", "", "", "", "", "Suma.-", supplierTotal]);
-        data.push([]);
-        grandTotal += supplierTotal;
-      });
-
-      data.push(["", "", "", "", "", "", "", "", "Total.-", grandTotal]);
-
-      downloadCSV(data, `Proveedor_${projectName.replace(/\s+/g, "_")}_SEM${weekNum}.csv`);
-    } catch (error) {
-      console.error("Error generating report:", error);
-    } finally {
-      setGenerating(null);
-    }
-  };
-
-  // ==================== PREVISIÓN DE PAGOS ====================
-  const generatePaymentsReport = async () => {
-    setGenerating("pending_payments");
-    try {
-      const today = new Date();
-      const weekNum = getWeekNumber(today);
-
-      // Filter unpaid invoices
-      let pendingInvoices = invoices.filter(i => i.status !== "paid" && !i.paidAt);
-      
-      if (selectedSupplier !== "all") {
-        pendingInvoices = pendingInvoices.filter(i => i.supplierId === selectedSupplier);
-      }
-      if (selectedDepartment !== "all") {
-        pendingInvoices = pendingInvoices.filter(i => i.department === selectedDepartment);
-      }
-
-      // Sort by due date
-      pendingInvoices.sort((a, b) => {
-        const dateA = a.dueDate?.getTime() || 0;
-        const dateB = b.dueDate?.getTime() || 0;
-        return dateA - dateB;
-      });
-
-      const data: any[][] = [];
-      
-      data.push([projectName, "", "", "", "", "", "", "", "PREVISIÓN DE PAGOS"]);
-      data.push([]);
-      data.push(["", "", "Fecha previsión:", today, "N.º previsión:", "-"]);
-      data.push(["", "", "Semana:", `SEM. ${weekNum}`, "Solicitante:", ""]);
-      data.push(["", "", "", "", "Departamento:", selectedDepartment === "all" ? "Todos" : selectedDepartment]);
-      data.push([]);
-      data.push([]);
-      data.push([`TRANSFERENCIAS SEM. ${weekNum}`]);
-      data.push([]);
-      data.push(["#", "Factura ID", "Factura", "Proveedor", "Contratistas", "Descripción", "IBAN", "Fecha vcto.", "Importe"]);
-
-      let rowNum = 1;
-      let total = 0;
-
-      pendingInvoices.forEach(inv => {
-        const supplier = suppliers.find(s => s.id === inv.supplierId);
-        data.push([
-          `01-${rowNum.toString().padStart(2, "0")}`,
-          inv.displayNumber,
-          inv.supplierNumber || "",
-          inv.supplier,
-          "",
-          inv.description,
-          supplier?.iban || "",
-          inv.dueDate || "",
-          inv.totalAmount
-        ]);
-        total += inv.totalAmount;
-        rowNum++;
-      });
-
-      data.push(["", "", "", "", "", "", "", "Suma y sigue.-", total]);
-      data.push([]);
-      data.push(["", "", "", "", "", "", "", "Total.-", total]);
-
-      downloadCSV(data, `Prevision_Pagos_${projectName.replace(/\s+/g, "_")}_SEM${weekNum}.csv`);
-    } catch (error) {
-      console.error("Error generating report:", error);
-    } finally {
-      setGenerating(null);
-    }
-  };
-
-  // ==================== LIBRO DE FACTURAS ====================
-  const generateInvoicesReport = async () => {
-    setGenerating("invoices_list");
-    try {
-      const today = new Date();
-
-      let filteredInvoices = [...invoices];
-      if (selectedSupplier !== "all") {
-        filteredInvoices = filteredInvoices.filter(i => i.supplierId === selectedSupplier);
-      }
-      if (selectedDepartment !== "all") {
-        filteredInvoices = filteredInvoices.filter(i => i.department === selectedDepartment);
-      }
-      if (dateFrom) {
-        const from = new Date(dateFrom);
-        filteredInvoices = filteredInvoices.filter(i => i.createdAt >= from);
-      }
-      if (dateTo) {
-        const to = new Date(dateTo);
-        filteredInvoices = filteredInvoices.filter(i => i.createdAt <= to);
-      }
-
-      const data: any[][] = [];
-      
-      data.push([projectName, "", "", "", "", "", "", "", "", "", "LIBRO DE FACTURAS"]);
-      data.push([]);
-      data.push(["", "", "Fecha:", today, "Período:", dateFrom && dateTo ? `${dateFrom} - ${dateTo}` : "Todo"]);
-      data.push([]);
-      data.push([]);
-      data.push(["#", "N.º Interno", "N.º Proveedor", "Tipo", "Proveedor", "NIF", "Descripción", "Fecha FCT", "Base", "IVA", "Total", "Estado", "Dpto."]);
-
-      let totalBase = 0;
-      let totalVat = 0;
-      let totalAmount = 0;
-
-      filteredInvoices.forEach((inv, idx) => {
-        const supplier = suppliers.find(s => s.id === inv.supplierId);
-        const typeLabels: Record<string, string> = {
-          invoice: "Factura", proforma: "Proforma", ticket: "Ticket", autonomo: "Autónomo"
-        };
-        const statusLabels: Record<string, string> = {
-          pending: "Pendiente", approved: "Aprobada", paid: "Pagada", 
-          coding: "Codificando", accounted: "Contabilizada", rejected: "Rechazada"
+        
+        const accountAvailable = accountBudgeted - accountCommitted - accountActual;
+        const accountPercentUsed = accountBudgeted > 0 ? ((accountCommitted + accountActual) / accountBudgeted * 100).toFixed(1) : "0";
+        
+        const accountRow: any = {
+          code: accountData.code, description: accountData.description, type: "CUENTA",
+          budgeted: accountBudgeted, committed: accountCommitted, actual: accountActual,
+          available: accountAvailable, percentUsed: `${accountPercentUsed}%`
         };
         
-        data.push([
-          idx + 1,
-          inv.displayNumber,
-          inv.supplierNumber || "",
-          typeLabels[inv.documentType] || inv.documentType,
-          inv.supplier,
-          supplier?.taxId || "",
-          inv.description,
-          inv.invoiceDate || "",
-          inv.baseAmount,
-          inv.vatAmount,
-          inv.totalAmount,
-          statusLabels[inv.status] || inv.status,
-          inv.department || ""
-        ]);
-        totalBase += inv.baseAmount;
-        totalVat += inv.vatAmount;
-        totalAmount += inv.totalAmount;
-      });
-
-      data.push([]);
-      data.push(["", "", "", "", "", "", "TOTALES:", "", totalBase, totalVat, totalAmount, "", ""]);
-
-      downloadCSV(data, `Libro_Facturas_${projectName.replace(/\s+/g, "_")}.csv`);
-    } catch (error) {
-      console.error("Error generating report:", error);
-    } finally {
-      setGenerating(null);
-    }
+        rows.push(columns.map(col => {
+          if (col.isBlank) return "";
+          const val = accountRow[col.originalId];
+          return typeof val === "number" ? formatCurrency(val) : val;
+        }));
+        
+        subRows.forEach(subRow => {
+          rows.push(columns.map(col => {
+            if (col.isBlank) return "";
+            const val = subRow[col.originalId];
+            return typeof val === "number" ? formatCurrency(val) : val;
+          }));
+        });
+      }
+      
+      await downloadFile(rows, `Presupuesto_${projectName}_${getCurrentDate()}.csv`);
+    } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
-  // ==================== LISTADO POs ====================
-  const generatePOsReport = async () => {
+  const generatePOsListReport = async (columns: SelectedColumn[]) => {
     setGenerating("pos_list");
     try {
-      const today = new Date();
-
-      let filteredPOs = [...pos];
-      if (selectedSupplier !== "all") {
-        filteredPOs = filteredPOs.filter(p => p.supplierId === selectedSupplier);
-      }
-      if (selectedDepartment !== "all") {
-        filteredPOs = filteredPOs.filter(p => p.department === selectedDepartment);
-      }
-      if (dateFrom) {
-        const from = new Date(dateFrom);
-        filteredPOs = filteredPOs.filter(p => p.createdAt >= from);
-      }
-      if (dateTo) {
-        const to = new Date(dateTo);
-        filteredPOs = filteredPOs.filter(p => p.createdAt <= to);
-      }
-
-      const data: any[][] = [];
+      const posSnapshot = await getDocs(query(collection(db, `projects/${id}/pos`), orderBy("createdAt", "desc")));
+      const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
       
-      data.push([projectName, "", "", "", "", "", "", "", "LISTADO DE POs"]);
-      data.push([]);
-      data.push(["", "", "Fecha:", today]);
-      data.push([]);
-      data.push([]);
-      data.push(["#", "N.º PO", "Proveedor", "Descripción", "Departamento", "Fecha", "Estado", "Base", "Total"]);
-
-      let totalBase = 0;
-      let totalAmount = 0;
-
-      const statusLabels: Record<string, string> = {
-        draft: "Borrador", pending: "Pendiente", approved: "Aprobada", 
-        rejected: "Rechazada", closed: "Cerrada", cancelled: "Anulada"
-      };
-
-      filteredPOs.forEach((po, idx) => {
-        data.push([
-          idx + 1,
-          po.displayNumber,
-          po.supplier,
-          po.description,
-          po.department || "",
-          po.createdAt,
-          statusLabels[po.status] || po.status,
-          po.baseAmount,
-          po.totalAmount
-        ]);
-        totalBase += po.baseAmount;
-        totalAmount += po.totalAmount;
-      });
-
-      data.push([]);
-      data.push(["", "", "", "", "", "TOTALES:", "", totalBase, totalAmount]);
-
-      downloadCSV(data, `Listado_POs_${projectName.replace(/\s+/g, "_")}.csv`);
-    } catch (error) {
-      console.error("Error generating report:", error);
-    } finally {
-      setGenerating(null);
-    }
+      for (const docSnap of posSnapshot.docs) {
+        const data = docSnap.data();
+        const items = data.items || [];
+        
+        const rowData: any = {
+          number: data.number || data.displayNumber || "",
+          supplier: data.supplier || "",
+          description: data.description || "",
+          baseAmount: data.baseAmount || 0,
+          taxAmount: data.taxAmount || 0,
+          totalAmount: data.totalAmount || 0,
+          status: data.status || "",
+          isOpen: data.isOpen !== false ? "Abierta" : "Cerrada",
+          createdAt: formatDate(data.createdAt),
+          createdBy: data.createdByName || "",
+          approvedAt: formatDate(data.approvedAt),
+          approvedBy: data.approvedByName || "",
+          itemCount: items.length,
+        };
+        
+        rows.push(columns.map(col => {
+          if (col.isBlank) return "";
+          const val = rowData[col.originalId];
+          return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
+        }));
+      }
+      
+      await downloadFile(rows, `POs_Listado_${projectName}_${getCurrentDate()}.csv`);
+    } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
-  // ==================== POs POR ITEMS ====================
-  const generatePOsItemsReport = async () => {
+  const generatePOsItemsReport = async (columns: SelectedColumn[]) => {
     setGenerating("pos_items");
     try {
-      const today = new Date();
-
-      let filteredPOs = [...pos];
-      if (selectedSupplier !== "all") {
-        filteredPOs = filteredPOs.filter(p => p.supplierId === selectedSupplier);
-      }
-      if (selectedDepartment !== "all") {
-        filteredPOs = filteredPOs.filter(p => p.department === selectedDepartment);
-      }
-      if (dateFrom) {
-        const from = new Date(dateFrom);
-        filteredPOs = filteredPOs.filter(p => p.createdAt >= from);
-      }
-      if (dateTo) {
-        const to = new Date(dateTo);
-        filteredPOs = filteredPOs.filter(p => p.createdAt <= to);
-      }
-
-      const data: any[][] = [];
+      const posSnapshot = await getDocs(query(collection(db, `projects/${id}/pos`), orderBy("createdAt", "desc")));
+      const invoicesSnapshot = await getDocs(collection(db, `projects/${id}/invoices`));
       
-      data.push([projectName, "", "", "", "", "", "", "", "", "", "", "POs POR ITEMS"]);
-      data.push([]);
-      data.push(["", "", "Fecha:", today]);
-      data.push([]);
-      data.push([]);
-      data.push([
-        "#", "N.º PO", "Proveedor", "Descripción PO", "Item", "Descripción Item", 
-        "Cuenta", "Capítulo", "Base", "IVA", "IRPF", "Total", "Estado"
-      ]);
-
-      let totalBase = 0;
-      let totalVat = 0;
-      let totalIrpf = 0;
-      let totalAmount = 0;
-      let rowNum = 1;
-
-      const statusLabels: Record<string, string> = {
-        draft: "Borrador", pending: "Pendiente", approved: "Aprobada", 
-        rejected: "Rechazada", closed: "Cerrada", cancelled: "Anulada"
-      };
-
-      filteredPOs.forEach((po) => {
-        if (po.items && po.items.length > 0) {
-          po.items.forEach((item: any, itemIdx: number) => {
-            data.push([
-              rowNum,
-              po.displayNumber,
-              po.supplier,
-              po.description,
-              itemIdx + 1,
-              item.description || "",
-              item.subAccountCode || "",
-              item.episodeAssignment || "general",
-              item.baseAmount || 0,
-              item.vatAmount || 0,
-              item.irpfAmount || 0,
-              item.totalAmount || 0,
-              statusLabels[po.status] || po.status
-            ]);
-            totalBase += item.baseAmount || 0;
-            totalVat += item.vatAmount || 0;
-            totalIrpf += item.irpfAmount || 0;
-            totalAmount += item.totalAmount || 0;
-            rowNum++;
+      // Crear mapa de facturas por PO y calcular facturado por item (solo facturas con estado válido según config)
+      const invoicedByPOItem: Record<string, Record<number, number>> = {};
+      invoicesSnapshot.docs.forEach(invDoc => {
+        const invData = invDoc.data();
+        const invStatus = invData.status || "";
+        // Usar shouldRealizeInvoice para determinar si la factura cuenta
+        if (invData.poId && invStatus !== "cancelled" && invStatus !== "rejected" && shouldRealizeInvoice(invStatus, costConfig)) {
+          if (!invoicedByPOItem[invData.poId]) invoicedByPOItem[invData.poId] = {};
+          (invData.items || []).forEach((invItem: any) => {
+            const itemIndex = invItem.poItemIndex ?? -1;
+            if (itemIndex >= 0) {
+              invoicedByPOItem[invData.poId][itemIndex] = (invoicedByPOItem[invData.poId][itemIndex] || 0) + (invItem.baseAmount || 0);
+            }
           });
-        } else {
-          data.push([
-            rowNum,
-            po.displayNumber,
-            po.supplier,
-            po.description,
-            1,
-            po.description,
-            "",
-            "",
-            po.baseAmount,
-            0,
-            0,
-            po.totalAmount,
-            statusLabels[po.status] || po.status
-          ]);
-          totalBase += po.baseAmount;
-          totalAmount += po.totalAmount;
-          rowNum++;
         }
       });
 
-      data.push([]);
-      data.push(["", "", "", "", "", "", "", "TOTALES:", totalBase, totalVat, totalIrpf, totalAmount, ""]);
+      const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
+      
+      for (const docSnap of posSnapshot.docs) {
+        const poData = docSnap.data();
+        const poStatus = poData.status || "";
+        
+        // Usar shouldCommitPO para determinar si la PO cuenta
+        if (!shouldCommitPO(poStatus, costConfig)) continue;
+        
+        const poId = docSnap.id;
+        const items = poData.items || [];
+        const poInvoiced = invoicedByPOItem[poId] || {};
+        
+        items.forEach((item: any, index: number) => {
+          const itemIsClosed = item.isClosed || false;
+          const rawBaseAmount = item.baseAmount || item.amount || 0;
+          const baseInvoiced = poInvoiced[index] || 0;
+          const taxRate = item.vatRate || item.taxRate || 21;
+          const irpfRate = item.irpfRate || 0;
+          
+          // Comprometido = lo pendiente de facturar (baseAmount - invoicedAmount)
+          // Si item cerrado: comprometido = 0 (se liberó el resto)
+          const baseCommitted = itemIsClosed ? 0 : Math.max(0, rawBaseAmount - baseInvoiced);
+          const taxAmount = baseCommitted * (taxRate / 100);
+          const irpfAmount = baseCommitted * (irpfRate / 100);
+          const totalCommitted = baseCommitted + taxAmount - irpfAmount;
+          
+          // Disponible = comprometido (ya que comprometido es lo pendiente)
+          const baseAvailable = baseCommitted;
+          const totalAvailable = totalCommitted;
 
-      downloadCSV(data, `POs_Items_${projectName.replace(/\s+/g, "_")}.csv`);
-    } catch (error) {
-      console.error("Error generating report:", error);
-    } finally {
-      setGenerating(null);
-    }
+          // Determinar capítulo(s)
+          const episodeAssignment = item.episodeAssignment || "general";
+          const episodes = item.episodes || [];
+
+          // Si splitByEpisode está activo y hay episodios específicos, crear una fila por cada uno
+          if (splitByEpisode && episodeAssignment === "specific" && episodes.length > 0) {
+            episodes.forEach((ep: any) => {
+              const rawEpBaseAmount = ep.amount || 0;
+              const epPercentage = rawBaseAmount > 0 ? rawEpBaseAmount / rawBaseAmount : 0;
+              const epBaseInvoiced = baseInvoiced * epPercentage;
+              
+              // Comprometido del episodio = pendiente de facturar
+              const epBaseCommitted = itemIsClosed ? 0 : Math.max(0, rawEpBaseAmount - epBaseInvoiced);
+              const epTaxAmount = epBaseCommitted * (taxRate / 100);
+              const epIrpfAmount = epBaseCommitted * (irpfRate / 100);
+              const epTotalCommitted = epBaseCommitted + epTaxAmount - epIrpfAmount;
+              const epBaseAvailable = epBaseCommitted;
+              const epTotalAvailable = epTotalCommitted;
+              
+              const rowData: any = {
+                poNumber: poData.number || poData.displayNumber || "",
+                poDescription: poData.generalDescription || poData.description || "",
+                supplier: poData.supplier || "",
+                itemNumber: index + 1,
+                itemDescription: item.description || "",
+                episode: ep.episode.toString(),
+                accountCode: item.accountCode || item.subAccountCode?.split(".")[0] || "",
+                accountDescription: item.accountDescription || "",
+                subaccountCode: item.subAccountCode || item.subaccountCode || "",
+                subaccountDescription: item.subAccountDescription || item.subaccountDescription || "",
+                baseCommitted: epBaseCommitted,
+                totalCommitted: epTotalCommitted,
+                baseInvoiced: epBaseInvoiced,
+                baseAvailable: epBaseAvailable,
+                totalAvailable: epTotalAvailable,
+                poStatus: poData.status || "",
+                isOpen: poData.isOpen !== false ? "Abierta" : "Cerrada",
+                itemClosed: itemIsClosed ? "Sí" : "No",
+                taxRate: `${taxRate}%`,
+                irpfRate: `${irpfRate}%`,
+              };
+              
+              rows.push(columns.map(col => {
+                if (col.isBlank) return "";
+                const val = rowData[col.originalId];
+                if (typeof val === "number") return formatCurrency(val);
+                return val?.toString() || "";
+              }));
+            });
+          } else {
+            // Fila única (general o sin desglose)
+            const episodeLabel = episodeAssignment === "general" ? "0" : 
+              episodes.length === 1 ? episodes[0].episode.toString() :
+              episodes.length > 1 ? episodes.map((e: any) => e.episode).join(", ") : "0";
+            
+            const rowData: any = {
+              poNumber: poData.number || poData.displayNumber || "",
+              poDescription: poData.generalDescription || poData.description || "",
+              supplier: poData.supplier || "",
+              itemNumber: index + 1,
+              itemDescription: item.description || "",
+              episode: episodeLabel,
+              accountCode: item.accountCode || item.subAccountCode?.split(".")[0] || "",
+              accountDescription: item.accountDescription || "",
+              subaccountCode: item.subAccountCode || item.subaccountCode || "",
+              subaccountDescription: item.subAccountDescription || item.subaccountDescription || "",
+              baseCommitted: baseCommitted,
+              totalCommitted: totalCommitted,
+              baseInvoiced: baseInvoiced,
+              baseAvailable: baseAvailable,
+              totalAvailable: totalAvailable,
+              poStatus: poData.status || "",
+              isOpen: poData.isOpen !== false ? "Abierta" : "Cerrada",
+              itemClosed: itemIsClosed ? "Sí" : "No",
+              taxRate: `${taxRate}%`,
+              irpfRate: `${irpfRate}%`,
+            };
+            
+            rows.push(columns.map(col => {
+              if (col.isBlank) return "";
+              const val = rowData[col.originalId];
+              if (typeof val === "number") return formatCurrency(val);
+              return val?.toString() || "";
+            }));
+          }
+        });
+      }
+      
+      await downloadFile(rows, `POs_Items_${projectName}_${getCurrentDate()}.csv`);
+    } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
-  // ==================== COSTES POR DEPARTAMENTO ====================
-  const generateDepartmentReport = async () => {
-    setGenerating("cost_by_department");
+  const generateInvoicesReport = async (columns: SelectedColumn[]) => {
+    setGenerating("invoices");
     try {
-      const today = new Date();
-
-      // Group invoices by department
-      const byDept: Record<string, { invoices: Invoice[]; total: number }> = {};
+      const invoicesSnapshot = await getDocs(query(collection(db, `projects/${id}/invoices`), orderBy("createdAt", "desc")));
+      const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
       
-      invoices.forEach(inv => {
-        const dept = inv.department || "Sin departamento";
-        if (!byDept[dept]) byDept[dept] = { invoices: [], total: 0 };
-        byDept[dept].invoices.push(inv);
-        byDept[dept].total += inv.totalAmount;
-      });
+      invoicesSnapshot.docs.forEach((docSnap) => {
+        const data = docSnap.data();
+        const items = data.items || [];
 
-      const data: any[][] = [];
-      
-      data.push([projectName, "", "", "", "", "", "COSTES POR DEPARTAMENTO"]);
-      data.push([]);
-      data.push(["", "", "Fecha:", today]);
-      data.push([]);
-      data.push([]);
-
-      let grandTotal = 0;
-
-      Object.entries(byDept).sort((a, b) => b[1].total - a[1].total).forEach(([dept, info]) => {
-        data.push([dept.toUpperCase()]);
-        data.push(["#", "Factura", "Proveedor", "Descripción", "Fecha", "Importe"]);
+        // Determinar capítulos de los items
+        let episodeLabel = "0";
+        const allEpisodes: number[] = [];
         
-        info.invoices.forEach((inv, idx) => {
-          data.push([
-            idx + 1,
-            inv.displayNumber,
-            inv.supplier,
-            inv.description,
-            inv.invoiceDate || inv.createdAt,
-            inv.totalAmount
-          ]);
+        items.forEach((item: any) => {
+          const assignment = item.episodeAssignment || "general";
+          if (assignment === "specific" && item.episodes && item.episodes.length > 0) {
+            item.episodes.forEach((ep: any) => {
+              if (!allEpisodes.includes(ep.episode)) {
+                allEpisodes.push(ep.episode);
+              }
+            });
+          }
+        });
+
+        if (allEpisodes.length > 0) {
+          allEpisodes.sort((a, b) => a - b);
+          episodeLabel = allEpisodes.length === 1 ? allEpisodes[0].toString() : allEpisodes.join(", ");
+        }
+
+        // Si splitByEpisode, crear filas separadas por capítulo
+        if (splitByEpisode && allEpisodes.length > 1) {
+          // Calcular importe por capítulo
+          const amountByEpisode: Record<number, number> = {};
+          items.forEach((item: any) => {
+            const assignment = item.episodeAssignment || "general";
+            if (assignment === "specific" && item.episodes && item.episodes.length > 0) {
+              item.episodes.forEach((ep: any) => {
+                amountByEpisode[ep.episode] = (amountByEpisode[ep.episode] || 0) + (ep.amount || 0);
+              });
+            } else {
+              // General: se distribuye entre todos (ponemos en 0)
+              amountByEpisode[0] = (amountByEpisode[0] || 0) + (item.baseAmount || 0);
+            }
+          });
+
+          Object.entries(amountByEpisode).forEach(([epNum, amount]) => {
+            const rowData: any = {
+              number: data.number || data.displayNumber || "",
+              supplier: data.supplier || "",
+              supplierTaxId: data.supplierTaxId || "",
+              description: data.description || "",
+              poNumber: data.poNumber || "",
+              episode: epNum,
+              baseAmount: amount,
+              taxAmount: amount * 0.21, // Aproximación
+              irpfAmount: 0,
+              totalAmount: amount * 1.21,
+              status: data.status || "",
+              dueDate: formatDate(data.dueDate),
+              createdAt: formatDate(data.createdAt),
+              paidAt: formatDate(data.paidAt),
+              accountCode: data.accountCode || "",
+            };
+            
+            rows.push(columns.map(col => {
+              if (col.isBlank) return "";
+              const val = rowData[col.originalId];
+              return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
+            }));
+          });
+        } else {
+          // Obtener cuenta contable del primer item
+          const accountCode = items.length > 0 ? (items[0].subAccountCode || "") : "";
+          
+          const rowData: any = {
+            number: data.number || data.displayNumber || "",
+            supplierNumber: data.supplierNumber || "",
+            supplier: data.supplier || "",
+            supplierTaxId: data.supplierTaxId || "",
+            description: data.description || "",
+            poNumber: data.poNumber || "",
+            episode: episodeLabel,
+            accountCode: accountCode,
+            baseAmount: data.baseAmount || 0,
+            taxAmount: data.vatAmount || data.taxAmount || 0,
+            irpfAmount: data.irpfAmount || 0,
+            totalAmount: data.totalAmount || 0,
+            status: data.status || "",
+            coded: data.codedAt ? "Sí" : "No",
+            accounted: data.accounted ? "Sí" : "No",
+            invoiceDate: formatDate(data.invoiceDate),
+            dueDate: formatDate(data.dueDate),
+            createdAt: formatDate(data.createdAt),
+            paidAt: formatDate(data.paidAt),
+          };
+          
+          rows.push(columns.map(col => {
+            if (col.isBlank) return "";
+            const val = rowData[col.originalId];
+            return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
+          }));
+        }
+      });
+      
+      await downloadFile(rows, `Facturas_${projectName}_${getCurrentDate()}.csv`);
+    } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
+  };
+
+  const generateSuppliersReport = async (columns: SelectedColumn[]) => {
+    setGenerating("suppliers");
+    try {
+      const suppliersSnapshot = await getDocs(query(collection(db, `projects/${id}/suppliers`), orderBy("fiscalName", "asc")));
+      const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
+      
+      suppliersSnapshot.docs.forEach((docSnap) => {
+        const data = docSnap.data();
+        
+        const rowData: any = {
+          fiscalName: data.fiscalName || "",
+          commercialName: data.commercialName || "",
+          taxId: data.taxId || "",
+          contactName: data.contact?.name || "",
+          contactEmail: data.contact?.email || "",
+          contactPhone: data.contact?.phone || "",
+          address: data.address || "",
+          city: data.city || "",
+          postalCode: data.postalCode || "",
+          paymentMethod: data.paymentMethod || "",
+          iban: data.bankAccount || data.iban || "",
+          paymentTerms: data.paymentTerms || "",
+          totalPOs: data.totalPOs || 0,
+          totalInvoiced: data.totalInvoiced || 0,
+        };
+        
+        rows.push(columns.map(col => {
+          if (col.isBlank) return "";
+          const val = rowData[col.originalId];
+          return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
+        }));
+      });
+      
+      await downloadFile(rows, `Proveedores_${projectName}_${getCurrentDate()}.csv`);
+    } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
+  };
+
+  const generateInvoicesAccountingReport = async (columns: SelectedColumn[]) => {
+    setGenerating("invoices_accounting");
+    try {
+      const invoicesSnapshot = await getDocs(query(collection(db, `projects/${id}/invoices`), orderBy("accountedAt", "desc")));
+      const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
+      
+      // Solo facturas contabilizadas
+      const accountedInvoices = invoicesSnapshot.docs.filter(doc => doc.data().accounted === true);
+      
+      accountedInvoices.forEach((docSnap) => {
+        const data = docSnap.data();
+        const items = data.items || [];
+        
+        // Obtener cuenta contable del primer item
+        const accountCode = items.length > 0 ? (items[0].subAccountCode || "") : "";
+        
+        // Calcular tasa de IVA
+        const taxRate = data.baseAmount > 0 ? Math.round((data.vatAmount / data.baseAmount) * 100) : 21;
+        const irpfRate = data.baseAmount > 0 ? Math.round((data.irpfAmount / data.baseAmount) * 100) : 0;
+        
+        const rowData: any = {
+          accountingEntryNumber: data.accountingEntryNumber || "",
+          number: data.number || data.displayNumber || "",
+          supplierNumber: data.supplierNumber || "",
+          invoiceDate: formatDate(data.invoiceDate),
+          supplier: data.supplier || "",
+          supplierTaxId: data.supplierTaxId || "",
+          supplierIban: data.supplierIban || "",
+          description: data.description || "",
+          accountCode: accountCode,
+          baseAmount: data.baseAmount || 0,
+          taxRate: `${taxRate}%`,
+          taxAmount: data.vatAmount || 0,
+          irpfRate: `${irpfRate}%`,
+          irpfAmount: data.irpfAmount || 0,
+          totalAmount: data.totalAmount || 0,
+          dueDate: formatDate(data.dueDate),
+          status: data.status === "paid" ? "Pagada" : "Pendiente",
+          paidAt: formatDate(data.paidAt),
+          accountedAt: formatDate(data.accountedAt),
+          accountedBy: data.accountedByName || "",
+        };
+        
+        rows.push(columns.map(col => {
+          if (col.isBlank) return "";
+          const val = rowData[col.originalId];
+          return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
+        }));
+      });
+      
+      await downloadFile(rows, `Libro_Facturas_${projectName}_${getCurrentDate()}.csv`);
+    } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
+  };
+
+  const generatePaymentsReport = async (columns: SelectedColumn[]) => {
+    setGenerating("payments");
+    try {
+      const invoicesSnapshot = await getDocs(query(collection(db, `projects/${id}/invoices`), orderBy("paidAt", "desc")));
+      const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
+      
+      // Solo facturas pagadas
+      const paidInvoices = invoicesSnapshot.docs.filter(doc => doc.data().status === "paid" && doc.data().paidAt);
+      
+      let paymentCounter = 1;
+      paidInvoices.forEach((docSnap) => {
+        const data = docSnap.data();
+        
+        const rowData: any = {
+          paymentNumber: `PAG-${String(paymentCounter).padStart(4, "0")}`,
+          invoiceNumber: data.number || data.displayNumber || "",
+          supplierNumber: data.supplierNumber || "",
+          supplier: data.supplier || "",
+          supplierTaxId: data.supplierTaxId || "",
+          supplierIban: data.supplierIban || "",
+          description: data.description || "",
+          baseAmount: data.baseAmount || 0,
+          totalAmount: data.totalAmount || 0,
+          paymentMethod: data.paymentMethod || "Transferencia",
+          paidAt: formatDate(data.paidAt),
+          paidBy: data.paidByName || "",
+          accountingEntryNumber: data.accountingEntryNumber || "",
+        };
+        
+        rows.push(columns.map(col => {
+          if (col.isBlank) return "";
+          const val = rowData[col.originalId];
+          return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
+        }));
+        
+        paymentCounter++;
+      });
+      
+      await downloadFile(rows, `Pagos_${projectName}_${getCurrentDate()}.csv`);
+    } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
+  };
+
+  const generateCostReport = async (columns: SelectedColumn[]) => {
+    setGenerating("cost_report");
+    try {
+      const accountsSnapshot = await getDocs(query(collection(db, `projects/${id}/accounts`), orderBy("code", "asc")));
+      const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
+      
+      for (const accountDoc of accountsSnapshot.docs) {
+        const accountData = accountDoc.data();
+        
+        // Obtener subcuentas
+        const subAccountsSnapshot = await getDocs(query(
+          collection(db, `projects/${id}/accounts/${accountDoc.id}/subaccounts`),
+          orderBy("code", "asc")
+        ));
+        
+        // Sumar valores de todas las subcuentas
+        let totalBudgeted = 0;
+        let totalCommitted = 0;
+        let totalActual = 0;
+        
+        subAccountsSnapshot.docs.forEach((subDoc) => {
+          const subData = subDoc.data();
+          totalBudgeted += subData.budgeted || 0;
+          totalCommitted += subData.committed || 0;
+          totalActual += subData.actual || 0;
         });
         
-        data.push(["", "", "", "", "Subtotal:", info.total]);
-        data.push([]);
-        grandTotal += info.total;
-      });
+        // Obtener facturas pagadas para esta cuenta
+        const invoicesSnapshot = await getDocs(collection(db, `projects/${id}/invoices`));
+        let totalPaid = 0;
+        let totalPending = 0;
+        
+        invoicesSnapshot.docs.forEach((invDoc) => {
+          const invData = invDoc.data();
+          const items = invData.items || [];
+          items.forEach((item: any) => {
+            if (item.subAccountCode?.startsWith(accountData.code)) {
+              if (invData.status === "paid") {
+                totalPaid += item.baseAmount || 0;
+              } else if (["approved", "pending", "accounted"].includes(invData.status)) {
+                totalPending += item.baseAmount || 0;
+              }
+            }
+          });
+        });
+        
+        const available = totalBudgeted - totalCommitted;
+        const percentExecuted = totalBudgeted > 0 ? Math.round((totalActual / totalBudgeted) * 100) : 0;
+        const deviation = totalActual - totalBudgeted;
+        
+        const rowData: any = {
+          accountCode: accountData.code || "",
+          accountDescription: accountData.description || "",
+          budgeted: totalBudgeted,
+          committed: totalCommitted,
+          invoiced: totalActual,
+          paid: totalPaid,
+          pendingPayment: totalPending,
+          available: available,
+          percentExecuted: `${percentExecuted}%`,
+          deviation: deviation,
+        };
+        
+        rows.push(columns.map(col => {
+          if (col.isBlank) return "";
+          const val = rowData[col.originalId];
+          return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
+        }));
+      }
+      
+      await downloadFile(rows, `Informe_Costes_${projectName}_${getCurrentDate()}.csv`);
+    } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
+  };
 
-      data.push(["", "", "", "", "TOTAL GENERAL:", grandTotal]);
-
-      downloadCSV(data, `Costes_Departamento_${projectName.replace(/\s+/g, "_")}.csv`);
-    } catch (error) {
-      console.error("Error generating report:", error);
-    } finally {
-      setGenerating(null);
+  const generateReport = (reportType: ReportType, columns?: SelectedColumn[]) => {
+    const cols = columns || getDefaultColumns(reportType);
+    switch (reportType) {
+      case "budget": return generateBudgetReport(cols);
+      case "pos_list": return generatePOsListReport(cols);
+      case "pos_items": return generatePOsItemsReport(cols);
+      case "invoices": return generateInvoicesReport(cols);
+      case "invoices_accounting": return generateInvoicesAccountingReport(cols);
+      case "suppliers": return generateSuppliersReport(cols);
+      case "payments": return generatePaymentsReport(cols);
+      case "cost_report": return generateCostReport(cols);
     }
   };
 
-  const handleGenerateReport = (reportId: string) => {
-    switch (reportId) {
-      case "supplier": generateSupplierReport(); break;
-      case "pending_payments": generatePaymentsReport(); break;
-      case "invoices_list": generateInvoicesReport(); break;
-      case "pos_list": generatePOsReport(); break;
-      case "pos_items": generatePOsItemsReport(); break;
-      case "cost_by_department": generateDepartmentReport(); break;
+  const generateFromPreset = (preset: ReportPreset) => {
+    const cols: SelectedColumn[] = preset.columns.map((c, i) => {
+      if (c.isBlank) {
+        return { id: `blank_${i}`, originalId: "blank", label: "", isBlank: true };
+      }
+      const original = REPORT_COLUMNS[preset.reportType].find(col => col.id === c.id);
+      return { id: `${c.id}_${i}`, originalId: c.id, label: original?.label || c.id };
+    });
+    generateReport(preset.reportType, cols);
+  };
+
+  const getReportCount = (reportType: ReportType) => {
+    switch (reportType) {
+      case "budget": 
+      case "cost_report": return counts.accounts;
+      case "pos_list": 
+      case "pos_items": return counts.pos;
+      case "invoices": 
+      case "invoices_accounting":
+      case "payments": return counts.invoices;
+      case "suppliers": return counts.suppliers;
     }
   };
+
+  const reportTypes: ReportType[] = ["budget", "cost_report", "pos_list", "pos_items", "invoices", "invoices_accounting", "payments", "suppliers"];
 
   if (loading) {
     return (
       <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-        <div className="w-10 h-10 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+        <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
       </div>
     );
   }
 
-  if (!hasAccess || accessError) {
+  if (accessError || !hasAccess) {
     return (
       <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
         <div className="text-center max-w-md">
-          <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <ShieldAlert size={24} className="text-red-500" />
+          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <ShieldAlert size={28} className="text-red-500" />
           </div>
           <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
-          <p className="text-slate-500 mb-6">{accessError || "No tienes permisos"}</p>
-          <Link href={`/project/${projectId}/accounting`} className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90" style={{ backgroundColor: "#2F52E0" }}>
+          <p className="text-slate-500 mb-6">{accessError || "No tienes permisos para acceder a esta página"}</p>
+          <Link
+            href={`/project/${id}/accounting`}
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90"
+            style={{ backgroundColor: "#2F52E0" }}
+          >
             <ArrowLeft size={16} />
-            Volver
+            Volver al panel
           </Link>
         </div>
       </div>
     );
   }
 
-  const colorClasses: Record<string, { bg: string; text: string; icon: string }> = {
-    amber: { bg: "bg-amber-50", text: "text-amber-600", icon: "text-amber-500" },
-    blue: { bg: "bg-blue-50", text: "text-blue-600", icon: "text-blue-500" },
-    emerald: { bg: "bg-emerald-50", text: "text-emerald-600", icon: "text-emerald-500" },
-    violet: { bg: "bg-violet-50", text: "text-violet-600", icon: "text-violet-500" },
-    indigo: { bg: "bg-indigo-50", text: "text-indigo-600", icon: "text-indigo-500" },
-    rose: { bg: "bg-rose-50", text: "text-rose-600", icon: "text-rose-500" },
-  };
-
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
+      {/* Header */}
       <div className="mt-[4.5rem]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-slate-200 pb-6">
+          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
-              <FileSpreadsheet size={24} style={{ color: "#2F52E0" }} />
+              <FileSpreadsheet size={24} className="text-slate-600" />
               <h1 className="text-2xl font-semibold text-slate-900">Informes</h1>
             </div>
-          </div>
+            
+            {/* Format Switch */}
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-slate-500">Formato:</span>
+              <button
+                onClick={toggleExportFormat}
+                className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg"
+              >
+                <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  exportFormat === "csv" 
+                    ? "bg-white text-slate-900 shadow-sm" 
+                    : "text-slate-500 hover:text-slate-700"
+                }`}>
+                  <FileText size={14} />
+                  CSV
+                </span>
+                <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  exportFormat === "xlsx" 
+                    ? "bg-white text-slate-900 shadow-sm" 
+                    : "text-slate-500 hover:text-slate-700"
+                }`}>
+                  <FileSpreadsheet size={14} />
+                  Excel
+                </span>
+              </button>
 
-          {/* Filters */}
-          <div className="mt-6 p-4 bg-slate-50 rounded-2xl">
-            <div className="flex items-center gap-2 mb-4">
-              <Filter size={16} className="text-slate-500" />
-              <span className="text-sm font-medium text-slate-700">Filtros</span>
-            </div>
-            <div className="grid grid-cols-4 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1.5">Proveedor</label>
-                <select
-                  value={selectedSupplier}
-                  onChange={(e) => setSelectedSupplier(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900"
-                >
-                  <option value="all">Todos</option>
-                  {suppliers.map(s => (
-                    <option key={s.id} value={s.id}>{s.fiscalName}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1.5">Departamento</label>
-                <select
-                  value={selectedDepartment}
-                  onChange={(e) => setSelectedDepartment(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900"
-                >
-                  <option value="all">Todos</option>
-                  {departments.map(d => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1.5">Desde</label>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1.5">Hasta</label>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Reports Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
-            {REPORTS.map((report) => {
-              const Icon = report.icon;
-              const colors = colorClasses[report.color];
-              const isGenerating = generating === report.id;
-              
-              return (
-                <div
-                  key={report.id}
-                  className="bg-white border border-slate-200 rounded-2xl p-6 hover:border-slate-300 hover:shadow-sm transition-all"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className={`w-12 h-12 ${colors.bg} rounded-xl flex items-center justify-center`}>
-                      <Icon size={24} className={colors.icon} />
-                    </div>
-                  </div>
-                  <h3 className="text-base font-semibold text-slate-900 mb-1">{report.title}</h3>
-                  <p className="text-sm text-slate-500 mb-4">{report.description}</p>
+              {/* Toggle desglosar por capítulos */}
+              {episodesEnabled && totalEpisodes > 0 && (
+                <>
+                  <div className="w-px h-6 bg-slate-200" />
                   <button
-                    onClick={() => handleGenerateReport(report.id)}
-                    disabled={isGenerating}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                    onClick={() => setSplitByEpisode(!splitByEpisode)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      splitByEpisode 
+                        ? "bg-violet-100 text-violet-700 border border-violet-200" 
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
                   >
-                    {isGenerating ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Generando...
-                      </>
-                    ) : (
-                      <>
-                        <Download size={16} />
-                        Descargar Excel
-                      </>
-                    )}
+                    <Film size={14} />
+                    Desglosar por capítulo
                   </button>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Stats */}
-          <div className="mt-8 grid grid-cols-4 gap-4">
-            <div className="bg-slate-50 rounded-xl p-4">
-              <p className="text-2xl font-bold text-slate-900">{suppliers.length}</p>
-              <p className="text-sm text-slate-500">Proveedores</p>
-            </div>
-            <div className="bg-slate-50 rounded-xl p-4">
-              <p className="text-2xl font-bold text-slate-900">{pos.length}</p>
-              <p className="text-sm text-slate-500">Órdenes de compra</p>
-            </div>
-            <div className="bg-slate-50 rounded-xl p-4">
-              <p className="text-2xl font-bold text-slate-900">{invoices.length}</p>
-              <p className="text-sm text-slate-500">Facturas</p>
-            </div>
-            <div className="bg-slate-50 rounded-xl p-4">
-              <p className="text-2xl font-bold text-slate-900">{formatCurrency(invoices.reduce((sum, i) => sum + i.totalAmount, 0))} €</p>
-              <p className="text-sm text-slate-500">Total facturado</p>
+                </>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="space-y-2">
+          {reportTypes.map((reportType) => {
+            const info = REPORT_INFO[reportType];
+            const Icon = info.icon;
+            const isExpanded = expandedReport === reportType;
+            const reportPresets = presets.filter(p => p.reportType === reportType);
+            const count = getReportCount(reportType);
+            
+            return (
+              <div key={reportType} className="bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-all">
+                <div className="px-4 py-3 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                    <Icon size={18} className="text-slate-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium text-slate-900 text-sm">{info.title}</h3>
+                      <span className="text-xs text-slate-400">{count}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 truncate">{info.description}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => openConfig(reportType)}
+                      className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                      title="Configurar columnas"
+                    >
+                      <Settings2 size={16} />
+                    </button>
+                    <button
+                      onClick={() => generateReport(reportType)}
+                      disabled={generating !== null}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
+                    >
+                      {generating === reportType ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download size={12} />
+                          Exportar
+                        </>
+                      )}
+                    </button>
+                    {reportPresets.length > 0 && (
+                      <button
+                        onClick={() => setExpandedReport(isExpanded ? null : reportType)}
+                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                      >
+                          <ChevronDown size={18} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {isExpanded && reportPresets.length > 0 && (
+                  <div className="px-4 pb-3 pt-0">
+                    <div className="border-t border-slate-100 pt-3">
+                      <p className="text-xs text-slate-400 mb-2">Plantillas guardadas</p>
+                      <div className="space-y-1">
+                        {reportPresets.map((preset) => (
+                          <div key={preset.id} className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg group">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-slate-700 truncate">{preset.name}</p>
+                            </div>
+                            <button
+                              onClick={() => generateFromPreset(preset)}
+                              disabled={generating !== null}
+                              className="px-2 py-1 bg-white border border-slate-200 text-slate-600 rounded text-xs hover:bg-slate-50 transition-colors disabled:opacity-50"
+                            >
+                              Usar
+                            </button>
+                            <button
+                              onClick={() => deletePreset(preset.id)}
+                              className="p-1 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </main>
+
+      {/* Modal de configuración */}
+      {showConfig && configReportType && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowConfig(false)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Configurar columnas</h3>
+                <p className="text-sm text-slate-500">{REPORT_INFO[configReportType].title}</p>
+              </div>
+              <button onClick={() => setShowConfig(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1">
+              {/* Presets */}
+              {presets.filter(p => p.reportType === configReportType).length > 0 && (
+                <div className="mb-6">
+                  <p className="text-xs font-medium text-slate-500 mb-2">Cargar plantilla</p>
+                  <div className="flex flex-wrap gap-2">
+                    {presets.filter(p => p.reportType === configReportType).map((preset) => (
+                      <button
+                        key={preset.id}
+                        onClick={() => loadPreset(preset)}
+                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors"
+                      >
+                        {preset.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-6">
+                {/* Columnas seleccionadas */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Columnas del informe</p>
+                    <span className="text-xs text-slate-400">{selectedColumns.length}</span>
+                  </div>
+                  <div className="space-y-1 min-h-[200px] p-3 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
+                    {selectedColumns.map((column, index) => {
+                      const isLocked = REPORT_COLUMNS[configReportType].find(c => c.id === column.originalId)?.locked;
+                      return (
+                        <div
+                          key={column.id}
+                          draggable={!isLocked}
+                          onDragStart={() => handleDragStart(index)}
+                          onDragOver={(e) => handleDragOver(e, index)}
+                          onDrop={(e) => handleDrop(e, index)}
+                          onDragEnd={handleDragEnd}
+                          className={`flex items-center gap-2 p-2 rounded-lg transition-all ${
+                            dragOverItem === index ? "bg-slate-200 border-slate-300" : "bg-white border-slate-200"
+                          } border ${draggedItem === index ? "opacity-50" : ""} ${
+                            column.isBlank ? "border-dashed" : ""
+                          }`}
+                        >
+                          <div className={`cursor-grab ${isLocked ? "opacity-30" : ""}`}>
+                            <GripVertical size={14} className="text-slate-400" />
+                          </div>
+                          <span className={`flex-1 text-sm ${column.isBlank ? "text-slate-400 italic" : "text-slate-700"}`}>
+                            {column.label}
+                          </span>
+                          {isLocked ? (
+                            <span className="text-[10px] text-slate-400">Req.</span>
+                          ) : (
+                            <button
+                              onClick={() => removeColumn(column.id, column.originalId)}
+                              className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                            >
+                              <Minus size={12} />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                    
+                    {/* Botón añadir columna en blanco */}
+                    <button
+                      onClick={addBlankColumn}
+                      className="w-full flex items-center justify-center gap-2 p-2 mt-2 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:border-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      <Plus size={14} />
+                      <span className="text-xs font-medium">Columna vacía</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Columnas disponibles */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Disponibles</p>
+                    <span className="text-xs text-slate-400">{availableColumns.length}</span>
+                  </div>
+                  <div className="space-y-1 min-h-[200px] p-3 bg-slate-50 rounded-xl">
+                    {availableColumns.length === 0 ? (
+                      <p className="text-xs text-slate-400 text-center py-8">Todas las columnas están en uso</p>
+                    ) : (
+                      availableColumns.map((column) => (
+                        <button
+                          key={column.id}
+                          onClick={() => addColumn(column)}
+                          className="w-full flex items-center gap-2 p-2 bg-white border border-slate-200 rounded-lg hover:border-slate-300 hover:bg-slate-50 transition-colors text-left"
+                        >
+                          <Plus size={14} className="text-slate-400" />
+                          <span className="flex-1 text-sm text-slate-600">{column.label}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-400 mt-4 text-center">
+                Arrastra las columnas para reordenarlas
+              </p>
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
+              {!showSavePreset ? (
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    onClick={() => setShowConfig(false)}
+                    className="px-4 py-2.5 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => setShowSavePreset(true)}
+                    className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors"
+                  >
+                    <Save size={14} />
+                    Guardar plantilla
+                  </button>
+                  <button
+                    onClick={() => {
+                      generateReport(configReportType, selectedColumns);
+                      setShowConfig(false);
+                    }}
+                    disabled={generating !== null}
+                    className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                    style={{ backgroundColor: '#2F52E0' }}
+                  >
+                    <Download size={14} />
+                    Exportar
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <input
+                    type="text"
+                    value={newPresetName}
+                    onChange={(e) => setNewPresetName(e.target.value)}
+                    placeholder="Nombre de la plantilla"
+                    className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    autoFocus
+                    onKeyDown={(e) => e.key === "Enter" && savePreset()}
+                  />
+                  <button
+                    onClick={() => { setShowSavePreset(false); setNewPresetName(""); }}
+                    className="px-4 py-2.5 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={savePreset}
+                    disabled={!newPresetName.trim()}
+                    className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                    style={{ backgroundColor: '#2F52E0' }}
+                  >
+                    <Check size={14} />
+                    Guardar
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
