@@ -1063,21 +1063,6 @@ export default function SupplierDetailPage() {
         </div>
       </div>
 
-      {/* Mensajes */}
-      <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        {errorMessage && (
-          <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700 text-sm">
-            <AlertCircle size={18} /><span className="flex-1">{errorMessage}</span>
-            <button onClick={() => setErrorMessage("")}><X size={16} /></button>
-          </div>
-        )}
-        {successMessage && (
-          <div className="mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3 text-emerald-700 text-sm">
-            <CheckCircle size={18} /><span>{successMessage}</span>
-          </div>
-        )}
-      </div>
-
       <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
         {/* Banner de proveedor cerrado */}
         {supplierClosure && (
@@ -1629,6 +1614,23 @@ export default function SupplierDetailPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast notifications */}
+      {successMessage && (
+        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white animate-in slide-in-from-bottom-2">
+          <CheckCircle size={16} />
+          {successMessage}
+        </div>
+      )}
+      {errorMessage && (
+        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white animate-in slide-in-from-bottom-2">
+          <AlertCircle size={16} />
+          {errorMessage}
+          <button onClick={() => setErrorMessage("")} className="ml-2 hover:bg-white/20 rounded p-0.5">
+            <X size={14} />
+          </button>
         </div>
       )}
     </div>
