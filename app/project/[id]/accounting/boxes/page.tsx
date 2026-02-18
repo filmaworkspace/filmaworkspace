@@ -784,25 +784,32 @@ export default function BoxesPage() {
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-center justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
-              <Package size={24} style={{ color: "#2F52E0" }} />
+              <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20">
+                <Package size={24} className="text-white" />
+              </div>
               <div>
-                <h1 className="text-2xl font-semibold text-slate-900">Cajas</h1>
-                <p className="text-sm text-slate-500">Gestión de gastos Pleo</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-slate-400 font-medium">Filma Workspace</span>
+                  <ChevronRight size={14} className="text-slate-300" />
+                  <span className="text-2xl font-bold bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">BOX</span>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-4 text-xs text-slate-500">
-                <span><strong className="text-slate-900">{totalBoxes}</strong> cajas</span>
-                <span><strong className="text-amber-600">{openEnvelopes}</strong> sobres abiertos</span>
-                <span><strong className="text-slate-900">{formatCurrency(totalExpensesAmount)} €</strong> total</span>
-              </div>
+            <div className="flex items-center gap-4">
+              {boxes.length > 0 && (
+                <div className="flex items-center gap-4 text-xs text-slate-500 mr-2">
+                  <span><strong className="text-slate-900">{totalBoxes}</strong> cajas</span>
+                  <span><strong className="text-amber-600">{openEnvelopes}</strong> sobres abiertos</span>
+                  <span><strong className="text-slate-900">{formatCurrency(totalExpensesAmount)} €</strong> total</span>
+                </div>
+              )}
               <button
                 onClick={() => {
                   setBoxForm({ name: "", code: "", department: "" });
                   setShowCreateBoxModal(true);
                 }}
-                className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90"
-                style={{ backgroundColor: "#2F52E0" }}
+                className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90 shadow-lg shadow-orange-500/20"
+                style={{ background: "linear-gradient(135deg, #f59e0b, #f97316)" }}
               >
                 <Plus size={16} />
                 Nueva caja
@@ -896,22 +903,20 @@ export default function BoxesPage() {
               /* Vista inicial sin caja seleccionada */
               <div className="flex items-center justify-center h-96">
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <Package size={28} className="text-slate-400" />
+                  <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-orange-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Package size={28} className="text-amber-500" />
                   </div>
-                  <h3 className="text-lg font-medium text-slate-900 mb-2">Selecciona una caja</h3>
-                  <p className="text-sm text-slate-500 mb-6">o crea una nueva para empezar</p>
-                  <button
-                    onClick={() => {
-                      setBoxForm({ name: "", code: "", department: "" });
-                      setShowCreateBoxModal(true);
-                    }}
-                    className="inline-flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90"
-                    style={{ backgroundColor: "#2F52E0" }}
-                  >
-                    <Plus size={16} />
-                    Nueva caja
-                  </button>
+                  {boxes.length === 0 ? (
+                    <>
+                      <h3 className="text-lg font-medium text-slate-900 mb-2">Empieza creando tu primera caja</h3>
+                      <p className="text-sm text-slate-500">Usa el botón de arriba para crear una caja y gestionar gastos Pleo</p>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="text-lg font-medium text-slate-900 mb-2">Selecciona una caja</h3>
+                      <p className="text-sm text-slate-500">Elige una caja del panel izquierdo para ver sus sobres</p>
+                    </>
+                  )}
                 </div>
               </div>
             ) : !selectedEnvelope ? (
