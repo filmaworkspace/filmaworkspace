@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, where, Timestamp, writeBatch } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, where, Timestamp, writeBatch, setDoc } from "firebase/firestore";
 import {
   Package, Plus, Search, ChevronDown, ChevronRight, X, Check, AlertCircle, CheckCircle,
   User, Mail, Hash, Trash2, Edit, Upload, FileText, Receipt, Eye, Calendar, Building2,
@@ -161,12 +161,14 @@ export default function BoxesPage() {
 
   // Modales
   const [showCreateBoxModal, setShowCreateBoxModal] = useState(false);
+  const [showEditBoxModal, setShowEditBoxModal] = useState(false);
   const [showCreateEnvelopeModal, setShowCreateEnvelopeModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showEditExpenseModal, setShowEditExpenseModal] = useState(false);
 
   // Formularios
   const [boxForm, setBoxForm] = useState({ name: "", code: "", department: "" });
+  const [editBoxForm, setEditBoxForm] = useState({ name: "", code: "" });
   const [editingExpense, setEditingExpense] = useState<BoxExpense | null>(null);
 
   // Import
@@ -240,7 +242,6 @@ export default function BoxesPage() {
 
       const userProjectData = userProjectSnap.data();
       const hasAccountingAccess = userProjectData.permissions?.accounting || false;
-      const accountingLevel = userProjectData.accountingAccessLevel;
 
       if (!hasAccountingAccess) {
         setAccessError("No tienes permisos de contabilidad");
@@ -328,7 +329,6 @@ export default function BoxesPage() {
       return;
     }
 
-    // Verificar código único
     if (boxes.some(b => b.code.toUpperCase() === boxForm.code.toUpperCase())) {
       showToast("error", "Ya existe una caja con ese código");
       return;
@@ -360,6 +360,40 @@ export default function BoxesPage() {
     }
   };
 
+  // Editar caja
+  const handleEditBox = async () => {
+    if (!selectedBox || !editBoxForm.name.trim() || !editBoxForm.code.trim()) return;
+
+    if (boxes.some(b => b.id !== selectedBox.id && b.code.toUpperCase() === editBoxForm.code.toUpperCase())) {
+      showToast("error", "Ya existe una caja con ese código");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, `projects/${projectId}/boxes`, selectedBox.id), {
+        name: editBoxForm.name.trim(),
+        code: editBoxForm.code.toUpperCase().trim(),
+      });
+
+      const updatedBox = {
+        ...selectedBox,
+        name: editBoxForm.name.trim(),
+        code: editBoxForm.code.toUpperCase().trim(),
+      };
+      setSelectedBox(updatedBox);
+      setBoxes(prev => prev.map(b => b.id === selectedBox.id ? updatedBox : b));
+
+      showToast("success", "Caja actualizada");
+      setShowEditBoxModal(false);
+    } catch (error) {
+      console.error("Error:", error);
+      showToast("error", "Error al actualizar caja");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Crear sobre
   const handleCreateEnvelope = async () => {
     if (!selectedBox) return;
@@ -385,10 +419,16 @@ export default function BoxesPage() {
         createdByName: userName,
       });
 
-      // Incrementar contador
+      const newNextNumber = envelopeNumber + 1;
+
       await updateDoc(doc(db, `projects/${projectId}/boxes`, selectedBox.id), {
-        nextEnvelopeNumber: envelopeNumber + 1,
+        nextEnvelopeNumber: newNextNumber,
       });
+
+      // Actualizar estado local inmediatamente para evitar duplicados de número
+      const updatedBox = { ...selectedBox, nextEnvelopeNumber: newNextNumber };
+      setSelectedBox(updatedBox);
+      setBoxes(prev => prev.map(b => b.id === selectedBox.id ? updatedBox : b));
 
       showToast("success", `Sobre ${displayNumber} creado`);
       setShowCreateEnvelopeModal(false);
@@ -408,10 +448,9 @@ export default function BoxesPage() {
       reader.onload = async (e) => {
         try {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          // Importar JSZip dinámicamente
           const JSZip = (await import("jszip")).default;
           const zip = await JSZip.loadAsync(data);
-          
+
           // Leer shared strings
           const sharedStrings: string[] = [];
           const ssFile = zip.file("xl/sharedStrings.xml");
@@ -425,11 +464,11 @@ export default function BoxesPage() {
           // Leer hoja
           const sheetFile = zip.file("xl/worksheets/sheet1.xml");
           if (!sheetFile) throw new Error("No se encontró la hoja");
-          
+
           const sheetContent = await sheetFile.async("text");
           const parser = new DOMParser();
           const sheetDoc = parser.parseFromString(sheetContent, "text/xml");
-          
+
           const rows: string[][] = [];
           sheetDoc.querySelectorAll("row").forEach(row => {
             const rowData: string[] = [];
@@ -453,20 +492,20 @@ export default function BoxesPage() {
 
           const headers = rows[0];
           const expenses: any[] = [];
-          
+
           // Agrupar por RECIBO PLEO
           const groupedByReceipt: Record<string, any[]> = {};
-          
+
           for (let i = 1; i < rows.length; i++) {
             const row = rows[i];
             const record: any = {};
             headers.forEach((h, j) => {
               record[h] = row[j] || "";
             });
-            
+
             const receiptId = record["RECIBO PLEO"];
             if (!receiptId) continue;
-            
+
             if (!groupedByReceipt[receiptId]) {
               groupedByReceipt[receiptId] = [];
             }
@@ -551,33 +590,34 @@ export default function BoxesPage() {
         expenses.filter(e => e.envelopeId === selectedEnvelope.id).map(e => e.pleoReceiptId)
       );
 
+      // Copia local de proveedores para no releer Firestore en cada iteración
+      const localSuppliers = [...boxSuppliers];
+
       for (const exp of importPreview) {
         // Saltar duplicados
         if (existingReceiptIds.has(exp.pleoReceiptId)) continue;
 
         // Buscar o crear proveedor
         let supplierName = exp.supplier;
-        const existingSupplier = boxSuppliers.find(s => s.taxId === exp.supplierTaxId);
+        const existingSupplier = localSuppliers.find(s => s.taxId === exp.supplierTaxId);
         if (existingSupplier) {
           supplierName = existingSupplier.name;
         } else if (exp.supplierTaxId) {
-          // Crear nuevo proveedor
+          // Usar setDoc con merge para crear o actualizar sin errores
           const normalizedName = capitalizeSupplierName(exp.supplier);
-          await updateDoc(doc(db, `projects/${projectId}/boxSuppliers`, exp.supplierTaxId), {
-            taxId: exp.supplierTaxId,
-            name: normalizedName,
-            originalName: exp.supplier,
-            updatedAt: Timestamp.now(),
-          }).catch(() => {
-            // Si no existe, crear
-            return addDoc(collection(db, `projects/${projectId}/boxSuppliers`), {
+          await setDoc(
+            doc(db, `projects/${projectId}/boxSuppliers`, exp.supplierTaxId),
+            {
               taxId: exp.supplierTaxId,
               name: normalizedName,
               originalName: exp.supplier,
               updatedAt: Timestamp.now(),
-            });
-          });
+            },
+            { merge: true }
+          );
           supplierName = normalizedName;
+          // Añadir a la copia local para no duplicar en la misma importación
+          localSuppliers.push({ taxId: exp.supplierTaxId, name: normalizedName, originalName: exp.supplier });
         }
 
         // Determinar número
@@ -647,6 +687,11 @@ export default function BoxesPage() {
 
       await batch.commit();
 
+      // Actualizar estado local de contadores de caja
+      const updatedBox = { ...selectedBox, nextInvoiceNumber: invoiceNum, nextTicketNumber: ticketNum };
+      setSelectedBox(updatedBox);
+      setBoxes(prev => prev.map(b => b.id === selectedBox.id ? updatedBox : b));
+
       showToast("success", `${importPreview.length} gastos importados`);
       setShowImportModal(false);
       setImportFile(null);
@@ -670,7 +715,6 @@ export default function BoxesPage() {
         reviewedByName: userName,
       });
 
-      // Actualizar contador del sobre
       const envelope = envelopes.find(e => e.id === expense.envelopeId);
       if (envelope) {
         await updateDoc(doc(db, `projects/${projectId}/boxEnvelopes`, envelope.id), {
@@ -699,7 +743,6 @@ export default function BoxesPage() {
     try {
       const batch = writeBatch(db);
 
-      // Actualizar sobre
       batch.update(doc(db, `projects/${projectId}/boxEnvelopes`, envelope.id), {
         status: "closed",
         closedAt: Timestamp.now(),
@@ -707,14 +750,11 @@ export default function BoxesPage() {
         closedByName: userName,
       });
 
-      // Marcar todos los gastos como contabilizados
       for (const expense of envelopeExpenses) {
         batch.update(doc(db, `projects/${projectId}/boxExpenses`, expense.id), {
           status: "accounted",
           accountedAt: Timestamp.now(),
         });
-
-        // TODO: Actualizar realizado en presupuesto
       }
 
       await batch.commit();
@@ -886,9 +926,9 @@ export default function BoxesPage() {
                 })}
 
                 {filteredBoxes.length === 0 && (
-                  <div className="text-center py-8 text-slate-500 text-sm">
+                  <p className="text-center py-8 text-slate-400 text-sm">
                     {searchTerm ? "Sin resultados" : "No hay cajas"}
-                  </div>
+                  </p>
                 )}
               </div>
             </div>
@@ -899,22 +939,9 @@ export default function BoxesPage() {
             {!selectedBox ? (
               /* Vista inicial sin caja seleccionada */
               <div className="flex items-center justify-center h-96">
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-orange-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <Package size={28} className="text-amber-500" />
-                  </div>
-                  {boxes.length === 0 ? (
-                    <>
-                      <h3 className="text-lg font-medium text-slate-900 mb-2">Empieza creando tu primera caja</h3>
-                      <p className="text-sm text-slate-500">Usa el botón de arriba para crear una caja y gestionar gastos Pleo</p>
-                    </>
-                  ) : (
-                    <>
-                      <h3 className="text-lg font-medium text-slate-900 mb-2">Selecciona una caja</h3>
-                      <p className="text-sm text-slate-500">Elige una caja del panel izquierdo para ver sus sobres</p>
-                    </>
-                  )}
-                </div>
+                <p className="text-sm text-slate-400">
+                  {boxes.length === 0 ? "No hay cajas creadas" : "Selecciona una caja"}
+                </p>
               </div>
             ) : !selectedEnvelope ? (
               /* Vista de sobres de la caja */
@@ -924,27 +951,30 @@ export default function BoxesPage() {
                     <h2 className="text-xl font-semibold text-slate-900">{selectedBox.name}</h2>
                     <p className="text-sm text-slate-500">Código: {selectedBox.code} · {boxEnvelopes.length} sobres</p>
                   </div>
-                  <button
-                    onClick={() => setShowCreateEnvelopeModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
-                  >
-                    <Plus size={16} />
-                    Nuevo sobre
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setEditBoxForm({ name: selectedBox.name, code: selectedBox.code });
+                        setShowEditBoxModal(true);
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50"
+                    >
+                      <Edit size={14} />
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => setShowCreateEnvelopeModal(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
+                    >
+                      <Plus size={16} />
+                      Nuevo sobre
+                    </button>
+                  </div>
                 </div>
 
                 {boxEnvelopes.length === 0 ? (
-                  <div className="flex items-center justify-center h-64 border-2 border-dashed border-slate-200 rounded-2xl">
-                    <div className="text-center">
-                      <Layers size={32} className="text-slate-300 mx-auto mb-3" />
-                      <p className="text-slate-500 mb-4">No hay sobres en esta caja</p>
-                      <button
-                        onClick={() => setShowCreateEnvelopeModal(true)}
-                        className="text-sm text-slate-600 hover:text-slate-900 font-medium"
-                      >
-                        Crear primer sobre
-                      </button>
-                    </div>
+                  <div className="flex items-center justify-center h-64">
+                    <p className="text-sm text-slate-400">No hay sobres en esta caja</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -1035,19 +1065,8 @@ export default function BoxesPage() {
                 </div>
 
                 {envelopeExpenses.length === 0 ? (
-                  <div className="flex items-center justify-center h-64 border-2 border-dashed border-slate-200 rounded-2xl">
-                    <div className="text-center">
-                      <FileUp size={32} className="text-slate-300 mx-auto mb-3" />
-                      <p className="text-slate-500 mb-4">No hay gastos en este sobre</p>
-                      <button
-                        onClick={() => setShowImportModal(true)}
-                        className="inline-flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90"
-                        style={{ backgroundColor: "#2F52E0" }}
-                      >
-                        <Upload size={16} />
-                        Importar desde Pleo
-                      </button>
-                    </div>
+                  <div className="flex items-center justify-center h-64">
+                    <p className="text-sm text-slate-400">No hay gastos en este sobre</p>
                   </div>
                 ) : (
                   <div className="border border-slate-200 rounded-xl overflow-hidden">
@@ -1215,6 +1234,55 @@ export default function BoxesPage() {
                 style={{ backgroundColor: "#2F52E0" }}
               >
                 {saving ? "Creando..." : "Crear caja"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal editar caja */}
+      {showEditBoxModal && selectedBox && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowEditBoxModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-900">Editar caja</h3>
+              <button onClick={() => setShowEditBoxModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Nombre del responsable *</label>
+                <input
+                  type="text"
+                  value={editBoxForm.name}
+                  onChange={(e) => setEditBoxForm({ ...editBoxForm, name: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Código *</label>
+                <input
+                  type="text"
+                  value={editBoxForm.code}
+                  onChange={(e) => setEditBoxForm({ ...editBoxForm, code: e.target.value.toUpperCase().slice(0, 3) })}
+                  maxLength={3}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono uppercase"
+                />
+                <p className="text-xs text-slate-500 mt-1">Cambiar el código no afecta a gastos ya creados</p>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+              <button onClick={() => setShowEditBoxModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">
+                Cancelar
+              </button>
+              <button
+                onClick={handleEditBox}
+                disabled={saving || !editBoxForm.name.trim() || !editBoxForm.code.trim()}
+                className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50"
+                style={{ backgroundColor: "#2F52E0" }}
+              >
+                {saving ? "Guardando..." : "Guardar cambios"}
               </button>
             </div>
           </div>
