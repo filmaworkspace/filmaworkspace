@@ -23,6 +23,7 @@ import {
   FileSpreadsheet,
   ArrowLeftRight,
   BarChart3,
+  Package,
 } from "lucide-react";
 import { Inter } from "next/font/google";
 import { auth, db } from "@/lib/firebase";
@@ -318,8 +319,19 @@ export default function Header() {
           )}
         </nav>
 
-        {/* Right side: Environment Switcher + Profile */}
+        {/* Right side: BOX + Environment Switcher + Profile */}
         <div className="relative flex items-center gap-2">
+          {/* BOX Icon - Solo visible en sección accounting */}
+          {isAccountingSection && projectId && permissions.accounting && (
+            <Link
+              href={`/project/${projectId}/accounting/boxes`}
+              className="hidden md:flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 shadow-sm hover:shadow-md hover:scale-105 transition-all"
+              title="Cajas (BOX)"
+            >
+              <Package size={14} className="text-white" />
+            </Link>
+          )}
+
           {/* Environment Switcher - Solo visible si estamos en un proyecto y hay más de un entorno disponible */}
           {isInProjectSection && projectId && (() => {
             const availableEnvs = [
