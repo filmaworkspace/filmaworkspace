@@ -277,7 +277,7 @@ export default function BoxesPage() {
       setSubAccounts(allSubAccounts);
 
       // Cargar cajas
-      const boxesSnap = await getDocs(query(collection(db, `projects/${projectId}/box/boxes`), orderBy("name")));
+      const boxesSnap = await getDocs(query(collection(db, `projects/${projectId}/boxes`), orderBy("name")));
       const boxesData = boxesSnap.docs.map(d => ({
         id: d.id,
         ...d.data(),
@@ -286,7 +286,7 @@ export default function BoxesPage() {
       setBoxes(boxesData);
 
       // Cargar sobres
-      const envelopesSnap = await getDocs(query(collection(db, `projects/${projectId}/box/envelopes`), orderBy("createdAt", "desc")));
+      const envelopesSnap = await getDocs(query(collection(db, `projects/${projectId}/boxEnvelopes`), orderBy("createdAt", "desc")));
       const envelopesData = envelopesSnap.docs.map(d => ({
         id: d.id,
         ...d.data(),
@@ -296,7 +296,7 @@ export default function BoxesPage() {
       setEnvelopes(envelopesData);
 
       // Cargar gastos
-      const expensesSnap = await getDocs(query(collection(db, `projects/${projectId}/box/expenses`), orderBy("date", "desc")));
+      const expensesSnap = await getDocs(query(collection(db, `projects/${projectId}/boxExpenses`), orderBy("date", "desc")));
       const expensesData = expensesSnap.docs.map(d => ({
         id: d.id,
         ...d.data(),
@@ -306,7 +306,7 @@ export default function BoxesPage() {
       setExpenses(expensesData);
 
       // Cargar proveedores de caja
-      const suppliersSnap = await getDocs(collection(db, `projects/${projectId}/box/suppliers`));
+      const suppliersSnap = await getDocs(collection(db, `projects/${projectId}/boxSuppliers`));
       const suppliersData = suppliersSnap.docs.map(d => ({
         taxId: d.id,
         ...d.data(),
@@ -336,7 +336,7 @@ export default function BoxesPage() {
 
     setSaving(true);
     try {
-      await addDoc(collection(db, `projects/${projectId}/box/boxes`), {
+      await addDoc(collection(db, `projects/${projectId}/boxes`), {
         name: boxForm.name.trim(),
         code: boxForm.code.toUpperCase().trim(),
         department: boxForm.department || "",
@@ -369,7 +369,7 @@ export default function BoxesPage() {
       const envelopeNumber = selectedBox.nextEnvelopeNumber || 1;
       const displayNumber = `ENV-${selectedBox.code}-${String(envelopeNumber).padStart(3, "0")}`;
 
-      await addDoc(collection(db, `projects/${projectId}/box/envelopes`), {
+      await addDoc(collection(db, `projects/${projectId}/boxEnvelopes`), {
         boxId: selectedBox.id,
         boxCode: selectedBox.code,
         number: envelopeNumber,
@@ -386,7 +386,7 @@ export default function BoxesPage() {
       });
 
       // Incrementar contador
-      await updateDoc(doc(db, `projects/${projectId}/box/boxes`, selectedBox.id), {
+      await updateDoc(doc(db, `projects/${projectId}/boxes`, selectedBox.id), {
         nextEnvelopeNumber: envelopeNumber + 1,
       });
 
@@ -563,14 +563,14 @@ export default function BoxesPage() {
         } else if (exp.supplierTaxId) {
           // Crear nuevo proveedor
           const normalizedName = capitalizeSupplierName(exp.supplier);
-          await updateDoc(doc(db, `projects/${projectId}/box/suppliers`, exp.supplierTaxId), {
+          await updateDoc(doc(db, `projects/${projectId}/boxSuppliers`, exp.supplierTaxId), {
             taxId: exp.supplierTaxId,
             name: normalizedName,
             originalName: exp.supplier,
             updatedAt: Timestamp.now(),
           }).catch(() => {
             // Si no existe, crear
-            return addDoc(collection(db, `projects/${projectId}/box/suppliers`), {
+            return addDoc(collection(db, `projects/${projectId}/boxSuppliers`), {
               taxId: exp.supplierTaxId,
               name: normalizedName,
               originalName: exp.supplier,
@@ -595,7 +595,7 @@ export default function BoxesPage() {
           }
         }
 
-        const expenseRef = doc(collection(db, `projects/${projectId}/box/expenses`));
+        const expenseRef = doc(collection(db, `projects/${projectId}/boxExpenses`));
         batch.set(expenseRef, {
           envelopeId: selectedEnvelope.id,
           boxId: selectedBox.id,
@@ -632,7 +632,7 @@ export default function BoxesPage() {
       }
 
       // Actualizar sobre
-      batch.update(doc(db, `projects/${projectId}/box/envelopes`, selectedEnvelope.id), {
+      batch.update(doc(db, `projects/${projectId}/boxEnvelopes`, selectedEnvelope.id), {
         totalBase,
         totalVat,
         totalAmount,
@@ -640,7 +640,7 @@ export default function BoxesPage() {
       });
 
       // Actualizar contadores de caja
-      batch.update(doc(db, `projects/${projectId}/box/boxes`, selectedBox.id), {
+      batch.update(doc(db, `projects/${projectId}/boxes`, selectedBox.id), {
         nextInvoiceNumber: invoiceNum,
         nextTicketNumber: ticketNum,
       });
@@ -663,7 +663,7 @@ export default function BoxesPage() {
   // Marcar gasto como revisado
   const handleReviewExpense = async (expense: BoxExpense) => {
     try {
-      await updateDoc(doc(db, `projects/${projectId}/box/expenses`, expense.id), {
+      await updateDoc(doc(db, `projects/${projectId}/boxExpenses`, expense.id), {
         status: "reviewed",
         reviewedAt: Timestamp.now(),
         reviewedBy: userId,
@@ -673,7 +673,7 @@ export default function BoxesPage() {
       // Actualizar contador del sobre
       const envelope = envelopes.find(e => e.id === expense.envelopeId);
       if (envelope) {
-        await updateDoc(doc(db, `projects/${projectId}/box/envelopes`, envelope.id), {
+        await updateDoc(doc(db, `projects/${projectId}/boxEnvelopes`, envelope.id), {
           reviewedCount: (envelope.reviewedCount || 0) + 1,
         });
       }
@@ -700,7 +700,7 @@ export default function BoxesPage() {
       const batch = writeBatch(db);
 
       // Actualizar sobre
-      batch.update(doc(db, `projects/${projectId}/box/envelopes`, envelope.id), {
+      batch.update(doc(db, `projects/${projectId}/boxEnvelopes`, envelope.id), {
         status: "closed",
         closedAt: Timestamp.now(),
         closedBy: userId,
@@ -709,7 +709,7 @@ export default function BoxesPage() {
 
       // Marcar todos los gastos como contabilizados
       for (const expense of envelopeExpenses) {
-        batch.update(doc(db, `projects/${projectId}/box/expenses`, expense.id), {
+        batch.update(doc(db, `projects/${projectId}/boxExpenses`, expense.id), {
           status: "accounted",
           accountedAt: Timestamp.now(),
         });
