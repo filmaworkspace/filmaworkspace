@@ -784,9 +784,6 @@ export default function BoxesPage() {
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-center justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20">
-                <Package size={24} className="text-white" />
-              </div>
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-slate-400 font-medium">Filma Accounting</span>
