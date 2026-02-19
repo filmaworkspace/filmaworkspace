@@ -5,7 +5,8 @@ import {
   shouldCommitOnStatusChange, 
   shouldUncommitPO,
   shouldRealizeOnStatusChange,
-  shouldUnrealizeInvoice 
+  shouldUnrealizeInvoice,
+  shouldRealizeBoxExpense
 } from "./budgetRules";
 
 interface BudgetItem {
@@ -259,6 +260,100 @@ export async function reopenPoItem(
     committed: current.committed + amountToRecommit,
     actual: current.actual,
   }));
+}
+
+// ==================== OPERACIONES DE BOX (CAJA) ====================
+
+interface BoxExpenseItem {
+  subAccountCode: string;
+  baseAmount: number;
+}
+
+/**
+ * Realiza gastos de caja: suma directamente al "box" (sin pasar por comprometido)
+ * Los gastos de caja van directamente a realizado cuando el sobre se cierra
+ */
+export async function realizeBoxExpenses(
+  projectId: string,
+  expenses: BoxExpenseItem[]
+): Promise<void> {
+  // Agrupar por subcuenta
+  const amountsByCode: Record<string, number> = {};
+  for (const exp of expenses) {
+    if (exp.subAccountCode && exp.baseAmount > 0) {
+      amountsByCode[exp.subAccountCode] = (amountsByCode[exp.subAccountCode] || 0) + exp.baseAmount;
+    }
+  }
+  
+  // Buscar subcuentas por código y actualizar box
+  const accountsSnapshot = await getDocs(collection(db, `projects/${projectId}/accounts`));
+  
+  for (const accountDoc of accountsSnapshot.docs) {
+    const subAccountsSnapshot = await getDocs(
+      collection(db, `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`)
+    );
+    
+    for (const subDoc of subAccountsSnapshot.docs) {
+      const subData = subDoc.data();
+      const code = subData.code || "";
+      
+      if (amountsByCode[code]) {
+        const subAccountRef = doc(
+          db,
+          `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`,
+          subDoc.id
+        );
+        
+        const currentBox = subData.box || 0;
+        await updateDoc(subAccountRef, {
+          box: currentBox + amountsByCode[code],
+        });
+      }
+    }
+  }
+}
+
+/**
+ * Revierte gastos de caja (cuando se reabre un sobre cerrado)
+ */
+export async function unrealizeBoxExpenses(
+  projectId: string,
+  expenses: BoxExpenseItem[]
+): Promise<void> {
+  // Agrupar por subcuenta
+  const amountsByCode: Record<string, number> = {};
+  for (const exp of expenses) {
+    if (exp.subAccountCode && exp.baseAmount > 0) {
+      amountsByCode[exp.subAccountCode] = (amountsByCode[exp.subAccountCode] || 0) + exp.baseAmount;
+    }
+  }
+  
+  // Buscar subcuentas por código y actualizar box
+  const accountsSnapshot = await getDocs(collection(db, `projects/${projectId}/accounts`));
+  
+  for (const accountDoc of accountsSnapshot.docs) {
+    const subAccountsSnapshot = await getDocs(
+      collection(db, `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`)
+    );
+    
+    for (const subDoc of subAccountsSnapshot.docs) {
+      const subData = subDoc.data();
+      const code = subData.code || "";
+      
+      if (amountsByCode[code]) {
+        const subAccountRef = doc(
+          db,
+          `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`,
+          subDoc.id
+        );
+        
+        const currentBox = subData.box || 0;
+        await updateDoc(subAccountRef, {
+          box: Math.max(0, currentBox - amountsByCode[code]),
+        });
+      }
+    }
+  }
 }
 
 // ==================== OPERACIONES DE PO ITEMS ====================
