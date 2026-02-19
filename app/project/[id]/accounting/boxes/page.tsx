@@ -261,7 +261,10 @@ export default function BoxesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
+  const [accountSelectorExpenseId, setAccountSelectorExpenseId] = useState<string | null>(null);
+  const [accountSearchTerm, setAccountSearchTerm] = useState("");
   const departmentDropdownRef = useRef<HTMLDivElement>(null);
+  const accountSelectorRef = useRef<HTMLDivElement>(null);
 
   // ─── Utils ────────────────────────────────────────────────────────────────────
 
@@ -290,6 +293,8 @@ export default function BoxesPage() {
     const h = (e: MouseEvent) => {
       if (departmentDropdownRef.current && !departmentDropdownRef.current.contains(e.target as Node))
         setShowDepartmentDropdown(false);
+      if (accountSelectorRef.current && !accountSelectorRef.current.contains(e.target as Node))
+        setAccountSelectorExpenseId(null);
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
@@ -1434,9 +1439,45 @@ export default function BoxesPage() {
                           placeholder="Descripción (opcional)"
                           className="w-full px-2 py-1 border border-slate-100 rounded-lg text-xs text-slate-500 focus:outline-none bg-slate-50" />
                       </div>
-                      <input type="text" value={exp.subAccountCode} onChange={e => updateTE(exp.id, { subAccountCode: e.target.value })}
-                        placeholder="000000"
-                        className="px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900" />
+                      <div className="relative" ref={accountSelectorExpenseId === exp.id ? accountSelectorRef : undefined}>
+                        <button type="button"
+                          onClick={() => { setAccountSelectorExpenseId(accountSelectorExpenseId === exp.id ? null : exp.id); setAccountSearchTerm(""); }}
+                          className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono text-left focus:outline-none focus:ring-1 focus:ring-slate-900 hover:border-slate-300 truncate"
+                        >
+                          {exp.subAccountCode || <span className="text-slate-400">Cuenta</span>}
+                        </button>
+                        {accountSelectorExpenseId === exp.id && (
+                          <div className="absolute z-50 top-full left-0 mt-1 w-72 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                            <div className="p-2 border-b border-slate-100">
+                              <input type="text" value={accountSearchTerm} onChange={e => setAccountSearchTerm(e.target.value)}
+                                placeholder="Buscar cuenta..."
+                                className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-900"
+                                autoFocus />
+                            </div>
+                            <div className="max-h-48 overflow-y-auto">
+                              {subAccounts
+                                .filter(sa => !accountSearchTerm || 
+                                  sa.code.toLowerCase().includes(accountSearchTerm.toLowerCase()) ||
+                                  sa.description.toLowerCase().includes(accountSearchTerm.toLowerCase()))
+                                .slice(0, 50)
+                                .map(sa => (
+                                  <button key={sa.id} type="button"
+                                    onClick={() => { updateTE(exp.id, { subAccountCode: sa.code, subAccountDescription: sa.description }); setAccountSelectorExpenseId(null); }}
+                                    className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2 border-b border-slate-50 last:border-0"
+                                  >
+                                    <span className="font-mono text-xs text-slate-600 w-16 flex-shrink-0">{sa.code}</span>
+                                    <span className="text-xs text-slate-700 truncate">{sa.description}</span>
+                                  </button>
+                                ))}
+                              {subAccounts.filter(sa => !accountSearchTerm || 
+                                sa.code.toLowerCase().includes(accountSearchTerm.toLowerCase()) ||
+                                sa.description.toLowerCase().includes(accountSearchTerm.toLowerCase())).length === 0 && (
+                                <p className="px-3 py-4 text-xs text-slate-400 text-center">Sin resultados</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       <input type="number" value={exp.baseAmount || ""} onChange={e => updateTE(exp.id, { baseAmount: parseFloat(e.target.value) || 0 })}
                         placeholder="0.00" step="0.01"
                         className="px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-right font-mono focus:outline-none focus:ring-1 focus:ring-slate-900" />
