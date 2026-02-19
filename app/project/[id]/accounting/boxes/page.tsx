@@ -96,6 +96,15 @@ interface BoxSupplier {
   updatedAt?: Date;
 }
 
+interface SubAccount {
+  id: string;
+  code: string;
+  description: string;
+  accountId: string;
+  accountCode: string;
+  accountDescription: string;
+}
+
 // ─── Transfer interfaces ───────────────────────────────────────────────────────
 
 type TransferStatus = "draft" | "pending" | "transferred";
@@ -220,6 +229,7 @@ export default function BoxesPage() {
   const [transfers, setTransfers] = useState<BoxTransfer[]>([]);
   const [boxSuppliers, setBoxSuppliers] = useState<BoxSupplier[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
+  const [subAccounts, setSubAccounts] = useState<SubAccount[]>([]);
 
   const [selectedBox, setSelectedBox] = useState<Box | null>(null);
   const [boxView, setBoxView] = useState<BoxView>("pleo");
@@ -299,8 +309,31 @@ export default function BoxesPage() {
       if (!ups.data().permissions?.accounting) { setAccessError("No tienes permisos de contabilidad"); setLoading(false); return; }
       setHasAccess(true);
 
-      const deptSnap = await getDocs(collection(db, `projects/${projectId}/departments`));
-      setDepartments(deptSnap.docs.map(d => d.data().name || d.id));
+      // Cargar departamentos del documento del proyecto
+      const projectDoc = await getDoc(doc(db, `projects/${projectId}`));
+      if (projectDoc.exists()) {
+        setDepartments(projectDoc.data().departments || []);
+      }
+
+      // Cargar cuentas y subcuentas del presupuesto
+      const accountsSnap = await getDocs(query(collection(db, `projects/${projectId}/accounts`), orderBy("code")));
+      const allSubAccounts: SubAccount[] = [];
+      for (const accDoc of accountsSnap.docs) {
+        const accData = accDoc.data();
+        const subSnap = await getDocs(query(collection(db, `projects/${projectId}/accounts/${accDoc.id}/subaccounts`), orderBy("code")));
+        subSnap.docs.forEach(subDoc => {
+          const subData = subDoc.data();
+          allSubAccounts.push({
+            id: subDoc.id,
+            code: subData.code || "",
+            description: subData.description || "",
+            accountId: accDoc.id,
+            accountCode: accData.code || "",
+            accountDescription: accData.description || "",
+          });
+        });
+      }
+      setSubAccounts(allSubAccounts);
 
       const boxesSnap = await getDocs(query(collection(db, `projects/${projectId}/boxes`), orderBy("name")));
       setBoxes(boxesSnap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate() || new Date() })) as Box[]);
