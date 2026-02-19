@@ -158,3 +158,13 @@ export function shouldUnrealizeInvoice(
   // Solo desrealizar si antes estaba realizada
   return shouldRealizeInvoice(oldStatus, costSettings);
 }
+
+// ==================== BOX EXPENSES ====================
+
+/**
+ * Determina si un gasto de caja (BOX) debe contar como realizado
+ * Los gastos de caja se realizan cuando el sobre está cerrado (status: accounted)
+ */
+export function shouldRealizeBoxExpense(expenseStatus: string): boolean {
+  return expenseStatus === "accounted";
+}
