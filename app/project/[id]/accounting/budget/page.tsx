@@ -10,9 +10,9 @@ import { getCostSettings, shouldCommitPO, shouldRealizeInvoice, CostSettings } f
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-interface SubAccount { id: string; code: string; description: string; budgeted: number; committed: number; actual: number; accountId: string; createdAt: Date; }
+interface SubAccount { id: string; code: string; description: string; budgeted: number; committed: number; actual: number; box: number; accountId: string; createdAt: Date; }
 interface Account { id: string; code: string; description: string; subAccounts: SubAccount[]; createdAt: Date; }
-interface BudgetSummary { totalBudgeted: number; totalCommitted: number; totalActual: number; totalAvailable: number; }
+interface BudgetSummary { totalBudgeted: number; totalCommitted: number; totalActual: number; totalBox: number; totalAvailable: number; }
 
 export default function BudgetPage() {
   const params = useParams();
@@ -41,7 +41,7 @@ export default function BudgetPage() {
   });
 
   const [formData, setFormData] = useState({ code: "", description: "", budgeted: 0 });
-  const [summary, setSummary] = useState<BudgetSummary>({ totalBudgeted: 0, totalCommitted: 0, totalActual: 0, totalAvailable: 0 });
+  const [summary, setSummary] = useState<BudgetSummary>({ totalBudgeted: 0, totalCommitted: 0, totalActual: 0, totalBox: 0, totalAvailable: 0 });
 
   // Estados para el importador mejorado
   const [importStep, setImportStep] = useState<"upload" | "preview" | "importing" | "done">("upload");
@@ -138,6 +138,18 @@ export default function BudgetPage() {
         }
       });
 
+      // Cargar gastos de caja (BOX) y calcular por subcuenta
+      // Solo cuentan los gastos con status "accounted" (sobre cerrado)
+      const boxBySubaccount: Record<string, number> = {};
+      const boxExpensesSnapshot = await getDocs(collection(db, `projects/${id}/boxExpenses`));
+      boxExpensesSnapshot.docs.forEach(expDoc => {
+        const expData = expDoc.data();
+        if (expData.status === "accounted" && expData.subAccountCode) {
+          const key = expData.subAccountCode;
+          boxBySubaccount[key] = (boxBySubaccount[key] || 0) + (expData.baseAmount || 0);
+        }
+      });
+
       // Cargar cuentas y subcuentas
       const accountsRef = collection(db, `projects/${id}/accounts`);
       const accountsQuery = query(accountsRef, orderBy("code", "asc"));
@@ -158,6 +170,7 @@ export default function BudgetPage() {
               budgeted: subData.budgeted || 0,
               committed: committedBySubaccount[subCode] || 0,
               actual: actualBySubaccount[subCode] || 0,
+              box: boxBySubaccount[subCode] || 0,
               accountId: accountDoc.id,
               createdAt: subData.createdAt?.toDate() || new Date(),
             };
@@ -181,22 +194,24 @@ export default function BudgetPage() {
   };
 
   const calculateSummary = () => {
-    let totalBudgeted = 0, totalCommitted = 0, totalActual = 0;
+    let totalBudgeted = 0, totalCommitted = 0, totalActual = 0, totalBox = 0;
     accounts.forEach((account) => {
       account.subAccounts.forEach((sub) => {
         totalBudgeted += sub.budgeted || 0;
         totalCommitted += sub.committed || 0;
         totalActual += sub.actual || 0;
+        totalBox += sub.box || 0;
       });
     });
-    setSummary({ totalBudgeted, totalCommitted, totalActual, totalAvailable: totalBudgeted - totalCommitted - totalActual });
+    setSummary({ totalBudgeted, totalCommitted, totalActual, totalBox, totalAvailable: totalBudgeted - totalCommitted - totalActual - totalBox });
   };
 
   const getAccountTotals = (account: Account) => {
     const budgeted = account.subAccounts.reduce((sum, sub) => sum + (sub.budgeted || 0), 0);
     const committed = account.subAccounts.reduce((sum, sub) => sum + (sub.committed || 0), 0);
     const actual = account.subAccounts.reduce((sum, sub) => sum + (sub.actual || 0), 0);
-    return { budgeted, committed, actual, available: budgeted - committed - actual, executed: committed + actual };
+    const box = account.subAccounts.reduce((sum, sub) => sum + (sub.box || 0), 0);
+    return { budgeted, committed, actual, box, available: budgeted - committed - actual - box, executed: committed + actual + box };
   };
 
   const toggleAccount = (accountId: string) => {
@@ -487,7 +502,7 @@ export default function BudgetPage() {
     return "bg-emerald-500";
   };
 
-  const totalExecuted = summary.totalCommitted + summary.totalActual;
+  const totalExecuted = summary.totalCommitted + summary.totalActual + summary.totalBox;
   const totalExecutionPercent = summary.totalBudgeted > 0 ? (totalExecuted / summary.totalBudgeted) * 100 : 0;
 
   if (loading) {
@@ -600,6 +615,7 @@ export default function BudgetPage() {
                   <th className="text-right px-2 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider min-w-[100px]">Presupuesto</th>
                   <th className="text-right px-2 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider min-w-[100px]">Comprometido</th>
                   <th className="text-right px-2 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider min-w-[100px]">Realizado</th>
+                  <th className="text-right px-2 py-2.5 text-[10px] font-semibold text-amber-600 uppercase tracking-wider min-w-[80px]">Box</th>
                   <th className="text-right px-2 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider min-w-[100px]">Disponible</th>
                   <th className="text-center px-2 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider min-w-[80px]">% Ejec.</th>
                   <th className="text-right px-4 py-2.5 min-w-[90px]"></th>
@@ -626,6 +642,7 @@ export default function BudgetPage() {
                         <td className="px-2 py-2 text-right font-bold text-slate-900 tabular-nums text-xs">{formatCurrency(totals.budgeted)}</td>
                         <td className="px-2 py-2 text-right font-bold text-slate-700 tabular-nums text-xs">{formatCurrency(totals.committed)}</td>
                         <td className="px-2 py-2 text-right font-bold text-slate-700 tabular-nums text-xs">{formatCurrency(totals.actual)}</td>
+                        <td className="px-2 py-2 text-right font-bold text-amber-600 tabular-nums text-xs">{formatCurrency(totals.box)}</td>
                         <td className="px-2 py-2 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <span className={`w-1.5 h-1.5 rounded-full ${status.color}`}></span>
@@ -651,8 +668,8 @@ export default function BudgetPage() {
 
                       {/* SubAccount Rows */}
                       {isExpanded && account.subAccounts.map((subAccount, subIndex) => {
-                        const available = subAccount.budgeted - subAccount.committed - subAccount.actual;
-                        const executed = subAccount.committed + subAccount.actual;
+                        const available = subAccount.budgeted - subAccount.committed - subAccount.actual - subAccount.box;
+                        const executed = subAccount.committed + subAccount.actual + subAccount.box;
                         const subExecPercent = getExecutionPercent(executed, subAccount.budgeted);
                         const subStatus = getStatusIndicator(available, subAccount.budgeted);
                         const isLast = subIndex === account.subAccounts.length - 1;
@@ -669,6 +686,7 @@ export default function BudgetPage() {
                             <td className="px-2 py-1.5 text-right text-slate-900 tabular-nums text-xs">{formatCurrency(subAccount.budgeted)}</td>
                             <td className="px-2 py-1.5 text-right text-slate-600 tabular-nums text-xs">{formatCurrency(subAccount.committed)}</td>
                             <td className="px-2 py-1.5 text-right text-slate-600 tabular-nums text-xs">{formatCurrency(subAccount.actual)}</td>
+                            <td className="px-2 py-1.5 text-right text-amber-600 tabular-nums text-xs">{subAccount.box > 0 ? formatCurrency(subAccount.box) : "-"}</td>
                             <td className="px-2 py-1.5 text-right">
                               <div className="flex items-center justify-end gap-1.5">
                                 <span className={`w-1.5 h-1.5 rounded-full ${subStatus.color}`}></span>
@@ -703,6 +721,7 @@ export default function BudgetPage() {
                   <td className="px-2 py-3 text-right font-bold tabular-nums text-xs">{formatCurrency(summary.totalBudgeted)}</td>
                   <td className="px-2 py-3 text-right font-bold tabular-nums text-xs">{formatCurrency(summary.totalCommitted)}</td>
                   <td className="px-2 py-3 text-right font-bold tabular-nums text-xs">{formatCurrency(summary.totalActual)}</td>
+                  <td className="px-2 py-3 text-right font-bold tabular-nums text-xs text-amber-400">{formatCurrency(summary.totalBox)}</td>
                   <td className="px-2 py-3 text-right font-bold tabular-nums text-xs">{formatCurrency(summary.totalAvailable)}</td>
                   <td className="px-2 py-3 text-center font-bold text-xs">{totalExecutionPercent.toFixed(1)}%</td>
                   <td className="px-4 py-3"></td>
