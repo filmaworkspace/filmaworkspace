@@ -187,6 +187,7 @@ export default function BoxesPage() {
   const [accountSearchTerm, setAccountSearchTerm] = useState("");
   const [accountSelectorPos, setAccountSelectorPos] = useState<{ top: number; left: number } | null>(null);
   const [editingExpenseIndex, setEditingExpenseIndex] = useState<number | null>(null);
+  const [showTypeDropdown, setShowTypeDropdown] = useState<number | null>(null);
   const departmentDropdownRef = useRef<HTMLDivElement>(null);
   const expenseDepartmentDropdownRef = useRef<HTMLDivElement>(null);
   const accountSelectorRef = useRef<HTMLDivElement>(null);
@@ -1229,12 +1230,19 @@ export default function BoxesPage() {
                         )}
                       </div>
                       <div className="grid grid-cols-6 gap-3">
-                        <div>
+                        <div className="relative">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
-                          <select value={exp.type} onChange={e => updateExpenseInList(idx, "type", e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900">
-                            <option value="ticket">Ticket</option>
-                            <option value="invoice">Factura</option>
-                          </select>
+                          <button type="button" onClick={() => setShowTypeDropdown(showTypeDropdown === idx ? null : idx)}
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-left text-sm flex items-center justify-between hover:border-slate-300">
+                            <span className="text-slate-900">{exp.type === "ticket" ? "Ticket" : "Factura"}</span>
+                            <ChevronDown size={14} className="text-slate-400" />
+                          </button>
+                          {showTypeDropdown === idx && (
+                            <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg py-1">
+                              <button type="button" onClick={() => { updateExpenseInList(idx, "type", "ticket"); setShowTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50">Ticket</button>
+                              <button type="button" onClick={() => { updateExpenseInList(idx, "type", "invoice"); setShowTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50">Factura</button>
+                            </div>
+                          )}
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label>
