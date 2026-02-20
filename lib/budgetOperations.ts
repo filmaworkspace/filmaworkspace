@@ -270,22 +270,13 @@ interface BoxExpenseItem {
 }
 
 /**
- * Realiza gastos de caja: suma directamente al "box" (sin pasar por comprometido)
- * Los gastos de caja van directamente a realizado cuando el sobre se cierra
+ * Busca subcuentas por código y actualiza el campo box
  */
-export async function realizeBoxExpenses(
+async function updateBoxByCode(
   projectId: string,
-  expenses: BoxExpenseItem[]
+  amountsByCode: Record<string, number>,
+  operation: "add" | "subtract"
 ): Promise<void> {
-  // Agrupar por subcuenta
-  const amountsByCode: Record<string, number> = {};
-  for (const exp of expenses) {
-    if (exp.subAccountCode && exp.baseAmount > 0) {
-      amountsByCode[exp.subAccountCode] = (amountsByCode[exp.subAccountCode] || 0) + exp.baseAmount;
-    }
-  }
-  
-  // Buscar subcuentas por código y actualizar box
   const accountsSnapshot = await getDocs(collection(db, `projects/${projectId}/accounts`));
   
   for (const accountDoc of accountsSnapshot.docs) {
@@ -305,12 +296,32 @@ export async function realizeBoxExpenses(
         );
         
         const currentBox = subData.box || 0;
-        await updateDoc(subAccountRef, {
-          box: currentBox + amountsByCode[code],
-        });
+        const newBox = operation === "add" 
+          ? currentBox + amountsByCode[code]
+          : Math.max(0, currentBox - amountsByCode[code]);
+          
+        await updateDoc(subAccountRef, { box: newBox });
       }
     }
   }
+}
+
+/**
+ * Realiza gastos de caja: suma directamente al "box" (sin pasar por comprometido)
+ * Los gastos de caja van directamente a realizado cuando el sobre se cierra
+ */
+export async function realizeBoxExpenses(
+  projectId: string,
+  expenses: BoxExpenseItem[]
+): Promise<void> {
+  const amountsByCode: Record<string, number> = {};
+  for (const exp of expenses) {
+    if (exp.subAccountCode && exp.baseAmount > 0) {
+      amountsByCode[exp.subAccountCode] = (amountsByCode[exp.subAccountCode] || 0) + exp.baseAmount;
+    }
+  }
+  
+  await updateBoxByCode(projectId, amountsByCode, "add");
 }
 
 /**
@@ -320,7 +331,6 @@ export async function unrealizeBoxExpenses(
   projectId: string,
   expenses: BoxExpenseItem[]
 ): Promise<void> {
-  // Agrupar por subcuenta
   const amountsByCode: Record<string, number> = {};
   for (const exp of expenses) {
     if (exp.subAccountCode && exp.baseAmount > 0) {
@@ -328,32 +338,113 @@ export async function unrealizeBoxExpenses(
     }
   }
   
-  // Buscar subcuentas por código y actualizar box
-  const accountsSnapshot = await getDocs(collection(db, `projects/${projectId}/accounts`));
+  await updateBoxByCode(projectId, amountsByCode, "subtract");
+}
+
+// ==================== OPERACIONES DE SOBRES DE TARJETA ====================
+
+/**
+ * Realiza un sobre de tarjeta completo
+ * Suma todos los gastos del sobre al campo "box" de cada subcuenta
+ */
+export async function realizeCardEnvelope(
+  projectId: string,
+  envelopeId: string
+): Promise<void> {
+  const expensesSnapshot = await getDocs(
+    collection(db, `projects/${projectId}/cardExpenses`)
+  );
   
-  for (const accountDoc of accountsSnapshot.docs) {
-    const subAccountsSnapshot = await getDocs(
-      collection(db, `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`)
-    );
-    
-    for (const subDoc of subAccountsSnapshot.docs) {
-      const subData = subDoc.data();
-      const code = subData.code || "";
-      
-      if (amountsByCode[code]) {
-        const subAccountRef = doc(
-          db,
-          `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`,
-          subDoc.id
-        );
-        
-        const currentBox = subData.box || 0;
-        await updateDoc(subAccountRef, {
-          box: Math.max(0, currentBox - amountsByCode[code]),
-        });
-      }
+  const expenses: BoxExpenseItem[] = [];
+  expensesSnapshot.docs.forEach(expDoc => {
+    const expData = expDoc.data();
+    if (expData.envelopeId === envelopeId && expData.subAccountCode) {
+      expenses.push({
+        subAccountCode: expData.subAccountCode,
+        baseAmount: expData.baseAmount || 0,
+      });
     }
-  }
+  });
+  
+  await realizeBoxExpenses(projectId, expenses);
+}
+
+/**
+ * Revierte un sobre de tarjeta (cuando se rechaza o reabre)
+ */
+export async function unrealizeCardEnvelope(
+  projectId: string,
+  envelopeId: string
+): Promise<void> {
+  const expensesSnapshot = await getDocs(
+    collection(db, `projects/${projectId}/cardExpenses`)
+  );
+  
+  const expenses: BoxExpenseItem[] = [];
+  expensesSnapshot.docs.forEach(expDoc => {
+    const expData = expDoc.data();
+    if (expData.envelopeId === envelopeId && expData.subAccountCode) {
+      expenses.push({
+        subAccountCode: expData.subAccountCode,
+        baseAmount: expData.baseAmount || 0,
+      });
+    }
+  });
+  
+  await unrealizeBoxExpenses(projectId, expenses);
+}
+
+// ==================== OPERACIONES DE SOBRES DE TRANSFERENCIA ====================
+
+/**
+ * Realiza un sobre de transferencia completo
+ * Suma todos los gastos del sobre al campo "box" de cada subcuenta
+ */
+export async function realizeTransferEnvelope(
+  projectId: string,
+  envelopeId: string
+): Promise<void> {
+  const expensesSnapshot = await getDocs(
+    collection(db, `projects/${projectId}/transferExpenses`)
+  );
+  
+  const expenses: BoxExpenseItem[] = [];
+  expensesSnapshot.docs.forEach(expDoc => {
+    const expData = expDoc.data();
+    if (expData.envelopeId === envelopeId && expData.subAccountCode) {
+      expenses.push({
+        subAccountCode: expData.subAccountCode,
+        baseAmount: expData.baseAmount || 0,
+      });
+    }
+  });
+  
+  await realizeBoxExpenses(projectId, expenses);
+}
+
+/**
+ * Revierte un sobre de transferencia (cuando se rechaza)
+ */
+export async function unrealizeTransferEnvelope(
+  projectId: string,
+  envelopeId: string
+): Promise<void> {
+  const expensesSnapshot = await getDocs(
+    collection(db, `projects/${projectId}/transferExpenses`)
+  );
+  
+  const expenses: BoxExpenseItem[] = [];
+  expensesSnapshot.docs.forEach(expDoc => {
+    const expData = expDoc.data();
+    if (expData.envelopeId === envelopeId && expData.subAccountCode) {
+      expenses.push({
+        subAccountCode: expData.subAccountCode,
+        baseAmount: expData.baseAmount || 0,
+      });
+    }
+  });
+  
+  await unrealizeBoxExpenses(projectId, expenses);
 }
 
 // ==================== OPERACIONES DE PO ITEMS ====================
