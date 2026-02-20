@@ -256,9 +256,10 @@ export default function AccountingConfigPage() {
   });
   
   // Tab de aprobaciones (PO vs Invoice)
-  const [activeTab, setActiveTab] = useState<"po" | "invoice">("po");
+  const [activeTab, setActiveTab] = useState<"po" | "invoice" | "box">("po");
   const [poApprovals, setPoApprovals] = useState<ApprovalStep[]>([]);
   const [invoiceApprovals, setInvoiceApprovals] = useState<ApprovalStep[]>([]);
+  const [boxApprovals, setBoxApprovals] = useState<ApprovalStep[]>([]);
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
   
   // Permisos
@@ -375,6 +376,7 @@ export default function AccountingConfigPage() {
           }));
         setPoApprovals(migrateSteps(c.poApprovals || []));
         setInvoiceApprovals(migrateSteps(c.invoiceApprovals || []));
+        setBoxApprovals(migrateSteps(c.boxApprovals || []));
         
         // Guardar info de auditoría
         if (c.updatedAt && c.updatedBy) {
@@ -469,8 +471,8 @@ export default function AccountingConfigPage() {
     }
   };
 
-  const addApprovalStep = (type: "po" | "invoice", withThreshold: boolean = false) => {
-    const current = type === "po" ? poApprovals : invoiceApprovals;
+  const addApprovalStep = (type: "po" | "invoice" | "box", withThreshold: boolean = false) => {
+    const current = type === "po" ? poApprovals : type === "invoice" ? invoiceApprovals : boxApprovals;
     const newStep: ApprovalStep = {
       id: `step-${Date.now()}`,
       order: current.length + 1,
@@ -482,26 +484,29 @@ export default function AccountingConfigPage() {
       amountCondition: "above",
     };
     if (type === "po") setPoApprovals([...current, newStep]);
-    else setInvoiceApprovals([...current, newStep]);
+    else if (type === "invoice") setInvoiceApprovals([...current, newStep]);
+    else setBoxApprovals([...current, newStep]);
     setExpandedSteps(new Set([...expandedSteps, newStep.id]));
   };
 
-  const removeApprovalStep = (type: "po" | "invoice", stepId: string) => {
-    const current = type === "po" ? poApprovals : invoiceApprovals;
+  const removeApprovalStep = (type: "po" | "invoice" | "box", stepId: string) => {
+    const current = type === "po" ? poApprovals : type === "invoice" ? invoiceApprovals : boxApprovals;
     const reordered = current.filter((s) => s.id !== stepId).map((s, i) => ({ ...s, order: i + 1 }));
     if (type === "po") setPoApprovals(reordered);
-    else setInvoiceApprovals(reordered);
+    else if (type === "invoice") setInvoiceApprovals(reordered);
+    else setBoxApprovals(reordered);
   };
 
-  const moveStep = (type: "po" | "invoice", stepId: string, direction: "up" | "down") => {
-    const current = type === "po" ? [...poApprovals] : [...invoiceApprovals];
+  const moveStep = (type: "po" | "invoice" | "box", stepId: string, direction: "up" | "down") => {
+    const current = type === "po" ? [...poApprovals] : type === "invoice" ? [...invoiceApprovals] : [...boxApprovals];
     const index = current.findIndex((s) => s.id === stepId);
     if ((direction === "up" && index <= 0) || (direction === "down" && index >= current.length - 1)) return;
     const swapIndex = direction === "up" ? index - 1 : index + 1;
     [current[index], current[swapIndex]] = [current[swapIndex], current[index]];
     const reordered = current.map((s, i) => ({ ...s, order: i + 1 }));
     if (type === "po") setPoApprovals(reordered);
-    else setInvoiceApprovals(reordered);
+    else if (type === "invoice") setInvoiceApprovals(reordered);
+    else setBoxApprovals(reordered);
   };
 
   // Funciones de configuración del proyecto
@@ -640,8 +645,8 @@ export default function AccountingConfigPage() {
     setBankAccountForm({ ...bankAccountForm, iban: formatIBAN(clean) });
   };
 
-  const updateStep = (type: "po" | "invoice", stepId: string, field: keyof ApprovalStep, value: any) => {
-    const current = type === "po" ? [...poApprovals] : [...invoiceApprovals];
+  const updateStep = (type: "po" | "invoice" | "box", stepId: string, field: keyof ApprovalStep, value: any) => {
+    const current = type === "po" ? [...poApprovals] : type === "invoice" ? [...invoiceApprovals] : [...boxApprovals];
     const idx = current.findIndex((s) => s.id === stepId);
     if (idx === -1) return;
     current[idx] = { ...current[idx], [field]: value };
@@ -659,11 +664,12 @@ export default function AccountingConfigPage() {
       current[idx].amountThresholdMax = undefined;
     }
     if (type === "po") setPoApprovals(current);
-    else setInvoiceApprovals(current);
+    else if (type === "invoice") setInvoiceApprovals(current);
+    else setBoxApprovals(current);
   };
 
-  const toggleApprover = (type: "po" | "invoice", stepId: string, approverId: string) => {
-    const current = type === "po" ? [...poApprovals] : [...invoiceApprovals];
+  const toggleApprover = (type: "po" | "invoice" | "box", stepId: string, approverId: string) => {
+    const current = type === "po" ? [...poApprovals] : type === "invoice" ? [...invoiceApprovals] : [...boxApprovals];
     const idx = current.findIndex((s) => s.id === stepId);
     if (idx === -1) return;
     const approvers = current[idx].approvers || [];
@@ -674,11 +680,12 @@ export default function AccountingConfigPage() {
         : [...approvers, approverId],
     };
     if (type === "po") setPoApprovals(current);
-    else setInvoiceApprovals(current);
+    else if (type === "invoice") setInvoiceApprovals(current);
+    else setBoxApprovals(current);
   };
 
-  const toggleRole = (type: "po" | "invoice", stepId: string, role: string) => {
-    const current = type === "po" ? [...poApprovals] : [...invoiceApprovals];
+  const toggleRole = (type: "po" | "invoice" | "box", stepId: string, role: string) => {
+    const current = type === "po" ? [...poApprovals] : type === "invoice" ? [...invoiceApprovals] : [...boxApprovals];
     const idx = current.findIndex((s) => s.id === stepId);
     if (idx === -1) return;
     const roles = current[idx].roles || [];
@@ -687,7 +694,8 @@ export default function AccountingConfigPage() {
       roles: roles.includes(role) ? roles.filter((r) => r !== role) : [...roles, role],
     };
     if (type === "po") setPoApprovals(current);
-    else setInvoiceApprovals(current);
+    else if (type === "invoice") setInvoiceApprovals(current);
+    else setBoxApprovals(current);
   };
 
   const cleanApprovalSteps = (steps: ApprovalStep[]): any[] =>
@@ -730,6 +738,7 @@ export default function AccountingConfigPage() {
       await setDoc(doc(db, `projects/${id}/config/approvals`), {
         poApprovals: cleanApprovalSteps(poApprovals),
         invoiceApprovals: cleanApprovalSteps(invoiceApprovals),
+        boxApprovals: cleanApprovalSteps(boxApprovals),
         updatedAt: now,
         updatedBy: userId,
         updatedByName: currentUserName,
@@ -835,8 +844,8 @@ export default function AccountingConfigPage() {
     );
   };
 
-  const renderApprovalStep = (step: ApprovalStep, type: "po" | "invoice", index: number) => {
-    const currentSteps = type === "po" ? poApprovals : invoiceApprovals;
+  const renderApprovalStep = (step: ApprovalStep, type: "po" | "invoice" | "box", index: number) => {
+    const currentSteps = type === "po" ? poApprovals : type === "invoice" ? invoiceApprovals : boxApprovals;
     const isExpanded = expandedSteps.has(step.id);
     const Icon = APPROVER_TYPE_ICONS[step.approverType] || Users;
 
@@ -1580,7 +1589,7 @@ export default function AccountingConfigPage() {
   // Render de la sección de aprobaciones
   const renderApprovalsSection = () => (
     <div className="space-y-6">
-      {/* Tabs PO/Invoice */}
+      {/* Tabs PO/Invoice/BOX */}
       <div className="flex gap-1 border-b border-slate-200">
         <button
           onClick={() => setActiveTab("po")}
@@ -1611,6 +1620,22 @@ export default function AccountingConfigPage() {
           {invoiceApprovals.length > 0 && (
             <span className="px-2 py-0.5 rounded-lg text-xs bg-slate-100 text-slate-600">
               {invoiceApprovals.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab("box")}
+          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "box"
+              ? "border-slate-900 text-slate-900"
+              : "border-transparent text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          <Layers size={16} />
+          BOX (Sobres)
+          {boxApprovals.length > 0 && (
+            <span className="px-2 py-0.5 rounded-lg text-xs bg-slate-100 text-slate-600">
+              {boxApprovals.length}
             </span>
           )}
         </button>
@@ -1647,7 +1672,7 @@ export default function AccountingConfigPage() {
               </button>
             </div>
           </>
-        ) : (
+        ) : activeTab === "invoice" ? (
           <>
             {invoiceApprovals.length === 0 ? (
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center">
@@ -1669,6 +1694,48 @@ export default function AccountingConfigPage() {
               </button>
               <button
                 onClick={() => addApprovalStep("invoice", true)}
+                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-amber-300 rounded-2xl hover:border-amber-400 hover:bg-amber-50 text-amber-600 hover:text-amber-700 transition-colors text-sm"
+              >
+                <DollarSign size={18} />
+                Añadir nivel por importe
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <Layers size={20} className="text-amber-600 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-amber-900">Aprobación de sobres BOX</p>
+                  <p className="text-xs text-amber-700 mt-1">
+                    Los sobres de tarjeta y transferencia pueden requerir aprobación antes de cerrarse.
+                    Se muestra un resumen de los gastos con el total del sobre.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {boxApprovals.length === 0 ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center">
+                <AlertCircle size={28} className="text-amber-600 mx-auto mb-3" />
+                <p className="text-amber-800 font-medium">Sin niveles de aprobación</p>
+                <p className="text-amber-700 text-sm mt-1">Los sobres se cerrarán sin aprobación</p>
+              </div>
+            ) : (
+              boxApprovals.map((step, i) => renderApprovalStep(step, "box", i))
+            )}
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <button
+                onClick={() => addApprovalStep("box", false)}
+                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-slate-300 rounded-2xl hover:border-slate-400 hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors text-sm"
+              >
+                <Plus size={18} />
+                Añadir nivel de aprobación
+              </button>
+              <button
+                onClick={() => addApprovalStep("box", true)}
                 className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-amber-300 rounded-2xl hover:border-amber-400 hover:bg-amber-50 text-amber-600 hover:text-amber-700 transition-colors text-sm"
               >
                 <DollarSign size={18} />
