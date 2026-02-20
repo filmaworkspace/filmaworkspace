@@ -168,3 +168,39 @@ export function shouldUnrealizeInvoice(
 export function shouldRealizeBoxExpense(expenseStatus: string): boolean {
   return expenseStatus === "accounted";
 }
+
+// ==================== CARD ENVELOPES (SOBRES DE TARJETA) ====================
+
+/**
+ * Determina si un sobre de tarjeta debe afectar al presupuesto
+ * Solo cuando el sobre está cerrado (closed) y aprobado
+ */
+export function shouldRealizeCardEnvelope(envelopeStatus: string): boolean {
+  return envelopeStatus === "closed";
+}
+
+/**
+ * Determina si un sobre de tarjeta necesita aprobación
+ * Los sobres en estado "pending_approval" requieren aprobación
+ */
+export function cardEnvelopeNeedsApproval(envelopeStatus: string): boolean {
+  return envelopeStatus === "pending_approval";
+}
+
+// ==================== TRANSFER ENVELOPES (SOBRES DE TRANSFERENCIA) ====================
+
+/**
+ * Determina si un sobre de transferencia debe afectar al presupuesto
+ * Solo cuando el sobre está transferido
+ */
+export function shouldRealizeTransferEnvelope(envelopeStatus: string): boolean {
+  return envelopeStatus === "transferred";
+}
+
+/**
+ * Determina si un sobre de transferencia necesita aprobación
+ * Los sobres en estado "pending" (enviados) requieren aprobación
+ */
+export function transferEnvelopeNeedsApproval(envelopeStatus: string): boolean {
+  return envelopeStatus === "pending";
+}
