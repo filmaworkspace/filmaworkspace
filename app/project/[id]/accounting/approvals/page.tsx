@@ -7,7 +7,7 @@ import {
   Clock, User, Calendar, Building2, Eye, Check, X, AlertTriangle,
   MessageSquare, History, TrendingUp, DollarSign, Shield, FileCheck, Zap,
   ChevronDown, ChevronUp, ExternalLink, Send, Info, Flame, Award, Target,
-  PieChart, HelpCircle, Link as LinkIcon, ClipboardCheck, Layers,
+  PieChart, HelpCircle, Link as LinkIcon, ClipboardCheck, Layers, CreditCard, Banknote,
 } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebase";
@@ -22,7 +22,8 @@ interface TimelineEvent { id: string; type: "created" | "approved" | "rejected" 
 interface AutoCheck { id: string; label: string; status: "pass" | "warning" | "fail" | "info"; message: string; details?: string; }
 interface POComparison { poNumber: string; poBaseAmount: number; invoicedBefore: number; thisInvoice: number; remaining: number; percentageUsed: number; itemDiscrepancies: { description: string; poAmount: number; invoiceAmount: number; difference: number; }[]; }
 interface SupplierStats { totalPOs: number; totalInvoices: number; pendingAmount: number; avgApprovalTime: number; lastTransaction: Date | null; }
-interface PendingApproval { id: string; type: "po" | "invoice"; documentId: string; documentNumber: string; displayNumber?: string; projectId: string; projectName: string; supplier: string; supplierId?: string; amount: number; baseAmount: number; description: string; createdAt: Date; createdBy: string; createdByName: string; currentApprovalStep: number; approvalSteps: ApprovalStepStatus[]; attachmentUrl?: string; attachmentFileName?: string; items?: any[]; department?: string; poType?: string; currency?: string; poId?: string; poNumber?: string; timeline: TimelineEvent[]; autoChecks: AutoCheck[]; poComparison?: POComparison; supplierStats?: SupplierStats; daysWaiting: number; isUrgent: boolean; budgetImpact?: { accountCode: string; accountName: string; budgeted: number; committed: number; actual: number; available: number; afterApproval: number; committedAfter?: number; actualAfter?: number; }[]; }
+interface BoxExpensePreview { id: string; supplier: string; subAccountCode: string; baseAmount: number; vatAmount: number; totalAmount: number; date?: string; personName?: string; }
+interface PendingApproval { id: string; type: "po" | "invoice" | "box"; documentId: string; documentNumber: string; displayNumber?: string; projectId: string; projectName: string; supplier: string; supplierId?: string; amount: number; baseAmount: number; description: string; createdAt: Date; createdBy: string; createdByName: string; currentApprovalStep: number; approvalSteps: ApprovalStepStatus[]; attachmentUrl?: string; attachmentFileName?: string; items?: any[]; department?: string; poType?: string; currency?: string; poId?: string; poNumber?: string; timeline: TimelineEvent[]; autoChecks: AutoCheck[]; poComparison?: POComparison; supplierStats?: SupplierStats; daysWaiting: number; isUrgent: boolean; budgetImpact?: { accountCode: string; accountName: string; budgeted: number; committed: number; actual: number; available: number; afterApproval: number; committedAfter?: number; actualAfter?: number; }[]; boxType?: "card" | "transfer"; boxExpenses?: BoxExpensePreview[]; expenseCount?: number; cardName?: string; paymentDate?: string; }
 interface UserStats { approvedToday: number; approvedThisWeek: number; approvedThisMonth: number; avgResponseTime: number; pendingCount: number; }
 
 export default function ApprovalsPage() {
@@ -39,7 +40,7 @@ export default function ApprovalsPage() {
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
   const [filteredApprovals, setFilteredApprovals] = useState<PendingApproval[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [typeFilter, setTypeFilter] = useState<"all" | "po" | "invoice">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "po" | "invoice" | "box">("all");
   const [selectedApproval, setSelectedApproval] = useState<PendingApproval | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectionModal, setShowRejectionModal] = useState(false);
@@ -133,6 +134,92 @@ export default function ApprovalsPage() {
               timeline: buildTimeline(d, membersMap), autoChecks: buildAutoChecks(d, "invoice", subAccountsMap),
               budgetImpact: calculateBudgetImpact(d.items || [], subAccountsMap, !!d.poId),
               supplierStats: await loadSupplierStats(d.supplierId), poComparison, daysWaiting, isUrgent: daysWaiting >= 3,
+            });
+          }
+        }
+      } catch (e) {}
+
+      // Load Card Envelopes (sobres de tarjeta pendientes de aprobación)
+      try {
+        const cardEnvSnap = await getDocs(query(collection(db, `projects/${id}/cardEnvelopes`), where("status", "==", "pending_approval")));
+        for (const envDoc of cardEnvSnap.docs) {
+          const d = envDoc.data();
+          if (canUserApprove(d, userId!, localUserRole, localUserDepartment, localUserPosition)) {
+            const createdAt = d.createdAt?.toDate() || new Date();
+            const daysWaiting = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+            
+            // Cargar gastos del sobre
+            const expensesSnap = await getDocs(query(collection(db, `projects/${id}/cardExpenses`), where("envelopeId", "==", envDoc.id)));
+            const boxExpenses: BoxExpensePreview[] = expensesSnap.docs.map(expDoc => {
+              const expData = expDoc.data();
+              return {
+                id: expDoc.id,
+                supplier: expData.supplier || "",
+                subAccountCode: expData.subAccountCode || "",
+                baseAmount: expData.baseAmount || 0,
+                vatAmount: expData.vatAmount || 0,
+                totalAmount: expData.totalAmount || 0,
+                date: expData.date?.toDate ? new Intl.DateTimeFormat("es-ES").format(expData.date.toDate()) : "",
+              };
+            });
+            
+            // Obtener nombre de la tarjeta
+            let cardName = d.boxCode || "";
+            try {
+              const cardDoc = await getDoc(doc(db, `projects/${id}/cards`, d.boxId));
+              if (cardDoc.exists()) cardName = cardDoc.data().name || d.boxCode;
+            } catch (e) {}
+            
+            approvals.push({
+              id: envDoc.id, type: "box", documentId: envDoc.id, documentNumber: d.displayNumber || `ENV-${d.number}`,
+              displayNumber: d.displayNumber || `ENV-${d.number}`, projectId: id, projectName: localProjectName,
+              supplier: cardName, amount: d.totalAmount || 0, baseAmount: d.totalBase || 0,
+              description: `Sobre de tarjeta · ${d.expenseCount || 0} gastos`,
+              createdAt, createdBy: d.createdBy, createdByName: d.createdByName || membersMap[d.createdBy] || "Usuario",
+              currentApprovalStep: d.currentApprovalStep || 0, approvalSteps: d.approvalSteps || [],
+              timeline: buildTimeline(d, membersMap), autoChecks: [],
+              daysWaiting, isUrgent: daysWaiting >= 3,
+              boxType: "card", boxExpenses, expenseCount: d.expenseCount || 0, cardName,
+            });
+          }
+        }
+      } catch (e) {}
+
+      // Load Transfer Envelopes (sobres de transferencia pendientes de aprobación)
+      try {
+        const transferEnvSnap = await getDocs(query(collection(db, `projects/${id}/transferEnvelopes`), where("status", "==", "pending_approval")));
+        for (const envDoc of transferEnvSnap.docs) {
+          const d = envDoc.data();
+          if (canUserApprove(d, userId!, localUserRole, localUserDepartment, localUserPosition)) {
+            const createdAt = d.createdAt?.toDate() || new Date();
+            const daysWaiting = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+            
+            // Cargar gastos del sobre
+            const expensesSnap = await getDocs(query(collection(db, `projects/${id}/transferExpenses`), where("envelopeId", "==", envDoc.id)));
+            const boxExpenses: BoxExpensePreview[] = expensesSnap.docs.map(expDoc => {
+              const expData = expDoc.data();
+              return {
+                id: expDoc.id,
+                supplier: expData.supplier || "",
+                subAccountCode: expData.subAccountCode || "",
+                baseAmount: expData.baseAmount || 0,
+                vatAmount: expData.vatAmount || 0,
+                totalAmount: expData.totalAmount || 0,
+                date: expData.date || "",
+                personName: expData.personName || "",
+              };
+            });
+            
+            approvals.push({
+              id: envDoc.id, type: "box", documentId: envDoc.id, documentNumber: d.displayNumber || `TRF-${d.number}`,
+              displayNumber: d.displayNumber || `TRF-${d.number}`, projectId: id, projectName: localProjectName,
+              supplier: `Transferencia`, amount: d.totalAmount || 0, baseAmount: d.totalBase || 0,
+              description: `Sobre de transferencia · ${d.expenseCount || 0} gastos`,
+              createdAt, createdBy: d.createdBy, createdByName: d.createdByName || membersMap[d.createdBy] || "Usuario",
+              currentApprovalStep: d.currentApprovalStep || 0, approvalSteps: d.approvalSteps || [],
+              timeline: buildTimeline(d, membersMap), autoChecks: [],
+              daysWaiting, isUrgent: daysWaiting >= 3,
+              boxType: "transfer", boxExpenses, expenseCount: d.expenseCount || 0, paymentDate: d.paymentDate,
             });
           }
         }
@@ -297,7 +384,13 @@ export default function ApprovalsPage() {
     setShowApprovalModal(false);
     setProcessing(true);
     try {
-      const collectionName = approval.type === "po" ? "pos" : "invoices";
+      let collectionName = approval.type === "po" ? "pos" : approval.type === "invoice" ? "invoices" : "";
+      
+      // Para sobres BOX, determinar la colección según boxType
+      if (approval.type === "box") {
+        collectionName = approval.boxType === "card" ? "cardEnvelopes" : "transferEnvelopes";
+      }
+      
       const docRef = doc(db, `projects/${approval.projectId}/${collectionName}`, approval.documentId);
       const docSnap = await getDoc(docRef);
       if (!docSnap.exists()) { setErrorMessage("El documento ya no existe"); setProcessing(false); return; }
@@ -346,7 +439,7 @@ export default function ApprovalsPage() {
           // Limpiar previousCommittedItems después de aprobar
           updates.previousCommittedItems = null;
           
-        } else {
+        } else if (approval.type === "invoice") {
           // Factura
           updates.status = "pending"; // Pasa a "pendiente de pago" (aprobada)
           updates.approvalStatus = "approved";
@@ -375,6 +468,19 @@ export default function ApprovalsPage() {
           if (approval.poId) {
             await updatePOItemsInvoiced(approval.projectId, approval.poId, budgetItems, "add");
           }
+        } else if (approval.type === "box") {
+          // Sobre BOX (tarjeta o transferencia)
+          updates.approvedAt = Timestamp.now();
+          updates.approvedBy = userId;
+          updates.approvedByName = userName;
+          
+          if (approval.boxType === "card") {
+            // Sobre de tarjeta: pasa a "reviewing" (revisado y aprobado, pendiente de cerrar)
+            updates.status = "reviewing";
+          } else {
+            // Sobre de transferencia: pasa directamente a "pending" (aprobado, pendiente de transferir)
+            updates.status = "pending";
+          }
         }
       }
       await updateDoc(docRef, updates);
@@ -390,7 +496,13 @@ export default function ApprovalsPage() {
     if (!selectedApproval || !rejectionReason.trim()) { setErrorMessage("Debes proporcionar un motivo"); return; }
     setProcessing(true);
     try {
-      const collectionName = selectedApproval.type === "po" ? "pos" : "invoices";
+      let collectionName = selectedApproval.type === "po" ? "pos" : selectedApproval.type === "invoice" ? "invoices" : "";
+      
+      // Para sobres BOX, determinar la colección según boxType
+      if (selectedApproval.type === "box") {
+        collectionName = selectedApproval.boxType === "card" ? "cardEnvelopes" : "transferEnvelopes";
+      }
+      
       const docRef = doc(db, `projects/${selectedApproval.projectId}/${collectionName}`, selectedApproval.documentId);
       const docSnap = await getDoc(docRef);
       
@@ -417,7 +529,7 @@ export default function ApprovalsPage() {
             }
             await handlePOStatusChange(selectedApproval.projectId, oldStatus, "rejected", budgetItems);
           }
-        } else {
+        } else if (selectedApproval.type === "invoice") {
           // Factura
           const budgetItems: Array<{ subAccountId: string; baseAmount: number }> = [];
           for (const item of (selectedApproval.items || [])) {
@@ -428,10 +540,18 @@ export default function ApprovalsPage() {
           }
           await handleInvoiceStatusChange(selectedApproval.projectId, oldStatus, "rejected", budgetItems);
         }
+        // Para sobres BOX no hay operación de presupuesto al rechazar (aún no se ha cerrado)
+      }
+      
+      // Determinar el nuevo status según el tipo
+      let newStatus = "rejected";
+      if (selectedApproval.type === "box") {
+        // Los sobres BOX vuelven a estado anterior (open para tarjetas, draft para transferencias)
+        newStatus = selectedApproval.boxType === "card" ? "open" : "draft";
       }
       
       await updateDoc(docRef, { 
-        status: "rejected", 
+        status: newStatus, 
         rejectedAt: Timestamp.now(), 
         rejectedBy: userId, 
         rejectedByName: userName, 
@@ -451,7 +571,10 @@ export default function ApprovalsPage() {
     if (!selectedApproval || !infoRequestMessage.trim()) { setErrorMessage("Escribe qué información necesitas"); return; }
     setProcessing(true);
     try {
-      const collectionName = selectedApproval.type === "po" ? "pos" : "invoices";
+      let collectionName = selectedApproval.type === "po" ? "pos" : selectedApproval.type === "invoice" ? "invoices" : "";
+      if (selectedApproval.type === "box") {
+        collectionName = selectedApproval.boxType === "card" ? "cardEnvelopes" : "transferEnvelopes";
+      }
       const docRef = doc(db, `projects/${selectedApproval.projectId}/${collectionName}`, selectedApproval.documentId);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) { const comments = docSnap.data().comments || []; comments.push({ id: `info-request-${Date.now()}`, userId, userName, text: infoRequestMessage.trim(), createdAt: Timestamp.now(), type: "info_request" }); await updateDoc(docRef, { comments, infoRequested: true, infoRequestedBy: userId, infoRequestedAt: Timestamp.now() }); }
@@ -514,7 +637,7 @@ export default function ApprovalsPage() {
           {/* Filter tabs */}
           <div className="flex items-center gap-4 pt-4">
             <div className="flex items-center gap-1 border border-slate-200 rounded-xl p-1">
-              {(["all", "po", "invoice"] as const).map((t) => (<button key={t} onClick={() => setTypeFilter(t)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${typeFilter === t ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900"}`}>{t === "all" ? "Todos" : t === "po" ? "POs" : "Facturas"}<span className="ml-1.5 text-xs opacity-70">({t === "all" ? pendingApprovals.length : pendingApprovals.filter(a => a.type === t).length})</span></button>))}
+              {(["all", "po", "invoice", "box"] as const).map((t) => (<button key={t} onClick={() => setTypeFilter(t)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${typeFilter === t ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900"}`}>{t === "all" ? "Todos" : t === "po" ? "POs" : t === "invoice" ? "Facturas" : "BOX"}<span className="ml-1.5 text-xs opacity-70">({t === "all" ? pendingApprovals.length : pendingApprovals.filter(a => a.type === t).length})</span></button>))}
             </div>
           </div>
         </div>
@@ -570,7 +693,7 @@ export default function ApprovalsPage() {
                     <div className="px-6 py-5 border-b border-slate-200 bg-slate-50">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          {currentApproval.type === "po" ? <div className="w-12 h-12 bg-slate-200 rounded-xl flex items-center justify-center"><FileText size={20} className="text-slate-600" /></div> : <div className="w-12 h-12 bg-slate-200 rounded-xl flex items-center justify-center"><Receipt size={20} className="text-slate-600" /></div>}
+                          {currentApproval.type === "po" ? <div className="w-12 h-12 bg-slate-200 rounded-xl flex items-center justify-center"><FileText size={20} className="text-slate-600" /></div> : currentApproval.type === "invoice" ? <div className="w-12 h-12 bg-slate-200 rounded-xl flex items-center justify-center"><Receipt size={20} className="text-slate-600" /></div> : <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">{currentApproval.boxType === "card" ? <CreditCard size={20} className="text-amber-600" /> : <Banknote size={20} className="text-amber-600" />}</div>}
                           <div>
                             <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-slate-900">{currentApproval.displayNumber}</h2>{currentApproval.isUrgent && (<span className="flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg font-medium"><Flame size={10} />Urgente</span>)}</div>
                             <p className="text-sm text-slate-500">{currentApproval.department && `${currentApproval.department} · `}{currentApproval.poType}{currentApproval.poNumber && currentApproval.type === "invoice" && (<span className="inline-flex items-center gap-1 ml-2 text-slate-600"><LinkIcon size={10} />PO-{currentApproval.poNumber}</span>)}</p>
@@ -637,6 +760,48 @@ export default function ApprovalsPage() {
                                 </div>
                               );
                             })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Vista previa de gastos BOX */}
+                      {currentApproval.type === "box" && currentApproval.boxExpenses && currentApproval.boxExpenses.length > 0 && (
+                        <div className="mb-6">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs text-slate-500">Gastos del sobre ({currentApproval.expenseCount || currentApproval.boxExpenses.length})</p>
+                            {currentApproval.boxType === "transfer" && currentApproval.paymentDate && (
+                              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg">Pago: {currentApproval.paymentDate}</span>
+                            )}
+                          </div>
+                          <div className="bg-amber-50 rounded-xl border border-amber-100 overflow-hidden">
+                            <div className="max-h-56 overflow-y-auto">
+                              <table className="w-full text-sm">
+                                <thead className="bg-amber-100/50 sticky top-0">
+                                  <tr>
+                                    {currentApproval.boxType === "transfer" && <th className="text-left px-3 py-2 text-xs font-medium text-amber-700">Persona</th>}
+                                    <th className="text-left px-3 py-2 text-xs font-medium text-amber-700">Proveedor</th>
+                                    <th className="text-left px-3 py-2 text-xs font-medium text-amber-700">Cuenta</th>
+                                    <th className="text-right px-3 py-2 text-xs font-medium text-amber-700">Base</th>
+                                    <th className="text-right px-3 py-2 text-xs font-medium text-amber-700">Total</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-amber-100">
+                                  {currentApproval.boxExpenses.map((exp, idx) => (
+                                    <tr key={exp.id || idx} className="hover:bg-amber-100/30">
+                                      {currentApproval.boxType === "transfer" && <td className="px-3 py-2 text-slate-900">{exp.personName || "-"}</td>}
+                                      <td className="px-3 py-2 text-slate-900 truncate max-w-[150px]">{exp.supplier}</td>
+                                      <td className="px-3 py-2 font-mono text-xs text-slate-600">{exp.subAccountCode}</td>
+                                      <td className="px-3 py-2 text-right font-mono text-slate-700">{formatCurrency(exp.baseAmount)}</td>
+                                      <td className="px-3 py-2 text-right font-mono font-medium text-slate-900">{formatCurrency(exp.totalAmount)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                            <div className="px-3 py-2 bg-amber-100 flex justify-between items-center border-t border-amber-200">
+                              <span className="text-xs text-amber-700 font-medium">{currentApproval.boxType === "card" ? `Tarjeta: ${currentApproval.cardName}` : "Sobre de transferencia"}</span>
+                              <span className="text-sm font-bold text-amber-900">{formatCurrency(currentApproval.amount)}</span>
+                            </div>
                           </div>
                         </div>
                       )}
