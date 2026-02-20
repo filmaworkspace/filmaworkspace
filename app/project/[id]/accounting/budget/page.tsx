@@ -139,12 +139,22 @@ export default function BudgetPage() {
       });
 
       // Cargar gastos de caja (BOX) y calcular por subcuenta
-      // Solo cuentan los gastos con status "accounted" (sobre cerrado)
+      // Solo cuentan los gastos Pleo con status "accounted" (sobre cerrado)
       const boxBySubaccount: Record<string, number> = {};
-      const boxExpensesSnapshot = await getDocs(collection(db, `projects/${id}/boxExpenses`));
+      const boxExpensesSnapshot = await getDocs(collection(db, `projects/${id}/cardExpenses`));
       boxExpensesSnapshot.docs.forEach(expDoc => {
         const expData = expDoc.data();
         if (expData.status === "accounted" && expData.subAccountCode) {
+          const key = expData.subAccountCode;
+          boxBySubaccount[key] = (boxBySubaccount[key] || 0) + (expData.baseAmount || 0);
+        }
+      });
+
+      // Cargar gastos de transferencias (todos cuentan, se suman al crear)
+      const transferExpensesSnapshot = await getDocs(collection(db, `projects/${id}/transferExpenses`));
+      transferExpensesSnapshot.docs.forEach(expDoc => {
+        const expData = expDoc.data();
+        if (expData.subAccountCode) {
           const key = expData.subAccountCode;
           boxBySubaccount[key] = (boxBySubaccount[key] || 0) + (expData.baseAmount || 0);
         }
