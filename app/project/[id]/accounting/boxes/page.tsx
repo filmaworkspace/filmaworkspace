@@ -115,7 +115,7 @@ const TRANSFER_STATUS_CONFIG = {
   transferred: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Transferido" },
 };
 
-type MainTab = "pleo" | "transfers";
+type MainTab = "tarjetas" | "transfers";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPONENT
@@ -134,7 +134,7 @@ export default function BoxesPage() {
   const [userName, setUserName] = useState("");
   const [hasAccess, setHasAccess] = useState(false);
   const [accessError, setAccessError] = useState("");
-  const [mainTab, setMainTab] = useState<MainTab>("pleo");
+  const [mainTab, setMainTab] = useState<MainTab>("tarjetas");
   const [departments, setDepartments] = useState<string[]>([]);
   const [subAccounts, setSubAccounts] = useState<SubAccount[]>([]);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -145,7 +145,7 @@ export default function BoxesPage() {
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [envelopes, setEnvelopes] = useState<Envelope[]>([]);
   const [expenses, setExpenses] = useState<BoxExpense[]>([]);
-  const [boxSuppliers, setBoxSuppliers] = useState<BoxSupplier[]>([]);
+  const [cardSuppliers, setBoxSuppliers] = useState<BoxSupplier[]>([]);
   const [selectedBox, setSelectedBox] = useState<Box | null>(null);
   const [selectedEnvelope, setSelectedEnvelope] = useState<Envelope | null>(null);
   const [showCreateBoxModal, setShowCreateBoxModal] = useState(false);
@@ -170,13 +170,14 @@ export default function BoxesPage() {
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
   const [showMarkTransferredModal, setShowMarkTransferredModal] = useState(false);
   const [transferEnvelopeForm, setTransferEnvelopeForm] = useState({ paymentDate: "", notes: "" });
-  const [expenseForm, setExpenseForm] = useState({
-    type: "ticket" as "invoice" | "ticket",
-    personName: "", personDepartment: "", personIban: "",
-    supplier: "", supplierTaxId: "",
-    subAccountCode: "", subAccountDescription: "", description: "",
-    date: new Date().toLocaleDateString("es-ES"), baseAmount: 0, vatRate: 21, irpfRate: 0,
-  });
+  // Persona común para todos los gastos del modal
+  const [expensePersonForm, setExpensePersonForm] = useState({ name: "", department: "", iban: "" });
+  // Lista de gastos a añadir
+  const [expensesList, setExpensesList] = useState<Array<{
+    id: string; type: "invoice" | "ticket"; supplier: string; supplierTaxId: string;
+    subAccountCode: string; subAccountDescription: string; description: string;
+    date: string; baseAmount: number; vatRate: number; irpfRate: number;
+  }>>([]);
   const [transferRef, setTransferRef] = useState("");
 
   // Dropdowns
@@ -185,6 +186,7 @@ export default function BoxesPage() {
   const [showAccountSelector, setShowAccountSelector] = useState(false);
   const [accountSearchTerm, setAccountSearchTerm] = useState("");
   const [accountSelectorPos, setAccountSelectorPos] = useState<{ top: number; left: number } | null>(null);
+  const [editingExpenseIndex, setEditingExpenseIndex] = useState<number | null>(null);
   const departmentDropdownRef = useRef<HTMLDivElement>(null);
   const expenseDepartmentDropdownRef = useRef<HTMLDivElement>(null);
   const accountSelectorRef = useRef<HTMLDivElement>(null);
@@ -247,16 +249,16 @@ export default function BoxesPage() {
       }
       setSubAccounts(allSubAccounts);
 
-      const boxesSnap = await getDocs(query(collection(db, `projects/${projectId}/boxes`), orderBy("name")));
+      const boxesSnap = await getDocs(query(collection(db, `projects/${projectId}/cards`), orderBy("name")));
       setBoxes(boxesSnap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate() || new Date() })) as Box[]);
 
-      const envSnap = await getDocs(query(collection(db, `projects/${projectId}/boxEnvelopes`), orderBy("createdAt", "desc")));
+      const envSnap = await getDocs(query(collection(db, `projects/${projectId}/cardEnvelopes`), orderBy("createdAt", "desc")));
       setEnvelopes(envSnap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate() || new Date(), closedAt: d.data().closedAt?.toDate() })) as Envelope[]);
 
-      const expSnap = await getDocs(query(collection(db, `projects/${projectId}/boxExpenses`), orderBy("date", "desc")));
+      const expSnap = await getDocs(query(collection(db, `projects/${projectId}/cardExpenses`), orderBy("date", "desc")));
       setExpenses(expSnap.docs.map(d => ({ id: d.id, ...d.data(), date: d.data().date?.toDate() || new Date(), reviewedAt: d.data().reviewedAt?.toDate() })) as BoxExpense[]);
 
-      const supSnap = await getDocs(collection(db, `projects/${projectId}/boxSuppliers`));
+      const supSnap = await getDocs(collection(db, `projects/${projectId}/cardSuppliers`));
       setBoxSuppliers(supSnap.docs.map(d => ({ taxId: d.id, ...d.data() })) as BoxSupplier[]);
 
       const trfEnvSnap = await getDocs(query(collection(db, `projects/${projectId}/transferEnvelopes`), orderBy("createdAt", "desc")));
@@ -278,7 +280,7 @@ export default function BoxesPage() {
     if (boxes.some(b => b.code.toUpperCase() === boxForm.code.toUpperCase())) return showToast("error", "Código ya en uso");
     setSaving(true);
     try {
-      await addDoc(collection(db, `projects/${projectId}/boxes`), {
+      await addDoc(collection(db, `projects/${projectId}/cards`), {
         name: boxForm.name.trim(), code: boxForm.code.toUpperCase().trim(), department: boxForm.department || "",
         nextInvoiceNumber: 1, nextTicketNumber: 1, nextEnvelopeNumber: 1,
         createdAt: Timestamp.now(), createdBy: userId, createdByName: userName,
@@ -292,7 +294,7 @@ export default function BoxesPage() {
     if (boxes.some(b => b.id !== selectedBox.id && b.code.toUpperCase() === editBoxForm.code.toUpperCase())) return showToast("error", "Código ya en uso");
     setSaving(true);
     try {
-      await updateDoc(doc(db, `projects/${projectId}/boxes`, selectedBox.id), { name: editBoxForm.name.trim(), code: editBoxForm.code.toUpperCase().trim() });
+      await updateDoc(doc(db, `projects/${projectId}/cards`, selectedBox.id), { name: editBoxForm.name.trim(), code: editBoxForm.code.toUpperCase().trim() });
       showToast("success", "Caja actualizada"); setShowEditBoxModal(false); loadData();
     } catch { showToast("error", "Error al actualizar"); } finally { setSaving(false); }
   };
@@ -304,9 +306,9 @@ export default function BoxesPage() {
     setSaving(true);
     try {
       const batch = writeBatch(db);
-      expenses.filter(e => e.boxId === selectedBox.id).forEach(e => batch.delete(doc(db, `projects/${projectId}/boxExpenses`, e.id)));
-      envelopes.filter(e => e.boxId === selectedBox.id).forEach(e => batch.delete(doc(db, `projects/${projectId}/boxEnvelopes`, e.id)));
-      batch.delete(doc(db, `projects/${projectId}/boxes`, selectedBox.id));
+      expenses.filter(e => e.boxId === selectedBox.id).forEach(e => batch.delete(doc(db, `projects/${projectId}/cardExpenses`, e.id)));
+      envelopes.filter(e => e.boxId === selectedBox.id).forEach(e => batch.delete(doc(db, `projects/${projectId}/cardEnvelopes`, e.id)));
+      batch.delete(doc(db, `projects/${projectId}/cards`, selectedBox.id));
       await batch.commit();
       showToast("success", "Caja eliminada"); setShowDeleteBoxModal(false); setSelectedBox(null); loadData();
     } catch { showToast("error", "Error al eliminar caja"); } finally { setSaving(false); }
@@ -318,12 +320,12 @@ export default function BoxesPage() {
     try {
       const num = selectedBox.nextEnvelopeNumber || 1;
       const displayNumber = `ENV-${selectedBox.code}-${String(num).padStart(3, "0")}`;
-      await addDoc(collection(db, `projects/${projectId}/boxEnvelopes`), {
+      await addDoc(collection(db, `projects/${projectId}/cardEnvelopes`), {
         boxId: selectedBox.id, boxCode: selectedBox.code, number: num, displayNumber,
         status: "open", totalBase: 0, totalVat: 0, totalAmount: 0, expenseCount: 0, reviewedCount: 0,
         createdAt: Timestamp.now(), createdBy: userId, createdByName: userName,
       });
-      await updateDoc(doc(db, `projects/${projectId}/boxes`, selectedBox.id), { nextEnvelopeNumber: num + 1 });
+      await updateDoc(doc(db, `projects/${projectId}/cards`, selectedBox.id), { nextEnvelopeNumber: num + 1 });
       showToast("success", `Sobre ${displayNumber} creado`); setShowCreateEnvelopeModal(false); loadData();
     } catch { showToast("error", "Error al crear sobre"); } finally { setSaving(false); }
   };
@@ -334,8 +336,8 @@ export default function BoxesPage() {
     setSaving(true);
     try {
       const batch = writeBatch(db);
-      expenses.filter(e => e.envelopeId === envelope.id).forEach(e => batch.delete(doc(db, `projects/${projectId}/boxExpenses`, e.id)));
-      batch.delete(doc(db, `projects/${projectId}/boxEnvelopes`, envelope.id));
+      expenses.filter(e => e.envelopeId === envelope.id).forEach(e => batch.delete(doc(db, `projects/${projectId}/cardExpenses`, e.id)));
+      batch.delete(doc(db, `projects/${projectId}/cardEnvelopes`, envelope.id));
       await batch.commit();
       showToast("success", "Sobre eliminado"); setShowDeleteEnvelopeModal(null);
       if (selectedEnvelope?.id === envelope.id) setSelectedEnvelope(null);
@@ -425,7 +427,7 @@ export default function BoxesPage() {
       let totalBase = selectedEnvelope.totalBase, totalVat = selectedEnvelope.totalVat;
       let totalAmount = selectedEnvelope.totalAmount, expenseCount = selectedEnvelope.expenseCount;
       const existingIds = new Set(expenses.filter(e => e.envelopeId === selectedEnvelope.id).map(e => e.pleoReceiptId));
-      const localSuppliers = [...boxSuppliers];
+      const localSuppliers = [...cardSuppliers];
       for (const exp of importPreview) {
         if (existingIds.has(exp.pleoReceiptId)) continue;
         let supplierName = exp.supplier;
@@ -433,7 +435,7 @@ export default function BoxesPage() {
         if (found) { supplierName = found.name; }
         else if (exp.supplierTaxId) {
           const normalized = capitalizeSupplierName(exp.supplier);
-          await setDoc(doc(db, `projects/${projectId}/boxSuppliers`, exp.supplierTaxId),
+          await setDoc(doc(db, `projects/${projectId}/cardSuppliers`, exp.supplierTaxId),
             { taxId: exp.supplierTaxId, name: normalized, originalName: exp.supplier, updatedAt: Timestamp.now() }, { merge: true });
           supplierName = normalized;
           localSuppliers.push({ taxId: exp.supplierTaxId, name: normalized, originalName: exp.supplier });
@@ -443,7 +445,7 @@ export default function BoxesPage() {
         const displayNumber = `BOX-${selectedBox.code}-${isTicket ? "T" : "F"}-${String(num).padStart(4, "0")}`;
         let expenseDate = new Date();
         if (exp.date) { const p = exp.date.split("/"); if (p.length === 3) expenseDate = new Date(parseInt(p[2]), parseInt(p[1]) - 1, parseInt(p[0])); }
-        const ref = doc(collection(db, `projects/${projectId}/boxExpenses`));
+        const ref = doc(collection(db, `projects/${projectId}/cardExpenses`));
         batch.set(ref, {
           envelopeId: selectedEnvelope.id, boxId: selectedBox.id, boxCode: selectedBox.code,
           number: num, displayNumber, type: exp.type, pleoReceiptId: exp.pleoReceiptId,
@@ -458,8 +460,8 @@ export default function BoxesPage() {
         totalBase += exp.baseAmount || 0; totalVat += exp.vatAmount || 0;
         totalAmount += exp.totalAmount || 0; expenseCount++;
       }
-      batch.update(doc(db, `projects/${projectId}/boxEnvelopes`, selectedEnvelope.id), { totalBase, totalVat, totalAmount, expenseCount });
-      batch.update(doc(db, `projects/${projectId}/boxes`, selectedBox.id), { nextInvoiceNumber: invoiceNum, nextTicketNumber: ticketNum });
+      batch.update(doc(db, `projects/${projectId}/cardEnvelopes`, selectedEnvelope.id), { totalBase, totalVat, totalAmount, expenseCount });
+      batch.update(doc(db, `projects/${projectId}/cards`, selectedBox.id), { nextInvoiceNumber: invoiceNum, nextTicketNumber: ticketNum });
       await batch.commit();
       showToast("success", `${importPreview.length} gastos importados`);
       setShowImportModal(false); setImportFile(null); setImportPreview([]); loadData();
@@ -468,11 +470,11 @@ export default function BoxesPage() {
 
   const handleReviewExpense = async (expense: BoxExpense) => {
     try {
-      await updateDoc(doc(db, `projects/${projectId}/boxExpenses`, expense.id), {
+      await updateDoc(doc(db, `projects/${projectId}/cardExpenses`, expense.id), {
         status: "reviewed", reviewedAt: Timestamp.now(), reviewedBy: userId, reviewedByName: userName,
       });
       const envelope = envelopes.find(e => e.id === expense.envelopeId);
-      if (envelope) await updateDoc(doc(db, `projects/${projectId}/boxEnvelopes`, envelope.id), { reviewedCount: (envelope.reviewedCount || 0) + 1 });
+      if (envelope) await updateDoc(doc(db, `projects/${projectId}/cardEnvelopes`, envelope.id), { reviewedCount: (envelope.reviewedCount || 0) + 1 });
       showToast("success", "Gasto revisado"); loadData();
     } catch { showToast("error", "Error al revisar"); }
   };
@@ -483,8 +485,8 @@ export default function BoxesPage() {
     if (pending > 0) return showToast("error", `${pending} gastos sin revisar`);
     try {
       const batch = writeBatch(db);
-      batch.update(doc(db, `projects/${projectId}/boxEnvelopes`, envelope.id), { status: "closed", closedAt: Timestamp.now(), closedBy: userId, closedByName: userName });
-      envExpenses.forEach(e => batch.update(doc(db, `projects/${projectId}/boxExpenses`, e.id), { status: "accounted", accountedAt: Timestamp.now() }));
+      batch.update(doc(db, `projects/${projectId}/cardEnvelopes`, envelope.id), { status: "closed", closedAt: Timestamp.now(), closedBy: userId, closedByName: userName });
+      envExpenses.forEach(e => batch.update(doc(db, `projects/${projectId}/cardExpenses`, e.id), { status: "accounted", accountedAt: Timestamp.now() }));
       await batch.commit(); showToast("success", "Sobre cerrado"); loadData();
     } catch { showToast("error", "Error al cerrar sobre"); }
   };
@@ -526,43 +528,71 @@ export default function BoxesPage() {
     } catch { showToast("error", "Error al eliminar sobre"); } finally { setSaving(false); }
   };
 
-  const computeExpenseAmounts = () => {
-    const vatAmount = Math.round(expenseForm.baseAmount * expenseForm.vatRate / 100 * 100) / 100;
-    const irpfAmount = Math.round(expenseForm.baseAmount * expenseForm.irpfRate / 100 * 100) / 100;
-    return { vatAmount, irpfAmount, totalAmount: expenseForm.baseAmount + vatAmount - irpfAmount };
+  const computeExpenseTotal = (exp: { baseAmount: number; vatRate: number; irpfRate: number }) => {
+    const vatAmount = Math.round(exp.baseAmount * exp.vatRate / 100 * 100) / 100;
+    const irpfAmount = Math.round(exp.baseAmount * exp.irpfRate / 100 * 100) / 100;
+    return { vatAmount, irpfAmount, totalAmount: exp.baseAmount + vatAmount - irpfAmount };
   };
 
-  const handleAddExpense = async () => {
+  const createEmptyExpense = () => ({
+    id: crypto.randomUUID(),
+    type: "ticket" as "invoice" | "ticket",
+    supplier: "", supplierTaxId: "",
+    subAccountCode: "", subAccountDescription: "", description: "",
+    date: new Date().toLocaleDateString("es-ES"), baseAmount: 0, vatRate: 21, irpfRate: 0,
+  });
+
+  const updateExpenseInList = (index: number, field: string, value: any) => {
+    setExpensesList(prev => prev.map((exp, i) => i === index ? { ...exp, [field]: value } : exp));
+  };
+
+  const removeExpenseFromList = (index: number) => {
+    setExpensesList(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAddAllExpenses = async () => {
     if (!selectedTransferEnvelope) return;
-    if (!expenseForm.personName.trim()) return showToast("error", "Nombre de persona obligatorio");
-    if (!expenseForm.supplier.trim()) return showToast("error", "Proveedor obligatorio");
-    if (expenseForm.baseAmount <= 0) return showToast("error", "Importe base obligatorio");
-    if (!expenseForm.subAccountCode) return showToast("error", "Cuenta obligatoria");
+    if (!expensePersonForm.name.trim()) return showToast("error", "Nombre de persona obligatorio");
+    const validExpenses = expensesList.filter(exp => exp.supplier.trim() && exp.baseAmount > 0 && exp.subAccountCode);
+    if (validExpenses.length === 0) return showToast("error", "Añade al menos un gasto válido");
     setSaving(true);
     try {
-      const { vatAmount, irpfAmount, totalAmount } = computeExpenseAmounts();
-      await addDoc(collection(db, `projects/${projectId}/transferExpenses`), {
-        envelopeId: selectedTransferEnvelope.id, type: expenseForm.type,
-        personName: expenseForm.personName.trim(), personDepartment: expenseForm.personDepartment || "",
-        personIban: expenseForm.personIban.trim() || "",
-        supplier: expenseForm.supplier.trim(), supplierTaxId: expenseForm.supplierTaxId.trim() || "",
-        subAccountCode: expenseForm.subAccountCode, subAccountDescription: expenseForm.subAccountDescription,
-        description: expenseForm.description.trim() || "", date: expenseForm.date,
-        baseAmount: expenseForm.baseAmount, vatRate: expenseForm.vatRate, vatAmount,
-        irpfRate: expenseForm.irpfRate, irpfAmount, totalAmount,
-        createdAt: Timestamp.now(), createdBy: userId, createdByName: userName,
+      const batch = writeBatch(db);
+      let addedTotalBase = 0, addedTotalVat = 0, addedTotalAmount = 0;
+      
+      for (const exp of validExpenses) {
+        const { vatAmount, irpfAmount, totalAmount } = computeExpenseTotal(exp);
+        const ref = doc(collection(db, `projects/${projectId}/transferExpenses`));
+        batch.set(ref, {
+          envelopeId: selectedTransferEnvelope.id, type: exp.type,
+          personName: expensePersonForm.name.trim(), personDepartment: expensePersonForm.department || "",
+          personIban: expensePersonForm.iban.trim() || "",
+          supplier: exp.supplier.trim(), supplierTaxId: exp.supplierTaxId.trim() || "",
+          subAccountCode: exp.subAccountCode, subAccountDescription: exp.subAccountDescription,
+          description: exp.description.trim() || "", date: exp.date,
+          baseAmount: exp.baseAmount, vatRate: exp.vatRate, vatAmount,
+          irpfRate: exp.irpfRate, irpfAmount, totalAmount,
+          createdAt: Timestamp.now(), createdBy: userId, createdByName: userName,
+        });
+        addedTotalBase += exp.baseAmount;
+        addedTotalVat += vatAmount;
+        addedTotalAmount += totalAmount;
+      }
+      
+      batch.update(doc(db, `projects/${projectId}/transferEnvelopes`, selectedTransferEnvelope.id), {
+        totalBase: selectedTransferEnvelope.totalBase + addedTotalBase,
+        totalVat: selectedTransferEnvelope.totalVat + addedTotalVat,
+        totalAmount: selectedTransferEnvelope.totalAmount + addedTotalAmount,
+        expenseCount: selectedTransferEnvelope.expenseCount + validExpenses.length,
       });
-      const newTotalBase = selectedTransferEnvelope.totalBase + expenseForm.baseAmount;
-      const newTotalVat = selectedTransferEnvelope.totalVat + vatAmount;
-      const newTotalAmount = selectedTransferEnvelope.totalAmount + totalAmount;
-      await updateDoc(doc(db, `projects/${projectId}/transferEnvelopes`, selectedTransferEnvelope.id), {
-        totalBase: newTotalBase, totalVat: newTotalVat, totalAmount: newTotalAmount,
-        expenseCount: selectedTransferEnvelope.expenseCount + 1,
-      });
-      showToast("success", "Gasto añadido"); setShowAddExpenseModal(false);
-      setExpenseForm({ type: "ticket", personName: "", personDepartment: "", personIban: "", supplier: "", supplierTaxId: "", subAccountCode: "", subAccountDescription: "", description: "", date: new Date().toLocaleDateString("es-ES"), baseAmount: 0, vatRate: 21, irpfRate: 0 });
+      
+      await batch.commit();
+      showToast("success", `${validExpenses.length} gasto${validExpenses.length > 1 ? "s" : ""} añadido${validExpenses.length > 1 ? "s" : ""}`);
+      setShowAddExpenseModal(false);
+      setExpensePersonForm({ name: "", department: "", iban: "" });
+      setExpensesList([]);
       loadData();
-    } catch { showToast("error", "Error al añadir gasto"); } finally { setSaving(false); }
+    } catch { showToast("error", "Error al añadir gastos"); } finally { setSaving(false); }
   };
 
   const handleDeleteExpense = async (expense: TransferExpense) => {
@@ -603,12 +633,12 @@ export default function BoxesPage() {
   // Derived Data
   const filteredBoxes = boxes.filter(b => b.name.toLowerCase().includes(searchTerm.toLowerCase()) || b.code.toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredTransferEnvelopes = transferEnvelopes.filter(e => e.displayNumber.toLowerCase().includes(searchTerm.toLowerCase()) || e.paymentDate.includes(searchTerm));
-  const boxEnvelopes = selectedBox ? envelopes.filter(e => e.boxId === selectedBox.id) : [];
+  const cardEnvelopes = selectedBox ? envelopes.filter(e => e.boxId === selectedBox.id) : [];
   const envelopeExpenses = selectedEnvelope ? expenses.filter(e => e.envelopeId === selectedEnvelope.id) : [];
   const currentTransferExpenses = selectedTransferEnvelope ? transferExpenses.filter(e => e.envelopeId === selectedTransferEnvelope.id) : [];
   const openEnvelopes = envelopes.filter(e => e.status === "open").length;
   const pendingTransfers = transferEnvelopes.filter(e => e.status === "pending").length;
-  const totalPleoAmount = expenses.reduce((s, e) => s + e.totalAmount, 0);
+  const totalTarjetasAmount = expenses.reduce((s, e) => s + e.totalAmount, 0);
   const totalTransferAmount = transferEnvelopes.reduce((s, e) => s + e.totalAmount, 0);
 
   // Loading / Access
@@ -654,9 +684,9 @@ export default function BoxesPage() {
                 <span className="text-2xl font-bold bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">BOX</span>
               </div>
               <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl ml-6">
-                <button onClick={() => { setMainTab("pleo"); setSelectedBox(null); setSelectedEnvelope(null); setSelectedTransferEnvelope(null); setSearchTerm(""); }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${mainTab === "pleo" ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"}`}>
-                  <FileSpreadsheet size={15} /> Pleo
+                <button onClick={() => { setMainTab("tarjetas"); setSelectedBox(null); setSelectedEnvelope(null); setSelectedTransferEnvelope(null); setSearchTerm(""); }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${mainTab === "tarjetas" ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"}`}>
+                  <CreditCard size={15} /> Tarjetas
                   {openEnvelopes > 0 && <span className="bg-amber-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{openEnvelopes}</span>}
                 </button>
                 <button onClick={() => { setMainTab("transfers"); setSelectedBox(null); setSelectedEnvelope(null); setSelectedTransferEnvelope(null); setSearchTerm(""); }}
@@ -668,16 +698,16 @@ export default function BoxesPage() {
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-4 text-xs text-slate-500">
-                {mainTab === "pleo" ? (
-                  <><span><strong className="text-slate-900">{boxes.length}</strong> cajas</span><span><strong className="text-amber-600">{openEnvelopes}</strong> sobres abiertos</span><span><strong className="text-slate-900">{fmt(totalPleoAmount)} €</strong></span></>
+                {mainTab === "tarjetas" ? (
+                  <><span><strong className="text-slate-900">{boxes.length}</strong> cajas</span><span><strong className="text-amber-600">{openEnvelopes}</strong> sobres abiertos</span><span><strong className="text-slate-900">{fmt(totalTarjetasAmount)} €</strong></span></>
                 ) : (
                   <><span><strong className="text-slate-900">{transferEnvelopes.length}</strong> sobres</span><span><strong className="text-amber-600">{pendingTransfers}</strong> pendientes</span><span><strong className="text-slate-900">{fmt(totalTransferAmount)} €</strong></span></>
                 )}
               </div>
-              <button onClick={() => mainTab === "pleo" ? (setBoxForm({ name: "", code: "", department: "" }), setShowCreateBoxModal(true)) : (setTransferEnvelopeForm({ paymentDate: "", notes: "" }), setShowCreateTransferEnvelopeModal(true))}
+              <button onClick={() => mainTab === "tarjetas" ? (setBoxForm({ name: "", code: "", department: "" }), setShowCreateBoxModal(true)) : (setTransferEnvelopeForm({ paymentDate: "", notes: "" }), setShowCreateTransferEnvelopeModal(true))}
                 className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90 shadow-lg shadow-orange-500/20"
                 style={{ background: "linear-gradient(135deg, #f59e0b, #f97316)" }}>
-                <Plus size={16} /> {mainTab === "pleo" ? "Nueva caja" : "Nuevo sobre"}
+                <Plus size={16} /> {mainTab === "tarjetas" ? "Nueva caja" : "Nuevo sobre"}
               </button>
             </div>
           </div>
@@ -693,11 +723,11 @@ export default function BoxesPage() {
               <div className="mb-4">
                 <div className="relative">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input type="text" placeholder={mainTab === "pleo" ? "Buscar caja" : "Buscar sobre"} value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                  <input type="text" placeholder={mainTab === "tarjetas" ? "Buscar caja" : "Buscar sobre"} value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
                     className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
                 </div>
               </div>
-              {mainTab === "pleo" ? (
+              {mainTab === "tarjetas" ? (
                 <div className="space-y-1">
                   {filteredBoxes.map(box => {
                     const openCount = envelopes.filter(e => e.boxId === box.id && e.status === "open").length;
@@ -707,10 +737,12 @@ export default function BoxesPage() {
                         className={`w-full text-left p-3 rounded-xl transition-all ${isSelected ? "bg-slate-900 text-white" : "hover:bg-slate-50"}`}>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"}`}>{box.code}</div>
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSelected ? "bg-white/20" : "bg-slate-100"}`}>
+                              <CreditCard size={16} className={isSelected ? "text-white" : "text-slate-500"} />
+                            </div>
                             <div>
                               <p className={`text-sm font-medium ${isSelected ? "text-white" : "text-slate-900"}`}>{box.name}</p>
-                              {box.department && <p className={`text-xs ${isSelected ? "text-white/70" : "text-slate-500"}`}>{box.department}</p>}
+                              <p className={`text-xs ${isSelected ? "text-white/70" : "text-slate-500"}`}>{box.code}{box.department ? ` · ${box.department}` : ""}</p>
                             </div>
                           </div>
                           {openCount > 0 && <span className={`text-xs px-1.5 py-0.5 rounded-full ${isSelected ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"}`}>{openCount}</span>}
@@ -718,7 +750,7 @@ export default function BoxesPage() {
                       </button>
                     );
                   })}
-                  {filteredBoxes.length === 0 && <p className="text-center py-8 text-slate-400 text-sm">{searchTerm ? "Sin resultados" : "No hay cajas"}</p>}
+                  {filteredBoxes.length === 0 && <p className="text-center py-8 text-slate-400 text-sm">{searchTerm ? "Sin resultados" : "No hay tarjetas"}</p>}
                 </div>
               ) : (
                 <div className="space-y-1">
@@ -751,7 +783,7 @@ export default function BoxesPage() {
 
           {/* Right Panel */}
           <div className="flex-1 min-w-0">
-            {mainTab === "pleo" ? (
+            {mainTab === "tarjetas" ? (
               !selectedBox ? (
                 <div className="flex items-center justify-center h-96"><p className="text-sm text-slate-400">{boxes.length === 0 ? "No hay cajas creadas" : "Selecciona una caja"}</p></div>
               ) : !selectedEnvelope ? (
@@ -767,12 +799,12 @@ export default function BoxesPage() {
                     </div>
                   </div>
                   <div className="flex items-center justify-between mb-4">
-                    <p className="text-sm text-slate-500">{boxEnvelopes.length} sobres</p>
+                    <p className="text-sm text-slate-500">{cardEnvelopes.length} sobres</p>
                     <button onClick={() => setShowCreateEnvelopeModal(true)} className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"><Plus size={16} /> Nuevo sobre</button>
                   </div>
-                  {boxEnvelopes.length === 0 ? <p className="text-center py-16 text-sm text-slate-400">No hay sobres en esta caja</p> : (
+                  {cardEnvelopes.length === 0 ? <p className="text-center py-16 text-sm text-slate-400">No hay sobres en esta caja</p> : (
                     <div className="space-y-2">
-                      {boxEnvelopes.map(envelope => {
+                      {cardEnvelopes.map(envelope => {
                         const envExpenses = expenses.filter(e => e.envelopeId === envelope.id);
                         const pendingCount = envExpenses.filter(e => e.status === "pending").length;
                         const sc = STATUS_CONFIG[envelope.status];
@@ -814,7 +846,7 @@ export default function BoxesPage() {
                     </div>
                     {selectedEnvelope.status === "open" && (
                       <div className="flex items-center gap-2">
-                        <button onClick={() => setShowImportModal(true)} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"><Upload size={16} /> Importar Pleo</button>
+                        <button onClick={() => setShowImportModal(true)} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"><Upload size={16} /> Importar gastos</button>
                         <button onClick={() => handleCloseEnvelope(selectedEnvelope)} disabled={envelopeExpenses.some(e => e.status === "pending")} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"><Lock size={16} /> Cerrar sobre</button>
                       </div>
                     )}
@@ -823,7 +855,7 @@ export default function BoxesPage() {
                     <div className="flex items-center justify-center h-64">
                       <div className="text-center">
                         <p className="text-sm text-slate-400 mb-4">No hay gastos en este sobre</p>
-                        {selectedEnvelope.status === "open" && <button onClick={() => setShowImportModal(true)} className="inline-flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium" style={{ backgroundColor: "#2F52E0" }}><Upload size={16} /> Importar desde Pleo</button>}
+                        {selectedEnvelope.status === "open" && <button onClick={() => setShowImportModal(true)} className="inline-flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium" style={{ backgroundColor: "#2F52E0" }}><Upload size={16} /> Importar gastos</button>}
                       </div>
                     </div>
                   ) : (
@@ -885,7 +917,7 @@ export default function BoxesPage() {
                     </div>
                     {selectedTransferEnvelope.status === "draft" && (
                       <div className="flex items-center gap-2">
-                        <button onClick={() => { setExpenseForm({ type: "ticket", personName: "", personDepartment: "", personIban: "", supplier: "", supplierTaxId: "", subAccountCode: "", subAccountDescription: "", description: "", date: new Date().toLocaleDateString("es-ES"), baseAmount: 0, vatRate: 21, irpfRate: 0 }); setShowAddExpenseModal(true); }} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"><Plus size={16} /> Añadir gasto</button>
+                        <button onClick={() => { setExpensePersonForm({ name: "", department: "", iban: "" }); setExpensesList([createEmptyExpense()]); setShowAddExpenseModal(true); }} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"><Plus size={16} /> Añadir gasto</button>
                         <button onClick={() => handleSendEnvelope(selectedTransferEnvelope)} disabled={selectedTransferEnvelope.expenseCount === 0} className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50"><Send size={16} /> Enviar</button>
                         {canDeleteTransferEnvelope(selectedTransferEnvelope) && <button onClick={() => setShowDeleteTransferEnvelopeModal(selectedTransferEnvelope)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl"><Trash2 size={16} /></button>}
                       </div>
@@ -903,7 +935,7 @@ export default function BoxesPage() {
                     <div className="flex items-center justify-center h-48">
                       <div className="text-center">
                         <p className="text-sm text-slate-400 mb-4">No hay gastos en este sobre</p>
-                        {selectedTransferEnvelope.status === "draft" && <button onClick={() => { setExpenseForm({ type: "ticket", personName: "", personDepartment: "", personIban: "", supplier: "", supplierTaxId: "", subAccountCode: "", subAccountDescription: "", description: "", date: new Date().toLocaleDateString("es-ES"), baseAmount: 0, vatRate: 21, irpfRate: 0 }); setShowAddExpenseModal(true); }} className="inline-flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium" style={{ backgroundColor: "#2F52E0" }}><Plus size={16} /> Añadir gasto</button>}
+                        {selectedTransferEnvelope.status === "draft" && <button onClick={() => { setExpensePersonForm({ name: "", department: "", iban: "" }); setExpensesList([createEmptyExpense()]); setShowAddExpenseModal(true); }} className="inline-flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium" style={{ backgroundColor: "#2F52E0" }}><Plus size={16} /> Añadir gasto</button>}
                       </div>
                     </div>
                   ) : (
@@ -1059,12 +1091,12 @@ export default function BoxesPage() {
         </div>
       )}
 
-      {/* Import Pleo Modal */}
+      {/* Import Tarjetas Modal */}
       {showImportModal && selectedEnvelope && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-              <div><h3 className="text-lg font-semibold text-slate-900">Importar desde Pleo</h3><p className="text-sm text-slate-500">Sube el Excel exportado de Pleo</p></div>
+              <div><h3 className="text-lg font-semibold text-slate-900">Importar gastos</h3><p className="text-sm text-slate-500">Sube el Excel de gastos de tarjeta</p></div>
               <button onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
             </div>
             <div className="p-6 flex-1 overflow-y-auto">
@@ -1146,56 +1178,118 @@ export default function BoxesPage() {
       {/* Add Expense Modal */}
       {showAddExpenseModal && selectedTransferEnvelope && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowAddExpenseModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white"><h3 className="text-lg font-semibold text-slate-900">Añadir gasto</h3><button onClick={() => setShowAddExpenseModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button></div>
-            <div className="p-6 space-y-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+              <h3 className="text-lg font-semibold text-slate-900">Añadir gastos</h3>
+              <button onClick={() => setShowAddExpenseModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+            </div>
+            <div className="p-6 flex-1 overflow-y-auto space-y-6">
               {/* Persona */}
-              <div className="p-4 bg-slate-50 rounded-xl space-y-3">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Datos de la persona</p>
-                <div><label className="block text-sm font-medium text-slate-700 mb-2">Nombre *</label><input type="text" value={expenseForm.personName} onChange={e => setExpenseForm({ ...expenseForm, personName: e.target.value })} placeholder="Nombre completo" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" /></div>
-                <div className="grid grid-cols-2 gap-3">
+              <div className="p-4 bg-slate-50 rounded-xl">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Datos de la persona</p>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Nombre *</label>
+                    <input type="text" value={expensePersonForm.name} onChange={e => setExpensePersonForm({ ...expensePersonForm, name: e.target.value })} placeholder="Nombre completo" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
+                  </div>
                   <div ref={expenseDepartmentDropdownRef} className="relative">
                     <label className="block text-sm font-medium text-slate-700 mb-2">Departamento</label>
                     <button type="button" onClick={() => setShowExpenseDepartmentDropdown(!showExpenseDepartmentDropdown)} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between bg-white">
-                      <span className={expenseForm.personDepartment ? "text-slate-900" : "text-slate-400"}>{expenseForm.personDepartment || "Seleccionar"}</span><ChevronDown size={16} className="text-slate-400" />
+                      <span className={expensePersonForm.department ? "text-slate-900" : "text-slate-400"}>{expensePersonForm.department || "Seleccionar"}</span><ChevronDown size={16} className="text-slate-400" />
                     </button>
                     {showExpenseDepartmentDropdown && (
                       <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
-                        <button type="button" onClick={() => { setExpenseForm({ ...expenseForm, personDepartment: "" }); setShowExpenseDepartmentDropdown(false); }} className="w-full px-4 py-2 text-left text-sm text-slate-400 hover:bg-slate-50">Sin departamento</button>
-                        {departments.map(d => <button key={d} type="button" onClick={() => { setExpenseForm({ ...expenseForm, personDepartment: d }); setShowExpenseDepartmentDropdown(false); }} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50">{d}</button>)}
+                        <button type="button" onClick={() => { setExpensePersonForm({ ...expensePersonForm, department: "" }); setShowExpenseDepartmentDropdown(false); }} className="w-full px-4 py-2 text-left text-sm text-slate-400 hover:bg-slate-50">Sin departamento</button>
+                        {departments.map(d => <button key={d} type="button" onClick={() => { setExpensePersonForm({ ...expensePersonForm, department: d }); setShowExpenseDepartmentDropdown(false); }} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50">{d}</button>)}
                       </div>
                     )}
                   </div>
-                  <div><label className="block text-sm font-medium text-slate-700 mb-2">IBAN</label><input type="text" value={expenseForm.personIban} onChange={e => setExpenseForm({ ...expenseForm, personIban: e.target.value })} placeholder="ES00 0000 0000 00" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono text-sm bg-white" /></div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">IBAN</label>
+                    <input type="text" value={expensePersonForm.iban} onChange={e => setExpensePersonForm({ ...expensePersonForm, iban: e.target.value })} placeholder="ES00 0000 0000 0000" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono text-sm bg-white" />
+                  </div>
                 </div>
               </div>
-              {/* Gasto */}
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div><label className="block text-sm font-medium text-slate-700 mb-2">Tipo</label><select value={expenseForm.type} onChange={e => setExpenseForm({ ...expenseForm, type: e.target.value as "invoice" | "ticket" })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900"><option value="ticket">Ticket</option><option value="invoice">Factura</option></select></div>
-                  <div><label className="block text-sm font-medium text-slate-700 mb-2">Fecha</label><input type="text" value={expenseForm.date} onChange={e => setExpenseForm({ ...expenseForm, date: e.target.value })} placeholder="DD/MM/YYYY" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" /></div>
-                </div>
-                <div><label className="block text-sm font-medium text-slate-700 mb-2">Proveedor *</label><input type="text" value={expenseForm.supplier} onChange={e => setExpenseForm({ ...expenseForm, supplier: e.target.value })} placeholder="Nombre del proveedor" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" /></div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Cuenta presupuestaria *</label>
-                  <button type="button" onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); setAccountSelectorPos({ top: rect.bottom + 4, left: rect.left }); setShowAccountSelector(true); setAccountSearchTerm(""); }}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between hover:border-slate-300">
-                    {expenseForm.subAccountCode ? <span><span className="font-mono text-slate-600">{expenseForm.subAccountCode}</span> - {expenseForm.subAccountDescription}</span> : <span className="text-slate-400">Seleccionar cuenta</span>}
-                    <ChevronDown size={16} className="text-slate-400" />
+
+              {/* Gastos */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Gastos ({expensesList.length})</p>
+                  <button onClick={() => setExpensesList([...expensesList, createEmptyExpense()])} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg">
+                    <Plus size={14} /> Añadir línea
                   </button>
                 </div>
-                <div><label className="block text-sm font-medium text-slate-700 mb-2">Descripción</label><input type="text" value={expenseForm.description} onChange={e => setExpenseForm({ ...expenseForm, description: e.target.value })} placeholder="Descripción del gasto" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" /></div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div><label className="block text-sm font-medium text-slate-700 mb-2">Base *</label><input type="number" value={expenseForm.baseAmount || ""} onChange={e => setExpenseForm({ ...expenseForm, baseAmount: parseFloat(e.target.value) || 0 })} step="0.01" placeholder="0.00" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" /></div>
-                  <div><label className="block text-sm font-medium text-slate-700 mb-2">IVA %</label><input type="number" value={expenseForm.vatRate} onChange={e => setExpenseForm({ ...expenseForm, vatRate: parseFloat(e.target.value) || 0 })} step="1" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" /></div>
-                  <div><label className="block text-sm font-medium text-slate-700 mb-2">IRPF %</label><input type="number" value={expenseForm.irpfRate} onChange={e => setExpenseForm({ ...expenseForm, irpfRate: parseFloat(e.target.value) || 0 })} step="1" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" /></div>
+                <div className="space-y-3">
+                  {expensesList.map((exp, idx) => (
+                    <div key={exp.id} className="p-4 border border-slate-200 rounded-xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-400">Gasto {idx + 1}</span>
+                        {expensesList.length > 1 && (
+                          <button onClick={() => removeExpenseFromList(idx)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={14} /></button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-6 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
+                          <select value={exp.type} onChange={e => updateExpenseInList(idx, "type", e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900">
+                            <option value="ticket">Ticket</option>
+                            <option value="invoice">Factura</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label>
+                          <input type="text" value={exp.date} onChange={e => updateExpenseInList(idx, "date", e.target.value)} placeholder="DD/MM/YYYY" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Proveedor *</label>
+                          <input type="text" value={exp.supplier} onChange={e => updateExpenseInList(idx, "supplier", e.target.value)} placeholder="Nombre del proveedor" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Cuenta *</label>
+                          <button type="button" onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); setAccountSelectorPos({ top: rect.bottom + 4, left: rect.left }); setEditingExpenseIndex(idx); setShowAccountSelector(true); setAccountSearchTerm(""); }}
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-left text-sm flex items-center justify-between hover:border-slate-300">
+                            {exp.subAccountCode ? <span className="truncate"><span className="font-mono text-slate-600">{exp.subAccountCode}</span></span> : <span className="text-slate-400">Seleccionar</span>}
+                            <ChevronDown size={14} className="text-slate-400 flex-shrink-0" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-6 gap-3">
+                        <div className="col-span-2">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Descripción</label>
+                          <input type="text" value={exp.description} onChange={e => updateExpenseInList(idx, "description", e.target.value)} placeholder="Descripción" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Base *</label>
+                          <input type="number" value={exp.baseAmount || ""} onChange={e => updateExpenseInList(idx, "baseAmount", parseFloat(e.target.value) || 0)} step="0.01" placeholder="0.00" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">IVA %</label>
+                          <input type="number" value={exp.vatRate} onChange={e => updateExpenseInList(idx, "vatRate", parseFloat(e.target.value) || 0)} step="1" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">IRPF %</label>
+                          <input type="number" value={exp.irpfRate} onChange={e => updateExpenseInList(idx, "irpfRate", parseFloat(e.target.value) || 0)} step="1" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Total</label>
+                          <div className="px-3 py-2 bg-slate-50 rounded-lg text-sm font-mono font-medium text-slate-900">{fmt(computeExpenseTotal(exp).totalAmount)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="p-3 bg-slate-50 rounded-xl flex justify-between items-center"><span className="text-sm text-slate-600">Total</span><span className="text-lg font-bold font-mono text-slate-900">{fmt(computeExpenseAmounts().totalAmount)} €</span></div>
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 sticky bottom-0 bg-white">
-              <button onClick={() => setShowAddExpenseModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
-              <button onClick={handleAddExpense} disabled={saving || !expenseForm.personName.trim() || !expenseForm.supplier.trim() || expenseForm.baseAmount <= 0 || !expenseForm.subAccountCode} className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>{saving ? "Añadiendo..." : "Añadir gasto"}</button>
+            <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between flex-shrink-0 bg-white">
+              <div className="text-sm text-slate-500">
+                Total: <strong className="text-slate-900 font-mono">{fmt(expensesList.reduce((sum, exp) => sum + computeExpenseTotal(exp).totalAmount, 0))} €</strong>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setShowAddExpenseModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
+                <button onClick={handleAddAllExpenses} disabled={saving || !expensePersonForm.name.trim() || expensesList.filter(e => e.supplier.trim() && e.baseAmount > 0 && e.subAccountCode).length === 0} className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
+                  {saving ? "Guardando..." : `Añadir ${expensesList.filter(e => e.supplier.trim() && e.baseAmount > 0 && e.subAccountCode).length} gasto${expensesList.filter(e => e.supplier.trim() && e.baseAmount > 0 && e.subAccountCode).length !== 1 ? "s" : ""}`}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1219,16 +1313,20 @@ export default function BoxesPage() {
       )}
 
       {/* Account Selector Dropdown (Fixed) */}
-      {showAccountSelector && accountSelectorPos && (
+      {showAccountSelector && accountSelectorPos && editingExpenseIndex !== null && (
         <>
-          <div className="fixed inset-0 z-[60]" onClick={() => setShowAccountSelector(false)} />
+          <div className="fixed inset-0 z-[60]" onClick={() => { setShowAccountSelector(false); setEditingExpenseIndex(null); }} />
           <div ref={accountSelectorRef} className="fixed z-[70] w-80 bg-white border border-slate-200 rounded-xl shadow-xl" style={{ top: Math.min(accountSelectorPos.top, window.innerHeight - 300), left: accountSelectorPos.left }}>
             <div className="p-2 border-b border-slate-100">
               <input type="text" value={accountSearchTerm} onChange={e => setAccountSearchTerm(e.target.value)} placeholder="Buscar cuenta" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-900" autoFocus />
             </div>
             <div className="max-h-64 overflow-y-auto">
               {subAccounts.filter(sa => !accountSearchTerm || sa.code.toLowerCase().includes(accountSearchTerm.toLowerCase()) || sa.description.toLowerCase().includes(accountSearchTerm.toLowerCase())).slice(0, 50).map(sa => (
-                <button key={sa.id} type="button" onClick={() => { setExpenseForm({ ...expenseForm, subAccountCode: sa.code, subAccountDescription: sa.description }); setShowAccountSelector(false); }}
+                <button key={sa.id} type="button" onClick={() => { 
+                  setExpensesList(prev => prev.map((exp, i) => i === editingExpenseIndex ? { ...exp, subAccountCode: sa.code, subAccountDescription: sa.description } : exp));
+                  setShowAccountSelector(false); 
+                  setEditingExpenseIndex(null);
+                }}
                   className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2 border-b border-slate-50 last:border-0">
                   <span className="font-mono text-xs text-slate-600 w-16 flex-shrink-0">{sa.code}</span>
                   <span className="text-sm text-slate-700 truncate">{sa.description}</span>
