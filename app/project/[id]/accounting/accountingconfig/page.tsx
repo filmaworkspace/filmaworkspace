@@ -34,6 +34,7 @@ import {
   Edit2,
   Film,
   Layers,
+  Package,
 } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebase";
@@ -163,9 +164,16 @@ const ACTUAL_TRIGGERS = [
   { value: "on_paid", label: "Al pagar", description: "Pasa a realizado cuando la factura se marca como pagada" },
 ];
 
+const BOX_TRIGGERS = [
+  { value: "on_approve", label: "Al aprobar sobre", description: "Pasa a realizado cuando el sobre es aprobado" },
+  { value: "on_account", label: "Al contabilizar", description: "Pasa a realizado cuando se marca como contabilizado" },
+  { value: "on_paid", label: "Al pagar/transferir", description: "Pasa a realizado cuando se marca como pagado o transferido" },
+];
+
 interface CostSettings {
   poCommitmentTrigger: "on_create" | "on_approve";
   invoiceActualTrigger: "on_approve" | "on_account" | "on_paid";
+  boxActualTrigger: "on_approve" | "on_account" | "on_paid";
 }
 
 // Configuración específica del proyecto para contabilidad
@@ -253,6 +261,7 @@ export default function AccountingConfigPage() {
   const [costSettings, setCostSettings] = useState<CostSettings>({
     poCommitmentTrigger: "on_approve",
     invoiceActualTrigger: "on_paid",
+    boxActualTrigger: "on_paid",
   });
   
   // Tab de aprobaciones (PO vs Invoice)
@@ -461,6 +470,7 @@ export default function AccountingConfigPage() {
         setCostSettings({
           poCommitmentTrigger: data.poCommitmentTrigger || "on_approve",
           invoiceActualTrigger: data.invoiceActualTrigger || "on_paid",
+          boxActualTrigger: data.boxActualTrigger || "on_paid",
         });
       }
 
@@ -1530,6 +1540,42 @@ export default function AccountingConfigPage() {
         </div>
       </div>
 
+      {/* Realizado - BOX */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100">
+          <h2 className="font-semibold text-slate-900">Realizado (BOX)</h2>
+          <p className="text-sm text-slate-500 mt-1">Define cuándo los gastos de tarjeta y transferencia pasan a realizado</p>
+        </div>
+
+        <div className="p-6">
+          <div className="space-y-3">
+            {BOX_TRIGGERS.map((trigger) => (
+              <label
+                key={trigger.value}
+                className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                  costSettings.boxActualTrigger === trigger.value
+                    ? "border-slate-900 bg-slate-50"
+                    : "border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="boxActualTrigger"
+                  value={trigger.value}
+                  checked={costSettings.boxActualTrigger === trigger.value}
+                  onChange={(e) => setCostSettings({ ...costSettings, boxActualTrigger: e.target.value as any })}
+                  className="mt-1 w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-500"
+                />
+                <div className="flex-1">
+                  <p className="font-medium text-slate-900">{trigger.label}</p>
+                  <p className="text-sm text-slate-500 mt-0.5">{trigger.description}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Asignación por capítulos - Solo para series */}
       {projectType === "serie" && (
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
@@ -1631,8 +1677,8 @@ export default function AccountingConfigPage() {
               : "border-transparent text-slate-500 hover:text-slate-700"
           }`}
         >
-          <Layers size={16} />
-          BOX (Sobres)
+          <Package size={16} />
+          BOX
           {boxApprovals.length > 0 && (
             <span className="px-2 py-0.5 rounded-lg text-xs bg-slate-100 text-slate-600">
               {boxApprovals.length}
@@ -1703,19 +1749,6 @@ export default function AccountingConfigPage() {
           </>
         ) : (
           <>
-            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 mb-4">
-              <div className="flex items-start gap-3">
-                <Layers size={20} className="text-amber-600 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-amber-900">Aprobación de sobres BOX</p>
-                  <p className="text-xs text-amber-700 mt-1">
-                    Los sobres de tarjeta y transferencia pueden requerir aprobación antes de cerrarse.
-                    Se muestra un resumen de los gastos con el total del sobre.
-                  </p>
-                </div>
-              </div>
-            </div>
-            
             {boxApprovals.length === 0 ? (
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center">
                 <AlertCircle size={28} className="text-amber-600 mx-auto mb-3" />
