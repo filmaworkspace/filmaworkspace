@@ -507,7 +507,7 @@ export default function NewPOPage() {
     if (approvalConfig.length === 0) return [];
     return approvalConfig.map((step) => {
       const { ids, names } = resolveApprovers(step, dept);
-      return {
+      const stepData: ApprovalStepStatus = {
         id: step.id || "",
         order: step.order || 0,
         approverType: step.approverType || "role",
@@ -520,10 +520,18 @@ export default function NewPOPage() {
         status: "pending" as const,
         requireAll: step.requireAll ?? false,
         hasAmountThreshold: step.hasAmountThreshold || false,
-        amountThreshold: step.amountThreshold,
-        amountCondition: step.amountCondition,
-        amountThresholdMax: step.amountThresholdMax,
       };
+      // Solo añadir campos opcionales si tienen valor definido
+      if (step.amountThreshold !== undefined) {
+        stepData.amountThreshold = step.amountThreshold;
+      }
+      if (step.amountCondition !== undefined) {
+        stepData.amountCondition = step.amountCondition;
+      }
+      if (step.amountThresholdMax !== undefined) {
+        stepData.amountThresholdMax = step.amountThresholdMax;
+      }
+      return stepData;
     });
   };
 
@@ -934,7 +942,24 @@ export default function NewPOPage() {
         poData.status = "draft";
       }
 
-      await addDoc(collection(db, "projects/" + id + "/pos"), poData);
+      // Función para eliminar campos undefined recursivamente
+      const removeUndefined = (obj: any): any => {
+        if (Array.isArray(obj)) {
+          return obj.map(item => removeUndefined(item));
+        }
+        if (obj !== null && typeof obj === 'object' && !(obj instanceof Date) && !(obj.toDate)) {
+          return Object.entries(obj).reduce((acc, [key, value]) => {
+            if (value !== undefined) {
+              acc[key] = removeUndefined(value);
+            }
+            return acc;
+          }, {} as any);
+        }
+        return obj;
+      };
+
+      const cleanPoData = removeUndefined(poData);
+      await addDoc(collection(db, "projects/" + id + "/pos"), cleanPoData);
 
       // Comprometer según la configuración
       const finalStatus = poData.status;
