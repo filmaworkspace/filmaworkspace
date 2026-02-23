@@ -870,19 +870,19 @@ export default function NewPOPage() {
       }
 
       const itemsData = items.map((item) => ({
-        description: item.description.trim(),
-        subAccountId: item.subAccountId,
-        subAccountCode: item.subAccountCode,
-        subAccountDescription: item.subAccountDescription,
-        date: item.date,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        baseAmount: item.baseAmount,
-        vatRate: item.vatRate,
-        vatAmount: item.vatAmount,
-        irpfRate: item.irpfRate,
-        irpfAmount: item.irpfAmount,
-        totalAmount: item.totalAmount,
+        description: (item.description || "").trim(),
+        subAccountId: item.subAccountId || "",
+        subAccountCode: item.subAccountCode || "",
+        subAccountDescription: item.subAccountDescription || "",
+        date: item.date || "",
+        quantity: item.quantity || 0,
+        unitPrice: item.unitPrice || 0,
+        baseAmount: item.baseAmount || 0,
+        vatRate: item.vatRate || 0,
+        vatAmount: item.vatAmount || 0,
+        irpfRate: item.irpfRate || 0,
+        irpfAmount: item.irpfAmount || 0,
+        totalAmount: item.totalAmount || 0,
         episodeAssignment: item.episodeAssignment || "general",
         ...(item.episodes && item.episodes.length > 0 && { episodes: item.episodes }),
       }));
@@ -902,11 +902,11 @@ export default function NewPOPage() {
         vatAmount: totals.vatAmount,
         irpfAmount: totals.irpfAmount,
         totalAmount: totals.totalAmount,
-        attachmentUrl: fileUrl,
+        attachmentUrl: fileUrl || "",
         attachmentFileName: uploadedFile?.name || "",
         createdAt: Timestamp.now(),
-        createdBy: permissions.userId,
-        createdByName: permissions.userName,
+        createdBy: permissions.userId || "",
+        createdByName: permissions.userName || "",
         version: 1,
       };
 
@@ -915,8 +915,8 @@ export default function NewPOPage() {
         if (shouldAutoApprove(approvalSteps)) {
           poData.status = "approved";
           poData.approvedAt = Timestamp.now();
-          poData.approvedBy = permissions.userId;
-          poData.approvedByName = permissions.userName;
+          poData.approvedBy = permissions.userId || "";
+          poData.approvedByName = permissions.userName || "";
           poData.autoApproved = true;
           poData.committedAmount = totals.baseAmount;
           poData.remainingAmount = totals.baseAmount;
@@ -1331,7 +1331,7 @@ export default function NewPOPage() {
                       value={formData.generalDescription}
                       onChange={(e) => setFormData({ ...formData, generalDescription: e.target.value.toUpperCase() })}
                       onBlur={() => handleBlur("generalDescription")}
-                      placeholder="CONCEPTO DE LA ORDEN DE COMPRA"
+                      placeholder="DESCRIBE EL PROPÓSITO DE ESTA ORDEN DE COMPRA"
                       rows={3}
                       className={cx(
                         "w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm pr-10 uppercase",
