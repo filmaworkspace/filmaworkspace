@@ -943,56 +943,6 @@ export default function DocumentCenterPage() {
       </div>
 
       <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center">
-                <CheckCircle size={20} className="text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-900">{invoices.filter((i) => i.status === "paid").length}</p>
-                <p className="text-xs text-slate-500">Pagadas</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-violet-50 rounded-lg flex items-center justify-center">
-                <FileCheck size={20} className="text-violet-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-900">{invoices.filter((i) => i.codedAt).length}</p>
-                <p className="text-xs text-slate-500">Codificadas</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center">
-                <Clock size={20} className="text-amber-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-900">{invoices.filter((i) => i.status === "pending").length}</p>
-                <p className="text-xs text-slate-500">Pendientes</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                <Euro size={20} className="text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-slate-900">
-                  {formatCurrency(invoices.filter((i) => i.status === "paid").reduce((sum, i) => sum + i.totalAmount, 0))}
-                </p>
-                <p className="text-xs text-slate-500">Total pagado</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Filters */}
         <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-6">
           <div className="flex flex-col lg:flex-row gap-4">
