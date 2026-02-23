@@ -7,7 +7,7 @@ import {
   Clock, User, Calendar, Building2, Eye, Check, X, AlertTriangle,
   MessageSquare, History, TrendingUp, DollarSign, Shield, FileCheck, Zap,
   ChevronDown, ChevronUp, ExternalLink, Send, Info, Flame, Award, Target,
-  PieChart, HelpCircle, Link as LinkIcon, ClipboardCheck, Layers, CreditCard, Banknote,
+  PieChart, HelpCircle, Link as LinkIcon, ClipboardCheck, Layers, CreditCard, Banknote, Package,
 } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebase";
@@ -693,7 +693,7 @@ export default function ApprovalsPage() {
                     <div className="px-6 py-5 border-b border-slate-200 bg-slate-50">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          {currentApproval.type === "po" ? <div className="w-12 h-12 bg-slate-200 rounded-xl flex items-center justify-center"><FileText size={20} className="text-slate-600" /></div> : currentApproval.type === "invoice" ? <div className="w-12 h-12 bg-slate-200 rounded-xl flex items-center justify-center"><Receipt size={20} className="text-slate-600" /></div> : <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">{currentApproval.boxType === "card" ? <CreditCard size={20} className="text-amber-600" /> : <Banknote size={20} className="text-amber-600" />}</div>}
+                          {currentApproval.type === "po" ? <div className="w-12 h-12 bg-slate-200 rounded-xl flex items-center justify-center"><FileText size={20} className="text-slate-600" /></div> : currentApproval.type === "invoice" ? <div className="w-12 h-12 bg-slate-200 rounded-xl flex items-center justify-center"><Receipt size={20} className="text-slate-600" /></div> : <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center"><Package size={20} className="text-blue-600" /></div>}
                           <div>
                             <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-slate-900">{currentApproval.displayNumber}</h2>{currentApproval.isUrgent && (<span className="flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg font-medium"><Flame size={10} />Urgente</span>)}</div>
                             <p className="text-sm text-slate-500">{currentApproval.department && `${currentApproval.department} · `}{currentApproval.poType}{currentApproval.poNumber && currentApproval.type === "invoice" && (<span className="inline-flex items-center gap-1 ml-2 text-slate-600"><LinkIcon size={10} />PO-{currentApproval.poNumber}</span>)}</p>
@@ -770,24 +770,24 @@ export default function ApprovalsPage() {
                           <div className="flex items-center justify-between mb-2">
                             <p className="text-xs text-slate-500">Gastos del sobre ({currentApproval.expenseCount || currentApproval.boxExpenses.length})</p>
                             {currentApproval.boxType === "transfer" && currentApproval.paymentDate && (
-                              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg">Pago: {currentApproval.paymentDate}</span>
+                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg">Pago: {currentApproval.paymentDate}</span>
                             )}
                           </div>
-                          <div className="bg-amber-50 rounded-xl border border-amber-100 overflow-hidden">
+                          <div className="bg-blue-50 rounded-xl border border-blue-100 overflow-hidden">
                             <div className="max-h-56 overflow-y-auto">
                               <table className="w-full text-sm">
-                                <thead className="bg-amber-100/50 sticky top-0">
+                                <thead className="bg-blue-100/50 sticky top-0">
                                   <tr>
-                                    {currentApproval.boxType === "transfer" && <th className="text-left px-3 py-2 text-xs font-medium text-amber-700">Persona</th>}
-                                    <th className="text-left px-3 py-2 text-xs font-medium text-amber-700">Proveedor</th>
-                                    <th className="text-left px-3 py-2 text-xs font-medium text-amber-700">Cuenta</th>
-                                    <th className="text-right px-3 py-2 text-xs font-medium text-amber-700">Base</th>
-                                    <th className="text-right px-3 py-2 text-xs font-medium text-amber-700">Total</th>
+                                    {currentApproval.boxType === "transfer" && <th className="text-left px-3 py-2 text-xs font-medium text-blue-700">Persona</th>}
+                                    <th className="text-left px-3 py-2 text-xs font-medium text-blue-700">Proveedor</th>
+                                    <th className="text-left px-3 py-2 text-xs font-medium text-blue-700">Cuenta</th>
+                                    <th className="text-right px-3 py-2 text-xs font-medium text-blue-700">Base</th>
+                                    <th className="text-right px-3 py-2 text-xs font-medium text-blue-700">Total</th>
                                   </tr>
                                 </thead>
-                                <tbody className="divide-y divide-amber-100">
+                                <tbody className="divide-y divide-blue-100">
                                   {currentApproval.boxExpenses.map((exp, idx) => (
-                                    <tr key={exp.id || idx} className="hover:bg-amber-100/30">
+                                    <tr key={exp.id || idx} className="hover:bg-blue-100/30">
                                       {currentApproval.boxType === "transfer" && <td className="px-3 py-2 text-slate-900">{exp.personName || "-"}</td>}
                                       <td className="px-3 py-2 text-slate-900 truncate max-w-[150px]">{exp.supplier}</td>
                                       <td className="px-3 py-2 font-mono text-xs text-slate-600">{exp.subAccountCode}</td>
@@ -798,9 +798,9 @@ export default function ApprovalsPage() {
                                 </tbody>
                               </table>
                             </div>
-                            <div className="px-3 py-2 bg-amber-100 flex justify-between items-center border-t border-amber-200">
-                              <span className="text-xs text-amber-700 font-medium">{currentApproval.boxType === "card" ? `Tarjeta: ${currentApproval.cardName}` : "Sobre de transferencia"}</span>
-                              <span className="text-sm font-bold text-amber-900">{formatCurrency(currentApproval.amount)}</span>
+                            <div className="px-3 py-2 bg-blue-100 flex justify-between items-center border-t border-blue-200">
+                              <span className="text-xs text-blue-700 font-medium">{currentApproval.boxType === "card" ? `Tarjeta: ${currentApproval.cardName}` : "Sobre de transferencia"}</span>
+                              <span className="text-sm font-bold text-blue-900">{formatCurrency(currentApproval.amount)}</span>
                             </div>
                           </div>
                         </div>
