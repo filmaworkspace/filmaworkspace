@@ -2028,7 +2028,7 @@ export default function AccountingConfigPage() {
           {/* Page header */}
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-3">
-              <Settings size={24} className="text-slate-400" />
+              <Settings size={24} style={{ color: "#2F52E0" }} />
               <h1 className="text-2xl font-semibold text-slate-900">Configuración de contabilidad</h1>
             </div>
 
