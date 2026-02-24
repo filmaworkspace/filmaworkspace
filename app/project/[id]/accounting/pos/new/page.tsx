@@ -229,6 +229,8 @@ export default function NewPOPage() {
   // Dropdowns custom
   const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
   const [showCurrencyDropdown, setShowCurrencyDropdown] = useState(false);
+  const [showVatDropdown, setShowVatDropdown] = useState<number | null>(null);
+  const [showIrpfDropdown, setShowIrpfDropdown] = useState<number | null>(null);
   const departmentDropdownRef = useRef<HTMLDivElement>(null);
   const currencyDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -1356,7 +1358,7 @@ export default function NewPOPage() {
                       value={formData.generalDescription}
                       onChange={(e) => setFormData({ ...formData, generalDescription: e.target.value.toUpperCase() })}
                       onBlur={() => handleBlur("generalDescription")}
-                      placeholder="DESCRIBE EL PROPÓSITO DE ESTA ORDEN DE COMPRA"
+                      placeholder="CONCEPTO DE LA ORDEN DE COMPRA"
                       rows={3}
                       className={cx(
                         "w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm pr-10 uppercase",
@@ -1553,25 +1555,55 @@ export default function NewPOPage() {
                         </div>
 
                         <div className="grid grid-cols-4 gap-3">
-                          <div>
+                          <div className="relative">
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">IVA</label>
-                            <select
-                              value={item.vatRate}
-                              onChange={(e) => updateItem(index, "vatRate", parseFloat(e.target.value))}
-                              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white"
+                            <button
+                              type="button"
+                              onClick={() => setShowVatDropdown(showVatDropdown === index ? null : index)}
+                              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white text-left flex items-center justify-between hover:border-slate-300 transition-colors"
                             >
-                              {VAT_RATES.map((rate) => (<option key={rate.value} value={rate.value}>{rate.label}</option>))}
-                            </select>
+                              <span>{VAT_RATES.find(r => r.value === item.vatRate)?.label || item.vatRate + "%"}</span>
+                              <ChevronDown size={14} className={cx("text-slate-400 transition-transform", showVatDropdown === index && "rotate-180")} />
+                            </button>
+                            {showVatDropdown === index && (
+                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1 max-h-48 overflow-y-auto">
+                                {VAT_RATES.map((rate) => (
+                                  <button
+                                    key={rate.value}
+                                    type="button"
+                                    onClick={() => { updateItem(index, "vatRate", rate.value); setShowVatDropdown(null); }}
+                                    className={cx("w-full px-3 py-2 text-left text-sm hover:bg-slate-50", item.vatRate === rate.value && "bg-slate-50 font-medium")}
+                                  >
+                                    {rate.label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                          <div>
+                          <div className="relative">
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">IRPF</label>
-                            <select
-                              value={item.irpfRate}
-                              onChange={(e) => updateItem(index, "irpfRate", parseFloat(e.target.value))}
-                              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white"
+                            <button
+                              type="button"
+                              onClick={() => setShowIrpfDropdown(showIrpfDropdown === index ? null : index)}
+                              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white text-left flex items-center justify-between hover:border-slate-300 transition-colors"
                             >
-                              {IRPF_RATES.map((rate) => (<option key={rate.value} value={rate.value}>{rate.label}</option>))}
-                            </select>
+                              <span>{IRPF_RATES.find(r => r.value === item.irpfRate)?.label || item.irpfRate + "%"}</span>
+                              <ChevronDown size={14} className={cx("text-slate-400 transition-transform", showIrpfDropdown === index && "rotate-180")} />
+                            </button>
+                            {showIrpfDropdown === index && (
+                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1 max-h-48 overflow-y-auto">
+                                {IRPF_RATES.map((rate) => (
+                                  <button
+                                    key={rate.value}
+                                    type="button"
+                                    onClick={() => { updateItem(index, "irpfRate", rate.value); setShowIrpfDropdown(null); }}
+                                    className={cx("w-full px-3 py-2 text-left text-sm hover:bg-slate-50", item.irpfRate === rate.value && "bg-slate-50 font-medium")}
+                                  >
+                                    {rate.label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">+IVA</label>
