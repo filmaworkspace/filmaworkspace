@@ -1380,7 +1380,7 @@ export default function NewPOPage() {
             </div>
 
             {/* Items */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="bg-white border border-slate-200 rounded-2xl">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <h2 className="font-semibold text-slate-900">Items</h2>
@@ -1566,7 +1566,7 @@ export default function NewPOPage() {
                               <ChevronDown size={14} className={cx("text-slate-400 transition-transform", showVatDropdown === index && "rotate-180")} />
                             </button>
                             {showVatDropdown === index && (
-                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1 max-h-48 overflow-y-auto">
+                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 max-h-48 overflow-y-auto">
                                 {VAT_RATES.map((rate) => (
                                   <button
                                     key={rate.value}
@@ -1591,7 +1591,7 @@ export default function NewPOPage() {
                               <ChevronDown size={14} className={cx("text-slate-400 transition-transform", showIrpfDropdown === index && "rotate-180")} />
                             </button>
                             {showIrpfDropdown === index && (
-                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1 max-h-48 overflow-y-auto">
+                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 max-h-48 overflow-y-auto">
                                 {IRPF_RATES.map((rate) => (
                                   <button
                                     key={rate.value}
