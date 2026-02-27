@@ -5,12 +5,12 @@ import { Inter } from "next/font/google";
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
-import { Download, FileText, Receipt, Building2, Wallet, Settings2, ChevronDown, Check, X, Save, Trash2, BookMarked, Layers, GripVertical, Plus, Minus, FileSpreadsheet, Film, ShieldAlert, ArrowLeft } from "lucide-react";
+import { Download, FileText, Receipt, Building2, Wallet, Settings2, ChevronDown, Check, X, Save, Trash2, BookMarked, Layers, GripVertical, Plus, Minus, FileSpreadsheet, Film, ShieldAlert, ArrowLeft, CreditCard, Banknote } from "lucide-react";
 import { getCostSettings, shouldCommitPO, shouldRealizeInvoice, CostSettings } from "@/lib/budgetRules";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-type ReportType = "budget" | "pos_list" | "pos_items" | "invoices" | "invoices_accounting" | "suppliers" | "payments" | "cost_report";
+type ReportType = "budget" | "pos_list" | "pos_items" | "invoices" | "invoices_accounting" | "suppliers" | "payments" | "cost_report" | "box_cards" | "box_transfers";
 
 interface ReportColumn {
   id: string;
@@ -169,6 +169,46 @@ const REPORT_COLUMNS: Record<ReportType, ReportColumn[]> = {
     { id: "percentExecuted", label: "% Ejecutado", enabled: true },
     { id: "deviation", label: "Desviación", enabled: false },
   ],
+  box_cards: [
+    { id: "envelopeNumber", label: "Nº Sobre", enabled: true, locked: true },
+    { id: "cardName", label: "Tarjeta", enabled: true },
+    { id: "expenseNumber", label: "Nº Gasto", enabled: true },
+    { id: "type", label: "Tipo", enabled: true },
+    { id: "date", label: "Fecha", enabled: true },
+    { id: "supplier", label: "Proveedor", enabled: true },
+    { id: "description", label: "Descripción", enabled: true },
+    { id: "accountCode", label: "Cuenta", enabled: true },
+    { id: "baseAmount", label: "Base", enabled: true },
+    { id: "vatRate", label: "% IVA", enabled: false },
+    { id: "vatAmount", label: "IVA", enabled: true },
+    { id: "irpfRate", label: "% IRPF", enabled: false },
+    { id: "irpfAmount", label: "IRPF", enabled: false },
+    { id: "totalAmount", label: "Total", enabled: true },
+    { id: "status", label: "Estado sobre", enabled: true },
+    { id: "createdAt", label: "Fecha registro", enabled: false },
+    { id: "createdBy", label: "Registrado por", enabled: false },
+  ],
+  box_transfers: [
+    { id: "envelopeNumber", label: "Nº Sobre", enabled: true, locked: true },
+    { id: "paymentDate", label: "Fecha pago", enabled: true },
+    { id: "personName", label: "Persona", enabled: true },
+    { id: "personDepartment", label: "Departamento", enabled: true },
+    { id: "personIban", label: "IBAN", enabled: false },
+    { id: "type", label: "Tipo", enabled: true },
+    { id: "date", label: "Fecha gasto", enabled: true },
+    { id: "supplier", label: "Proveedor", enabled: true },
+    { id: "description", label: "Descripción", enabled: false },
+    { id: "accountCode", label: "Cuenta", enabled: true },
+    { id: "baseAmount", label: "Base", enabled: true },
+    { id: "vatRate", label: "% IVA", enabled: false },
+    { id: "vatAmount", label: "IVA", enabled: true },
+    { id: "irpfRate", label: "% IRPF", enabled: false },
+    { id: "irpfAmount", label: "IRPF", enabled: false },
+    { id: "totalAmount", label: "Total", enabled: true },
+    { id: "status", label: "Estado sobre", enabled: true },
+    { id: "transferReference", label: "Ref. transferencia", enabled: true },
+    { id: "transferredAt", label: "Fecha transferencia", enabled: false },
+  ],
 };
 
 const REPORT_INFO: Record<ReportType, { title: string; icon: any; section: string }> = {
@@ -179,6 +219,8 @@ const REPORT_INFO: Record<ReportType, { title: string; icon: any; section: strin
   invoices: { title: "Listado de facturas", icon: Receipt, section: "facturas" },
   invoices_accounting: { title: "Libro de facturas", icon: BookMarked, section: "facturas" },
   payments: { title: "Registro de pagos", icon: Wallet, section: "facturas" },
+  box_cards: { title: "Gastos de tarjeta", icon: CreditCard, section: "box" },
+  box_transfers: { title: "Transferencias de caja", icon: Banknote, section: "box" },
   suppliers: { title: "Proveedores", icon: Building2, section: "otros" },
 };
 
@@ -186,6 +228,7 @@ const REPORT_SECTIONS = [
   { id: "presupuesto", title: "Presupuesto", reports: ["budget", "cost_report"] as ReportType[] },
   { id: "pos", title: "Órdenes de compra", reports: ["pos_list", "pos_items"] as ReportType[] },
   { id: "facturas", title: "Facturas y pagos", reports: ["invoices", "invoices_accounting", "payments"] as ReportType[] },
+  { id: "box", title: "BOX", reports: ["box_cards", "box_transfers"] as ReportType[] },
   { id: "otros", title: "Otros", reports: ["suppliers"] as ReportType[] },
 ];
 
@@ -196,7 +239,7 @@ export default function ReportsPage() {
   const [projectName, setProjectName] = useState("");
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState<string | null>(null);
-  const [counts, setCounts] = useState({ pos: 0, invoices: 0, suppliers: 0, accounts: 0 });
+  const [counts, setCounts] = useState({ pos: 0, invoices: 0, suppliers: 0, accounts: 0, cardExpenses: 0, transferExpenses: 0 });
   const [userId, setUserId] = useState<string | null>(null);
   const [hasAccess, setHasAccess] = useState(false);
   const [accessError, setAccessError] = useState("");
@@ -274,13 +317,22 @@ export default function ReportsPage() {
       const projectDoc = await getDoc(doc(db, "projects", id));
       if (projectDoc.exists()) setProjectName(projectDoc.data().name || "Proyecto");
       
-      const [posSnap, invoicesSnap, suppliersSnap, accountsSnap] = await Promise.all([
+      const [posSnap, invoicesSnap, suppliersSnap, accountsSnap, cardExpensesSnap, transferExpensesSnap] = await Promise.all([
         getDocs(collection(db, `projects/${id}/pos`)),
         getDocs(collection(db, `projects/${id}/invoices`)),
         getDocs(collection(db, `projects/${id}/suppliers`)),
         getDocs(collection(db, `projects/${id}/accounts`)),
+        getDocs(collection(db, `projects/${id}/cardExpenses`)),
+        getDocs(collection(db, `projects/${id}/transferExpenses`)),
       ]);
-      setCounts({ pos: posSnap.size, invoices: invoicesSnap.size, suppliers: suppliersSnap.size, accounts: accountsSnap.size });
+      setCounts({ 
+        pos: posSnap.size, 
+        invoices: invoicesSnap.size, 
+        suppliers: suppliersSnap.size, 
+        accounts: accountsSnap.size,
+        cardExpenses: cardExpensesSnap.size,
+        transferExpenses: transferExpensesSnap.size,
+      });
 
       try {
         const productionDoc = await getDoc(doc(db, `projects/${id}/config/production`));
@@ -719,6 +771,84 @@ export default function ReportsPage() {
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
+  const generateBoxCardsReport = async (columns: SelectedColumn[]) => {
+    setGenerating("box_cards");
+    try {
+      const [envelopesSnap, expensesSnap] = await Promise.all([
+        getDocs(collection(db, `projects/${id}/cardEnvelopes`)),
+        getDocs(query(collection(db, `projects/${id}/cardExpenses`), orderBy("createdAt", "desc"))),
+      ]);
+      const envelopesMap = new Map(envelopesSnap.docs.map(d => [d.id, d.data()]));
+      const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
+      for (const expDoc of expensesSnap.docs) {
+        const exp = expDoc.data();
+        const envelope = envelopesMap.get(exp.envelopeId);
+        const rowData: any = {
+          envelopeNumber: envelope?.displayNumber || "",
+          boxCode: exp.boxCode || "",
+          type: exp.type === "ticket" ? "Ticket" : "Factura",
+          date: exp.date ? (exp.date.toDate ? exp.date.toDate().toLocaleDateString("es-ES") : exp.date) : "",
+          supplier: exp.supplier || "",
+          supplierTaxId: exp.supplierTaxId || "",
+          subAccountCode: exp.subAccountCode || "",
+          subAccountDescription: exp.subAccountDescription || "",
+          description: exp.description || "",
+          baseAmount: exp.baseAmount || 0,
+          vatAmount: exp.vatAmount || 0,
+          irpfAmount: exp.irpfAmount || 0,
+          totalAmount: exp.totalAmount || 0,
+          status: exp.status === "reviewed" ? "Revisado" : exp.status === "accounted" ? "Contabilizado" : "Pendiente",
+          envelopeStatus: envelope?.status === "closed" ? "Cerrado" : envelope?.status === "reviewing" ? "En revisión" : "Abierto",
+        };
+        rows.push(columns.map(col => { if (col.isBlank) return ""; const val = rowData[col.originalId]; return typeof val === "number" ? formatCurrency(val) : val?.toString() || ""; }));
+      }
+      downloadCSV(rows, `BOX_Tarjetas_${projectName}_${getCurrentDate()}.csv`);
+    } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
+  };
+
+  const generateBoxTransfersReport = async (columns: SelectedColumn[]) => {
+    setGenerating("box_transfers");
+    try {
+      const [envelopesSnap, expensesSnap] = await Promise.all([
+        getDocs(collection(db, `projects/${id}/transferEnvelopes`)),
+        getDocs(query(collection(db, `projects/${id}/transferExpenses`), orderBy("createdAt", "desc"))),
+      ]);
+      const envelopesMap = new Map(envelopesSnap.docs.map(d => [d.id, d.data()]));
+      const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
+      for (const expDoc of expensesSnap.docs) {
+        const exp = expDoc.data();
+        const envelope = envelopesMap.get(exp.envelopeId);
+        // Handle both old format (single subAccountCode) and new format (items array)
+        const items = exp.items && exp.items.length > 0 ? exp.items : [{ subAccountCode: exp.subAccountCode, subAccountDescription: exp.subAccountDescription, description: exp.description, baseAmount: exp.baseAmount }];
+        for (const item of items) {
+          const rowData: any = {
+            envelopeNumber: envelope?.displayNumber || "",
+            paymentDate: envelope?.paymentDate || "",
+            type: exp.type === "ticket" ? "Ticket" : "Factura",
+            personName: exp.personName || "",
+            personDepartment: exp.personDepartment || "",
+            personIban: exp.personIban || "",
+            date: exp.date || "",
+            supplier: exp.supplier || "",
+            supplierTaxId: exp.supplierTaxId || "",
+            subAccountCode: item.subAccountCode || "",
+            subAccountDescription: item.subAccountDescription || "",
+            description: item.description || exp.description || "",
+            baseAmount: item.baseAmount || 0,
+            vatAmount: item.vatAmount || exp.vatAmount || 0,
+            irpfAmount: exp.irpfAmount || 0,
+            totalAmount: exp.totalAmount || 0,
+            status: envelope?.status === "transferred" ? "Transferido" : envelope?.status === "pending" ? "Pendiente" : "Borrador",
+            transferReference: envelope?.transferReference || "",
+            transferredAt: envelope?.transferredAt ? (envelope.transferredAt.toDate ? envelope.transferredAt.toDate().toLocaleDateString("es-ES") : envelope.transferredAt) : "",
+          };
+          rows.push(columns.map(col => { if (col.isBlank) return ""; const val = rowData[col.originalId]; return typeof val === "number" ? formatCurrency(val) : val?.toString() || ""; }));
+        }
+      }
+      downloadCSV(rows, `BOX_Transferencias_${projectName}_${getCurrentDate()}.csv`);
+    } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
+  };
+
   const generateReport = (reportType: ReportType, columns?: SelectedColumn[]) => {
     const cols = columns || getDefaultColumns(reportType);
     switch (reportType) {
@@ -730,6 +860,8 @@ export default function ReportsPage() {
       case "suppliers": return generateSuppliersReport(cols);
       case "payments": return generatePaymentsReport(cols);
       case "cost_report": return generateCostReport(cols);
+      case "box_cards": return generateBoxCardsReport(cols);
+      case "box_transfers": return generateBoxTransfersReport(cols);
     }
   };
 
@@ -748,6 +880,9 @@ export default function ReportsPage() {
       case "pos_list": case "pos_items": return counts.pos;
       case "invoices": case "invoices_accounting": case "payments": return counts.invoices;
       case "suppliers": return counts.suppliers;
+      case "box_cards": return counts.cardExpenses || 0;
+      case "box_transfers": return counts.transferExpenses || 0;
+      default: return 0;
     }
   };
 
