@@ -696,7 +696,7 @@ export default function BudgetPage() {
                             <td className="px-2 py-1.5 text-right text-slate-900 tabular-nums text-xs">{formatCurrency(subAccount.budgeted)}</td>
                             <td className="px-2 py-1.5 text-right text-slate-600 tabular-nums text-xs">{formatCurrency(subAccount.committed)}</td>
                             <td className="px-2 py-1.5 text-right text-slate-600 tabular-nums text-xs">{formatCurrency(subAccount.actual)}</td>
-                            <td className="px-2 py-1.5 text-right text-amber-600 tabular-nums text-xs">{subAccount.box > 0 ? formatCurrency(subAccount.box) : "-"}</td>
+                            <td className="px-2 py-1.5 text-right text-amber-600 tabular-nums text-xs">{formatCurrency(subAccount.box)}</td>
                             <td className="px-2 py-1.5 text-right">
                               <div className="flex items-center justify-end gap-1.5">
                                 <span className={`w-1.5 h-1.5 rounded-full ${subStatus.color}`}></span>
@@ -991,7 +991,7 @@ export default function BudgetPage() {
                                 </span>
                               </td>
                               <td className="px-3 py-2 text-right font-medium text-slate-900">
-                                {row.budgeted > 0 ? formatCurrency(row.budgeted) : "-"}
+                                {formatCurrency(row.budgeted)}
                               </td>
                             </tr>
                           ))}
