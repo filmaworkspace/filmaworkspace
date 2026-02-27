@@ -171,16 +171,23 @@ const REPORT_COLUMNS: Record<ReportType, ReportColumn[]> = {
   ],
 };
 
-const REPORT_INFO: Record<ReportType, { title: string; description: string; icon: any }> = {
-  budget: { title: "Presupuesto", description: "Cuentas, subcuentas y ejecución presupuestaria", icon: Wallet },
-  pos_list: { title: "Listado de POs", description: "Órdenes de compra con totales", icon: FileText },
-  pos_items: { title: "POs por ítems", description: "Desglose detallado de cada ítem de PO", icon: Layers },
-  invoices: { title: "Facturas", description: "Listado completo de facturas recibidas", icon: Receipt },
-  invoices_accounting: { title: "Libro de facturas", description: "Facturas contabilizadas con nº de asiento", icon: BookMarked },
-  suppliers: { title: "Proveedores", description: "Directorio completo de proveedores", icon: Building2 },
-  payments: { title: "Registro de pagos", description: "Histórico de pagos realizados", icon: Wallet },
-  cost_report: { title: "Informe de costes", description: "Resumen de ejecución por cuenta contable", icon: FileSpreadsheet },
+const REPORT_INFO: Record<ReportType, { title: string; icon: any; section: string }> = {
+  budget: { title: "Presupuesto", icon: Wallet, section: "presupuesto" },
+  cost_report: { title: "Informe de costes", icon: FileSpreadsheet, section: "presupuesto" },
+  pos_list: { title: "Listado de POs", icon: FileText, section: "pos" },
+  pos_items: { title: "POs desglosado por ítems", icon: Layers, section: "pos" },
+  invoices: { title: "Listado de facturas", icon: Receipt, section: "facturas" },
+  invoices_accounting: { title: "Libro de facturas", icon: BookMarked, section: "facturas" },
+  payments: { title: "Registro de pagos", icon: Wallet, section: "facturas" },
+  suppliers: { title: "Proveedores", icon: Building2, section: "otros" },
 };
+
+const REPORT_SECTIONS = [
+  { id: "presupuesto", title: "Presupuesto", reports: ["budget", "cost_report"] as ReportType[] },
+  { id: "pos", title: "Órdenes de compra", reports: ["pos_list", "pos_items"] as ReportType[] },
+  { id: "facturas", title: "Facturas y pagos", reports: ["invoices", "invoices_accounting", "payments"] as ReportType[] },
+  { id: "otros", title: "Otros", reports: ["suppliers"] as ReportType[] },
+];
 
 export default function ReportsPage() {
   const params = useParams();
@@ -205,14 +212,11 @@ export default function ReportsPage() {
   const [showSavePreset, setShowSavePreset] = useState(false);
   const [newPresetName, setNewPresetName] = useState("");
   const [expandedReport, setExpandedReport] = useState<ReportType | null>(null);
-  const [exportFormat, setExportFormat] = useState<"csv" | "xlsx">("csv");
 
-  // Estados para episodios
   const [episodesEnabled, setEpisodesEnabled] = useState(false);
   const [totalEpisodes, setTotalEpisodes] = useState(0);
   const [splitByEpisode, setSplitByEpisode] = useState(false);
 
-  // Configuración de coste
   const [costConfig, setCostConfig] = useState<CostSettings>({
     poCommitmentTrigger: "on_approve",
     invoiceActualTrigger: "on_paid",
@@ -221,17 +225,7 @@ export default function ReportsPage() {
   useEffect(() => {
     const savedPresets = localStorage.getItem(`report_presets_${id}`);
     if (savedPresets) setPresets(JSON.parse(savedPresets));
-    
-    // Cargar formato de exportación guardado
-    const savedFormat = localStorage.getItem(`report_export_format`) as "csv" | "xlsx" | null;
-    if (savedFormat) setExportFormat(savedFormat);
   }, [id]);
-
-  const toggleExportFormat = () => {
-    const newFormat = exportFormat === "csv" ? "xlsx" : "csv";
-    setExportFormat(newFormat);
-    localStorage.setItem(`report_export_format`, newFormat);
-  };
 
   const savePresetsToStorage = (newPresets: ReportPreset[]) => {
     localStorage.setItem(`report_presets_${id}`, JSON.stringify(newPresets));
@@ -252,7 +246,6 @@ export default function ReportsPage() {
     try {
       setLoading(true);
       
-      // Verificar acceso: accounting o accounting_extended, o EP/PM
       const userProjectRef = doc(db, `userProjects/${userId}/projects/${id}`);
       const userProjectSnap = await getDoc(userProjectRef);
       if (!userProjectSnap.exists()) {
@@ -289,14 +282,12 @@ export default function ReportsPage() {
       ]);
       setCounts({ pos: posSnap.size, invoices: invoicesSnap.size, suppliers: suppliersSnap.size, accounts: accountsSnap.size });
 
-      // Cargar configuración de episodios
       try {
         const productionDoc = await getDoc(doc(db, `projects/${id}/config/production`));
         if (productionDoc.exists()) {
           const prodData = productionDoc.data();
           if (prodData.projectType === "serie") {
             setTotalEpisodes(prodData.episodes || 0);
-            
             const projectConfigDoc = await getDoc(doc(db, `projects/${id}/config/project`));
             if (projectConfigDoc.exists()) {
               const configData = projectConfigDoc.data();
@@ -308,7 +299,6 @@ export default function ReportsPage() {
         console.error("Error loading episodes config:", epErr);
       }
 
-      // Cargar configuración de costes usando budgetRules
       try {
         const loadedCostConfig = await getCostSettings(id);
         setCostConfig(loadedCostConfig);
@@ -369,42 +359,27 @@ export default function ReportsPage() {
     setSelectedColumns([...selectedColumns, blankCol]);
   };
 
-  const handleDragStart = (index: number) => {
-    setDraggedItem(index);
-  };
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    setDragOverItem(index);
-  };
-
+  const handleDragStart = (index: number) => setDraggedItem(index);
+  const handleDragOver = (e: React.DragEvent, index: number) => { e.preventDefault(); setDragOverItem(index); };
   const handleDrop = (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
     if (draggedItem === null) return;
-    
     const newColumns = [...selectedColumns];
     const draggedColumn = newColumns[draggedItem];
     newColumns.splice(draggedItem, 1);
     newColumns.splice(dropIndex, 0, draggedColumn);
-    
     setSelectedColumns(newColumns);
     setDraggedItem(null);
     setDragOverItem(null);
   };
-
-  const handleDragEnd = () => {
-    setDraggedItem(null);
-    setDragOverItem(null);
-  };
+  const handleDragEnd = () => { setDraggedItem(null); setDragOverItem(null); };
 
   const getDefaultColumns = (reportType: ReportType): SelectedColumn[] => {
-    return REPORT_COLUMNS[reportType]
-      .filter(c => c.enabled)
-      .map((c, i) => ({
-        id: `${c.id}_${i}`,
-        originalId: c.id,
-        label: c.label,
-      }));
+    return REPORT_COLUMNS[reportType].filter(c => c.enabled).map((c, i) => ({
+      id: `${c.id}_${i}`,
+      originalId: c.id,
+      label: c.label,
+    }));
   };
 
   const savePreset = () => {
@@ -421,20 +396,15 @@ export default function ReportsPage() {
     setShowSavePreset(false);
   };
 
-  const deletePreset = (presetId: string) => {
-    savePresetsToStorage(presets.filter(p => p.id !== presetId));
-  };
+  const deletePreset = (presetId: string) => savePresetsToStorage(presets.filter(p => p.id !== presetId));
 
   const loadPreset = (preset: ReportPreset) => {
     const cols = preset.columns.map((c, i) => {
-      if (c.isBlank) {
-        return { id: `blank_${i}`, originalId: "blank", label: "(Columna vacía)", isBlank: true };
-      }
+      if (c.isBlank) return { id: `blank_${i}`, originalId: "blank", label: "(Columna vacía)", isBlank: true };
       const original = REPORT_COLUMNS[preset.reportType].find(col => col.id === c.id);
       return { id: `${c.id}_${i}`, originalId: c.id, label: original?.label || c.id };
     });
     setSelectedColumns(cols);
-    
     const usedIds = cols.filter(c => !c.isBlank).map(c => c.originalId);
     setAvailableColumns(REPORT_COLUMNS[preset.reportType].filter(c => !usedIds.includes(c.id)));
   };
@@ -443,20 +413,11 @@ export default function ReportsPage() {
   const formatDate = (date: any) => date?.toDate ? new Date(date.toDate()).toLocaleDateString("es-ES") : "";
   const getCurrentDate = () => new Date().toISOString().split("T")[0];
 
-  const downloadFile = async (rows: string[][], filename: string) => {
-    if (exportFormat === "xlsx") {
-      await downloadXLSX(rows, filename.replace(".csv", ".xlsx"));
-    } else {
-      downloadCSV(rows, filename);
-    }
-  };
-
   const downloadCSV = (rows: string[][], filename: string) => {
     const csvContent = rows.map(row => row.map(cell => {
       const escaped = (cell || "").toString().replace(/"/g, '""');
       return `"${escaped}"`;
     }).join(";")).join("\n");
-    
     const BOM = "\uFEFF";
     const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
@@ -465,34 +426,6 @@ export default function ReportsPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  const downloadXLSX = async (rows: string[][], filename: string) => {
-    try {
-      // Importar SheetJS dinámicamente
-      const XLSX = await import("xlsx");
-      
-      // Crear worksheet desde los datos
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      
-      // Ajustar anchos de columna automáticamente
-      const colWidths = rows[0].map((_, colIndex) => {
-        const maxLen = Math.max(...rows.map(row => (row[colIndex] || "").toString().length));
-        return { wch: Math.min(Math.max(maxLen + 2, 10), 50) };
-      });
-      ws["!cols"] = colWidths;
-      
-      // Crear workbook
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Datos");
-      
-      // Generar archivo y descargar
-      XLSX.writeFile(wb, filename.endsWith(".xlsx") ? filename : filename + ".xlsx");
-    } catch (error) {
-      console.error("Error generando XLSX:", error);
-      // Fallback a CSV si falla
-      downloadCSV(rows, filename.replace(".xlsx", ".csv"));
-    }
   };
 
   const generateBudgetReport = async (columns: SelectedColumn[]) => {
@@ -514,38 +447,17 @@ export default function ReportsPage() {
           accountBudgeted += budgeted; accountCommitted += committed; accountActual += actual;
           const available = budgeted - committed - actual;
           const percentUsed = budgeted > 0 ? ((committed + actual) / budgeted * 100).toFixed(1) : "0";
-          
-          subRows.push({
-            code: subData.code, description: subData.description, type: "SUBCUENTA",
-            budgeted, committed, actual, available, percentUsed: `${percentUsed}%`
-          });
+          subRows.push({ code: subData.code, description: subData.description, type: "SUBCUENTA", budgeted, committed, actual, available, percentUsed: `${percentUsed}%` });
         });
         
         const accountAvailable = accountBudgeted - accountCommitted - accountActual;
         const accountPercentUsed = accountBudgeted > 0 ? ((accountCommitted + accountActual) / accountBudgeted * 100).toFixed(1) : "0";
+        const accountRow: any = { code: accountData.code, description: accountData.description, type: "CUENTA", budgeted: accountBudgeted, committed: accountCommitted, actual: accountActual, available: accountAvailable, percentUsed: `${accountPercentUsed}%` };
         
-        const accountRow: any = {
-          code: accountData.code, description: accountData.description, type: "CUENTA",
-          budgeted: accountBudgeted, committed: accountCommitted, actual: accountActual,
-          available: accountAvailable, percentUsed: `${accountPercentUsed}%`
-        };
-        
-        rows.push(columns.map(col => {
-          if (col.isBlank) return "";
-          const val = accountRow[col.originalId];
-          return typeof val === "number" ? formatCurrency(val) : val;
-        }));
-        
-        subRows.forEach(subRow => {
-          rows.push(columns.map(col => {
-            if (col.isBlank) return "";
-            const val = subRow[col.originalId];
-            return typeof val === "number" ? formatCurrency(val) : val;
-          }));
-        });
+        rows.push(columns.map(col => { if (col.isBlank) return ""; const val = accountRow[col.originalId]; return typeof val === "number" ? formatCurrency(val) : val; }));
+        subRows.forEach(subRow => { rows.push(columns.map(col => { if (col.isBlank) return ""; const val = subRow[col.originalId]; return typeof val === "number" ? formatCurrency(val) : val; })); });
       }
-      
-      await downloadFile(rows, `Presupuesto_${projectName}_${getCurrentDate()}.csv`);
+      downloadCSV(rows, `Presupuesto_${projectName}_${getCurrentDate()}.csv`);
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
@@ -558,31 +470,16 @@ export default function ReportsPage() {
       for (const docSnap of posSnapshot.docs) {
         const data = docSnap.data();
         const items = data.items || [];
-        
         const rowData: any = {
-          number: data.number || data.displayNumber || "",
-          supplier: data.supplier || "",
-          description: data.description || "",
-          baseAmount: data.baseAmount || 0,
-          taxAmount: data.taxAmount || 0,
-          totalAmount: data.totalAmount || 0,
-          status: data.status || "",
-          isOpen: data.isOpen !== false ? "Abierta" : "Cerrada",
-          createdAt: formatDate(data.createdAt),
-          createdBy: data.createdByName || "",
-          approvedAt: formatDate(data.approvedAt),
-          approvedBy: data.approvedByName || "",
-          itemCount: items.length,
+          number: data.number || data.displayNumber || "", supplier: data.supplier || "", description: data.description || "",
+          baseAmount: data.baseAmount || 0, taxAmount: data.taxAmount || 0, totalAmount: data.totalAmount || 0,
+          status: data.status || "", isOpen: data.isOpen !== false ? "Abierta" : "Cerrada",
+          createdAt: formatDate(data.createdAt), createdBy: data.createdByName || "",
+          approvedAt: formatDate(data.approvedAt), approvedBy: data.approvedByName || "", itemCount: items.length,
         };
-        
-        rows.push(columns.map(col => {
-          if (col.isBlank) return "";
-          const val = rowData[col.originalId];
-          return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
-        }));
+        rows.push(columns.map(col => { if (col.isBlank) return ""; const val = rowData[col.originalId]; return typeof val === "number" ? formatCurrency(val) : val?.toString() || ""; }));
       }
-      
-      await downloadFile(rows, `POs_Listado_${projectName}_${getCurrentDate()}.csv`);
+      downloadCSV(rows, `POs_Listado_${projectName}_${getCurrentDate()}.csv`);
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
@@ -592,19 +489,15 @@ export default function ReportsPage() {
       const posSnapshot = await getDocs(query(collection(db, `projects/${id}/pos`), orderBy("createdAt", "desc")));
       const invoicesSnapshot = await getDocs(collection(db, `projects/${id}/invoices`));
       
-      // Crear mapa de facturas por PO y calcular facturado por item (solo facturas con estado válido según config)
       const invoicedByPOItem: Record<string, Record<number, number>> = {};
       invoicesSnapshot.docs.forEach(invDoc => {
         const invData = invDoc.data();
         const invStatus = invData.status || "";
-        // Usar shouldRealizeInvoice para determinar si la factura cuenta
         if (invData.poId && invStatus !== "cancelled" && invStatus !== "rejected" && shouldRealizeInvoice(invStatus, costConfig)) {
           if (!invoicedByPOItem[invData.poId]) invoicedByPOItem[invData.poId] = {};
           (invData.items || []).forEach((invItem: any) => {
             const itemIndex = invItem.poItemIndex ?? -1;
-            if (itemIndex >= 0) {
-              invoicedByPOItem[invData.poId][itemIndex] = (invoicedByPOItem[invData.poId][itemIndex] || 0) + (invItem.baseAmount || 0);
-            }
+            if (itemIndex >= 0) invoicedByPOItem[invData.poId][itemIndex] = (invoicedByPOItem[invData.poId][itemIndex] || 0) + (invItem.baseAmount || 0);
           });
         }
       });
@@ -614,8 +507,6 @@ export default function ReportsPage() {
       for (const docSnap of posSnapshot.docs) {
         const poData = docSnap.data();
         const poStatus = poData.status || "";
-        
-        // Usar shouldCommitPO para determinar si la PO cuenta
         if (!shouldCommitPO(poStatus, costConfig)) continue;
         
         const poId = docSnap.id;
@@ -628,107 +519,54 @@ export default function ReportsPage() {
           const baseInvoiced = poInvoiced[index] || 0;
           const taxRate = item.vatRate || item.taxRate || 21;
           const irpfRate = item.irpfRate || 0;
-          
-          // Comprometido = lo pendiente de facturar (baseAmount - invoicedAmount)
-          // Si item cerrado: comprometido = 0 (se liberó el resto)
           const baseCommitted = itemIsClosed ? 0 : Math.max(0, rawBaseAmount - baseInvoiced);
           const taxAmount = baseCommitted * (taxRate / 100);
           const irpfAmount = baseCommitted * (irpfRate / 100);
           const totalCommitted = baseCommitted + taxAmount - irpfAmount;
-          
-          // Disponible = comprometido (ya que comprometido es lo pendiente)
           const baseAvailable = baseCommitted;
           const totalAvailable = totalCommitted;
-
-          // Determinar capítulo(s)
           const episodeAssignment = item.episodeAssignment || "general";
           const episodes = item.episodes || [];
 
-          // Si splitByEpisode está activo y hay episodios específicos, crear una fila por cada uno
           if (splitByEpisode && episodeAssignment === "specific" && episodes.length > 0) {
             episodes.forEach((ep: any) => {
               const rawEpBaseAmount = ep.amount || 0;
               const epPercentage = rawBaseAmount > 0 ? rawEpBaseAmount / rawBaseAmount : 0;
               const epBaseInvoiced = baseInvoiced * epPercentage;
-              
-              // Comprometido del episodio = pendiente de facturar
               const epBaseCommitted = itemIsClosed ? 0 : Math.max(0, rawEpBaseAmount - epBaseInvoiced);
               const epTaxAmount = epBaseCommitted * (taxRate / 100);
               const epIrpfAmount = epBaseCommitted * (irpfRate / 100);
               const epTotalCommitted = epBaseCommitted + epTaxAmount - epIrpfAmount;
-              const epBaseAvailable = epBaseCommitted;
-              const epTotalAvailable = epTotalCommitted;
-              
               const rowData: any = {
-                poNumber: poData.number || poData.displayNumber || "",
-                poDescription: poData.generalDescription || poData.description || "",
-                supplier: poData.supplier || "",
-                itemNumber: index + 1,
-                itemDescription: item.description || "",
-                episode: ep.episode.toString(),
-                accountCode: item.accountCode || item.subAccountCode?.split(".")[0] || "",
-                accountDescription: item.accountDescription || "",
-                subaccountCode: item.subAccountCode || item.subaccountCode || "",
+                poNumber: poData.number || poData.displayNumber || "", poDescription: poData.generalDescription || poData.description || "",
+                supplier: poData.supplier || "", itemNumber: index + 1, itemDescription: item.description || "",
+                episode: ep.episode.toString(), accountCode: item.accountCode || item.subAccountCode?.split(".")[0] || "",
+                accountDescription: item.accountDescription || "", subaccountCode: item.subAccountCode || item.subaccountCode || "",
                 subaccountDescription: item.subAccountDescription || item.subaccountDescription || "",
-                baseCommitted: epBaseCommitted,
-                totalCommitted: epTotalCommitted,
-                baseInvoiced: epBaseInvoiced,
-                baseAvailable: epBaseAvailable,
-                totalAvailable: epTotalAvailable,
-                poStatus: poData.status || "",
-                isOpen: poData.isOpen !== false ? "Abierta" : "Cerrada",
-                itemClosed: itemIsClosed ? "Sí" : "No",
-                taxRate: `${taxRate}%`,
-                irpfRate: `${irpfRate}%`,
+                baseCommitted: epBaseCommitted, totalCommitted: epTotalCommitted, baseInvoiced: epBaseInvoiced,
+                baseAvailable: epBaseCommitted, totalAvailable: epTotalCommitted,
+                poStatus: poData.status || "", isOpen: poData.isOpen !== false ? "Abierta" : "Cerrada",
+                itemClosed: itemIsClosed ? "Sí" : "No", taxRate: `${taxRate}%`, irpfRate: `${irpfRate}%`,
               };
-              
-              rows.push(columns.map(col => {
-                if (col.isBlank) return "";
-                const val = rowData[col.originalId];
-                if (typeof val === "number") return formatCurrency(val);
-                return val?.toString() || "";
-              }));
+              rows.push(columns.map(col => { if (col.isBlank) return ""; const val = rowData[col.originalId]; if (typeof val === "number") return formatCurrency(val); return val?.toString() || ""; }));
             });
           } else {
-            // Fila única (general o sin desglose)
-            const episodeLabel = episodeAssignment === "general" ? "0" : 
-              episodes.length === 1 ? episodes[0].episode.toString() :
-              episodes.length > 1 ? episodes.map((e: any) => e.episode).join(", ") : "0";
-            
+            const episodeLabel = episodeAssignment === "general" ? "0" : episodes.length === 1 ? episodes[0].episode.toString() : episodes.length > 1 ? episodes.map((e: any) => e.episode).join(", ") : "0";
             const rowData: any = {
-              poNumber: poData.number || poData.displayNumber || "",
-              poDescription: poData.generalDescription || poData.description || "",
-              supplier: poData.supplier || "",
-              itemNumber: index + 1,
-              itemDescription: item.description || "",
-              episode: episodeLabel,
-              accountCode: item.accountCode || item.subAccountCode?.split(".")[0] || "",
-              accountDescription: item.accountDescription || "",
-              subaccountCode: item.subAccountCode || item.subaccountCode || "",
+              poNumber: poData.number || poData.displayNumber || "", poDescription: poData.generalDescription || poData.description || "",
+              supplier: poData.supplier || "", itemNumber: index + 1, itemDescription: item.description || "",
+              episode: episodeLabel, accountCode: item.accountCode || item.subAccountCode?.split(".")[0] || "",
+              accountDescription: item.accountDescription || "", subaccountCode: item.subAccountCode || item.subaccountCode || "",
               subaccountDescription: item.subAccountDescription || item.subaccountDescription || "",
-              baseCommitted: baseCommitted,
-              totalCommitted: totalCommitted,
-              baseInvoiced: baseInvoiced,
-              baseAvailable: baseAvailable,
-              totalAvailable: totalAvailable,
-              poStatus: poData.status || "",
-              isOpen: poData.isOpen !== false ? "Abierta" : "Cerrada",
-              itemClosed: itemIsClosed ? "Sí" : "No",
-              taxRate: `${taxRate}%`,
-              irpfRate: `${irpfRate}%`,
+              baseCommitted, totalCommitted, baseInvoiced, baseAvailable, totalAvailable,
+              poStatus: poData.status || "", isOpen: poData.isOpen !== false ? "Abierta" : "Cerrada",
+              itemClosed: itemIsClosed ? "Sí" : "No", taxRate: `${taxRate}%`, irpfRate: `${irpfRate}%`,
             };
-            
-            rows.push(columns.map(col => {
-              if (col.isBlank) return "";
-              const val = rowData[col.originalId];
-              if (typeof val === "number") return formatCurrency(val);
-              return val?.toString() || "";
-            }));
+            rows.push(columns.map(col => { if (col.isBlank) return ""; const val = rowData[col.originalId]; if (typeof val === "number") return formatCurrency(val); return val?.toString() || ""; }));
           }
         });
       }
-      
-      await downloadFile(rows, `POs_Items_${projectName}_${getCurrentDate()}.csv`);
+      downloadCSV(rows, `POs_Items_${projectName}_${getCurrentDate()}.csv`);
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
@@ -741,103 +579,29 @@ export default function ReportsPage() {
       invoicesSnapshot.docs.forEach((docSnap) => {
         const data = docSnap.data();
         const items = data.items || [];
-
-        // Determinar capítulos de los items
         let episodeLabel = "0";
         const allEpisodes: number[] = [];
-        
         items.forEach((item: any) => {
           const assignment = item.episodeAssignment || "general";
           if (assignment === "specific" && item.episodes && item.episodes.length > 0) {
-            item.episodes.forEach((ep: any) => {
-              if (!allEpisodes.includes(ep.episode)) {
-                allEpisodes.push(ep.episode);
-              }
-            });
+            item.episodes.forEach((ep: any) => { if (!allEpisodes.includes(ep.episode)) allEpisodes.push(ep.episode); });
           }
         });
-
-        if (allEpisodes.length > 0) {
-          allEpisodes.sort((a, b) => a - b);
-          episodeLabel = allEpisodes.length === 1 ? allEpisodes[0].toString() : allEpisodes.join(", ");
-        }
-
-        // Si splitByEpisode, crear filas separadas por capítulo
-        if (splitByEpisode && allEpisodes.length > 1) {
-          // Calcular importe por capítulo
-          const amountByEpisode: Record<number, number> = {};
-          items.forEach((item: any) => {
-            const assignment = item.episodeAssignment || "general";
-            if (assignment === "specific" && item.episodes && item.episodes.length > 0) {
-              item.episodes.forEach((ep: any) => {
-                amountByEpisode[ep.episode] = (amountByEpisode[ep.episode] || 0) + (ep.amount || 0);
-              });
-            } else {
-              // General: se distribuye entre todos (ponemos en 0)
-              amountByEpisode[0] = (amountByEpisode[0] || 0) + (item.baseAmount || 0);
-            }
-          });
-
-          Object.entries(amountByEpisode).forEach(([epNum, amount]) => {
-            const rowData: any = {
-              number: data.number || data.displayNumber || "",
-              supplier: data.supplier || "",
-              supplierTaxId: data.supplierTaxId || "",
-              description: data.description || "",
-              poNumber: data.poNumber || "",
-              episode: epNum,
-              baseAmount: amount,
-              taxAmount: amount * 0.21, // Aproximación
-              irpfAmount: 0,
-              totalAmount: amount * 1.21,
-              status: data.status || "",
-              dueDate: formatDate(data.dueDate),
-              createdAt: formatDate(data.createdAt),
-              paidAt: formatDate(data.paidAt),
-              accountCode: data.accountCode || "",
-            };
-            
-            rows.push(columns.map(col => {
-              if (col.isBlank) return "";
-              const val = rowData[col.originalId];
-              return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
-            }));
-          });
-        } else {
-          // Obtener cuenta contable del primer item
-          const accountCode = items.length > 0 ? (items[0].subAccountCode || "") : "";
-          
-          const rowData: any = {
-            number: data.number || data.displayNumber || "",
-            supplierNumber: data.supplierNumber || "",
-            supplier: data.supplier || "",
-            supplierTaxId: data.supplierTaxId || "",
-            description: data.description || "",
-            poNumber: data.poNumber || "",
-            episode: episodeLabel,
-            accountCode: accountCode,
-            baseAmount: data.baseAmount || 0,
-            taxAmount: data.vatAmount || data.taxAmount || 0,
-            irpfAmount: data.irpfAmount || 0,
-            totalAmount: data.totalAmount || 0,
-            status: data.status || "",
-            coded: data.codedAt ? "Sí" : "No",
-            accounted: data.accounted ? "Sí" : "No",
-            invoiceDate: formatDate(data.invoiceDate),
-            dueDate: formatDate(data.dueDate),
-            createdAt: formatDate(data.createdAt),
-            paidAt: formatDate(data.paidAt),
-          };
-          
-          rows.push(columns.map(col => {
-            if (col.isBlank) return "";
-            const val = rowData[col.originalId];
-            return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
-          }));
-        }
+        if (allEpisodes.length > 0) { allEpisodes.sort((a, b) => a - b); episodeLabel = allEpisodes.length === 1 ? allEpisodes[0].toString() : allEpisodes.join(", "); }
+        const accountCode = items.length > 0 ? (items[0].subAccountCode || "") : "";
+        const rowData: any = {
+          number: data.number || data.displayNumber || "", supplierNumber: data.supplierNumber || "",
+          supplier: data.supplier || "", supplierTaxId: data.supplierTaxId || "", description: data.description || "",
+          poNumber: data.poNumber || "", episode: episodeLabel, accountCode: accountCode,
+          baseAmount: data.baseAmount || 0, taxAmount: data.vatAmount || data.taxAmount || 0,
+          irpfAmount: data.irpfAmount || 0, totalAmount: data.totalAmount || 0, status: data.status || "",
+          coded: data.codedAt ? "Sí" : "No", accounted: data.accounted ? "Sí" : "No",
+          invoiceDate: formatDate(data.invoiceDate), dueDate: formatDate(data.dueDate),
+          createdAt: formatDate(data.createdAt), paidAt: formatDate(data.paidAt),
+        };
+        rows.push(columns.map(col => { if (col.isBlank) return ""; const val = rowData[col.originalId]; return typeof val === "number" ? formatCurrency(val) : val?.toString() || ""; }));
       });
-      
-      await downloadFile(rows, `Facturas_${projectName}_${getCurrentDate()}.csv`);
+      downloadCSV(rows, `Facturas_${projectName}_${getCurrentDate()}.csv`);
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
@@ -846,35 +610,18 @@ export default function ReportsPage() {
     try {
       const suppliersSnapshot = await getDocs(query(collection(db, `projects/${id}/suppliers`), orderBy("fiscalName", "asc")));
       const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
-      
       suppliersSnapshot.docs.forEach((docSnap) => {
         const data = docSnap.data();
-        
         const rowData: any = {
-          fiscalName: data.fiscalName || "",
-          commercialName: data.commercialName || "",
-          taxId: data.taxId || "",
-          contactName: data.contact?.name || "",
-          contactEmail: data.contact?.email || "",
-          contactPhone: data.contact?.phone || "",
-          address: data.address || "",
-          city: data.city || "",
-          postalCode: data.postalCode || "",
-          paymentMethod: data.paymentMethod || "",
-          iban: data.bankAccount || data.iban || "",
-          paymentTerms: data.paymentTerms || "",
-          totalPOs: data.totalPOs || 0,
-          totalInvoiced: data.totalInvoiced || 0,
+          fiscalName: data.fiscalName || "", commercialName: data.commercialName || "", taxId: data.taxId || "",
+          contactName: data.contact?.name || "", contactEmail: data.contact?.email || "", contactPhone: data.contact?.phone || "",
+          address: data.address || "", city: data.city || "", postalCode: data.postalCode || "",
+          paymentMethod: data.paymentMethod || "", iban: data.bankAccount || data.iban || "",
+          paymentTerms: data.paymentTerms || "", totalPOs: data.totalPOs || 0, totalInvoiced: data.totalInvoiced || 0,
         };
-        
-        rows.push(columns.map(col => {
-          if (col.isBlank) return "";
-          const val = rowData[col.originalId];
-          return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
-        }));
+        rows.push(columns.map(col => { if (col.isBlank) return ""; const val = rowData[col.originalId]; return typeof val === "number" ? formatCurrency(val) : val?.toString() || ""; }));
       });
-      
-      await downloadFile(rows, `Proveedores_${projectName}_${getCurrentDate()}.csv`);
+      downloadCSV(rows, `Proveedores_${projectName}_${getCurrentDate()}.csv`);
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
@@ -883,52 +630,26 @@ export default function ReportsPage() {
     try {
       const invoicesSnapshot = await getDocs(query(collection(db, `projects/${id}/invoices`), orderBy("accountedAt", "desc")));
       const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
-      
-      // Solo facturas contabilizadas
       const accountedInvoices = invoicesSnapshot.docs.filter(doc => doc.data().accounted === true);
-      
       accountedInvoices.forEach((docSnap) => {
         const data = docSnap.data();
         const items = data.items || [];
-        
-        // Obtener cuenta contable del primer item
         const accountCode = items.length > 0 ? (items[0].subAccountCode || "") : "";
-        
-        // Calcular tasa de IVA
         const taxRate = data.baseAmount > 0 ? Math.round((data.vatAmount / data.baseAmount) * 100) : 21;
         const irpfRate = data.baseAmount > 0 ? Math.round((data.irpfAmount / data.baseAmount) * 100) : 0;
-        
         const rowData: any = {
-          accountingEntryNumber: data.accountingEntryNumber || "",
-          number: data.number || data.displayNumber || "",
-          supplierNumber: data.supplierNumber || "",
-          invoiceDate: formatDate(data.invoiceDate),
-          supplier: data.supplier || "",
-          supplierTaxId: data.supplierTaxId || "",
-          supplierIban: data.supplierIban || "",
-          description: data.description || "",
-          accountCode: accountCode,
-          baseAmount: data.baseAmount || 0,
-          taxRate: `${taxRate}%`,
-          taxAmount: data.vatAmount || 0,
-          irpfRate: `${irpfRate}%`,
-          irpfAmount: data.irpfAmount || 0,
-          totalAmount: data.totalAmount || 0,
-          dueDate: formatDate(data.dueDate),
-          status: data.status === "paid" ? "Pagada" : "Pendiente",
-          paidAt: formatDate(data.paidAt),
-          accountedAt: formatDate(data.accountedAt),
-          accountedBy: data.accountedByName || "",
+          accountingEntryNumber: data.accountingEntryNumber || "", number: data.number || data.displayNumber || "",
+          supplierNumber: data.supplierNumber || "", invoiceDate: formatDate(data.invoiceDate),
+          supplier: data.supplier || "", supplierTaxId: data.supplierTaxId || "", supplierIban: data.supplierIban || "",
+          description: data.description || "", accountCode: accountCode, baseAmount: data.baseAmount || 0,
+          taxRate: `${taxRate}%`, taxAmount: data.vatAmount || 0, irpfRate: `${irpfRate}%`, irpfAmount: data.irpfAmount || 0,
+          totalAmount: data.totalAmount || 0, dueDate: formatDate(data.dueDate),
+          status: data.status === "paid" ? "Pagada" : "Pendiente", paidAt: formatDate(data.paidAt),
+          accountedAt: formatDate(data.accountedAt), accountedBy: data.accountedByName || "",
         };
-        
-        rows.push(columns.map(col => {
-          if (col.isBlank) return "";
-          const val = rowData[col.originalId];
-          return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
-        }));
+        rows.push(columns.map(col => { if (col.isBlank) return ""; const val = rowData[col.originalId]; return typeof val === "number" ? formatCurrency(val) : val?.toString() || ""; }));
       });
-      
-      await downloadFile(rows, `Libro_Facturas_${projectName}_${getCurrentDate()}.csv`);
+      downloadCSV(rows, `Libro_Facturas_${projectName}_${getCurrentDate()}.csv`);
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
@@ -937,40 +658,22 @@ export default function ReportsPage() {
     try {
       const invoicesSnapshot = await getDocs(query(collection(db, `projects/${id}/invoices`), orderBy("paidAt", "desc")));
       const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
-      
-      // Solo facturas pagadas
       const paidInvoices = invoicesSnapshot.docs.filter(doc => doc.data().status === "paid" && doc.data().paidAt);
-      
       let paymentCounter = 1;
       paidInvoices.forEach((docSnap) => {
         const data = docSnap.data();
-        
         const rowData: any = {
           paymentNumber: `PAG-${String(paymentCounter).padStart(4, "0")}`,
-          invoiceNumber: data.number || data.displayNumber || "",
-          supplierNumber: data.supplierNumber || "",
-          supplier: data.supplier || "",
-          supplierTaxId: data.supplierTaxId || "",
-          supplierIban: data.supplierIban || "",
-          description: data.description || "",
-          baseAmount: data.baseAmount || 0,
-          totalAmount: data.totalAmount || 0,
-          paymentMethod: data.paymentMethod || "Transferencia",
-          paidAt: formatDate(data.paidAt),
-          paidBy: data.paidByName || "",
-          accountingEntryNumber: data.accountingEntryNumber || "",
+          invoiceNumber: data.number || data.displayNumber || "", supplierNumber: data.supplierNumber || "",
+          supplier: data.supplier || "", supplierTaxId: data.supplierTaxId || "", supplierIban: data.supplierIban || "",
+          description: data.description || "", baseAmount: data.baseAmount || 0, totalAmount: data.totalAmount || 0,
+          paymentMethod: data.paymentMethod || "Transferencia", paidAt: formatDate(data.paidAt),
+          paidBy: data.paidByName || "", accountingEntryNumber: data.accountingEntryNumber || "",
         };
-        
-        rows.push(columns.map(col => {
-          if (col.isBlank) return "";
-          const val = rowData[col.originalId];
-          return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
-        }));
-        
+        rows.push(columns.map(col => { if (col.isBlank) return ""; const val = rowData[col.originalId]; return typeof val === "number" ? formatCurrency(val) : val?.toString() || ""; }));
         paymentCounter++;
       });
-      
-      await downloadFile(rows, `Pagos_${projectName}_${getCurrentDate()}.csv`);
+      downloadCSV(rows, `Pagos_${projectName}_${getCurrentDate()}.csv`);
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
@@ -979,72 +682,40 @@ export default function ReportsPage() {
     try {
       const accountsSnapshot = await getDocs(query(collection(db, `projects/${id}/accounts`), orderBy("code", "asc")));
       const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
-      
       for (const accountDoc of accountsSnapshot.docs) {
         const accountData = accountDoc.data();
-        
-        // Obtener subcuentas
-        const subAccountsSnapshot = await getDocs(query(
-          collection(db, `projects/${id}/accounts/${accountDoc.id}/subaccounts`),
-          orderBy("code", "asc")
-        ));
-        
-        // Sumar valores de todas las subcuentas
-        let totalBudgeted = 0;
-        let totalCommitted = 0;
-        let totalActual = 0;
-        
+        const subAccountsSnapshot = await getDocs(query(collection(db, `projects/${id}/accounts/${accountDoc.id}/subaccounts`), orderBy("code", "asc")));
+        let totalBudgeted = 0, totalCommitted = 0, totalActual = 0;
         subAccountsSnapshot.docs.forEach((subDoc) => {
           const subData = subDoc.data();
           totalBudgeted += subData.budgeted || 0;
           totalCommitted += subData.committed || 0;
           totalActual += subData.actual || 0;
         });
-        
-        // Obtener facturas pagadas para esta cuenta
         const invoicesSnapshot = await getDocs(collection(db, `projects/${id}/invoices`));
-        let totalPaid = 0;
-        let totalPending = 0;
-        
+        let totalPaid = 0, totalPending = 0;
         invoicesSnapshot.docs.forEach((invDoc) => {
           const invData = invDoc.data();
           const items = invData.items || [];
           items.forEach((item: any) => {
             if (item.subAccountCode?.startsWith(accountData.code)) {
-              if (invData.status === "paid") {
-                totalPaid += item.baseAmount || 0;
-              } else if (["approved", "pending", "accounted"].includes(invData.status)) {
-                totalPending += item.baseAmount || 0;
-              }
+              if (invData.status === "paid") totalPaid += item.baseAmount || 0;
+              else if (["approved", "pending", "accounted"].includes(invData.status)) totalPending += item.baseAmount || 0;
             }
           });
         });
-        
         const available = totalBudgeted - totalCommitted;
         const percentExecuted = totalBudgeted > 0 ? Math.round((totalActual / totalBudgeted) * 100) : 0;
         const deviation = totalActual - totalBudgeted;
-        
         const rowData: any = {
-          accountCode: accountData.code || "",
-          accountDescription: accountData.description || "",
-          budgeted: totalBudgeted,
-          committed: totalCommitted,
-          invoiced: totalActual,
-          paid: totalPaid,
-          pendingPayment: totalPending,
-          available: available,
-          percentExecuted: `${percentExecuted}%`,
-          deviation: deviation,
+          accountCode: accountData.code || "", accountDescription: accountData.description || "",
+          budgeted: totalBudgeted, committed: totalCommitted, invoiced: totalActual,
+          paid: totalPaid, pendingPayment: totalPending, available: available,
+          percentExecuted: `${percentExecuted}%`, deviation: deviation,
         };
-        
-        rows.push(columns.map(col => {
-          if (col.isBlank) return "";
-          const val = rowData[col.originalId];
-          return typeof val === "number" ? formatCurrency(val) : val?.toString() || "";
-        }));
+        rows.push(columns.map(col => { if (col.isBlank) return ""; const val = rowData[col.originalId]; return typeof val === "number" ? formatCurrency(val) : val?.toString() || ""; }));
       }
-      
-      await downloadFile(rows, `Informe_Costes_${projectName}_${getCurrentDate()}.csv`);
+      downloadCSV(rows, `Informe_Costes_${projectName}_${getCurrentDate()}.csv`);
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
@@ -1064,9 +735,7 @@ export default function ReportsPage() {
 
   const generateFromPreset = (preset: ReportPreset) => {
     const cols: SelectedColumn[] = preset.columns.map((c, i) => {
-      if (c.isBlank) {
-        return { id: `blank_${i}`, originalId: "blank", label: "", isBlank: true };
-      }
+      if (c.isBlank) return { id: `blank_${i}`, originalId: "blank", label: "", isBlank: true };
       const original = REPORT_COLUMNS[preset.reportType].find(col => col.id === c.id);
       return { id: `${c.id}_${i}`, originalId: c.id, label: original?.label || c.id };
     });
@@ -1075,18 +744,12 @@ export default function ReportsPage() {
 
   const getReportCount = (reportType: ReportType) => {
     switch (reportType) {
-      case "budget": 
-      case "cost_report": return counts.accounts;
-      case "pos_list": 
-      case "pos_items": return counts.pos;
-      case "invoices": 
-      case "invoices_accounting":
-      case "payments": return counts.invoices;
+      case "budget": case "cost_report": return counts.accounts;
+      case "pos_list": case "pos_items": return counts.pos;
+      case "invoices": case "invoices_accounting": case "payments": return counts.invoices;
       case "suppliers": return counts.suppliers;
     }
   };
-
-  const reportTypes: ReportType[] = ["budget", "cost_report", "pos_list", "pos_items", "invoices", "invoices_accounting", "payments", "suppliers"];
 
   if (loading) {
     return (
@@ -1105,11 +768,7 @@ export default function ReportsPage() {
           </div>
           <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
           <p className="text-slate-500 mb-6">{accessError || "No tienes permisos para acceder a esta página"}</p>
-          <Link
-            href={`/project/${id}/accounting`}
-            className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90"
-            style={{ backgroundColor: "#2F52E0" }}
-          >
+          <Link href={"/project/" + id + "/accounting"} className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90" style={{ backgroundColor: "#2F52E0" }}>
             <ArrowLeft size={16} />
             Volver al panel
           </Link>
@@ -1120,156 +779,87 @@ export default function ReportsPage() {
 
   return (
     <div className={"min-h-screen bg-white " + inter.className}>
-      {/* Header */}
       <div className="mt-[4.5rem]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
-              <FileSpreadsheet size={24} style={{ color: '#2F52E0' }} />
+              <FileSpreadsheet size={24} style={{ color: "#2F52E0" }} />
               <h1 className="text-2xl font-semibold text-slate-900">Informes</h1>
             </div>
-            
-            {/* Format Switch */}
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-slate-500">Formato:</span>
-              <button
-                onClick={toggleExportFormat}
-                className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg"
-              >
-                <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  exportFormat === "csv" 
-                    ? "bg-white text-slate-900 shadow-sm" 
-                    : "text-slate-500 hover:text-slate-700"
-                }`}>
-                  <FileText size={14} />
-                  CSV
-                </span>
-                <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  exportFormat === "xlsx" 
-                    ? "bg-white text-slate-900 shadow-sm" 
-                    : "text-slate-500 hover:text-slate-700"
-                }`}>
-                  <FileSpreadsheet size={14} />
-                  Excel
-                </span>
+            {episodesEnabled && totalEpisodes > 0 && (
+              <button onClick={() => setSplitByEpisode(!splitByEpisode)} className={"flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all " + (splitByEpisode ? "bg-violet-100 text-violet-700 border border-violet-200" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}>
+                <Film size={14} />
+                Desglosar por capítulo
               </button>
-
-              {/* Toggle desglosar por capítulos */}
-              {episodesEnabled && totalEpisodes > 0 && (
-                <>
-                  <div className="w-px h-6 bg-slate-200" />
-                  <button
-                    onClick={() => setSplitByEpisode(!splitByEpisode)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      splitByEpisode 
-                        ? "bg-violet-100 text-violet-700 border border-violet-200" 
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    <Film size={14} />
-                    Desglosar por capítulo
-                  </button>
-                </>
-              )}
-            </div>
+            )}
           </div>
         </div>
       </div>
 
       <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
-        <div className="space-y-2">
-          {reportTypes.map((reportType) => {
-            const info = REPORT_INFO[reportType];
-            const Icon = info.icon;
-            const isExpanded = expandedReport === reportType;
-            const reportPresets = presets.filter(p => p.reportType === reportType);
-            const count = getReportCount(reportType);
-            
-            return (
-              <div key={reportType} className="bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-all">
-                <div className="px-4 py-3 flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                    <Icon size={18} className="text-slate-500" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium text-slate-900 text-sm">{info.title}</h3>
-                      <span className="text-xs text-slate-400">{count}</span>
-                    </div>
-                    <p className="text-xs text-slate-500 truncate">{info.description}</p>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => openConfig(reportType)}
-                      className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                      title="Configurar columnas"
-                    >
-                      <Settings2 size={16} />
-                    </button>
-                    <button
-                      onClick={() => generateReport(reportType)}
-                      disabled={generating !== null}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
-                    >
-                      {generating === reportType ? (
-                        <>
-                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          <span>...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Download size={12} />
-                          Exportar
-                        </>
-                      )}
-                    </button>
-                    {reportPresets.length > 0 && (
-                      <button
-                        onClick={() => setExpandedReport(isExpanded ? null : reportType)}
-                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                      >
-                        <ChevronDown size={18} className={"transition-transform " + (isExpanded ? "rotate-180" : "")} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {isExpanded && reportPresets.length > 0 && (
-                  <div className="px-4 pb-3 pt-0">
-                    <div className="border-t border-slate-100 pt-3">
-                      <p className="text-xs text-slate-400 mb-2">Plantillas guardadas</p>
-                      <div className="space-y-1">
-                        {reportPresets.map((preset) => (
-                          <div key={preset.id} className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg group">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium text-slate-700 truncate">{preset.name}</p>
-                            </div>
-                            <button
-                              onClick={() => generateFromPreset(preset)}
-                              disabled={generating !== null}
-                              className="px-2 py-1 bg-white border border-slate-200 text-slate-600 rounded text-xs hover:bg-slate-50 transition-colors disabled:opacity-50"
-                            >
-                              Usar
-                            </button>
-                            <button
-                              onClick={() => deletePreset(preset.id)}
-                              className="p-1 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                            >
-                              <Trash2 size={12} />
-                            </button>
+        <div className="space-y-8">
+          {REPORT_SECTIONS.map((section) => (
+            <div key={section.id}>
+              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">{section.title}</h2>
+              <div className="space-y-2">
+                {section.reports.map((reportType) => {
+                  const info = REPORT_INFO[reportType];
+                  const Icon = info.icon;
+                  const isExpanded = expandedReport === reportType;
+                  const reportPresets = presets.filter(p => p.reportType === reportType);
+                  const count = getReportCount(reportType);
+                  
+                  return (
+                    <div key={reportType} className="bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-all">
+                      <div className="px-4 py-3 flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                          <Icon size={18} className="text-slate-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-medium text-slate-900 text-sm">{info.title}</h3>
+                            <span className="text-xs text-slate-400">{count}</span>
                           </div>
-                        ))}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button onClick={() => openConfig(reportType)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Configurar columnas">
+                            <Settings2 size={16} />
+                          </button>
+                          <button onClick={() => generateReport(reportType)} disabled={generating !== null} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 transition-colors disabled:opacity-50">
+                            {generating === reportType ? (<><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /><span>...</span></>) : (<><Download size={12} />Exportar</>)}
+                          </button>
+                          {reportPresets.length > 0 && (
+                            <button onClick={() => setExpandedReport(isExpanded ? null : reportType)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                              <ChevronDown size={18} className={"transition-transform " + (isExpanded ? "rotate-180" : "")} />
+                            </button>
+                          )}
+                        </div>
                       </div>
+                      {isExpanded && reportPresets.length > 0 && (
+                        <div className="px-4 pb-3 pt-0">
+                          <div className="border-t border-slate-100 pt-3">
+                            <p className="text-xs text-slate-400 mb-2">Plantillas guardadas</p>
+                            <div className="space-y-1">
+                              {reportPresets.map((preset) => (
+                                <div key={preset.id} className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg group">
+                                  <div className="flex-1 min-w-0"><p className="text-xs font-medium text-slate-700 truncate">{preset.name}</p></div>
+                                  <button onClick={() => generateFromPreset(preset)} disabled={generating !== null} className="px-2 py-1 bg-white border border-slate-200 text-slate-600 rounded text-xs hover:bg-slate-50 transition-colors disabled:opacity-50">Usar</button>
+                                  <button onClick={() => deletePreset(preset.id)} className="p-1 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={12} /></button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       </main>
 
-      {/* Modal de configuración */}
       {showConfig && configReportType && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowConfig(false)}>
           <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -1278,32 +868,22 @@ export default function ReportsPage() {
                 <h3 className="text-lg font-semibold text-slate-900">Configurar columnas</h3>
                 <p className="text-sm text-slate-500">{REPORT_INFO[configReportType].title}</p>
               </div>
-              <button onClick={() => setShowConfig(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
-                <X size={18} />
-              </button>
+              <button onClick={() => setShowConfig(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
             </div>
 
             <div className="p-6 overflow-y-auto flex-1">
-              {/* Presets */}
               {presets.filter(p => p.reportType === configReportType).length > 0 && (
                 <div className="mb-6">
                   <p className="text-xs font-medium text-slate-500 mb-2">Cargar plantilla</p>
                   <div className="flex flex-wrap gap-2">
                     {presets.filter(p => p.reportType === configReportType).map((preset) => (
-                      <button
-                        key={preset.id}
-                        onClick={() => loadPreset(preset)}
-                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors"
-                      >
-                        {preset.name}
-                      </button>
+                      <button key={preset.id} onClick={() => loadPreset(preset)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors">{preset.name}</button>
                     ))}
                   </div>
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-6">
-                {/* Columnas seleccionadas */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Columnas del informe</p>
@@ -1313,135 +893,50 @@ export default function ReportsPage() {
                     {selectedColumns.map((column, index) => {
                       const isLocked = REPORT_COLUMNS[configReportType].find(c => c.id === column.originalId)?.locked;
                       return (
-                        <div
-                          key={column.id}
-                          draggable={!isLocked}
-                          onDragStart={() => handleDragStart(index)}
-                          onDragOver={(e) => handleDragOver(e, index)}
-                          onDrop={(e) => handleDrop(e, index)}
-                          onDragEnd={handleDragEnd}
-                          className={`flex items-center gap-2 p-2 rounded-lg transition-all ${
-                            dragOverItem === index ? "bg-slate-200 border-slate-300" : "bg-white border-slate-200"
-                          } border ${draggedItem === index ? "opacity-50" : ""} ${
-                            column.isBlank ? "border-dashed" : ""
-                          }`}
-                        >
-                          <div className={`cursor-grab ${isLocked ? "opacity-30" : ""}`}>
-                            <GripVertical size={14} className="text-slate-400" />
-                          </div>
-                          <span className={`flex-1 text-sm ${column.isBlank ? "text-slate-400 italic" : "text-slate-700"}`}>
-                            {column.label}
-                          </span>
-                          {isLocked ? (
-                            <span className="text-[10px] text-slate-400">Req.</span>
-                          ) : (
-                            <button
-                              onClick={() => removeColumn(column.id, column.originalId)}
-                              className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                            >
-                              <Minus size={12} />
-                            </button>
-                          )}
+                        <div key={column.id} draggable={!isLocked} onDragStart={() => handleDragStart(index)} onDragOver={(e) => handleDragOver(e, index)} onDrop={(e) => handleDrop(e, index)} onDragEnd={handleDragEnd} className={"flex items-center gap-2 p-2 rounded-lg transition-all border " + (dragOverItem === index ? "bg-slate-200 border-slate-300" : "bg-white border-slate-200") + (draggedItem === index ? " opacity-50" : "") + (column.isBlank ? " border-dashed" : "")}>
+                          <div className={"cursor-grab " + (isLocked ? "opacity-30" : "")}><GripVertical size={14} className="text-slate-400" /></div>
+                          <span className={"flex-1 text-sm " + (column.isBlank ? "text-slate-400 italic" : "text-slate-700")}>{column.label}</span>
+                          {isLocked ? (<span className="text-[10px] text-slate-400">Req.</span>) : (<button onClick={() => removeColumn(column.id, column.originalId)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"><Minus size={12} /></button>)}
                         </div>
                       );
                     })}
-                    
-                    {/* Botón añadir columna en blanco */}
-                    <button
-                      onClick={addBlankColumn}
-                      className="w-full flex items-center justify-center gap-2 p-2 mt-2 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:border-slate-400 hover:text-slate-600 transition-colors"
-                    >
-                      <Plus size={14} />
-                      <span className="text-xs font-medium">Columna vacía</span>
+                    <button onClick={addBlankColumn} className="w-full flex items-center justify-center gap-2 p-2 mt-2 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:border-slate-400 hover:text-slate-600 transition-colors">
+                      <Plus size={14} /><span className="text-xs font-medium">Columna vacía</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Columnas disponibles */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Disponibles</p>
                     <span className="text-xs text-slate-400">{availableColumns.length}</span>
                   </div>
                   <div className="space-y-1 min-h-[200px] p-3 bg-slate-50 rounded-xl">
-                    {availableColumns.length === 0 ? (
-                      <p className="text-xs text-slate-400 text-center py-8">Todas las columnas están en uso</p>
-                    ) : (
+                    {availableColumns.length === 0 ? (<p className="text-xs text-slate-400 text-center py-8">Todas las columnas están en uso</p>) : (
                       availableColumns.map((column) => (
-                        <button
-                          key={column.id}
-                          onClick={() => addColumn(column)}
-                          className="w-full flex items-center gap-2 p-2 bg-white border border-slate-200 rounded-lg hover:border-slate-300 hover:bg-slate-50 transition-colors text-left"
-                        >
-                          <Plus size={14} className="text-slate-400" />
-                          <span className="flex-1 text-sm text-slate-600">{column.label}</span>
+                        <button key={column.id} onClick={() => addColumn(column)} className="w-full flex items-center gap-2 p-2 bg-white border border-slate-200 rounded-lg hover:border-slate-300 hover:bg-slate-50 transition-colors text-left">
+                          <Plus size={14} className="text-slate-400" /><span className="flex-1 text-sm text-slate-600">{column.label}</span>
                         </button>
                       ))
                     )}
                   </div>
                 </div>
               </div>
-
-              <p className="text-xs text-slate-400 mt-4 text-center">
-                Arrastra las columnas para reordenarlas
-              </p>
+              <p className="text-xs text-slate-400 mt-4 text-center">Arrastra las columnas para reordenarlas</p>
             </div>
 
             <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
               {!showSavePreset ? (
                 <div className="flex items-center justify-end gap-3">
-                  <button
-                    onClick={() => setShowConfig(false)}
-                    className="px-4 py-2.5 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={() => setShowSavePreset(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors"
-                  >
-                    <Save size={14} />
-                    Guardar plantilla
-                  </button>
-                  <button
-                    onClick={() => {
-                      generateReport(configReportType, selectedColumns);
-                      setShowConfig(false);
-                    }}
-                    disabled={generating !== null}
-                    className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-                    style={{ backgroundColor: '#2F52E0' }}
-                  >
-                    <Download size={14} />
-                    Exportar
-                  </button>
+                  <button onClick={() => setShowConfig(false)} className="px-4 py-2.5 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100 transition-colors">Cancelar</button>
+                  <button onClick={() => setShowSavePreset(true)} className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors"><Save size={14} />Guardar plantilla</button>
+                  <button onClick={() => { generateReport(configReportType, selectedColumns); setShowConfig(false); }} disabled={generating !== null} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}><Download size={14} />Exportar</button>
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
-                  <input
-                    type="text"
-                    value={newPresetName}
-                    onChange={(e) => setNewPresetName(e.target.value)}
-                    placeholder="Nombre de la plantilla"
-                    className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                    autoFocus
-                    onKeyDown={(e) => e.key === "Enter" && savePreset()}
-                  />
-                  <button
-                    onClick={() => { setShowSavePreset(false); setNewPresetName(""); }}
-                    className="px-4 py-2.5 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={savePreset}
-                    disabled={!newPresetName.trim()}
-                    className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-                    style={{ backgroundColor: '#2F52E0' }}
-                  >
-                    <Check size={14} />
-                    Guardar
-                  </button>
+                  <input type="text" value={newPresetName} onChange={(e) => setNewPresetName(e.target.value)} placeholder="Nombre de la plantilla" className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" autoFocus onKeyDown={(e) => e.key === "Enter" && savePreset()} />
+                  <button onClick={() => { setShowSavePreset(false); setNewPresetName(""); }} className="px-4 py-2.5 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100 transition-colors">Cancelar</button>
+                  <button onClick={savePreset} disabled={!newPresetName.trim()} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}><Check size={14} />Guardar</button>
                 </div>
               )}
             </div>
