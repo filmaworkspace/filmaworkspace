@@ -195,37 +195,29 @@ export default function AccountingPage() {
               <h1 className="text-2xl font-semibold text-slate-900">Panel de contabilidad</h1>
             </div>
 
-            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
+            <div className="flex items-center gap-3">
               {isApprover && (
-                <Link href={`/project/${id}/accounting/approvals`}>
-                  <button className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    pendingApprovalsCount > 0 
-                      ? "text-amber-700 bg-amber-50 hover:bg-amber-100" 
-                      : "text-slate-600 hover:bg-white hover:text-slate-900"
-                  }`}>
-                    <ClipboardCheck size={16} />
-                    <span>Aprobaciones</span>
-                    {pendingApprovalsCount > 0 && (
-                      <span className="px-1.5 py-0.5 bg-amber-500 text-white text-xs rounded-full font-bold min-w-[20px] text-center">{pendingApprovalsCount}</span>
-                    )}
-                  </button>
+                <Link href={`/project/${id}/accounting/approvals`} className="relative flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors">
+                  <ClipboardCheck size={15} />
+                  <span>Aprobaciones</span>
+                  {pendingApprovalsCount > 0 && (
+                    <span className="ml-0.5 px-1.5 py-0.5 bg-amber-500 text-white text-[10px] rounded-full font-bold min-w-[18px] text-center">{pendingApprovalsCount}</span>
+                  )}
                 </Link>
               )}
               {(userRole === "EP" || userRole === "PM" || userRole === "Controller") && (
-                <Link href={`/project/${id}/accounting/document-center`}>
-                  <button className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-white hover:text-slate-900 transition-colors">
-                    <FolderDown size={16} />
+                <>
+                  <span className="text-slate-200">·</span>
+                  <Link href={`/project/${id}/accounting/document-center`} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors">
+                    <FolderDown size={15} />
                     <span>Documentos</span>
-                  </button>
-                </Link>
-              )}
-              {(userRole === "EP" || userRole === "PM" || userRole === "Controller") && (
-                <Link href={`/project/${id}/accounting/accountingconfig`}>
-                  <button className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-white hover:text-slate-900 transition-colors">
-                    <Settings size={16} />
-                    <span>Configuración</span>
-                  </button>
-                </Link>
+                  </Link>
+                  <span className="text-slate-200">·</span>
+                  <Link href={`/project/${id}/accounting/accountingconfig`} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors">
+                    <Settings size={15} />
+                    <span>Ajustes</span>
+                  </Link>
+                </>
               )}
             </div>
           </div>
@@ -257,32 +249,24 @@ export default function AccountingPage() {
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           {/* Recent POs */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1 lg:max-w-[50%]">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <div className="flex items-center gap-3">
-                <div 
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ backgroundColor: 'rgba(47, 82, 224, 0.1)' }}
-                >
-                  <FileText size={18} style={{ color: '#2F52E0' }} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-slate-900">Últimas POs</h3>
-                </div>
+            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <FileText size={18} style={{ color: '#2F52E0' }} />
+                <h3 className="font-semibold text-slate-900">POs</h3>
+                <span className="text-xs text-slate-400">recientes</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <Link 
                   href={`/project/${id}/accounting/pos/new`} 
-                  className="p-2 rounded-lg transition-colors"
-                  style={{ color: '#2F52E0', backgroundColor: 'rgba(47, 82, 224, 0.1)' }}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                 >
-                  <Plus size={18} />
+                  <Plus size={16} />
                 </Link>
                 <Link 
                   href={`/project/${id}/accounting/pos`} 
-                  className="text-sm font-medium flex items-center gap-1 px-3 py-2 rounded-lg transition-colors"
-                  style={{ color: '#2F52E0', backgroundColor: 'rgba(47, 82, 224, 0.1)' }}
+                  className="text-xs font-medium flex items-center gap-0.5 px-2 py-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                 >
-                  Abrir <ChevronRight size={14} />
+                  Ver todas <ChevronRight size={12} />
                 </Link>
               </div>
             </div>
@@ -327,42 +311,33 @@ export default function AccountingPage() {
 
           {/* Recent Invoices */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1 lg:max-w-[50%]">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <div className="flex items-center gap-3">
-                <div 
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ backgroundColor: 'rgba(47, 82, 224, 0.1)' }}
-                >
-                  <Receipt size={18} style={{ color: '#2F52E0' }} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-slate-900">Últimas facturas</h3>
-                </div>
+            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <Receipt size={18} style={{ color: '#2F52E0' }} />
+                <h3 className="font-semibold text-slate-900">Facturas</h3>
+                <span className="text-xs text-slate-400">recientes</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 {hasExtendedAccess && (
                   <Link 
                     href={`/project/${id}/accounting/payments`} 
-                    className="p-2 rounded-lg transition-colors" 
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors" 
                     title="Pagos"
-                    style={{ color: '#2F52E0', backgroundColor: 'rgba(47, 82, 224, 0.1)' }}
                   >
-                    <CreditCard size={18} />
+                    <CreditCard size={16} />
                   </Link>
                 )}
                 <Link 
                   href={`/project/${id}/accounting/invoices/new`} 
-                  className="p-2 rounded-lg transition-colors"
-                  style={{ color: '#2F52E0', backgroundColor: 'rgba(47, 82, 224, 0.1)' }}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                 >
-                  <Upload size={18} />
+                  <Upload size={16} />
                 </Link>
                 <Link 
                   href={`/project/${id}/accounting/invoices`} 
-                  className="text-sm font-medium flex items-center gap-1 px-3 py-2 rounded-lg transition-colors"
-                  style={{ color: '#2F52E0', backgroundColor: 'rgba(47, 82, 224, 0.1)' }}
+                  className="text-xs font-medium flex items-center gap-0.5 px-2 py-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                 >
-                  Abrir <ChevronRight size={14} />
+                  Ver todas <ChevronRight size={12} />
                 </Link>
               </div>
             </div>
@@ -413,4 +388,3 @@ export default function AccountingPage() {
     </div>
   );
 }
-
