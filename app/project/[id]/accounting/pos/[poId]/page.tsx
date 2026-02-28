@@ -848,8 +848,8 @@ export default function PODetailPage() {
                                             />
                                           </div>
                                         </div>
-                                        {/* Botón de acción */}
-                                        {canEditPO(po) && (
+                                        {/* Botón de acción - disponible para POs aprobadas y abiertas */}
+                                        {po.status === "approved" && po.isOpen !== false && (permissions.role === "EP" || permissions.role === "PM" || permissions.role === "Controller" || permissions.accessLevel === "manager" || permissions.accessLevel === "admin") && (
                                           <div className="pt-2 border-t border-slate-100">
                                             {item.isClosed ? (
                                               <button
@@ -948,7 +948,7 @@ export default function PODetailPage() {
                               {Math.round(itemProgress)}% realizado
                               {isOverInvoiced && <span className="text-amber-600 ml-2">· Excedido en {formatCurrency(itemInvoiced - itemCommitted)} {getCurrencySymbol()}</span>}
                             </p>
-                            {canEditPO(po) && (
+                            {po.status === "approved" && po.isOpen !== false && (permissions.role === "EP" || permissions.role === "PM" || permissions.role === "Controller" || permissions.accessLevel === "manager" || permissions.accessLevel === "admin") && (
                               item.isClosed ? (
                                 <button
                                   onClick={() => { setShowReopenItemModal(index); setPasswordInput(""); setPasswordError(""); }}
