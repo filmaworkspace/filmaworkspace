@@ -14,10 +14,10 @@ import {
   Trash2, Edit, Upload, FileText, Receipt, ArrowLeft, Layers, ShieldAlert, FileSpreadsheet,
   ExternalLink, Lock, Send, Banknote, UserCircle, CreditCard, CheckSquare, AlertTriangle,
   Calendar, Users, Paperclip, Eye, Info, SplitSquareHorizontal, Scissors, FileX, PanelRightOpen,
-  RotateCcw, Save, ChevronLeft
+  RotateCcw, Save, ChevronLeft, Download
 } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
-import { unzipSync, strFromU8 } from "fflate";
+import { unzipSync, strFromU8, zipSync, strToU8 } from "fflate";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -249,6 +249,7 @@ export default function BoxesPage() {
   const [showReceiptImportModal, setShowReceiptImportModal] = useState(false);
   const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
   const [uploadingReceipts, setUploadingReceipts] = useState(false);
+  const [exportingEnvelope, setExportingEnvelope] = useState(false);
   const [showManualExpenseModal, setShowManualExpenseModal] = useState(false);
   const [cardExpensesList, setCardExpensesList] = useState<Array<{
     id: string; type: "invoice" | "ticket"; supplier: string; supplierTaxId: string;
@@ -948,6 +949,191 @@ export default function BoxesPage() {
     }
   };
 
+  // ── Exportar sobre: ZIP con Excel + recibos renombrados ─────────────────
+  const handleExportEnvelope = async (envelope: Envelope) => {
+    setExportingEnvelope(true);
+    try {
+      const exps = expenses.filter(e => e.envelopeId === envelope.id)
+        .sort((a, b) => a.number - b.number);
+
+      // ── 1. Build XLSX (SpreadsheetML) ──────────────────────────────────────
+      const esc = (s: string) => s
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      const fmtDate = (d: any): string => {
+        const dt = d instanceof Date ? d : d?.toDate?.();
+        if (!dt) return "";
+        return dt.toLocaleDateString("es-ES");
+      };
+
+      // Headers
+      const headers = [
+        "Número", "Fecha", "Tipo", "Proveedor", "CIF", "Nº Factura",
+        "Descripción", "Cuenta", "Descripción cuenta",
+        "Base imponible", "IVA %", "Cuota IVA", "IRPF %", "Cuota IRPF", "Total línea",
+        "Estado", "Incidencia",
+      ];
+
+      // One row per VAT line
+      type Row = (string | number)[];
+      const rows: Row[] = [];
+      for (const exp of exps) {
+        const lines = exp.items && exp.items.length > 0 ? exp.items : [{
+          baseAmount: exp.baseAmount,
+          vatRate: 0,
+          vatAmount: exp.vatAmount,
+          subAccountCode: exp.subAccountCode,
+          subAccountDescription: exp.subAccountDescription,
+        } as any];
+
+        lines.forEach((item: any, li: number) => {
+          const base = item.baseAmount ?? 0;
+          const vatRate = item.vatRate ?? 0;
+          const vatAmt = item.vatAmount ?? Math.round(base * vatRate / 100 * 100) / 100;
+          const irpfRate = li === 0 ? (exp.irpfRate ?? 0) : 0;
+          const irpfAmt  = li === 0 ? (exp.irpfAmount ?? 0) : 0;
+          const total    = Math.round((base + vatAmt - irpfAmt) * 100) / 100;
+          rows.push([
+            li === 0 ? exp.displayNumber : "",
+            li === 0 ? fmtDate(exp.date) : "",
+            li === 0 ? (exp.type === "invoice" ? "Factura" : "Ticket") : "",
+            li === 0 ? exp.supplier : "",
+            li === 0 ? (exp.supplierTaxId ?? "") : "",
+            li === 0 ? (exp.supplierNumber ?? "") : "",
+            li === 0 ? (exp.description ?? "") : "",
+            item.subAccountCode ?? exp.subAccountCode ?? "",
+            item.subAccountDescription ?? exp.subAccountDescription ?? "",
+            base, vatRate, vatAmt, irpfRate, irpfAmt, total,
+            li === 0 ? exp.status : "",
+            li === 0 ? (exp.conflictType ?? "") : "",
+          ]);
+        });
+      }
+
+      // Totals row
+      const numCols = headers.length;
+      const dataStart = 2; // row 1 = header, data from row 2
+      const dataEnd   = dataStart + rows.length - 1;
+      const totalRow: (string | number)[] = new Array(numCols).fill("");
+      totalRow[0]  = "TOTAL";
+      totalRow[9]  = `=SUM(J${dataStart}:J${dataEnd})`;
+      totalRow[11] = `=SUM(L${dataStart}:L${dataEnd})`;
+      totalRow[13] = `=SUM(N${dataStart}:N${dataEnd})`;
+      totalRow[14] = `=SUM(O${dataStart}:O${dataEnd})`;
+
+      // Build XML cells
+      const colLetter = (n: number) => {
+        let s = "";
+        while (n >= 0) { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; }
+        return s;
+      };
+      const cellXml = (col: number, row: number, val: string | number): string => {
+        const addr = colLetter(col) + row;
+        if (typeof val === "number") {
+          return `<c r="${addr}"><v>${val}</v></c>`;
+        }
+        if (typeof val === "string" && val.startsWith("=")) {
+          return `<c r="${addr}" t="str"><f>${esc(val.slice(1))}</f></c>`;
+        }
+        return `<c r="${addr}" t="inlineStr"><is><t>${esc(String(val))}</t></is></c>`;
+      };
+
+      // Header row XML
+      let sheetRows = `<row r="1">${headers.map((h, c) => cellXml(c, 1, h)).join("")}</row>`;
+      // Data rows
+      rows.forEach((row, ri) => {
+        const r = ri + 2;
+        sheetRows += `<row r="${r}">${row.map((v, c) => cellXml(c, r, v)).join("")}</row>`;
+      });
+      // Totals row
+      const tr = rows.length + 2;
+      sheetRows += `<row r="${tr}">${totalRow.map((v, c) => v !== "" ? cellXml(c, tr, v) : "").join("")}</row>`;
+
+      // Column widths
+      const colWidths = [16,12,8,24,12,16,24,10,24,12,6,10,6,10,12,10,14];
+      const colsXml = colWidths.map((w, i) => `<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("");
+
+      const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<sheetData>${sheetRows}</sheetData>
+<cols>${colsXml}</cols>
+</worksheet>`;
+
+      const sharedStringsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="0" uniqueCount="0"/>`;
+      const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets><sheet name="Gastos" sheetId="1" r:id="rId1"/></sheets></workbook>`;
+      const wbRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>`;
+      const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>`;
+      const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+
+      const xlsxFiles: Record<string, Uint8Array> = {
+        "[Content_Types].xml":             strToU8(contentTypes),
+        "_rels/.rels":                     strToU8(rootRels),
+        "xl/workbook.xml":                 strToU8(workbookXml),
+        "xl/_rels/workbook.xml.rels":      strToU8(wbRels),
+        "xl/worksheets/sheet1.xml":        strToU8(sheetXml),
+        "xl/sharedStrings.xml":            strToU8(sharedStringsXml),
+      };
+      const xlsxZip = zipSync(xlsxFiles);
+
+      // ── 2. Build outer ZIP ─────────────────────────────────────────────────
+      const folderName = envelope.displayNumber;
+      const zipEntries: Record<string, Uint8Array> = {
+        [`${folderName}/gastos_${envelope.displayNumber}.xlsx`]: xlsxZip,
+      };
+
+      // Download each documentUrl and add with displayNumber as filename
+      const fetchPromises = exps
+        .filter(e => e.documentUrl)
+        .map(async (e) => {
+          try {
+            const resp = await fetch(e.documentUrl!);
+            if (!resp.ok) return;
+            const buf = await resp.arrayBuffer();
+            // Guess extension from URL or content-type
+            const ct = resp.headers.get("content-type") ?? "";
+            const ext = e.documentUrl!.includes(".pdf") || ct.includes("pdf") ? "pdf"
+              : e.documentUrl!.includes(".png") || ct.includes("png") ? "png"
+              : e.documentUrl!.includes(".jpg") || ct.includes("jpeg") ? "jpg"
+              : "pdf";
+            zipEntries[`${folderName}/recibos/${e.displayNumber}.${ext}`] = new Uint8Array(buf);
+          } catch { /* skip if fetch fails */ }
+        });
+      await Promise.all(fetchPromises);
+
+      const outerZip = zipSync(zipEntries);
+
+      // ── 3. Trigger download ────────────────────────────────────────────────
+      const blob = new Blob([outerZip], { type: "application/zip" });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href = url;
+      a.download = `${envelope.displayNumber}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("success", `Sobre exportado · ${exps.filter(e => e.documentUrl).length} recibos incluidos`);
+    } catch (e) {
+      console.error(e);
+      showToast("error", "Error al exportar");
+    } finally {
+      setExportingEnvelope(false);
+    }
+  };
+
   const handleReviewExpense = async (expense: BoxExpense) => {
     try {
       await updateDoc(doc(db, `projects/${projectId}/cardExpenses`, expense.id), {
@@ -1612,6 +1798,15 @@ export default function BoxesPage() {
                           </span>
                         )}
                       </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => handleExportEnvelope(selectedEnvelope)}
+                        disabled={exportingEnvelope || envelopeExpenses.length === 0}
+                        className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
+                        {exportingEnvelope
+                          ? <><RotateCcw size={16} className="animate-spin" /> Exportando...</>
+                          : <><Download size={16} /> Exportar sobre</>}
+                      </button>
                     </div>
                     {selectedEnvelope.status === "open" && (
                       <div className="flex items-center gap-2">
