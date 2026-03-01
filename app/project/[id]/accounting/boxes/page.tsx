@@ -274,8 +274,13 @@ export default function BoxesPage() {
     conflictNote: "",
   });
   const [drawerSaving, setDrawerSaving] = useState(false);
+  const [drawerItems, setDrawerItems] = useState<Array<{
+    id: string; subAccountCode: string; subAccountDescription: string;
+    description: string; baseAmount: number; vatRate: number;
+  }>>([]);
   const [showDrawerAccountSelector, setShowDrawerAccountSelector] = useState(false);
   const [drawerAccountSearch, setDrawerAccountSearch] = useState("");
+  const [drawerAccountSelectorItemIdx, setDrawerAccountSelectorItemIdx] = useState<number | null>(null);
 
   // TRANSFERS State
   const [transferEnvelopes, setTransferEnvelopes] = useState<TransferEnvelope[]>([]);
@@ -447,8 +452,24 @@ export default function BoxesPage() {
       conflictType: expense.conflictType ?? "",
       conflictNote: expense.conflictNote ?? "",
     });
+    // Populate drawerItems from expense.items, fallback to single line from flat fields
+    const items = expense.items && expense.items.length > 0
+      ? expense.items.map((it: any, i: number) => ({
+          id: crypto.randomUUID(),
+          subAccountCode: i === 0 ? (expense.subAccountCode || "") : (it.subAccountCode || ""),
+          subAccountDescription: i === 0 ? (expense.subAccountDescription || "") : (it.subAccountDescription || ""),
+          description: i === 0 ? (expense.description || "") : (it.description || ""),
+          baseAmount: it.baseAmount || 0,
+          vatRate: it.vatRate ?? 21,
+        }))
+      : [{ id: crypto.randomUUID(), subAccountCode: expense.subAccountCode || "",
+           subAccountDescription: expense.subAccountDescription || "",
+           description: expense.description || "",
+           baseAmount: expense.baseAmount || 0, vatRate: 21 }];
+    setDrawerItems(items);
     setDrawerAccountSearch("");
     setShowDrawerAccountSelector(false);
+    setDrawerAccountSelectorItemIdx(null);
   };
 
   const closeDrawer = () => { setDrawerExpense(null); setShowDrawerAccountSelector(false); };
@@ -457,22 +478,46 @@ export default function BoxesPage() {
     if (!drawerExpense) return;
     setDrawerSaving(true);
     try {
+      // If supplier name changed and we have a CIF, update cardSuppliers (supplier learning)
+      const newSupplier = drawerForm.supplier.trim();
+      const cif = drawerForm.supplierTaxId.trim();
+      if (cif && newSupplier && newSupplier !== drawerExpense.supplier) {
+        await setDoc(doc(db, `projects/${projectId}/cardSuppliers`, cif),
+          { taxId: cif, name: newSupplier, originalName: drawerExpense.supplier, updatedAt: Timestamp.now() },
+          { merge: true });
+        setBoxSuppliers(prev => {
+          const without = prev.filter(s => s.taxId !== cif);
+          return [...without, { taxId: cif, name: newSupplier, originalName: drawerExpense.supplier }];
+        });
+      }
+      // Compute totals from drawerItems lines
+      const irpfRate   = parseFloat(drawerForm.irpfRate) || 0;
+      const baseAmount = drawerItems.reduce((s, it) => s + (it.baseAmount || 0), 0);
+      const vatAmount  = drawerItems.reduce((s, it) =>
+        s + Math.round((it.baseAmount || 0) * (it.vatRate || 0) / 100 * 100) / 100, 0);
+      const irpfAmount = Math.round(baseAmount * irpfRate / 100 * 100) / 100;
+      const totalAmount = Math.round((baseAmount + vatAmount - irpfAmount) * 100) / 100;
+      // First item drives the top-level account fields
+      const first = drawerItems[0] ?? { subAccountCode: "", subAccountDescription: "", description: "" };
       const updates: any = {
         supplier: drawerForm.supplier.trim(),
         supplierTaxId: drawerForm.supplierTaxId.trim(),
         supplierNumber: drawerForm.supplierNumber.trim(),
-        subAccountCode: drawerForm.subAccountCode.trim(),
-        subAccountDescription: drawerForm.subAccountDescription.trim(),
-        description: drawerForm.description.trim(),
-        baseAmount: parseFloat(drawerForm.baseAmount) || 0,
-        vatAmount: parseFloat(drawerForm.vatAmount) || 0,
-        irpfRate: parseFloat(drawerForm.irpfRate) || 0,
-        irpfAmount: parseFloat(drawerForm.irpfAmount) || 0,
-        totalAmount: parseFloat(drawerForm.totalAmount) || 0,
+        subAccountCode: first.subAccountCode,
+        subAccountDescription: first.subAccountDescription,
+        description: first.description,
+        baseAmount, vatAmount, irpfRate, irpfAmount, totalAmount,
+        items: drawerItems.map(it => ({
+          subAccountCode: it.subAccountCode,
+          subAccountDescription: it.subAccountDescription,
+          description: it.description,
+          baseAmount: it.baseAmount,
+          vatRate: it.vatRate,
+          vatAmount: Math.round((it.baseAmount || 0) * (it.vatRate || 0) / 100 * 100) / 100,
+        })),
         conflictType: drawerForm.conflictType || null,
         conflictNote: drawerForm.conflictNote.trim(),
       };
-      // Parse date string DD/MM/YYYY back to Timestamp
       if (drawerForm.date) {
         const parts = drawerForm.date.split("/");
         if (parts.length === 3) {
@@ -775,10 +820,19 @@ export default function BoxesPage() {
       let invoiceNum = selectedBox.nextInvoiceNumber, ticketNum = selectedBox.nextTicketNumber;
       let totalBase = selectedEnvelope.totalBase, totalVat = selectedEnvelope.totalVat;
       let totalAmount = selectedEnvelope.totalAmount, expenseCount = selectedEnvelope.expenseCount;
-      const existingIds = new Set(expenses.filter(e => e.envelopeId === selectedEnvelope.id).map(e => e.pleoReceiptId));
+      // Duplicate check: pleoReceiptId across ALL envelopes, and taxId+invoiceNumber for facturas
+      const existingPleoIds = new Set(expenses.map(e => e.pleoReceiptId));
+      const existingInvoiceKeys = new Set(
+        expenses
+          .filter(e => e.type === "invoice" && e.supplierTaxId && e.supplierNumber)
+          .map(e => `${e.supplierTaxId}||${e.supplierNumber}`)
+      );
       const localSuppliers = [...cardSuppliers];
       for (const exp of importPreview) {
-        if (existingIds.has(exp.pleoReceiptId)) continue;
+        if (existingPleoIds.has(exp.pleoReceiptId)) continue;
+        const invoiceKey = exp.type === "invoice" && exp.supplierTaxId && exp.supplierNumber
+          ? `${exp.supplierTaxId}||${exp.supplierNumber}` : null;
+        if (invoiceKey && existingInvoiceKeys.has(invoiceKey)) continue;
         let supplierName = exp.supplier;
         const found = localSuppliers.find(s => s.taxId === exp.supplierTaxId);
         if (found) {
@@ -1592,7 +1646,17 @@ export default function BoxesPage() {
                                   <p className="text-xs text-slate-500">{expense.supplierTaxId}</p>
                                 </td>
                                 <td className="px-4 py-3">
-                                  <span className="font-mono text-xs text-slate-600">{expense.subAccountCode}</span>
+                                  {(() => {
+                                    const missing = expense.subAccountCode && !subAccounts.some(sa => sa.code === expense.subAccountCode);
+                                    return missing ? (
+                                      <div>
+                                        <span className="font-mono text-xs text-red-500 font-medium">{expense.subAccountCode}</span>
+                                        <p className="text-xs text-red-400 mt-0.5">La cuenta no existe en el proyecto</p>
+                                      </div>
+                                    ) : (
+                                      <span className="font-mono text-xs text-slate-600">{expense.subAccountCode}</span>
+                                    );
+                                  })()}
                                 </td>
                                 <td className="px-4 py-3 text-right font-mono">{fmt(expense.baseAmount)}</td>
                                 <td className="px-4 py-3 text-right font-mono text-emerald-600">+{fmt(expense.vatAmount)}</td>
@@ -1927,67 +1991,122 @@ export default function BoxesPage() {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Subcuenta contable</label>
-                    <div className="relative">
+                  {/* ── Líneas de detalle ── */}
+                  <div className="bg-slate-50 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Líneas ({drawerItems.length})</span>
                       <button type="button"
-                        onClick={() => { setShowDrawerAccountSelector(s => !s); setDrawerAccountSearch(""); }}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-left flex items-center justify-between hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900">
-                        {drawerForm.subAccountCode
-                          ? <span className="font-mono text-slate-700">{drawerForm.subAccountCode} <span className="font-sans text-slate-500 text-xs">· {drawerForm.subAccountDescription}</span></span>
-                          : <span className="text-slate-400">Seleccionar cuenta</span>}
-                        <ChevronDown size={14} className="text-slate-400 flex-shrink-0" />
+                        onClick={() => setDrawerItems(prev => [...prev, { id: crypto.randomUUID(), subAccountCode: "", subAccountDescription: "", description: "", baseAmount: 0, vatRate: 21 }])}
+                        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium">
+                        <Plus size={12} /> Añadir línea
                       </button>
-                      {showDrawerAccountSelector && (
-                        <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl">
-                          <div className="p-2 border-b border-slate-100">
-                            <input type="text" value={drawerAccountSearch}
-                              onChange={e => setDrawerAccountSearch(e.target.value)}
-                              placeholder="Buscar cuenta"
-                              className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-900"
-                              autoFocus />
+                    </div>
+                    {drawerItems.map((item, idx) => {
+                      const accountMissing = item.subAccountCode && !subAccounts.some(sa => sa.code === item.subAccountCode);
+                      return (
+                        <div key={item.id} className="bg-white rounded-lg border border-slate-200 p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-slate-400 font-medium">Línea {idx + 1}</span>
+                            {drawerItems.length > 1 && (
+                              <button type="button"
+                                onClick={() => setDrawerItems(prev => prev.filter((_, i) => i !== idx))}
+                                className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded">
+                                <Trash2 size={12} />
+                              </button>
+                            )}
                           </div>
-                          <div className="max-h-52 overflow-y-auto">
-                            {subAccounts
-                              .filter(sa => !drawerAccountSearch || sa.code.toLowerCase().includes(drawerAccountSearch.toLowerCase()) || sa.description.toLowerCase().includes(drawerAccountSearch.toLowerCase()))
-                              .slice(0, 40)
-                              .map(sa => (
-                                <button key={sa.id} type="button"
-                                  onClick={() => { setDrawerForm(f => ({ ...f, subAccountCode: sa.code, subAccountDescription: sa.description })); setShowDrawerAccountSelector(false); }}
-                                  className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2 border-b border-slate-50 last:border-0 text-sm">
-                                  <span className="font-mono text-xs text-slate-500 w-16 flex-shrink-0">{sa.code}</span>
-                                  <span className="text-slate-700 truncate">{sa.description}</span>
-                                </button>
-                              ))}
+                          {/* Cuenta */}
+                          <div className="relative">
+                            <button type="button"
+                              onClick={() => {
+                                setDrawerAccountSelectorItemIdx(drawerAccountSelectorItemIdx === idx ? null : idx);
+                                setDrawerAccountSearch("");
+                              }}
+                              className={`w-full px-3 py-2 border rounded-lg text-xs text-left flex items-center justify-between hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 ${accountMissing ? "border-red-300 bg-red-50" : "border-slate-200 bg-white"}`}>
+                              {item.subAccountCode
+                                ? <span className={`font-mono ${accountMissing ? "text-red-600" : "text-slate-700"}`}>
+                                    {item.subAccountCode}
+                                    {accountMissing
+                                      ? <span className="ml-2 font-sans text-red-500 font-medium">· La cuenta no existe en el proyecto</span>
+                                      : <span className="ml-2 font-sans text-slate-400">{item.subAccountDescription}</span>}
+                                  </span>
+                                : <span className="text-slate-400">Seleccionar cuenta</span>}
+                              <ChevronDown size={12} className="text-slate-400 flex-shrink-0" />
+                            </button>
+                            {drawerAccountSelectorItemIdx === idx && (
+                              <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl">
+                                <div className="p-2 border-b border-slate-100">
+                                  <input type="text" value={drawerAccountSearch}
+                                    onChange={e => setDrawerAccountSearch(e.target.value)}
+                                    placeholder="Buscar cuenta"
+                                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-900"
+                                    autoFocus />
+                                </div>
+                                <div className="max-h-48 overflow-y-auto">
+                                  {subAccounts
+                                    .filter(sa => !drawerAccountSearch || sa.code.toLowerCase().includes(drawerAccountSearch.toLowerCase()) || sa.description.toLowerCase().includes(drawerAccountSearch.toLowerCase()))
+                                    .slice(0, 40)
+                                    .map(sa => (
+                                      <button key={sa.id} type="button"
+                                        onClick={() => {
+                                          setDrawerItems(prev => prev.map((it, i) => i === idx ? { ...it, subAccountCode: sa.code, subAccountDescription: sa.description } : it));
+                                          setDrawerAccountSelectorItemIdx(null);
+                                        }}
+                                        className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2 border-b border-slate-50 last:border-0">
+                                        <span className="font-mono text-xs text-slate-500 w-16 flex-shrink-0">{sa.code}</span>
+                                        <span className="text-xs text-slate-700 truncate">{sa.description}</span>
+                                      </button>
+                                    ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {/* Descripción + importes */}
+                          <input type="text" value={item.description} placeholder="Descripción"
+                            onChange={e => setDrawerItems(prev => prev.map((it, i) => i === idx ? { ...it, description: e.target.value } : it))}
+                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-900" />
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <label className="block text-xs text-slate-500 mb-1">Base *</label>
+                              <input type="number" step="0.01" value={item.baseAmount || ""}
+                                onChange={e => setDrawerItems(prev => prev.map((it, i) => i === idx ? { ...it, baseAmount: parseFloat(e.target.value) || 0 } : it))}
+                                className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900" />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-slate-500 mb-1">IVA %</label>
+                              <input type="number" step="1" value={item.vatRate}
+                                onChange={e => setDrawerItems(prev => prev.map((it, i) => i === idx ? { ...it, vatRate: parseFloat(e.target.value) || 0 } : it))}
+                                className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900" />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-slate-500 mb-1">Cuota IVA</label>
+                              <div className="px-2 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-xs font-mono text-slate-500">
+                                {fmt(Math.round((item.baseAmount || 0) * (item.vatRate || 0) / 100 * 100) / 100)} €
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Descripción</label>
-                    <input type="text" value={drawerForm.description}
-                      onChange={e => setDrawerForm(f => ({ ...f, description: e.target.value }))}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
-                  </div>
-
-                  {/* Importes */}
-                  <div className="grid grid-cols-4 gap-2">
-                    {[
-                      { label: "Base", key: "baseAmount" },
-                      { label: "IVA", key: "vatAmount" },
-                      { label: "IRPF %", key: "irpfRate" },
-                      { label: "Total", key: "totalAmount" },
-                    ].map(({ label, key }) => (
-                      <div key={key}>
-                        <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
-                        <input type="number" step="0.01"
-                          value={(drawerForm as any)[key]}
-                          onChange={e => setDrawerForm(f => ({ ...f, [key]: e.target.value }))}
-                          className="w-full px-2 py-2 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                      );
+                    })}
+                    {/* IRPF + Total global */}
+                    <div className="flex items-center justify-between pt-1 px-1">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-slate-500">IRPF %</label>
+                        <input type="number" step="1" value={drawerForm.irpfRate}
+                          onChange={e => setDrawerForm(f => ({ ...f, irpfRate: e.target.value }))}
+                          className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900 bg-white" />
                       </div>
-                    ))}
+                      <div className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs">
+                        <span className="text-slate-400">Total:</span>
+                        <span className="ml-1.5 font-mono font-semibold">
+                          {fmt(Math.round((
+                            drawerItems.reduce((s, it) => s + (it.baseAmount || 0), 0) +
+                            drawerItems.reduce((s, it) => s + Math.round((it.baseAmount || 0) * (it.vatRate || 0) / 100 * 100) / 100, 0) -
+                            Math.round(drawerItems.reduce((s, it) => s + (it.baseAmount || 0), 0) * (parseFloat(drawerForm.irpfRate) || 0) / 100 * 100) / 100
+                          ) * 100) / 100)} €
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -2534,10 +2653,25 @@ export default function BoxesPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {importPreview.slice(0, 15).map((exp, i) => (
-                            <tr key={i} className="hover:bg-slate-50 align-top">
+                          {importPreview.slice(0, 15).map((exp, i) => {
+                            // Detect duplicates for this preview row
+                            const dupById   = expenses.some(e => e.pleoReceiptId === exp.pleoReceiptId);
+                            const invKey    = exp.type === "invoice" && exp.supplierTaxId && exp.supplierNumber
+                              ? `${exp.supplierTaxId}||${exp.supplierNumber}` : null;
+                            const dupByInv  = !!invKey && expenses.some(e =>
+                              e.type === "invoice" && e.supplierTaxId === exp.supplierTaxId && e.supplierNumber === exp.supplierNumber
+                            );
+                            const isDup     = dupById || dupByInv;
+                            const dupReason = dupById ? "ID Pleo ya importado" : dupByInv ? "Factura ya existe (mismo CIF + Nº)" : "";
+                            // Resolved supplier name
+                            const knownSupplier = cardSuppliers.find(s => s.taxId === exp.supplierTaxId);
+                            const displaySupplier = knownSupplier ? knownSupplier.name : capitalizeSupplierName(exp.supplier);
+                            const nameWasNormalized = knownSupplier && knownSupplier.name !== capitalizeSupplierName(exp.supplier);
+                            return (
+                            <tr key={i} className={`align-top ${isDup ? "bg-amber-50/60" : "hover:bg-slate-50"}`}>
                               <td className="px-3 py-2.5">
                                 <div className="flex items-center gap-1.5">
+                                  {isDup && <AlertTriangle size={12} className="text-amber-500 flex-shrink-0" title={dupReason} />}
                                   {exp.type === "ticket"
                                     ? <Receipt size={13} className="text-amber-500 flex-shrink-0" />
                                     : <FileText size={13} className="text-blue-500 flex-shrink-0" />}
@@ -2546,17 +2680,19 @@ export default function BoxesPage() {
                                   </span>
                                 </div>
                                 <p className="text-xs text-slate-400 mt-1 pl-0.5">{exp.date}</p>
+                                {isDup && <p className="text-xs text-amber-600 font-medium mt-0.5">{dupReason} — se omitirá</p>}
                               </td>
                               <td className="px-3 py-2.5">
-                                <p className="font-medium text-slate-900 truncate max-w-[200px]" title={exp.supplier}>
-                                  {capitalizeSupplierName(exp.supplier)}
+                                <p className={`font-medium truncate max-w-[200px] ${isDup ? "text-slate-400 line-through" : "text-slate-900"}`} title={exp.supplier}>
+                                  {displaySupplier}
                                 </p>
-                                {exp.employee && (
-                                  <p className="text-xs text-slate-400 truncate">{exp.employee}</p>
+                                {nameWasNormalized && (
+                                  <p className="text-xs text-emerald-600 flex items-center gap-1 mt-0.5">
+                                    <Check size={10} /> Nombre fiscal aplicado
+                                  </p>
                                 )}
-                                {exp.supplierTaxId && (
-                                  <p className="text-xs font-mono text-slate-400">{exp.supplierTaxId}</p>
-                                )}
+                                {exp.employee && <p className="text-xs text-slate-400 truncate">{exp.employee}</p>}
+                                {exp.supplierTaxId && <p className="text-xs font-mono text-slate-400">{exp.supplierTaxId}</p>}
                               </td>
                               <td className="px-3 py-2.5">
                                 {exp.items.map((item: any, j: number) => (
@@ -2570,10 +2706,11 @@ export default function BoxesPage() {
                                   </div>
                                 ))}
                               </td>
-                              <td className="px-3 py-2.5 text-right font-mono text-slate-700">{fmt(exp.baseAmount)}</td>
-                              <td className="px-3 py-2.5 text-right font-mono font-semibold text-slate-900">{fmt(exp.totalAmount)} €</td>
+                              <td className={`px-3 py-2.5 text-right font-mono ${isDup ? "text-slate-400" : "text-slate-700"}`}>{fmt(exp.baseAmount)}</td>
+                              <td className={`px-3 py-2.5 text-right font-mono font-semibold ${isDup ? "text-slate-400" : "text-slate-900"}`}>{fmt(exp.totalAmount)} €</td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                         <tfoot className="bg-slate-50 border-t border-slate-200">
                           <tr>
@@ -2599,20 +2736,38 @@ export default function BoxesPage() {
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex justify-between items-center flex-shrink-0">
               <span className="text-sm text-slate-500">
-                {importPreview.length > 0 && (
-                  <>
-                    <strong className="text-slate-900">{importPreview.length}</strong> gastos ·{" "}
-                    Base: <strong className="text-slate-900">{fmt(importPreview.reduce((s: number, e: any) => s + e.baseAmount, 0))} €</strong> ·{" "}
-                    Total: <strong className="text-slate-900">{fmt(importPreview.reduce((s: number, e: any) => s + e.totalAmount, 0))} €</strong>
-                  </>
-                )}
+                {importPreview.length > 0 && (() => {
+                  const dupCount = importPreview.filter(exp => {
+                    if (expenses.some(e => e.pleoReceiptId === exp.pleoReceiptId)) return true;
+                    if (exp.type === "invoice" && exp.supplierTaxId && exp.supplierNumber)
+                      return expenses.some(e => e.type === "invoice" && e.supplierTaxId === exp.supplierTaxId && e.supplierNumber === exp.supplierNumber);
+                    return false;
+                  }).length;
+                  const newCount = importPreview.length - dupCount;
+                  return (
+                    <>
+                      <strong className="text-slate-900">{newCount}</strong> nuevos
+                      {dupCount > 0 && <> · <strong className="text-amber-600">{dupCount} duplicado{dupCount > 1 ? "s" : ""}</strong> (se omitirán)</>}
+                      {" · "}Base: <strong className="text-slate-900">{fmt(importPreview.filter((_: any, i: number) => !expenses.some(e => e.pleoReceiptId === importPreview[i].pleoReceiptId)).reduce((s: number, e: any) => s + e.baseAmount, 0))} €</strong>
+                    </>
+                  );
+                })()}
               </span>
               <div className="flex gap-3">
                 <button onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }}
                   className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
                 <button onClick={handleImportExpenses} disabled={importing || importPreview.length === 0}
                   className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
-                  {importing ? "Importando..." : `Importar ${importPreview.length} gastos`}
+                  {importing ? "Importando..." : (() => {
+                    const dupCount = importPreview.filter(exp => {
+                      if (expenses.some(e => e.pleoReceiptId === exp.pleoReceiptId)) return true;
+                      if (exp.type === "invoice" && exp.supplierTaxId && exp.supplierNumber)
+                        return expenses.some(e => e.type === "invoice" && e.supplierTaxId === exp.supplierTaxId && e.supplierNumber === exp.supplierNumber);
+                      return false;
+                    }).length;
+                    const newCount = importPreview.length - dupCount;
+                    return `Importar ${newCount} gasto${newCount !== 1 ? "s" : ""}${dupCount > 0 ? ` (omitir ${dupCount})` : ""}`;
+                  })()}
                 </button>
               </div>
             </div>
