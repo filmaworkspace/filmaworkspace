@@ -607,11 +607,29 @@ export default function BoxesPage() {
     const sharedStrings: string[] = [];
     const ssXml = readEntry("xl/sharedStrings.xml");
     if (ssXml) {
-      for (const si of ssXml.match(/<si>(.*?)<\/si>/gs) ?? []) {
-        const parts = si.match(/<t(?:\s[^>]*)?>([^<]*)<\/t>/g) ?? [];
-        sharedStrings.push(
-          parts.map(p => p.replace(/<t[^>]*>/, "").replace(/<\/t>/, "")).join("")
-        );
+      // Extraer <si>...</si> con indexOf para evitar problemas de minificación
+      let ssp = 0;
+      while (true) {
+        const siS = ssXml.indexOf("<si>", ssp);
+        if (siS < 0) break;
+        const siE = ssXml.indexOf("</si>", siS);
+        if (siE < 0) break;
+        const siContent = ssXml.substring(siS + 4, siE);
+        // Concatenar todos los <t>...</t> dentro del <si>
+        let text = "";
+        let tp = 0;
+        while (true) {
+          const tS = siContent.indexOf("<t", tp);
+          if (tS < 0) break;
+          const tTagE = siContent.indexOf(">", tS);
+          if (tTagE < 0) break;
+          const tE = siContent.indexOf("</t>", tTagE);
+          if (tE < 0) break;
+          text += siContent.substring(tTagE + 1, tE);
+          tp = tE + 4;
+        }
+        sharedStrings.push(text);
+        ssp = siE + 5;
       }
     }
     console.log("[XLSX] sharedStrings:", sharedStrings.length, sharedStrings.slice(0,5));
@@ -619,20 +637,56 @@ export default function BoxesPage() {
     // 2. Sheet
     const sheetXml = readEntry("xl/worksheets/sheet1.xml");
     if (!sheetXml) throw new Error("No se encontró la hoja de cálculo en el XLSX");
-    const rowBlocks = sheetXml.match(/<row[^>]*>(.*?)<\/row>/gs) ?? [];
+    // Extraer bloques <row>...</row> completos con indexOf
+    const rowBlocks: string[] = [];
+    { let rp = 0;
+      while (true) {
+        const rs = sheetXml.indexOf("<row", rp);
+        if (rs < 0) break;
+        const re = sheetXml.indexOf("</row>", rs);
+        if (re < 0) break;
+        rowBlocks.push(sheetXml.substring(rs, re + 6));
+        rp = re + 6;
+      }
+    }
     console.log("[XLSX] sheetXml length:", sheetXml?.length, "rowBlocks:", rowBlocks.length);
     if (rowBlocks.length < 2) throw new Error("El archivo no contiene filas de datos");
 
+    // parseRow: usa indexOf/substring — inmune al minificador de Next.js.
+    // Los regex con comillas dentro (/t="s"/) se corrompen al minificar.
     const parseRow = (rowXml: string): Record<string, string> => {
       const result: Record<string, string> = {};
-      const rx = /<c\s+r="([A-Z]+)\d+"([^>]*)>(.*?)<\/c>/gs;
-      let m: RegExpExecArray | null;
-      while ((m = rx.exec(rowXml)) !== null) {
-        const tM = m[2].match(/t="([^"]*)"/);
-        const vM = m[3].match(/<v>([^<]*)<\/v>/);
-        let v = vM ? vM[1].trim() : "";
-        if (tM?.[1] === "s" && v !== "") v = sharedStrings[parseInt(v, 10)] ?? "";
-        result[m[1]] = v;
+      let pos = 0;
+      while (true) {
+        const cStart = rowXml.indexOf("<c ", pos);
+        if (cStart < 0) break;
+        const cEnd = rowXml.indexOf(">", cStart);
+        if (cEnd < 0) break;
+        const tag = rowXml.substring(cStart + 1, cEnd);
+
+        // Extraer columna de r="A1"
+        const rIdx = tag.indexOf(" r=");
+        if (rIdx < 0) { pos = cEnd + 1; continue; }
+        let ci = rIdx + 3;
+        if (tag[ci] === '"' || tag[ci] === "'") ci++;
+        let col = "";
+        while (ci < tag.length && tag[ci] >= "A" && tag[ci] <= "Z") col += tag[ci++];
+        if (!col) { pos = cEnd + 1; continue; }
+
+        // Detectar t="s" (shared string) sin regex con comillas
+        const tIdx = tag.indexOf(" t=");
+        const isShared = tIdx >= 0 && tag.substring(tIdx + 3).replace(/^["']/, "")[0] === "s";
+
+        // Extraer <v>valor</v>
+        const closeIdx = rowXml.indexOf("</c>", cEnd);
+        if (closeIdx < 0) break;
+        const inner = rowXml.substring(cEnd + 1, closeIdx);
+        const vO = inner.indexOf("<v>"), vC = inner.indexOf("</v>");
+        let v = vO >= 0 && vC > vO ? inner.substring(vO + 3, vC).trim() : "";
+
+        if (isShared && v !== "") v = sharedStrings[parseInt(v, 10)] ?? v;
+        result[col] = v;
+        pos = closeIdx + 4;
       }
       return result;
     };
