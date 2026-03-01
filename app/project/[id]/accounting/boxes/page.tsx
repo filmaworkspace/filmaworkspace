@@ -13,7 +13,8 @@ import {
   Package, Plus, Search, ChevronDown, ChevronRight, X, Check, AlertCircle, CheckCircle,
   Trash2, Edit, Upload, FileText, Receipt, ArrowLeft, Layers, ShieldAlert, FileSpreadsheet,
   ExternalLink, Lock, Send, Banknote, UserCircle, CreditCard, CheckSquare, AlertTriangle,
-  Calendar, Users, Paperclip, Eye
+  Calendar, Users, Paperclip, Eye, Info, SplitSquareHorizontal, Scissors, FileX, PanelRightOpen,
+  RotateCcw, Save, ChevronLeft
 } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
@@ -40,6 +41,8 @@ interface Envelope {
 
 interface ExpenseItem { baseAmount: number; vatRate: number; vatAmount: number; }
 
+type ConflictType = "amount_diff" | "invoice_covers_multiple" | "partial_invoice" | "missing_document";
+
 interface BoxExpense {
   id: string; envelopeId: string; boxId: string; boxCode: string;
   number: number; displayNumber: string; type: "invoice" | "ticket";
@@ -48,8 +51,14 @@ interface BoxExpense {
   subAccountCode: string; subAccountDescription: string; description: string;
   date: Date; items: ExpenseItem[];
   baseAmount: number; vatAmount: number; irpfRate: number; irpfAmount: number; totalAmount: number;
+  pleoAmount?: number;
   status: "pending" | "reviewed" | "accounted";
   reviewedAt?: Date; reviewedBy?: string; reviewedByName?: string;
+  conflictType?: ConflictType | null;
+  conflictNote?: string;
+  conflictResolvedAt?: Date;
+  conflictResolvedBy?: string;
+  conflictResolvedByName?: string;
 }
 
 interface BoxSupplier { taxId: string; name: string; originalName: string; updatedAt?: Date; }
@@ -190,6 +199,13 @@ const TRANSFER_STATUS_CONFIG = {
   transferred: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Transferido" },
 };
 
+const CONFLICT_CONFIG: Record<ConflictType, { icon: string; label: string; description: string; color: string }> = {
+  amount_diff:               { icon: "diff",     label: "Diferencia de importe",      description: "El importe de la factura no coincide con el cargo en Pleo",          color: "amber"  },
+  invoice_covers_multiple:   { icon: "merge",    label: "Factura cubre varios cargos", description: "Una sola factura agrupa varios movimientos de tarjeta",              color: "blue"   },
+  partial_invoice:           { icon: "split",    label: "Factura parcial",             description: "El movimiento de tarjeta corresponde a varias facturas o tickets",   color: "violet" },
+  missing_document:          { icon: "missing",  label: "Documento ausente",           description: "No hay factura ni ticket adjunto en Pleo para este gasto",           color: "slate"  },
+};
+
 type MainTab = "tarjetas" | "transfers";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -229,12 +245,37 @@ export default function BoxesPage() {
   const [showCreateEnvelopeModal, setShowCreateEnvelopeModal] = useState(false);
   const [showDeleteEnvelopeModal, setShowDeleteEnvelopeModal] = useState<Envelope | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showManualExpenseModal, setShowManualExpenseModal] = useState(false);
+  const [manualExpenseForm, setManualExpenseForm] = useState({
+    type: "invoice" as "invoice" | "ticket",
+    supplier: "", supplierTaxId: "", supplierNumber: "",
+    subAccountCode: "", subAccountDescription: "",
+    description: "", date: "",
+    baseAmount: "", vatRate: "21", vatAmount: "", irpfRate: "0", irpfAmount: "",
+    notes: "",
+  });
+  const [manualExpenseFile, setManualExpenseFile] = useState<File | null>(null);
+  const [manualExpenseSaving, setManualExpenseSaving] = useState(false);
+  const [showManualAccountSelector, setShowManualAccountSelector] = useState(false);
+  const [manualAccountSearch, setManualAccountSearch] = useState("");
   const [boxForm, setBoxForm] = useState({ name: "", code: "", department: "" });
   const [editBoxForm, setEditBoxForm] = useState({ name: "", code: "" });
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importPreview, setImportPreview] = useState<any[]>([]);
   const [importing, setImporting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  // Expense drawer (conflict & edit panel)
+  const [drawerExpense, setDrawerExpense] = useState<BoxExpense | null>(null);
+  const [drawerForm, setDrawerForm] = useState({
+    supplier: "", supplierTaxId: "", supplierNumber: "",
+    subAccountCode: "", subAccountDescription: "", description: "",
+    date: "", baseAmount: "", vatAmount: "", irpfRate: "", irpfAmount: "", totalAmount: "",
+    conflictType: "" as ConflictType | "",
+    conflictNote: "",
+  });
+  const [drawerSaving, setDrawerSaving] = useState(false);
+  const [showDrawerAccountSelector, setShowDrawerAccountSelector] = useState(false);
+  const [drawerAccountSearch, setDrawerAccountSearch] = useState("");
 
   // TRANSFERS State
   const [transferEnvelopes, setTransferEnvelopes] = useState<TransferEnvelope[]>([]);
@@ -385,6 +426,80 @@ export default function BoxesPage() {
   // PLEO FUNCTIONS
   // ═══════════════════════════════════════════════════════════════════════════════
 
+  // ─── Expense Drawer helpers ──────────────────────────────────────────────────
+  const openDrawer = (expense: BoxExpense) => {
+    setDrawerExpense(expense);
+    setDrawerForm({
+      supplier: expense.supplier,
+      supplierTaxId: expense.supplierTaxId || "",
+      supplierNumber: expense.supplierNumber || "",
+      subAccountCode: expense.subAccountCode || "",
+      subAccountDescription: expense.subAccountDescription || "",
+      description: expense.description || "",
+      date: expense.date instanceof Date
+        ? expense.date.toLocaleDateString("es-ES")
+        : (expense.date as any)?.toDate?.()?.toLocaleDateString("es-ES") ?? "",
+      baseAmount: String(expense.baseAmount ?? ""),
+      vatAmount: String(expense.vatAmount ?? ""),
+      irpfRate: String(expense.irpfRate ?? ""),
+      irpfAmount: String(expense.irpfAmount ?? ""),
+      totalAmount: String(expense.totalAmount ?? ""),
+      conflictType: expense.conflictType ?? "",
+      conflictNote: expense.conflictNote ?? "",
+    });
+    setDrawerAccountSearch("");
+    setShowDrawerAccountSelector(false);
+  };
+
+  const closeDrawer = () => { setDrawerExpense(null); setShowDrawerAccountSelector(false); };
+
+  const handleSaveDrawer = async () => {
+    if (!drawerExpense) return;
+    setDrawerSaving(true);
+    try {
+      const updates: any = {
+        supplier: drawerForm.supplier.trim(),
+        supplierTaxId: drawerForm.supplierTaxId.trim(),
+        supplierNumber: drawerForm.supplierNumber.trim(),
+        subAccountCode: drawerForm.subAccountCode.trim(),
+        subAccountDescription: drawerForm.subAccountDescription.trim(),
+        description: drawerForm.description.trim(),
+        baseAmount: parseFloat(drawerForm.baseAmount) || 0,
+        vatAmount: parseFloat(drawerForm.vatAmount) || 0,
+        irpfRate: parseFloat(drawerForm.irpfRate) || 0,
+        irpfAmount: parseFloat(drawerForm.irpfAmount) || 0,
+        totalAmount: parseFloat(drawerForm.totalAmount) || 0,
+        conflictType: drawerForm.conflictType || null,
+        conflictNote: drawerForm.conflictNote.trim(),
+      };
+      // Parse date string DD/MM/YYYY back to Timestamp
+      if (drawerForm.date) {
+        const parts = drawerForm.date.split("/");
+        if (parts.length === 3) {
+          updates.date = Timestamp.fromDate(new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0])));
+        }
+      }
+      await updateDoc(doc(db, `projects/${projectId}/cardExpenses`, drawerExpense.id), updates);
+      showToast("success", "Gasto actualizado");
+      closeDrawer();
+      loadData();
+    } catch { showToast("error", "Error al guardar"); } finally { setDrawerSaving(false); }
+  };
+
+  const handleResolveConflict = async () => {
+    if (!drawerExpense) return;
+    setDrawerSaving(true);
+    try {
+      await updateDoc(doc(db, `projects/${projectId}/cardExpenses`, drawerExpense.id), {
+        conflictType: null, conflictNote: "",
+        conflictResolvedAt: Timestamp.now(), conflictResolvedBy: userId, conflictResolvedByName: userName,
+      });
+      showToast("success", "Conflicto resuelto");
+      closeDrawer();
+      loadData();
+    } catch { showToast("error", "Error al resolver conflicto"); } finally { setDrawerSaving(false); }
+  };
+
   const handleCreateBox = async () => {
     if (!boxForm.name.trim() || !boxForm.code.trim()) return showToast("error", "Nombre y código obligatorios");
     if (boxes.some(b => b.code.toUpperCase() === boxForm.code.toUpperCase())) return showToast("error", "Código ya en uso");
@@ -478,146 +593,175 @@ export default function BoxesPage() {
     } catch { showToast("error", "Error al eliminar sobre"); } finally { setSaving(false); }
   };
 
+  // ── Parser XLSX nativo sin dependencias (DecompressionStream browser API) ──
   const parsePleoExcel = async (file: File): Promise<any[]> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const JSZip = (await import("jszip")).default;
-          const zip = await JSZip.loadAsync(data);
+    const r16 = (d: Uint8Array, o: number) => d[o] | (d[o + 1] << 8);
+    const r32 = (d: Uint8Array, o: number) =>
+      (d[o] | (d[o+1]<<8) | (d[o+2]<<16) | (d[o+3]<<24)) >>> 0;
+    const tdec = new TextDecoder("utf-8");
 
-          // ── 1. SharedStrings ────────────────────────────────────────────────
-          // Usamos regex en lugar de DOMParser+querySelectorAll porque el XML
-          // tiene xmlns que hace que querySelectorAll("t") devuelva 0 resultados.
-          // Cada <si> puede tener un <t> simple o múltiples <r><t> (rich text).
-          const sharedStrings: string[] = [];
-          const ssFile = zip.file("xl/sharedStrings.xml");
-          if (ssFile) {
-            const ssXml = await ssFile.async("text");
-            const siBlocks = ssXml.match(/<si>([\s\S]*?)<\/si>/g) || [];
-            for (const si of siBlocks) {
-              const parts = si.match(/<t(?:\s[^>]*)?>([^<]*)<\/t>/g) || [];
-              const text = parts.map(p => p.replace(/<t(?:\s[^>]*)?>/, "").replace(/<\/t>/, "")).join("");
-              sharedStrings.push(text);
-            }
-          }
+    const inflateRaw = async (compressed: Uint8Array): Promise<string> => {
+      const ds = new (window as any).DecompressionStream("deflate-raw");
+      const writer = ds.writable.getWriter();
+      const reader = ds.readable.getReader();
+      writer.write(compressed);
+      writer.close();
+      const chunks: Uint8Array[] = [];
+      for (;;) {
+        const { done, value } = await reader.read() as { done: boolean; value: Uint8Array };
+        if (done) break;
+        chunks.push(value);
+      }
+      const total = chunks.reduce((s, c) => s + c.length, 0);
+      const out = new Uint8Array(total);
+      let off = 0;
+      for (const c of chunks) { out.set(c, off); off += c.length; }
+      return tdec.decode(out);
+    };
 
-          // ── 2. Sheet ────────────────────────────────────────────────────────
-          const sheetFile = zip.file("xl/worksheets/sheet1.xml");
-          if (!sheetFile) throw new Error("No se encontró la hoja de cálculo");
-          const sheetXml = await sheetFile.async("text");
+    const ab = await file.arrayBuffer();
+    const data = new Uint8Array(ab);
 
-          // Extraer bloques <row>
-          const rowBlocks = sheetXml.match(/<row\b[^>]*>([\s\S]*?)<\/row>/g) || [];
-          if (rowBlocks.length < 2) throw new Error("El archivo no contiene datos");
+    // Locate End-of-Central-Directory record
+    let eocd = -1;
+    for (let i = data.length - 22; i >= 0; i--) {
+      if (data[i] === 0x50 && data[i+1] === 0x4b && data[i+2] === 0x05 && data[i+3] === 0x06) {
+        eocd = i; break;
+      }
+    }
+    if (eocd < 0) throw new Error("El archivo no es un XLSX válido (no es un ZIP)");
 
-          // Parsear una fila: devuelve { colLetra: valor }
-          const parseRow = (rowXml: string): Record<string, string> => {
-            const result: Record<string, string> = {};
-            // <c r="A1" ... t="s"><v>0</v></c>  o  <c r="B2"><v>17.40</v></c>
-            const cellRegex = /<c\s+r="([A-Z]+)\d+"([^>]*)>([\s\S]*?)<\/c>/g;
-            let m: RegExpExecArray | null;
-            while ((m = cellRegex.exec(rowXml)) !== null) {
-              const colLetter = m[1];
-              const attrs = m[2];
-              const inner = m[3];
-              const tMatch = attrs.match(/\bt="([^"]*)"/);
-              const vMatch = inner.match(/<v>([^<]*)<\/v>/);
-              let value = vMatch ? vMatch[1].trim() : "";
-              if (tMatch?.[1] === "s" && value !== "") {
-                value = sharedStrings[parseInt(value, 10)] ?? "";
-              }
-              result[colLetter] = value;
-            }
-            return result;
-          };
+    const cdOffset = r32(data, eocd + 16);
+    const cdCount  = r16(data, eocd + 8);
 
-          // Fila 1 → mapa colLetra → nombre de cabecera
-          const headerRow = parseRow(rowBlocks[0]);
-          const colToHeader: Record<string, string> = headerRow; // ya son strings resueltos
-
-          // Filas de datos → array de { "NOMBRE COLUMNA": valor }
-          const grouped: Record<string, any[]> = {};
-          for (let i = 1; i < rowBlocks.length; i++) {
-            const raw = parseRow(rowBlocks[i]);
-            const record: Record<string, string> = {};
-            for (const [col, val] of Object.entries(raw)) {
-              const header = colToHeader[col];
-              if (header) record[header] = val;
-            }
-            const id = record["RECIBO PLEO"];
-            if (!id) continue;
-            if (!grouped[id]) grouped[id] = [];
-            grouped[id].push(record);
-          }
-
-          // ── 3. Construir resultado final ────────────────────────────────────
-          const parseNum = (v: string | undefined) =>
-            parseFloat((v ?? "0").replace(",", ".")) || 0;
-
-          const result: any[] = [];
-          for (const [receiptId, records] of Object.entries(grouped)) {
-            const first = records[0];
-
-            // Tipo: TICKET o FACTURA (PLEO exporta en mayúsculas)
-            const rawType = (first["TIPO DE DOCUMENTO"] ?? "").toUpperCase().trim();
-            const type: "ticket" | "invoice" = rawType === "TICKET" ? "ticket" : "invoice";
-
-            // Líneas de IVA: una por fila con el mismo RECIBO PLEO
-            const items = records.map(r => ({
-              baseAmount: parseNum(r["ANTES DE IMPUESTOS"]),
-              vatRate: parseNum(r["PORCENTAJE IMPUESTO"]),
-              vatAmount: parseNum(r["TOTAL IMPUESTO"]),
-            }));
-
-            const totalBase = Math.round(items.reduce((s, it) => s + it.baseAmount, 0) * 100) / 100;
-            const totalVat  = Math.round(items.reduce((s, it) => s + it.vatAmount, 0) * 100) / 100;
-            const irpfRate   = parseNum(first["IRPF %"]);
-            const irpfAmount = parseNum(first["IRPF TOTAL"]);
-
-            // Descripción: DESCRIPCION tiene preferencia, luego NOTAS
-            const description = (first["DESCRIPCION"] || first["NOTAS"] || "").trim();
-
-            // Fecha: usar FECHA FACTURA/TICKET (columna A); si vacía, FECHA FACTURA (col V)
-            const date = (first["FECHA FACTURA/TICKET"] || first["FECHA FACTURA"] || "").trim();
-
-            result.push({
-              pleoReceiptId: receiptId,
-              type,
-              employee: (first["EMPLEADO"] || "").trim(),
-              supplier: (first["PROVEEDOR"] || "").trim(),
-              supplierTaxId: (first["CIF"] || "").trim(),
-              supplierNumber: (first["Número de Factura"] || "").trim(),
-              subAccountCode: (first["CODIGO PRESUPUESTO"] || "").trim(),
-              subAccountDescription: (first["DESCRIPCIÓN NUMERO CUENTA"] || "").trim(),
-              description,
-              date,
-              pleoUrl: (first["URL"] || "").trim(),
-              items,
-              baseAmount: totalBase,
-              vatAmount: totalVat,
-              irpfRate,
-              irpfAmount,
-              totalAmount: Math.round((totalBase + totalVat - irpfAmount) * 100) / 100,
-            });
-          }
-
-          if (result.length === 0) throw new Error("No se encontraron gastos en el archivo");
-          resolve(result);
-        } catch (err) {
-          reject(err);
-        }
+    // Parse Central Directory to build file map
+    const fileMap: Record<string, { localOffset: number; method: number; compSize: number }> = {};
+    let pos = cdOffset;
+    for (let i = 0; i < cdCount; i++) {
+      const fnLen      = r16(data, pos + 28);
+      const extraLen   = r16(data, pos + 30);
+      const commentLen = r16(data, pos + 32);
+      const name       = tdec.decode(data.subarray(pos + 46, pos + 46 + fnLen));
+      fileMap[name] = {
+        localOffset: r32(data, pos + 42),
+        method:      r16(data, pos + 10),
+        compSize:    r32(data, pos + 20),
       };
-      reader.onerror = () => reject(new Error("Error leyendo el archivo"));
-      reader.readAsArrayBuffer(file);
-    });
+      pos += 46 + fnLen + extraLen + commentLen;
+    }
+
+    const readEntry = async (name: string): Promise<string | null> => {
+      const fi = fileMap[name];
+      if (!fi) return null;
+      const fnLen    = r16(data, fi.localOffset + 26);
+      const extraLen = r16(data, fi.localOffset + 28);
+      const start    = fi.localOffset + 30 + fnLen + extraLen;
+      const raw      = data.subarray(start, start + fi.compSize);
+      if (fi.method === 0) return tdec.decode(raw);   // stored
+      if (fi.method === 8) return inflateRaw(raw);    // deflate
+      throw new Error("Método de compresión XLSX no soportado: " + fi.method);
+    };
+
+    // 1. SharedStrings
+    const sharedStrings: string[] = [];
+    const ssXml = await readEntry("xl/sharedStrings.xml");
+    if (ssXml) {
+      for (const si of ssXml.match(/<si>([\s\S]*?)<\/si>/g) ?? []) {
+        const parts = si.match(/<t(?:\s[^>]*)?>([^<]*)<\/t>/g) ?? [];
+        sharedStrings.push(
+          parts.map(p => p.replace(/<t[^>]*>/, "").replace(/<\/t>/, "")).join("")
+        );
+      }
+    }
+
+    // 2. Sheet
+    const sheetXml = await readEntry("xl/worksheets/sheet1.xml");
+    if (!sheetXml) throw new Error("No se encontró la hoja de cálculo en el XLSX");
+    const rowBlocks = sheetXml.match(/<row[^>]*>([\s\S]*?)<\/row>/g) ?? [];
+    if (rowBlocks.length < 2) throw new Error("El archivo no contiene filas de datos");
+
+    const parseRow = (rowXml: string): Record<string, string> => {
+      const result: Record<string, string> = {};
+      const rx = /<c\s+r="([A-Z]+)\d+"([^>]*)>([\s\S]*?)<\/c>/g;
+      let m: RegExpExecArray | null;
+      while ((m = rx.exec(rowXml)) !== null) {
+        const tM = m[2].match(/t="([^"]*)"/);
+        const vM = m[3].match(/<v>([^<]*)<\/v>/);
+        let v = vM ? vM[1].trim() : "";
+        if (tM?.[1] === "s" && v !== "") v = sharedStrings[parseInt(v, 10)] ?? "";
+        result[m[1]] = v;
+      }
+      return result;
+    };
+
+    const colToHeader = parseRow(rowBlocks[0]);
+
+    // 3. Group rows by RECIBO PLEO
+    const grouped: Record<string, Record<string, string>[]> = {};
+    for (let i = 1; i < rowBlocks.length; i++) {
+      const raw = parseRow(rowBlocks[i]);
+      const record: Record<string, string> = {};
+      for (const [col, val] of Object.entries(raw)) {
+        const h = colToHeader[col]; if (h) record[h] = val;
+      }
+      const id = record["RECIBO PLEO"]; if (!id) continue;
+      (grouped[id] ??= []).push(record);
+    }
+
+    // 4. Build result
+    const pn = (v?: string) => parseFloat((v ?? "0").replace(",", ".")) || 0;
+    const result: any[] = [];
+
+    for (const [receiptId, records] of Object.entries(grouped)) {
+      const first = records[0];
+      const type: "ticket" | "invoice" =
+        (first["TIPO DE DOCUMENTO"] ?? "").toUpperCase() === "TICKET" ? "ticket" : "invoice";
+      const items = records.map(r => ({
+        baseAmount: pn(r["ANTES DE IMPUESTOS"]),
+        vatRate:    pn(r["PORCENTAJE IMPUESTO"]),
+        vatAmount:  pn(r["TOTAL IMPUESTO"]),
+      }));
+      const totalBase  = Math.round(items.reduce((s, it) => s + it.baseAmount, 0) * 100) / 100;
+      const totalVat   = Math.round(items.reduce((s, it) => s + it.vatAmount,  0) * 100) / 100;
+      const irpfRate   = pn(first["IRPF %"]);
+      const irpfAmount = pn(first["IRPF TOTAL"]);
+      result.push({
+        pleoReceiptId:        receiptId,
+        type,
+        employee:             (first["EMPLEADO"]                  ?? "").trim(),
+        supplier:             (first["PROVEEDOR"]                 ?? "").trim(),
+        supplierTaxId:        (first["CIF"]                       ?? "").trim(),
+        supplierNumber:       (first["Número de Factura"]         ?? "").trim(),
+        subAccountCode:       (first["CODIGO PRESUPUESTO"]        ?? "").trim(),
+        subAccountDescription:(first["DESCRIPCIÓN NUMERO CUENTA"] ?? "").trim(),
+        description:          (first["DESCRIPCION"] || first["NOTAS"] || "").trim(),
+        date:                 (first["FECHA FACTURA/TICKET"] || first["FECHA FACTURA"] || "").trim(),
+        pleoUrl:              (first["URL"]                       ?? "").trim(),
+        items,
+        baseAmount:  totalBase,
+        vatAmount:   totalVat,
+        irpfRate,
+        irpfAmount,
+        totalAmount: Math.round((totalBase + totalVat - irpfAmount) * 100) / 100,
+        pleoAmount:  Math.round(records.reduce((s, r) => s + pn(r["IMPORTE"]), 0) * 100) / 100,
+      });
+    }
+
+    if (result.length === 0) throw new Error("No se encontraron gastos en el archivo");
+    return result;
   };
+
 
   const handleFileSelect = async (file: File) => {
     setImportFile(file);
-    try { setImportPreview(await parsePleoExcel(file)); }
-    catch { showToast("error", "Error al leer el archivo"); setImportFile(null); setImportPreview([]); }
+    try {
+      setImportPreview(await parsePleoExcel(file));
+    } catch (err: any) {
+      const msg = err?.message ? `Error: ${err.message}` : "Error al leer el archivo";
+      showToast("error", msg);
+      setImportFile(null);
+      setImportPreview([]);
+    }
   };
 
   const handleImportExpenses = async () => {
@@ -652,6 +796,17 @@ export default function BoxesPage() {
           const p = exp.date.split("/");
           if (p.length === 3) expenseDate = new Date(parseInt(p[2]), parseInt(p[1]) - 1, parseInt(p[0]));
         }
+        // Auto-detect conflicts
+        const pleoAmount = exp.pleoAmount || 0;
+        const computedTotal = exp.totalAmount || 0;
+        const autoConflicts: ConflictType[] = [];
+        if (!exp.pleoUrl || exp.pleoUrl.trim() === "") autoConflicts.push("missing_document");
+        if (pleoAmount > 0 && Math.abs(pleoAmount - computedTotal) > 0.02) autoConflicts.push("amount_diff");
+        const autoConflictType: ConflictType | null = autoConflicts[0] ?? null;
+        const autoConflictNote = autoConflicts.length > 0
+          ? autoConflicts.map(c => CONFLICT_CONFIG[c].label).join(", ") + " (detectado automáticamente)"
+          : "";
+
         const expRef = doc(collection(db, `projects/${projectId}/cardExpenses`));
         batch.set(expRef, {
           envelopeId: selectedEnvelope.id, boxId: selectedBox.id, boxCode: selectedBox.code,
@@ -662,6 +817,9 @@ export default function BoxesPage() {
           description: exp.description || "", date: Timestamp.fromDate(expenseDate),
           items: exp.items || [], baseAmount: exp.baseAmount || 0, vatAmount: exp.vatAmount || 0,
           irpfRate: exp.irpfRate || 0, irpfAmount: exp.irpfAmount || 0, totalAmount: exp.totalAmount || 0,
+          pleoAmount: pleoAmount,
+          conflictType: autoConflictType,
+          conflictNote: autoConflictNote,
           status: "pending", createdAt: Timestamp.now(), createdBy: userId, createdByName: userName,
         });
         totalBase += exp.baseAmount || 0;
@@ -698,6 +856,87 @@ export default function BoxesPage() {
       showToast("success", "Gasto revisado");
       loadData();
     } catch { showToast("error", "Error al revisar"); }
+  };
+
+  const handleAddManualExpense = async () => {
+    if (!selectedEnvelope || !selectedBox) return;
+    const f = manualExpenseForm;
+    if (!f.supplier.trim()) return showToast("error", "El proveedor es obligatorio");
+    if (!f.date.trim()) return showToast("error", "La fecha es obligatoria");
+    if (!f.baseAmount) return showToast("error", "El importe base es obligatorio");
+    if (!f.subAccountCode) return showToast("error", "La subcuenta es obligatoria");
+    setManualExpenseSaving(true);
+    try {
+      const boxSnap = await getDoc(doc(db, `projects/${projectId}/cards`, selectedBox.id));
+      const boxData = boxSnap.data() || {};
+      const isTicket = f.type === "ticket";
+      const num = isTicket ? (boxData.nextTicketNumber ?? 1) : (boxData.nextInvoiceNumber ?? 1);
+      const displayNumber = `BOX-${selectedBox.code}-${isTicket ? "T" : "F"}-${String(num).padStart(4, "0")}`;
+
+      // Parse date DD/MM/YYYY
+      const dateParts = f.date.split("/");
+      const expenseDate = dateParts.length === 3
+        ? new Date(parseInt(dateParts[2]), parseInt(dateParts[1]) - 1, parseInt(dateParts[0]))
+        : new Date();
+
+      const baseAmount  = parseFloat(f.baseAmount)  || 0;
+      const vatRate     = parseFloat(f.vatRate)      || 0;
+      const vatAmount   = parseFloat(f.vatAmount)    || Math.round(baseAmount * vatRate / 100 * 100) / 100;
+      const irpfRate    = parseFloat(f.irpfRate)     || 0;
+      const irpfAmount  = parseFloat(f.irpfAmount)   || Math.round(baseAmount * irpfRate / 100 * 100) / 100;
+      const totalAmount = Math.round((baseAmount + vatAmount - irpfAmount) * 100) / 100;
+
+      // Upload document if provided
+      let documentUrl = "";
+      if (manualExpenseFile) {
+        const ext = manualExpenseFile.name.split(".").pop() ?? "pdf";
+        const storageRef = ref(storage, `projects/${projectId}/cardExpenses/${displayNumber}.${ext}`);
+        await uploadBytes(storageRef, manualExpenseFile);
+        documentUrl = await getDownloadURL(storageRef);
+      }
+
+      const supplierName = capitalizeSupplierName(f.supplier.trim());
+      const batch = writeBatch(db);
+      const expRef = doc(collection(db, `projects/${projectId}/cardExpenses`));
+      batch.set(expRef, {
+        envelopeId: selectedEnvelope.id, boxId: selectedBox.id, boxCode: selectedBox.code,
+        number: num, displayNumber, type: f.type,
+        pleoReceiptId: `MANUAL-${Date.now()}`,
+        pleoUrl: "", documentUrl,
+        supplier: supplierName, supplierTaxId: f.supplierTaxId.trim(),
+        supplierNumber: f.supplierNumber.trim(),
+        subAccountCode: f.subAccountCode, subAccountDescription: f.subAccountDescription,
+        description: f.description.trim(),
+        date: Timestamp.fromDate(expenseDate),
+        items: [{ baseAmount, vatRate, vatAmount }],
+        baseAmount, vatAmount, irpfRate, irpfAmount, totalAmount,
+        pleoAmount: 0,
+        conflictType: null, conflictNote: "",
+        status: "pending",
+        createdAt: Timestamp.now(), createdBy: userId, createdByName: userName,
+      });
+      batch.update(doc(db, `projects/${projectId}/cardEnvelopes`, selectedEnvelope.id), {
+        totalBase: (selectedEnvelope.totalBase || 0) + baseAmount,
+        totalVat: (selectedEnvelope.totalVat || 0) + vatAmount,
+        totalAmount: (selectedEnvelope.totalAmount || 0) + totalAmount,
+        expenseCount: (selectedEnvelope.expenseCount || 0) + 1,
+      });
+      batch.update(doc(db, `projects/${projectId}/cards`, selectedBox.id), {
+        [isTicket ? "nextTicketNumber" : "nextInvoiceNumber"]: num + 1,
+      });
+      await batch.commit();
+      showToast("success", `Gasto ${displayNumber} añadido`);
+      setShowManualExpenseModal(false);
+      setManualExpenseForm({
+        type: "invoice", supplier: "", supplierTaxId: "", supplierNumber: "",
+        subAccountCode: "", subAccountDescription: "", description: "", date: "",
+        baseAmount: "", vatRate: "21", vatAmount: "", irpfRate: "0", irpfAmount: "", notes: "",
+      });
+      setManualExpenseFile(null);
+      loadData();
+    } catch (e: any) {
+      showToast("error", e?.message ?? "Error al añadir gasto");
+    } finally { setManualExpenseSaving(false); }
   };
 
   const handleCloseEnvelope = async (envelope: Envelope) => {
@@ -1163,6 +1402,7 @@ export default function BoxesPage() {
                       {cardEnvelopes.map(envelope => {
                         const envExpenses = expenses.filter(e => e.envelopeId === envelope.id);
                         const pendingCount = envExpenses.filter(e => e.status === "pending").length;
+                        const conflictCount = envExpenses.filter(e => !!e.conflictType).length;
                         const sc = STATUS_CONFIG[envelope.status];
                         return (
                           <div key={envelope.id} className="p-4 border border-slate-200 rounded-xl hover:border-slate-300 transition-all">
@@ -1179,6 +1419,7 @@ export default function BoxesPage() {
                                   <p className="text-xs text-slate-500">
                                     {envelope.expenseCount} gastos · {fmt(envelope.totalAmount)} €
                                     {pendingCount > 0 && <span className="text-amber-600 ml-2">· {pendingCount} pendientes</span>}
+                                    {conflictCount > 0 && <span className="text-amber-500 ml-2">· {conflictCount} con incidencia</span>}
                                   </p>
                                 </div>
                               </div>
@@ -1216,13 +1457,26 @@ export default function BoxesPage() {
                       </div>
                       <p className="text-sm text-slate-500">
                         {selectedEnvelope.expenseCount} gastos · Base: {fmt(selectedEnvelope.totalBase)} € · Total: {fmt(selectedEnvelope.totalAmount)} €
+                        {envelopeExpenses.filter(e => !!e.conflictType).length > 0 && (
+                          <span className="ml-2 text-amber-500">
+                            · {envelopeExpenses.filter(e => !!e.conflictType).length} incidencia{envelopeExpenses.filter(e => !!e.conflictType).length > 1 ? "s" : ""}
+                          </span>
+                        )}
                       </p>
                     </div>
                     {selectedEnvelope.status === "open" && (
                       <div className="flex items-center gap-2">
                         <button onClick={() => setShowImportModal(true)}
                           className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
-                          <Upload size={16} /> Importar gastos
+                          <Upload size={16} /> Importar Excel
+                        </button>
+                        <button onClick={() => {
+                          setManualExpenseForm({ type: "invoice", supplier: "", supplierTaxId: "", supplierNumber: "", subAccountCode: "", subAccountDescription: "", description: "", date: "", baseAmount: "", vatRate: "21", vatAmount: "", irpfRate: "0", irpfAmount: "", notes: "" });
+                          setManualExpenseFile(null);
+                          setShowManualExpenseModal(true);
+                        }}
+                          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+                          <Plus size={16} /> Añadir gasto
                         </button>
                         <button
                           onClick={() => handleCloseEnvelope(selectedEnvelope)}
@@ -1238,11 +1492,17 @@ export default function BoxesPage() {
                       <div className="text-center">
                         <p className="text-sm text-slate-400 mb-4">No hay gastos en este sobre</p>
                         {selectedEnvelope.status === "open" && (
-                          <button onClick={() => setShowImportModal(true)}
-                            className="inline-flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium"
-                            style={{ backgroundColor: "#2F52E0" }}>
-                            <Upload size={16} /> Importar gastos
-                          </button>
+                          <div className="flex gap-2 justify-center">
+                            <button onClick={() => setShowImportModal(true)}
+                              className="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+                              <Upload size={16} /> Importar Excel
+                            </button>
+                            <button onClick={() => { setManualExpenseForm({ type: "invoice", supplier: "", supplierTaxId: "", supplierNumber: "", subAccountCode: "", subAccountDescription: "", description: "", date: "", baseAmount: "", vatRate: "21", vatAmount: "", irpfRate: "0", irpfAmount: "", notes: "" }); setManualExpenseFile(null); setShowManualExpenseModal(true); }}
+                              className="inline-flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium"
+                              style={{ backgroundColor: "#2F52E0" }}>
+                              <Plus size={16} /> Añadir gasto
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1264,8 +1524,13 @@ export default function BoxesPage() {
                         <tbody className="divide-y divide-slate-100">
                           {envelopeExpenses.map(expense => {
                             const sc = EXPENSE_STATUS_CONFIG[expense.status];
+                            const hasConflict = !!expense.conflictType;
+                            const conflictCfg = hasConflict ? CONFLICT_CONFIG[expense.conflictType!] : null;
+                            const isDrawerOpen = drawerExpense?.id === expense.id;
                             return (
-                              <tr key={expense.id} className="hover:bg-slate-50">
+                              <tr key={expense.id}
+                                className={`hover:bg-slate-50 cursor-pointer transition-colors ${isDrawerOpen ? "bg-amber-50/40" : ""}`}
+                                onClick={() => openDrawer(expense)}>
                                 <td className="px-4 py-3">
                                   <div className="flex items-center gap-2">
                                     {expense.type === "ticket"
@@ -1273,6 +1538,12 @@ export default function BoxesPage() {
                                       : <FileText size={14} className="text-blue-500" />}
                                     <span className="font-mono text-xs">{expense.displayNumber}</span>
                                   </div>
+                                  {hasConflict && (
+                                    <div className="flex items-center gap-1 mt-1">
+                                      <Info size={11} className="text-amber-500 flex-shrink-0" />
+                                      <span className="text-xs text-amber-600">{conflictCfg!.label}</span>
+                                    </div>
+                                  )}
                                 </td>
                                 <td className="px-4 py-3">
                                   <p className="font-medium text-slate-900 truncate max-w-[180px]">{expense.supplier}</p>
@@ -1283,11 +1554,16 @@ export default function BoxesPage() {
                                 </td>
                                 <td className="px-4 py-3 text-right font-mono">{fmt(expense.baseAmount)}</td>
                                 <td className="px-4 py-3 text-right font-mono text-emerald-600">+{fmt(expense.vatAmount)}</td>
-                                <td className="px-4 py-3 text-right font-mono font-medium">{fmt(expense.totalAmount)}</td>
+                                <td className="px-4 py-3 text-right">
+                                  <span className="font-mono font-medium">{fmt(expense.totalAmount)}</span>
+                                  {hasConflict && expense.pleoAmount && Math.abs(expense.pleoAmount - expense.totalAmount) > 0.02 && (
+                                    <p className="text-xs text-amber-500 font-mono">Pleo: {fmt(expense.pleoAmount)}</p>
+                                  )}
+                                </td>
                                 <td className="px-4 py-3 text-center">
                                   <span className={`text-xs px-2 py-0.5 rounded-full ${sc.bg} ${sc.text}`}>{sc.label}</span>
                                 </td>
-                                <td className="px-4 py-3">
+                                <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                                   <div className="flex items-center justify-center gap-1">
                                     {expense.pleoUrl && (
                                       <a href={expense.pleoUrl} target="_blank" rel="noopener noreferrer"
@@ -1301,6 +1577,10 @@ export default function BoxesPage() {
                                         <Check size={14} />
                                       </button>
                                     )}
+                                    <button onClick={() => openDrawer(expense)}
+                                      className={`p-1.5 rounded transition-colors ${isDrawerOpen ? "text-amber-500 bg-amber-50" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"}`}>
+                                      <PanelRightOpen size={14} />
+                                    </button>
                                   </div>
                                 </td>
                               </tr>
@@ -1499,6 +1779,249 @@ export default function BoxesPage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* EXPENSE DRAWER (panel lateral de edición y conflictos)                  */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+
+      {/* Backdrop */}
+      {drawerExpense && (
+        <div className="fixed inset-0 z-30 bg-black/10 backdrop-blur-[1px]" onClick={closeDrawer} />
+      )}
+
+      {/* Drawer panel */}
+      <div className={`fixed top-0 right-0 h-full w-[480px] bg-white shadow-2xl z-40 flex flex-col transition-transform duration-300 ease-out ${drawerExpense ? "translate-x-0" : "translate-x-full"}`}>
+        {drawerExpense && (() => {
+          const hasConflict = !!drawerExpense.conflictType;
+          const conflictCfg = hasConflict ? CONFLICT_CONFIG[drawerExpense.conflictType!] : null;
+          const amountDiff = drawerExpense.pleoAmount && drawerExpense.pleoAmount > 0
+            ? Math.round((drawerExpense.pleoAmount - drawerExpense.totalAmount) * 100) / 100
+            : null;
+          return (
+            <>
+              {/* Drawer header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${drawerExpense.type === "ticket" ? "bg-amber-50" : "bg-blue-50"}`}>
+                    {drawerExpense.type === "ticket"
+                      ? <Receipt size={16} className="text-amber-500" />
+                      : <FileText size={16} className="text-blue-500" />}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{drawerExpense.displayNumber}</p>
+                    <p className="text-xs text-slate-500">{drawerExpense.supplier}</p>
+                  </div>
+                </div>
+                <button onClick={closeDrawer} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto">
+
+                {/* ── Aviso de conflicto activo ── */}
+                {hasConflict && (
+                  <div className="mx-5 mt-4 p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                    <div className="flex items-start gap-2">
+                      <Info size={15} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-amber-800">{conflictCfg!.label}</p>
+                        <p className="text-xs text-amber-600 mt-0.5">{conflictCfg!.description}</p>
+                        {drawerExpense.conflictNote && (
+                          <p className="text-xs text-amber-700 mt-1 italic">"{drawerExpense.conflictNote}"</p>
+                        )}
+                      </div>
+                      <button onClick={handleResolveConflict} disabled={drawerSaving}
+                        className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors disabled:opacity-50">
+                        <Check size={12} /> Resolver
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Importe Pleo vs contable ── */}
+                {drawerExpense.pleoAmount && drawerExpense.pleoAmount > 0 && (
+                  <div className="mx-5 mt-3">
+                    <div className={`flex items-center justify-between p-2.5 rounded-lg text-xs ${amountDiff && Math.abs(amountDiff) > 0.02 ? "bg-amber-50 border border-amber-100" : "bg-slate-50"}`}>
+                      <span className="text-slate-500">Cargo real en Pleo</span>
+                      <span className={`font-mono font-semibold ${amountDiff && Math.abs(amountDiff) > 0.02 ? "text-amber-700" : "text-slate-700"}`}>
+                        {fmt(drawerExpense.pleoAmount)} €
+                        {amountDiff && Math.abs(amountDiff) > 0.02 && (
+                          <span className="ml-2 text-amber-500">({amountDiff > 0 ? "+" : ""}{fmt(amountDiff)} vs factura)</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Edición de datos del gasto ── */}
+                <div className="px-5 mt-4 space-y-4">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Datos del gasto</p>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Proveedor</label>
+                      <input type="text" value={drawerForm.supplier}
+                        onChange={e => setDrawerForm(f => ({ ...f, supplier: e.target.value }))}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">CIF / NIF</label>
+                      <input type="text" value={drawerForm.supplierTaxId}
+                        onChange={e => setDrawerForm(f => ({ ...f, supplierTaxId: e.target.value }))}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Nº Factura</label>
+                      <input type="text" value={drawerForm.supplierNumber}
+                        onChange={e => setDrawerForm(f => ({ ...f, supplierNumber: e.target.value }))}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label>
+                      <input type="text" value={drawerForm.date} placeholder="DD/MM/YYYY"
+                        onChange={e => setDrawerForm(f => ({ ...f, date: e.target.value }))}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Subcuenta contable</label>
+                    <div className="relative">
+                      <button type="button"
+                        onClick={() => { setShowDrawerAccountSelector(s => !s); setDrawerAccountSearch(""); }}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-left flex items-center justify-between hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900">
+                        {drawerForm.subAccountCode
+                          ? <span className="font-mono text-slate-700">{drawerForm.subAccountCode} <span className="font-sans text-slate-500 text-xs">· {drawerForm.subAccountDescription}</span></span>
+                          : <span className="text-slate-400">Seleccionar cuenta</span>}
+                        <ChevronDown size={14} className="text-slate-400 flex-shrink-0" />
+                      </button>
+                      {showDrawerAccountSelector && (
+                        <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl">
+                          <div className="p-2 border-b border-slate-100">
+                            <input type="text" value={drawerAccountSearch}
+                              onChange={e => setDrawerAccountSearch(e.target.value)}
+                              placeholder="Buscar cuenta"
+                              className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-900"
+                              autoFocus />
+                          </div>
+                          <div className="max-h-52 overflow-y-auto">
+                            {subAccounts
+                              .filter(sa => !drawerAccountSearch || sa.code.toLowerCase().includes(drawerAccountSearch.toLowerCase()) || sa.description.toLowerCase().includes(drawerAccountSearch.toLowerCase()))
+                              .slice(0, 40)
+                              .map(sa => (
+                                <button key={sa.id} type="button"
+                                  onClick={() => { setDrawerForm(f => ({ ...f, subAccountCode: sa.code, subAccountDescription: sa.description })); setShowDrawerAccountSelector(false); }}
+                                  className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2 border-b border-slate-50 last:border-0 text-sm">
+                                  <span className="font-mono text-xs text-slate-500 w-16 flex-shrink-0">{sa.code}</span>
+                                  <span className="text-slate-700 truncate">{sa.description}</span>
+                                </button>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Descripción</label>
+                    <input type="text" value={drawerForm.description}
+                      onChange={e => setDrawerForm(f => ({ ...f, description: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                  </div>
+
+                  {/* Importes */}
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { label: "Base", key: "baseAmount" },
+                      { label: "IVA", key: "vatAmount" },
+                      { label: "IRPF %", key: "irpfRate" },
+                      { label: "Total", key: "totalAmount" },
+                    ].map(({ label, key }) => (
+                      <div key={key}>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
+                        <input type="number" step="0.01"
+                          value={(drawerForm as any)[key]}
+                          onChange={e => setDrawerForm(f => ({ ...f, [key]: e.target.value }))}
+                          className="w-full px-2 py-2 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Sección de incidencia ── */}
+                <div className="px-5 mt-5 pb-4 space-y-3">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Incidencia</p>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Tipo de incidencia</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(Object.entries(CONFLICT_CONFIG) as [ConflictType, typeof CONFLICT_CONFIG[ConflictType]][]).map(([key, cfg]) => {
+                        const icons: Record<string, React.ReactNode> = {
+                          diff:    <Info size={13} />,
+                          merge:   <SplitSquareHorizontal size={13} />,
+                          split:   <Scissors size={13} />,
+                          missing: <FileX size={13} />,
+                        };
+                        const selected = drawerForm.conflictType === key;
+                        return (
+                          <button key={key} type="button"
+                            onClick={() => setDrawerForm(f => ({ ...f, conflictType: selected ? "" : key as ConflictType }))}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium text-left transition-colors ${selected ? "border-amber-300 bg-amber-50 text-amber-800" : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"}`}>
+                            <span className={selected ? "text-amber-500" : "text-slate-400"}>{icons[cfg.icon]}</span>
+                            {cfg.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {drawerForm.conflictType && (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Nota explicativa</label>
+                      <textarea value={drawerForm.conflictNote}
+                        onChange={e => setDrawerForm(f => ({ ...f, conflictNote: e.target.value }))}
+                        rows={3} placeholder="Explica la incidencia para que quede registrada..."
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none" />
+                    </div>
+                  )}
+
+                  {drawerExpense.conflictResolvedAt && !drawerExpense.conflictType && (
+                    <div className="flex items-center gap-2 p-2 bg-emerald-50 rounded-lg text-xs text-emerald-700">
+                      <Check size={12} className="text-emerald-500" />
+                      Incidencia resuelta por {drawerExpense.conflictResolvedByName} · {fmtDate(drawerExpense.conflictResolvedAt)}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Drawer footer */}
+              <div className="flex items-center justify-between px-5 py-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  {drawerExpense.pleoUrl && (
+                    <a href={drawerExpense.pleoUrl} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-600 border border-slate-200 rounded-lg hover:bg-white">
+                      <ExternalLink size={12} /> Ver en Pleo
+                    </a>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={closeDrawer}
+                    className="px-3 py-1.5 text-xs text-slate-600 rounded-lg hover:bg-slate-200 transition-colors">
+                    Cancelar
+                  </button>
+                  <button onClick={handleSaveDrawer} disabled={drawerSaving}
+                    className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium text-white rounded-lg disabled:opacity-50 transition-colors"
+                    style={{ backgroundColor: "#2F52E0" }}>
+                    <Save size={12} /> {drawerSaving ? "Guardando..." : "Guardar cambios"}
+                  </button>
+                </div>
+              </div>
+            </>
+          );
+        })()}
+      </div>
+
       {/* MODALS */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
 
@@ -1664,6 +2187,202 @@ export default function BoxesPage() {
                   {saving ? "Eliminando..." : "Eliminar"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Añadir gasto manual ───────────────────────────────────────── */}
+      {showManualExpenseModal && selectedEnvelope && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowManualExpenseModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[92vh] flex flex-col"
+            onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Añadir gasto manual</h3>
+                <p className="text-sm text-slate-500">{selectedEnvelope.displayNumber} · {selectedBox?.name}</p>
+              </div>
+              <button onClick={() => setShowManualExpenseModal(false)}
+                className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+            </div>
+
+            <div className="p-6 flex-1 overflow-y-auto space-y-4">
+
+              {/* Tipo */}
+              <div className="flex gap-2">
+                {(["invoice", "ticket"] as const).map(t => (
+                  <button key={t} type="button"
+                    onClick={() => setManualExpenseForm(f => ({ ...f, type: t }))}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-medium transition-colors ${manualExpenseForm.type === t
+                      ? t === "invoice" ? "border-blue-300 bg-blue-50 text-blue-700" : "border-amber-300 bg-amber-50 text-amber-700"
+                      : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>
+                    {t === "invoice" ? <FileText size={15} /> : <Receipt size={15} />}
+                    {t === "invoice" ? "Factura" : "Ticket"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Proveedor + CIF */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Proveedor *</label>
+                  <input type="text" value={manualExpenseForm.supplier} placeholder="Nombre del proveedor"
+                    onChange={e => setManualExpenseForm(f => ({ ...f, supplier: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">CIF / NIF</label>
+                  <input type="text" value={manualExpenseForm.supplierTaxId} placeholder="B12345678"
+                    onChange={e => setManualExpenseForm(f => ({ ...f, supplierTaxId: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                </div>
+              </div>
+
+              {/* Nº factura + Fecha */}
+              <div className="grid grid-cols-2 gap-3">
+                {manualExpenseForm.type === "invoice" && (
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Nº Factura</label>
+                    <input type="text" value={manualExpenseForm.supplierNumber} placeholder="FAC-2026-001"
+                      onChange={e => setManualExpenseForm(f => ({ ...f, supplierNumber: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                  </div>
+                )}
+                <div className={manualExpenseForm.type === "ticket" ? "col-span-2" : ""}>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Fecha *</label>
+                  <input type="text" value={manualExpenseForm.date} placeholder="DD/MM/YYYY"
+                    onChange={e => setManualExpenseForm(f => ({ ...f, date: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                </div>
+              </div>
+
+              {/* Subcuenta */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Subcuenta *</label>
+                <div className="relative">
+                  <button type="button"
+                    onClick={() => { setShowManualAccountSelector(s => !s); setManualAccountSearch(""); }}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900">
+                    {manualExpenseForm.subAccountCode
+                      ? <span className="font-mono">{manualExpenseForm.subAccountCode} <span className="font-sans text-slate-500 text-xs">· {manualExpenseForm.subAccountDescription}</span></span>
+                      : <span className="text-slate-400">Seleccionar subcuenta</span>}
+                    <ChevronDown size={14} className="text-slate-400" />
+                  </button>
+                  {showManualAccountSelector && (
+                    <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl">
+                      <div className="p-2 border-b border-slate-100">
+                        <input type="text" value={manualAccountSearch} autoFocus
+                          onChange={e => setManualAccountSearch(e.target.value)}
+                          placeholder="Buscar cuenta..." className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-900" />
+                      </div>
+                      <div className="max-h-44 overflow-y-auto">
+                        {subAccounts.filter(sa => !manualAccountSearch || sa.code.toLowerCase().includes(manualAccountSearch.toLowerCase()) || sa.description.toLowerCase().includes(manualAccountSearch.toLowerCase())).slice(0, 40).map(sa => (
+                          <button key={sa.id} type="button"
+                            onClick={() => { setManualExpenseForm(f => ({ ...f, subAccountCode: sa.code, subAccountDescription: sa.description })); setShowManualAccountSelector(false); }}
+                            className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2 border-b border-slate-50 last:border-0 text-sm">
+                            <span className="font-mono text-xs text-slate-500 w-16 flex-shrink-0">{sa.code}</span>
+                            <span className="text-slate-700 truncate">{sa.description}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Descripción */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Descripción</label>
+                <input type="text" value={manualExpenseForm.description} placeholder="Concepto del gasto"
+                  onChange={e => setManualExpenseForm(f => ({ ...f, description: e.target.value }))}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+              </div>
+
+              {/* Importes */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-2">Importes *</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { label: "Base", key: "baseAmount", placeholder: "0.00" },
+                    { label: "IVA %", key: "vatRate", placeholder: "21" },
+                    { label: "Cuota IVA", key: "vatAmount", placeholder: "auto" },
+                    { label: "IRPF %", key: "irpfRate", placeholder: "0" },
+                  ].map(({ label, key, placeholder }) => (
+                    <div key={key}>
+                      <label className="block text-xs text-slate-500 mb-1">{label}</label>
+                      <input type="number" step="0.01" placeholder={placeholder}
+                        value={(manualExpenseForm as any)[key]}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setManualExpenseForm(f => {
+                            const next = { ...f, [key]: val };
+                            // auto-calc vatAmount when base or vatRate changes
+                            if (key === "baseAmount" || key === "vatRate") {
+                              const base = parseFloat(key === "baseAmount" ? val : f.baseAmount) || 0;
+                              const rate = parseFloat(key === "vatRate" ? val : f.vatRate) || 0;
+                              next.vatAmount = String(Math.round(base * rate / 100 * 100) / 100);
+                            }
+                            return next;
+                          });
+                        }}
+                        className="w-full px-2 py-2 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                    </div>
+                  ))}
+                </div>
+                {/* Total calculado */}
+                {manualExpenseForm.baseAmount && (
+                  <p className="text-xs text-slate-500 mt-2 text-right">
+                    Total: <strong className="text-slate-900 font-mono">
+                      {fmt((parseFloat(manualExpenseForm.baseAmount) || 0) + (parseFloat(manualExpenseForm.vatAmount) || 0) - (parseFloat(manualExpenseForm.baseAmount) || 0) * (parseFloat(manualExpenseForm.irpfRate) || 0) / 100)} €
+                    </strong>
+                  </p>
+                )}
+              </div>
+
+              {/* Documento adjunto */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Documento (factura / ticket)</label>
+                {manualExpenseFile ? (
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <div className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                      {manualExpenseFile.type === "application/pdf"
+                        ? <FileText size={14} className="text-red-500" />
+                        : <Eye size={14} className="text-blue-500" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">{manualExpenseFile.name}</p>
+                      <p className="text-xs text-slate-400">{(manualExpenseFile.size / 1024).toFixed(0)} KB</p>
+                    </div>
+                    <button onClick={() => setManualExpenseFile(null)}
+                      className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"><X size={14} /></button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-slate-300 hover:bg-slate-50 transition-colors"
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) setManualExpenseFile(f); }}>
+                    <Paperclip size={20} className="text-slate-300" />
+                    <span className="text-sm text-slate-500">Arrastra el PDF o imagen aquí</span>
+                    <span className="text-xs text-slate-400">o haz clic para seleccionar</span>
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) setManualExpenseFile(f); }} />
+                  </label>
+                )}
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 flex-shrink-0">
+              <button onClick={() => setShowManualExpenseModal(false)}
+                className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
+              <button onClick={handleAddManualExpense} disabled={manualExpenseSaving}
+                className="px-5 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+                style={{ backgroundColor: "#2F52E0" }}>
+                {manualExpenseSaving ? "Guardando..." : <><Plus size={15} /> Añadir gasto</>}
+              </button>
             </div>
           </div>
         </div>
