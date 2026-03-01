@@ -600,14 +600,26 @@ export default function BoxesPage() {
     const tdec = new TextDecoder("utf-8");
 
     const inflateRaw = async (compressed: Uint8Array): Promise<string> => {
-      // Usar Response.text() en lugar de leer manualmente los chunks.
-      // Esto evita race conditions por writer.write/close no awaited y
-      // problemas de backpressure en el stream reader.
+      // compressed es un subarray (vista) — copiar antes para evitar que
+      // el buffer subyacente sea reclamado antes de que el stream lo procese.
+      const copy = compressed.slice(0);
       const ds = new (window as any).DecompressionStream("deflate-raw");
       const writer = ds.writable.getWriter();
-      await writer.write(compressed);
+      await writer.write(copy);
       await writer.close();
-      return new Response(ds.readable).text();
+      // Leer chunks manualmente para maxima compatibilidad entre browsers
+      const reader = ds.readable.getReader();
+      const chunks: Uint8Array[] = [];
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value as Uint8Array);
+      }
+      const total = chunks.reduce((s: number, c: Uint8Array) => s + c.length, 0);
+      const out = new Uint8Array(total);
+      let off = 0;
+      for (const c of chunks) { out.set(c, off); off += c.length; }
+      return new TextDecoder("utf-8").decode(out);
     };
 
     const ab = await file.arrayBuffer();
@@ -664,11 +676,13 @@ export default function BoxesPage() {
         );
       }
     }
+    console.log("[XLSX] sharedStrings:", sharedStrings.length, sharedStrings.slice(0,5));
 
     // 2. Sheet
     const sheetXml = await readEntry("xl/worksheets/sheet1.xml");
     if (!sheetXml) throw new Error("No se encontró la hoja de cálculo en el XLSX");
     const rowBlocks = sheetXml.match(/<row[^>]*>([\s\S]*?)<\/row>/g) ?? [];
+    console.log("[XLSX] sheetXml length:", sheetXml?.length, "rowBlocks:", rowBlocks.length);
     if (rowBlocks.length < 2) throw new Error("El archivo no contiene filas de datos");
 
     const parseRow = (rowXml: string): Record<string, string> => {
@@ -686,6 +700,7 @@ export default function BoxesPage() {
     };
 
     const colToHeader = parseRow(rowBlocks[0]);
+    console.log("[XLSX] colToHeader:", JSON.stringify(colToHeader));
 
     // 3. Group rows by RECIBO PLEO
     const grouped: Record<string, Record<string, string>[]> = {};
@@ -695,7 +710,9 @@ export default function BoxesPage() {
       for (const [col, val] of Object.entries(raw)) {
         const h = colToHeader[col]; if (h) record[h] = val;
       }
-      const id = record["RECIBO PLEO"]; if (!id) continue;
+      const id = record["RECIBO PLEO"];
+      console.log("[XLSX] row RECIBO PLEO:", JSON.stringify(id));
+      if (!id) continue;
       (grouped[id] ??= []).push(record);
     }
 
@@ -745,9 +762,12 @@ export default function BoxesPage() {
 
   const handleFileSelect = async (file: File) => {
     setImportFile(file);
+    setImportPreview([]);
     try {
-      setImportPreview(await parsePleoExcel(file));
+      const result = await parsePleoExcel(file);
+      setImportPreview(result);
     } catch (err: any) {
+      console.error("[parsePleoExcel] Error:", err);
       const msg = err?.message ? `Error: ${err.message}` : "Error al leer el archivo";
       showToast("error", msg);
       setImportFile(null);
@@ -894,6 +914,8 @@ export default function BoxesPage() {
       e => e.supplier.trim() && e.items.some(it => it.baseAmount > 0 && it.subAccountCode)
     );
     if (valid.length === 0) return showToast("error", "Añade al menos un gasto con proveedor, cuenta e importe");
+    const missingCif = valid.find(e => e.type === "invoice" && !e.supplierTaxId.trim());
+    if (missingCif) return showToast("error", `El CIF es obligatorio en facturas (gasto: ${missingCif.supplier || "sin proveedor"})`);
     setManualExpenseSaving(true);
     try {
       const boxSnap = await getDoc(doc(db, `projects/${projectId}/cards`, selectedBox.id));
@@ -2320,11 +2342,13 @@ export default function BoxesPage() {
 
                         {/* CIF */}
                         <div className="col-span-2">
-                          <label className="block text-xs font-medium text-slate-600 mb-1">CIF / NIF</label>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">
+                            CIF / NIF {exp.type === "invoice" && <span className="text-red-400">*</span>}
+                          </label>
                           <input type="text" value={exp.supplierTaxId}
                             onChange={e => updateCardExpense(idx, "supplierTaxId", e.target.value)}
                             placeholder="B12345678"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                            className={`w-full px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900 ${exp.type === "invoice" && !exp.supplierTaxId.trim() ? "border-red-300 bg-red-50/30" : "border-slate-200"}`} />
                         </div>
 
                         {/* Nº Factura (solo si es factura) */}
