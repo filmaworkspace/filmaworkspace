@@ -486,69 +486,130 @@ export default function BoxesPage() {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
           const JSZip = (await import("jszip")).default;
           const zip = await JSZip.loadAsync(data);
+
+          // ── 1. SharedStrings ────────────────────────────────────────────────
+          // Usamos regex en lugar de DOMParser+querySelectorAll porque el XML
+          // tiene xmlns que hace que querySelectorAll("t") devuelva 0 resultados.
+          // Cada <si> puede tener un <t> simple o múltiples <r><t> (rich text).
           const sharedStrings: string[] = [];
           const ssFile = zip.file("xl/sharedStrings.xml");
           if (ssFile) {
-            const ssDoc = new DOMParser().parseFromString(await ssFile.async("text"), "text/xml");
-            ssDoc.querySelectorAll("t").forEach(t => sharedStrings.push(t.textContent || ""));
+            const ssXml = await ssFile.async("text");
+            const siBlocks = ssXml.match(/<si>([\s\S]*?)<\/si>/g) || [];
+            for (const si of siBlocks) {
+              const parts = si.match(/<t(?:\s[^>]*)?>([^<]*)<\/t>/g) || [];
+              const text = parts.map(p => p.replace(/<t(?:\s[^>]*)?>/, "").replace(/<\/t>/, "")).join("");
+              sharedStrings.push(text);
+            }
           }
+
+          // ── 2. Sheet ────────────────────────────────────────────────────────
           const sheetFile = zip.file("xl/worksheets/sheet1.xml");
-          if (!sheetFile) throw new Error("No se encontró la hoja");
-          const sheetDoc = new DOMParser().parseFromString(await sheetFile.async("text"), "text/xml");
-          const rows: string[][] = [];
-          sheetDoc.querySelectorAll("row").forEach(row => {
-            const rd: string[] = [];
-            row.querySelectorAll("c").forEach(cell => {
-              const type = cell.getAttribute("t"), vElem = cell.querySelector("v");
-              let value = vElem?.textContent || "";
-              if (type === "s" && value) value = sharedStrings[parseInt(value)] || "";
-              rd.push(value);
-            });
-            rows.push(rd);
-          });
-          if (rows.length < 2) { reject(new Error("Sin datos")); return; }
-          const headers = rows[0];
+          if (!sheetFile) throw new Error("No se encontró la hoja de cálculo");
+          const sheetXml = await sheetFile.async("text");
+
+          // Extraer bloques <row>
+          const rowBlocks = sheetXml.match(/<row\b[^>]*>([\s\S]*?)<\/row>/g) || [];
+          if (rowBlocks.length < 2) throw new Error("El archivo no contiene datos");
+
+          // Parsear una fila: devuelve { colLetra: valor }
+          const parseRow = (rowXml: string): Record<string, string> => {
+            const result: Record<string, string> = {};
+            // <c r="A1" ... t="s"><v>0</v></c>  o  <c r="B2"><v>17.40</v></c>
+            const cellRegex = /<c\s+r="([A-Z]+)\d+"([^>]*)>([\s\S]*?)<\/c>/g;
+            let m: RegExpExecArray | null;
+            while ((m = cellRegex.exec(rowXml)) !== null) {
+              const colLetter = m[1];
+              const attrs = m[2];
+              const inner = m[3];
+              const tMatch = attrs.match(/\bt="([^"]*)"/);
+              const vMatch = inner.match(/<v>([^<]*)<\/v>/);
+              let value = vMatch ? vMatch[1].trim() : "";
+              if (tMatch?.[1] === "s" && value !== "") {
+                value = sharedStrings[parseInt(value, 10)] ?? "";
+              }
+              result[colLetter] = value;
+            }
+            return result;
+          };
+
+          // Fila 1 → mapa colLetra → nombre de cabecera
+          const headerRow = parseRow(rowBlocks[0]);
+          const colToHeader: Record<string, string> = headerRow; // ya son strings resueltos
+
+          // Filas de datos → array de { "NOMBRE COLUMNA": valor }
           const grouped: Record<string, any[]> = {};
-          for (let i = 1; i < rows.length; i++) {
-            const record: any = {};
-            headers.forEach((h, j) => { record[h] = rows[i][j] || ""; });
-            const id = record["RECIBO PLEO"]; if (!id) continue;
+          for (let i = 1; i < rowBlocks.length; i++) {
+            const raw = parseRow(rowBlocks[i]);
+            const record: Record<string, string> = {};
+            for (const [col, val] of Object.entries(raw)) {
+              const header = colToHeader[col];
+              if (header) record[header] = val;
+            }
+            const id = record["RECIBO PLEO"];
+            if (!id) continue;
             if (!grouped[id]) grouped[id] = [];
             grouped[id].push(record);
           }
+
+          // ── 3. Construir resultado final ────────────────────────────────────
+          const parseNum = (v: string | undefined) =>
+            parseFloat((v ?? "0").replace(",", ".")) || 0;
+
           const result: any[] = [];
           for (const [receiptId, records] of Object.entries(grouped)) {
             const first = records[0];
+
+            // Tipo: TICKET o FACTURA (PLEO exporta en mayúsculas)
+            const rawType = (first["TIPO DE DOCUMENTO"] ?? "").toUpperCase().trim();
+            const type: "ticket" | "invoice" = rawType === "TICKET" ? "ticket" : "invoice";
+
+            // Líneas de IVA: una por fila con el mismo RECIBO PLEO
             const items = records.map(r => ({
-              baseAmount: parseFloat(r["ANTES DE IMPUESTOS"]?.replace(",", ".") || "0"),
-              vatRate: parseFloat(r["PORCENTAJE IMPUESTO"]?.replace(",", ".") || "0"),
-              vatAmount: parseFloat(r["TOTAL IMPUESTO"]?.replace(",", ".") || "0"),
+              baseAmount: parseNum(r["ANTES DE IMPUESTOS"]),
+              vatRate: parseNum(r["PORCENTAJE IMPUESTO"]),
+              vatAmount: parseNum(r["TOTAL IMPUESTO"]),
             }));
-            const totalBase = items.reduce((s, i) => s + i.baseAmount, 0);
-            const totalVat = items.reduce((s, i) => s + i.vatAmount, 0);
-            const irpfRate = parseFloat(first["IRPF %"]?.replace(",", ".") || "0");
-            const irpfAmount = parseFloat(first["IRPF TOTAL"]?.replace(",", ".") || "0");
+
+            const totalBase = Math.round(items.reduce((s, it) => s + it.baseAmount, 0) * 100) / 100;
+            const totalVat  = Math.round(items.reduce((s, it) => s + it.vatAmount, 0) * 100) / 100;
+            const irpfRate   = parseNum(first["IRPF %"]);
+            const irpfAmount = parseNum(first["IRPF TOTAL"]);
+
+            // Descripción: DESCRIPCION tiene preferencia, luego NOTAS
+            const description = (first["DESCRIPCION"] || first["NOTAS"] || "").trim();
+
+            // Fecha: usar FECHA FACTURA/TICKET (columna A); si vacía, FECHA FACTURA (col V)
+            const date = (first["FECHA FACTURA/TICKET"] || first["FECHA FACTURA"] || "").trim();
+
             result.push({
               pleoReceiptId: receiptId,
-              type: first["TIPO DE DOCUMENTO"]?.toLowerCase() === "ticket" ? "ticket" : "invoice",
-              supplier: first["PROVEEDOR"] || "",
-              supplierTaxId: first["CIF"] || "",
-              supplierNumber: first["Número de Factura"] || "",
-              subAccountCode: first["CODIGO PRESUPUESTO"] || "",
-              subAccountDescription: first["DESCRIPCIÓN NUMERO CUENTA"] || "",
-              description: first["DESCRIPCION"] || first["NOTAS"] || "",
-              date: first["FECHA FACTURA/TICKET"] || "",
-              pleoUrl: first["URL"] || "",
-              items, totalBase, totalVat, irpfRate, irpfAmount,
-              totalAmount: totalBase + totalVat - irpfAmount,
+              type,
+              employee: (first["EMPLEADO"] || "").trim(),
+              supplier: (first["PROVEEDOR"] || "").trim(),
+              supplierTaxId: (first["CIF"] || "").trim(),
+              supplierNumber: (first["Número de Factura"] || "").trim(),
+              subAccountCode: (first["CODIGO PRESUPUESTO"] || "").trim(),
+              subAccountDescription: (first["DESCRIPCIÓN NUMERO CUENTA"] || "").trim(),
+              description,
+              date,
+              pleoUrl: (first["URL"] || "").trim(),
+              items,
               baseAmount: totalBase,
               vatAmount: totalVat,
+              irpfRate,
+              irpfAmount,
+              totalAmount: Math.round((totalBase + totalVat - irpfAmount) * 100) / 100,
             });
           }
+
+          if (result.length === 0) throw new Error("No se encontraron gastos en el archivo");
           resolve(result);
-        } catch (err) { reject(err); }
+        } catch (err) {
+          reject(err);
+        }
       };
-      reader.onerror = () => reject(new Error("Error leyendo archivo"));
+      reader.onerror = () => reject(new Error("Error leyendo el archivo"));
       reader.readAsArrayBuffer(file);
     });
   };
@@ -1655,31 +1716,71 @@ export default function BoxesPage() {
                       <table className="w-full text-sm">
                         <thead className="bg-slate-50 border-b border-slate-200">
                           <tr>
-                            <th className="text-left px-3 py-2 font-medium text-slate-600">Tipo</th>
-                            <th className="text-left px-3 py-2 font-medium text-slate-600">Proveedor</th>
-                            <th className="text-left px-3 py-2 font-medium text-slate-600">Cuenta</th>
-                            <th className="text-right px-3 py-2 font-medium text-slate-600">Total</th>
+                            <th className="text-left px-3 py-2 font-medium text-slate-600 w-[80px]">Tipo</th>
+                            <th className="text-left px-3 py-2 font-medium text-slate-600">Proveedor / Empleado</th>
+                            <th className="text-left px-3 py-2 font-medium text-slate-600">Cuenta · IVA</th>
+                            <th className="text-right px-3 py-2 font-medium text-slate-600 w-[90px]">Base</th>
+                            <th className="text-right px-3 py-2 font-medium text-slate-600 w-[90px]">Total</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {importPreview.slice(0, 10).map((exp, i) => (
-                            <tr key={i}>
-                              <td className="px-3 py-2">
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${exp.type === "ticket" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
-                                  {exp.type === "ticket" ? "Ticket" : "Factura"}
-                                </span>
+                          {importPreview.slice(0, 15).map((exp, i) => (
+                            <tr key={i} className="hover:bg-slate-50 align-top">
+                              <td className="px-3 py-2.5">
+                                <div className="flex items-center gap-1.5">
+                                  {exp.type === "ticket"
+                                    ? <Receipt size={13} className="text-amber-500 flex-shrink-0" />
+                                    : <FileText size={13} className="text-blue-500 flex-shrink-0" />}
+                                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${exp.type === "ticket" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
+                                    {exp.type === "ticket" ? "Ticket" : "Factura"}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-400 mt-1 pl-0.5">{exp.date}</p>
                               </td>
-                              <td className="px-3 py-2">
-                                <p className="font-medium text-slate-900 truncate max-w-[200px]">{capitalizeSupplierName(exp.supplier)}</p>
+                              <td className="px-3 py-2.5">
+                                <p className="font-medium text-slate-900 truncate max-w-[200px]" title={exp.supplier}>
+                                  {capitalizeSupplierName(exp.supplier)}
+                                </p>
+                                {exp.employee && (
+                                  <p className="text-xs text-slate-400 truncate">{exp.employee}</p>
+                                )}
+                                {exp.supplierTaxId && (
+                                  <p className="text-xs font-mono text-slate-400">{exp.supplierTaxId}</p>
+                                )}
                               </td>
-                              <td className="px-3 py-2 font-mono text-xs">{exp.subAccountCode}</td>
-                              <td className="px-3 py-2 text-right font-mono font-medium">{fmt(exp.totalAmount)} €</td>
+                              <td className="px-3 py-2.5">
+                                {exp.items.map((item: any, j: number) => (
+                                  <div key={j} className={`flex items-center gap-2 ${j > 0 ? "mt-0.5" : ""}`}>
+                                    <span className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">
+                                      {exp.subAccountCode || "—"}
+                                    </span>
+                                    <span className="text-xs text-slate-500">
+                                      {item.vatRate}% · {fmt(item.vatAmount)} €
+                                    </span>
+                                  </div>
+                                ))}
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-mono text-slate-700">{fmt(exp.baseAmount)}</td>
+                              <td className="px-3 py-2.5 text-right font-mono font-semibold text-slate-900">{fmt(exp.totalAmount)} €</td>
                             </tr>
                           ))}
                         </tbody>
+                        <tfoot className="bg-slate-50 border-t border-slate-200">
+                          <tr>
+                            <td colSpan={3} className="px-3 py-2 text-right text-xs font-semibold text-slate-500">TOTAL</td>
+                            <td className="px-3 py-2 text-right font-mono font-semibold text-slate-700">
+                              {fmt(importPreview.reduce((s: number, e: any) => s + e.baseAmount, 0))}
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono font-bold text-slate-900">
+                              {fmt(importPreview.reduce((s: number, e: any) => s + e.totalAmount, 0))} €
+                            </td>
+                          </tr>
+                        </tfoot>
                       </table>
-                      {importPreview.length > 10 && (
-                        <div className="px-3 py-2 bg-slate-50 text-xs text-slate-500 text-center">+{importPreview.length - 10} más</div>
+                      {importPreview.length > 15 && (
+                        <div className="px-3 py-2 bg-slate-50 text-xs text-slate-500 text-center border-t border-slate-100">
+                          +{importPreview.length - 15} gastos más no mostrados
+                        </div>
                       )}
                     </div>
                   )}
@@ -1688,7 +1789,13 @@ export default function BoxesPage() {
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex justify-between items-center flex-shrink-0">
               <span className="text-sm text-slate-500">
-                {importPreview.length > 0 && <>Total: <strong className="text-slate-900">{fmt(importPreview.reduce((s, e) => s + e.totalAmount, 0))} €</strong></>}
+                {importPreview.length > 0 && (
+                  <>
+                    <strong className="text-slate-900">{importPreview.length}</strong> gastos ·{" "}
+                    Base: <strong className="text-slate-900">{fmt(importPreview.reduce((s: number, e: any) => s + e.baseAmount, 0))} €</strong> ·{" "}
+                    Total: <strong className="text-slate-900">{fmt(importPreview.reduce((s: number, e: any) => s + e.totalAmount, 0))} €</strong>
+                  </>
+                )}
               </span>
               <div className="flex gap-3">
                 <button onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }}
