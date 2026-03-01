@@ -246,18 +246,17 @@ export default function BoxesPage() {
   const [showDeleteEnvelopeModal, setShowDeleteEnvelopeModal] = useState<Envelope | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showManualExpenseModal, setShowManualExpenseModal] = useState(false);
-  const [manualExpenseForm, setManualExpenseForm] = useState({
-    type: "invoice" as "invoice" | "ticket",
-    supplier: "", supplierTaxId: "", supplierNumber: "",
-    subAccountCode: "", subAccountDescription: "",
-    description: "", date: "",
-    baseAmount: "", vatRate: "21", vatAmount: "", irpfRate: "0", irpfAmount: "",
-    notes: "",
-  });
-  const [manualExpenseFile, setManualExpenseFile] = useState<File | null>(null);
+  const [cardExpensesList, setCardExpensesList] = useState<Array<{
+    id: string; type: "invoice" | "ticket"; supplier: string; supplierTaxId: string;
+    supplierNumber: string; date: string; irpfRate: number; file: File | null;
+    items: Array<{ id: string; subAccountCode: string; subAccountDescription: string; description: string; baseAmount: number; vatRate: number; }>;
+  }>>([]);
   const [manualExpenseSaving, setManualExpenseSaving] = useState(false);
-  const [showManualAccountSelector, setShowManualAccountSelector] = useState(false);
-  const [manualAccountSearch, setManualAccountSearch] = useState("");
+  const [showCardTypeDropdown, setShowCardTypeDropdown] = useState<number | null>(null);
+  const [showCardAccountSelector, setShowCardAccountSelector] = useState(false);
+  const [cardAccountSearch, setCardAccountSearch] = useState("");
+  const [cardAccountSelectorPos, setCardAccountSelectorPos] = useState<{ top: number; left: number } | null>(null);
+  const [editingCardExpenseIndex, setEditingCardExpenseIndex] = useState<number | null>(null);
   const [boxForm, setBoxForm] = useState({ name: "", code: "", department: "" });
   const [editBoxForm, setEditBoxForm] = useState({ name: "", code: "" });
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -601,22 +600,14 @@ export default function BoxesPage() {
     const tdec = new TextDecoder("utf-8");
 
     const inflateRaw = async (compressed: Uint8Array): Promise<string> => {
+      // Usar Response.text() en lugar de leer manualmente los chunks.
+      // Esto evita race conditions por writer.write/close no awaited y
+      // problemas de backpressure en el stream reader.
       const ds = new (window as any).DecompressionStream("deflate-raw");
       const writer = ds.writable.getWriter();
-      const reader = ds.readable.getReader();
-      writer.write(compressed);
-      writer.close();
-      const chunks: Uint8Array[] = [];
-      for (;;) {
-        const { done, value } = await reader.read() as { done: boolean; value: Uint8Array };
-        if (done) break;
-        chunks.push(value);
-      }
-      const total = chunks.reduce((s, c) => s + c.length, 0);
-      const out = new Uint8Array(total);
-      let off = 0;
-      for (const c of chunks) { out.set(c, off); off += c.length; }
-      return tdec.decode(out);
+      await writer.write(compressed);
+      await writer.close();
+      return new Response(ds.readable).text();
     };
 
     const ab = await file.arrayBuffer();
@@ -858,81 +849,122 @@ export default function BoxesPage() {
     } catch { showToast("error", "Error al revisar"); }
   };
 
+  // helpers for card expense list (same pattern as transfers)
+  const createEmptyCardItem = () => ({
+    id: crypto.randomUUID(),
+    subAccountCode: "", subAccountDescription: "", description: "",
+    baseAmount: 0, vatRate: 21,
+  });
+
+  const createEmptyCardExpense = () => ({
+    id: crypto.randomUUID(),
+    type: "invoice" as "invoice" | "ticket",
+    supplier: "", supplierTaxId: "", supplierNumber: "",
+    date: new Date().toLocaleDateString("es-ES"),
+    irpfRate: 0,
+    file: null as File | null,
+    items: [createEmptyCardItem()],
+  });
+
+  const updateCardExpense = (index: number, field: string, value: any) =>
+    setCardExpensesList(prev => prev.map((e, i) => i === index ? { ...e, [field]: value } : e));
+
+  const updateCardItem = (expIdx: number, itemIdx: number, field: string, value: any) =>
+    setCardExpensesList(prev => prev.map((e, i) => {
+      if (i !== expIdx) return e;
+      return { ...e, items: e.items.map((it, j) => j === itemIdx ? { ...it, [field]: value } : it) };
+    }));
+
+  const addCardItem = (expIdx: number) =>
+    setCardExpensesList(prev => prev.map((e, i) =>
+      i === expIdx ? { ...e, items: [...e.items, createEmptyCardItem()] } : e));
+
+  const removeCardItem = (expIdx: number, itemIdx: number) =>
+    setCardExpensesList(prev => prev.map((e, i) =>
+      i === expIdx && e.items.length > 1
+        ? { ...e, items: e.items.filter((_, j) => j !== itemIdx) }
+        : e));
+
+  const removeCardExpense = (index: number) =>
+    setCardExpensesList(prev => prev.filter((_, i) => i !== index));
+
   const handleAddManualExpense = async () => {
     if (!selectedEnvelope || !selectedBox) return;
-    const f = manualExpenseForm;
-    if (!f.supplier.trim()) return showToast("error", "El proveedor es obligatorio");
-    if (!f.date.trim()) return showToast("error", "La fecha es obligatoria");
-    if (!f.baseAmount) return showToast("error", "El importe base es obligatorio");
-    if (!f.subAccountCode) return showToast("error", "La subcuenta es obligatoria");
+    const valid = cardExpensesList.filter(
+      e => e.supplier.trim() && e.items.some(it => it.baseAmount > 0 && it.subAccountCode)
+    );
+    if (valid.length === 0) return showToast("error", "Añade al menos un gasto con proveedor, cuenta e importe");
     setManualExpenseSaving(true);
     try {
       const boxSnap = await getDoc(doc(db, `projects/${projectId}/cards`, selectedBox.id));
       const boxData = boxSnap.data() || {};
-      const isTicket = f.type === "ticket";
-      const num = isTicket ? (boxData.nextTicketNumber ?? 1) : (boxData.nextInvoiceNumber ?? 1);
-      const displayNumber = `BOX-${selectedBox.code}-${isTicket ? "T" : "F"}-${String(num).padStart(4, "0")}`;
+      let nextInvoice = boxData.nextInvoiceNumber ?? 1;
+      let nextTicket  = boxData.nextTicketNumber  ?? 1;
+      let addedBase = 0, addedVat = 0, addedTotal = 0;
+      const batch = writeBatch(db);
 
-      // Parse date DD/MM/YYYY
-      const dateParts = f.date.split("/");
-      const expenseDate = dateParts.length === 3
-        ? new Date(parseInt(dateParts[2]), parseInt(dateParts[1]) - 1, parseInt(dateParts[0]))
-        : new Date();
+      for (const exp of valid) {
+        const isTicket = exp.type === "ticket";
+        const num = isTicket ? nextTicket++ : nextInvoice++;
+        const displayNumber = `BOX-${selectedBox.code}-${isTicket ? "T" : "F"}-${String(num).padStart(4, "0")}`;
+        const { baseAmount, vatAmount, irpfAmount, totalAmount } = computeExpenseTotal(exp);
 
-      const baseAmount  = parseFloat(f.baseAmount)  || 0;
-      const vatRate     = parseFloat(f.vatRate)      || 0;
-      const vatAmount   = parseFloat(f.vatAmount)    || Math.round(baseAmount * vatRate / 100 * 100) / 100;
-      const irpfRate    = parseFloat(f.irpfRate)     || 0;
-      const irpfAmount  = parseFloat(f.irpfAmount)   || Math.round(baseAmount * irpfRate / 100 * 100) / 100;
-      const totalAmount = Math.round((baseAmount + vatAmount - irpfAmount) * 100) / 100;
+        const dateParts = exp.date.split("/");
+        const expenseDate = dateParts.length === 3
+          ? new Date(parseInt(dateParts[2]), parseInt(dateParts[1]) - 1, parseInt(dateParts[0]))
+          : new Date();
 
-      // Upload document if provided
-      let documentUrl = "";
-      if (manualExpenseFile) {
-        const ext = manualExpenseFile.name.split(".").pop() ?? "pdf";
-        const storageRef = ref(storage, `projects/${projectId}/cardExpenses/${displayNumber}.${ext}`);
-        await uploadBytes(storageRef, manualExpenseFile);
-        documentUrl = await getDownloadURL(storageRef);
+        let documentUrl = "";
+        if (exp.file) {
+          const ext = exp.file.name.split(".").pop() ?? "pdf";
+          const sRef = ref(storage, `projects/${projectId}/cardExpenses/${displayNumber}.${ext}`);
+          await uploadBytes(sRef, exp.file);
+          documentUrl = await getDownloadURL(sRef);
+        }
+
+        const supplierName = capitalizeSupplierName(exp.supplier.trim());
+        const firstItem = exp.items[0];
+        const expRef = doc(collection(db, `projects/${projectId}/cardExpenses`));
+        batch.set(expRef, {
+          envelopeId: selectedEnvelope.id, boxId: selectedBox.id, boxCode: selectedBox.code,
+          number: num, displayNumber, type: exp.type,
+          pleoReceiptId: `MANUAL-${Date.now()}-${num}`,
+          pleoUrl: "", documentUrl,
+          supplier: supplierName, supplierTaxId: exp.supplierTaxId.trim(),
+          supplierNumber: exp.supplierNumber.trim(),
+          subAccountCode: firstItem?.subAccountCode ?? "",
+          subAccountDescription: firstItem?.subAccountDescription ?? "",
+          description: firstItem?.description ?? "",
+          date: Timestamp.fromDate(expenseDate),
+          items: exp.items.map(it => ({
+            baseAmount: it.baseAmount,
+            vatRate: it.vatRate,
+            vatAmount: Math.round(it.baseAmount * it.vatRate / 100 * 100) / 100,
+          })),
+          baseAmount, vatAmount, irpfRate: exp.irpfRate, irpfAmount, totalAmount,
+          pleoAmount: 0, conflictType: null, conflictNote: "",
+          status: "pending",
+          createdAt: Timestamp.now(), createdBy: userId, createdByName: userName,
+        });
+        addedBase  += baseAmount;
+        addedVat   += vatAmount;
+        addedTotal += totalAmount;
       }
 
-      const supplierName = capitalizeSupplierName(f.supplier.trim());
-      const batch = writeBatch(db);
-      const expRef = doc(collection(db, `projects/${projectId}/cardExpenses`));
-      batch.set(expRef, {
-        envelopeId: selectedEnvelope.id, boxId: selectedBox.id, boxCode: selectedBox.code,
-        number: num, displayNumber, type: f.type,
-        pleoReceiptId: `MANUAL-${Date.now()}`,
-        pleoUrl: "", documentUrl,
-        supplier: supplierName, supplierTaxId: f.supplierTaxId.trim(),
-        supplierNumber: f.supplierNumber.trim(),
-        subAccountCode: f.subAccountCode, subAccountDescription: f.subAccountDescription,
-        description: f.description.trim(),
-        date: Timestamp.fromDate(expenseDate),
-        items: [{ baseAmount, vatRate, vatAmount }],
-        baseAmount, vatAmount, irpfRate, irpfAmount, totalAmount,
-        pleoAmount: 0,
-        conflictType: null, conflictNote: "",
-        status: "pending",
-        createdAt: Timestamp.now(), createdBy: userId, createdByName: userName,
-      });
       batch.update(doc(db, `projects/${projectId}/cardEnvelopes`, selectedEnvelope.id), {
-        totalBase: (selectedEnvelope.totalBase || 0) + baseAmount,
-        totalVat: (selectedEnvelope.totalVat || 0) + vatAmount,
-        totalAmount: (selectedEnvelope.totalAmount || 0) + totalAmount,
-        expenseCount: (selectedEnvelope.expenseCount || 0) + 1,
+        totalBase:    (selectedEnvelope.totalBase   || 0) + addedBase,
+        totalVat:     (selectedEnvelope.totalVat    || 0) + addedVat,
+        totalAmount:  (selectedEnvelope.totalAmount || 0) + addedTotal,
+        expenseCount: (selectedEnvelope.expenseCount || 0) + valid.length,
       });
       batch.update(doc(db, `projects/${projectId}/cards`, selectedBox.id), {
-        [isTicket ? "nextTicketNumber" : "nextInvoiceNumber"]: num + 1,
+        nextInvoiceNumber: nextInvoice,
+        nextTicketNumber:  nextTicket,
       });
       await batch.commit();
-      showToast("success", `Gasto ${displayNumber} añadido`);
+      showToast("success", `${valid.length} gasto${valid.length > 1 ? "s" : ""} añadido${valid.length > 1 ? "s" : ""}`);
       setShowManualExpenseModal(false);
-      setManualExpenseForm({
-        type: "invoice", supplier: "", supplierTaxId: "", supplierNumber: "",
-        subAccountCode: "", subAccountDescription: "", description: "", date: "",
-        baseAmount: "", vatRate: "21", vatAmount: "", irpfRate: "0", irpfAmount: "", notes: "",
-      });
-      setManualExpenseFile(null);
+      setCardExpensesList([]);
       loadData();
     } catch (e: any) {
       showToast("error", e?.message ?? "Error al añadir gasto");
@@ -1470,11 +1502,7 @@ export default function BoxesPage() {
                           className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
                           <Upload size={16} /> Importar Excel
                         </button>
-                        <button onClick={() => {
-                          setManualExpenseForm({ type: "invoice", supplier: "", supplierTaxId: "", supplierNumber: "", subAccountCode: "", subAccountDescription: "", description: "", date: "", baseAmount: "", vatRate: "21", vatAmount: "", irpfRate: "0", irpfAmount: "", notes: "" });
-                          setManualExpenseFile(null);
-                          setShowManualExpenseModal(true);
-                        }}
+                        <button onClick={() => { setCardExpensesList([createEmptyCardExpense()]); setShowManualExpenseModal(true); }}
                           className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
                           <Plus size={16} /> Añadir gasto
                         </button>
@@ -1497,7 +1525,7 @@ export default function BoxesPage() {
                               className="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
                               <Upload size={16} /> Importar Excel
                             </button>
-                            <button onClick={() => { setManualExpenseForm({ type: "invoice", supplier: "", supplierTaxId: "", supplierNumber: "", subAccountCode: "", subAccountDescription: "", description: "", date: "", baseAmount: "", vatRate: "21", vatAmount: "", irpfRate: "0", irpfAmount: "", notes: "" }); setManualExpenseFile(null); setShowManualExpenseModal(true); }}
+                            <button onClick={() => { setCardExpensesList([createEmptyCardExpense()]); setShowManualExpenseModal(true); }}
                               className="inline-flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium"
                               style={{ backgroundColor: "#2F52E0" }}>
                               <Plus size={16} /> Añadir gasto
@@ -2196,198 +2224,245 @@ export default function BoxesPage() {
       {showManualExpenseModal && selectedEnvelope && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setShowManualExpenseModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[92vh] flex flex-col"
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col"
             onClick={e => e.stopPropagation()}>
 
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Añadir gasto manual</h3>
+                <h3 className="text-lg font-semibold text-slate-900">Añadir gastos</h3>
                 <p className="text-sm text-slate-500">{selectedEnvelope.displayNumber} · {selectedBox?.name}</p>
               </div>
-              <button onClick={() => setShowManualExpenseModal(false)}
-                className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+              <button onClick={() => setShowManualExpenseModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
             </div>
 
-            <div className="p-6 flex-1 overflow-y-auto space-y-4">
+            <div className="p-6 flex-1 overflow-y-auto space-y-6">
 
-              {/* Tipo */}
-              <div className="flex gap-2">
-                {(["invoice", "ticket"] as const).map(t => (
-                  <button key={t} type="button"
-                    onClick={() => setManualExpenseForm(f => ({ ...f, type: t }))}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-medium transition-colors ${manualExpenseForm.type === t
-                      ? t === "invoice" ? "border-blue-300 bg-blue-50 text-blue-700" : "border-amber-300 bg-amber-50 text-amber-700"
-                      : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>
-                    {t === "invoice" ? <FileText size={15} /> : <Receipt size={15} />}
-                    {t === "invoice" ? "Factura" : "Ticket"}
-                  </button>
-                ))}
-              </div>
-
-              {/* Proveedor + CIF */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Proveedor *</label>
-                  <input type="text" value={manualExpenseForm.supplier} placeholder="Nombre del proveedor"
-                    onChange={e => setManualExpenseForm(f => ({ ...f, supplier: e.target.value }))}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">CIF / NIF</label>
-                  <input type="text" value={manualExpenseForm.supplierTaxId} placeholder="B12345678"
-                    onChange={e => setManualExpenseForm(f => ({ ...f, supplierTaxId: e.target.value }))}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
-                </div>
-              </div>
-
-              {/* Nº factura + Fecha */}
-              <div className="grid grid-cols-2 gap-3">
-                {manualExpenseForm.type === "invoice" && (
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Nº Factura</label>
-                    <input type="text" value={manualExpenseForm.supplierNumber} placeholder="FAC-2026-001"
-                      onChange={e => setManualExpenseForm(f => ({ ...f, supplierNumber: e.target.value }))}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
-                  </div>
-                )}
-                <div className={manualExpenseForm.type === "ticket" ? "col-span-2" : ""}>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Fecha *</label>
-                  <input type="text" value={manualExpenseForm.date} placeholder="DD/MM/YYYY"
-                    onChange={e => setManualExpenseForm(f => ({ ...f, date: e.target.value }))}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
-                </div>
-              </div>
-
-              {/* Subcuenta */}
+              {/* ── Lista de gastos ── */}
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Subcuenta *</label>
-                <div className="relative">
-                  <button type="button"
-                    onClick={() => { setShowManualAccountSelector(s => !s); setManualAccountSearch(""); }}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900">
-                    {manualExpenseForm.subAccountCode
-                      ? <span className="font-mono">{manualExpenseForm.subAccountCode} <span className="font-sans text-slate-500 text-xs">· {manualExpenseForm.subAccountDescription}</span></span>
-                      : <span className="text-slate-400">Seleccionar subcuenta</span>}
-                    <ChevronDown size={14} className="text-slate-400" />
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Gastos ({cardExpensesList.length})</p>
+                  <button onClick={() => setCardExpensesList(prev => [...prev, createEmptyCardExpense()])}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg">
+                    <Plus size={14} /> Nuevo gasto
                   </button>
-                  {showManualAccountSelector && (
-                    <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl">
-                      <div className="p-2 border-b border-slate-100">
-                        <input type="text" value={manualAccountSearch} autoFocus
-                          onChange={e => setManualAccountSearch(e.target.value)}
-                          placeholder="Buscar cuenta..." className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-900" />
+                </div>
+                <div className="space-y-4">
+                  {cardExpensesList.map((exp, idx) => (
+                    <div key={exp.id} className="p-4 border border-slate-200 rounded-xl space-y-4">
+
+                      {/* Header del gasto */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Gasto {idx + 1}</span>
+                        <div className="flex items-center gap-2">
+                          {exp.file && (
+                            <span className="flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
+                              <Paperclip size={12} /> {exp.file.name.length > 20 ? exp.file.name.substring(0, 20) + "…" : exp.file.name}
+                            </span>
+                          )}
+                          {cardExpensesList.length > 1 && (
+                            <button onClick={() => removeCardExpense(idx)}
+                              className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded">
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="max-h-44 overflow-y-auto">
-                        {subAccounts.filter(sa => !manualAccountSearch || sa.code.toLowerCase().includes(manualAccountSearch.toLowerCase()) || sa.description.toLowerCase().includes(manualAccountSearch.toLowerCase())).slice(0, 40).map(sa => (
-                          <button key={sa.id} type="button"
-                            onClick={() => { setManualExpenseForm(f => ({ ...f, subAccountCode: sa.code, subAccountDescription: sa.description })); setShowManualAccountSelector(false); }}
-                            className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2 border-b border-slate-50 last:border-0 text-sm">
-                            <span className="font-mono text-xs text-slate-500 w-16 flex-shrink-0">{sa.code}</span>
-                            <span className="text-slate-700 truncate">{sa.description}</span>
+
+                      {/* Datos generales */}
+                      <div className="grid grid-cols-12 gap-3">
+                        {/* Tipo */}
+                        <div className="col-span-2 relative">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
+                          <button type="button"
+                            onClick={() => setShowCardTypeDropdown(showCardTypeDropdown === idx ? null : idx)}
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm flex items-center justify-between hover:border-slate-300">
+                            <span className="flex items-center gap-1.5">
+                              {exp.type === "ticket"
+                                ? <><Receipt size={13} className="text-amber-500" /> Ticket</>
+                                : <><FileText size={13} className="text-blue-500" /> Factura</>}
+                            </span>
+                            <ChevronDown size={13} className="text-slate-400" />
                           </button>
-                        ))}
+                          {showCardTypeDropdown === idx && (
+                            <div className="absolute z-50 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                              <button type="button"
+                                onClick={() => { updateCardExpense(idx, "type", "ticket"); setShowCardTypeDropdown(null); }}
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
+                                <Receipt size={13} className="text-amber-500" /> Ticket
+                              </button>
+                              <button type="button"
+                                onClick={() => { updateCardExpense(idx, "type", "invoice"); setShowCardTypeDropdown(null); }}
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
+                                <FileText size={13} className="text-blue-500" /> Factura
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Fecha */}
+                        <div className="col-span-2">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label>
+                          <input type="text" value={exp.date}
+                            onChange={e => updateCardExpense(idx, "date", e.target.value)}
+                            placeholder="DD/MM/YYYY"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                        </div>
+
+                        {/* Proveedor */}
+                        <div className="col-span-3">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Proveedor *</label>
+                          <input type="text" value={exp.supplier}
+                            onChange={e => updateCardExpense(idx, "supplier", e.target.value)}
+                            placeholder="Nombre del proveedor"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                        </div>
+
+                        {/* CIF */}
+                        <div className="col-span-2">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">CIF / NIF</label>
+                          <input type="text" value={exp.supplierTaxId}
+                            onChange={e => updateCardExpense(idx, "supplierTaxId", e.target.value)}
+                            placeholder="B12345678"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                        </div>
+
+                        {/* Nº Factura (solo si es factura) */}
+                        <div className="col-span-2">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">
+                            {exp.type === "invoice" ? "Nº Factura" : "Referencia"}
+                          </label>
+                          <input type="text" value={exp.supplierNumber}
+                            onChange={e => updateCardExpense(idx, "supplierNumber", e.target.value)}
+                            placeholder={exp.type === "invoice" ? "FAC-2026-001" : "—"}
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                        </div>
+
+                        {/* IRPF */}
+                        <div className="col-span-1">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">IRPF %</label>
+                          <input type="number" value={exp.irpfRate}
+                            onChange={e => updateCardExpense(idx, "irpfRate", parseFloat(e.target.value) || 0)}
+                            step="1" placeholder="0"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                        </div>
+
+                        {/* Documento */}
+                        <div className="col-span-12 sm:col-span-0">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Documento</label>
+                          <label className="w-full px-3 py-2 border border-dashed border-slate-300 rounded-lg text-sm flex items-center justify-center gap-2 cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-colors">
+                            <Upload size={14} className="text-slate-400" />
+                            <span className="text-slate-500">{exp.file ? "Cambiar" : "Subir"}</span>
+                            <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden"
+                              onChange={e => { if (e.target.files?.[0]) updateCardExpense(idx, "file", e.target.files[0]); }} />
+                          </label>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              </div>
 
-              {/* Descripción */}
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Descripción</label>
-                <input type="text" value={manualExpenseForm.description} placeholder="Concepto del gasto"
-                  onChange={e => setManualExpenseForm(f => ({ ...f, description: e.target.value }))}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
-              </div>
+                      {/* Líneas de detalle */}
+                      <div className="bg-slate-50 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium text-slate-500">Líneas de detalle ({exp.items.length})</span>
+                          <button onClick={() => addCardItem(idx)}
+                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700">
+                            <Plus size={12} /> Añadir línea
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          {exp.items.map((item, itemIdx) => (
+                            <div key={item.id} className="grid grid-cols-12 gap-2 items-end">
+                              {/* Cuenta */}
+                              <div className="col-span-3">
+                                {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">Cuenta *</label>}
+                                <button type="button"
+                                  onClick={(e) => {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    setCardAccountSelectorPos({ top: rect.bottom + 4, left: rect.left });
+                                    setEditingCardExpenseIndex(idx * 1000 + itemIdx);
+                                    setShowCardAccountSelector(true);
+                                    setCardAccountSearch("");
+                                  }}
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-left text-xs flex items-center justify-between hover:border-slate-300 bg-white">
+                                  {item.subAccountCode
+                                    ? <span className="font-mono text-slate-700 truncate">{item.subAccountCode}</span>
+                                    : <span className="text-slate-400">Cuenta</span>}
+                                  <ChevronDown size={12} className="text-slate-400 flex-shrink-0" />
+                                </button>
+                              </div>
+                              {/* Descripción */}
+                              <div className="col-span-4">
+                                {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">Descripción</label>}
+                                <input type="text" value={item.description}
+                                  onChange={e => updateCardItem(idx, itemIdx, "description", e.target.value)}
+                                  placeholder="Descripción del gasto"
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                              </div>
+                              {/* Base */}
+                              <div className="col-span-2">
+                                {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">Base *</label>}
+                                <input type="number" value={item.baseAmount || ""}
+                                  onChange={e => updateCardItem(idx, itemIdx, "baseAmount", parseFloat(e.target.value) || 0)}
+                                  step="0.01" placeholder="0.00"
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                              </div>
+                              {/* IVA % */}
+                              <div className="col-span-2">
+                                {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">IVA %</label>}
+                                <input type="number" value={item.vatRate}
+                                  onChange={e => updateCardItem(idx, itemIdx, "vatRate", parseFloat(e.target.value) || 0)}
+                                  step="1"
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                              </div>
+                              {/* Eliminar línea */}
+                              <div className="col-span-1 flex justify-center">
+                                {exp.items.length > 1 && (
+                                  <button onClick={() => removeCardItem(idx, itemIdx)}
+                                    className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded">
+                                    <Trash2 size={12} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
 
-              {/* Importes */}
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-2">Importes *</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {[
-                    { label: "Base", key: "baseAmount", placeholder: "0.00" },
-                    { label: "IVA %", key: "vatRate", placeholder: "21" },
-                    { label: "Cuota IVA", key: "vatAmount", placeholder: "auto" },
-                    { label: "IRPF %", key: "irpfRate", placeholder: "0" },
-                  ].map(({ label, key, placeholder }) => (
-                    <div key={key}>
-                      <label className="block text-xs text-slate-500 mb-1">{label}</label>
-                      <input type="number" step="0.01" placeholder={placeholder}
-                        value={(manualExpenseForm as any)[key]}
-                        onChange={e => {
-                          const val = e.target.value;
-                          setManualExpenseForm(f => {
-                            const next = { ...f, [key]: val };
-                            // auto-calc vatAmount when base or vatRate changes
-                            if (key === "baseAmount" || key === "vatRate") {
-                              const base = parseFloat(key === "baseAmount" ? val : f.baseAmount) || 0;
-                              const rate = parseFloat(key === "vatRate" ? val : f.vatRate) || 0;
-                              next.vatAmount = String(Math.round(base * rate / 100 * 100) / 100);
-                            }
-                            return next;
-                          });
-                        }}
-                        className="w-full px-2 py-2 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                      {/* Total del gasto */}
+                      <div className="flex justify-end">
+                        <div className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm">
+                          <span className="text-slate-400">Total gasto:</span>
+                          <span className="ml-2 font-mono font-semibold">{fmt(computeExpenseTotal(exp).totalAmount)} €</span>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
-                {/* Total calculado */}
-                {manualExpenseForm.baseAmount && (
-                  <p className="text-xs text-slate-500 mt-2 text-right">
-                    Total: <strong className="text-slate-900 font-mono">
-                      {fmt((parseFloat(manualExpenseForm.baseAmount) || 0) + (parseFloat(manualExpenseForm.vatAmount) || 0) - (parseFloat(manualExpenseForm.baseAmount) || 0) * (parseFloat(manualExpenseForm.irpfRate) || 0) / 100)} €
-                    </strong>
-                  </p>
-                )}
-              </div>
-
-              {/* Documento adjunto */}
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Documento (factura / ticket)</label>
-                {manualExpenseFile ? (
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                    <div className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center flex-shrink-0">
-                      {manualExpenseFile.type === "application/pdf"
-                        ? <FileText size={14} className="text-red-500" />
-                        : <Eye size={14} className="text-blue-500" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">{manualExpenseFile.name}</p>
-                      <p className="text-xs text-slate-400">{(manualExpenseFile.size / 1024).toFixed(0)} KB</p>
-                    </div>
-                    <button onClick={() => setManualExpenseFile(null)}
-                      className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"><X size={14} /></button>
-                  </div>
-                ) : (
-                  <label className="flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-slate-300 hover:bg-slate-50 transition-colors"
-                    onDragOver={e => e.preventDefault()}
-                    onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) setManualExpenseFile(f); }}>
-                    <Paperclip size={20} className="text-slate-300" />
-                    <span className="text-sm text-slate-500">Arrastra el PDF o imagen aquí</span>
-                    <span className="text-xs text-slate-400">o haz clic para seleccionar</span>
-                    <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden"
-                      onChange={e => { const f = e.target.files?.[0]; if (f) setManualExpenseFile(f); }} />
-                  </label>
-                )}
               </div>
 
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 flex-shrink-0">
-              <button onClick={() => setShowManualExpenseModal(false)}
-                className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
-              <button onClick={handleAddManualExpense} disabled={manualExpenseSaving}
-                className="px-5 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50 flex items-center gap-2"
-                style={{ backgroundColor: "#2F52E0" }}>
-                {manualExpenseSaving ? "Guardando..." : <><Plus size={15} /> Añadir gasto</>}
-              </button>
+            <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
+              <p className="text-sm text-slate-500">
+                {cardExpensesList.length > 0 && (
+                  <>Total: <strong className="text-slate-900 font-mono">
+                    {fmt(cardExpensesList.reduce((s, e) => s + computeExpenseTotal(e).totalAmount, 0))} €
+                  </strong></>
+                )}
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setShowManualExpenseModal(false)}
+                  className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
+                <button onClick={handleAddManualExpense} disabled={manualExpenseSaving}
+                  className="px-5 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+                  style={{ backgroundColor: "#2F52E0" }}>
+                  {manualExpenseSaving ? "Guardando..." : <><Check size={15} /> Guardar gastos</>}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
-
       {/* Import Tarjetas Modal */}
       {showImportModal && selectedEnvelope && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
@@ -2942,6 +3017,50 @@ export default function BoxesPage() {
                 !accountSearchTerm ||
                 sa.code.toLowerCase().includes(accountSearchTerm.toLowerCase()) ||
                 sa.description.toLowerCase().includes(accountSearchTerm.toLowerCase())
+              ).length === 0 && (
+                <p className="px-3 py-4 text-sm text-slate-400 text-center">Sin resultados</p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+      {showCardAccountSelector && cardAccountSelectorPos && editingCardExpenseIndex !== null && (
+        <>
+          <div className="fixed inset-0 z-[60]" onClick={() => { setShowCardAccountSelector(false); setEditingCardExpenseIndex(null); }} />
+          <div className="fixed z-[70] w-80 bg-white border border-slate-200 rounded-xl shadow-xl"
+            style={{ top: Math.min(cardAccountSelectorPos.top, window.innerHeight - 300), left: cardAccountSelectorPos.left }}>
+            <div className="p-2 border-b border-slate-100">
+              <input type="text" value={cardAccountSearch}
+                onChange={e => setCardAccountSearch(e.target.value)}
+                placeholder="Buscar cuenta"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-900"
+                autoFocus />
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              {subAccounts
+                .filter(sa => !cardAccountSearch ||
+                  sa.code.toLowerCase().includes(cardAccountSearch.toLowerCase()) ||
+                  sa.description.toLowerCase().includes(cardAccountSearch.toLowerCase()))
+                .slice(0, 50)
+                .map(sa => (
+                  <button key={sa.id} type="button"
+                    onClick={() => {
+                      const expIdx  = Math.floor(editingCardExpenseIndex / 1000);
+                      const itemIdx = editingCardExpenseIndex % 1000;
+                      updateCardItem(expIdx, itemIdx, "subAccountCode", sa.code);
+                      updateCardItem(expIdx, itemIdx, "subAccountDescription", sa.description);
+                      setShowCardAccountSelector(false);
+                      setEditingCardExpenseIndex(null);
+                    }}
+                    className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2 border-b border-slate-50 last:border-0">
+                    <span className="font-mono text-xs text-slate-600 w-16 flex-shrink-0">{sa.code}</span>
+                    <span className="text-sm text-slate-700 truncate">{sa.description}</span>
+                  </button>
+                ))}
+              {subAccounts.filter(sa =>
+                !cardAccountSearch ||
+                sa.code.toLowerCase().includes(cardAccountSearch.toLowerCase()) ||
+                sa.description.toLowerCase().includes(cardAccountSearch.toLowerCase())
               ).length === 0 && (
                 <p className="px-3 py-4 text-sm text-slate-400 text-center">Sin resultados</p>
               )}
