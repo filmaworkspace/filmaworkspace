@@ -17,7 +17,7 @@ import {
   RotateCcw, Save, ChevronLeft
 } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
-import { inflateRawSync as fflateInflateRaw } from "fflate";
+import { unzipSync, strFromU8 } from "fflate";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -593,58 +593,14 @@ export default function BoxesPage() {
     } catch { showToast("error", "Error al eliminar sobre"); } finally { setSaving(false); }
   };
 
-  // ── Parser XLSX — usa fflate (pure-JS DEFLATE) sin APIs de browser ──
+  // ── Parser XLSX — usa fflate.unzipSync (pure-JS, sin APIs de browser) ──
   const parsePleoExcel = async (file: File): Promise<any[]> => {
-    const r16 = (d: Uint8Array, o: number) => d[o] | (d[o + 1] << 8);
-    const r32 = (d: Uint8Array, o: number) =>
-      (d[o] | (d[o+1]<<8) | (d[o+2]<<16) | (d[o+3]<<24)) >>> 0;
-    const tdec = new TextDecoder("utf-8");
-
-    // inflateRaw usa fflate.inflateRawSync (pure-JS DEFLATE, sin APIs de browser)
-    const inflateRaw = (compressed: Uint8Array): string =>
-      new TextDecoder("utf-8").decode(fflateInflateRaw(compressed));
-
     const ab = await file.arrayBuffer();
-    const data = new Uint8Array(ab);
-
-    // Locate End-of-Central-Directory record
-    let eocd = -1;
-    for (let i = data.length - 22; i >= 0; i--) {
-      if (data[i] === 0x50 && data[i+1] === 0x4b && data[i+2] === 0x05 && data[i+3] === 0x06) {
-        eocd = i; break;
-      }
-    }
-    if (eocd < 0) throw new Error("El archivo no es un XLSX válido (no es un ZIP)");
-
-    const cdOffset = r32(data, eocd + 16);
-    const cdCount  = r16(data, eocd + 8);
-
-    // Parse Central Directory to build file map
-    const fileMap: Record<string, { localOffset: number; method: number; compSize: number }> = {};
-    let pos = cdOffset;
-    for (let i = 0; i < cdCount; i++) {
-      const fnLen      = r16(data, pos + 28);
-      const extraLen   = r16(data, pos + 30);
-      const commentLen = r16(data, pos + 32);
-      const name       = tdec.decode(data.subarray(pos + 46, pos + 46 + fnLen));
-      fileMap[name] = {
-        localOffset: r32(data, pos + 42),
-        method:      r16(data, pos + 10),
-        compSize:    r32(data, pos + 20),
-      };
-      pos += 46 + fnLen + extraLen + commentLen;
-    }
+    const zip = unzipSync(new Uint8Array(ab));   // descomprime todo el ZIP de una vez
 
     const readEntry = (name: string): string | null => {
-      const fi = fileMap[name];
-      if (!fi) return null;
-      const fnLen    = r16(data, fi.localOffset + 26);
-      const extraLen = r16(data, fi.localOffset + 28);
-      const start    = fi.localOffset + 30 + fnLen + extraLen;
-      const raw      = data.slice(start, start + fi.compSize);  // slice = copy, not view
-      if (fi.method === 0) return tdec.decode(raw);   // stored
-      if (fi.method === 8) return inflateRaw(raw);    // deflate (fflate, pure JS)
-      throw new Error("Método de compresión XLSX no soportado: " + fi.method);
+      const entry = zip[name];
+      return entry ? strFromU8(entry) : null;
     };
 
     // 1. SharedStrings
