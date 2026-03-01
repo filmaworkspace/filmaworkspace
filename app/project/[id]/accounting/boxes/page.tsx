@@ -17,6 +17,7 @@ import {
   RotateCcw, Save, ChevronLeft
 } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
+import { inflateRawSync as fflateInflateRaw } from "fflate";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -592,35 +593,16 @@ export default function BoxesPage() {
     } catch { showToast("error", "Error al eliminar sobre"); } finally { setSaving(false); }
   };
 
-  // ── Parser XLSX nativo sin dependencias (DecompressionStream browser API) ──
+  // ── Parser XLSX — usa fflate (pure-JS DEFLATE) sin APIs de browser ──
   const parsePleoExcel = async (file: File): Promise<any[]> => {
     const r16 = (d: Uint8Array, o: number) => d[o] | (d[o + 1] << 8);
     const r32 = (d: Uint8Array, o: number) =>
       (d[o] | (d[o+1]<<8) | (d[o+2]<<16) | (d[o+3]<<24)) >>> 0;
     const tdec = new TextDecoder("utf-8");
 
-    const inflateRaw = async (compressed: Uint8Array): Promise<string> => {
-      // compressed es un subarray (vista) — copiar antes para evitar que
-      // el buffer subyacente sea reclamado antes de que el stream lo procese.
-      const copy = compressed.slice(0);
-      const ds = new (window as any).DecompressionStream("deflate-raw");
-      const writer = ds.writable.getWriter();
-      await writer.write(copy);
-      await writer.close();
-      // Leer chunks manualmente para maxima compatibilidad entre browsers
-      const reader = ds.readable.getReader();
-      const chunks: Uint8Array[] = [];
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value as Uint8Array);
-      }
-      const total = chunks.reduce((s: number, c: Uint8Array) => s + c.length, 0);
-      const out = new Uint8Array(total);
-      let off = 0;
-      for (const c of chunks) { out.set(c, off); off += c.length; }
-      return new TextDecoder("utf-8").decode(out);
-    };
+    // inflateRaw usa fflate.inflateRawSync (pure-JS DEFLATE, sin APIs de browser)
+    const inflateRaw = (compressed: Uint8Array): string =>
+      new TextDecoder("utf-8").decode(fflateInflateRaw(compressed));
 
     const ab = await file.arrayBuffer();
     const data = new Uint8Array(ab);
@@ -653,21 +635,21 @@ export default function BoxesPage() {
       pos += 46 + fnLen + extraLen + commentLen;
     }
 
-    const readEntry = async (name: string): Promise<string | null> => {
+    const readEntry = (name: string): string | null => {
       const fi = fileMap[name];
       if (!fi) return null;
       const fnLen    = r16(data, fi.localOffset + 26);
       const extraLen = r16(data, fi.localOffset + 28);
       const start    = fi.localOffset + 30 + fnLen + extraLen;
-      const raw      = data.subarray(start, start + fi.compSize);
+      const raw      = data.slice(start, start + fi.compSize);  // slice = copy, not view
       if (fi.method === 0) return tdec.decode(raw);   // stored
-      if (fi.method === 8) return inflateRaw(raw);    // deflate
+      if (fi.method === 8) return inflateRaw(raw);    // deflate (fflate, pure JS)
       throw new Error("Método de compresión XLSX no soportado: " + fi.method);
     };
 
     // 1. SharedStrings
     const sharedStrings: string[] = [];
-    const ssXml = await readEntry("xl/sharedStrings.xml");
+    const ssXml = readEntry("xl/sharedStrings.xml");
     if (ssXml) {
       for (const si of ssXml.match(/<si>([\s\S]*?)<\/si>/g) ?? []) {
         const parts = si.match(/<t(?:\s[^>]*)?>([^<]*)<\/t>/g) ?? [];
@@ -679,7 +661,7 @@ export default function BoxesPage() {
     console.log("[XLSX] sharedStrings:", sharedStrings.length, sharedStrings.slice(0,5));
 
     // 2. Sheet
-    const sheetXml = await readEntry("xl/worksheets/sheet1.xml");
+    const sheetXml = readEntry("xl/worksheets/sheet1.xml");
     if (!sheetXml) throw new Error("No se encontró la hoja de cálculo en el XLSX");
     const rowBlocks = sheetXml.match(/<row[^>]*>([\s\S]*?)<\/row>/g) ?? [];
     console.log("[XLSX] sheetXml length:", sheetXml?.length, "rowBlocks:", rowBlocks.length);
