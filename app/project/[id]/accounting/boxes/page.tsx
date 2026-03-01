@@ -607,7 +607,7 @@ export default function BoxesPage() {
     const sharedStrings: string[] = [];
     const ssXml = readEntry("xl/sharedStrings.xml");
     if (ssXml) {
-      for (const si of ssXml.match(/<si>([\s\S]*?)<\/si>/g) ?? []) {
+      for (const si of ssXml.match(/<si>(.*?)<\/si>/gs) ?? []) {
         const parts = si.match(/<t(?:\s[^>]*)?>([^<]*)<\/t>/g) ?? [];
         sharedStrings.push(
           parts.map(p => p.replace(/<t[^>]*>/, "").replace(/<\/t>/, "")).join("")
@@ -619,13 +619,13 @@ export default function BoxesPage() {
     // 2. Sheet
     const sheetXml = readEntry("xl/worksheets/sheet1.xml");
     if (!sheetXml) throw new Error("No se encontró la hoja de cálculo en el XLSX");
-    const rowBlocks = sheetXml.match(/<row[^>]*>([\s\S]*?)<\/row>/g) ?? [];
+    const rowBlocks = sheetXml.match(/<row[^>]*>(.*?)<\/row>/gs) ?? [];
     console.log("[XLSX] sheetXml length:", sheetXml?.length, "rowBlocks:", rowBlocks.length);
     if (rowBlocks.length < 2) throw new Error("El archivo no contiene filas de datos");
 
     const parseRow = (rowXml: string): Record<string, string> => {
       const result: Record<string, string> = {};
-      const rx = /<c\s+r="([A-Z]+)\d+"([^>]*)>([\s\S]*?)<\/c>/g;
+      const rx = /<c\s+r="([A-Z]+)\d+"([^>]*)>(.*?)<\/c>/gs;
       let m: RegExpExecArray | null;
       while ((m = rx.exec(rowXml)) !== null) {
         const tM = m[2].match(/t="([^"]*)"/);
