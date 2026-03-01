@@ -246,6 +246,9 @@ export default function BoxesPage() {
   const [showCreateEnvelopeModal, setShowCreateEnvelopeModal] = useState(false);
   const [showDeleteEnvelopeModal, setShowDeleteEnvelopeModal] = useState<Envelope | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showReceiptImportModal, setShowReceiptImportModal] = useState(false);
+  const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
+  const [uploadingReceipts, setUploadingReceipts] = useState(false);
   const [showManualExpenseModal, setShowManualExpenseModal] = useState(false);
   const [cardExpensesList, setCardExpensesList] = useState<Array<{
     id: string; type: "invoice" | "ticket"; supplier: string; supplierTaxId: string;
@@ -897,6 +900,52 @@ export default function BoxesPage() {
       setImportPreview([]);
       loadData();
     } catch (e) { console.error(e); showToast("error", "Error al importar"); } finally { setImporting(false); }
+  };
+
+  const handleImportReceipts = async () => {
+    if (!selectedEnvelope || receiptFiles.length === 0) return;
+    setUploadingReceipts(true);
+    const envelopeExps = expenses.filter(e => e.envelopeId === selectedEnvelope.id);
+    let matched = 0, skipped = 0;
+    try {
+      for (const file of receiptFiles) {
+        // Extract ID from filename: "2601557.pdf" → "2601557", "rec_2601557_mercadona.pdf" → "2601557"
+        const nameNoExt = file.name.replace(/\.[^.]+$/, "");
+        // Try to find a pleoReceiptId that appears in the filename
+        const expense = envelopeExps.find(e =>
+          e.pleoReceiptId && nameNoExt.includes(String(e.pleoReceiptId))
+        );
+        if (!expense) { skipped++; continue; }
+        // Upload to Firebase Storage
+        const ext = file.name.split(".").pop() ?? "pdf";
+        const sRef = ref(storage,
+          `projects/${projectId}/cardExpenses/${expense.id}/receipt.${ext}`);
+        await uploadBytes(sRef, file);
+        const url = await getDownloadURL(sRef);
+        // Update expense: set documentUrl, resolve missing_document conflict if present
+        const updates: any = { documentUrl: url };
+        if (expense.conflictType === "missing_document") {
+          updates.conflictType = null;
+          updates.conflictNote = "";
+          updates.conflictResolvedAt = Timestamp.now();
+          updates.conflictResolvedBy = userId;
+          updates.conflictResolvedByName = userName;
+        }
+        await updateDoc(doc(db, `projects/${projectId}/cardExpenses`, expense.id), updates);
+        matched++;
+      }
+      showToast("success",
+        `${matched} recibo${matched !== 1 ? "s" : ""} vinculado${matched !== 1 ? "s" : ""}${skipped > 0 ? ` · ${skipped} sin emparejar` : ""}`
+      );
+      setShowReceiptImportModal(false);
+      setReceiptFiles([]);
+      loadData();
+    } catch (e) {
+      console.error(e);
+      showToast("error", "Error al subir recibos");
+    } finally {
+      setUploadingReceipts(false);
+    }
   };
 
   const handleReviewExpense = async (expense: BoxExpense) => {
@@ -1570,6 +1619,12 @@ export default function BoxesPage() {
                           className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
                           <Upload size={16} /> Importar Excel
                         </button>
+                        {envelopeExpenses.length > 0 && (
+                          <button onClick={() => { setReceiptFiles([]); setShowReceiptImportModal(true); }}
+                            className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+                            <FileText size={16} /> Importar recibos
+                          </button>
+                        )}
                         <button onClick={() => { setCardExpensesList([createEmptyCardExpense()]); setShowManualExpenseModal(true); }}
                           className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
                           <Plus size={16} /> Añadir gasto
@@ -1671,9 +1726,15 @@ export default function BoxesPage() {
                                 </td>
                                 <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                                   <div className="flex items-center justify-center gap-1">
+                                    {expense.documentUrl && (
+                                      <a href={expense.documentUrl} target="_blank" rel="noopener noreferrer"
+                                        className="p-1.5 text-blue-500 hover:text-blue-600 hover:bg-blue-50 rounded" title="Ver documento">
+                                        <FileText size={14} />
+                                      </a>
+                                    )}
                                     {expense.pleoUrl && (
                                       <a href={expense.pleoUrl} target="_blank" rel="noopener noreferrer"
-                                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded">
+                                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded" title="Ver en Pleo">
                                         <ExternalLink size={14} />
                                       </a>
                                     )}
@@ -1991,6 +2052,14 @@ export default function BoxesPage() {
                     </div>
                   </div>
 
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Descripción del gasto</label>
+                    <input type="text" value={drawerForm.description}
+                      onChange={e => setDrawerForm(f => ({ ...f, description: e.target.value }))}
+                      placeholder="Concepto general del gasto"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                  </div>
+
                   {/* ── Líneas de detalle ── */}
                   <div className="bg-slate-50 rounded-xl p-3 space-y-2">
                     <div className="flex items-center justify-between mb-1">
@@ -2061,10 +2130,7 @@ export default function BoxesPage() {
                               </div>
                             )}
                           </div>
-                          {/* Descripción + importes */}
-                          <input type="text" value={item.description} placeholder="Descripción"
-                            onChange={e => setDrawerItems(prev => prev.map((it, i) => i === idx ? { ...it, description: e.target.value } : it))}
-                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-900" />
+                          {/* Importes — descripción es del gasto, no de la línea */}
                           <div className="grid grid-cols-3 gap-2">
                             <div>
                               <label className="block text-xs text-slate-500 mb-1">Base *</label>
@@ -2159,6 +2225,12 @@ export default function BoxesPage() {
               {/* Drawer footer */}
               <div className="flex items-center justify-between px-5 py-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
                 <div className="flex items-center gap-2">
+                  {drawerExpense.documentUrl && (
+                    <a href={drawerExpense.documentUrl} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50">
+                      <FileText size={12} /> Ver documento
+                    </a>
+                  )}
                   {drawerExpense.pleoUrl && (
                     <a href={drawerExpense.pleoUrl} target="_blank" rel="noopener noreferrer"
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-600 border border-slate-200 rounded-lg hover:bg-white">
@@ -2492,6 +2564,14 @@ export default function BoxesPage() {
                               onChange={e => { if (e.target.files?.[0]) updateCardExpense(idx, "file", e.target.files[0]); }} />
                           </label>
                         </div>
+                        {/* Descripción del gasto — común para todas las líneas */}
+                        <div className="col-span-12">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Descripción del gasto</label>
+                          <input type="text" value={exp.description ?? ""}
+                            onChange={e => updateCardExpense(idx, "description", e.target.value)}
+                            placeholder="Concepto del gasto"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                        </div>
                       </div>
 
                       {/* Líneas de detalle */}
@@ -2507,7 +2587,7 @@ export default function BoxesPage() {
                           {exp.items.map((item, itemIdx) => (
                             <div key={item.id} className="grid grid-cols-12 gap-2 items-end">
                               {/* Cuenta */}
-                              <div className="col-span-3">
+                              <div className="col-span-6">
                                 {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">Cuenta *</label>}
                                 <button type="button"
                                   onClick={(e) => {
@@ -2524,16 +2604,8 @@ export default function BoxesPage() {
                                   <ChevronDown size={12} className="text-slate-400 flex-shrink-0" />
                                 </button>
                               </div>
-                              {/* Descripción */}
-                              <div className="col-span-4">
-                                {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">Descripción</label>}
-                                <input type="text" value={item.description}
-                                  onChange={e => updateCardItem(idx, itemIdx, "description", e.target.value)}
-                                  placeholder="Descripción del gasto"
-                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-slate-900" />
-                              </div>
                               {/* Base */}
-                              <div className="col-span-2">
+                              <div className="col-span-3">
                                 {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">Base *</label>}
                                 <input type="number" value={item.baseAmount || ""}
                                   onChange={e => updateCardItem(idx, itemIdx, "baseAmount", parseFloat(e.target.value) || 0)}
@@ -2775,6 +2847,143 @@ export default function BoxesPage() {
         </div>
       )}
 
+
+      {/* ── Receipt Import Modal ── */}
+      {showReceiptImportModal && selectedEnvelope && (() => {
+        const envelopeExps = expenses.filter(e => e.envelopeId === selectedEnvelope.id);
+        // Compute matches for current receiptFiles selection
+        const fileMatches = receiptFiles.map(file => {
+          const nameNoExt = file.name.replace(/\.[^.]+$/, "");
+          const expense = envelopeExps.find(e =>
+            e.pleoReceiptId && nameNoExt.includes(String(e.pleoReceiptId))
+          );
+          return { file, expense: expense ?? null };
+        });
+        const matched   = fileMatches.filter(m => m.expense).length;
+        const unmatched = fileMatches.filter(m => !m.expense).length;
+        // Gastos que ya tienen documentUrl o que quedarán cubiertos
+        const coveredIds = new Set(fileMatches.filter(m => m.expense).map(m => m.expense!.id));
+        const missingDocs = envelopeExps.filter(e => !e.documentUrl && !coveredIds.has(e.id));
+        return (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }}>
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl flex flex-col max-h-[85vh]"
+              onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 flex-shrink-0">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Importar recibos</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Los archivos se emparejan por el ID Pleo en el nombre del archivo
+                  </p>
+                </div>
+                <button onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }}
+                  className="p-2 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                {/* Drop zone / file picker */}
+                <label className={`flex flex-col items-center justify-center gap-2 w-full py-8 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${receiptFiles.length > 0 ? "border-blue-300 bg-blue-50/30" : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"}`}>
+                  <FileText size={28} className={receiptFiles.length > 0 ? "text-blue-400" : "text-slate-300"} />
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-slate-700">
+                      {receiptFiles.length > 0
+                        ? `${receiptFiles.length} archivo${receiptFiles.length > 1 ? "s" : ""} seleccionado${receiptFiles.length > 1 ? "s" : ""}`
+                        : "Selecciona facturas y tickets"}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">PDF, JPG, PNG · varios archivos a la vez</p>
+                  </div>
+                  <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden"
+                    onChange={e => setReceiptFiles(Array.from(e.target.files ?? []))} />
+                </label>
+
+                {receiptFiles.length > 0 && (
+                  <>
+                    {/* Summary chips */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-xs font-medium text-emerald-700">
+                        <Check size={12} /> {matched} emparejado{matched !== 1 ? "s" : ""}
+                      </span>
+                      {unmatched > 0 && (
+                        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full text-xs font-medium text-amber-700">
+                          <AlertTriangle size={12} /> {unmatched} sin emparejar
+                        </span>
+                      )}
+                      {missingDocs.length > 0 && (
+                        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-full text-xs font-medium text-slate-500">
+                          <FileX size={12} /> {missingDocs.length} gasto{missingDocs.length > 1 ? "s" : ""} sin documento tras importar
+                        </span>
+                      )}
+                    </div>
+
+                    {/* File list */}
+                    <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
+                      {fileMatches.map(({ file, expense: exp }, i) => (
+                        <div key={i} className={`flex items-center gap-3 px-4 py-2.5 ${exp ? "" : "bg-amber-50/40"}`}>
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${exp ? "bg-emerald-50" : "bg-amber-50"}`}>
+                            {exp
+                              ? <Check size={13} className="text-emerald-500" />
+                              : <AlertTriangle size={13} className="text-amber-400" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-mono text-slate-700 truncate">{file.name}</p>
+                            {exp
+                              ? <p className="text-xs text-emerald-600 mt-0.5">{exp.displayNumber} · {exp.supplier}</p>
+                              : <p className="text-xs text-amber-500 mt-0.5">No se encontró ningún gasto con este ID en el sobre</p>}
+                          </div>
+                          {exp?.documentUrl && (
+                            <span className="text-xs text-slate-400 flex-shrink-0">Reemplazará doc. existente</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Gastos que quedan sin documento */}
+                    {missingDocs.length > 0 && (
+                      <div className="bg-slate-50 rounded-xl p-3">
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                          Gastos sin documento tras importar ({missingDocs.length})
+                        </p>
+                        <div className="space-y-1">
+                          {missingDocs.map(e => (
+                            <div key={e.id} className="flex items-center gap-2 text-xs text-slate-500">
+                              <span className="font-mono text-slate-400 w-24 flex-shrink-0">{e.displayNumber}</span>
+                              <span className="truncate">{e.supplier}</span>
+                              <span className="font-mono text-slate-300 ml-auto flex-shrink-0">{e.pleoReceiptId}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
+                <p className="text-xs text-slate-400">
+                  {envelopeExps.filter(e => !e.documentUrl).length} gastos sin documento en el sobre
+                </p>
+                <div className="flex gap-3">
+                  <button onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }}
+                    className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-200">
+                    Cancelar
+                  </button>
+                  <button onClick={handleImportReceipts}
+                    disabled={uploadingReceipts || matched === 0}
+                    className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50"
+                    style={{ backgroundColor: "#2F52E0" }}>
+                    {uploadingReceipts
+                      ? <><RotateCcw size={14} className="animate-spin" /> Subiendo...</>
+                      : <><Upload size={14} /> Vincular {matched} recibo{matched !== 1 ? "s" : ""}</>}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Create Transfer Envelope Modal */}
       {showCreateTransferEnvelopeModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
@@ -3006,6 +3215,12 @@ export default function BoxesPage() {
                         </div>
                       </div>
 
+                      {/* Descripción del gasto — común para todas las líneas */}
+                      <input type="text" value={exp.description ?? ""}
+                        onChange={e => updateExpenseInList(idx, "description", e.target.value)}
+                        placeholder="Descripción del gasto"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+
                       {/* Líneas de detalle */}
                       <div className="bg-slate-50 rounded-lg p-3">
                         <div className="flex items-center justify-between mb-2">
@@ -3018,7 +3233,7 @@ export default function BoxesPage() {
                         <div className="space-y-2">
                           {exp.items.map((item, itemIdx) => (
                             <div key={item.id} className="grid grid-cols-12 gap-2 items-end">
-                              <div className="col-span-3">
+                              <div className="col-span-6">
                                 {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">Cuenta *</label>}
                                 <button type="button"
                                   onClick={(e) => {
@@ -3035,14 +3250,7 @@ export default function BoxesPage() {
                                   <ChevronDown size={12} className="text-slate-400 flex-shrink-0" />
                                 </button>
                               </div>
-                              <div className="col-span-4">
-                                {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">Descripción</label>}
-                                <input type="text" value={item.description}
-                                  onChange={e => updateExpenseItem(idx, itemIdx, "description", e.target.value)}
-                                  placeholder="Descripción"
-                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-slate-900" />
-                              </div>
-                              <div className="col-span-2">
+                              <div className="col-span-3">
                                 {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">Base *</label>}
                                 <input type="number" value={item.baseAmount || ""}
                                   onChange={e => updateExpenseItem(idx, itemIdx, "baseAmount", parseFloat(e.target.value) || 0)}
