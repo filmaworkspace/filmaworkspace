@@ -8,7 +8,7 @@ import {
   doc, getDoc, collection, getDocs, addDoc, updateDoc, deleteDoc,
   query, orderBy, Timestamp, writeBatch, setDoc
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, getBlob } from "firebase/storage";
 import {
   Package, Plus, Search, ChevronDown, ChevronRight, X, Check, AlertCircle, CheckCircle,
   Trash2, Edit, Upload, FileText, Receipt, ArrowLeft, Layers, ShieldAlert, FileSpreadsheet,
@@ -1087,23 +1087,30 @@ export default function BoxesPage() {
         [`${folderName}/${folderName}.xlsx`]: xlsxZip,
       };
 
-      // Download each document and add to documents/ subfolder named by displayNumber
+      // Download each document using Firebase Storage getBlob (CORS-safe)
       const fetchPromises = exps
         .filter(e => e.documentUrl)
         .map(async (e) => {
           try {
-            const resp = await fetch(e.documentUrl!);
-            if (!resp.ok) return;
-            const buf = await resp.arrayBuffer();
-            const ct = resp.headers.get("content-type") ?? "";
-            const url = e.documentUrl!;
-            const ext = url.includes(".pdf") || ct.includes("pdf") ? "pdf"
-              : url.includes(".png") || ct.includes("png") ? "png"
-              : url.includes(".jpg") || url.includes(".jpeg") || ct.includes("jpeg") ? "jpg"
-              : url.includes(".webp") || ct.includes("webp") ? "webp"
-              : "pdf";
+            // Firebase Storage download URLs encode the storage path in ?o=
+            // e.g. https://firebasestorage.googleapis.com/v0/b/bucket/o/path%2Ffile.pdf?alt=media&token=...
+            let storagePath = "";
+            let ext = "pdf";
+            try {
+              const u = new URL(e.documentUrl!);
+              storagePath = decodeURIComponent(u.searchParams.get("o") || u.pathname.split("/o/")[1] || "");
+              const match = storagePath.match(/\.(\w{2,4})$/);
+              if (match) ext = match[1].toLowerCase();
+            } catch { /* keep defaults */ }
+
+            if (!storagePath) return;
+            const storageRef = ref(storage, storagePath);
+            const blob = await getBlob(storageRef);
+            const buf = await blob.arrayBuffer();
             zipEntries[`${folderName}/documents/${e.displayNumber}.${ext}`] = new Uint8Array(buf);
-          } catch { /* skip failed fetches */ }
+          } catch (err) {
+            console.warn(`No se pudo descargar documento de ${e.displayNumber}:`, err);
+          }
         });
       await Promise.all(fetchPromises);
 
