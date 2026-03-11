@@ -27,7 +27,7 @@ const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] }
 
 interface Box {
   id: string; name: string; code: string; department?: string;
-  nextInvoiceNumber: number; nextTicketNumber: number; nextEnvelopeNumber: number;
+  nextEnvelopeNumber: number;
   createdAt: Date; createdBy: string; createdByName: string;
 }
 
@@ -36,6 +36,7 @@ interface Envelope {
   status: "open" | "reviewing" | "closed";
   totalBase: number; totalVat: number; totalAmount: number;
   expenseCount: number; reviewedCount: number;
+  nextInvoiceNumber: number; nextTicketNumber: number;
   createdAt: Date; createdBy: string; createdByName: string;
   closedAt?: Date; closedBy?: string; closedByName?: string;
 }
@@ -615,11 +616,12 @@ export default function BoxesPage() {
     setSaving(true);
     try {
       const num = selectedBox.nextEnvelopeNumber || 1;
-      const displayNumber = `ENV-${selectedBox.code}-${String(num).padStart(3, "0")}`;
+      const displayNumber = `BOX-${selectedBox.code}${String(num).padStart(3, "0")}`;
       await addDoc(collection(db, `projects/${projectId}/cardEnvelopes`), {
         boxId: selectedBox.id, boxCode: selectedBox.code, number: num, displayNumber,
         status: "open", totalBase: 0, totalVat: 0, totalAmount: 0,
         expenseCount: 0, reviewedCount: 0,
+        nextInvoiceNumber: 1, nextTicketNumber: 1,
         createdAt: Timestamp.now(), createdBy: userId, createdByName: userName,
       });
       await updateDoc(doc(db, `projects/${projectId}/cards`, selectedBox.id), {
@@ -816,7 +818,7 @@ export default function BoxesPage() {
     setImporting(true);
     try {
       const batch = writeBatch(db);
-      let invoiceNum = selectedBox.nextInvoiceNumber, ticketNum = selectedBox.nextTicketNumber;
+      let invoiceNum = selectedEnvelope.nextInvoiceNumber ?? 1, ticketNum = selectedEnvelope.nextTicketNumber ?? 1;
       let totalBase = selectedEnvelope.totalBase, totalVat = selectedEnvelope.totalVat;
       let totalAmount = selectedEnvelope.totalAmount, expenseCount = selectedEnvelope.expenseCount;
       const existingPleoIds = new Set(expenses.map(e => e.pleoReceiptId));
@@ -845,7 +847,7 @@ export default function BoxesPage() {
         }
         const isTicket = exp.type === "ticket";
         const num = isTicket ? ticketNum++ : invoiceNum++;
-        const displayNumber = `BOX-${selectedBox.code}-${isTicket ? "T" : "F"}-${String(num).padStart(4, "0")}`;
+        const displayNumber = `${selectedEnvelope.displayNumber}-${isTicket ? "T" : "F"}${String(num).padStart(3, "0")}`;
         let expenseDate = new Date();
         if (exp.date) {
           const p = exp.date.split("/");
@@ -885,8 +887,6 @@ export default function BoxesPage() {
       }
       batch.update(doc(db, `projects/${projectId}/cardEnvelopes`, selectedEnvelope.id), {
         totalBase, totalVat, totalAmount, expenseCount,
-      });
-      batch.update(doc(db, `projects/${projectId}/cards`, selectedBox.id), {
         nextInvoiceNumber: invoiceNum, nextTicketNumber: ticketNum,
       });
       await batch.commit();
@@ -1191,17 +1191,17 @@ export default function BoxesPage() {
     if (missingCif) return showToast("error", `El CIF es obligatorio en facturas (gasto: ${missingCif.supplier || "sin proveedor"})`);
     setManualExpenseSaving(true);
     try {
-      const boxSnap = await getDoc(doc(db, `projects/${projectId}/cards`, selectedBox.id));
-      const boxData = boxSnap.data() || {};
-      let nextInvoice = boxData.nextInvoiceNumber ?? 1;
-      let nextTicket  = boxData.nextTicketNumber  ?? 1;
+      const envSnap = await getDoc(doc(db, `projects/${projectId}/cardEnvelopes`, selectedEnvelope.id));
+      const envData = envSnap.data() || {};
+      let nextInvoice = envData.nextInvoiceNumber ?? 1;
+      let nextTicket  = envData.nextTicketNumber  ?? 1;
       let addedBase = 0, addedVat = 0, addedTotal = 0;
       const batch = writeBatch(db);
 
       for (const exp of valid) {
         const isTicket = exp.type === "ticket";
         const num = isTicket ? nextTicket++ : nextInvoice++;
-        const displayNumber = `BOX-${selectedBox.code}-${isTicket ? "T" : "F"}-${String(num).padStart(4, "0")}`;
+        const displayNumber = `${selectedEnvelope.displayNumber}-${isTicket ? "T" : "F"}${String(num).padStart(3, "0")}`;
         const { baseAmount, vatAmount, irpfAmount, totalAmount } = computeExpenseTotal(exp);
 
         const dateParts = exp.date.split("/");
@@ -1252,8 +1252,6 @@ export default function BoxesPage() {
         totalVat:     (selectedEnvelope.totalVat    || 0) + addedVat,
         totalAmount:  (selectedEnvelope.totalAmount || 0) + addedTotal,
         expenseCount: (selectedEnvelope.expenseCount || 0) + valid.length,
-      });
-      batch.update(doc(db, `projects/${projectId}/cards`, selectedBox.id), {
         nextInvoiceNumber: nextInvoice,
         nextTicketNumber:  nextTicket,
       });
@@ -2676,7 +2674,7 @@ export default function BoxesPage() {
               <button onClick={() => setShowCreateEnvelopeModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
             </div>
             <div className="p-6 text-center py-8">
-              <p className="text-slate-900 font-medium mb-1">ENV-{selectedBox.code}-{String(selectedBox.nextEnvelopeNumber || 1).padStart(3, "0")}</p>
+              <p className="text-slate-900 font-medium mb-1">BOX-{selectedBox.code}{String(selectedBox.nextEnvelopeNumber || 1).padStart(3, "0")}</p>
               <p className="text-sm text-slate-500">Se creará un nuevo sobre para {selectedBox.name}</p>
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
