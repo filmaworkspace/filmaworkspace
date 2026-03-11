@@ -2134,11 +2134,11 @@ export default function BoxesPage() {
       {/* ═══════════════════════════════════════════════════════════════════════ */}
 
       {drawerExpense && (
-        <div className="fixed inset-0 z-30 bg-black/10 backdrop-blur-[1px]" onClick={closeDrawer} />
+        <div className="fixed top-[45px] inset-x-0 bottom-0 z-30 bg-black/10 backdrop-blur-[1px]" onClick={closeDrawer} />
       )}
 
       {/* Drawer — expands to double panel when preview is open */}
-      <div className={`fixed top-0 right-0 h-full bg-white shadow-2xl z-40 flex flex-col transition-all duration-300 ease-out ${drawerExpense ? "translate-x-0" : "translate-x-full"} ${drawerShowPreview ? "w-[900px]" : "w-[480px]"}`}>
+      <div className={`fixed top-[45px] right-0 bg-white shadow-2xl z-40 flex flex-col transition-all duration-300 ease-out ${drawerExpense ? "translate-x-0" : "translate-x-full"} ${drawerShowPreview ? "w-[900px]" : "w-[480px]"}`} style={{ height: "calc(100vh - 45px)" }}>
         {drawerExpense && (() => {
           const hasConflict = !!drawerExpense.conflictType;
           const conflictCfg = hasConflict ? CONFLICT_CONFIG[drawerExpense.conflictType!] : null;
