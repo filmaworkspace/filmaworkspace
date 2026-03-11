@@ -2149,7 +2149,7 @@ export default function BoxesPage() {
               {/* ── Left side: form ── */}
               <div className="w-[480px] flex-shrink-0 flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 flex-shrink-0">
+                <div className="flex items-center justify-between px-5 py-4 flex-shrink-0">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${drawerExpense.type === "ticket" ? "bg-amber-50" : "bg-blue-50"}`}>
                       {drawerExpense.type === "ticket"
