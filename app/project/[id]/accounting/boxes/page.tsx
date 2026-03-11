@@ -14,7 +14,7 @@ import {
   Trash2, Edit, Upload, FileText, Receipt, ArrowLeft, Layers, ShieldAlert, FileSpreadsheet,
   ExternalLink, Lock, Send, Banknote, UserCircle, CreditCard, CheckSquare, AlertTriangle,
   Calendar, Users, Paperclip, Eye, Info, SplitSquareHorizontal, Scissors, FileX, PanelRightOpen,
-  RotateCcw, Save, ChevronLeft, Download
+  RotateCcw, Save, ChevronLeft, Download, ZoomIn, ZoomOut, Maximize2
 } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { unzipSync, strFromU8, zipSync, strToU8 } from "fflate";
@@ -40,9 +40,12 @@ interface Envelope {
   closedAt?: Date; closedBy?: string; closedByName?: string;
 }
 
-interface ExpenseItem { baseAmount: number; vatRate: number; vatAmount: number; }
+interface ExpenseItem { baseAmount: number; vatRate: number; vatAmount: number; subAccountCode?: string; subAccountDescription?: string; }
 
 type ConflictType = "amount_diff" | "invoice_covers_multiple" | "partial_invoice" | "missing_document";
+
+// For invoice_covers_multiple: list of card charges that this invoice covers
+interface LinkedCharge { amount: number; date: string; }
 
 interface BoxExpense {
   id: string; envelopeId: string; boxId: string; boxCode: string;
@@ -57,6 +60,10 @@ interface BoxExpense {
   reviewedAt?: Date; reviewedBy?: string; reviewedByName?: string;
   conflictType?: ConflictType | null;
   conflictNote?: string;
+  conflictAnnotatedAt?: Date;
+  conflictAnnotatedBy?: string;
+  conflictAnnotatedByName?: string;
+  linkedCharges?: LinkedCharge[];  // for invoice_covers_multiple
   conflictResolvedAt?: Date;
   conflictResolvedBy?: string;
   conflictResolvedByName?: string;
@@ -119,52 +126,26 @@ const generateCode = (name: string): string => {
 
 // ── IBAN helpers ──────────────────────────────────────────────────────────────
 const SPANISH_BANKS: Record<string, string> = {
-  "0049": "Santander",
-  "0075": "Banco Popular",
-  "0081": "Banco Sabadell",
-  "0128": "Bankinter",
-  "0182": "BBVA",
-  "2038": "Bankia",
-  "2100": "CaixaBank",
-  "2085": "Ibercaja",
-  "1465": "ING",
-  "0073": "Openbank",
-  "0238": "Banco Pastor",
-  "0487": "Banco Mare Nostrum",
-  "3058": "Cajamar",
-  "2048": "Kutxabank",
-  "0030": "Banco Español de Crédito",
-  "1491": "Triodos Bank",
-  "0061": "Banca March",
-  "0019": "Deutsche Bank",
-  "0065": "Barclays",
-  "2095": "Abanca",
-  "3025": "Caixa Rural",
-  "0234": "Banco Mediolanum",
-  "2080": "Abanca",
-  "2103": "Unicaja",
-  "3035": "Cajasiete",
-  "3159": "Caja Rural de Navarra",
-  "0083": "Renta 4",
-  "0186": "Banco Sabadell Atlántico",
-  "2013": "NCG Banco",
-  "0131": "Banco Espirito Santo",
-  "0093": "Sabadell",
-  "0155": "Banco de Crédito Local",
-  "2045": "Banco Santander Consumer",
-  "2046": "Colonya Caixa Pollença",
-  "6000": "Finances i Intercanvis",
+  "0049": "Santander", "0075": "Banco Popular", "0081": "Banco Sabadell",
+  "0128": "Bankinter", "0182": "BBVA", "2038": "Bankia", "2100": "CaixaBank",
+  "2085": "Ibercaja", "1465": "ING", "0073": "Openbank", "0238": "Banco Pastor",
+  "0487": "Banco Mare Nostrum", "3058": "Cajamar", "2048": "Kutxabank",
+  "0030": "Banco Español de Crédito", "1491": "Triodos Bank", "0061": "Banca March",
+  "0019": "Deutsche Bank", "0065": "Barclays", "2095": "Abanca", "3025": "Caixa Rural",
+  "0234": "Banco Mediolanum", "2080": "Abanca", "2103": "Unicaja", "3035": "Cajasiete",
+  "3159": "Caja Rural de Navarra", "0083": "Renta 4", "0186": "Banco Sabadell Atlántico",
+  "2013": "NCG Banco", "0131": "Banco Espirito Santo", "0093": "Sabadell",
+  "0155": "Banco de Crédito Local", "2045": "Banco Santander Consumer",
+  "2046": "Colonya Caixa Pollença", "6000": "Finances i Intercanvis",
   "1000": "Instituto de Crédito Oficial",
 };
 
-const formatIban = (raw: string): string =>
-  raw.replace(/\s+/g, "").toUpperCase();
+const formatIban = (raw: string): string => raw.replace(/\s+/g, "").toUpperCase();
 
 const detectBank = (iban: string): string | null => {
   const clean = formatIban(iban);
   if (!clean.startsWith("ES") || clean.length !== 24) return null;
-  const bankCode = clean.substring(4, 8);
-  return SPANISH_BANKS[bankCode] || null;
+  return SPANISH_BANKS[clean.substring(4, 8)] || null;
 };
 
 const validateIban = (iban: string): boolean => {
@@ -183,28 +164,31 @@ const validateIban = (iban: string): boolean => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG = {
-  open: { bg: "bg-blue-50", text: "text-blue-700", label: "Abierto" },
-  reviewing: { bg: "bg-amber-50", text: "text-amber-700", label: "En revisión" },
-  closed: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Cerrado" },
+  open:      { bg: "bg-blue-50",    text: "text-blue-700",    label: "Abierto"     },
+  reviewing: { bg: "bg-amber-50",   text: "text-amber-700",   label: "En revisión" },
+  closed:    { bg: "bg-emerald-50", text: "text-emerald-700", label: "Cerrado"     },
 };
 
 const EXPENSE_STATUS_CONFIG = {
-  pending: { bg: "bg-slate-100", text: "text-slate-600", label: "Pendiente" },
-  reviewed: { bg: "bg-blue-50", text: "text-blue-700", label: "Revisado" },
-  accounted: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Contabilizado" },
+  pending:    { bg: "bg-slate-100",  text: "text-slate-600",   label: "Pendiente"     },
+  reviewed:   { bg: "bg-blue-50",    text: "text-blue-700",    label: "Revisado"      },
+  accounted:  { bg: "bg-emerald-50", text: "text-emerald-700", label: "Contabilizado" },
 };
 
 const TRANSFER_STATUS_CONFIG = {
-  draft: { bg: "bg-slate-100", text: "text-slate-600", label: "Borrador" },
-  pending: { bg: "bg-amber-50", text: "text-amber-700", label: "Pendiente" },
+  draft:       { bg: "bg-slate-100",  text: "text-slate-600",   label: "Borrador"    },
+  pending:     { bg: "bg-amber-50",   text: "text-amber-700",   label: "Pendiente"   },
   transferred: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Transferido" },
 };
 
-const CONFLICT_CONFIG: Record<ConflictType, { icon: string; label: string; description: string; color: string }> = {
-  amount_diff:               { icon: "diff",     label: "Diferencia de importe",      description: "El importe de la factura no coincide con el cargo en Pleo",          color: "amber"  },
-  invoice_covers_multiple:   { icon: "merge",    label: "Factura cubre varios cargos", description: "Una sola factura agrupa varios movimientos de tarjeta",              color: "blue"   },
-  partial_invoice:           { icon: "split",    label: "Factura parcial",             description: "El movimiento de tarjeta corresponde a varias facturas o tickets",   color: "violet" },
-  missing_document:          { icon: "missing",  label: "Documento ausente",           description: "No hay factura ni ticket adjunto en Pleo para este gasto",           color: "slate"  },
+const CONFLICT_CONFIG: Record<ConflictType, {
+  icon: string; label: string; description: string; color: string;
+  resolvable: boolean; // true = can be fully resolved; false = annotate-only
+}> = {
+  amount_diff:             { icon: "diff",    label: "Diferencia de importe",       description: "El importe de la factura no coincide con el cargo en Pleo",         color: "amber",  resolvable: false },
+  invoice_covers_multiple: { icon: "merge",   label: "Factura cubre varios cargos", description: "Una sola factura agrupa varios movimientos de tarjeta",             color: "blue",   resolvable: false },
+  partial_invoice:         { icon: "split",   label: "Factura parcial",             description: "El movimiento de tarjeta corresponde a varias facturas o tickets",  color: "violet", resolvable: false },
+  missing_document:        { icon: "missing", label: "Documento ausente",           description: "No hay factura ni ticket adjunto en Pleo para este gasto",          color: "slate",  resolvable: true  },
 };
 
 type MainTab = "tarjetas" | "transfers";
@@ -268,8 +252,10 @@ export default function BoxesPage() {
   const [importPreview, setImportPreview] = useState<any[]>([]);
   const [importing, setImporting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  // Expense drawer (conflict & edit panel)
+
+  // Expense drawer
   const [drawerExpense, setDrawerExpense] = useState<BoxExpense | null>(null);
+  const [drawerShowPreview, setDrawerShowPreview] = useState(false);
   const [drawerForm, setDrawerForm] = useState({
     supplier: "", supplierTaxId: "", supplierNumber: "",
     subAccountCode: "", subAccountDescription: "", description: "",
@@ -282,6 +268,8 @@ export default function BoxesPage() {
     id: string; subAccountCode: string; subAccountDescription: string;
     description: string; baseAmount: number; vatRate: number;
   }>>([]);
+  // Linked charges for invoice_covers_multiple
+  const [drawerLinkedCharges, setDrawerLinkedCharges] = useState<LinkedCharge[]>([]);
   const [showDrawerAccountSelector, setShowDrawerAccountSelector] = useState(false);
   const [drawerAccountSearch, setDrawerAccountSearch] = useState("");
   const [drawerAccountSelectorItemIdx, setDrawerAccountSelectorItemIdx] = useState<number | null>(null);
@@ -299,10 +287,7 @@ export default function BoxesPage() {
   const [expensesList, setExpensesList] = useState<Array<{
     id: string; type: "invoice" | "ticket"; supplier: string; supplierTaxId: string;
     date: string; irpfRate: number; file: File | null;
-    items: Array<{
-      id: string; subAccountCode: string; subAccountDescription: string;
-      description: string; baseAmount: number; vatRate: number;
-    }>;
+    items: Array<{ id: string; subAccountCode: string; subAccountDescription: string; description: string; baseAmount: number; vatRate: number; }>;
   }>>([]);
   const [transferRef, setTransferRef] = useState("");
 
@@ -438,6 +423,7 @@ export default function BoxesPage() {
   // ─── Expense Drawer helpers ──────────────────────────────────────────────────
   const openDrawer = (expense: BoxExpense) => {
     setDrawerExpense(expense);
+    setDrawerShowPreview(false);
     setDrawerForm({
       supplier: expense.supplier,
       supplierTaxId: expense.supplierTaxId || "",
@@ -456,13 +442,12 @@ export default function BoxesPage() {
       conflictType: expense.conflictType ?? "",
       conflictNote: expense.conflictNote ?? "",
     });
-    // Populate drawerItems from expense.items, fallback to single line from flat fields
     const items = expense.items && expense.items.length > 0
       ? expense.items.map((it: any, i: number) => ({
           id: crypto.randomUUID(),
-          subAccountCode: i === 0 ? (expense.subAccountCode || "") : (it.subAccountCode || ""),
-          subAccountDescription: i === 0 ? (expense.subAccountDescription || "") : (it.subAccountDescription || ""),
-          description: i === 0 ? (expense.description || "") : (it.description || ""),
+          subAccountCode: it.subAccountCode ?? (i === 0 ? expense.subAccountCode || "" : ""),
+          subAccountDescription: it.subAccountDescription ?? (i === 0 ? expense.subAccountDescription || "" : ""),
+          description: it.description ?? (i === 0 ? expense.description || "" : ""),
           baseAmount: it.baseAmount || 0,
           vatRate: it.vatRate ?? 21,
         }))
@@ -471,18 +456,22 @@ export default function BoxesPage() {
            description: expense.description || "",
            baseAmount: expense.baseAmount || 0, vatRate: 21 }];
     setDrawerItems(items);
+    setDrawerLinkedCharges(expense.linkedCharges || []);
     setDrawerAccountSearch("");
     setShowDrawerAccountSelector(false);
     setDrawerAccountSelectorItemIdx(null);
   };
 
-  const closeDrawer = () => { setDrawerExpense(null); setShowDrawerAccountSelector(false); };
+  const closeDrawer = () => {
+    setDrawerExpense(null);
+    setDrawerShowPreview(false);
+    setShowDrawerAccountSelector(false);
+  };
 
   const handleSaveDrawer = async () => {
     if (!drawerExpense) return;
     setDrawerSaving(true);
     try {
-      // If supplier name changed and we have a CIF, update cardSuppliers (supplier learning)
       const newSupplier = drawerForm.supplier.trim();
       const cif = drawerForm.supplierTaxId.trim();
       if (cif && newSupplier && newSupplier !== drawerExpense.supplier) {
@@ -494,14 +483,12 @@ export default function BoxesPage() {
           return [...without, { taxId: cif, name: newSupplier, originalName: drawerExpense.supplier }];
         });
       }
-      // Compute totals from drawerItems lines
       const irpfRate   = parseFloat(drawerForm.irpfRate) || 0;
       const baseAmount = drawerItems.reduce((s, it) => s + (it.baseAmount || 0), 0);
       const vatAmount  = drawerItems.reduce((s, it) =>
         s + Math.round((it.baseAmount || 0) * (it.vatRate || 0) / 100 * 100) / 100, 0);
       const irpfAmount = Math.round(baseAmount * irpfRate / 100 * 100) / 100;
       const totalAmount = Math.round((baseAmount + vatAmount - irpfAmount) * 100) / 100;
-      // First item drives the top-level account fields
       const first = drawerItems[0] ?? { subAccountCode: "", subAccountDescription: "", description: "" };
       const updates: any = {
         supplier: drawerForm.supplier.trim(),
@@ -521,6 +508,7 @@ export default function BoxesPage() {
         })),
         conflictType: drawerForm.conflictType || null,
         conflictNote: drawerForm.conflictNote.trim(),
+        linkedCharges: drawerLinkedCharges,
       };
       if (drawerForm.date) {
         const parts = drawerForm.date.split("/");
@@ -535,6 +523,7 @@ export default function BoxesPage() {
     } catch { showToast("error", "Error al guardar"); } finally { setDrawerSaving(false); }
   };
 
+  // Resolve: only for resolvable conflicts (missing_document)
   const handleResolveConflict = async () => {
     if (!drawerExpense) return;
     setDrawerSaving(true);
@@ -543,10 +532,28 @@ export default function BoxesPage() {
         conflictType: null, conflictNote: "",
         conflictResolvedAt: Timestamp.now(), conflictResolvedBy: userId, conflictResolvedByName: userName,
       });
-      showToast("success", "Conflicto resuelto");
+      showToast("success", "Incidencia resuelta");
       closeDrawer();
       loadData();
-    } catch { showToast("error", "Error al resolver conflicto"); } finally { setDrawerSaving(false); }
+    } catch { showToast("error", "Error al resolver incidencia"); } finally { setDrawerSaving(false); }
+  };
+
+  // Annotate: for non-resolvable conflicts — saves note + timestamp but keeps conflictType
+  const handleAnnotateConflict = async () => {
+    if (!drawerExpense) return;
+    setDrawerSaving(true);
+    try {
+      await updateDoc(doc(db, `projects/${projectId}/cardExpenses`, drawerExpense.id), {
+        conflictNote: drawerForm.conflictNote.trim(),
+        linkedCharges: drawerLinkedCharges,
+        conflictAnnotatedAt: Timestamp.now(),
+        conflictAnnotatedBy: userId,
+        conflictAnnotatedByName: userName,
+      });
+      showToast("success", "Incidencia anotada para cuadre");
+      closeDrawer();
+      loadData();
+    } catch { showToast("error", "Error al anotar incidencia"); } finally { setDrawerSaving(false); }
   };
 
   const handleCreateBox = async () => {
@@ -642,10 +649,10 @@ export default function BoxesPage() {
     } catch { showToast("error", "Error al eliminar sobre"); } finally { setSaving(false); }
   };
 
-  // ── Parser XLSX — usa fflate.unzipSync (pure-JS, sin APIs de browser) ──
+  // ── Parser XLSX ──────────────────────────────────────────────────────────────
   const parsePleoExcel = async (file: File): Promise<any[]> => {
     const ab = await file.arrayBuffer();
-    const zip = unzipSync(new Uint8Array(ab));   // descomprime todo el ZIP de una vez
+    const zip = unzipSync(new Uint8Array(ab));
 
     const readEntry = (name: string): string | null => {
       const entry = zip[name];
@@ -656,7 +663,6 @@ export default function BoxesPage() {
     const sharedStrings: string[] = [];
     const ssXml = readEntry("xl/sharedStrings.xml");
     if (ssXml) {
-      // Extraer <si>...</si> con indexOf para evitar problemas de minificación
       let ssp = 0;
       while (true) {
         const siS = ssXml.indexOf("<si>", ssp);
@@ -664,7 +670,6 @@ export default function BoxesPage() {
         const siE = ssXml.indexOf("</si>", siS);
         if (siE < 0) break;
         const siContent = ssXml.substring(siS + 4, siE);
-        // Concatenar todos los <t>...</t> dentro del <si>
         let text = "";
         let tp = 0;
         while (true) {
@@ -681,12 +686,10 @@ export default function BoxesPage() {
         ssp = siE + 5;
       }
     }
-    console.log("[XLSX] sharedStrings:", sharedStrings.length, sharedStrings.slice(0,5));
 
     // 2. Sheet
     const sheetXml = readEntry("xl/worksheets/sheet1.xml");
     if (!sheetXml) throw new Error("No se encontró la hoja de cálculo en el XLSX");
-    // Extraer bloques <row>...</row> completos con indexOf
     const rowBlocks: string[] = [];
     { let rp = 0;
       while (true) {
@@ -698,11 +701,8 @@ export default function BoxesPage() {
         rp = re + 6;
       }
     }
-    console.log("[XLSX] sheetXml length:", sheetXml?.length, "rowBlocks:", rowBlocks.length);
     if (rowBlocks.length < 2) throw new Error("El archivo no contiene filas de datos");
 
-    // parseRow: usa indexOf/substring — inmune al minificador de Next.js.
-    // Los regex con comillas dentro (/t="s"/) se corrompen al minificar.
     const parseRow = (rowXml: string): Record<string, string> => {
       const result: Record<string, string> = {};
       let pos = 0;
@@ -712,8 +712,6 @@ export default function BoxesPage() {
         const cEnd = rowXml.indexOf(">", cStart);
         if (cEnd < 0) break;
         const tag = rowXml.substring(cStart + 1, cEnd);
-
-        // Extraer columna de r="A1"
         const rIdx = tag.indexOf(" r=");
         if (rIdx < 0) { pos = cEnd + 1; continue; }
         let ci = rIdx + 3;
@@ -721,18 +719,13 @@ export default function BoxesPage() {
         let col = "";
         while (ci < tag.length && tag[ci] >= "A" && tag[ci] <= "Z") col += tag[ci++];
         if (!col) { pos = cEnd + 1; continue; }
-
-        // Detectar t="s" (shared string) sin regex con comillas
         const tIdx = tag.indexOf(" t=");
         const isShared = tIdx >= 0 && tag.substring(tIdx + 3).replace(/^["']/, "")[0] === "s";
-
-        // Extraer <v>valor</v>
         const closeIdx = rowXml.indexOf("</c>", cEnd);
         if (closeIdx < 0) break;
         const inner = rowXml.substring(cEnd + 1, closeIdx);
         const vO = inner.indexOf("<v>"), vC = inner.indexOf("</v>");
         let v = vO >= 0 && vC > vO ? inner.substring(vO + 3, vC).trim() : "";
-
         if (isShared && v !== "") v = sharedStrings[parseInt(v, 10)] ?? v;
         result[col] = v;
         pos = closeIdx + 4;
@@ -741,7 +734,6 @@ export default function BoxesPage() {
     };
 
     const colToHeader = parseRow(rowBlocks[0]);
-    console.log("[XLSX] colToHeader:", JSON.stringify(colToHeader));
 
     // 3. Group rows by RECIBO PLEO
     const grouped: Record<string, Record<string, string>[]> = {};
@@ -752,12 +744,11 @@ export default function BoxesPage() {
         const h = colToHeader[col]; if (h) record[h] = val;
       }
       const id = record["RECIBO PLEO"];
-      console.log("[XLSX] row RECIBO PLEO:", JSON.stringify(id));
       if (!id) continue;
       (grouped[id] ??= []).push(record);
     }
 
-    // 4. Build result
+    // 4. Build result — FIX: each item reads its own subAccountCode from its row
     const pn = (v?: string) => parseFloat((v ?? "0").replace(",", ".")) || 0;
     const result: any[] = [];
 
@@ -765,27 +756,33 @@ export default function BoxesPage() {
       const first = records[0];
       const type: "ticket" | "invoice" =
         (first["TIPO DE DOCUMENTO"] ?? "").toUpperCase() === "TICKET" ? "ticket" : "invoice";
+
+      // ── FIX: each item reads subAccountCode/Description from its own row,
+      //         falling back to first row if empty
       const items = records.map(r => ({
-        baseAmount: pn(r["ANTES DE IMPUESTOS"]),
-        vatRate:    pn(r["PORCENTAJE IMPUESTO"]),
-        vatAmount:  pn(r["TOTAL IMPUESTO"]),
+        baseAmount:            pn(r["ANTES DE IMPUESTOS"]),
+        vatRate:               pn(r["PORCENTAJE IMPUESTO"]),
+        vatAmount:             pn(r["TOTAL IMPUESTO"]),
+        subAccountCode:        (r["CODIGO PRESUPUESTO"]         || first["CODIGO PRESUPUESTO"]         || "").trim(),
+        subAccountDescription: (r["DESCRIPCIÓN NUMERO CUENTA"]  || first["DESCRIPCIÓN NUMERO CUENTA"]  || "").trim(),
       }));
+
       const totalBase  = Math.round(items.reduce((s, it) => s + it.baseAmount, 0) * 100) / 100;
       const totalVat   = Math.round(items.reduce((s, it) => s + it.vatAmount,  0) * 100) / 100;
       const irpfRate   = pn(first["IRPF %"]);
       const irpfAmount = pn(first["IRPF TOTAL"]);
       result.push({
-        pleoReceiptId:        receiptId,
+        pleoReceiptId:         receiptId,
         type,
-        employee:             (first["EMPLEADO"]                  ?? "").trim(),
-        supplier:             (first["PROVEEDOR"]                 ?? "").trim(),
-        supplierTaxId:        (first["CIF"]                       ?? "").trim(),
-        supplierNumber:       (first["Número de Factura"]         ?? "").trim(),
-        subAccountCode:       (first["CODIGO PRESUPUESTO"]        ?? "").trim(),
-        subAccountDescription:(first["DESCRIPCIÓN NUMERO CUENTA"] ?? "").trim(),
-        description:          (first["DESCRIPCION"] || first["NOTAS"] || "").trim(),
-        date:                 (first["FECHA FACTURA/TICKET"] || first["FECHA FACTURA"] || "").trim(),
-        pleoUrl:              (first["URL"]                       ?? "").trim(),
+        employee:              (first["EMPLEADO"]                  ?? "").trim(),
+        supplier:              (first["PROVEEDOR"]                 ?? "").trim(),
+        supplierTaxId:         (first["CIF"]                       ?? "").trim(),
+        supplierNumber:        (first["Número de Factura"]         ?? "").trim(),
+        subAccountCode:        (first["CODIGO PRESUPUESTO"]        ?? "").trim(),
+        subAccountDescription: (first["DESCRIPCIÓN NUMERO CUENTA"] ?? "").trim(),
+        description:           (first["DESCRIPCION"] || first["NOTAS"] || "").trim(),
+        date:                  (first["FECHA FACTURA/TICKET"] || first["FECHA FACTURA"] || "").trim(),
+        pleoUrl:               (first["URL"]                       ?? "").trim(),
         items,
         baseAmount:  totalBase,
         vatAmount:   totalVat,
@@ -800,7 +797,6 @@ export default function BoxesPage() {
     return result;
   };
 
-
   const handleFileSelect = async (file: File) => {
     setImportFile(file);
     setImportPreview([]);
@@ -809,8 +805,7 @@ export default function BoxesPage() {
       setImportPreview(result);
     } catch (err: any) {
       console.error("[parsePleoExcel] Error:", err);
-      const msg = err?.message ? `Error: ${err.message}` : "Error al leer el archivo";
-      showToast("error", msg);
+      showToast("error", err?.message ? `Error: ${err.message}` : "Error al leer el archivo");
       setImportFile(null);
       setImportPreview([]);
     }
@@ -824,7 +819,6 @@ export default function BoxesPage() {
       let invoiceNum = selectedBox.nextInvoiceNumber, ticketNum = selectedBox.nextTicketNumber;
       let totalBase = selectedEnvelope.totalBase, totalVat = selectedEnvelope.totalVat;
       let totalAmount = selectedEnvelope.totalAmount, expenseCount = selectedEnvelope.expenseCount;
-      // Duplicate check: pleoReceiptId across ALL envelopes, and taxId+invoiceNumber for facturas
       const existingPleoIds = new Set(expenses.map(e => e.pleoReceiptId));
       const existingInvoiceKeys = new Set(
         expenses
@@ -857,7 +851,6 @@ export default function BoxesPage() {
           const p = exp.date.split("/");
           if (p.length === 3) expenseDate = new Date(parseInt(p[2]), parseInt(p[1]) - 1, parseInt(p[0]));
         }
-        // Auto-detect conflicts
         const pleoAmount = exp.pleoAmount || 0;
         const computedTotal = exp.totalAmount || 0;
         const autoConflicts: ConflictType[] = [];
@@ -876,11 +869,13 @@ export default function BoxesPage() {
           supplierTaxId: exp.supplierTaxId || "", supplierNumber: exp.supplierNumber || "",
           subAccountCode: exp.subAccountCode || "", subAccountDescription: exp.subAccountDescription || "",
           description: exp.description || "", date: Timestamp.fromDate(expenseDate),
-          items: exp.items || [], baseAmount: exp.baseAmount || 0, vatAmount: exp.vatAmount || 0,
+          items: exp.items || [],
+          baseAmount: exp.baseAmount || 0, vatAmount: exp.vatAmount || 0,
           irpfRate: exp.irpfRate || 0, irpfAmount: exp.irpfAmount || 0, totalAmount: exp.totalAmount || 0,
-          pleoAmount: pleoAmount,
+          pleoAmount,
           conflictType: autoConflictType,
           conflictNote: autoConflictNote,
+          linkedCharges: [],
           status: "pending", createdAt: Timestamp.now(), createdBy: userId, createdByName: userName,
         });
         totalBase += exp.baseAmount || 0;
@@ -910,20 +905,16 @@ export default function BoxesPage() {
     let matched = 0, skipped = 0;
     try {
       for (const file of receiptFiles) {
-        // Extract ID from filename: "2601557.pdf" → "2601557", "rec_2601557_mercadona.pdf" → "2601557"
         const nameNoExt = file.name.replace(/\.[^.]+$/, "");
-        // Try to find a pleoReceiptId that appears in the filename
         const expense = envelopeExps.find(e =>
           e.pleoReceiptId && nameNoExt.includes(String(e.pleoReceiptId))
         );
         if (!expense) { skipped++; continue; }
-        // Upload to Firebase Storage
         const ext = file.name.split(".").pop() ?? "pdf";
         const sRef = ref(storage,
           `projects/${projectId}/cardExpenses/${expense.id}/receipt.${ext}`);
         await uploadBytes(sRef, file);
         const url = await getDownloadURL(sRef);
-        // Update expense: set documentUrl, resolve missing_document conflict if present
         const updates: any = { documentUrl: url };
         if (expense.conflictType === "missing_document") {
           updates.conflictType = null;
@@ -949,24 +940,23 @@ export default function BoxesPage() {
     }
   };
 
-  // ── Exportar sobre: ZIP con Excel + recibos renombrados ─────────────────
+  // ── Export envelope: ZIP with XLSX + renamed receipts ─────────────────────
   const handleExportEnvelope = async (envelope: Envelope) => {
     setExportingEnvelope(true);
     try {
       const exps = expenses.filter(e => e.envelopeId === envelope.id)
         .sort((a, b) => a.number - b.number);
 
-      // ── 1. Build XLSX (SpreadsheetML) ──────────────────────────────────────
       const esc = (s: string) => s
         .replace(/&/g, "&amp;").replace(/</g, "&lt;")
         .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-      const fmtDate = (d: any): string => {
+
+      const fmtDateStr = (d: any): string => {
         const dt = d instanceof Date ? d : d?.toDate?.();
         if (!dt) return "";
         return dt.toLocaleDateString("es-ES");
       };
 
-      // Headers
       const headers = [
         "Número", "Fecha", "Tipo", "Proveedor", "CIF", "Nº Factura",
         "Descripción", "Cuenta", "Descripción cuenta",
@@ -974,7 +964,6 @@ export default function BoxesPage() {
         "Estado", "Incidencia",
       ];
 
-      // One row per VAT line
       type Row = (string | number)[];
       const rows: Row[] = [];
       for (const exp of exps) {
@@ -987,22 +976,27 @@ export default function BoxesPage() {
         } as any];
 
         lines.forEach((item: any, li: number) => {
-          const base = item.baseAmount ?? 0;
+          const base    = item.baseAmount ?? 0;
           const vatRate = item.vatRate ?? 0;
-          const vatAmt = item.vatAmount ?? Math.round(base * vatRate / 100 * 100) / 100;
+          const vatAmt  = item.vatAmount ?? Math.round(base * vatRate / 100 * 100) / 100;
           const irpfRate = li === 0 ? (exp.irpfRate ?? 0) : 0;
           const irpfAmt  = li === 0 ? (exp.irpfAmount ?? 0) : 0;
           const total    = Math.round((base + vatAmt - irpfAmt) * 100) / 100;
+
+          // Use per-item subAccountCode if available (FIX applied here too)
+          const lineAccountCode = item.subAccountCode ?? exp.subAccountCode ?? "";
+          const lineAccountDesc = item.subAccountDescription ?? exp.subAccountDescription ?? "";
+
           rows.push([
             li === 0 ? exp.displayNumber : "",
-            li === 0 ? fmtDate(exp.date) : "",
+            li === 0 ? fmtDateStr(exp.date) : "",
             li === 0 ? (exp.type === "invoice" ? "Factura" : "Ticket") : "",
             li === 0 ? exp.supplier : "",
             li === 0 ? (exp.supplierTaxId ?? "") : "",
             li === 0 ? (exp.supplierNumber ?? "") : "",
             li === 0 ? (exp.description ?? "") : "",
-            item.subAccountCode ?? exp.subAccountCode ?? "",
-            item.subAccountDescription ?? exp.subAccountDescription ?? "",
+            lineAccountCode,
+            lineAccountDesc,
             base, vatRate, vatAmt, irpfRate, irpfAmt, total,
             li === 0 ? exp.status : "",
             li === 0 ? (exp.conflictType ?? "") : "",
@@ -1010,9 +1004,8 @@ export default function BoxesPage() {
         });
       }
 
-      // Totals row
-      const numCols = headers.length;
-      const dataStart = 2; // row 1 = header, data from row 2
+      const numCols   = headers.length;
+      const dataStart = 2;
       const dataEnd   = dataStart + rows.length - 1;
       const totalRow: (string | number)[] = new Array(numCols).fill("");
       totalRow[0]  = "TOTAL";
@@ -1021,45 +1014,37 @@ export default function BoxesPage() {
       totalRow[13] = `=SUM(N${dataStart}:N${dataEnd})`;
       totalRow[14] = `=SUM(O${dataStart}:O${dataEnd})`;
 
-      // Build XML cells
       const colLetter = (n: number) => {
         let s = "";
         while (n >= 0) { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; }
         return s;
       };
+
       const cellXml = (col: number, row: number, val: string | number): string => {
         const addr = colLetter(col) + row;
-        if (typeof val === "number") {
-          return `<c r="${addr}"><v>${val}</v></c>`;
-        }
-        if (typeof val === "string" && val.startsWith("=")) {
+        if (typeof val === "number") return `<c r="${addr}"><v>${val}</v></c>`;
+        if (typeof val === "string" && val.startsWith("="))
           return `<c r="${addr}" t="str"><f>${esc(val.slice(1))}</f></c>`;
-        }
         return `<c r="${addr}" t="inlineStr"><is><t>${esc(String(val))}</t></is></c>`;
       };
 
-      // Header row XML
       let sheetRows = `<row r="1">${headers.map((h, c) => cellXml(c, 1, h)).join("")}</row>`;
-      // Data rows
       rows.forEach((row, ri) => {
         const r = ri + 2;
         sheetRows += `<row r="${r}">${row.map((v, c) => cellXml(c, r, v)).join("")}</row>`;
       });
-      // Totals row
       const tr = rows.length + 2;
       sheetRows += `<row r="${tr}">${totalRow.map((v, c) => v !== "" ? cellXml(c, tr, v) : "").join("")}</row>`;
 
-      // Column widths
       const colWidths = [16,12,8,24,12,16,24,10,24,12,6,10,6,10,12,10,14];
       const colsXml = colWidths.map((w, i) => `<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("");
 
       const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<sheetData>${sheetRows}</sheetData>
 <cols>${colsXml}</cols>
+<sheetData>${sheetRows}</sheetData>
 </worksheet>`;
 
-      const sharedStringsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="0" uniqueCount="0"/>`;
       const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
   xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -1079,24 +1064,30 @@ export default function BoxesPage() {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
 </Relationships>`;
+      const sharedStringsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="0" uniqueCount="0"/>`;
 
       const xlsxFiles: Record<string, Uint8Array> = {
-        "[Content_Types].xml":             strToU8(contentTypes),
-        "_rels/.rels":                     strToU8(rootRels),
-        "xl/workbook.xml":                 strToU8(workbookXml),
-        "xl/_rels/workbook.xml.rels":      strToU8(wbRels),
-        "xl/worksheets/sheet1.xml":        strToU8(sheetXml),
-        "xl/sharedStrings.xml":            strToU8(sharedStringsXml),
+        "[Content_Types].xml":         strToU8(contentTypes),
+        "_rels/.rels":                 strToU8(rootRels),
+        "xl/workbook.xml":             strToU8(workbookXml),
+        "xl/_rels/workbook.xml.rels":  strToU8(wbRels),
+        "xl/worksheets/sheet1.xml":    strToU8(sheetXml),
+        "xl/sharedStrings.xml":        strToU8(sharedStringsXml),
       };
       const xlsxZip = zipSync(xlsxFiles);
 
-      // ── 2. Build outer ZIP ─────────────────────────────────────────────────
+      // ── Build outer ZIP with correct structure ─────────────────────────────
+      // Structure: ENV-XX-001/
+      //              ENV-XX-001.xlsx
+      //              documents/
+      //                BOX-XX-F-0001.pdf
+      //                BOX-XX-T-0002.jpg
       const folderName = envelope.displayNumber;
       const zipEntries: Record<string, Uint8Array> = {
-        [`${folderName}/gastos_${envelope.displayNumber}.xlsx`]: xlsxZip,
+        [`${folderName}/${folderName}.xlsx`]: xlsxZip,
       };
 
-      // Download each documentUrl and add with displayNumber as filename
+      // Download each document and add to documents/ subfolder named by displayNumber
       const fetchPromises = exps
         .filter(e => e.documentUrl)
         .map(async (e) => {
@@ -1104,20 +1095,19 @@ export default function BoxesPage() {
             const resp = await fetch(e.documentUrl!);
             if (!resp.ok) return;
             const buf = await resp.arrayBuffer();
-            // Guess extension from URL or content-type
             const ct = resp.headers.get("content-type") ?? "";
-            const ext = e.documentUrl!.includes(".pdf") || ct.includes("pdf") ? "pdf"
-              : e.documentUrl!.includes(".png") || ct.includes("png") ? "png"
-              : e.documentUrl!.includes(".jpg") || ct.includes("jpeg") ? "jpg"
+            const url = e.documentUrl!;
+            const ext = url.includes(".pdf") || ct.includes("pdf") ? "pdf"
+              : url.includes(".png") || ct.includes("png") ? "png"
+              : url.includes(".jpg") || url.includes(".jpeg") || ct.includes("jpeg") ? "jpg"
+              : url.includes(".webp") || ct.includes("webp") ? "webp"
               : "pdf";
-            zipEntries[`${folderName}/recibos/${e.displayNumber}.${ext}`] = new Uint8Array(buf);
-          } catch { /* skip if fetch fails */ }
+            zipEntries[`${folderName}/documents/${e.displayNumber}.${ext}`] = new Uint8Array(buf);
+          } catch { /* skip failed fetches */ }
         });
       await Promise.all(fetchPromises);
 
       const outerZip = zipSync(zipEntries);
-
-      // ── 3. Trigger download ────────────────────────────────────────────────
       const blob = new Blob([outerZip], { type: "application/zip" });
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement("a");
@@ -1125,7 +1115,9 @@ export default function BoxesPage() {
       a.download = `${envelope.displayNumber}.zip`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast("success", `Sobre exportado · ${exps.filter(e => e.documentUrl).length} recibos incluidos`);
+
+      const docsCount = exps.filter(e => e.documentUrl).length;
+      showToast("success", `Sobre exportado · ${docsCount} documento${docsCount !== 1 ? "s" : ""} incluido${docsCount !== 1 ? "s" : ""}`);
     } catch (e) {
       console.error(e);
       showToast("error", "Error al exportar");
@@ -1150,7 +1142,7 @@ export default function BoxesPage() {
     } catch { showToast("error", "Error al revisar"); }
   };
 
-  // helpers for card expense list (same pattern as transfers)
+  // helpers for card expense list
   const createEmptyCardItem = () => ({
     id: crypto.randomUUID(),
     subAccountCode: "", subAccountDescription: "", description: "",
@@ -1219,8 +1211,8 @@ export default function BoxesPage() {
 
         let documentUrl = "";
         if (exp.file) {
-          const ext = exp.file.name.split(".").pop() ?? "pdf";
-          const sRef = ref(storage, `projects/${projectId}/cardExpenses/${displayNumber}.${ext}`);
+          const extFile = exp.file.name.split(".").pop() ?? "pdf";
+          const sRef = ref(storage, `projects/${projectId}/cardExpenses/${displayNumber}.${extFile}`);
           await uploadBytes(sRef, exp.file);
           documentUrl = await getDownloadURL(sRef);
         }
@@ -1240,12 +1232,13 @@ export default function BoxesPage() {
           description: firstItem?.description ?? "",
           date: Timestamp.fromDate(expenseDate),
           items: exp.items.map(it => ({
-            baseAmount: it.baseAmount,
-            vatRate: it.vatRate,
+            baseAmount: it.baseAmount, vatRate: it.vatRate,
             vatAmount: Math.round(it.baseAmount * it.vatRate / 100 * 100) / 100,
+            subAccountCode: it.subAccountCode,
+            subAccountDescription: it.subAccountDescription,
           })),
           baseAmount, vatAmount, irpfRate: exp.irpfRate, irpfAmount, totalAmount,
-          pleoAmount: 0, conflictType: null, conflictNote: "",
+          pleoAmount: 0, conflictType: null, conflictNote: "", linkedCharges: [],
           status: "pending",
           createdAt: Timestamp.now(), createdBy: userId, createdByName: userName,
         });
@@ -1359,35 +1352,27 @@ export default function BoxesPage() {
     items: [createEmptyItem()],
   });
 
-  const updateExpenseInList = (index: number, field: string, value: any) => {
+  const updateExpenseInList = (index: number, field: string, value: any) =>
     setExpensesList(prev => prev.map((exp, i) => i === index ? { ...exp, [field]: value } : exp));
-  };
 
-  const updateExpenseItem = (expIndex: number, itemIndex: number, field: string, value: any) => {
+  const updateExpenseItem = (expIndex: number, itemIndex: number, field: string, value: any) =>
     setExpensesList(prev => prev.map((exp, i) => {
       if (i !== expIndex) return exp;
-      const newItems = exp.items.map((item, j) => j === itemIndex ? { ...item, [field]: value } : item);
-      return { ...exp, items: newItems };
+      return { ...exp, items: exp.items.map((item, j) => j === itemIndex ? { ...item, [field]: value } : item) };
     }));
-  };
 
-  const addItemToExpense = (expIndex: number) => {
-    setExpensesList(prev => prev.map((exp, i) => {
-      if (i !== expIndex) return exp;
-      return { ...exp, items: [...exp.items, createEmptyItem()] };
-    }));
-  };
+  const addItemToExpense = (expIndex: number) =>
+    setExpensesList(prev => prev.map((exp, i) =>
+      i === expIndex ? { ...exp, items: [...exp.items, createEmptyItem()] } : exp));
 
-  const removeItemFromExpense = (expIndex: number, itemIndex: number) => {
+  const removeItemFromExpense = (expIndex: number, itemIndex: number) =>
     setExpensesList(prev => prev.map((exp, i) => {
       if (i !== expIndex || exp.items.length <= 1) return exp;
       return { ...exp, items: exp.items.filter((_, j) => j !== itemIndex) };
     }));
-  };
 
-  const removeExpenseFromList = (index: number) => {
+  const removeExpenseFromList = (index: number) =>
     setExpensesList(prev => prev.filter((_, i) => i !== index));
-  };
 
   const handleAddAllExpenses = async () => {
     if (!selectedTransferEnvelope) return;
@@ -1509,6 +1494,16 @@ export default function BoxesPage() {
   const totalTarjetasAmount = expenses.reduce((s, e) => s + e.totalAmount, 0);
   const totalTransferAmount = transferEnvelopes.reduce((s, e) => s + e.totalAmount, 0);
 
+  // Detect document type for preview
+  const getDocumentType = (url: string): "pdf" | "image" | null => {
+    if (!url) return null;
+    const lower = url.toLowerCase();
+    if (lower.includes(".pdf") || lower.includes("pdf")) return "pdf";
+    if (lower.includes(".jpg") || lower.includes(".jpeg") || lower.includes(".png") || lower.includes(".webp")
+      || lower.includes("image")) return "image";
+    return "pdf"; // default assumption
+  };
+
   // ─── Loading / Access ─────────────────────────────────────────────────────────
   if (loading || permissionsLoading) return (
     <div className={"min-h-screen bg-white flex items-center justify-center " + inter.className}>
@@ -1624,7 +1619,6 @@ export default function BoxesPage() {
                 </div>
               </div>
 
-              {/* Tarjetas list */}
               {mainTab === "tarjetas" ? (
                 <div className="space-y-1">
                   {filteredBoxes.map(box => {
@@ -1659,7 +1653,6 @@ export default function BoxesPage() {
                   )}
                 </div>
               ) : (
-                /* Transfers list */
                 <div className="space-y-1">
                   {filteredTransferEnvelopes.map(envelope => {
                     const sc = TRANSFER_STATUS_CONFIG[envelope.status];
@@ -1695,14 +1688,12 @@ export default function BoxesPage() {
           {/* ── Right Panel ─────────────────────────────────────────────────────── */}
           <div className="flex-1 min-w-0">
 
-            {/* ── TARJETAS TAB ────────────────────────────────────────────────── */}
             {mainTab === "tarjetas" ? (
               !selectedBox ? (
                 <div className="flex items-center justify-center h-96">
                   <p className="text-sm text-slate-400">{boxes.length === 0 ? "No hay cajas creadas" : "Selecciona una caja"}</p>
                 </div>
               ) : !selectedEnvelope ? (
-                /* Box detail */
                 <div>
                   <div className="flex items-center justify-between mb-5">
                     <div>
@@ -1901,7 +1892,7 @@ export default function BoxesPage() {
                                     return missing ? (
                                       <div>
                                         <span className="font-mono text-xs text-red-500 font-medium">{expense.subAccountCode}</span>
-                                        <p className="text-xs text-red-400 mt-0.5">La cuenta no existe en el proyecto</p>
+                                        <p className="text-xs text-red-400 mt-0.5">La cuenta no existe</p>
                                       </div>
                                     ) : (
                                       <span className="font-mono text-xs text-slate-600">{expense.subAccountCode}</span>
@@ -1922,10 +1913,11 @@ export default function BoxesPage() {
                                 <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                                   <div className="flex items-center justify-center gap-1">
                                     {expense.documentUrl && (
-                                      <a href={expense.documentUrl} target="_blank" rel="noopener noreferrer"
+                                      <button
+                                        onClick={() => { openDrawer(expense); setDrawerShowPreview(true); }}
                                         className="p-1.5 text-blue-500 hover:text-blue-600 hover:bg-blue-50 rounded" title="Ver documento">
-                                        <FileText size={14} />
-                                      </a>
+                                        <Eye size={14} />
+                                      </button>
                                     )}
                                     {expense.pleoUrl && (
                                       <a href={expense.pleoUrl} target="_blank" rel="noopener noreferrer"
@@ -1955,7 +1947,7 @@ export default function BoxesPage() {
                 </div>
               )
             ) : (
-              /* ── TRANSFERS TAB ────────────────────────────────────────────────── */
+              /* ── TRANSFERS TAB ── */
               !selectedTransferEnvelope ? (
                 <div className="flex items-center justify-center h-96">
                   <p className="text-sm text-slate-400">
@@ -2061,11 +2053,9 @@ export default function BoxesPage() {
                             const displayItems = exp.items && exp.items.length > 0
                               ? exp.items
                               : [{ subAccountCode: exp.subAccountCode || "", subAccountDescription: exp.subAccountDescription || "", baseAmount: exp.baseAmount, vatRate: 0, vatAmount: exp.vatAmount }];
-                            const ibanValid = exp.personIban ? validateIban(exp.personIban) : null;
                             const bank = exp.personIban ? detectBank(exp.personIban) : null;
                             return (
                               <tr key={exp.id} className="hover:bg-slate-50 align-top">
-                                {/* ── Persona column ── */}
                                 <td className="px-4 py-3">
                                   <p className="font-medium text-slate-900 leading-tight">
                                     {exp.personName}
@@ -2076,9 +2066,7 @@ export default function BoxesPage() {
                                   {exp.personIban && (
                                     <p className="font-mono text-xs text-slate-400 mt-0.5 leading-tight break-all">
                                       {exp.personIban}
-                                      {bank && (
-                                        <span className="font-sans not-italic ml-1 text-slate-300">· {bank}</span>
-                                      )}
+                                      {bank && <span className="font-sans not-italic ml-1 text-slate-300">· {bank}</span>}
                                     </p>
                                   )}
                                 </td>
@@ -2089,9 +2077,7 @@ export default function BoxesPage() {
                                 <td className="px-4 py-3">
                                   {displayItems.map((item, idx) => (
                                     <div key={idx} className={idx > 0 ? "mt-1 pt-1 border-t border-slate-100" : ""}>
-                                      <span className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">
-                                        {item.subAccountCode}
-                                      </span>
+                                      <span className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">{item.subAccountCode}</span>
                                       {displayItems.length > 1 && (
                                         <span className="ml-2 text-xs text-slate-500">{fmt(item.baseAmount)} €</span>
                                       )}
@@ -2141,242 +2127,262 @@ export default function BoxesPage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* EXPENSE DRAWER (panel lateral de edición y conflictos)                  */}
+      {/* EXPENSE DRAWER                                                          */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
 
-      {/* Backdrop */}
       {drawerExpense && (
         <div className="fixed inset-0 z-30 bg-black/10 backdrop-blur-[1px]" onClick={closeDrawer} />
       )}
 
-      {/* Drawer panel */}
-      <div className={`fixed top-0 right-0 h-full w-[480px] bg-white shadow-2xl z-40 flex flex-col transition-transform duration-300 ease-out ${drawerExpense ? "translate-x-0" : "translate-x-full"}`}>
+      {/* Drawer — expands to double panel when preview is open */}
+      <div className={`fixed top-0 right-0 h-full bg-white shadow-2xl z-40 flex flex-col transition-all duration-300 ease-out ${drawerExpense ? "translate-x-0" : "translate-x-full"} ${drawerShowPreview ? "w-[900px]" : "w-[480px]"}`}>
         {drawerExpense && (() => {
           const hasConflict = !!drawerExpense.conflictType;
           const conflictCfg = hasConflict ? CONFLICT_CONFIG[drawerExpense.conflictType!] : null;
+          const isResolvable = hasConflict && conflictCfg!.resolvable;
+          const isAnnotatable = hasConflict && !conflictCfg!.resolvable;
           const amountDiff = drawerExpense.pleoAmount && drawerExpense.pleoAmount > 0
             ? Math.round((drawerExpense.pleoAmount - drawerExpense.totalAmount) * 100) / 100
             : null;
+          const docType = getDocumentType(drawerExpense.documentUrl || "");
+
           return (
-            <>
-              {/* Drawer header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 flex-shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${drawerExpense.type === "ticket" ? "bg-amber-50" : "bg-blue-50"}`}>
-                    {drawerExpense.type === "ticket"
-                      ? <Receipt size={16} className="text-amber-500" />
-                      : <FileText size={16} className="text-blue-500" />}
+            <div className="flex flex-1 overflow-hidden">
+              {/* ── Left side: form ── */}
+              <div className="w-[480px] flex-shrink-0 flex flex-col">
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${drawerExpense.type === "ticket" ? "bg-amber-50" : "bg-blue-50"}`}>
+                      {drawerExpense.type === "ticket"
+                        ? <Receipt size={16} className="text-amber-500" />
+                        : <FileText size={16} className="text-blue-500" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{drawerExpense.displayNumber}</p>
+                      <p className="text-xs text-slate-500">{drawerExpense.supplier}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{drawerExpense.displayNumber}</p>
-                    <p className="text-xs text-slate-500">{drawerExpense.supplier}</p>
+                  <div className="flex items-center gap-2">
+                    {drawerExpense.documentUrl && (
+                      <button
+                        onClick={() => setDrawerShowPreview(!drawerShowPreview)}
+                        title={drawerShowPreview ? "Ocultar documento" : "Ver documento"}
+                        className={`p-1.5 rounded-lg transition-colors ${drawerShowPreview ? "text-blue-600 bg-blue-50" : "text-slate-400 hover:bg-slate-100"}`}>
+                        <Eye size={16} />
+                      </button>
+                    )}
+                    <button onClick={closeDrawer} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
                   </div>
                 </div>
-                <button onClick={closeDrawer} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
-              </div>
 
-              <div className="flex-1 overflow-y-auto">
-
-                {/* ── Aviso de conflicto activo ── */}
-                {hasConflict && (
-                  <div className="mx-5 mt-4 p-3 bg-amber-50 border border-amber-100 rounded-xl">
-                    <div className="flex items-start gap-2">
-                      <Info size={15} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-amber-800">{conflictCfg!.label}</p>
-                        <p className="text-xs text-amber-600 mt-0.5">{conflictCfg!.description}</p>
-                        {drawerExpense.conflictNote && (
-                          <p className="text-xs text-amber-700 mt-1 italic">"{drawerExpense.conflictNote}"</p>
-                        )}
-                      </div>
-                      <button onClick={handleResolveConflict} disabled={drawerSaving}
-                        className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors disabled:opacity-50">
-                        <Check size={12} /> Resolver
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Importe Pleo vs contable ── */}
-                {drawerExpense.pleoAmount && drawerExpense.pleoAmount > 0 && (
-                  <div className="mx-5 mt-3">
-                    <div className={`flex items-center justify-between p-2.5 rounded-lg text-xs ${amountDiff && Math.abs(amountDiff) > 0.02 ? "bg-amber-50 border border-amber-100" : "bg-slate-50"}`}>
-                      <span className="text-slate-500">Cargo real en Pleo</span>
-                      <span className={`font-mono font-semibold ${amountDiff && Math.abs(amountDiff) > 0.02 ? "text-amber-700" : "text-slate-700"}`}>
-                        {fmt(drawerExpense.pleoAmount)} €
-                        {amountDiff && Math.abs(amountDiff) > 0.02 && (
-                          <span className="ml-2 text-amber-500">({amountDiff > 0 ? "+" : ""}{fmt(amountDiff)} vs factura)</span>
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Edición de datos del gasto ── */}
-                <div className="px-5 mt-4 space-y-4">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Datos del gasto</p>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Proveedor</label>
-                      <input type="text" value={drawerForm.supplier}
-                        onChange={e => setDrawerForm(f => ({ ...f, supplier: e.target.value }))}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">CIF / NIF</label>
-                      <input type="text" value={drawerForm.supplierTaxId}
-                        onChange={e => setDrawerForm(f => ({ ...f, supplierTaxId: e.target.value }))}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Nº Factura</label>
-                      <input type="text" value={drawerForm.supplierNumber}
-                        onChange={e => setDrawerForm(f => ({ ...f, supplierNumber: e.target.value }))}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label>
-                      <input type="text" value={drawerForm.date} placeholder="DD/MM/YYYY"
-                        onChange={e => setDrawerForm(f => ({ ...f, date: e.target.value }))}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Descripción del gasto</label>
-                    <input type="text" value={drawerForm.description}
-                      onChange={e => setDrawerForm(f => ({ ...f, description: e.target.value }))}
-                      placeholder="Concepto general del gasto"
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
-                  </div>
-
-                  {/* ── Líneas de detalle ── */}
-                  <div className="bg-slate-50 rounded-xl p-3 space-y-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Líneas ({drawerItems.length})</span>
-                      <button type="button"
-                        onClick={() => setDrawerItems(prev => [...prev, { id: crypto.randomUUID(), subAccountCode: "", subAccountDescription: "", description: "", baseAmount: 0, vatRate: 21 }])}
-                        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium">
-                        <Plus size={12} /> Añadir línea
-                      </button>
-                    </div>
-                    {drawerItems.map((item, idx) => {
-                      const accountMissing = item.subAccountCode && !subAccounts.some(sa => sa.code === item.subAccountCode);
-                      return (
-                        <div key={item.id} className="bg-white rounded-lg border border-slate-200 p-3 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-slate-400 font-medium">Línea {idx + 1}</span>
-                            {drawerItems.length > 1 && (
-                              <button type="button"
-                                onClick={() => setDrawerItems(prev => prev.filter((_, i) => i !== idx))}
-                                className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded">
-                                <Trash2 size={12} />
-                              </button>
-                            )}
-                          </div>
-                          {/* Cuenta */}
-                          <div className="relative">
-                            <button type="button"
-                              onClick={() => {
-                                setDrawerAccountSelectorItemIdx(drawerAccountSelectorItemIdx === idx ? null : idx);
-                                setDrawerAccountSearch("");
-                              }}
-                              className={`w-full px-3 py-2 border rounded-lg text-xs text-left flex items-center justify-between hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 ${accountMissing ? "border-red-300 bg-red-50" : "border-slate-200 bg-white"}`}>
-                              {item.subAccountCode
-                                ? <span className={`font-mono ${accountMissing ? "text-red-600" : "text-slate-700"}`}>
-                                    {item.subAccountCode}
-                                    {accountMissing
-                                      ? <span className="ml-2 font-sans text-red-500 font-medium">· La cuenta no existe en el proyecto</span>
-                                      : <span className="ml-2 font-sans text-slate-400">{item.subAccountDescription}</span>}
-                                  </span>
-                                : <span className="text-slate-400">Seleccionar cuenta</span>}
-                              <ChevronDown size={12} className="text-slate-400 flex-shrink-0" />
-                            </button>
-                            {drawerAccountSelectorItemIdx === idx && (
-                              <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl">
-                                <div className="p-2 border-b border-slate-100">
-                                  <input type="text" value={drawerAccountSearch}
-                                    onChange={e => setDrawerAccountSearch(e.target.value)}
-                                    placeholder="Buscar cuenta"
-                                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-900"
-                                    autoFocus />
-                                </div>
-                                <div className="max-h-48 overflow-y-auto">
-                                  {subAccounts
-                                    .filter(sa => !drawerAccountSearch || sa.code.toLowerCase().includes(drawerAccountSearch.toLowerCase()) || sa.description.toLowerCase().includes(drawerAccountSearch.toLowerCase()))
-                                    .slice(0, 40)
-                                    .map(sa => (
-                                      <button key={sa.id} type="button"
-                                        onClick={() => {
-                                          setDrawerItems(prev => prev.map((it, i) => i === idx ? { ...it, subAccountCode: sa.code, subAccountDescription: sa.description } : it));
-                                          setDrawerAccountSelectorItemIdx(null);
-                                        }}
-                                        className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2 border-b border-slate-50 last:border-0">
-                                        <span className="font-mono text-xs text-slate-500 w-16 flex-shrink-0">{sa.code}</span>
-                                        <span className="text-xs text-slate-700 truncate">{sa.description}</span>
-                                      </button>
-                                    ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          {/* Importes — descripción es del gasto, no de la línea */}
-                          <div className="grid grid-cols-3 gap-2">
-                            <div>
-                              <label className="block text-xs text-slate-500 mb-1">Base *</label>
-                              <input type="number" step="0.01" value={item.baseAmount || ""}
-                                onChange={e => setDrawerItems(prev => prev.map((it, i) => i === idx ? { ...it, baseAmount: parseFloat(e.target.value) || 0 } : it))}
-                                className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900" />
-                            </div>
-                            <div>
-                              <label className="block text-xs text-slate-500 mb-1">IVA %</label>
-                              <input type="number" step="1" value={item.vatRate}
-                                onChange={e => setDrawerItems(prev => prev.map((it, i) => i === idx ? { ...it, vatRate: parseFloat(e.target.value) || 0 } : it))}
-                                className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900" />
-                            </div>
-                            <div>
-                              <label className="block text-xs text-slate-500 mb-1">Cuota IVA</label>
-                              <div className="px-2 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-xs font-mono text-slate-500">
-                                {fmt(Math.round((item.baseAmount || 0) * (item.vatRate || 0) / 100 * 100) / 100)} €
-                              </div>
-                            </div>
-                          </div>
+                <div className="flex-1 overflow-y-auto">
+                  {/* Conflict banner */}
+                  {hasConflict && (
+                    <div className="mx-5 mt-4 p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                      <div className="flex items-start gap-2">
+                        <Info size={15} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-amber-800">{conflictCfg!.label}</p>
+                          <p className="text-xs text-amber-600 mt-0.5">{conflictCfg!.description}</p>
+                          {!conflictCfg!.resolvable && (
+                            <p className="text-xs text-amber-500 mt-1 italic">Esta incidencia se anota para cuadre posterior — no se cierra.</p>
+                          )}
+                          {drawerExpense.conflictNote && (
+                            <p className="text-xs text-amber-700 mt-1 italic">"{drawerExpense.conflictNote}"</p>
+                          )}
+                          {drawerExpense.conflictAnnotatedAt && (
+                            <p className="text-xs text-amber-500 mt-1">
+                              Anotado por {drawerExpense.conflictAnnotatedByName} · {fmtDate(drawerExpense.conflictAnnotatedAt)}
+                            </p>
+                          )}
                         </div>
-                      );
-                    })}
-                    {/* IRPF + Total global */}
-                    <div className="flex items-center justify-between pt-1 px-1">
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-slate-500">IRPF %</label>
-                        <input type="number" step="1" value={drawerForm.irpfRate}
-                          onChange={e => setDrawerForm(f => ({ ...f, irpfRate: e.target.value }))}
-                          className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900 bg-white" />
+                        {isResolvable && (
+                          <button onClick={handleResolveConflict} disabled={drawerSaving}
+                            className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 disabled:opacity-50">
+                            <Check size={12} /> Resolver
+                          </button>
+                        )}
+                        {isAnnotatable && (
+                          <button onClick={handleAnnotateConflict} disabled={drawerSaving}
+                            className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-lg border border-amber-300 disabled:opacity-50">
+                            <Save size={12} /> Anotar
+                          </button>
+                        )}
                       </div>
-                      <div className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs">
-                        <span className="text-slate-400">Total:</span>
-                        <span className="ml-1.5 font-mono font-semibold">
-                          {fmt(Math.round((
-                            drawerItems.reduce((s, it) => s + (it.baseAmount || 0), 0) +
-                            drawerItems.reduce((s, it) => s + Math.round((it.baseAmount || 0) * (it.vatRate || 0) / 100 * 100) / 100, 0) -
-                            Math.round(drawerItems.reduce((s, it) => s + (it.baseAmount || 0), 0) * (parseFloat(drawerForm.irpfRate) || 0) / 100 * 100) / 100
-                          ) * 100) / 100)} €
+                    </div>
+                  )}
+
+                  {/* Pleo amount diff */}
+                  {drawerExpense.pleoAmount && drawerExpense.pleoAmount > 0 && (
+                    <div className="mx-5 mt-3">
+                      <div className={`flex items-center justify-between p-2.5 rounded-lg text-xs ${amountDiff && Math.abs(amountDiff) > 0.02 ? "bg-amber-50 border border-amber-100" : "bg-slate-50"}`}>
+                        <span className="text-slate-500">Cargo real en Pleo</span>
+                        <span className={`font-mono font-semibold ${amountDiff && Math.abs(amountDiff) > 0.02 ? "text-amber-700" : "text-slate-700"}`}>
+                          {fmt(drawerExpense.pleoAmount)} €
+                          {amountDiff && Math.abs(amountDiff) > 0.02 && (
+                            <span className="ml-2 text-amber-500">({amountDiff > 0 ? "+" : ""}{fmt(amountDiff)} vs factura)</span>
+                          )}
                         </span>
                       </div>
                     </div>
+                  )}
+
+                  {/* Form fields */}
+                  <div className="px-5 mt-4 space-y-4">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Datos del gasto</p>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Proveedor</label>
+                        <input type="text" value={drawerForm.supplier}
+                          onChange={e => setDrawerForm(f => ({ ...f, supplier: e.target.value }))}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">CIF / NIF</label>
+                        <input type="text" value={drawerForm.supplierTaxId}
+                          onChange={e => setDrawerForm(f => ({ ...f, supplierTaxId: e.target.value }))}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Nº Factura</label>
+                        <input type="text" value={drawerForm.supplierNumber}
+                          onChange={e => setDrawerForm(f => ({ ...f, supplierNumber: e.target.value }))}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label>
+                        <input type="text" value={drawerForm.date} placeholder="DD/MM/YYYY"
+                          onChange={e => setDrawerForm(f => ({ ...f, date: e.target.value }))}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Descripción del gasto</label>
+                      <input type="text" value={drawerForm.description}
+                        onChange={e => setDrawerForm(f => ({ ...f, description: e.target.value }))}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                    </div>
+
+                    {/* Líneas */}
+                    <div className="bg-slate-50 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Líneas ({drawerItems.length})</span>
+                        <button type="button"
+                          onClick={() => setDrawerItems(prev => [...prev, { id: crypto.randomUUID(), subAccountCode: "", subAccountDescription: "", description: "", baseAmount: 0, vatRate: 21 }])}
+                          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium">
+                          <Plus size={12} /> Añadir línea
+                        </button>
+                      </div>
+                      {drawerItems.map((item, idx) => {
+                        const accountMissing = item.subAccountCode && !subAccounts.some(sa => sa.code === item.subAccountCode);
+                        return (
+                          <div key={item.id} className="bg-white rounded-lg border border-slate-200 p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-slate-400 font-medium">Línea {idx + 1}</span>
+                              {drawerItems.length > 1 && (
+                                <button type="button"
+                                  onClick={() => setDrawerItems(prev => prev.filter((_, i) => i !== idx))}
+                                  className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded">
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                            </div>
+                            <div className="relative">
+                              <button type="button"
+                                onClick={() => { setDrawerAccountSelectorItemIdx(drawerAccountSelectorItemIdx === idx ? null : idx); setDrawerAccountSearch(""); }}
+                                className={`w-full px-3 py-2 border rounded-lg text-xs text-left flex items-center justify-between hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 ${accountMissing ? "border-red-300 bg-red-50" : "border-slate-200 bg-white"}`}>
+                                {item.subAccountCode
+                                  ? <span className={`font-mono ${accountMissing ? "text-red-600" : "text-slate-700"}`}>
+                                      {item.subAccountCode}
+                                      {accountMissing
+                                        ? <span className="ml-2 font-sans text-red-500 font-medium">· La cuenta no existe</span>
+                                        : <span className="ml-2 font-sans text-slate-400">{item.subAccountDescription}</span>}
+                                    </span>
+                                  : <span className="text-slate-400">Seleccionar cuenta</span>}
+                                <ChevronDown size={12} className="text-slate-400 flex-shrink-0" />
+                              </button>
+                              {drawerAccountSelectorItemIdx === idx && (
+                                <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl">
+                                  <div className="p-2 border-b border-slate-100">
+                                    <input type="text" value={drawerAccountSearch}
+                                      onChange={e => setDrawerAccountSearch(e.target.value)}
+                                      placeholder="Buscar cuenta"
+                                      className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-900"
+                                      autoFocus />
+                                  </div>
+                                  <div className="max-h-48 overflow-y-auto">
+                                    {subAccounts
+                                      .filter(sa => !drawerAccountSearch || sa.code.toLowerCase().includes(drawerAccountSearch.toLowerCase()) || sa.description.toLowerCase().includes(drawerAccountSearch.toLowerCase()))
+                                      .slice(0, 40)
+                                      .map(sa => (
+                                        <button key={sa.id} type="button"
+                                          onClick={() => {
+                                            setDrawerItems(prev => prev.map((it, i) => i === idx ? { ...it, subAccountCode: sa.code, subAccountDescription: sa.description } : it));
+                                            setDrawerAccountSelectorItemIdx(null);
+                                          }}
+                                          className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2 border-b border-slate-50 last:border-0">
+                                          <span className="font-mono text-xs text-slate-500 w-16 flex-shrink-0">{sa.code}</span>
+                                          <span className="text-xs text-slate-700 truncate">{sa.description}</span>
+                                        </button>
+                                      ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <label className="block text-xs text-slate-500 mb-1">Base *</label>
+                                <input type="number" step="0.01" value={item.baseAmount || ""}
+                                  onChange={e => setDrawerItems(prev => prev.map((it, i) => i === idx ? { ...it, baseAmount: parseFloat(e.target.value) || 0 } : it))}
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900" />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-slate-500 mb-1">IVA %</label>
+                                <input type="number" step="1" value={item.vatRate}
+                                  onChange={e => setDrawerItems(prev => prev.map((it, i) => i === idx ? { ...it, vatRate: parseFloat(e.target.value) || 0 } : it))}
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900" />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-slate-500 mb-1">Cuota IVA</label>
+                                <div className="px-2 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-xs font-mono text-slate-500">
+                                  {fmt(Math.round((item.baseAmount || 0) * (item.vatRate || 0) / 100 * 100) / 100)} €
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div className="flex items-center justify-between pt-1 px-1">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-slate-500">IRPF %</label>
+                          <input type="number" step="1" value={drawerForm.irpfRate}
+                            onChange={e => setDrawerForm(f => ({ ...f, irpfRate: e.target.value }))}
+                            className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900 bg-white" />
+                        </div>
+                        <div className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs">
+                          <span className="text-slate-400">Total:</span>
+                          <span className="ml-1.5 font-mono font-semibold">
+                            {fmt(Math.round((
+                              drawerItems.reduce((s, it) => s + (it.baseAmount || 0), 0) +
+                              drawerItems.reduce((s, it) => s + Math.round((it.baseAmount || 0) * (it.vatRate || 0) / 100 * 100) / 100, 0) -
+                              Math.round(drawerItems.reduce((s, it) => s + (it.baseAmount || 0), 0) * (parseFloat(drawerForm.irpfRate) || 0) / 100 * 100) / 100
+                            ) * 100) / 100)} €
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                {/* ── Sección de incidencia ── */}
-                <div className="px-5 mt-5 pb-4 space-y-3">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Incidencia</p>
+                  {/* Incidencias section */}
+                  <div className="px-5 mt-5 pb-4 space-y-3">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Incidencia</p>
 
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Tipo de incidencia</label>
                     <div className="grid grid-cols-2 gap-2">
                       {(Object.entries(CONFLICT_CONFIG) as [ConflictType, typeof CONFLICT_CONFIG[ConflictType]][]).map(([key, cfg]) => {
                         const icons: Record<string, React.ReactNode> = {
@@ -2391,66 +2397,164 @@ export default function BoxesPage() {
                             onClick={() => setDrawerForm(f => ({ ...f, conflictType: selected ? "" : key as ConflictType }))}
                             className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium text-left transition-colors ${selected ? "border-amber-300 bg-amber-50 text-amber-800" : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"}`}>
                             <span className={selected ? "text-amber-500" : "text-slate-400"}>{icons[cfg.icon]}</span>
-                            {cfg.label}
+                            <span>{cfg.label}</span>
+                            {!cfg.resolvable && (
+                              <span className="ml-auto text-[10px] text-slate-300">cuadre</span>
+                            )}
                           </button>
                         );
                       })}
                     </div>
+
+                    {drawerForm.conflictType && (
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Nota explicativa</label>
+                        <textarea value={drawerForm.conflictNote}
+                          onChange={e => setDrawerForm(f => ({ ...f, conflictNote: e.target.value }))}
+                          rows={2} placeholder="Explica la incidencia..."
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none" />
+                      </div>
+                    )}
+
+                    {/* Linked charges mini-table for invoice_covers_multiple */}
+                    {drawerForm.conflictType === "invoice_covers_multiple" && (
+                      <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-semibold text-blue-700">Cargos de tarjeta que cubre esta factura</p>
+                          <button type="button"
+                            onClick={() => setDrawerLinkedCharges(prev => [...prev, { amount: 0, date: "" }])}
+                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium">
+                            <Plus size={12} /> Añadir cargo
+                          </button>
+                        </div>
+                        {drawerLinkedCharges.length === 0 && (
+                          <p className="text-xs text-blue-400 text-center py-2">Sin cargos anotados aún</p>
+                        )}
+                        <div className="space-y-2">
+                          {drawerLinkedCharges.map((charge, ci) => (
+                            <div key={ci} className="flex items-center gap-2 bg-white rounded-lg border border-blue-100 px-3 py-2">
+                              <div className="flex-1">
+                                <input
+                                  type="text"
+                                  value={charge.date}
+                                  onChange={e => setDrawerLinkedCharges(prev => prev.map((c, i) => i === ci ? { ...c, date: e.target.value } : c))}
+                                  placeholder="DD/MM/YYYY"
+                                  className="w-full text-xs border-0 focus:outline-none bg-transparent text-slate-600 placeholder-slate-300"
+                                />
+                              </div>
+                              <div className="w-28">
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={charge.amount || ""}
+                                    onChange={e => setDrawerLinkedCharges(prev => prev.map((c, i) => i === ci ? { ...c, amount: parseFloat(e.target.value) || 0 } : c))}
+                                    placeholder="0.00"
+                                    className="w-full text-xs font-mono border-0 focus:outline-none bg-transparent text-right text-slate-900 placeholder-slate-300"
+                                  />
+                                  <span className="text-xs text-slate-400">€</span>
+                                </div>
+                              </div>
+                              <button type="button"
+                                onClick={() => setDrawerLinkedCharges(prev => prev.filter((_, i) => i !== ci))}
+                                className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded">
+                                <X size={11} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        {drawerLinkedCharges.length > 0 && (
+                          <div className="flex justify-between items-center mt-2 pt-2 border-t border-blue-100">
+                            <span className="text-xs text-blue-500">Total cargos</span>
+                            <span className="text-xs font-mono font-semibold text-blue-700">
+                              {fmt(drawerLinkedCharges.reduce((s, c) => s + (c.amount || 0), 0))} €
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {drawerExpense.conflictResolvedAt && !drawerExpense.conflictType && (
+                      <div className="flex items-center gap-2 p-2 bg-emerald-50 rounded-lg text-xs text-emerald-700">
+                        <Check size={12} className="text-emerald-500" />
+                        Incidencia resuelta por {drawerExpense.conflictResolvedByName} · {fmtDate(drawerExpense.conflictResolvedAt)}
+                      </div>
+                    )}
                   </div>
+                </div>
 
-                  {drawerForm.conflictType && (
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Nota explicativa</label>
-                      <textarea value={drawerForm.conflictNote}
-                        onChange={e => setDrawerForm(f => ({ ...f, conflictNote: e.target.value }))}
-                        rows={3} placeholder="Explica la incidencia para que quede registrada..."
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none" />
-                    </div>
-                  )}
-
-                  {drawerExpense.conflictResolvedAt && !drawerExpense.conflictType && (
-                    <div className="flex items-center gap-2 p-2 bg-emerald-50 rounded-lg text-xs text-emerald-700">
-                      <Check size={12} className="text-emerald-500" />
-                      Incidencia resuelta por {drawerExpense.conflictResolvedByName} · {fmtDate(drawerExpense.conflictResolvedAt)}
-                    </div>
-                  )}
+                {/* Drawer footer */}
+                <div className="flex items-center justify-between px-5 py-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
+                  <div className="flex items-center gap-2">
+                    {drawerExpense.documentUrl && (
+                      <a href={drawerExpense.documentUrl} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50">
+                        <ExternalLink size={12} /> Abrir en nueva pestaña
+                      </a>
+                    )}
+                    {drawerExpense.pleoUrl && (
+                      <a href={drawerExpense.pleoUrl} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-600 border border-slate-200 rounded-lg hover:bg-white">
+                        <ExternalLink size={12} /> Ver en Pleo
+                      </a>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={closeDrawer}
+                      className="px-3 py-1.5 text-xs text-slate-600 rounded-lg hover:bg-slate-200 transition-colors">
+                      Cancelar
+                    </button>
+                    <button onClick={handleSaveDrawer} disabled={drawerSaving}
+                      className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium text-white rounded-lg disabled:opacity-50 transition-colors"
+                      style={{ backgroundColor: "#2F52E0" }}>
+                      <Save size={12} /> {drawerSaving ? "Guardando..." : "Guardar cambios"}
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Drawer footer */}
-              <div className="flex items-center justify-between px-5 py-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
-                <div className="flex items-center gap-2">
-                  {drawerExpense.documentUrl && (
-                    <a href={drawerExpense.documentUrl} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50">
-                      <FileText size={12} /> Ver documento
-                    </a>
-                  )}
-                  {drawerExpense.pleoUrl && (
-                    <a href={drawerExpense.pleoUrl} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-600 border border-slate-200 rounded-lg hover:bg-white">
-                      <ExternalLink size={12} /> Ver en Pleo
-                    </a>
-                  )}
+              {/* ── Right side: document preview ── */}
+              {drawerShowPreview && drawerExpense.documentUrl && (
+                <div className="flex-1 border-l border-slate-200 flex flex-col bg-slate-50">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white flex-shrink-0">
+                    <p className="text-xs font-semibold text-slate-600">Documento</p>
+                    <div className="flex items-center gap-2">
+                      <a href={drawerExpense.documentUrl} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700">
+                        <Maximize2 size={12} /> Abrir
+                      </a>
+                      <button onClick={() => setDrawerShowPreview(false)}
+                        className="p-1 text-slate-400 hover:bg-slate-100 rounded">
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-hidden p-2">
+                    {docType === "pdf" ? (
+                      <iframe
+                        src={drawerExpense.documentUrl}
+                        className="w-full h-full rounded-lg border border-slate-200"
+                        title="Documento del gasto"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center overflow-auto">
+                        <img
+                          src={drawerExpense.documentUrl}
+                          alt="Documento del gasto"
+                          className="max-w-full max-h-full object-contain rounded-lg shadow"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={closeDrawer}
-                    className="px-3 py-1.5 text-xs text-slate-600 rounded-lg hover:bg-slate-200 transition-colors">
-                    Cancelar
-                  </button>
-                  <button onClick={handleSaveDrawer} disabled={drawerSaving}
-                    className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium text-white rounded-lg disabled:opacity-50 transition-colors"
-                    style={{ backgroundColor: "#2F52E0" }}>
-                    <Save size={12} /> {drawerSaving ? "Guardando..." : "Guardar cambios"}
-                  </button>
-                </div>
-              </div>
-            </>
+              )}
+            </div>
           );
         })()}
       </div>
 
-      {/* MODALS */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* MODALS                                                                  */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
 
       {/* Create Box Modal */}
@@ -2548,18 +2652,12 @@ export default function BoxesPage() {
           onClick={() => setShowDeleteBoxModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <div className="p-6">
-              <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mb-4">
-                <AlertTriangle size={22} className="text-red-500" />
-              </div>
+              <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mb-4"><AlertTriangle size={22} className="text-red-500" /></div>
               <h3 className="text-lg font-semibold text-slate-900 mb-1">Eliminar caja</h3>
-              <p className="text-sm text-slate-500 mb-6">
-                Se eliminará <strong>{selectedBox.name}</strong> y todos sus sobres y gastos pendientes.
-              </p>
+              <p className="text-sm text-slate-500 mb-6">Se eliminará <strong>{selectedBox.name}</strong> y todos sus sobres y gastos pendientes.</p>
               <div className="flex gap-3">
-                <button onClick={() => setShowDeleteBoxModal(false)}
-                  className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50">Cancelar</button>
-                <button onClick={handleDeleteBox} disabled={saving}
-                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 disabled:opacity-50">
+                <button onClick={() => setShowDeleteBoxModal(false)} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50">Cancelar</button>
+                <button onClick={handleDeleteBox} disabled={saving} className="flex-1 px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 disabled:opacity-50">
                   {saving ? "Eliminando..." : "Eliminar"}
                 </button>
               </div>
@@ -2578,15 +2676,12 @@ export default function BoxesPage() {
               <button onClick={() => setShowCreateEnvelopeModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
             </div>
             <div className="p-6 text-center py-8">
-              <p className="text-slate-900 font-medium mb-1">
-                ENV-{selectedBox.code}-{String(selectedBox.nextEnvelopeNumber || 1).padStart(3, "0")}
-              </p>
+              <p className="text-slate-900 font-medium mb-1">ENV-{selectedBox.code}-{String(selectedBox.nextEnvelopeNumber || 1).padStart(3, "0")}</p>
               <p className="text-sm text-slate-500">Se creará un nuevo sobre para {selectedBox.name}</p>
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
               <button onClick={() => setShowCreateEnvelopeModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
-              <button onClick={handleCreateEnvelope} disabled={saving}
-                className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
+              <button onClick={handleCreateEnvelope} disabled={saving} className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
                 {saving ? "Creando..." : "Crear sobre"}
               </button>
             </div>
@@ -2600,18 +2695,12 @@ export default function BoxesPage() {
           onClick={() => setShowDeleteEnvelopeModal(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <div className="p-6">
-              <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mb-4">
-                <AlertTriangle size={22} className="text-red-500" />
-              </div>
+              <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mb-4"><AlertTriangle size={22} className="text-red-500" /></div>
               <h3 className="text-lg font-semibold text-slate-900 mb-1">Eliminar sobre</h3>
-              <p className="text-sm text-slate-500 mb-6">
-                Se eliminará <strong>{showDeleteEnvelopeModal.displayNumber}</strong> y todos sus gastos.
-              </p>
+              <p className="text-sm text-slate-500 mb-6">Se eliminará <strong>{showDeleteEnvelopeModal.displayNumber}</strong> y todos sus gastos.</p>
               <div className="flex gap-3">
-                <button onClick={() => setShowDeleteEnvelopeModal(null)}
-                  className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50">Cancelar</button>
-                <button onClick={() => handleDeleteEnvelope(showDeleteEnvelopeModal)} disabled={saving}
-                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 disabled:opacity-50">
+                <button onClick={() => setShowDeleteEnvelopeModal(null)} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50">Cancelar</button>
+                <button onClick={() => handleDeleteEnvelope(showDeleteEnvelopeModal)} disabled={saving} className="flex-1 px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 disabled:opacity-50">
                   {saving ? "Eliminando..." : "Eliminar"}
                 </button>
               </div>
@@ -2620,14 +2709,11 @@ export default function BoxesPage() {
         </div>
       )}
 
-      {/* ── Modal: Añadir gasto manual ───────────────────────────────────────── */}
+      {/* Manual Expense Modal */}
       {showManualExpenseModal && selectedEnvelope && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setShowManualExpenseModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col"
-            onClick={e => e.stopPropagation()}>
-
-            {/* Header */}
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">Añadir gastos</h3>
@@ -2635,10 +2721,7 @@ export default function BoxesPage() {
               </div>
               <button onClick={() => setShowManualExpenseModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
             </div>
-
             <div className="p-6 flex-1 overflow-y-auto space-y-6">
-
-              {/* ── Lista de gastos ── */}
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Gastos ({cardExpensesList.length})</p>
@@ -2650,8 +2733,6 @@ export default function BoxesPage() {
                 <div className="space-y-4">
                   {cardExpensesList.map((exp, idx) => (
                     <div key={exp.id} className="p-4 border border-slate-200 rounded-xl space-y-4">
-
-                      {/* Header del gasto */}
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Gasto {idx + 1}</span>
                         <div className="flex items-center gap-2">
@@ -2661,96 +2742,58 @@ export default function BoxesPage() {
                             </span>
                           )}
                           {cardExpensesList.length > 1 && (
-                            <button onClick={() => removeCardExpense(idx)}
-                              className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded">
-                              <Trash2 size={14} />
-                            </button>
+                            <button onClick={() => removeCardExpense(idx)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={14} /></button>
                           )}
                         </div>
                       </div>
-
-                      {/* Datos generales */}
                       <div className="grid grid-cols-12 gap-3">
-                        {/* Tipo */}
                         <div className="col-span-2 relative">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
-                          <button type="button"
-                            onClick={() => setShowCardTypeDropdown(showCardTypeDropdown === idx ? null : idx)}
+                          <button type="button" onClick={() => setShowCardTypeDropdown(showCardTypeDropdown === idx ? null : idx)}
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm flex items-center justify-between hover:border-slate-300">
                             <span className="flex items-center gap-1.5">
-                              {exp.type === "ticket"
-                                ? <><Receipt size={13} className="text-amber-500" /> Ticket</>
-                                : <><FileText size={13} className="text-blue-500" /> Factura</>}
+                              {exp.type === "ticket" ? <><Receipt size={13} className="text-amber-500" /> Ticket</> : <><FileText size={13} className="text-blue-500" /> Factura</>}
                             </span>
                             <ChevronDown size={13} className="text-slate-400" />
                           </button>
                           {showCardTypeDropdown === idx && (
                             <div className="absolute z-50 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
-                              <button type="button"
-                                onClick={() => { updateCardExpense(idx, "type", "ticket"); setShowCardTypeDropdown(null); }}
-                                className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
-                                <Receipt size={13} className="text-amber-500" /> Ticket
-                              </button>
-                              <button type="button"
-                                onClick={() => { updateCardExpense(idx, "type", "invoice"); setShowCardTypeDropdown(null); }}
-                                className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
-                                <FileText size={13} className="text-blue-500" /> Factura
-                              </button>
+                              <button type="button" onClick={() => { updateCardExpense(idx, "type", "ticket"); setShowCardTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2"><Receipt size={13} className="text-amber-500" /> Ticket</button>
+                              <button type="button" onClick={() => { updateCardExpense(idx, "type", "invoice"); setShowCardTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2"><FileText size={13} className="text-blue-500" /> Factura</button>
                             </div>
                           )}
                         </div>
-
-                        {/* Fecha */}
                         <div className="col-span-2">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label>
-                          <input type="text" value={exp.date}
-                            onChange={e => updateCardExpense(idx, "date", e.target.value)}
-                            placeholder="DD/MM/YYYY"
+                          <input type="text" value={exp.date} onChange={e => updateCardExpense(idx, "date", e.target.value)} placeholder="DD/MM/YYYY"
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
                         </div>
-
-                        {/* Proveedor */}
                         <div className="col-span-3">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Proveedor *</label>
-                          <input type="text" value={exp.supplier}
-                            onChange={e => updateCardExpense(idx, "supplier", e.target.value)}
-                            placeholder="Nombre del proveedor"
+                          <input type="text" value={exp.supplier} onChange={e => updateCardExpense(idx, "supplier", e.target.value)} placeholder="Nombre del proveedor"
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
                         </div>
-
-                        {/* CIF */}
                         <div className="col-span-2">
-                          <label className="block text-xs font-medium text-slate-600 mb-1">
-                            CIF / NIF {exp.type === "invoice" && <span className="text-red-400">*</span>}
-                          </label>
-                          <input type="text" value={exp.supplierTaxId}
-                            onChange={e => updateCardExpense(idx, "supplierTaxId", e.target.value)}
-                            placeholder="B12345678"
+                          <label className="block text-xs font-medium text-slate-600 mb-1">CIF / NIF {exp.type === "invoice" && <span className="text-red-400">*</span>}</label>
+                          <input type="text" value={exp.supplierTaxId} onChange={e => updateCardExpense(idx, "supplierTaxId", e.target.value)} placeholder="B12345678"
                             className={`w-full px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900 ${exp.type === "invoice" && !exp.supplierTaxId.trim() ? "border-red-300 bg-red-50/30" : "border-slate-200"}`} />
                         </div>
-
-                        {/* Nº Factura (solo si es factura) */}
                         <div className="col-span-2">
-                          <label className="block text-xs font-medium text-slate-600 mb-1">
-                            {exp.type === "invoice" ? "Nº Factura" : "Referencia"}
-                          </label>
-                          <input type="text" value={exp.supplierNumber}
-                            onChange={e => updateCardExpense(idx, "supplierNumber", e.target.value)}
-                            placeholder={exp.type === "invoice" ? "FAC-2026-001" : "—"}
+                          <label className="block text-xs font-medium text-slate-600 mb-1">{exp.type === "invoice" ? "Nº Factura" : "Referencia"}</label>
+                          <input type="text" value={exp.supplierNumber} onChange={e => updateCardExpense(idx, "supplierNumber", e.target.value)}
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
                         </div>
-
-                        {/* IRPF */}
                         <div className="col-span-1">
                           <label className="block text-xs font-medium text-slate-600 mb-1">IRPF %</label>
-                          <input type="number" value={exp.irpfRate}
-                            onChange={e => updateCardExpense(idx, "irpfRate", parseFloat(e.target.value) || 0)}
-                            step="1" placeholder="0"
+                          <input type="number" value={exp.irpfRate} onChange={e => updateCardExpense(idx, "irpfRate", parseFloat(e.target.value) || 0)} step="1"
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
                         </div>
-
-                        {/* Documento */}
-                        <div className="col-span-12 sm:col-span-0">
+                        <div className="col-span-12">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Descripción del gasto</label>
+                          <input type="text" value={(exp as any).description ?? ""} onChange={e => updateCardExpense(idx, "description", e.target.value)} placeholder="Concepto del gasto"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                        </div>
+                        <div className="col-span-12">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Documento</label>
                           <label className="w-full px-3 py-2 border border-dashed border-slate-300 rounded-lg text-sm flex items-center justify-center gap-2 cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-colors">
                             <Upload size={14} className="text-slate-400" />
@@ -2759,29 +2802,15 @@ export default function BoxesPage() {
                               onChange={e => { if (e.target.files?.[0]) updateCardExpense(idx, "file", e.target.files[0]); }} />
                           </label>
                         </div>
-                        {/* Descripción del gasto — común para todas las líneas */}
-                        <div className="col-span-12">
-                          <label className="block text-xs font-medium text-slate-600 mb-1">Descripción del gasto</label>
-                          <input type="text" value={exp.description ?? ""}
-                            onChange={e => updateCardExpense(idx, "description", e.target.value)}
-                            placeholder="Concepto del gasto"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
-                        </div>
                       </div>
-
-                      {/* Líneas de detalle */}
                       <div className="bg-slate-50 rounded-lg p-3">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-medium text-slate-500">Líneas de detalle ({exp.items.length})</span>
-                          <button onClick={() => addCardItem(idx)}
-                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700">
-                            <Plus size={12} /> Añadir línea
-                          </button>
+                          <button onClick={() => addCardItem(idx)} className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"><Plus size={12} /> Añadir línea</button>
                         </div>
                         <div className="space-y-2">
                           {exp.items.map((item, itemIdx) => (
                             <div key={item.id} className="grid grid-cols-12 gap-2 items-end">
-                              {/* Cuenta */}
                               <div className="col-span-6">
                                 {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">Cuenta *</label>}
                                 <button type="button"
@@ -2793,43 +2822,29 @@ export default function BoxesPage() {
                                     setCardAccountSearch("");
                                   }}
                                   className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-left text-xs flex items-center justify-between hover:border-slate-300 bg-white">
-                                  {item.subAccountCode
-                                    ? <span className="font-mono text-slate-700 truncate">{item.subAccountCode}</span>
-                                    : <span className="text-slate-400">Cuenta</span>}
+                                  {item.subAccountCode ? <span className="font-mono text-slate-700 truncate">{item.subAccountCode}</span> : <span className="text-slate-400">Cuenta</span>}
                                   <ChevronDown size={12} className="text-slate-400 flex-shrink-0" />
                                 </button>
                               </div>
-                              {/* Base */}
                               <div className="col-span-3">
                                 {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">Base *</label>}
-                                <input type="number" value={item.baseAmount || ""}
-                                  onChange={e => updateCardItem(idx, itemIdx, "baseAmount", parseFloat(e.target.value) || 0)}
-                                  step="0.01" placeholder="0.00"
+                                <input type="number" value={item.baseAmount || ""} onChange={e => updateCardItem(idx, itemIdx, "baseAmount", parseFloat(e.target.value) || 0)} step="0.01"
                                   className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
                               </div>
-                              {/* IVA % */}
                               <div className="col-span-2">
                                 {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">IVA %</label>}
-                                <input type="number" value={item.vatRate}
-                                  onChange={e => updateCardItem(idx, itemIdx, "vatRate", parseFloat(e.target.value) || 0)}
-                                  step="1"
+                                <input type="number" value={item.vatRate} onChange={e => updateCardItem(idx, itemIdx, "vatRate", parseFloat(e.target.value) || 0)} step="1"
                                   className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
                               </div>
-                              {/* Eliminar línea */}
                               <div className="col-span-1 flex justify-center">
                                 {exp.items.length > 1 && (
-                                  <button onClick={() => removeCardItem(idx, itemIdx)}
-                                    className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded">
-                                    <Trash2 size={12} />
-                                  </button>
+                                  <button onClick={() => removeCardItem(idx, itemIdx)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={12} /></button>
                                 )}
                               </div>
                             </div>
                           ))}
                         </div>
                       </div>
-
-                      {/* Total del gasto */}
                       <div className="flex justify-end">
                         <div className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm">
                           <span className="text-slate-400">Total gasto:</span>
@@ -2840,24 +2855,15 @@ export default function BoxesPage() {
                   ))}
                 </div>
               </div>
-
             </div>
-
-            {/* Footer */}
             <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
               <p className="text-sm text-slate-500">
-                {cardExpensesList.length > 0 && (
-                  <>Total: <strong className="text-slate-900 font-mono">
-                    {fmt(cardExpensesList.reduce((s, e) => s + computeExpenseTotal(e).totalAmount, 0))} €
-                  </strong></>
-                )}
+                {cardExpensesList.length > 0 && <>Total: <strong className="text-slate-900 font-mono">{fmt(cardExpensesList.reduce((s, e) => s + computeExpenseTotal(e).totalAmount, 0))} €</strong></>}
               </p>
               <div className="flex gap-3">
-                <button onClick={() => setShowManualExpenseModal(false)}
-                  className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
+                <button onClick={() => setShowManualExpenseModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
                 <button onClick={handleAddManualExpense} disabled={manualExpenseSaving}
-                  className="px-5 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50 flex items-center gap-2"
-                  style={{ backgroundColor: "#2F52E0" }}>
+                  className="px-5 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50 flex items-center gap-2" style={{ backgroundColor: "#2F52E0" }}>
                   {manualExpenseSaving ? "Guardando..." : <><Check size={15} /> Guardar gastos</>}
                 </button>
               </div>
@@ -2865,19 +2871,18 @@ export default function BoxesPage() {
           </div>
         </div>
       )}
-      {/* Import Tarjetas Modal */}
+
+      {/* Import Excel Modal */}
       {showImportModal && selectedEnvelope && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col"
-            onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">Importar gastos</h3>
                 <p className="text-sm text-slate-500">Sube el Excel de gastos de tarjeta</p>
               </div>
-              <button onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }}
-                className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+              <button onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
             </div>
             <div className="p-6 flex-1 overflow-y-auto">
               {!importFile ? (
@@ -2891,9 +2896,7 @@ export default function BoxesPage() {
                   <p className="text-sm text-slate-400 mb-4">o</p>
                   <label className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium cursor-pointer">
                     <FileSpreadsheet size={16} /> Seleccionar archivo
-                    <input type="file" accept=".xlsx"
-                      onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }}
-                      className="hidden" />
+                    <input type="file" accept=".xlsx" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }} className="hidden" />
                   </label>
                 </div>
               ) : (
@@ -2904,8 +2907,7 @@ export default function BoxesPage() {
                       <p className="text-sm font-medium text-slate-900">{importFile.name}</p>
                       <p className="text-xs text-slate-500">{importPreview.length} gastos detectados</p>
                     </div>
-                    <button onClick={() => { setImportFile(null); setImportPreview([]); }}
-                      className="p-1.5 text-slate-400 hover:bg-slate-200 rounded"><X size={16} /></button>
+                    <button onClick={() => { setImportFile(null); setImportPreview([]); }} className="p-1.5 text-slate-400 hover:bg-slate-200 rounded"><X size={16} /></button>
                   </div>
                   {importPreview.length > 0 && (
                     <div className="border border-slate-200 rounded-xl overflow-hidden">
@@ -2913,7 +2915,7 @@ export default function BoxesPage() {
                         <thead className="bg-slate-50 border-b border-slate-200">
                           <tr>
                             <th className="text-left px-3 py-2 font-medium text-slate-600 w-[80px]">Tipo</th>
-                            <th className="text-left px-3 py-2 font-medium text-slate-600">Proveedor / Empleado</th>
+                            <th className="text-left px-3 py-2 font-medium text-slate-600">Proveedor</th>
                             <th className="text-left px-3 py-2 font-medium text-slate-600">Cuenta · IVA</th>
                             <th className="text-right px-3 py-2 font-medium text-slate-600 w-[90px]">Base</th>
                             <th className="text-right px-3 py-2 font-medium text-slate-600 w-[90px]">Total</th>
@@ -2921,73 +2923,49 @@ export default function BoxesPage() {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {importPreview.slice(0, 15).map((exp, i) => {
-                            // Detect duplicates for this preview row
-                            const dupById   = expenses.some(e => e.pleoReceiptId === exp.pleoReceiptId);
-                            const invKey    = exp.type === "invoice" && exp.supplierTaxId && exp.supplierNumber
-                              ? `${exp.supplierTaxId}||${exp.supplierNumber}` : null;
-                            const dupByInv  = !!invKey && expenses.some(e =>
-                              e.type === "invoice" && e.supplierTaxId === exp.supplierTaxId && e.supplierNumber === exp.supplierNumber
-                            );
-                            const isDup     = dupById || dupByInv;
+                            const dupById  = expenses.some(e => e.pleoReceiptId === exp.pleoReceiptId);
+                            const invKey   = exp.type === "invoice" && exp.supplierTaxId && exp.supplierNumber ? `${exp.supplierTaxId}||${exp.supplierNumber}` : null;
+                            const dupByInv = !!invKey && expenses.some(e => e.type === "invoice" && e.supplierTaxId === exp.supplierTaxId && e.supplierNumber === exp.supplierNumber);
+                            const isDup    = dupById || dupByInv;
                             const dupReason = dupById ? "ID Pleo ya importado" : dupByInv ? "Factura ya existe (mismo CIF + Nº)" : "";
-                            // Resolved supplier name
                             const knownSupplier = cardSuppliers.find(s => s.taxId === exp.supplierTaxId);
                             const displaySupplier = knownSupplier ? knownSupplier.name : capitalizeSupplierName(exp.supplier);
-                            const nameWasNormalized = knownSupplier && knownSupplier.name !== capitalizeSupplierName(exp.supplier);
                             return (
-                            <tr key={i} className={`align-top ${isDup ? "bg-amber-50/60" : "hover:bg-slate-50"}`}>
-                              <td className="px-3 py-2.5">
-                                <div className="flex items-center gap-1.5">
-                                  {isDup && <AlertTriangle size={12} className="text-amber-500 flex-shrink-0" title={dupReason} />}
-                                  {exp.type === "ticket"
-                                    ? <Receipt size={13} className="text-amber-500 flex-shrink-0" />
-                                    : <FileText size={13} className="text-blue-500 flex-shrink-0" />}
-                                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${exp.type === "ticket" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
-                                    {exp.type === "ticket" ? "Ticket" : "Factura"}
-                                  </span>
-                                </div>
-                                <p className="text-xs text-slate-400 mt-1 pl-0.5">{exp.date}</p>
-                                {isDup && <p className="text-xs text-amber-600 font-medium mt-0.5">{dupReason} — se omitirá</p>}
-                              </td>
-                              <td className="px-3 py-2.5">
-                                <p className={`font-medium truncate max-w-[200px] ${isDup ? "text-slate-400 line-through" : "text-slate-900"}`} title={exp.supplier}>
-                                  {displaySupplier}
-                                </p>
-                                {nameWasNormalized && (
-                                  <p className="text-xs text-emerald-600 flex items-center gap-1 mt-0.5">
-                                    <Check size={10} /> Nombre fiscal aplicado
-                                  </p>
-                                )}
-                                {exp.employee && <p className="text-xs text-slate-400 truncate">{exp.employee}</p>}
-                                {exp.supplierTaxId && <p className="text-xs font-mono text-slate-400">{exp.supplierTaxId}</p>}
-                              </td>
-                              <td className="px-3 py-2.5">
-                                {exp.items.map((item: any, j: number) => (
-                                  <div key={j} className={`flex items-center gap-2 ${j > 0 ? "mt-0.5" : ""}`}>
-                                    <span className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">
-                                      {exp.subAccountCode || "—"}
-                                    </span>
-                                    <span className="text-xs text-slate-500">
-                                      {item.vatRate}% · {fmt(item.vatAmount)} €
-                                    </span>
+                              <tr key={i} className={`align-top ${isDup ? "bg-amber-50/60" : "hover:bg-slate-50"}`}>
+                                <td className="px-3 py-2.5">
+                                  <div className="flex items-center gap-1.5">
+                                    {isDup && <AlertTriangle size={12} className="text-amber-500 flex-shrink-0" />}
+                                    {exp.type === "ticket" ? <Receipt size={13} className="text-amber-500 flex-shrink-0" /> : <FileText size={13} className="text-blue-500 flex-shrink-0" />}
+                                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${exp.type === "ticket" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>{exp.type === "ticket" ? "Ticket" : "Factura"}</span>
                                   </div>
-                                ))}
-                              </td>
-                              <td className={`px-3 py-2.5 text-right font-mono ${isDup ? "text-slate-400" : "text-slate-700"}`}>{fmt(exp.baseAmount)}</td>
-                              <td className={`px-3 py-2.5 text-right font-mono font-semibold ${isDup ? "text-slate-400" : "text-slate-900"}`}>{fmt(exp.totalAmount)} €</td>
-                            </tr>
+                                  <p className="text-xs text-slate-400 mt-1">{exp.date}</p>
+                                  {isDup && <p className="text-xs text-amber-600 font-medium mt-0.5">{dupReason} — se omitirá</p>}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <p className={`font-medium truncate max-w-[200px] ${isDup ? "text-slate-400 line-through" : "text-slate-900"}`}>{displaySupplier}</p>
+                                  {exp.supplierTaxId && <p className="text-xs font-mono text-slate-400">{exp.supplierTaxId}</p>}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  {exp.items.map((item: any, j: number) => (
+                                    <div key={j} className={`flex items-center gap-2 ${j > 0 ? "mt-0.5" : ""}`}>
+                                      <span className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">
+                                        {item.subAccountCode || exp.subAccountCode || "—"}
+                                      </span>
+                                      <span className="text-xs text-slate-500">{item.vatRate}% · {fmt(item.vatAmount)} €</span>
+                                    </div>
+                                  ))}
+                                </td>
+                                <td className={`px-3 py-2.5 text-right font-mono ${isDup ? "text-slate-400" : "text-slate-700"}`}>{fmt(exp.baseAmount)}</td>
+                                <td className={`px-3 py-2.5 text-right font-mono font-semibold ${isDup ? "text-slate-400" : "text-slate-900"}`}>{fmt(exp.totalAmount)} €</td>
+                              </tr>
                             );
                           })}
                         </tbody>
                         <tfoot className="bg-slate-50 border-t border-slate-200">
                           <tr>
                             <td colSpan={3} className="px-3 py-2 text-right text-xs font-semibold text-slate-500">TOTAL</td>
-                            <td className="px-3 py-2 text-right font-mono font-semibold text-slate-700">
-                              {fmt(importPreview.reduce((s: number, e: any) => s + e.baseAmount, 0))}
-                            </td>
-                            <td className="px-3 py-2 text-right font-mono font-bold text-slate-900">
-                              {fmt(importPreview.reduce((s: number, e: any) => s + e.totalAmount, 0))} €
-                            </td>
+                            <td className="px-3 py-2 text-right font-mono font-semibold text-slate-700">{fmt(importPreview.reduce((s: number, e: any) => s + e.baseAmount, 0))}</td>
+                            <td className="px-3 py-2 text-right font-mono font-bold text-slate-900">{fmt(importPreview.reduce((s: number, e: any) => s + e.totalAmount, 0))} €</td>
                           </tr>
                         </tfoot>
                       </table>
@@ -3011,30 +2989,14 @@ export default function BoxesPage() {
                     return false;
                   }).length;
                   const newCount = importPreview.length - dupCount;
-                  return (
-                    <>
-                      <strong className="text-slate-900">{newCount}</strong> nuevos
-                      {dupCount > 0 && <> · <strong className="text-amber-600">{dupCount} duplicado{dupCount > 1 ? "s" : ""}</strong> (se omitirán)</>}
-                      {" · "}Base: <strong className="text-slate-900">{fmt(importPreview.filter((_: any, i: number) => !expenses.some(e => e.pleoReceiptId === importPreview[i].pleoReceiptId)).reduce((s: number, e: any) => s + e.baseAmount, 0))} €</strong>
-                    </>
-                  );
+                  return <><strong className="text-slate-900">{newCount}</strong> nuevos{dupCount > 0 && <> · <strong className="text-amber-600">{dupCount} duplicado{dupCount > 1 ? "s" : ""}</strong> (se omitirán)</>}</>;
                 })()}
               </span>
               <div className="flex gap-3">
-                <button onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }}
-                  className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
+                <button onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
                 <button onClick={handleImportExpenses} disabled={importing || importPreview.length === 0}
                   className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
-                  {importing ? "Importando..." : (() => {
-                    const dupCount = importPreview.filter(exp => {
-                      if (expenses.some(e => e.pleoReceiptId === exp.pleoReceiptId)) return true;
-                      if (exp.type === "invoice" && exp.supplierTaxId && exp.supplierNumber)
-                        return expenses.some(e => e.type === "invoice" && e.supplierTaxId === exp.supplierTaxId && e.supplierNumber === exp.supplierNumber);
-                      return false;
-                    }).length;
-                    const newCount = importPreview.length - dupCount;
-                    return `Importar ${newCount} gasto${newCount !== 1 ? "s" : ""}${dupCount > 0 ? ` (omitir ${dupCount})` : ""}`;
-                  })()}
+                  {importing ? "Importando..." : `Importar ${importPreview.length - importPreview.filter(exp => expenses.some(e => e.pleoReceiptId === exp.pleoReceiptId)).length} gastos`}
                 </button>
               </div>
             </div>
@@ -3042,59 +3004,41 @@ export default function BoxesPage() {
         </div>
       )}
 
-
-      {/* ── Receipt Import Modal ── */}
+      {/* Receipt Import Modal */}
       {showReceiptImportModal && selectedEnvelope && (() => {
         const envelopeExps = expenses.filter(e => e.envelopeId === selectedEnvelope.id);
-        // Compute matches for current receiptFiles selection
         const fileMatches = receiptFiles.map(file => {
           const nameNoExt = file.name.replace(/\.[^.]+$/, "");
-          const expense = envelopeExps.find(e =>
-            e.pleoReceiptId && nameNoExt.includes(String(e.pleoReceiptId))
-          );
+          const expense = envelopeExps.find(e => e.pleoReceiptId && nameNoExt.includes(String(e.pleoReceiptId)));
           return { file, expense: expense ?? null };
         });
         const matched   = fileMatches.filter(m => m.expense).length;
         const unmatched = fileMatches.filter(m => !m.expense).length;
-        // Gastos que ya tienen documentUrl o que quedarán cubiertos
         const coveredIds = new Set(fileMatches.filter(m => m.expense).map(m => m.expense!.id));
         const missingDocs = envelopeExps.filter(e => !e.documentUrl && !coveredIds.has(e.id));
         return (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
             onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }}>
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl flex flex-col max-h-[85vh]"
-              onClick={e => e.stopPropagation()}>
-              {/* Header */}
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 flex-shrink-0">
                 <div>
                   <h3 className="text-lg font-semibold text-slate-900">Importar recibos</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Los archivos se emparejan por el ID Pleo en el nombre del archivo
-                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">Los archivos se emparejan por el ID Pleo en el nombre</p>
                 </div>
-                <button onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }}
-                  className="p-2 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
+                <button onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }} className="p-2 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
               </div>
-
               <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                {/* Drop zone / file picker */}
                 <label className={`flex flex-col items-center justify-center gap-2 w-full py-8 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${receiptFiles.length > 0 ? "border-blue-300 bg-blue-50/30" : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"}`}>
                   <FileText size={28} className={receiptFiles.length > 0 ? "text-blue-400" : "text-slate-300"} />
                   <div className="text-center">
-                    <p className="text-sm font-medium text-slate-700">
-                      {receiptFiles.length > 0
-                        ? `${receiptFiles.length} archivo${receiptFiles.length > 1 ? "s" : ""} seleccionado${receiptFiles.length > 1 ? "s" : ""}`
-                        : "Selecciona facturas y tickets"}
-                    </p>
+                    <p className="text-sm font-medium text-slate-700">{receiptFiles.length > 0 ? `${receiptFiles.length} archivo${receiptFiles.length > 1 ? "s" : ""} seleccionado${receiptFiles.length > 1 ? "s" : ""}` : "Selecciona facturas y tickets"}</p>
                     <p className="text-xs text-slate-400 mt-0.5">PDF, JPG, PNG · varios archivos a la vez</p>
                   </div>
                   <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden"
                     onChange={e => setReceiptFiles(Array.from(e.target.files ?? []))} />
                 </label>
-
                 {receiptFiles.length > 0 && (
                   <>
-                    {/* Summary chips */}
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-xs font-medium text-emerald-700">
                         <Check size={12} /> {matched} emparejado{matched !== 1 ? "s" : ""}
@@ -3104,73 +3048,31 @@ export default function BoxesPage() {
                           <AlertTriangle size={12} /> {unmatched} sin emparejar
                         </span>
                       )}
-                      {missingDocs.length > 0 && (
-                        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-full text-xs font-medium text-slate-500">
-                          <FileX size={12} /> {missingDocs.length} gasto{missingDocs.length > 1 ? "s" : ""} sin documento tras importar
-                        </span>
-                      )}
                     </div>
-
-                    {/* File list */}
                     <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
                       {fileMatches.map(({ file, expense: exp }, i) => (
                         <div key={i} className={`flex items-center gap-3 px-4 py-2.5 ${exp ? "" : "bg-amber-50/40"}`}>
                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${exp ? "bg-emerald-50" : "bg-amber-50"}`}>
-                            {exp
-                              ? <Check size={13} className="text-emerald-500" />
-                              : <AlertTriangle size={13} className="text-amber-400" />}
+                            {exp ? <Check size={13} className="text-emerald-500" /> : <AlertTriangle size={13} className="text-amber-400" />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-mono text-slate-700 truncate">{file.name}</p>
-                            {exp
-                              ? <p className="text-xs text-emerald-600 mt-0.5">{exp.displayNumber} · {exp.supplier}</p>
-                              : <p className="text-xs text-amber-500 mt-0.5">No se encontró ningún gasto con este ID en el sobre</p>}
+                            {exp ? <p className="text-xs text-emerald-600 mt-0.5">{exp.displayNumber} · {exp.supplier}</p>
+                              : <p className="text-xs text-amber-500 mt-0.5">No se encontró ningún gasto con este ID</p>}
                           </div>
-                          {exp?.documentUrl && (
-                            <span className="text-xs text-slate-400 flex-shrink-0">Reemplazará doc. existente</span>
-                          )}
                         </div>
                       ))}
                     </div>
-
-                    {/* Gastos que quedan sin documento */}
-                    {missingDocs.length > 0 && (
-                      <div className="bg-slate-50 rounded-xl p-3">
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                          Gastos sin documento tras importar ({missingDocs.length})
-                        </p>
-                        <div className="space-y-1">
-                          {missingDocs.map(e => (
-                            <div key={e.id} className="flex items-center gap-2 text-xs text-slate-500">
-                              <span className="font-mono text-slate-400 w-24 flex-shrink-0">{e.displayNumber}</span>
-                              <span className="truncate">{e.supplier}</span>
-                              <span className="font-mono text-slate-300 ml-auto flex-shrink-0">{e.pleoReceiptId}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </>
                 )}
               </div>
-
-              {/* Footer */}
               <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
-                <p className="text-xs text-slate-400">
-                  {envelopeExps.filter(e => !e.documentUrl).length} gastos sin documento en el sobre
-                </p>
+                <p className="text-xs text-slate-400">{envelopeExps.filter(e => !e.documentUrl).length} gastos sin documento</p>
                 <div className="flex gap-3">
-                  <button onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }}
-                    className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-200">
-                    Cancelar
-                  </button>
-                  <button onClick={handleImportReceipts}
-                    disabled={uploadingReceipts || matched === 0}
-                    className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50"
-                    style={{ backgroundColor: "#2F52E0" }}>
-                    {uploadingReceipts
-                      ? <><RotateCcw size={14} className="animate-spin" /> Subiendo...</>
-                      : <><Upload size={14} /> Vincular {matched} recibo{matched !== 1 ? "s" : ""}</>}
+                  <button onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-200">Cancelar</button>
+                  <button onClick={handleImportReceipts} disabled={uploadingReceipts || matched === 0}
+                    className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
+                    {uploadingReceipts ? <><RotateCcw size={14} className="animate-spin" /> Subiendo...</> : <><Upload size={14} /> Vincular {matched} recibo{matched !== 1 ? "s" : ""}</>}
                   </button>
                 </div>
               </div>
@@ -3208,8 +3110,7 @@ export default function BoxesPage() {
               </div>
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-              <button onClick={() => setShowCreateTransferEnvelopeModal(false)}
-                className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
+              <button onClick={() => setShowCreateTransferEnvelopeModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
               <button onClick={handleCreateTransferEnvelope} disabled={saving || !transferEnvelopeForm.paymentDate.trim()}
                 className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
                 {saving ? "Creando..." : "Crear sobre"}
@@ -3225,18 +3126,12 @@ export default function BoxesPage() {
           onClick={() => setShowDeleteTransferEnvelopeModal(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <div className="p-6">
-              <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mb-4">
-                <AlertTriangle size={22} className="text-red-500" />
-              </div>
+              <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mb-4"><AlertTriangle size={22} className="text-red-500" /></div>
               <h3 className="text-lg font-semibold text-slate-900 mb-1">Eliminar sobre</h3>
-              <p className="text-sm text-slate-500 mb-6">
-                Se eliminará <strong>{showDeleteTransferEnvelopeModal.displayNumber}</strong> y todos sus gastos.
-              </p>
+              <p className="text-sm text-slate-500 mb-6">Se eliminará <strong>{showDeleteTransferEnvelopeModal.displayNumber}</strong> y todos sus gastos.</p>
               <div className="flex gap-3">
-                <button onClick={() => setShowDeleteTransferEnvelopeModal(null)}
-                  className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50">Cancelar</button>
-                <button onClick={() => handleDeleteTransferEnvelope(showDeleteTransferEnvelopeModal)} disabled={saving}
-                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 disabled:opacity-50">
+                <button onClick={() => setShowDeleteTransferEnvelopeModal(null)} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50">Cancelar</button>
+                <button onClick={() => handleDeleteTransferEnvelope(showDeleteTransferEnvelopeModal)} disabled={saving} className="flex-1 px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 disabled:opacity-50">
                   {saving ? "Eliminando..." : "Eliminar"}
                 </button>
               </div>
@@ -3245,19 +3140,17 @@ export default function BoxesPage() {
         </div>
       )}
 
-      {/* Add Expense Modal */}
+      {/* Add Transfer Expense Modal */}
       {showAddExpenseModal && selectedTransferEnvelope && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setShowAddExpenseModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col"
-            onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
               <h3 className="text-lg font-semibold text-slate-900">Añadir gastos</h3>
               <button onClick={() => setShowAddExpenseModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
             </div>
             <div className="p-6 flex-1 overflow-y-auto space-y-6">
-
-              {/* ── Persona ── */}
+              {/* Persona */}
               <div className="p-4 bg-slate-50 rounded-xl">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Datos de la persona</p>
                 <div className="grid grid-cols-3 gap-4">
@@ -3265,26 +3158,21 @@ export default function BoxesPage() {
                     <label className="block text-sm font-medium text-slate-700 mb-2">Nombre *</label>
                     <input type="text" value={expensePersonForm.name}
                       onChange={e => setExpensePersonForm({ ...expensePersonForm, name: e.target.value })}
-                      placeholder="Nombre completo"
                       className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
                   </div>
                   <div ref={expenseDepartmentDropdownRef} className="relative">
                     <label className="block text-sm font-medium text-slate-700 mb-2">Departamento</label>
                     <button type="button" onClick={() => setShowExpenseDepartmentDropdown(!showExpenseDepartmentDropdown)}
                       className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between bg-white hover:border-slate-300">
-                      <span className={expensePersonForm.department ? "text-slate-900" : "text-slate-400"}>
-                        {expensePersonForm.department || "Seleccionar"}
-                      </span>
+                      <span className={expensePersonForm.department ? "text-slate-900" : "text-slate-400"}>{expensePersonForm.department || "Seleccionar"}</span>
                       <ChevronDown size={16} className="text-slate-400" />
                     </button>
                     {showExpenseDepartmentDropdown && (
                       <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
-                        <button type="button"
-                          onClick={() => { setExpensePersonForm({ ...expensePersonForm, department: "" }); setShowExpenseDepartmentDropdown(false); }}
+                        <button type="button" onClick={() => { setExpensePersonForm({ ...expensePersonForm, department: "" }); setShowExpenseDepartmentDropdown(false); }}
                           className="w-full px-4 py-2 text-left text-sm text-slate-400 hover:bg-slate-50">Sin departamento</button>
                         {departments.map(d => (
-                          <button key={d} type="button"
-                            onClick={() => { setExpensePersonForm({ ...expensePersonForm, department: d }); setShowExpenseDepartmentDropdown(false); }}
+                          <button key={d} type="button" onClick={() => { setExpensePersonForm({ ...expensePersonForm, department: d }); setShowExpenseDepartmentDropdown(false); }}
                             className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50">{d}</button>
                         ))}
                       </div>
@@ -3292,34 +3180,20 @@ export default function BoxesPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">IBAN</label>
-                    <input
-                      type="text"
-                      value={expensePersonForm.iban}
+                    <input type="text" value={expensePersonForm.iban}
                       onChange={e => setExpensePersonForm({ ...expensePersonForm, iban: formatIban(e.target.value) })}
                       placeholder="ES00 0000 0000 0000 0000 0000"
                       className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 font-mono text-sm bg-white transition-colors ${
-                        expensePersonForm.iban && !validateIban(expensePersonForm.iban)
-                          ? "border-red-300 focus:ring-red-400"
-                          : expensePersonForm.iban && validateIban(expensePersonForm.iban)
-                          ? "border-emerald-300 focus:ring-emerald-400"
+                        expensePersonForm.iban && !validateIban(expensePersonForm.iban) ? "border-red-300 focus:ring-red-400"
+                          : expensePersonForm.iban && validateIban(expensePersonForm.iban) ? "border-emerald-300 focus:ring-emerald-400"
                           : "border-slate-200 focus:ring-slate-900"
-                      }`}
-                    />
+                      }`} />
                     {expensePersonForm.iban && (
                       <div className="mt-1.5 flex items-center gap-1.5">
                         {validateIban(expensePersonForm.iban) ? (
-                          <>
-                            <Check size={12} className="text-emerald-500 flex-shrink-0" />
-                            <span className="text-xs text-emerald-600">IBAN válido</span>
-                            {detectBank(expensePersonForm.iban) && (
-                              <span className="text-xs text-slate-400">· {detectBank(expensePersonForm.iban)}</span>
-                            )}
-                          </>
+                          <><Check size={12} className="text-emerald-500 flex-shrink-0" /><span className="text-xs text-emerald-600">IBAN válido</span>{detectBank(expensePersonForm.iban) && <span className="text-xs text-slate-400">· {detectBank(expensePersonForm.iban)}</span>}</>
                         ) : (
-                          <>
-                            <AlertCircle size={12} className="text-red-400 flex-shrink-0" />
-                            <span className="text-xs text-red-500">IBAN no válido</span>
-                          </>
+                          <><AlertCircle size={12} className="text-red-400 flex-shrink-0" /><span className="text-xs text-red-500">IBAN no válido</span></>
                         )}
                       </div>
                     )}
@@ -3327,7 +3201,7 @@ export default function BoxesPage() {
                 </div>
               </div>
 
-              {/* ── Gastos ── */}
+              {/* Gastos */}
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Gastos ({expensesList.length})</p>
@@ -3339,69 +3213,46 @@ export default function BoxesPage() {
                 <div className="space-y-4">
                   {expensesList.map((exp, idx) => (
                     <div key={exp.id} className="p-4 border border-slate-200 rounded-xl space-y-4">
-                      {/* Header del gasto */}
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Gasto {idx + 1}</span>
                         <div className="flex items-center gap-2">
-                          {exp.file && (
-                            <span className="flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
-                              <Paperclip size={12} /> {exp.file.name.substring(0, 20)}...
-                            </span>
-                          )}
-                          {expensesList.length > 1 && (
-                            <button onClick={() => removeExpenseFromList(idx)}
-                              className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded">
-                              <Trash2 size={14} />
-                            </button>
-                          )}
+                          {exp.file && <span className="flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg"><Paperclip size={12} /> {exp.file.name.substring(0, 20)}...</span>}
+                          {expensesList.length > 1 && <button onClick={() => removeExpenseFromList(idx)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={14} /></button>}
                         </div>
                       </div>
-
-                      {/* Datos generales del gasto */}
                       <div className="grid grid-cols-12 gap-3">
                         <div className="col-span-2 relative">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
-                          <button type="button"
-                            onClick={() => setShowTypeDropdown(showTypeDropdown === idx ? null : idx)}
+                          <button type="button" onClick={() => setShowTypeDropdown(showTypeDropdown === idx ? null : idx)}
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-left text-sm flex items-center justify-between hover:border-slate-300">
                             <span className="text-slate-900">{exp.type === "ticket" ? "Ticket" : "Factura"}</span>
                             <ChevronDown size={14} className="text-slate-400" />
                           </button>
                           {showTypeDropdown === idx && (
                             <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg py-1">
-                              <button type="button"
-                                onClick={() => { updateExpenseInList(idx, "type", "ticket"); setShowTypeDropdown(null); }}
-                                className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50">Ticket</button>
-                              <button type="button"
-                                onClick={() => { updateExpenseInList(idx, "type", "invoice"); setShowTypeDropdown(null); }}
-                                className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50">Factura</button>
+                              <button type="button" onClick={() => { updateExpenseInList(idx, "type", "ticket"); setShowTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50">Ticket</button>
+                              <button type="button" onClick={() => { updateExpenseInList(idx, "type", "invoice"); setShowTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50">Factura</button>
                             </div>
                           )}
                         </div>
                         <div className="col-span-2">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label>
-                          <input type="text" value={exp.date}
-                            onChange={e => updateExpenseInList(idx, "date", e.target.value)}
-                            placeholder="DD/MM/YYYY"
+                          <input type="text" value={exp.date} onChange={e => updateExpenseInList(idx, "date", e.target.value)} placeholder="DD/MM/YYYY"
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
                         </div>
                         <div className="col-span-4">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Proveedor *</label>
-                          <input type="text" value={exp.supplier}
-                            onChange={e => updateExpenseInList(idx, "supplier", e.target.value)}
-                            placeholder="Nombre del proveedor"
+                          <input type="text" value={exp.supplier} onChange={e => updateExpenseInList(idx, "supplier", e.target.value)}
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
                         </div>
                         <div className="col-span-2">
                           <label className="block text-xs font-medium text-slate-600 mb-1">IRPF %</label>
-                          <input type="number" value={exp.irpfRate}
-                            onChange={e => updateExpenseInList(idx, "irpfRate", parseFloat(e.target.value) || 0)}
-                            step="1"
+                          <input type="number" value={exp.irpfRate} onChange={e => updateExpenseInList(idx, "irpfRate", parseFloat(e.target.value) || 0)} step="1"
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
                         </div>
                         <div className="col-span-2">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Documento</label>
-                          <label className="w-full px-3 py-2 border border-dashed border-slate-300 rounded-lg text-sm flex items-center justify-center gap-2 cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-colors">
+                          <label className="w-full px-3 py-2 border border-dashed border-slate-300 rounded-lg text-sm flex items-center justify-center gap-2 cursor-pointer hover:border-slate-400 hover:bg-slate-50">
                             <Upload size={14} className="text-slate-400" />
                             <span className="text-slate-500">{exp.file ? "Cambiar" : "Subir"}</span>
                             <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
@@ -3409,21 +3260,12 @@ export default function BoxesPage() {
                           </label>
                         </div>
                       </div>
-
-                      {/* Descripción del gasto — común para todas las líneas */}
-                      <input type="text" value={exp.description ?? ""}
-                        onChange={e => updateExpenseInList(idx, "description", e.target.value)}
-                        placeholder="Descripción del gasto"
+                      <input type="text" value={(exp as any).description ?? ""} onChange={e => updateExpenseInList(idx, "description", e.target.value)} placeholder="Descripción del gasto"
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
-
-                      {/* Líneas de detalle */}
                       <div className="bg-slate-50 rounded-lg p-3">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-medium text-slate-500">Líneas de detalle ({exp.items.length})</span>
-                          <button onClick={() => addItemToExpense(idx)}
-                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700">
-                            <Plus size={12} /> Añadir línea
-                          </button>
+                          <button onClick={() => addItemToExpense(idx)} className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"><Plus size={12} /> Añadir línea</button>
                         </div>
                         <div className="space-y-2">
                           {exp.items.map((item, itemIdx) => (
@@ -3439,40 +3281,27 @@ export default function BoxesPage() {
                                     setAccountSearchTerm("");
                                   }}
                                   className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-left text-xs flex items-center justify-between hover:border-slate-300 bg-white">
-                                  {item.subAccountCode
-                                    ? <span className="font-mono text-slate-700 truncate">{item.subAccountCode}</span>
-                                    : <span className="text-slate-400">Cuenta</span>}
+                                  {item.subAccountCode ? <span className="font-mono text-slate-700 truncate">{item.subAccountCode}</span> : <span className="text-slate-400">Cuenta</span>}
                                   <ChevronDown size={12} className="text-slate-400 flex-shrink-0" />
                                 </button>
                               </div>
                               <div className="col-span-3">
                                 {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">Base *</label>}
-                                <input type="number" value={item.baseAmount || ""}
-                                  onChange={e => updateExpenseItem(idx, itemIdx, "baseAmount", parseFloat(e.target.value) || 0)}
-                                  step="0.01" placeholder="0.00"
+                                <input type="number" value={item.baseAmount || ""} onChange={e => updateExpenseItem(idx, itemIdx, "baseAmount", parseFloat(e.target.value) || 0)} step="0.01"
                                   className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
                               </div>
                               <div className="col-span-2">
                                 {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">IVA %</label>}
-                                <input type="number" value={item.vatRate}
-                                  onChange={e => updateExpenseItem(idx, itemIdx, "vatRate", parseFloat(e.target.value) || 0)}
-                                  step="1"
+                                <input type="number" value={item.vatRate} onChange={e => updateExpenseItem(idx, itemIdx, "vatRate", parseFloat(e.target.value) || 0)} step="1"
                                   className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
                               </div>
                               <div className="col-span-1 flex justify-center">
-                                {exp.items.length > 1 && (
-                                  <button onClick={() => removeItemFromExpense(idx, itemIdx)}
-                                    className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded">
-                                    <Trash2 size={12} />
-                                  </button>
-                                )}
+                                {exp.items.length > 1 && <button onClick={() => removeItemFromExpense(idx, itemIdx)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={12} /></button>}
                               </div>
                             </div>
                           ))}
                         </div>
                       </div>
-
-                      {/* Total del gasto */}
                       <div className="flex justify-end">
                         <div className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm">
                           <span className="text-slate-400">Total gasto:</span>
@@ -3484,25 +3313,16 @@ export default function BoxesPage() {
                 </div>
               </div>
             </div>
-
             <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between flex-shrink-0 bg-white">
               <div className="text-sm text-slate-500">
-                Total: <strong className="text-slate-900 font-mono">
-                  {fmt(expensesList.reduce((sum, exp) => sum + computeExpenseTotal(exp).totalAmount, 0))} €
-                </strong>
+                Total: <strong className="text-slate-900 font-mono">{fmt(expensesList.reduce((sum, exp) => sum + computeExpenseTotal(exp).totalAmount, 0))} €</strong>
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setShowAddExpenseModal(false)}
-                  className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
-                <button
-                  onClick={handleAddAllExpenses}
+                <button onClick={() => setShowAddExpenseModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
+                <button onClick={handleAddAllExpenses}
                   disabled={saving || !expensePersonForm.name.trim() || expensesList.filter(e => e.supplier.trim() && e.items.some(item => item.baseAmount > 0 && item.subAccountCode)).length === 0}
-                  className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50"
-                  style={{ backgroundColor: "#2F52E0" }}>
-                  {saving ? "Guardando..." : (() => {
-                    const count = expensesList.filter(e => e.supplier.trim() && e.items.some(item => item.baseAmount > 0 && item.subAccountCode)).length;
-                    return `Añadir ${count} gasto${count !== 1 ? "s" : ""}`;
-                  })()}
+                  className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
+                  {saving ? "Guardando..." : `Añadir ${expensesList.filter(e => e.supplier.trim() && e.items.some(item => item.baseAmount > 0 && item.subAccountCode)).length} gasto${expensesList.filter(e => e.supplier.trim() && e.items.some(item => item.baseAmount > 0 && item.subAccountCode)).length !== 1 ? "s" : ""}`}
                 </button>
               </div>
             </div>
@@ -3527,14 +3347,12 @@ export default function BoxesPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Referencia de la transferencia *</label>
-                <input type="text" value={transferRef} onChange={e => setTransferRef(e.target.value)}
-                  placeholder="Ej: 2024-TRF-001"
+                <input type="text" value={transferRef} onChange={e => setTransferRef(e.target.value)} placeholder="Ej: 2024-TRF-001"
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
               </div>
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-              <button onClick={() => setShowMarkTransferredModal(false)}
-                className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
+              <button onClick={() => setShowMarkTransferredModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
               <button onClick={handleMarkTransferred} disabled={saving || !transferRef.trim()}
                 className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
                 <Check size={14} /> {saving ? "Guardando..." : "Confirmar"}
@@ -3544,7 +3362,7 @@ export default function BoxesPage() {
         </div>
       )}
 
-      {/* Account Selector Dropdown (Fixed) */}
+      {/* Account Selector (Transfer modal) */}
       {showAccountSelector && accountSelectorPos && editingExpenseIndex !== null && (
         <>
           <div className="fixed inset-0 z-[60]" onClick={() => { setShowAccountSelector(false); setEditingExpenseIndex(null); }} />
@@ -3552,17 +3370,12 @@ export default function BoxesPage() {
             className="fixed z-[70] w-80 bg-white border border-slate-200 rounded-xl shadow-xl"
             style={{ top: Math.min(accountSelectorPos.top, window.innerHeight - 300), left: accountSelectorPos.left }}>
             <div className="p-2 border-b border-slate-100">
-              <input type="text" value={accountSearchTerm}
-                onChange={e => setAccountSearchTerm(e.target.value)}
-                placeholder="Buscar cuenta"
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-900"
-                autoFocus />
+              <input type="text" value={accountSearchTerm} onChange={e => setAccountSearchTerm(e.target.value)} placeholder="Buscar cuenta"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-900" autoFocus />
             </div>
             <div className="max-h-64 overflow-y-auto">
               {subAccounts
-                .filter(sa => !accountSearchTerm ||
-                  sa.code.toLowerCase().includes(accountSearchTerm.toLowerCase()) ||
-                  sa.description.toLowerCase().includes(accountSearchTerm.toLowerCase()))
+                .filter(sa => !accountSearchTerm || sa.code.toLowerCase().includes(accountSearchTerm.toLowerCase()) || sa.description.toLowerCase().includes(accountSearchTerm.toLowerCase()))
                 .slice(0, 50)
                 .map(sa => (
                   <button key={sa.id} type="button"
@@ -3587,34 +3400,27 @@ export default function BoxesPage() {
                     <span className="text-sm text-slate-700 truncate">{sa.description}</span>
                   </button>
                 ))}
-              {subAccounts.filter(sa =>
-                !accountSearchTerm ||
-                sa.code.toLowerCase().includes(accountSearchTerm.toLowerCase()) ||
-                sa.description.toLowerCase().includes(accountSearchTerm.toLowerCase())
-              ).length === 0 && (
+              {subAccounts.filter(sa => !accountSearchTerm || sa.code.toLowerCase().includes(accountSearchTerm.toLowerCase()) || sa.description.toLowerCase().includes(accountSearchTerm.toLowerCase())).length === 0 && (
                 <p className="px-3 py-4 text-sm text-slate-400 text-center">Sin resultados</p>
               )}
             </div>
           </div>
         </>
       )}
+
+      {/* Account Selector (Card modal) */}
       {showCardAccountSelector && cardAccountSelectorPos && editingCardExpenseIndex !== null && (
         <>
           <div className="fixed inset-0 z-[60]" onClick={() => { setShowCardAccountSelector(false); setEditingCardExpenseIndex(null); }} />
           <div className="fixed z-[70] w-80 bg-white border border-slate-200 rounded-xl shadow-xl"
             style={{ top: Math.min(cardAccountSelectorPos.top, window.innerHeight - 300), left: cardAccountSelectorPos.left }}>
             <div className="p-2 border-b border-slate-100">
-              <input type="text" value={cardAccountSearch}
-                onChange={e => setCardAccountSearch(e.target.value)}
-                placeholder="Buscar cuenta"
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-900"
-                autoFocus />
+              <input type="text" value={cardAccountSearch} onChange={e => setCardAccountSearch(e.target.value)} placeholder="Buscar cuenta"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-900" autoFocus />
             </div>
             <div className="max-h-64 overflow-y-auto">
               {subAccounts
-                .filter(sa => !cardAccountSearch ||
-                  sa.code.toLowerCase().includes(cardAccountSearch.toLowerCase()) ||
-                  sa.description.toLowerCase().includes(cardAccountSearch.toLowerCase()))
+                .filter(sa => !cardAccountSearch || sa.code.toLowerCase().includes(cardAccountSearch.toLowerCase()) || sa.description.toLowerCase().includes(cardAccountSearch.toLowerCase()))
                 .slice(0, 50)
                 .map(sa => (
                   <button key={sa.id} type="button"
@@ -3631,11 +3437,7 @@ export default function BoxesPage() {
                     <span className="text-sm text-slate-700 truncate">{sa.description}</span>
                   </button>
                 ))}
-              {subAccounts.filter(sa =>
-                !cardAccountSearch ||
-                sa.code.toLowerCase().includes(cardAccountSearch.toLowerCase()) ||
-                sa.description.toLowerCase().includes(cardAccountSearch.toLowerCase())
-              ).length === 0 && (
+              {subAccounts.filter(sa => !cardAccountSearch || sa.code.toLowerCase().includes(cardAccountSearch.toLowerCase()) || sa.description.toLowerCase().includes(cardAccountSearch.toLowerCase())).length === 0 && (
                 <p className="px-3 py-4 text-sm text-slate-400 text-center">Sin resultados</p>
               )}
             </div>
