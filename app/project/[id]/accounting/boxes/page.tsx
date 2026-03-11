@@ -2134,11 +2134,11 @@ export default function BoxesPage() {
       {/* ═══════════════════════════════════════════════════════════════════════ */}
 
       {drawerExpense && (
-        <div className="fixed top-[45px] inset-x-0 bottom-0 z-30 bg-black/10 backdrop-blur-[1px]" onClick={closeDrawer} />
+        <div className="fixed top-[57px] inset-x-0 bottom-0 z-30 bg-black/10 backdrop-blur-[1px]" onClick={closeDrawer} />
       )}
 
       {/* Drawer — expands to double panel when preview is open */}
-      <div className={`fixed top-[45px] right-0 bg-white shadow-2xl z-40 flex flex-col transition-all duration-300 ease-out ${drawerExpense ? "translate-x-0" : "translate-x-full"} ${drawerShowPreview ? "w-[900px]" : "w-[480px]"}`} style={{ height: "calc(100vh - 45px)" }}>
+      <div className={`fixed top-[57px] right-0 bg-white shadow-2xl z-40 flex flex-col transition-all duration-300 ease-out ${drawerExpense ? "translate-x-0" : "translate-x-full"} ${drawerShowPreview ? "w-[900px]" : "w-[480px]"}`} style={{ height: "calc(100vh - 57px)" }}>
         {drawerExpense && (() => {
           const hasConflict = !!drawerExpense.conflictType;
           const conflictCfg = hasConflict ? CONFLICT_CONFIG[drawerExpense.conflictType!] : null;
@@ -2149,6 +2149,13 @@ export default function BoxesPage() {
             : null;
           const docType = getDocumentType(drawerExpense.documentUrl || "");
 
+          // Navigation within envelope
+          const navList = envelopeExpenses; // sorted same as table
+          const navIdx = navList.findIndex(e => e.id === drawerExpense.id);
+          const hasPrev = navIdx > 0;
+          const hasNext = navIdx < navList.length - 1;
+          const goTo = (idx: number) => openDrawer(navList[idx], drawerShowPreview);
+
           return (
             <div className="flex flex-1 overflow-hidden">
               {/* ── Left side: form ── */}
@@ -2156,6 +2163,24 @@ export default function BoxesPage() {
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 flex-shrink-0">
                   <div className="flex items-center gap-3">
+                    {/* Prev/Next arrows */}
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        onClick={() => hasPrev && goTo(navIdx - 1)}
+                        disabled={!hasPrev}
+                        className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                        title="Gasto anterior">
+                        <ChevronLeft size={15} />
+                      </button>
+                      <span className="text-xs text-slate-400 tabular-nums">{navIdx + 1}/{navList.length}</span>
+                      <button
+                        onClick={() => hasNext && goTo(navIdx + 1)}
+                        disabled={!hasNext}
+                        className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                        title="Gasto siguiente">
+                        <ChevronRight size={15} />
+                      </button>
+                    </div>
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${drawerExpense.type === "ticket" ? "bg-amber-50" : "bg-blue-50"}`}>
                       {drawerExpense.type === "ticket"
                         ? <Receipt size={16} className="text-amber-500" />
@@ -2511,17 +2536,19 @@ export default function BoxesPage() {
 
                 {/* Drawer footer */}
                 <div className="flex items-center justify-between px-5 py-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     {drawerExpense.documentUrl && (
                       <a href={drawerExpense.documentUrl} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50">
-                        <ExternalLink size={12} /> Abrir en nueva pestaña
+                        title="Abrir documento en nueva pestaña"
+                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                        <ExternalLink size={15} />
                       </a>
                     )}
                     {drawerExpense.pleoUrl && (
                       <a href={drawerExpense.pleoUrl} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-600 border border-slate-200 rounded-lg hover:bg-white">
-                        <ExternalLink size={12} /> Ver en Pleo
+                        title="Ver en Pleo"
+                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors text-xs font-medium flex items-center gap-1">
+                        <ExternalLink size={15} /> Pleo
                       </a>
                     )}
                   </div>
@@ -2533,7 +2560,7 @@ export default function BoxesPage() {
                     <button onClick={handleSaveDrawer} disabled={drawerSaving}
                       className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium text-white rounded-lg disabled:opacity-50 transition-colors"
                       style={{ backgroundColor: "#2F52E0" }}>
-                      <Save size={12} /> {drawerSaving ? "Guardando..." : "Guardar cambios"}
+                      {drawerSaving ? "Guardando..." : "Guardar"}
                     </button>
                   </div>
                 </div>
