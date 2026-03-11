@@ -422,9 +422,9 @@ export default function BoxesPage() {
   // ═══════════════════════════════════════════════════════════════════════════════
 
   // ─── Expense Drawer helpers ──────────────────────────────────────────────────
-  const openDrawer = (expense: BoxExpense) => {
+  const openDrawer = (expense: BoxExpense, showPreview = false) => {
     setDrawerExpense(expense);
-    setDrawerShowPreview(false);
+    setDrawerShowPreview(showPreview);
     setDrawerForm({
       supplier: expense.supplier,
       supplierTaxId: expense.supplierTaxId || "",
@@ -1492,14 +1492,19 @@ export default function BoxesPage() {
   const totalTarjetasAmount = expenses.reduce((s, e) => s + e.totalAmount, 0);
   const totalTransferAmount = transferEnvelopes.reduce((s, e) => s + e.totalAmount, 0);
 
-  // Detect document type for preview
+  // Detect document type for preview — Firebase Storage URLs encode the filename in the `o` query param
   const getDocumentType = (url: string): "pdf" | "image" | null => {
     if (!url) return null;
-    const lower = url.toLowerCase();
-    if (lower.includes(".pdf") || lower.includes("pdf")) return "pdf";
-    if (lower.includes(".jpg") || lower.includes(".jpeg") || lower.includes(".png") || lower.includes(".webp")
-      || lower.includes("image")) return "image";
-    return "pdf"; // default assumption
+    // Try to extract the actual filename from Firebase Storage URL (?o=path%2Ffile.pdf&...)
+    let filename = url;
+    try {
+      const u = new URL(url);
+      const o = u.searchParams.get("o") || u.pathname;
+      filename = decodeURIComponent(o).toLowerCase();
+    } catch { filename = url.toLowerCase(); }
+    if (filename.includes(".pdf")) return "pdf";
+    if (filename.includes(".jpg") || filename.includes(".jpeg") || filename.includes(".png") || filename.includes(".webp")) return "image";
+    return "pdf"; // default
   };
 
   // ─── Loading / Access ─────────────────────────────────────────────────────────
@@ -1912,7 +1917,7 @@ export default function BoxesPage() {
                                   <div className="flex items-center justify-center gap-1">
                                     {expense.documentUrl && (
                                       <button
-                                        onClick={() => { openDrawer(expense); setDrawerShowPreview(true); }}
+                                        onClick={() => openDrawer(expense, true)}
                                         className="p-1.5 text-blue-500 hover:text-blue-600 hover:bg-blue-50 rounded" title="Ver documento">
                                         <Eye size={14} />
                                       </button>
