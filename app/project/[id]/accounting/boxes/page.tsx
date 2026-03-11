@@ -2211,9 +2211,9 @@ export default function BoxesPage() {
                     </div>
                   )}
 
-                  {/* Pleo amount diff */}
+                  {/* Pleo amount + linked charges */}
                   {drawerExpense.pleoAmount && drawerExpense.pleoAmount > 0 && (
-                    <div className="mx-5 mt-3">
+                    <div className={`mx-5 ${hasConflict ? "mt-3" : "mt-4"}`}>
                       <div className={`flex items-center justify-between p-2.5 rounded-lg text-xs ${amountDiff && Math.abs(amountDiff) > 0.02 ? "bg-amber-50 border border-amber-100" : "bg-slate-50"}`}>
                         <span className="text-slate-500">Cargo real en Pleo</span>
                         <span className={`font-mono font-semibold ${amountDiff && Math.abs(amountDiff) > 0.02 ? "text-amber-700" : "text-slate-700"}`}>
@@ -2223,6 +2223,29 @@ export default function BoxesPage() {
                           )}
                         </span>
                       </div>
+                      {/* Linked charges: shown when invoice covers multiple card charges */}
+                      {drawerExpense.conflictType === "invoice_covers_multiple" && drawerExpense.linkedCharges && drawerExpense.linkedCharges.length > 0 && (
+                        <div className="mt-1.5 border border-blue-100 rounded-lg overflow-hidden">
+                          <div className="bg-blue-50 px-3 py-1.5 flex items-center justify-between">
+                            <span className="text-xs font-medium text-blue-700">Cargos de tarjeta vinculados</span>
+                            <span className="text-xs text-blue-500">{drawerExpense.linkedCharges.length} cargo{drawerExpense.linkedCharges.length !== 1 ? "s" : ""}</span>
+                          </div>
+                          <div className="divide-y divide-blue-50 bg-white">
+                            {drawerExpense.linkedCharges.map((charge, ci) => (
+                              <div key={ci} className="flex items-center justify-between px-3 py-2">
+                                <span className="text-xs text-slate-500">{charge.date || "—"}</span>
+                                <span className="text-xs font-mono font-medium text-slate-800">{fmt(charge.amount)} €</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="bg-blue-50 px-3 py-1.5 flex items-center justify-between border-t border-blue-100">
+                            <span className="text-xs font-medium text-blue-600">Total cargos</span>
+                            <span className="text-xs font-mono font-semibold text-blue-700">
+                              {fmt(drawerExpense.linkedCharges.reduce((s, c) => s + (c.amount || 0), 0))} €
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
