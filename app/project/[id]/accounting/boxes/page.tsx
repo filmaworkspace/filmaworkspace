@@ -1087,29 +1087,51 @@ export default function BoxesPage() {
         [`${folderName}/${folderName}.xlsx`]: xlsxZip,
       };
 
-      // Download each document using Firebase Storage getBlob (CORS-safe)
+      // Download documents — try getBlob first (Firebase SDK), fallback to fetch with token URL
+      let docsIncluded = 0;
       const fetchPromises = exps
         .filter(e => e.documentUrl)
         .map(async (e) => {
           try {
-            // Firebase Storage download URLs encode the storage path in ?o=
-            // e.g. https://firebasestorage.googleapis.com/v0/b/bucket/o/path%2Ffile.pdf?alt=media&token=...
-            let storagePath = "";
+            // Extract extension from storage path in the URL
             let ext = "pdf";
             try {
               const u = new URL(e.documentUrl!);
-              storagePath = decodeURIComponent(u.searchParams.get("o") || u.pathname.split("/o/")[1] || "");
-              const match = storagePath.match(/\.(\w{2,4})$/);
+              // Firebase Storage URL: path is in ?o= param
+              const o = u.searchParams.get("o");
+              const pathForExt = o ? decodeURIComponent(o) : u.pathname;
+              const match = pathForExt.match(/\.(\w{2,4})(?:[?#]|$)/);
               if (match) ext = match[1].toLowerCase();
-            } catch { /* keep defaults */ }
+            } catch { /* keep pdf */ }
 
-            if (!storagePath) return;
-            const storageRef = ref(storage, storagePath);
-            const blob = await getBlob(storageRef);
-            const buf = await blob.arrayBuffer();
-            zipEntries[`${folderName}/documents/${e.displayNumber}.${ext}`] = new Uint8Array(buf);
+            let buf: ArrayBuffer | null = null;
+
+            // Method 1: Firebase getBlob via storage path
+            try {
+              const u = new URL(e.documentUrl!);
+              const o = u.searchParams.get("o");
+              if (o) {
+                const storagePath = decodeURIComponent(o);
+                const storageRef = ref(storage, storagePath);
+                const blob = await getBlob(storageRef);
+                buf = await blob.arrayBuffer();
+              }
+            } catch (err1) {
+              console.warn(`getBlob falló para ${e.displayNumber}, intentando fetch:`, err1);
+            }
+
+            // Method 2: fetch with full signed URL (includes token, works cross-origin)
+            if (!buf) {
+              const resp = await fetch(e.documentUrl!, { mode: "cors" });
+              if (resp.ok) buf = await resp.arrayBuffer();
+            }
+
+            if (buf && buf.byteLength > 0) {
+              zipEntries[`${folderName}/documents/${e.displayNumber}.${ext}`] = new Uint8Array(buf);
+              docsIncluded++;
+            }
           } catch (err) {
-            console.warn(`No se pudo descargar documento de ${e.displayNumber}:`, err);
+            console.warn(`No se pudo descargar ${e.displayNumber}:`, err);
           }
         });
       await Promise.all(fetchPromises);
@@ -1123,8 +1145,7 @@ export default function BoxesPage() {
       a.click();
       URL.revokeObjectURL(url);
 
-      const docsCount = exps.filter(e => e.documentUrl).length;
-      showToast("success", `Sobre exportado · ${docsCount} documento${docsCount !== 1 ? "s" : ""} incluido${docsCount !== 1 ? "s" : ""}`);
+      showToast("success", `Sobre exportado · ${docsIncluded} documento${docsIncluded !== 1 ? "s" : ""} incluido${docsIncluded !== 1 ? "s" : ""}`);
     } catch (e) {
       console.error(e);
       showToast("error", "Error al exportar");
@@ -2141,11 +2162,11 @@ export default function BoxesPage() {
       {/* ═══════════════════════════════════════════════════════════════════════ */}
 
       {drawerExpense && (
-        <div className="fixed top-[57px] inset-x-0 bottom-0 z-30 bg-black/10 backdrop-blur-[1px]" onClick={closeDrawer} />
+        <div className="fixed top-[72px] inset-x-0 bottom-0 z-30 bg-black/10 backdrop-blur-[1px]" onClick={closeDrawer} />
       )}
 
       {/* Drawer — expands to double panel when preview is open */}
-      <div className={`fixed top-[57px] right-0 bg-white shadow-2xl z-40 flex flex-col transition-all duration-300 ease-out ${drawerExpense ? "translate-x-0" : "translate-x-full"} ${drawerShowPreview ? "w-[900px]" : "w-[480px]"}`} style={{ height: "calc(100vh - 57px)" }}>
+      <div className={`fixed top-[72px] right-0 bg-white shadow-2xl z-40 flex flex-col transition-all duration-300 ease-out ${drawerExpense ? "translate-x-0" : "translate-x-full"} ${drawerShowPreview ? "w-[900px]" : "w-[480px]"}`} style={{ height: "calc(100vh - 72px)" }}>
         {drawerExpense && (() => {
           const hasConflict = !!drawerExpense.conflictType;
           const conflictCfg = hasConflict ? CONFLICT_CONFIG[drawerExpense.conflictType!] : null;
