@@ -1089,8 +1089,11 @@ export default function BoxesPage() {
 
       // Download documents — try getBlob first (Firebase SDK), fallback to fetch with token URL
       let docsIncluded = 0;
-      const fetchPromises = exps
-        .filter(e => e.documentUrl)
+      const expsWithDocs = exps.filter(e => e.documentUrl);
+      console.log(`[Export] ${expsWithDocs.length} gastos con documento`);
+      expsWithDocs.forEach(e => console.log(`[Export] - ${e.displayNumber}: ${e.documentUrl}`));
+
+      const fetchPromises = expsWithDocs
         .map(async (e) => {
           try {
             // Extract extension from storage path in the URL
@@ -1102,7 +1105,8 @@ export default function BoxesPage() {
               const pathForExt = o ? decodeURIComponent(o) : u.pathname;
               const match = pathForExt.match(/\.(\w{2,4})(?:[?#]|$)/);
               if (match) ext = match[1].toLowerCase();
-            } catch { /* keep pdf */ }
+              console.log(`[Export] ${e.displayNumber} → path: ${pathForExt} → ext: ${ext}`);
+            } catch (parseErr) { console.warn(`[Export] URL parse error:`, parseErr); }
 
             let buf: ArrayBuffer | null = null;
 
@@ -1112,29 +1116,43 @@ export default function BoxesPage() {
               const o = u.searchParams.get("o");
               if (o) {
                 const storagePath = decodeURIComponent(o);
+                console.log(`[Export] getBlob attempt: "${storagePath}"`);
                 const storageRef = ref(storage, storagePath);
                 const blob = await getBlob(storageRef);
                 buf = await blob.arrayBuffer();
+                console.log(`[Export] getBlob OK: ${buf.byteLength} bytes`);
               }
             } catch (err1) {
-              console.warn(`getBlob falló para ${e.displayNumber}, intentando fetch:`, err1);
+              console.warn(`[Export] getBlob failed for ${e.displayNumber}:`, err1);
             }
 
-            // Method 2: fetch with full signed URL (includes token, works cross-origin)
+            // Method 2: fetch with full signed URL
             if (!buf) {
-              const resp = await fetch(e.documentUrl!, { mode: "cors" });
-              if (resp.ok) buf = await resp.arrayBuffer();
+              try {
+                console.log(`[Export] fetch attempt: ${e.documentUrl}`);
+                const resp = await fetch(e.documentUrl!, { mode: "cors" });
+                console.log(`[Export] fetch status: ${resp.status}`);
+                if (resp.ok) buf = await resp.arrayBuffer();
+              } catch (err2) {
+                console.warn(`[Export] fetch failed for ${e.displayNumber}:`, err2);
+              }
             }
 
             if (buf && buf.byteLength > 0) {
-              zipEntries[`${folderName}/documents/${e.displayNumber}.${ext}`] = new Uint8Array(buf);
+              const key = `${folderName}/documents/${e.displayNumber}.${ext}`;
+              console.log(`[Export] Adding to ZIP: "${key}" (${buf.byteLength} bytes)`);
+              zipEntries[key] = new Uint8Array(buf);
               docsIncluded++;
+            } else {
+              console.error(`[Export] No buffer for ${e.displayNumber}`);
             }
           } catch (err) {
-            console.warn(`No se pudo descargar ${e.displayNumber}:`, err);
+            console.warn(`[Export] Uncaught error for ${e.displayNumber}:`, err);
           }
         });
       await Promise.all(fetchPromises);
+      console.log(`[Export] ZIP entries:`, Object.keys(zipEntries));
+      console.log(`[Export] docsIncluded: ${docsIncluded}`);
 
       const outerZip = zipSync(zipEntries);
       const blob = new Blob([outerZip], { type: "application/zip" });
@@ -1573,7 +1591,7 @@ export default function BoxesPage() {
       )}
 
       {/* Header */}
-      <div className="mt-[4rem]">
+      <div className="mt-[4.5rem]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-center justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
