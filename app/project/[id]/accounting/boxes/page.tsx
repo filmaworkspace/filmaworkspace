@@ -1087,72 +1087,41 @@ export default function BoxesPage() {
         [`${folderName}/${folderName}.xlsx`]: xlsxZip,
       };
 
-      // Download documents — try getBlob first (Firebase SDK), fallback to fetch with token URL
+      // Download documents using Firebase Storage getBlob (CORS-safe)
       let docsIncluded = 0;
       const expsWithDocs = exps.filter(e => e.documentUrl);
-      console.log(`[Export] ${expsWithDocs.length} gastos con documento`);
-      expsWithDocs.forEach(e => console.log(`[Export] - ${e.displayNumber}: ${e.documentUrl}`));
 
-      const fetchPromises = expsWithDocs
-        .map(async (e) => {
+      const fetchPromises = expsWithDocs.map(async (e) => {
           try {
-            // Extract extension from storage path in the URL
-            let ext = "pdf";
-            try {
-              const u = new URL(e.documentUrl!);
-              // Firebase Storage URL: path is in ?o= param
-              const o = u.searchParams.get("o");
-              const pathForExt = o ? decodeURIComponent(o) : u.pathname;
-              const match = pathForExt.match(/\.(\w{2,4})(?:[?#]|$)/);
-              if (match) ext = match[1].toLowerCase();
-              console.log(`[Export] ${e.displayNumber} → path: ${pathForExt} → ext: ${ext}`);
-            } catch (parseErr) { console.warn(`[Export] URL parse error:`, parseErr); }
-
-            let buf: ArrayBuffer | null = null;
-
-            // Method 1: Firebase getBlob via storage path
-            try {
-              const u = new URL(e.documentUrl!);
-              const o = u.searchParams.get("o");
-              if (o) {
-                const storagePath = decodeURIComponent(o);
-                console.log(`[Export] getBlob attempt: "${storagePath}"`);
-                const storageRef = ref(storage, storagePath);
-                const blob = await getBlob(storageRef);
-                buf = await blob.arrayBuffer();
-                console.log(`[Export] getBlob OK: ${buf.byteLength} bytes`);
-              }
-            } catch (err1) {
-              console.warn(`[Export] getBlob failed for ${e.displayNumber}:`, err1);
+            // URL format: https://firebasestorage.googleapis.com/v0/b/BUCKET/o/PATH?alt=media&token=...
+            // Storage path is in the pathname after /o/
+            const u = new URL(e.documentUrl!);
+            const pathMatch = u.pathname.match(/\/o\/(.+)$/);
+            if (!pathMatch) {
+              console.warn(`[Export] No se pudo extraer path de: ${e.documentUrl}`);
+              return;
             }
+            const storagePath = decodeURIComponent(pathMatch[1]);
+            const extMatch = storagePath.match(/\.(\w{2,4})$/);
+            const ext = extMatch ? extMatch[1].toLowerCase() : "pdf";
 
-            // Method 2: fetch with full signed URL
-            if (!buf) {
-              try {
-                console.log(`[Export] fetch attempt: ${e.documentUrl}`);
-                const resp = await fetch(e.documentUrl!, { mode: "cors" });
-                console.log(`[Export] fetch status: ${resp.status}`);
-                if (resp.ok) buf = await resp.arrayBuffer();
-              } catch (err2) {
-                console.warn(`[Export] fetch failed for ${e.displayNumber}:`, err2);
-              }
-            }
+            console.log(`[Export] getBlob: "${storagePath}" → .${ext}`);
+            const storageRef = ref(storage, storagePath);
+            const blob = await getBlob(storageRef);
+            const buf = await blob.arrayBuffer();
 
-            if (buf && buf.byteLength > 0) {
+            if (buf.byteLength > 0) {
               const key = `${folderName}/documents/${e.displayNumber}.${ext}`;
-              console.log(`[Export] Adding to ZIP: "${key}" (${buf.byteLength} bytes)`);
               zipEntries[key] = new Uint8Array(buf);
               docsIncluded++;
-            } else {
-              console.error(`[Export] No buffer for ${e.displayNumber}`);
+              console.log(`[Export] ✓ ${key} (${buf.byteLength} bytes)`);
             }
           } catch (err) {
-            console.warn(`[Export] Uncaught error for ${e.displayNumber}:`, err);
+            console.warn(`[Export] Error en ${e.displayNumber}:`, err);
           }
         });
       await Promise.all(fetchPromises);
       console.log(`[Export] ZIP entries:`, Object.keys(zipEntries));
-      console.log(`[Export] docsIncluded: ${docsIncluded}`);
 
       const outerZip = zipSync(zipEntries);
       const blob = new Blob([outerZip], { type: "application/zip" });
