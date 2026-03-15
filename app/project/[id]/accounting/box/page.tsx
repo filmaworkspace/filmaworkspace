@@ -1560,7 +1560,7 @@ export default function BoxesPage() {
       )}
 
       {/* Header */}
-      <div className="mt-[4rem]">
+      <div className="mt-[57px]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-center justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
