@@ -16,14 +16,35 @@ interface ExpenseData {
   supplier: string;
   supplierNumber: string;
   date: string;
-  type: "invoice" | "ticket";
+  type: string; // "invoice"|"ticket"|"proforma"|"budget"|"guarantee"
   items: ExpenseItem[];
   baseAmount: number;
   vatAmount: number;
   irpfRate: number;
   irpfAmount: number;
   totalAmount: number;
+  // optional — payment info from document-center
+  status?: string;
+  paidAt?: string | null;
+  paymentMethod?: string | null;
+  paymentReference?: string | null;
 }
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  invoice:   "Factura",
+  ticket:    "Ticket",
+  proforma:  "Proforma",
+  budget:    "Presupuesto",
+  guarantee: "Fianza",
+};
+
+const PAYMENT_METHODS: Record<string, string> = {
+  transfer:     "Transferencia bancaria",
+  card:         "Tarjeta",
+  cash:         "Efectivo",
+  check:        "Cheque",
+  direct_debit: "Domiciliación",
+};
 
 const fmt = (n: number) =>
   n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -41,12 +62,13 @@ const fmtDate = (iso: string) => {
 async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
   const pageWidth = 595;
   const padding   = 20;
-  const headerH   = 32;          // dark bar — only ID + date/type
-  const subH      = 24;          // white bar — supplier + invoice number
+  const headerH   = 32;
+  const subH      = 24;
   const lineH     = 15;
   const itemsH    = Math.max(1, expense.items.length) * lineH + 8;
+  const paymentH  = (expense.status === "paid" && expense.paidAt) ? 20 : 0;
   const footerH   = 26;
-  const pageHeight = headerH + subH + itemsH + footerH + padding + 8;
+  const pageHeight = headerH + subH + itemsH + paymentH + footerH + padding + 8;
 
   const pdfDoc = await PDFDocument.create();
   const page   = pdfDoc.addPage([pageWidth, pageHeight]);
@@ -58,25 +80,22 @@ async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
   const mid    = rgb(0.44, 0.50, 0.56);
   const white  = rgb(1, 1, 1);
   const light  = rgb(0.95, 0.96, 0.97);
+  const green  = rgb(0.13, 0.77, 0.37);
   const border = rgb(0.85, 0.87, 0.89);
 
-  // ── White background ────────────────────────────────────────────────
   page.drawRectangle({ x: 0, y: 0, width: pageWidth, height: pageHeight, color: white });
 
-  // ── Dark header bar ──────────────────────────────────────────────────
+  // Dark header bar
   const hY = pageHeight - headerH;
   page.drawRectangle({ x: 0, y: hY, width: pageWidth, height: headerH, color: dark });
-  // Orange left accent
   page.drawRectangle({ x: 0, y: hY, width: 4, height: headerH, color: orange });
 
-  // ID — bold white, vertically centered
   page.drawText(expense.displayNumber, {
     x: padding, y: hY + (headerH - 13) / 2,
     size: 13, font: fontB, color: white,
   });
 
-  // Date · Type — right, same vertical center
-  const typeLabel = expense.type === "invoice" ? "Factura" : "Ticket";
+  const typeLabel = DOC_TYPE_LABELS[expense.type] || expense.type;
   const dateStr = `${fmtDate(expense.date)}  ·  ${typeLabel}`;
   const dateW = fontR.widthOfTextAtSize(dateStr, 9);
   page.drawText(dateStr, {
@@ -84,18 +103,16 @@ async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
     size: 9, font: fontR, color: rgb(0.7, 0.75, 0.8),
   });
 
-  // ── Supplier sub-row ─────────────────────────────────────────────────
+  // Supplier sub-row
   const subY = hY - subH;
-  // Subtle bottom border under sub-row
   page.drawLine({ start: { x: 0, y: subY }, end: { x: pageWidth, y: subY }, thickness: 0.5, color: border });
-
   const supplierParts = [expense.supplier, expense.supplierNumber].filter(Boolean).join("  ·  ");
   page.drawText(supplierParts, {
     x: padding, y: subY + (subH - 10) / 2,
     size: 10, font: fontB, color: dark,
   });
 
-  // ── Items ─────────────────────────────────────────────────────────────
+  // Items
   const itemsTop = subY - 8;
   expense.items.forEach((item, i) => {
     const y = itemsTop - i * lineH;
@@ -104,22 +121,31 @@ async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
     }
     const account = [item.subAccountCode, item.subAccountDescription].filter(Boolean).join(" · ") || "—";
     page.drawText(account, { x: padding, y: y + 2, size: 8, font: fontR, color: dark });
-
     const baseStr = `Base: ${fmtNum(item.baseAmount)}`;
     page.drawText(baseStr, { x: 300, y: y + 2, size: 8, font: fontR, color: mid });
-
     const vatStr = `IVA ${item.vatRate}%: ${fmtNum(item.vatAmount)}`;
     const vatW = fontR.widthOfTextAtSize(vatStr, 8);
     page.drawText(vatStr, { x: pageWidth - padding - vatW, y: y + 2, size: 8, font: fontR, color: mid });
   });
 
-  // ── Divider ───────────────────────────────────────────────────────────
-  const divY = itemsTop - expense.items.length * lineH - 4;
-  page.drawLine({ start: { x: padding, y: divY }, end: { x: pageWidth - padding, y: divY }, thickness: 0.5, color: border });
+  // Payment row (only for paid invoices from document-center)
+  const afterItemsY = itemsTop - expense.items.length * lineH - 4;
+  if (expense.status === "paid" && expense.paidAt) {
+    const payY = afterItemsY - 2;
+    page.drawRectangle({ x: 0, y: payY - 3, width: pageWidth, height: paymentH, color: rgb(0.93, 0.99, 0.95) });
+    const payMethod = expense.paymentMethod ? (PAYMENT_METHODS[expense.paymentMethod] || expense.paymentMethod) : "";
+    const parts = ["✓ Pagada el " + fmtDate(expense.paidAt), payMethod, expense.paymentReference ? "Ref: " + expense.paymentReference : ""].filter(Boolean).join("  ·  ");
+    page.drawText(parts, { x: padding, y: payY + 4, size: 8, font: fontB, color: green });
+  }
 
-  // ── Footer totals ─────────────────────────────────────────────────────
-  const footerY = divY - 16;
+  // Divider
+  const divBase = (expense.status === "paid" && expense.paidAt)
+    ? afterItemsY - paymentH - 6
+    : afterItemsY - 4;
+  page.drawLine({ start: { x: padding, y: divBase }, end: { x: pageWidth - padding, y: divBase }, thickness: 0.5, color: border });
 
+  // Footer totals
+  const footerY = divBase - 16;
   page.drawText("Base imponible:", { x: padding, y: footerY, size: 8, font: fontR, color: mid });
   page.drawText(fmt(expense.baseAmount), { x: padding + 75, y: footerY, size: 8, font: fontB, color: dark });
 
@@ -135,13 +161,10 @@ async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
   page.drawText(totalLabelStr, { x: pageWidth - padding - totalValW - totalLabelW - 6, y: footerY, size: 8, font: fontR, color: mid });
   page.drawText(totalValStr, { x: pageWidth - padding - totalValW, y: footerY, size: 9, font: fontB, color: dark });
 
-  // Watermark — bottom right, tiny grey
+  // Watermark
   const watermark = "Generado por Filma Workspace · filmaworkspace.com";
   const wmW = fontR.widthOfTextAtSize(watermark, 6);
-  page.drawText(watermark, {
-    x: pageWidth - padding - wmW, y: 5,
-    size: 6, font: fontR, color: rgb(0.75, 0.78, 0.82),
-  });
+  page.drawText(watermark, { x: pageWidth - padding - wmW, y: 5, size: 6, font: fontR, color: rgb(0.75, 0.78, 0.82) });
 
   return pdfDoc.save();
 }
