@@ -324,7 +324,7 @@ export default function Header() {
           {/* BOX Icon - Solo visible en sección accounting */}
           {isAccountingSection && projectId && permissions.accounting && (
             <Link
-              href={`/project/${projectId}/accounting/boxes`}
+              href={`/project/${projectId}/accounting/box`}
               className="hidden md:flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 shadow-sm hover:shadow-md hover:scale-105 transition-all"
               title="Cajas (BOX)"
             >
