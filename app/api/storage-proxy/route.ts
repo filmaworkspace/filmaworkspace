@@ -1,3 +1,5 @@
+// app/api/storage-proxy/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
@@ -132,6 +134,14 @@ async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
   const totalLabelW = fontR.widthOfTextAtSize(totalLabelStr, 8);
   page.drawText(totalLabelStr, { x: pageWidth - padding - totalValW - totalLabelW - 6, y: footerY, size: 8, font: fontR, color: mid });
   page.drawText(totalValStr, { x: pageWidth - padding - totalValW, y: footerY, size: 9, font: fontB, color: dark });
+
+  // Watermark — bottom right, tiny grey
+  const watermark = "Generado por Filma Workspace · filmaworkspace.com";
+  const wmW = fontR.widthOfTextAtSize(watermark, 6);
+  page.drawText(watermark, {
+    x: pageWidth - padding - wmW, y: 5,
+    size: 6, font: fontR, color: rgb(0.75, 0.78, 0.82),
+  });
 
   return pdfDoc.save();
 }
