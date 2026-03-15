@@ -1560,7 +1560,7 @@ export default function BoxesPage() {
       )}
 
       {/* Header */}
-      <div className="mt-[57px]">
+      <div className="mt-[53px]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-center justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
@@ -2149,11 +2149,11 @@ export default function BoxesPage() {
       {/* ═══════════════════════════════════════════════════════════════════════ */}
 
       {drawerExpense && (
-        <div className="fixed top-[72px] inset-x-0 bottom-0 z-30 bg-black/10 backdrop-blur-[1px]" onClick={closeDrawer} />
+        <div className="fixed top-[53px] inset-x-0 bottom-0 z-30 bg-black/10 backdrop-blur-[1px]" onClick={closeDrawer} />
       )}
 
       {/* Drawer — expands to double panel when preview is open */}
-      <div className={`fixed top-[72px] right-0 bg-white shadow-2xl z-40 flex flex-col transition-all duration-300 ease-out ${drawerExpense ? "translate-x-0" : "translate-x-full"} ${drawerShowPreview ? "w-[900px]" : "w-[480px]"}`} style={{ height: "calc(100vh - 72px)" }}>
+      <div className={`fixed top-[53px] right-0 bg-white shadow-2xl z-40 flex flex-col transition-all duration-300 ease-out ${drawerExpense ? "translate-x-0" : "translate-x-full"} ${drawerShowPreview ? "w-[900px]" : "w-[480px]"}`} style={{ height: "calc(100vh - 53px)" }}>
         {drawerExpense && (() => {
           const hasConflict = !!drawerExpense.conflictType;
           const conflictCfg = hasConflict ? CONFLICT_CONFIG[drawerExpense.conflictType!] : null;
