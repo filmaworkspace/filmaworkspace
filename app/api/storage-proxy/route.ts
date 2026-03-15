@@ -16,14 +16,13 @@ interface ExpenseData {
   supplier: string;
   supplierNumber: string;
   date: string;
-  type: string; // "invoice"|"ticket"|"proforma"|"budget"|"guarantee"
+  type: string;
   items: ExpenseItem[];
   baseAmount: number;
   vatAmount: number;
   irpfRate: number;
   irpfAmount: number;
   totalAmount: number;
-  // optional — payment info from document-center
   status?: string;
   paidAt?: string | null;
   paymentMethod?: string | null;
@@ -85,7 +84,6 @@ async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
 
   page.drawRectangle({ x: 0, y: 0, width: pageWidth, height: pageHeight, color: white });
 
-  // Dark header bar
   const hY = pageHeight - headerH;
   page.drawRectangle({ x: 0, y: hY, width: pageWidth, height: headerH, color: dark });
   page.drawRectangle({ x: 0, y: hY, width: 4, height: headerH, color: orange });
@@ -103,7 +101,6 @@ async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
     size: 9, font: fontR, color: rgb(0.7, 0.75, 0.8),
   });
 
-  // Supplier sub-row
   const subY = hY - subH;
   page.drawLine({ start: { x: 0, y: subY }, end: { x: pageWidth, y: subY }, thickness: 0.5, color: border });
   const supplierParts = [expense.supplier, expense.supplierNumber].filter(Boolean).join("  ·  ");
@@ -112,7 +109,6 @@ async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
     size: 10, font: fontB, color: dark,
   });
 
-  // Items
   const itemsTop = subY - 8;
   expense.items.forEach((item, i) => {
     const y = itemsTop - i * lineH;
@@ -128,7 +124,6 @@ async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
     page.drawText(vatStr, { x: pageWidth - padding - vatW, y: y + 2, size: 8, font: fontR, color: mid });
   });
 
-  // Payment row (only for paid invoices from document-center)
   const afterItemsY = itemsTop - expense.items.length * lineH - 4;
   if (expense.status === "paid" && expense.paidAt) {
     const payY = afterItemsY - 2;
@@ -138,13 +133,11 @@ async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
     page.drawText(parts, { x: padding, y: payY + 4, size: 8, font: fontB, color: green });
   }
 
-  // Divider
   const divBase = (expense.status === "paid" && expense.paidAt)
     ? afterItemsY - paymentH - 6
     : afterItemsY - 4;
   page.drawLine({ start: { x: padding, y: divBase }, end: { x: pageWidth - padding, y: divBase }, thickness: 0.5, color: border });
 
-  // Footer totals
   const footerY = divBase - 16;
   page.drawText("Base imponible:", { x: padding, y: footerY, size: 8, font: fontR, color: mid });
   page.drawText(fmt(expense.baseAmount), { x: padding + 75, y: footerY, size: 8, font: fontB, color: dark });
@@ -161,7 +154,6 @@ async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
   page.drawText(totalLabelStr, { x: pageWidth - padding - totalValW - totalLabelW - 6, y: footerY, size: 8, font: fontR, color: mid });
   page.drawText(totalValStr, { x: pageWidth - padding - totalValW, y: footerY, size: 9, font: fontB, color: dark });
 
-  // Watermark
   const watermark = "Generado por Filma Workspace · filmaworkspace.com";
   const wmW = fontR.widthOfTextAtSize(watermark, 6);
   page.drawText(watermark, { x: pageWidth - padding - wmW, y: 5, size: 6, font: fontR, color: rgb(0.75, 0.78, 0.82) });
@@ -187,18 +179,47 @@ async function convertImageToPdf(imageBytes: Uint8Array, contentType: string): P
   return pdfDoc.save();
 }
 
-async function prependBannerToPdf(bannerBytes: Uint8Array, docBytes: Uint8Array): Promise<Uint8Array> {
+async function mergePdfs(first: Uint8Array, second: Uint8Array): Promise<Uint8Array> {
+  // Try standard copy first
   try {
-    const bannerDoc = await PDFDocument.load(bannerBytes);
-    const docPdf    = await PDFDocument.load(docBytes);
-    const merged    = await PDFDocument.create();
-    const [bannerPage] = await merged.copyPages(bannerDoc, [0]);
-    merged.addPage(bannerPage);
-    const docPages = await merged.copyPages(docPdf, docPdf.getPageIndices());
-    docPages.forEach(p => merged.addPage(p));
-    return merged.save();
-  } catch {
-    return bannerBytes;
+    const a = await PDFDocument.load(first);
+    const b = await PDFDocument.load(second, { ignoreEncryption: true });
+    const merged = await PDFDocument.create();
+    const aPages = await merged.copyPages(a, a.getPageIndices());
+    aPages.forEach(p => merged.addPage(p));
+    const bPages = await merged.copyPages(b, b.getPageIndices());
+    bPages.forEach(p => merged.addPage(p));
+    const result = await merged.save();
+    console.log("[Proxy] merge OK, pages:", merged.getPageCount(), "bytes:", result.length);
+    return result;
+  } catch (err) {
+    console.error("[Proxy] merge failed:", err);
+    // Fallback: re-save second PDF through pdf-lib to normalise it, then retry
+    try {
+      console.log("[Proxy] trying normalise fallback...");
+      // Write second doc bytes through a fresh PDFDocument to strip problematic features
+      const raw = await PDFDocument.load(second, { ignoreEncryption: true });
+      const normalised = await PDFDocument.create();
+      const pages = await normalised.copyPages(raw, raw.getPageIndices());
+      pages.forEach(p => normalised.addPage(p));
+      const normBytes = await normalised.save();
+
+      const a = await PDFDocument.load(first);
+      const b = await PDFDocument.load(normBytes);
+      const merged = await PDFDocument.create();
+      const aPages = await merged.copyPages(a, a.getPageIndices());
+      aPages.forEach(p => merged.addPage(p));
+      const bPages = await merged.copyPages(b, b.getPageIndices());
+      bPages.forEach(p => merged.addPage(p));
+      const result = await merged.save();
+      console.log("[Proxy] normalise fallback OK, pages:", merged.getPageCount());
+      return result;
+    } catch (err2) {
+      console.error("[Proxy] normalise fallback also failed:", err2);
+      // Last resort: return both as separate pages by embedding second as image
+      // At minimum return banner so user gets something
+      return first;
+    }
   }
 }
 
@@ -219,6 +240,8 @@ export async function GET(request: NextRequest) {
     const fileBytes   = new Uint8Array(await response.arrayBuffer());
     const contentType = response.headers.get("content-type") || "application/octet-stream";
 
+    console.log("[Proxy] file fetched, contentType:", contentType, "bytes:", fileBytes.length);
+
     if (!expenseRaw) {
       return new NextResponse(fileBytes, {
         status: 200,
@@ -228,18 +251,21 @@ export async function GET(request: NextRequest) {
 
     const expense: ExpenseData = JSON.parse(expenseRaw);
     const bannerBytes = await generateBannerPdf(expense);
+    console.log("[Proxy] banner generated:", bannerBytes.length, "bytes");
+
     const docPdfBytes = contentType.includes("pdf")
       ? fileBytes
       : await convertImageToPdf(fileBytes, contentType);
+    console.log("[Proxy] docPdfBytes:", docPdfBytes.length);
 
-    const merged = await prependBannerToPdf(bannerBytes, docPdfBytes);
+    const merged = await mergePdfs(bannerBytes, docPdfBytes);
 
     return new NextResponse(merged, {
       status: 200,
       headers: { "Content-Type": "application/pdf", "Cache-Control": "private, max-age=3600" },
     });
   } catch (error) {
-    console.error("Storage proxy error:", error);
+    console.error("[Proxy] top-level error:", error);
     return NextResponse.json({ error: "Proxy fetch failed" }, { status: 500 });
   }
 }
