@@ -784,7 +784,7 @@ export default function BoxesPage() {
         supplierNumber:        (first["Número de Factura"]         ?? "").trim(),
         subAccountCode:        (first["CODIGO PRESUPUESTO"]        ?? "").trim(),
         subAccountDescription: (first["DESCRIPCIÓN NUMERO CUENTA"] ?? "").trim(),
-        description:           (first["DESCRIPCION"] || first["NOTAS"] || "").trim(),
+        description:           (first["DESCRIPCION"] || first["NOTAS"] || "").replace(/\s+/g, " ").trim(),
         date:                  (first["FECHA FACTURA/TICKET"] || first["FECHA FACTURA"] || "").trim(),
         pleoUrl:               (first["URL"]                       ?? "").trim(),
         items,
