@@ -1,6 +1,3 @@
-// app/api/storage-proxy/route.ts
-// Proxy para descargar archivos de Firebase Storage + añade banner PDF con datos del gasto
-
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
@@ -15,6 +12,7 @@ interface ExpenseItem {
 interface ExpenseData {
   displayNumber: string;
   supplier: string;
+  supplierNumber: string;
   date: string;
   type: "invoice" | "ticket";
   items: ExpenseItem[];
@@ -40,69 +38,96 @@ const fmtDate = (iso: string) => {
 
 async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
   const pageWidth = 595;
-  const lineH = 14;
-  const padding = 20;
-  const headerH = 36;
-  const itemsH = Math.max(1, expense.items.length) * lineH;
-  const footerH = 28;
-  const pageHeight = headerH + itemsH + footerH + padding * 2 + 16;
+  const padding   = 20;
+  const headerH   = 32;          // dark bar — only ID + date/type
+  const subH      = 24;          // white bar — supplier + invoice number
+  const lineH     = 15;
+  const itemsH    = Math.max(1, expense.items.length) * lineH + 8;
+  const footerH   = 26;
+  const pageHeight = headerH + subH + itemsH + footerH + padding + 8;
 
   const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([pageWidth, pageHeight]);
-  const fontR = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontB = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const page   = pdfDoc.addPage([pageWidth, pageHeight]);
+  const fontR  = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontB  = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
   const dark   = rgb(0.12, 0.16, 0.23);
   const orange = rgb(0.976, 0.451, 0.086);
   const mid    = rgb(0.44, 0.50, 0.56);
   const white  = rgb(1, 1, 1);
   const light  = rgb(0.95, 0.96, 0.97);
+  const border = rgb(0.85, 0.87, 0.89);
 
+  // ── White background ────────────────────────────────────────────────
   page.drawRectangle({ x: 0, y: 0, width: pageWidth, height: pageHeight, color: white });
-  page.drawRectangle({ x: 0, y: pageHeight - headerH, width: pageWidth, height: headerH, color: dark });
-  page.drawRectangle({ x: 0, y: pageHeight - headerH, width: 4, height: headerH, color: orange });
 
-  page.drawText(expense.displayNumber, { x: padding, y: pageHeight - headerH + 14, size: 13, font: fontB, color: white });
-  page.drawText(expense.supplier, { x: padding, y: pageHeight - headerH + 2, size: 9, font: fontR, color: rgb(0.7, 0.75, 0.8) });
+  // ── Dark header bar ──────────────────────────────────────────────────
+  const hY = pageHeight - headerH;
+  page.drawRectangle({ x: 0, y: hY, width: pageWidth, height: headerH, color: dark });
+  // Orange left accent
+  page.drawRectangle({ x: 0, y: hY, width: 4, height: headerH, color: orange });
 
+  // ID — bold white, vertically centered
+  page.drawText(expense.displayNumber, {
+    x: padding, y: hY + (headerH - 13) / 2,
+    size: 13, font: fontB, color: white,
+  });
+
+  // Date · Type — right, same vertical center
   const typeLabel = expense.type === "invoice" ? "Factura" : "Ticket";
   const dateStr = `${fmtDate(expense.date)}  ·  ${typeLabel}`;
   const dateW = fontR.widthOfTextAtSize(dateStr, 9);
-  page.drawText(dateStr, { x: pageWidth - padding - dateW, y: pageHeight - headerH + 14, size: 9, font: fontR, color: rgb(0.7, 0.75, 0.8) });
-
-  const totalStr = fmt(expense.totalAmount);
-  const totalW = fontB.widthOfTextAtSize(totalStr, 11);
-  page.drawText(totalStr, { x: pageWidth - padding - totalW, y: pageHeight - headerH + 2, size: 11, font: fontB, color: orange });
-
-  const itemsY = pageHeight - headerH - padding;
-  expense.items.forEach((item, i) => {
-    const y = itemsY - i * lineH;
-    if (i % 2 === 0) {
-      page.drawRectangle({ x: padding - 4, y: y - 3, width: pageWidth - padding * 2 + 8, height: lineH, color: light });
-    }
-    const account = [item.subAccountCode, item.subAccountDescription].filter(Boolean).join(" · ") || "—";
-    page.drawText(account, { x: padding, y: y + 1, size: 8, font: fontR, color: dark });
-    const baseStr = `Base: ${fmtNum(item.baseAmount)}`;
-    page.drawText(baseStr, { x: 280, y: y + 1, size: 8, font: fontR, color: mid });
-    const vatStr = `IVA ${item.vatRate}%: ${fmtNum(item.vatAmount)}`;
-    const vatW = fontR.widthOfTextAtSize(vatStr, 8);
-    page.drawText(vatStr, { x: pageWidth - padding - vatW, y: y + 1, size: 8, font: fontR, color: mid });
+  page.drawText(dateStr, {
+    x: pageWidth - padding - dateW, y: hY + (headerH - 9) / 2,
+    size: 9, font: fontR, color: rgb(0.7, 0.75, 0.8),
   });
 
-  const divY = pageHeight - headerH - padding - itemsH - 6;
-  page.drawLine({ start: { x: padding, y: divY }, end: { x: pageWidth - padding, y: divY }, thickness: 0.5, color: rgb(0.85, 0.87, 0.89) });
+  // ── Supplier sub-row ─────────────────────────────────────────────────
+  const subY = hY - subH;
+  // Subtle bottom border under sub-row
+  page.drawLine({ start: { x: 0, y: subY }, end: { x: pageWidth, y: subY }, thickness: 0.5, color: border });
 
+  const supplierParts = [expense.supplier, expense.supplierNumber].filter(Boolean).join("  ·  ");
+  page.drawText(supplierParts, {
+    x: padding, y: subY + (subH - 10) / 2,
+    size: 10, font: fontB, color: dark,
+  });
+
+  // ── Items ─────────────────────────────────────────────────────────────
+  const itemsTop = subY - 8;
+  expense.items.forEach((item, i) => {
+    const y = itemsTop - i * lineH;
+    if (i % 2 === 0) {
+      page.drawRectangle({ x: 0, y: y - 3, width: pageWidth, height: lineH, color: light });
+    }
+    const account = [item.subAccountCode, item.subAccountDescription].filter(Boolean).join(" · ") || "—";
+    page.drawText(account, { x: padding, y: y + 2, size: 8, font: fontR, color: dark });
+
+    const baseStr = `Base: ${fmtNum(item.baseAmount)}`;
+    page.drawText(baseStr, { x: 300, y: y + 2, size: 8, font: fontR, color: mid });
+
+    const vatStr = `IVA ${item.vatRate}%: ${fmtNum(item.vatAmount)}`;
+    const vatW = fontR.widthOfTextAtSize(vatStr, 8);
+    page.drawText(vatStr, { x: pageWidth - padding - vatW, y: y + 2, size: 8, font: fontR, color: mid });
+  });
+
+  // ── Divider ───────────────────────────────────────────────────────────
+  const divY = itemsTop - expense.items.length * lineH - 4;
+  page.drawLine({ start: { x: padding, y: divY }, end: { x: pageWidth - padding, y: divY }, thickness: 0.5, color: border });
+
+  // ── Footer totals ─────────────────────────────────────────────────────
   const footerY = divY - 16;
+
   page.drawText("Base imponible:", { x: padding, y: footerY, size: 8, font: fontR, color: mid });
-  page.drawText(fmt(expense.baseAmount), { x: padding + 72, y: footerY, size: 8, font: fontB, color: dark });
+  page.drawText(fmt(expense.baseAmount), { x: padding + 75, y: footerY, size: 8, font: fontB, color: dark });
 
   if (expense.irpfRate > 0) {
     const irpfStr = `IRPF ${expense.irpfRate}%: ${fmt(expense.irpfAmount)}`;
-    page.drawText(irpfStr, { x: 240, y: footerY, size: 8, font: fontR, color: mid });
+    page.drawText(irpfStr, { x: 260, y: footerY, size: 8, font: fontR, color: mid });
   }
 
-  const totalLabelStr = "Total:";
   const totalValStr = fmt(expense.totalAmount);
+  const totalLabelStr = "Total:";
   const totalValW = fontB.widthOfTextAtSize(totalValStr, 9);
   const totalLabelW = fontR.widthOfTextAtSize(totalLabelStr, 8);
   page.drawText(totalLabelStr, { x: pageWidth - padding - totalValW - totalLabelW - 6, y: footerY, size: 8, font: fontR, color: mid });
@@ -113,12 +138,9 @@ async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
 
 async function convertImageToPdf(imageBytes: Uint8Array, contentType: string): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
-  let image;
-  if (contentType.includes("png")) {
-    image = await pdfDoc.embedPng(imageBytes);
-  } else {
-    image = await pdfDoc.embedJpg(imageBytes);
-  }
+  const image = contentType.includes("png")
+    ? await pdfDoc.embedPng(imageBytes)
+    : await pdfDoc.embedJpg(imageBytes);
   const { width, height } = image.scale(1);
   const maxW = 595, maxH = 842;
   const scale = Math.min(maxW / width, maxH / height, 1);
@@ -149,24 +171,19 @@ async function prependBannerToPdf(bannerBytes: Uint8Array, docBytes: Uint8Array)
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const url = searchParams.get("url");
+  const url        = searchParams.get("url");
   const expenseRaw = searchParams.get("expense");
 
-  if (!url) {
-    return NextResponse.json({ error: "Missing url parameter" }, { status: 400 });
-  }
-
-  if (!url.includes("firebasestorage.googleapis.com") && !url.includes("firebasestorage.app")) {
+  if (!url) return NextResponse.json({ error: "Missing url" }, { status: 400 });
+  if (!url.includes("firebasestorage.googleapis.com") && !url.includes("firebasestorage.app"))
     return NextResponse.json({ error: "Invalid storage URL" }, { status: 403 });
-  }
 
   try {
     const response = await fetch(url);
-    if (!response.ok) {
+    if (!response.ok)
       return NextResponse.json({ error: `Storage fetch failed: ${response.status}` }, { status: response.status });
-    }
 
-    const fileBytes = new Uint8Array(await response.arrayBuffer());
+    const fileBytes   = new Uint8Array(await response.arrayBuffer());
     const contentType = response.headers.get("content-type") || "application/octet-stream";
 
     if (!expenseRaw) {
@@ -178,13 +195,9 @@ export async function GET(request: NextRequest) {
 
     const expense: ExpenseData = JSON.parse(expenseRaw);
     const bannerBytes = await generateBannerPdf(expense);
-
-    let docPdfBytes: Uint8Array;
-    if (contentType.includes("pdf")) {
-      docPdfBytes = fileBytes;
-    } else {
-      docPdfBytes = await convertImageToPdf(fileBytes, contentType);
-    }
+    const docPdfBytes = contentType.includes("pdf")
+      ? fileBytes
+      : await convertImageToPdf(fileBytes, contentType);
 
     const merged = await prependBannerToPdf(bannerBytes, docPdfBytes);
 
