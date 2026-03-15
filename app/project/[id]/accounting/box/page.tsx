@@ -1130,34 +1130,33 @@ export default function BoxesPage() {
         [`${folderName}/${folderName}.xlsx`]: xlsxZip,
       };
 
-      // Download documents using Firebase Storage getBlob (CORS-safe)
+      // Download documents via server-side proxy (bypasses Firebase Storage CORS)
       let docsIncluded = 0;
       const expsWithDocs = exps.filter(e => e.documentUrl);
 
       const fetchPromises = expsWithDocs.map(async (e) => {
           try {
-            // URL format: https://firebasestorage.googleapis.com/v0/b/BUCKET/o/PATH?alt=media&token=...
-            // Storage path is in the pathname after /o/
+            // Extract extension from storage path in the URL pathname after /o/
             const u = new URL(e.documentUrl!);
             const pathMatch = u.pathname.match(/\/o\/(.+)$/);
-            if (!pathMatch) {
-              console.warn(`[Export] No se pudo extraer path de: ${e.documentUrl}`);
-              return;
-            }
-            const storagePath = decodeURIComponent(pathMatch[1]);
+            const storagePath = pathMatch ? decodeURIComponent(pathMatch[1]) : "";
             const extMatch = storagePath.match(/\.(\w{2,4})$/);
             const ext = extMatch ? extMatch[1].toLowerCase() : "pdf";
 
-            console.log(`[Export] getBlob: "${storagePath}" → .${ext}`);
-            const storageRef = ref(storage, storagePath);
-            const blob = await getBlob(storageRef);
-            const buf = await blob.arrayBuffer();
+            // Use server-side proxy to avoid CORS — pass the full signed URL
+            const proxyUrl = `/api/storage-proxy?url=${encodeURIComponent(e.documentUrl!)}`;
+            const resp = await fetch(proxyUrl);
 
+            if (!resp.ok) {
+              console.warn(`[Export] Proxy failed for ${e.displayNumber}: ${resp.status}`);
+              return;
+            }
+
+            const buf = await resp.arrayBuffer();
             if (buf.byteLength > 0) {
-              const key = `${folderName}/documents/${e.displayNumber}.${ext}`;
-              zipEntries[key] = new Uint8Array(buf);
+              zipEntries[`${folderName}/documents/${e.displayNumber}.${ext}`] = new Uint8Array(buf);
               docsIncluded++;
-              console.log(`[Export] ✓ ${key} (${buf.byteLength} bytes)`);
+              console.log(`[Export] ✓ ${e.displayNumber}.${ext} (${buf.byteLength} bytes)`);
             }
           } catch (err) {
             console.warn(`[Export] Error en ${e.displayNumber}:`, err);
