@@ -221,98 +221,79 @@ export default function DocumentCenterPage() {
   const hasFilters = searchTerm || supplierFilter !== "all" || statusFilter !== "all" || dateRange.from || dateRange.to;
 
   // ── download — SAME pattern as BOX ──────────────────────────────────
-  // BOX: passes url + expense JSON to /api/storage-proxy → returns banner+doc merged PDF
-  // Here: same, but we also append the receipt afterwards via pdf-lib
-
   const buildInvoicePdf = async (invoice: Invoice): Promise<Uint8Array | null> => {
-    const { PDFDocument } = await import("pdf-lib");
-    const final = await PDFDocument.create();
-
-    const embedBytes = async (bytes: ArrayBuffer, fileName?: string) => {
-      try {
-        const src = await PDFDocument.load(bytes);
-        const pages = await final.copyPages(src, src.getPageIndices());
-        pages.forEach(p => final.addPage(p));
-      } catch {
-        try {
-          const imgBytes = new Uint8Array(bytes);
-          const isPng = fileName?.toLowerCase().endsWith(".png");
-          const img = isPng ? await final.embedPng(imgBytes) : await final.embedJpg(imgBytes);
-          const { width, height } = img.scale(1);
-          const scale = Math.min(555 / width, 800 / height, 1);
-          const page = final.addPage([595.28, 841.89]);
-          page.drawImage(img, { x: 20, y: 841.89 - 20 - height * scale, width: width * scale, height: height * scale });
-        } catch (e2) { console.warn("embed image failed:", e2); }
-      }
+    const expenseData = {
+      displayNumber: invoice.displayNumber,
+      supplier: invoice.supplier,
+      supplierNumber: invoice.supplierNumber || "",
+      date: (invoice.invoiceDate || invoice.createdAt).toISOString(),
+      type: invoice.documentType,
+      items: invoice.items.map(it => ({
+        baseAmount: it.baseAmount,
+        vatRate: it.vatRate,
+        vatAmount: it.vatAmount,
+        subAccountCode: it.subAccountCode,
+        subAccountDescription: it.subAccountDescription,
+      })),
+      baseAmount: invoice.baseAmount,
+      vatAmount: invoice.vatAmount,
+      irpfRate: invoice.items[0]?.irpfRate ?? 0,
+      irpfAmount: invoice.irpfAmount,
+      totalAmount: invoice.totalAmount,
+      status: invoice.status,
+      paidAt: invoice.paidAt?.toISOString() || null,
+      paymentMethod: invoice.paymentMethod || null,
+      paymentReference: invoice.paymentReference || null,
     };
 
-    // 1. Banner + factura en una sola llamada al proxy (igual que BOX)
+    // Case 1: has attachment → proxy merges banner+doc server-side (same as BOX)
     if (invoice.attachmentUrl) {
-      const expenseData = {
-        displayNumber: invoice.displayNumber,
-        supplier: invoice.supplier,
-        supplierNumber: invoice.supplierNumber || "",
-        date: (invoice.invoiceDate || invoice.createdAt).toISOString(),
-        type: invoice.documentType,
-        items: invoice.items.map(it => ({
-          baseAmount: it.baseAmount,
-          vatRate: it.vatRate,
-          vatAmount: it.vatAmount,
-          subAccountCode: it.subAccountCode,
-          subAccountDescription: it.subAccountDescription,
-          irpfRate: it.irpfRate,
-        })),
-        baseAmount: invoice.baseAmount,
-        vatAmount: invoice.vatAmount,
-        irpfRate: invoice.items[0]?.irpfRate ?? 0,
-        irpfAmount: invoice.irpfAmount,
-        totalAmount: invoice.totalAmount,
-        // extra fields for payment info
-        status: invoice.status,
-        paidAt: invoice.paidAt?.toISOString() || null,
-        paymentMethod: invoice.paymentMethod || null,
-        paymentReference: invoice.paymentReference || null,
-      };
       const proxyUrl = `/api/storage-proxy?url=${encodeURIComponent(invoice.attachmentUrl)}&expense=${encodeURIComponent(JSON.stringify(expenseData))}`;
-      try {
-        const resp = await fetch(proxyUrl);
-        if (resp.ok) await embedBytes(await resp.arrayBuffer(), invoice.attachmentFileName);
-      } catch (e) { console.warn("proxy failed:", e); }
-    } else {
-      // No attachment — generate banner-only via invoice-banner route
-      const body = {
-        displayNumber: invoice.displayNumber,
-        supplier: invoice.supplier,
-        supplierNumber: invoice.supplierNumber || "",
-        date: (invoice.invoiceDate || invoice.createdAt).toISOString(),
-        type: invoice.documentType,
-        items: invoice.items,
-        baseAmount: invoice.baseAmount,
-        vatAmount: invoice.vatAmount,
-        irpfRate: invoice.items[0]?.irpfRate ?? 0,
-        irpfAmount: invoice.irpfAmount,
-        totalAmount: invoice.totalAmount,
-        status: invoice.status,
-        paidAt: invoice.paidAt?.toISOString() || null,
-        paymentMethod: invoice.paymentMethod || null,
-        paymentReference: invoice.paymentReference || null,
-      };
-      try {
-        const resp = await fetch("/api/invoice-banner", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-        if (resp.ok) await embedBytes(await resp.arrayBuffer());
-      } catch (e) { console.warn("banner failed:", e); }
+      const resp = await fetch(proxyUrl);
+      if (!resp.ok) return null;
+      const mainBytes = new Uint8Array(await resp.arrayBuffer());
+
+      // If there's also a receipt, append it
+      if (invoice.receiptUrl) {
+        const { PDFDocument } = await import("pdf-lib");
+        const final = await PDFDocument.create();
+        const mainDoc = await PDFDocument.load(mainBytes);
+        const mainPages = await final.copyPages(mainDoc, mainDoc.getPageIndices());
+        mainPages.forEach(p => final.addPage(p));
+        try {
+          const rResp = await fetch(`/api/storage-proxy?url=${encodeURIComponent(invoice.receiptUrl)}`);
+          if (rResp.ok) {
+            const rBytes = await rResp.arrayBuffer();
+            try {
+              const rDoc = await PDFDocument.load(rBytes);
+              const rPages = await final.copyPages(rDoc, rDoc.getPageIndices());
+              rPages.forEach(p => final.addPage(p));
+            } catch {
+              // image receipt
+              const imgBytes = new Uint8Array(rBytes);
+              const isPng = invoice.receiptName?.toLowerCase().endsWith(".png");
+              const img = isPng ? await final.embedPng(imgBytes) : await final.embedJpg(imgBytes);
+              const { width, height } = img.scale(1);
+              const scale = Math.min(555 / width, 800 / height, 1);
+              const page = final.addPage([595.28, 841.89]);
+              page.drawImage(img, { x: 20, y: 841.89 - 20 - height * scale, width: width * scale, height: height * scale });
+            }
+          }
+        } catch (e) { console.warn("receipt failed:", e); }
+        return final.save();
+      }
+
+      return mainBytes;
     }
 
-    // 2. Comprobante de pago (via proxy, sin banner)
-    if (invoice.receiptUrl) {
-      try {
-        const resp = await fetch(`/api/storage-proxy?url=${encodeURIComponent(invoice.receiptUrl)}`);
-        if (resp.ok) await embedBytes(await resp.arrayBuffer(), invoice.receiptName);
-      } catch (e) { console.warn("receipt failed:", e); }
-    }
-
-    if (final.getPageCount() === 0) return null;
-    return final.save();
+    // Case 2: no attachment → banner only via proxy (pass a dummy? No — use invoice-banner POST)
+    const resp = await fetch("/api/invoice-banner", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(expenseData),
+    });
+    if (!resp.ok) return null;
+    return new Uint8Array(await resp.arrayBuffer());
   };
 
   const triggerDownload = (bytes: Uint8Array, fileName: string) => {
