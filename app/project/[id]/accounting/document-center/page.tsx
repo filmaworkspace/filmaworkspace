@@ -249,9 +249,12 @@ export default function DocumentCenterPage() {
     // Case 1: has attachment → proxy merges banner+doc server-side (same as BOX)
     if (invoice.attachmentUrl) {
       const proxyUrl = `/api/storage-proxy?url=${encodeURIComponent(invoice.attachmentUrl)}&expense=${encodeURIComponent(JSON.stringify(expenseData))}`;
+      console.log("[DocCenter] fetching proxy:", proxyUrl.substring(0, 120) + "...");
       const resp = await fetch(proxyUrl);
+      console.log("[DocCenter] proxy status:", resp.status, "content-type:", resp.headers.get("content-type"));
       if (!resp.ok) return null;
       const mainBytes = new Uint8Array(await resp.arrayBuffer());
+      console.log("[DocCenter] mainBytes:", mainBytes.length);
 
       // If there's also a receipt, append it
       if (invoice.receiptUrl) {
