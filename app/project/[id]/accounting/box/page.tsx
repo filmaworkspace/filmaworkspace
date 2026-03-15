@@ -209,6 +209,7 @@ export default function BoxesPage() {
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState("");
+  const [projectName, setProjectName] = useState("");
   const [hasAccess, setHasAccess] = useState(false);
   const [accessError, setAccessError] = useState("");
   const [mainTab, setMainTab] = useState<MainTab>("tarjetas");
@@ -356,6 +357,7 @@ export default function BoxesPage() {
       if (projectDoc.exists()) {
         setDepartments(projectDoc.data().departments || []);
         setNextTransferNumber(projectDoc.data().nextTransferNumber || 1);
+        setProjectName(projectDoc.data().name || "");
       }
 
       const accountsSnap = await getDocs(query(collection(db, `projects/${projectId}/accounts`), orderBy("code")));
@@ -1005,7 +1007,9 @@ export default function BoxesPage() {
       }
 
       const numCols   = headers.length;
-      const dataStart = 2;
+      const titleRowNum = 1;
+      const headerRowNum = 2;
+      const dataStart = 3;
       const dataEnd   = dataStart + rows.length - 1;
       const totalRow: (string | number)[] = new Array(numCols).fill("");
       totalRow[0]  = "TOTAL";
@@ -1020,24 +1024,60 @@ export default function BoxesPage() {
         return s;
       };
 
-      const cellXml = (col: number, row: number, val: string | number): string => {
+      // Style indices: 0=default, 1=title (white bold on dark), 2=header (white bold on orange), 3=total (bold)
+      const cellXml = (col: number, row: number, val: string | number, styleIdx = 0): string => {
         const addr = colLetter(col) + row;
-        if (typeof val === "number") return `<c r="${addr}"><v>${val}</v></c>`;
+        const s = styleIdx > 0 ? ` s="${styleIdx}"` : "";
+        if (typeof val === "number") return `<c r="${addr}"${s}><v>${val}</v></c>`;
         if (typeof val === "string" && val.startsWith("="))
-          return `<c r="${addr}" t="str"><f>${esc(val.slice(1))}</f></c>`;
-        return `<c r="${addr}" t="inlineStr"><is><t>${esc(String(val))}</t></is></c>`;
+          return `<c r="${addr}" t="str"${s}><f>${esc(val.slice(1))}</f></c>`;
+        return `<c r="${addr}" t="inlineStr"${s}><is><t>${esc(String(val))}</t></is></c>`;
       };
 
-      let sheetRows = `<row r="1">${headers.map((h, c) => cellXml(c, 1, h)).join("")}</row>`;
+      // Row 1: title spanning all columns — production name + envelope id
+      const titleText = `${projectName ? projectName.toUpperCase() + " · " : ""}${envelope.displayNumber}`;
+      let sheetRows = `<row r="1" ht="22" customHeight="1">${cellXml(0, 1, titleText, 1)}${Array.from({length: numCols - 1}, (_, i) => `<c r="${colLetter(i+1)}1" s="1"/>`).join("")}</row>`;
+
+      // Row 2: column headers with orange background
+      sheetRows += `<row r="2" ht="18" customHeight="1">${headers.map((h, c) => cellXml(c, 2, h, 2)).join("")}</row>`;
+
+      // Data rows
       rows.forEach((row, ri) => {
-        const r = ri + 2;
+        const r = ri + dataStart;
         sheetRows += `<row r="${r}">${row.map((v, c) => cellXml(c, r, v)).join("")}</row>`;
       });
-      const tr = rows.length + 2;
-      sheetRows += `<row r="${tr}">${totalRow.map((v, c) => v !== "" ? cellXml(c, tr, v) : "").join("")}</row>`;
+
+      // Total row
+      const tr = rows.length + dataStart;
+      sheetRows += `<row r="${tr}">${totalRow.map((v, c) => v !== "" ? cellXml(c, tr, v, 3) : "").join("")}</row>`;
 
       const colWidths = [16,12,8,24,12,16,24,10,24,12,6,10,6,10,12,10,14];
       const colsXml = colWidths.map((w, i) => `<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("");
+
+      // Styles XML: fonts, fills, borders, cellXfs
+      const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="4">
+    <font><sz val="11"/><name val="Calibri"/></font>
+    <font><b/><sz val="13"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
+    <font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
+    <font><b/><sz val="11"/><name val="Calibri"/></font>
+  </fonts>
+  <fills count="4">
+    <fill><patternFill patternType="none"/></fill>
+    <fill><patternFill patternType="gray125"/></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FF1E293B"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFF97316"/></patternFill></fill>
+  </fills>
+  <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+  <cellXfs count="4">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+    <xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"><alignment vertical="center"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+  </cellXfs>
+</styleSheet>`;
 
       const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
@@ -1052,6 +1092,7 @@ export default function BoxesPage() {
       const wbRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
 </Relationships>`;
       const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -1059,6 +1100,7 @@ export default function BoxesPage() {
 <Default Extension="xml" ContentType="application/xml"/>
 <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
 <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
 </Types>`;
       const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
@@ -1072,6 +1114,7 @@ export default function BoxesPage() {
         "xl/workbook.xml":             strToU8(workbookXml),
         "xl/_rels/workbook.xml.rels":  strToU8(wbRels),
         "xl/worksheets/sheet1.xml":    strToU8(sheetXml),
+        "xl/styles.xml":               strToU8(stylesXml),
         "xl/sharedStrings.xml":        strToU8(sharedStringsXml),
       };
       const xlsxZip = zipSync(xlsxFiles);
