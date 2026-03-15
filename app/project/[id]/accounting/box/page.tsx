@@ -1143,8 +1143,20 @@ export default function BoxesPage() {
             const extMatch = storagePath.match(/\.(\w{2,4})$/);
             const ext = extMatch ? extMatch[1].toLowerCase() : "pdf";
 
-            // Use server-side proxy to avoid CORS — pass the full signed URL
-            const proxyUrl = `/api/storage-proxy?url=${encodeURIComponent(e.documentUrl!)}`;
+            // Use server-side proxy — pass URL + expense data for banner generation
+            const expenseData = {
+              displayNumber: e.displayNumber,
+              supplier: e.supplier,
+              date: e.date instanceof Date ? e.date.toISOString() : String(e.date),
+              type: e.type,
+              items: e.items,
+              baseAmount: e.baseAmount,
+              vatAmount: e.vatAmount,
+              irpfRate: e.irpfRate,
+              irpfAmount: e.irpfAmount,
+              totalAmount: e.totalAmount,
+            };
+            const proxyUrl = `/api/storage-proxy?url=${encodeURIComponent(e.documentUrl!)}&expense=${encodeURIComponent(JSON.stringify(expenseData))}`;
             const resp = await fetch(proxyUrl);
 
             if (!resp.ok) {
@@ -1154,9 +1166,10 @@ export default function BoxesPage() {
 
             const buf = await resp.arrayBuffer();
             if (buf.byteLength > 0) {
-              zipEntries[`${folderName}/documents/${e.displayNumber}.${ext}`] = new Uint8Array(buf);
+              // Proxy always returns PDF (images get converted too)
+              zipEntries[`${folderName}/documents/${e.displayNumber}.pdf`] = new Uint8Array(buf);
               docsIncluded++;
-              console.log(`[Export] ✓ ${e.displayNumber}.${ext} (${buf.byteLength} bytes)`);
+              console.log(`[Export] ✓ ${e.displayNumber}.pdf (${buf.byteLength} bytes)`);
             }
           } catch (err) {
             console.warn(`[Export] Error en ${e.displayNumber}:`, err);
