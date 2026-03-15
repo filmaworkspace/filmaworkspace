@@ -1147,6 +1147,7 @@ export default function BoxesPage() {
             const expenseData = {
               displayNumber: e.displayNumber,
               supplier: e.supplier,
+              supplierNumber: e.supplierNumber || "",
               date: e.date instanceof Date ? e.date.toISOString() : String(e.date),
               type: e.type,
               items: e.items,
