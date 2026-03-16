@@ -447,7 +447,7 @@ export default function InvoiceDetailPage() {
             <button onClick={() => setCodingMode(false)} className="p-2 hover:bg-violet-700 rounded-lg"><X size={20} /></button>
             <div className="flex items-center gap-3">
               <Code size={20} />
-              <span className="font-semibold">Codificar</span>
+              <span className="font-semibold">CODIFICAR</span>
               <span className="bg-violet-500 px-2 py-0.5 rounded text-sm">{invoice.displayNumber}</span>
             </div>
           </div>
