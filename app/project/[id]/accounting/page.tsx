@@ -9,8 +9,8 @@ import { FileText, Receipt, ArrowRight, Settings, ClipboardCheck, ChevronRight, 
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-interface PO { id: string; number: string; supplier: string; description: string; baseAmount: number; status: "draft" | "pending" | "approved" | "rejected" | "closed" | "cancelled"; createdAt: Date | null; }
-interface Invoice { id: string; number: string; supplier: string; description: string; baseAmount: number; status: "pending_approval" | "pending" | "paid" | "overdue" | "rejected" | "cancelled"; dueDate: Date | null; createdAt: Date | null; }
+interface PO { id: string; number: string; supplier: string; description: string; baseAmount: number; status: "draft" | "pending" | "approved" | "rejected" | "closed" | "cancelled"; createdAt: Date | null; department?: string; createdBy: string; }
+interface Invoice { id: string; number: string; supplier: string; description: string; baseAmount: number; status: "pending_approval" | "pending" | "paid" | "overdue" | "rejected" | "cancelled"; dueDate: Date | null; createdAt: Date | null; department?: string; createdBy: string; }
 
 export default function AccountingPage() {
   const params = useParams();
@@ -21,6 +21,8 @@ export default function AccountingPage() {
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState("");
+  const [userDepartment, setUserDepartment] = useState("");
+  const [userPosition, setUserPosition] = useState("");
   const [accountingAccessLevel, setAccountingAccessLevel] = useState<string>("");
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const [isApprover, setIsApprover] = useState(false);
@@ -47,8 +49,20 @@ export default function AccountingPage() {
           currentUserDepartment = memberData.department || "";
           currentUserPosition = memberData.position || "";
           setUserRole(currentUserRole);
+          setUserDepartment(currentUserDepartment);
+          setUserPosition(currentUserPosition);
           setAccountingAccessLevel(memberData.accountingAccessLevel || "user");
         }
+        
+        // Determinar permisos de visibilidad
+        const isProjectRole = ["admin", "PM", "EP", "LP", "Coordinator", "Accounting"].includes(currentUserRole);
+        const canViewAllPOs = isProjectRole;
+        const canViewDepartmentPOs = !isProjectRole && (
+          currentUserPosition?.toLowerCase().includes("head") || 
+          currentUserPosition?.toLowerCase().includes("jefe") ||
+          currentUserRole === "HOD"
+        );
+        const canViewOwnPOs = !isProjectRole && !canViewDepartmentPOs;
 
         let approvalCount = 0;
         let userIsApprover = false;
@@ -139,19 +153,60 @@ export default function AccountingPage() {
         setPendingApprovalsCount(approvalCount);
         setIsApprover(userIsApprover);
 
-        const posRecentQuery = query(collection(db, `projects/${id}/pos`), orderBy("createdAt", "desc"), limit(5));
+        // Cargar POs recientes con filtrado
+        const posRecentQuery = query(collection(db, `projects/${id}/pos`), orderBy("createdAt", "desc"), limit(20));
         const posRecentSnapshot = await getDocs(posRecentQuery);
-        setRecentPOs(posRecentSnapshot.docs.map(doc => {
+        const allPOs = posRecentSnapshot.docs.map(doc => {
           const data = doc.data();
-          return { id: doc.id, number: data.number || "", supplier: data.supplier || "", description: data.generalDescription || data.description || "", baseAmount: data.baseAmount || 0, status: data.status || "draft", createdAt: data.createdAt?.toDate() || null };
-        }));
+          return { 
+            id: doc.id, 
+            number: data.number || "", 
+            supplier: data.supplier || "", 
+            description: data.generalDescription || data.description || "", 
+            baseAmount: data.baseAmount || 0, 
+            status: data.status || "draft", 
+            createdAt: data.createdAt?.toDate() || null,
+            department: data.department || "",
+            createdBy: data.createdBy || "",
+          };
+        });
+        
+        // Filtrar según permisos
+        const filteredPOs = allPOs.filter((po) => {
+          if (canViewAllPOs) return true;
+          if (canViewDepartmentPOs && po.department === currentUserDepartment) return true;
+          if (canViewOwnPOs && po.createdBy === userId) return true;
+          return false;
+        }).slice(0, 5);
+        setRecentPOs(filteredPOs);
 
-        const invoicesRecentQuery = query(collection(db, `projects/${id}/invoices`), orderBy("createdAt", "desc"), limit(5));
+        // Cargar Invoices recientes con filtrado
+        const invoicesRecentQuery = query(collection(db, `projects/${id}/invoices`), orderBy("createdAt", "desc"), limit(20));
         const invoicesRecentSnapshot = await getDocs(invoicesRecentQuery);
-        setRecentInvoices(invoicesRecentSnapshot.docs.map(doc => {
+        const allInvoices = invoicesRecentSnapshot.docs.map(doc => {
           const data = doc.data();
-          return { id: doc.id, number: data.number || "", supplier: data.supplier || "", description: data.description || "", baseAmount: data.baseAmount || 0, status: data.status || "pending", createdAt: data.createdAt?.toDate() || null, dueDate: data.dueDate?.toDate() || null };
-        }));
+          return { 
+            id: doc.id, 
+            number: data.number || "", 
+            supplier: data.supplier || "", 
+            description: data.description || "", 
+            baseAmount: data.baseAmount || 0, 
+            status: data.status || "pending", 
+            createdAt: data.createdAt?.toDate() || null, 
+            dueDate: data.dueDate?.toDate() || null,
+            department: data.department || "",
+            createdBy: data.createdBy || "",
+          };
+        });
+        
+        // Filtrar según permisos
+        const filteredInvoices = allInvoices.filter((inv) => {
+          if (canViewAllPOs) return true;
+          if (canViewDepartmentPOs && inv.department === currentUserDepartment) return true;
+          if (canViewOwnPOs && inv.createdBy === userId) return true;
+          return false;
+        }).slice(0, 5);
+        setRecentInvoices(filteredInvoices);
       } catch (error) {
         console.error("Error cargando datos:", error);
       } finally {
@@ -213,7 +268,7 @@ export default function AccountingPage() {
                     <span>Documentos</span>
                   </Link>
                   <span className="text-slate-200">·</span>
-                  <Link href={`/project/${id}/accounting/config`} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors">
+                  <Link href={`/project/${id}/accounting/accountingconfig`} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors">
                     <Settings size={15} />
                     <span>Configuración</span>
                   </Link>
@@ -388,4 +443,3 @@ export default function AccountingPage() {
     </div>
   );
 }
-
