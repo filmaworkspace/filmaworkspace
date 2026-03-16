@@ -342,6 +342,9 @@ export default function NewInvoicePage() {
   const [dueDates, setDueDates] = useState<DueDateEntry[]>([]);
 
   const [items, setItems] = useState<InvoiceItem[]>([]);
+  
+  // Estado para delegar codificación a contabilidad
+  const [delegateToAccounting, setDelegateToAccounting] = useState(false);
 
   const [totals, setTotals] = useState({
     baseAmount: 0,
@@ -1392,7 +1395,16 @@ export default function NewInvoicePage() {
 
       // Estado de aprobación
       const steps = generateApprovalSteps();
-      if (shouldAutoApprove(steps)) {
+      
+      // Si se delega a contabilidad, va directamente a estado "coding"
+      if (delegateToAccounting) {
+        invoiceData.status = "coding";
+        invoiceData.approvalStatus = "pending";
+        invoiceData.delegatedToAccounting = true;
+        invoiceData.delegatedAt = Timestamp.now();
+        invoiceData.delegatedBy = permissions.userId || "";
+        invoiceData.delegatedByName = permissions.userName || "";
+      } else if (shouldAutoApprove(steps)) {
         invoiceData.status = "pending";
         invoiceData.approvalStatus = "approved";
         invoiceData.autoApproved = true;
@@ -2314,6 +2326,38 @@ export default function NewInvoicePage() {
                   </button>
                 </div>
               </div>
+              
+              {/* Toggle delegar a contabilidad */}
+              {formData.invoiceType === "without-po" && (
+                <div className="px-6 py-3 bg-slate-50 border-b border-slate-100">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <button
+                      type="button"
+                      onClick={() => setDelegateToAccounting(!delegateToAccounting)}
+                      className={cx(
+                        "relative w-10 h-5 rounded-full transition-colors",
+                        delegateToAccounting ? "bg-amber-500" : "bg-slate-300"
+                      )}
+                    >
+                      <span
+                        className={cx(
+                          "absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform",
+                          delegateToAccounting ? "left-5" : "left-0.5"
+                        )}
+                      />
+                    </button>
+                    <div>
+                      <span className="text-sm font-medium text-slate-700 group-hover:text-slate-900">
+                        Delegar codificación a contabilidad
+                      </span>
+                      <p className="text-xs text-slate-500">
+                        No asignaré cuentas, lo hará el departamento de contabilidad
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              )}
+              
               <div className="p-6">
                 {items.length === 0 ? (
                   <div className={cx("text-center py-12 border-2 border-dashed rounded-xl", hasError("items") ? "border-red-300 bg-red-50" : "border-slate-200")}>
@@ -2328,7 +2372,9 @@ export default function NewInvoicePage() {
                 ) : (
                   <div className="space-y-4">
                     {items.map((item, index) => {
-                      const itemComplete = item.description.trim() && item.subAccountId && item.quantity > 0 && item.unitPrice > 0;
+                      const itemComplete = delegateToAccounting 
+                        ? item.description.trim() && item.quantity > 0 && item.unitPrice > 0
+                        : item.description.trim() && item.subAccountId && item.quantity > 0 && item.unitPrice > 0;
                       return (
                         <div key={item.id} className={cx("border rounded-xl p-5", itemComplete ? "border-emerald-200 bg-emerald-50/30" : "border-slate-200 bg-slate-50/50")}>
                           <div className="flex items-center justify-between mb-4">
@@ -2362,39 +2408,50 @@ export default function NewInvoicePage() {
                                 hasError("item_" + index + "_description") ? "border-red-300 bg-red-50" : item.description.trim() ? "border-emerald-200" : "border-slate-200"
                               )}
                             />
-                            {item.isNewItem ? (
-                              <button
-                                onClick={() => {
-                                  setCurrentItemIndex(index);
-                                  setShowAccountModal(true);
-                                }}
-                                className={cx(
-                                  "w-full px-4 py-2.5 border rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 bg-white",
-                                  hasError("item_" + index + "_account")
-                                    ? "border-red-300 bg-red-50"
-                                    : item.subAccountCode
-                                    ? "border-emerald-200 bg-emerald-50"
-                                    : "border-slate-200"
-                                )}
-                              >
-                                {item.subAccountCode ? (
-                                  <div className="flex items-center gap-2">
-                                    <CheckCircle2 size={14} className="text-emerald-600" />
-                                    <span className="font-mono text-slate-900">
-                                      {item.subAccountCode} - {item.subAccountDescription}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-400">Seleccionar cuenta</span>
-                                )}
-                                <Search size={14} className="text-slate-400" />
-                              </button>
-                            ) : (
-                              <div className="px-4 py-2.5 bg-slate-100 rounded-xl text-sm flex items-center gap-2">
-                                <CheckCircle2 size={14} className="text-emerald-600" />
-                                <span className="font-mono text-slate-700">
-                                  {item.subAccountCode} - {item.subAccountDescription}
-                                </span>
+                            {/* Selector de cuenta - se oculta si se delega a contabilidad */}
+                            {!delegateToAccounting && (
+                              item.isNewItem ? (
+                                <button
+                                  onClick={() => {
+                                    setCurrentItemIndex(index);
+                                    setShowAccountModal(true);
+                                  }}
+                                  className={cx(
+                                    "w-full px-4 py-2.5 border rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 bg-white",
+                                    hasError("item_" + index + "_account")
+                                      ? "border-red-300 bg-red-50"
+                                      : item.subAccountCode
+                                      ? "border-emerald-200 bg-emerald-50"
+                                      : "border-slate-200"
+                                  )}
+                                >
+                                  {item.subAccountCode ? (
+                                    <div className="flex items-center gap-2">
+                                      <CheckCircle2 size={14} className="text-emerald-600" />
+                                      <span className="font-mono text-slate-900">
+                                        {item.subAccountCode} - {item.subAccountDescription}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-400">Seleccionar cuenta</span>
+                                  )}
+                                  <Search size={14} className="text-slate-400" />
+                                </button>
+                              ) : (
+                                <div className="px-4 py-2.5 bg-slate-100 rounded-xl text-sm flex items-center gap-2">
+                                  <CheckCircle2 size={14} className="text-emerald-600" />
+                                  <span className="font-mono text-slate-700">
+                                    {item.subAccountCode} - {item.subAccountDescription}
+                                  </span>
+                                </div>
+                              )
+                            )}
+                            
+                            {/* Aviso de delegación a contabilidad */}
+                            {delegateToAccounting && item.isNewItem && (
+                              <div className="px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm flex items-center gap-2">
+                                <Clock size={14} className="text-amber-600" />
+                                <span className="text-amber-700">Pendiente de codificación por contabilidad</span>
                               </div>
                             )}
 
