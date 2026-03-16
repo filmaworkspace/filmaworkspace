@@ -268,7 +268,7 @@ export default function AccountingPage() {
                     <span>Documentos</span>
                   </Link>
                   <span className="text-slate-200">·</span>
-                  <Link href={`/project/${id}/accounting/accountingconfig`} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors">
+                  <Link href={`/project/${id}/accounting/config`} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors">
                     <Settings size={15} />
                     <span>Configuración</span>
                   </Link>
