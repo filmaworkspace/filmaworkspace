@@ -351,6 +351,19 @@ export default function BoxesPage() {
       const ups = await getDoc(doc(db, `userProjects/${userId}/projects/${projectId}`));
       if (!ups.exists()) { setAccessError("No tienes acceso a este proyecto"); setLoading(false); return; }
       if (!ups.data().permissions?.accounting) { setAccessError("No tienes permisos de contabilidad"); setLoading(false); return; }
+
+      // Verificar nivel de acceso BOX — solo visitor, accounting y accounting_extended
+      const memberSnap = await getDoc(doc(db, `projects/${projectId}/members`, userId!));
+      if (memberSnap.exists()) {
+        const level = memberSnap.data().accountingAccessLevel || "user";
+        const boxLevels = ["visitor", "accounting", "accounting_extended"];
+        if (!boxLevels.includes(level)) {
+          setAccessError("Tu nivel de acceso no incluye el módulo BOX. Contacta con el administrador del proyecto.");
+          setLoading(false);
+          return;
+        }
+      }
+
       setHasAccess(true);
 
       const projectDoc = await getDoc(doc(db, `projects/${projectId}`));
@@ -1592,11 +1605,11 @@ export default function BoxesPage() {
           <ShieldAlert size={28} className="text-red-500" />
         </div>
         <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
-        <p className="text-slate-500 mb-6">{accessError}</p>
+        <p className="text-slate-500 mb-6 text-sm">{accessError || "No tienes permisos para acceder a este módulo"}</p>
         <Link href={`/project/${projectId}/accounting`}
-          className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium"
+          className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90"
           style={{ backgroundColor: "#2F52E0" }}>
-          <ArrowLeft size={16} /> Volver
+          <ArrowLeft size={16} /> Volver a contabilidad
         </Link>
       </div>
     </div>
