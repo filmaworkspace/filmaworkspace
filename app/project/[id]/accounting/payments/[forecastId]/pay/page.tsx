@@ -419,6 +419,9 @@ export default function PaymentPayPage() {
 
   const isPDF = (url?: string) => url?.toLowerCase().includes(".pdf") || url?.toLowerCase().includes("application/pdf");
 
+  // Verificar permisos - solo accounting_extended puede acceder
+  const canAccessPayments = permissions.accountingAccessLevel === "accounting_extended";
+
   // Loading
   if (permissionsLoading || loading) {
     return (
@@ -429,21 +432,23 @@ export default function PaymentPayPage() {
   }
 
   // Acceso denegado
-  if (permissionsError || !permissions.hasAccountingAccess) {
+  if (permissionsError || !canAccessPayments) {
     return (
       <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-        <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <ShieldAlert size={28} className="text-red-500" />
+        <div className="text-center max-w-md px-6">
+          <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <ShieldAlert size={32} className="text-red-600" />
           </div>
-          <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
-          <p className="text-slate-500 mb-6">{permissionsError || "No tienes permisos para acceder a esta página"}</p>
+          <h1 className="text-2xl font-semibold text-slate-900 mb-2">Acceso restringido</h1>
+          <p className="text-slate-500 mb-6">
+            No tienes permisos para acceder a la gestión de pagos. Esta sección está disponible únicamente para usuarios con nivel de acceso "Contabilidad ampliada".
+          </p>
           <Link 
-            href={`/project/${id}/accounting/payments`} 
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
+            href={`/project/${id}/accounting`} 
+            className="inline-flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors"
           >
             <ArrowLeft size={16} />
-            Volver a pagos
+            Volver al panel
           </Link>
         </div>
       </div>
@@ -473,7 +478,7 @@ export default function PaymentPayPage() {
           <button onClick={() => router.push(`/project/${id}/accounting/payments`)} className="p-2 hover:bg-emerald-700 rounded-lg"><X size={20} /></button>
           <div className="flex items-center gap-3">
             <CreditCard size={20} />
-            <span className="font-semibold">Pagar remesa</span>
+            <span className="font-semibold">PAGAR REMESA</span>
             <span className="bg-emerald-500 px-2 py-0.5 rounded text-sm">{forecast.name}</span>
           </div>
         </div>
@@ -580,7 +585,7 @@ export default function PaymentPayPage() {
 
           {/* Pending Items */}
           {pendingItems.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-4">
+            <div className="bg-white rounded-2xl border border-slate-200 mb-4">
               <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
                 <Clock size={16} className="text-amber-500" />
                 <span className="font-semibold text-slate-900 text-sm">Pagos pendientes</span>
@@ -670,7 +675,7 @@ export default function PaymentPayPage() {
 
           {/* Completed Items */}
           {completedItems.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-white rounded-2xl border border-slate-200">
               <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
                 <CheckCircle2 size={16} className="text-emerald-500" />
                 <span className="font-semibold text-slate-900 text-sm">Completados</span>
