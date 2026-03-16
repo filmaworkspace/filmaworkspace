@@ -53,6 +53,7 @@ export default function Header() {
     budget: false,
     users: false,
     reports: false,
+    box: false,
   });
   const router = useRouter();
   const pathname = usePathname();
@@ -96,7 +97,7 @@ export default function Header() {
     const loadPermissions = async () => {
       if (!user?.uid || !projectId) {
         setPermissions({ config: false, accounting: false, team: false });
-        setAccountingAccess({ panel: false, suppliers: false, budget: false, users: false, reports: false });
+        setAccountingAccess({ panel: false, suppliers: false, budget: false, users: false, reports: false, box: false });
         return;
       }
 
@@ -121,26 +122,26 @@ export default function Header() {
           const hasAccountingPermission = memberData.permissions?.accounting || false;
 
           if (!hasAccountingPermission) {
-            setAccountingAccess({ panel: false, suppliers: false, budget: false, users: false, reports: false });
+            setAccountingAccess({ panel: false, suppliers: false, budget: false, users: false, reports: false, box: false });
             return;
           }
 
           const accessLevel = memberData.accountingAccessLevel || "user";
           const accessLevels = {
-            visitor: { panel: true, suppliers: false, budget: false, users: false, reports: false },
-            user: { panel: true, suppliers: true, budget: false, users: false, reports: false },
-            accounting: { panel: true, suppliers: true, budget: false, users: false, reports: true },
-            accounting_extended: { panel: true, suppliers: true, budget: true, users: true, reports: true },
+            visitor: { panel: true, suppliers: false, budget: false, users: false, reports: false, box: true },
+            user: { panel: true, suppliers: true, budget: false, users: false, reports: false, box: false },
+            accounting: { panel: true, suppliers: true, budget: false, users: false, reports: true, box: true },
+            accounting_extended: { panel: true, suppliers: true, budget: true, users: true, reports: true, box: true },
           };
 
           setAccountingAccess(accessLevels[accessLevel as keyof typeof accessLevels] || accessLevels.user);
         } else {
-          setAccountingAccess({ panel: false, suppliers: false, budget: false, users: false, reports: false });
+          setAccountingAccess({ panel: false, suppliers: false, budget: false, users: false, reports: false, box: false });
         }
       } catch (error) {
         console.error("Error cargando permisos:", error);
         setPermissions({ config: false, accounting: false, team: false });
-        setAccountingAccess({ panel: false, suppliers: false, budget: false, users: false, reports: false });
+        setAccountingAccess({ panel: false, suppliers: false, budget: false, users: false, reports: false, box: false });
       }
     };
 
@@ -321,10 +322,10 @@ export default function Header() {
 
         {/* Right side: BOX + Environment Switcher + Profile */}
         <div className="relative flex items-center gap-2">
-          {/* BOX Icon - Solo visible en sección accounting */}
-          {isAccountingSection && projectId && permissions.accounting && (
+          {/* BOX Icon - Solo visible para visitor, accounting y accounting_extended */}
+          {isAccountingSection && projectId && accountingAccess.box && (
             <Link
-              href={`/project/${projectId}/accounting/box`}
+              href={`/project/${projectId}/accounting/boxes`}
               className="hidden md:flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 shadow-sm hover:shadow-md hover:scale-105 transition-all"
               title="Cajas (BOX)"
             >
