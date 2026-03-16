@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { doc, getDoc, collection, getDocs, updateDoc, query, where, orderBy, Timestamp } from "firebase/firestore";
-import { Receipt, Edit, Download, XCircle, CheckCircle, Clock, Ban, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, ExternalLink, MoreHorizontal, CreditCard, FileText, Link as LinkIcon, Eye, EyeOff, Code, Save, X, Plus, Trash2, Search, RefreshCw, Percent, Euro, FileCheck, ZoomIn, ZoomOut, RotateCw, Layers, Lock } from "lucide-react";
+import { Receipt, Edit, Download, XCircle, CheckCircle, Clock, Ban, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, ExternalLink, MoreHorizontal, CreditCard, FileText, Link as LinkIcon, Eye, EyeOff, Code, Save, X, Plus, Trash2, Search, RefreshCw, Percent, Euro, FileCheck, ZoomIn, ZoomOut, RotateCw, Layers, Lock, Glasses, Check } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
 import { unrealizeInvoice, updatePOItemsInvoiced, realizeInvoice } from "@/lib/budgetOperations";
@@ -18,7 +18,9 @@ type DocumentType = "invoice" | "proforma" | "autonomo" | "ticket";
 
 interface EpisodeDistribution { episode: number; amount: number; percentage: number; }
 interface InvoiceItem { description: string; subAccountId: string; subAccountCode: string; subAccountDescription: string; quantity: number; unitPrice: number; baseAmount: number; vatRate: number; vatAmount: number; irpfRate: number; irpfAmount: number; totalAmount: number; poItemId?: string; poItemIndex?: number; isNewItem?: boolean; episodeAssignment?: "general" | "specific"; episodes?: EpisodeDistribution[]; }
-interface Invoice { id: string; documentType: DocumentType; number: string; displayNumber: string; supplierNumber?: string; supplier: string; supplierId: string; supplierTaxId?: string; supplierIban?: string; supplierBic?: string; department?: string; description: string; notes?: string; items: InvoiceItem[]; baseAmount: number; vatAmount: number; irpfAmount: number; totalAmount: number; invoiceDate?: Date; dueDate: Date; status: InvoiceStatus; approvalStatus?: string; attachmentUrl?: string; attachmentFileName?: string; createdAt: Date; createdBy: string; createdByName: string; codedAt?: Date; codedBy?: string; codedByName?: string; approvedAt?: Date; approvedBy?: string; approvedByName?: string; paidAt?: Date; paidAmount?: number; paymentMethod?: string; paymentReference?: string; cancelledAt?: Date; cancelledByName?: string; cancellationReason?: string; poId?: string; poNumber?: string; requiresReplacement?: boolean; replacedByInvoiceId?: string; isReplacement?: boolean; replacesDocumentId?: string; replacesDocumentNumber?: string; currency?: string; accountingEntry?: string; isAsset?: boolean; assetCategory?: string; replacedFromType?: string; replacedAt?: Date; originalAttachmentUrl?: string; originalAttachmentFileName?: string; accounted?: boolean; accountedAt?: Date; accountedBy?: string; accountedByName?: string; accountingEntryNumber?: string; accountingAccount?: string; delegatedToAccounting?: boolean; delegatedAt?: Date; delegatedBy?: string; delegatedByName?: string; }
+interface ApprovalStepStatus { id: string; order: number; approverType: "fixed" | "role" | "hod" | "coordinator"; approvers: string[]; approverNames?: string[]; roles?: string[]; department?: string; approvedBy: string[]; approvedByNames?: string[]; rejectedBy: string[]; status: "pending" | "approved" | "rejected"; requireAll: boolean; approvedAt?: Date; }
+interface ApprovalComment { id: string; userId: string; userName: string; text: string; createdAt: Date; type: "approval" | "rejection" | "info_request" | "comment"; stepOrder?: number; }
+interface Invoice { id: string; documentType: DocumentType; number: string; displayNumber: string; supplierNumber?: string; supplier: string; supplierId: string; supplierTaxId?: string; supplierIban?: string; supplierBic?: string; department?: string; description: string; notes?: string; items: InvoiceItem[]; baseAmount: number; vatAmount: number; irpfAmount: number; totalAmount: number; invoiceDate?: Date; dueDate: Date; status: InvoiceStatus; approvalStatus?: string; approvalSteps?: ApprovalStepStatus[]; currentApprovalStep?: number; comments?: ApprovalComment[]; attachmentUrl?: string; attachmentFileName?: string; createdAt: Date; createdBy: string; createdByName: string; codedAt?: Date; codedBy?: string; codedByName?: string; approvedAt?: Date; approvedBy?: string; approvedByName?: string; paidAt?: Date; paidAmount?: number; paymentMethod?: string; paymentReference?: string; cancelledAt?: Date; cancelledByName?: string; cancellationReason?: string; poId?: string; poNumber?: string; requiresReplacement?: boolean; replacedByInvoiceId?: string; isReplacement?: boolean; replacesDocumentId?: string; replacesDocumentNumber?: string; currency?: string; accountingEntry?: string; isAsset?: boolean; assetCategory?: string; replacedFromType?: string; replacedAt?: Date; originalAttachmentUrl?: string; originalAttachmentFileName?: string; accounted?: boolean; accountedAt?: Date; accountedBy?: string; accountedByName?: string; accountingEntryNumber?: string; accountingAccount?: string; delegatedToAccounting?: boolean; delegatedAt?: Date; delegatedBy?: string; delegatedByName?: string; }
 interface LinkedPO { id: string; number: string; supplier: string; baseAmount: number; invoicedAmount: number; status: string; items?: any[]; }
 interface Supplier { id: string; name: string; taxId?: string; iban?: string; bic?: string; }
 interface SubAccount { id: string; code: string; description: string; accountId: string; committed: number; actual: number; budgeted: number; }
@@ -87,6 +89,7 @@ export default function InvoiceDetailPage() {
   });
   const [codingItems, setCodingItems] = useState<Array<{ description: string; subAccountId: string; subAccountCode: string; subAccountDescription: string; quantity: number; unitPrice: number; vatRate: number; irpfRate: number; poItemIndex?: number; isNewItem: boolean; }>>([]);
   const [searchSubAccount, setSearchSubAccount] = useState("");
+  const [showApprovalNoteModal, setShowApprovalNoteModal] = useState<ApprovalComment | null>(null);
 
   const showToast = (type: "success" | "error", message: string) => { setToast({ type, message }); setTimeout(() => setToast(null), 3000); };
   const formatCurrency = (a: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(a || 0);
@@ -123,6 +126,15 @@ export default function InvoiceDetailPage() {
         accounted: data.accounted || false, accountedAt: data.accountedAt?.toDate(), accountedBy: data.accountedBy,
         accountedByName: data.accountedByName, accountingEntryNumber: data.accountingEntryNumber, accountingAccount: data.accountingAccount,
         delegatedToAccounting: data.delegatedToAccounting || false, delegatedAt: data.delegatedAt?.toDate(), delegatedBy: data.delegatedBy, delegatedByName: data.delegatedByName,
+        approvalSteps: (data.approvalSteps || []).map((step: any) => ({
+          ...step,
+          approvedAt: step.approvedAt?.toDate ? step.approvedAt.toDate() : undefined,
+        })),
+        currentApprovalStep: data.currentApprovalStep ?? null,
+        comments: (data.comments || []).map((c: any) => ({
+          ...c,
+          createdAt: c.createdAt?.toDate ? c.createdAt.toDate() : new Date(),
+        })),
       };
       setInvoice(invoiceData);
 
@@ -1271,7 +1283,181 @@ export default function InvoiceDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Firmas */}
+        {invoice.approvalSteps && invoice.approvalSteps.length > 0 && (
+          <div className="mt-8 bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="px-6 py-3 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-semibold text-slate-900">Firmas</h3>
+              {invoice.status === "approved" || invoice.status === "pending" || invoice.status === "paid" ? (
+                <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                  <CheckCircle size={12} />
+                  Completado
+                </span>
+              ) : invoice.status === "pending_approval" ? (
+                <span className="text-xs text-amber-600 font-medium flex items-center gap-1">
+                  <Clock size={12} />
+                  {invoice.approvalSteps.filter(s => s.status === "approved").length}/{invoice.approvalSteps.length}
+                </span>
+              ) : invoice.status === "rejected" ? (
+                <span className="text-xs text-red-600 font-medium flex items-center gap-1">
+                  <XCircle size={12} />
+                  Rechazado
+                </span>
+              ) : null}
+            </div>
+
+            <div className="p-4">
+              <div className={`grid gap-3`} style={{ gridTemplateColumns: `repeat(${invoice.approvalSteps.length}, minmax(0, 1fr))` }}>
+                {invoice.approvalSteps.map((step, index) => {
+                  const isApproved = step.status === "approved";
+                  const isRejected = step.status === "rejected";
+                  const isPending = step.status === "pending";
+                  const isCurrent = invoice.currentApprovalStep === index;
+                  
+                  const signerName = isApproved && step.approvedByNames?.[0] 
+                    ? step.approvedByNames[0] 
+                    : step.approverNames?.[0] || "—";
+                  
+                  const signerId = isApproved && step.approvedBy?.[0] 
+                    ? step.approvedBy[0] 
+                    : step.approvers?.[0];
+                  
+                  const userComment = signerId ? (invoice.comments || []).find(c => 
+                    c.userId === signerId && 
+                    (c.type === "approval" || c.type === "rejection" || c.type === "comment")
+                  ) : null;
+
+                  return (
+                    <div 
+                      key={step.id} 
+                      className={`p-3 rounded-xl border text-center ${
+                        isApproved ? "bg-emerald-50 border-emerald-200" : 
+                        isRejected ? "bg-red-50 border-red-200" : 
+                        isCurrent ? "bg-amber-50 border-amber-200" : 
+                        "bg-slate-50 border-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-1 mb-2">
+                        <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Nivel {step.order}</span>
+                        {userComment && (
+                          <button
+                            onClick={() => setShowApprovalNoteModal(userComment)}
+                            className="p-0.5 hover:bg-white/50 rounded transition-colors"
+                            title="Ver nota"
+                          >
+                            <Glasses size={12} className={
+                              isApproved ? "text-emerald-600" : 
+                              isRejected ? "text-red-600" : 
+                              "text-slate-400"
+                            } />
+                          </button>
+                        )}
+                      </div>
+                      
+                      <div className={`w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center text-xs font-semibold ${
+                        isApproved ? "bg-emerald-200 text-emerald-700" : 
+                        isRejected ? "bg-red-200 text-red-700" : 
+                        isCurrent ? "bg-amber-200 text-amber-700" :
+                        "bg-slate-200 text-slate-500"
+                      }`}>
+                        {isApproved ? <Check size={14} /> : 
+                         isRejected ? <X size={14} /> : 
+                         signerName.charAt(0).toUpperCase()}
+                      </div>
+                      
+                      <p className={`text-sm font-medium truncate ${
+                        isApproved ? "text-emerald-800" : 
+                        isRejected ? "text-red-800" : 
+                        "text-slate-700"
+                      }`}>
+                        {signerName}
+                      </p>
+                      
+                      {isApproved && step.approvedAt ? (
+                        <p className="text-[10px] text-slate-500 mt-0.5">
+                          {new Date(step.approvedAt).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })} · {new Date(step.approvedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      ) : isRejected ? (
+                        <p className="text-[10px] text-red-600 mt-0.5">Rechazado</p>
+                      ) : isCurrent ? (
+                        <p className="text-[10px] text-amber-600 mt-0.5">Pendiente</p>
+                      ) : (
+                        <p className="text-[10px] text-slate-400 mt-0.5">En espera</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              
+              <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <span>Creado por <span className="font-medium text-slate-700">{invoice.createdByName}</span></span>
+                <span>{formatDate(invoice.createdAt)}</span>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
+
+      {/* Modal Nota del Aprobador */}
+      {showApprovalNoteModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowApprovalNoteModal(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                  showApprovalNoteModal.type === "approval" ? "bg-emerald-100" :
+                  showApprovalNoteModal.type === "rejection" ? "bg-red-100" :
+                  "bg-slate-100"
+                }`}>
+                  <Glasses size={24} className={
+                    showApprovalNoteModal.type === "approval" ? "text-emerald-600" :
+                    showApprovalNoteModal.type === "rejection" ? "text-red-600" :
+                    "text-slate-600"
+                  } />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900">Nota del aprobador</h3>
+                  <p className="text-sm text-slate-500">{showApprovalNoteModal.userName}</p>
+                </div>
+              </div>
+              
+              <div className={`p-4 rounded-xl border ${
+                showApprovalNoteModal.type === "approval" ? "bg-emerald-50 border-emerald-200" :
+                showApprovalNoteModal.type === "rejection" ? "bg-red-50 border-red-200" :
+                "bg-slate-50 border-slate-200"
+              }`}>
+                <p className="text-sm text-slate-700 italic">"{showApprovalNoteModal.text}"</p>
+              </div>
+              
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <Calendar size={12} />
+                  {formatDateTime(showApprovalNoteModal.createdAt)}
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                  showApprovalNoteModal.type === "approval" ? "bg-emerald-100 text-emerald-700" :
+                  showApprovalNoteModal.type === "rejection" ? "bg-red-100 text-red-700" :
+                  showApprovalNoteModal.type === "info_request" ? "bg-amber-100 text-amber-700" :
+                  "bg-slate-100 text-slate-700"
+                }`}>
+                  {showApprovalNoteModal.type === "approval" && "Aprobación"}
+                  {showApprovalNoteModal.type === "rejection" && "Rechazo"}
+                  {showApprovalNoteModal.type === "info_request" && "Solicitud de info"}
+                  {showApprovalNoteModal.type === "comment" && "Comentario"}
+                </span>
+              </div>
+              
+              <button 
+                onClick={() => setShowApprovalNoteModal(null)}
+                className="w-full mt-4 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cancel Modal */}
       {showCancelModal && (
