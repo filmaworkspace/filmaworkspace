@@ -1,12 +1,13 @@
 "use client";
 import React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Inter } from "next/font/google";
+import { Inter } from "next/google";
 import { useState, useEffect, useRef } from "react";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, Timestamp } from "firebase/firestore";
-import { CreditCard, Plus, Search, Trash2, X, CheckCircle2, Calendar, FileText, MoreHorizontal, Receipt, GripVertical, Upload, Clock, Banknote, Shield, Landmark, ChevronRight, Eye, Edit3, Send, LayoutGrid, List, Wallet, PiggyBank, CircleDollarSign, FolderOpen, Download, ChevronDown, AlertTriangle, FileCheck, ExternalLink, Filter, HelpCircle } from "lucide-react";
+import { CreditCard, Plus, Search, Trash2, X, CheckCircle2, Calendar, FileText, MoreHorizontal, Receipt, GripVertical, Upload, Clock, Banknote, Shield, Landmark, ChevronRight, Eye, Edit3, Send, LayoutGrid, List, Wallet, PiggyBank, CircleDollarSign, FolderOpen, Download, ChevronDown, AlertTriangle, FileCheck, ExternalLink, Filter, HelpCircle, ShieldAlert } from "lucide-react";
 import jsPDF from "jspdf";
+import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -109,6 +110,7 @@ export default function PaymentsPage() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
+  const { loading: permissionsLoading, permissions } = useAccountingPermissions(id);
 
   const [projectName, setProjectName] = useState("");
   const [loading, setLoading] = useState(true);
@@ -522,7 +524,10 @@ export default function PaymentsPage() {
     pdf.save("Prevision_" + forecast.name.replace(/\s+/g, "_") + "_" + formatDateForFile(forecast.paymentDate) + ".pdf");
   };
 
-  if (loading) {
+  // Verificar permisos - solo accounting_extended puede acceder
+  const canAccessPayments = permissions.accountingAccessLevel === "accounting_extended";
+
+  if (permissionsLoading || loading) {
     return (
       <div className={cx("min-h-screen bg-white flex items-center justify-center", inter.className)}>
         <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
@@ -530,10 +535,32 @@ export default function PaymentsPage() {
     );
   }
 
+  if (!canAccessPayments) {
+    return (
+      <div className={cx("min-h-screen bg-white flex items-center justify-center", inter.className)}>
+        <div className="text-center max-w-md mx-auto px-6">
+          <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <ShieldAlert size={32} className="text-red-600" />
+          </div>
+          <h1 className="text-2xl font-semibold text-slate-900 mb-2">Acceso restringido</h1>
+          <p className="text-slate-500 mb-6">
+            No tienes permisos para acceder a la gestión de pagos. Esta sección está disponible únicamente para usuarios con nivel de acceso "Contabilidad ampliada".
+          </p>
+          <button
+            onClick={() => router.push(`/project/${id}/accounting`)}
+            className="px-6 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors"
+          >
+            Volver al panel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cx("min-h-screen bg-white", inter.className)}>
       {toast && (
-        <div className={cx("fixed top-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2", toast.type === "success" ? "bg-slate-900 text-white" : "bg-red-600 text-white")}>
+        <div className={cx("fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2", toast.type === "success" ? "bg-slate-900 text-white" : "bg-red-600 text-white")}>
           {toast.type === "success" ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
           {toast.message}
         </div>
@@ -546,6 +573,7 @@ export default function PaymentsPage() {
               <CreditCard size={24} style={{ color: "#2F52E0" }} />
               <div>
                 <h1 className="text-2xl font-semibold text-slate-900">Previsiones de pago</h1>
+                <p className="text-sm text-slate-500 mt-0.5">{forecasts.length} previsiones · {formatCurrency(forecasts.reduce((s, f) => s + f.totalAmount, 0))} € total</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -656,7 +684,7 @@ export default function PaymentsPage() {
                   <div className="p-3 border-b border-slate-100">
                     <div className="relative mb-2">
                       <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input type="text" value={invoiceSearch} onChange={(e) => setInvoiceSearch(e.target.value)} placeholder="Buscar factura" className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
+                      <input type="text" value={invoiceSearch} onChange={(e) => setInvoiceSearch(e.target.value)} placeholder="Buscar factura..." className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
                       {invoiceSearch && (<button onClick={() => setInvoiceSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600"><X size={12} /></button>)}
                     </div>
                     <div className="flex gap-2">
