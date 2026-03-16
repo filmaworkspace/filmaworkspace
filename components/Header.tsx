@@ -160,7 +160,7 @@ export default function Header() {
   const isAdminSection = pathname.includes("/admin");
   const isAccountingSection = pathname.includes("/accounting");
   const isTeamSection = pathname.includes("/team") && !pathname.includes("/config");
-  const isConfigSection = pathname.includes("/config");
+  const isConfigSection = pathname.includes("/config") && !pathname.includes("/accounting/config");
   const isInProjectSection = isAccountingSection || isTeamSection || isConfigSection;
 
   const currentSection = isAdminSection ? "admin" : isAccountingSection ? "accounting" : isTeamSection ? "team" : isConfigSection ? "config" : null;
@@ -170,11 +170,11 @@ export default function Header() {
       ? "suppliers"
       : pathname.includes("/budget")
       ? "budget"
-      : pathname.includes("/users")
+      : pathname.includes("/users") && !pathname.includes("/config/users")
       ? "users"
       : pathname.includes("/reports")
       ? "reports"
-      : pathname.includes("/config")
+      : pathname.includes("/accounting/config")
       ? "config"
       : "panel"
     : null;
