@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { doc, getDoc, collection, getDocs, updateDoc, deleteDoc, query, where, orderBy, Timestamp } from "firebase/firestore";
-import { FileText, ArrowLeft, Edit, Download, Receipt, Lock, Unlock, XCircle, CheckCircle, Clock, Ban, Archive, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, FileEdit, ExternalLink, MoreHorizontal, Layers, BookCheck, Wallet, Info, Trash2 } from "lucide-react";
+import { FileText, ArrowLeft, Edit, Download, Receipt, Lock, Unlock, XCircle, CheckCircle, Clock, Ban, Archive, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, FileEdit, ExternalLink, MoreHorizontal, Layers, BookCheck, Wallet, Info, Trash2, Upload, Glasses, Check, X, MessageSquare, PenLine } from "lucide-react";
 import jsPDF from "jspdf";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldCommitPO } from "@/lib/budgetRules";
@@ -48,6 +48,32 @@ interface Invoice {
   totalAmount: number;
   status: string;
   createdAt: Date;
+}
+
+interface ApprovalStepStatus {
+  id: string;
+  order: number;
+  approverType: "fixed" | "role" | "hod" | "coordinator";
+  approvers: string[];
+  approverNames?: string[];
+  roles?: string[];
+  department?: string;
+  approvedBy: string[];
+  approvedByNames?: string[];
+  rejectedBy: string[];
+  status: "pending" | "approved" | "rejected";
+  requireAll: boolean;
+  approvedAt?: Date;
+}
+
+interface ApprovalComment {
+  id: string;
+  userId: string;
+  userName: string;
+  text: string;
+  createdAt: Date;
+  type: "approval" | "rejection" | "info_request" | "comment";
+  stepOrder?: number;
 }
 
 interface ModificationEntry {
@@ -92,6 +118,9 @@ interface PO {
   cancelledByName?: string;
   cancellationReason?: string;
   modificationHistory?: ModificationEntry[];
+  approvalSteps?: ApprovalStepStatus[];
+  currentApprovalStep?: number;
+  comments?: ApprovalComment[];
 }
 
 const STATUS_CONFIG: Record<POStatus, { bg: string; text: string; label: string; icon: typeof Clock; gradient: string }> = {
@@ -132,6 +161,7 @@ export default function PODetailPage() {
   const [processing, setProcessing] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showApprovalNoteModal, setShowApprovalNoteModal] = useState<ApprovalComment | null>(null);
 
   useEffect(() => {
     if (projectId && poId && !permissionsLoading) loadData();
@@ -162,6 +192,16 @@ export default function PODetailPage() {
         remainingAmount: poDoc.data().remainingAmount || 0,
         items: poDoc.data().items || [],
         modificationHistory: poDoc.data().modificationHistory || [],
+        approvalSteps: (poDoc.data().approvalSteps || []).map((step: any) => ({
+          ...step,
+          approvedAt: step.approvedAt?.toDate?.() || null,
+          approvedByNames: step.approvedByNames || [],
+        })),
+        currentApprovalStep: poDoc.data().currentApprovalStep ?? null,
+        comments: (poDoc.data().comments || []).map((c: any) => ({
+          ...c,
+          createdAt: c.createdAt?.toDate?.() || new Date(),
+        })),
       } as PO;
 
       if (!canViewPO(poData)) {
@@ -651,10 +691,10 @@ export default function PODetailPage() {
                   Editar
                 </Link>
               )}
-              {po.status === "approved" && poPerms.canCreateInvoice && (
+              {po.status === "approved" && (
                 <Link href={`/project/${projectId}/accounting/invoices/new?poId=${po.id}`} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium">
-                  <Receipt size={16} />
-                  Crear factura
+                  <Upload size={16} />
+                  Subir factura
                 </Link>
               )}
               {po.status === "closed" && poPerms.canReopen && (
@@ -1136,6 +1176,245 @@ export default function PODetailPage() {
             )}
           </div>
         </div>
+
+        {/* Auditoría de Firmas */}
+        {po.approvalSteps && po.approvalSteps.length > 0 && (
+          <div className="mt-8 bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl flex items-center justify-center">
+                  <PenLine size={18} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900">Auditoría de firmas</h3>
+                  <p className="text-xs text-slate-500">
+                    {po.approvalSteps.filter(s => s.status === "approved").length} de {po.approvalSteps.length} firmas completadas
+                  </p>
+                </div>
+              </div>
+              {po.status === "approved" && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-100 rounded-full">
+                  <CheckCircle size={14} className="text-emerald-600" />
+                  <span className="text-xs font-medium text-emerald-700">Documento firmado</span>
+                </div>
+              )}
+              {po.status === "pending" && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-100 rounded-full">
+                  <Clock size={14} className="text-amber-600" />
+                  <span className="text-xs font-medium text-amber-700">Pendiente de firmas</span>
+                </div>
+              )}
+              {po.status === "rejected" && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-red-100 rounded-full">
+                  <XCircle size={14} className="text-red-600" />
+                  <span className="text-xs font-medium text-red-700">Rechazado</span>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6">
+              <div className="relative">
+                {/* Línea conectora vertical */}
+                <div className="absolute left-6 top-8 bottom-8 w-0.5 bg-slate-200" />
+
+                <div className="space-y-6">
+                  {po.approvalSteps.map((step, index) => {
+                    const isApproved = step.status === "approved";
+                    const isRejected = step.status === "rejected";
+                    const isPending = step.status === "pending";
+                    const isCurrent = po.currentApprovalStep === index;
+                    
+                    // Buscar comentarios de este paso
+                    const stepComments = (po.comments || []).filter(c => 
+                      c.stepOrder === step.order || 
+                      (c.type === "approval" && step.approvedBy?.includes(c.userId)) ||
+                      (c.type === "rejection" && step.rejectedBy?.includes(c.userId))
+                    );
+
+                    return (
+                      <div key={step.id} className="relative flex gap-4">
+                        {/* Icono del paso */}
+                        <div className={`relative z-10 w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                          isApproved ? "bg-emerald-100" : 
+                          isRejected ? "bg-red-100" : 
+                          isCurrent ? "bg-amber-100 ring-2 ring-amber-300 ring-offset-2" : 
+                          "bg-slate-100"
+                        }`}>
+                          {isApproved && <Check size={20} className="text-emerald-600" />}
+                          {isRejected && <X size={20} className="text-red-600" />}
+                          {isPending && !isCurrent && <Clock size={20} className="text-slate-400" />}
+                          {isPending && isCurrent && <Clock size={20} className="text-amber-600" />}
+                        </div>
+
+                        {/* Contenido del paso */}
+                        <div className={`flex-1 p-4 rounded-xl border ${
+                          isApproved ? "bg-emerald-50/50 border-emerald-200" : 
+                          isRejected ? "bg-red-50/50 border-red-200" : 
+                          isCurrent ? "bg-amber-50/50 border-amber-200" : 
+                          "bg-slate-50/50 border-slate-200"
+                        }`}>
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-slate-900">Nivel {step.order}</span>
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                  isApproved ? "bg-emerald-100 text-emerald-700" : 
+                                  isRejected ? "bg-red-100 text-red-700" : 
+                                  isCurrent ? "bg-amber-100 text-amber-700" : 
+                                  "bg-slate-100 text-slate-600"
+                                }`}>
+                                  {isApproved ? "Firmado" : isRejected ? "Rechazado" : isCurrent ? "Pendiente" : "En espera"}
+                                </span>
+                              </div>
+                              <p className="text-sm text-slate-500 mt-0.5">
+                                {step.approverType === "fixed" && "Aprobadores específicos"}
+                                {step.approverType === "role" && `Rol: ${step.roles?.join(", ")}`}
+                                {step.approverType === "hod" && "Jefe de departamento"}
+                                {step.approverType === "coordinator" && "Coordinador de producción"}
+                                {step.requireAll && " · Requiere todos"}
+                              </p>
+                            </div>
+                            {step.approvedAt && (
+                              <span className="text-xs text-slate-500">{formatDateTime(step.approvedAt)}</span>
+                            )}
+                          </div>
+
+                          {/* Firmantes */}
+                          <div className="mt-3 space-y-2">
+                            {/* Aprobadores asignados */}
+                            {step.approverNames && step.approverNames.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {step.approverNames.map((name, i) => {
+                                  const userId = step.approvers?.[i];
+                                  const hasApproved = userId && step.approvedBy?.includes(userId);
+                                  const hasRejected = userId && step.rejectedBy?.includes(userId);
+                                  
+                                  // Buscar si este usuario tiene comentario
+                                  const userComment = (po.comments || []).find(c => 
+                                    c.userId === userId && 
+                                    (c.type === "approval" || c.type === "rejection" || c.type === "comment")
+                                  );
+
+                                  return (
+                                    <div 
+                                      key={i} 
+                                      className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+                                        hasApproved ? "bg-emerald-100" : 
+                                        hasRejected ? "bg-red-100" : 
+                                        "bg-white border border-slate-200"
+                                      }`}
+                                    >
+                                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold ${
+                                        hasApproved ? "bg-emerald-200 text-emerald-700" : 
+                                        hasRejected ? "bg-red-200 text-red-700" : 
+                                        "bg-slate-200 text-slate-600"
+                                      }`}>
+                                        {name.charAt(0).toUpperCase()}
+                                      </div>
+                                      <div>
+                                        <p className={`text-sm font-medium ${
+                                          hasApproved ? "text-emerald-800" : 
+                                          hasRejected ? "text-red-800" : 
+                                          "text-slate-700"
+                                        }`}>
+                                          {name}
+                                        </p>
+                                        <p className="text-xs text-slate-500">
+                                          {hasApproved && "Firmado"}
+                                          {hasRejected && "Rechazado"}
+                                          {!hasApproved && !hasRejected && "Pendiente"}
+                                        </p>
+                                      </div>
+                                      {/* Icono de gafas si tiene comentario */}
+                                      {userComment && (
+                                        <button
+                                          onClick={() => setShowApprovalNoteModal(userComment)}
+                                          className="p-1.5 hover:bg-white/50 rounded-lg transition-colors"
+                                          title="Ver nota del aprobador"
+                                        >
+                                          <Glasses size={16} className={
+                                            hasApproved ? "text-emerald-600" : 
+                                            hasRejected ? "text-red-600" : 
+                                            "text-slate-500"
+                                          } />
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Si no hay nombres pero sí approvedByNames (firmantes que ya firmaron) */}
+                            {(!step.approverNames || step.approverNames.length === 0) && step.approvedByNames && step.approvedByNames.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {step.approvedByNames.map((name, i) => {
+                                  const userId = step.approvedBy?.[i];
+                                  const userComment = (po.comments || []).find(c => 
+                                    c.userId === userId && 
+                                    (c.type === "approval" || c.type === "comment")
+                                  );
+
+                                  return (
+                                    <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-100">
+                                      <div className="w-7 h-7 rounded-full bg-emerald-200 flex items-center justify-center text-xs font-semibold text-emerald-700">
+                                        {name.charAt(0).toUpperCase()}
+                                      </div>
+                                      <div>
+                                        <p className="text-sm font-medium text-emerald-800">{name}</p>
+                                        <p className="text-xs text-emerald-600">Firmado</p>
+                                      </div>
+                                      {userComment && (
+                                        <button
+                                          onClick={() => setShowApprovalNoteModal(userComment)}
+                                          className="p-1.5 hover:bg-white/50 rounded-lg transition-colors"
+                                          title="Ver nota del aprobador"
+                                        >
+                                          <Glasses size={16} className="text-emerald-600" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Mensaje si está pendiente y es el paso actual */}
+                            {isPending && isCurrent && (
+                              <p className="text-sm text-amber-700 flex items-center gap-2 mt-2">
+                                <Info size={14} />
+                                Esperando firma de este nivel
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Firma final del creador */}
+              <div className="mt-8 pt-6 border-t border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center text-sm font-semibold text-slate-600">
+                      {po.createdByName.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">{po.createdByName}</p>
+                      <p className="text-xs text-slate-500">Creador del documento</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-slate-500">{formatDate(po.createdAt)}</p>
+                    <p className="text-xs text-slate-400">PO-{po.number} · V{String(po.version).padStart(2, "0")}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Close Modal */}
@@ -1506,6 +1785,66 @@ export default function PODetailPage() {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nota del Aprobador */}
+      {showApprovalNoteModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowApprovalNoteModal(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                  showApprovalNoteModal.type === "approval" ? "bg-emerald-100" :
+                  showApprovalNoteModal.type === "rejection" ? "bg-red-100" :
+                  "bg-slate-100"
+                }`}>
+                  <Glasses size={24} className={
+                    showApprovalNoteModal.type === "approval" ? "text-emerald-600" :
+                    showApprovalNoteModal.type === "rejection" ? "text-red-600" :
+                    "text-slate-600"
+                  } />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900">Nota del aprobador</h3>
+                  <p className="text-sm text-slate-500">{showApprovalNoteModal.userName}</p>
+                </div>
+              </div>
+              
+              <div className={`p-4 rounded-xl border ${
+                showApprovalNoteModal.type === "approval" ? "bg-emerald-50 border-emerald-200" :
+                showApprovalNoteModal.type === "rejection" ? "bg-red-50 border-red-200" :
+                "bg-slate-50 border-slate-200"
+              }`}>
+                <p className="text-sm text-slate-700 italic">"{showApprovalNoteModal.text}"</p>
+              </div>
+              
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <Calendar size={12} />
+                  {formatDateTime(showApprovalNoteModal.createdAt)}
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                  showApprovalNoteModal.type === "approval" ? "bg-emerald-100 text-emerald-700" :
+                  showApprovalNoteModal.type === "rejection" ? "bg-red-100 text-red-700" :
+                  showApprovalNoteModal.type === "info_request" ? "bg-amber-100 text-amber-700" :
+                  "bg-slate-100 text-slate-700"
+                }`}>
+                  {showApprovalNoteModal.type === "approval" && "Aprobación"}
+                  {showApprovalNoteModal.type === "rejection" && "Rechazo"}
+                  {showApprovalNoteModal.type === "info_request" && "Solicitud de info"}
+                  {showApprovalNoteModal.type === "comment" && "Comentario"}
+                </span>
+              </div>
+              
+              <button 
+                onClick={() => setShowApprovalNoteModal(null)}
+                className="w-full mt-4 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
+              >
+                Cerrar
+              </button>
             </div>
           </div>
         </div>
