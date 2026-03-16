@@ -374,6 +374,9 @@ export default function InvoiceDetailPage() {
     if (invoice?.accounted) return false; // Bloqueada si está contabilizada
     return permissions.accountingAccessLevel === "accounting" || permissions.accountingAccessLevel === "accounting_extended";
   };
+  const canPay = () => {
+    return permissions.accountingAccessLevel === "accounting_extended";
+  };
   const canCancel = () => {
     if (invoice?.accounted) return false; // Bloqueada si está contabilizada
     return invoice && !["cancelled", "paid"].includes(invoice.status) && permissions.isProjectRole;
@@ -432,7 +435,7 @@ export default function InvoiceDetailPage() {
             <button onClick={() => setCodingMode(false)} className="p-2 hover:bg-violet-700 rounded-lg"><X size={20} /></button>
             <div className="flex items-center gap-3">
               <Code size={20} />
-              <span className="font-semibold">Codificar</span>
+              <span className="font-semibold">CODIFICAR</span>
               <span className="bg-violet-500 px-2 py-0.5 rounded text-sm">{invoice.displayNumber}</span>
             </div>
           </div>
@@ -818,7 +821,7 @@ export default function InvoiceDetailPage() {
               )}
 
               {canEdit() && <Link href={`/project/${projectId}/accounting/invoices/${invoice.id}/edit`} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium"><Edit size={16} />Editar</Link>}
-              {invoice.status === "pending" && <Link href={`/project/${projectId}/accounting/payments?invoice=${invoice.id}`} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium"><CreditCard size={16} />Ir a pagar</Link>}
+              {invoice.status === "pending" && canPay() && <Link href={`/project/${projectId}/accounting/payments?invoice=${invoice.id}`} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium"><CreditCard size={16} />Ir a pagar</Link>}
 
               <div className="relative">
                 <button onClick={() => setShowActionsMenu(!showActionsMenu)} className="p-2.5 border border-slate-200 rounded-xl hover:bg-slate-50"><MoreHorizontal size={18} /></button>
