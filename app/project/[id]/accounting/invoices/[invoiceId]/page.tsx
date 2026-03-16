@@ -1374,9 +1374,12 @@ export default function InvoiceDetailPage() {
                         {signerName}
                       </p>
                       
-                      {isApproved && step.approvedAt ? (
-                        <p className="text-[10px] text-slate-500 mt-0.5">
-                          {new Date(step.approvedAt).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })} · {new Date(step.approvedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                      {isApproved ? (
+                        <p className="text-[10px] text-emerald-600 mt-0.5">
+                          {step.approvedAt 
+                            ? `${new Date(step.approvedAt).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })} · ${new Date(step.approvedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}`
+                            : "Firmado"
+                          }
                         </p>
                       ) : isRejected ? (
                         <p className="text-[10px] text-red-600 mt-0.5">Rechazado</p>
