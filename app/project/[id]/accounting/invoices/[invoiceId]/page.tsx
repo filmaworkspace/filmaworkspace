@@ -18,7 +18,7 @@ type DocumentType = "invoice" | "proforma" | "autonomo" | "ticket";
 
 interface EpisodeDistribution { episode: number; amount: number; percentage: number; }
 interface InvoiceItem { description: string; subAccountId: string; subAccountCode: string; subAccountDescription: string; quantity: number; unitPrice: number; baseAmount: number; vatRate: number; vatAmount: number; irpfRate: number; irpfAmount: number; totalAmount: number; poItemId?: string; poItemIndex?: number; isNewItem?: boolean; episodeAssignment?: "general" | "specific"; episodes?: EpisodeDistribution[]; }
-interface Invoice { id: string; documentType: DocumentType; number: string; displayNumber: string; supplierNumber?: string; supplier: string; supplierId: string; supplierTaxId?: string; supplierIban?: string; supplierBic?: string; department?: string; description: string; notes?: string; items: InvoiceItem[]; baseAmount: number; vatAmount: number; irpfAmount: number; totalAmount: number; invoiceDate?: Date; dueDate: Date; status: InvoiceStatus; approvalStatus?: string; attachmentUrl?: string; attachmentFileName?: string; createdAt: Date; createdBy: string; createdByName: string; codedAt?: Date; codedBy?: string; codedByName?: string; approvedAt?: Date; approvedBy?: string; approvedByName?: string; paidAt?: Date; paidAmount?: number; paymentMethod?: string; paymentReference?: string; cancelledAt?: Date; cancelledByName?: string; cancellationReason?: string; poId?: string; poNumber?: string; requiresReplacement?: boolean; replacedByInvoiceId?: string; isReplacement?: boolean; replacesDocumentId?: string; replacesDocumentNumber?: string; currency?: string; accountingEntry?: string; isAsset?: boolean; assetCategory?: string; replacedFromType?: string; replacedAt?: Date; originalAttachmentUrl?: string; originalAttachmentFileName?: string; accounted?: boolean; accountedAt?: Date; accountedBy?: string; accountedByName?: string; accountingEntryNumber?: string; accountingAccount?: string; }
+interface Invoice { id: string; documentType: DocumentType; number: string; displayNumber: string; supplierNumber?: string; supplier: string; supplierId: string; supplierTaxId?: string; supplierIban?: string; supplierBic?: string; department?: string; description: string; notes?: string; items: InvoiceItem[]; baseAmount: number; vatAmount: number; irpfAmount: number; totalAmount: number; invoiceDate?: Date; dueDate: Date; status: InvoiceStatus; approvalStatus?: string; attachmentUrl?: string; attachmentFileName?: string; createdAt: Date; createdBy: string; createdByName: string; codedAt?: Date; codedBy?: string; codedByName?: string; approvedAt?: Date; approvedBy?: string; approvedByName?: string; paidAt?: Date; paidAmount?: number; paymentMethod?: string; paymentReference?: string; cancelledAt?: Date; cancelledByName?: string; cancellationReason?: string; poId?: string; poNumber?: string; requiresReplacement?: boolean; replacedByInvoiceId?: string; isReplacement?: boolean; replacesDocumentId?: string; replacesDocumentNumber?: string; currency?: string; accountingEntry?: string; isAsset?: boolean; assetCategory?: string; replacedFromType?: string; replacedAt?: Date; originalAttachmentUrl?: string; originalAttachmentFileName?: string; accounted?: boolean; accountedAt?: Date; accountedBy?: string; accountedByName?: string; accountingEntryNumber?: string; accountingAccount?: string; delegatedToAccounting?: boolean; delegatedAt?: Date; delegatedBy?: string; delegatedByName?: string; }
 interface LinkedPO { id: string; number: string; supplier: string; baseAmount: number; invoicedAmount: number; status: string; items?: any[]; }
 interface Supplier { id: string; name: string; taxId?: string; iban?: string; bic?: string; }
 interface SubAccount { id: string; code: string; description: string; accountId: string; committed: number; actual: number; budgeted: number; }
@@ -122,6 +122,7 @@ export default function InvoiceDetailPage() {
         originalAttachmentUrl: data.originalAttachmentUrl, originalAttachmentFileName: data.originalAttachmentFileName,
         accounted: data.accounted || false, accountedAt: data.accountedAt?.toDate(), accountedBy: data.accountedBy,
         accountedByName: data.accountedByName, accountingEntryNumber: data.accountingEntryNumber, accountingAccount: data.accountingAccount,
+        delegatedToAccounting: data.delegatedToAccounting || false, delegatedAt: data.delegatedAt?.toDate(), delegatedBy: data.delegatedBy, delegatedByName: data.delegatedByName,
       };
       setInvoice(invoiceData);
 
@@ -832,6 +833,34 @@ export default function InvoiceDetailPage() {
       </div>
 
       <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+        {/* Banner de delegación a contabilidad */}
+        {invoice.status === "coding" && invoice.delegatedToAccounting && (
+          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Clock size={20} className="text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-amber-800 mb-1">Pendiente de codificación</h3>
+                <p className="text-sm text-amber-700">
+                  Esta factura fue enviada sin codificar por <span className="font-medium">{invoice.delegatedByName || invoice.createdByName}</span>
+                  {invoice.delegatedAt && <span> el {formatDate(invoice.delegatedAt)}</span>}.
+                  Los items necesitan asignación de cuentas contables.
+                </p>
+                {canCode() && (
+                  <button 
+                    onClick={() => setCodingMode(true)} 
+                    className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700"
+                  >
+                    <Code size={14} />
+                    Codificar ahora
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Descripción siempre primero */}
         {invoice.description && (
           <div className="mb-6 bg-slate-50 border border-slate-200 rounded-xl px-5 py-4">
