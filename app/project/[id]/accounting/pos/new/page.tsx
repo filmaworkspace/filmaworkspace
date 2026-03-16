@@ -629,7 +629,7 @@ export default function NewPOPage() {
         hasAssignedPOs: false,
         hasAssignedInvoices: false,
       };
-      const docRef = await addDoc(collection(db, `projects/${projectId}/suppliers`), newSupplier);
+      const docRef = await addDoc(collection(db, `projects/${id}/suppliers`), newSupplier);
       
       // Seleccionar el nuevo proveedor y poner su método de pago por defecto
       setFormData({
