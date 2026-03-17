@@ -217,8 +217,18 @@ export default function PODetailPage() {
       const invoicesSnapshot = await getDocs(query(collection(db, `projects/${projectId}/invoices`), where("poId", "==", poId)));
       setInvoices(invoicesSnapshot.docs.map((d) => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate() } as Invoice)));
 
+      // Cargar solo las POs que el usuario puede ver para navegación
       const posSnapshot = await getDocs(query(collection(db, `projects/${projectId}/pos`), orderBy("createdAt", "asc")));
-      const ids = posSnapshot.docs.map((d) => d.id);
+      const accessiblePOs = posSnapshot.docs.filter((d) => {
+        const data = d.data();
+        return canViewPO({
+          id: d.id,
+          department: data.department || "",
+          createdBy: data.createdBy || "",
+          status: data.status || "draft",
+        });
+      });
+      const ids = accessiblePOs.map((d) => d.id);
       setAllPOIds(ids);
       setCurrentIndex(ids.indexOf(poId));
     } catch (error) {
