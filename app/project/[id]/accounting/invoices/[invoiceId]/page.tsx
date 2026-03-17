@@ -396,11 +396,11 @@ export default function InvoiceDetailPage() {
     if (invoice?.accounted) return false; // Bloqueada si está contabilizada
     return invoice && !["cancelled", "paid"].includes(invoice.status) && permissions.isProjectRole;
   };
-  // Cualquier usuario con acceso puede modificar (genera nueva versión y reinicia aprobaciones)
+  // Solo contabilidad ampliada puede modificar (genera nueva versión y reinicia aprobaciones)
   const canModify = () => {
     if (invoice?.accounted) return false;
     if (invoice?.status === "cancelled" || invoice?.status === "paid") return false;
-    return true; // Cualquier usuario con acceso al documento puede modificar
+    return permissions.accountingAccessLevel === "accounting_extended";
   };
   // Solo contabilidad ampliada puede hacer corrección administrativa (sin nueva versión)
   const canAdminCorrect = () => {
@@ -415,7 +415,7 @@ export default function InvoiceDetailPage() {
   const canReplaceDocument = () => {
     if (invoice?.accounted) return false;
     if (invoice?.status === "cancelled") return false;
-    return canModify() || canAdminCorrect();
+    return permissions.accountingAccessLevel === "accounting_extended";
   };
   const isPDF = (url?: string) => url?.toLowerCase().includes(".pdf") || url?.toLowerCase().includes("application/pdf");
 
