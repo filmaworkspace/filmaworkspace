@@ -443,27 +443,32 @@ export default function InvoiceDetailPage() {
       };
       
       // Actualizar documento
-      await updateDoc(doc(db, `projects/${projectId}/invoices`, invoiceId), {
+      const updateData: Record<string, any> = {
         attachmentUrl: newUrl,
         attachmentFileName: file.name,
-        // Guardar documento anterior si no había original
-        ...(invoice.originalAttachmentUrl ? {} : {
-          originalAttachmentUrl: invoice.attachmentUrl,
-          originalAttachmentFileName: invoice.attachmentFileName,
-        }),
         documentHistory: arrayUnion(auditEntry),
         updatedAt: Timestamp.now(),
         updatedBy: permissions.userId || "",
         updatedByName: permissions.userName || "",
-      });
+      };
+      
+      // Guardar documento anterior si no había original y existe uno actual
+      if (!invoice.originalAttachmentUrl && invoice.attachmentUrl) {
+        updateData.originalAttachmentUrl = invoice.attachmentUrl;
+        updateData.originalAttachmentFileName = invoice.attachmentFileName || "";
+      }
+      
+      await updateDoc(doc(db, `projects/${projectId}/invoices`, invoiceId), updateData);
       
       // Actualizar estado local
       setInvoice({
         ...invoice,
         attachmentUrl: newUrl,
         attachmentFileName: file.name,
-        originalAttachmentUrl: invoice.originalAttachmentUrl || invoice.attachmentUrl,
-        originalAttachmentFileName: invoice.originalAttachmentFileName || invoice.attachmentFileName,
+        ...((!invoice.originalAttachmentUrl && invoice.attachmentUrl) ? {
+          originalAttachmentUrl: invoice.attachmentUrl,
+          originalAttachmentFileName: invoice.attachmentFileName || "",
+        } : {}),
       });
       
       showToast("success", "Documento reemplazado correctamente");
