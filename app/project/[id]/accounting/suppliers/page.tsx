@@ -24,13 +24,13 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
 ];
 
 const COUNTRIES = [
-  { code: "ES", name: "España", flag: "🇪🇸", ibanLength: 24, ibanPrefix: "ES" },
-  { code: "FR", name: "Francia", flag: "🇫🇷", ibanLength: 27, ibanPrefix: "FR" },
-  { code: "DE", name: "Alemania", flag: "🇩🇪", ibanLength: 22, ibanPrefix: "DE" },
-  { code: "IT", name: "Italia", flag: "🇮🇹", ibanLength: 27, ibanPrefix: "IT" },
-  { code: "PT", name: "Portugal", flag: "🇵🇹", ibanLength: 25, ibanPrefix: "PT" },
-  { code: "UK", name: "Reino Unido", flag: "🇬🇧", ibanLength: 22, ibanPrefix: "GB" },
-  { code: "US", name: "Estados Unidos", flag: "🇺🇸", ibanLength: 0, ibanPrefix: "" },
+  { code: "ES", name: "España", ibanLength: 24, ibanPrefix: "ES" },
+  { code: "FR", name: "Francia", ibanLength: 27, ibanPrefix: "FR" },
+  { code: "DE", name: "Alemania", ibanLength: 22, ibanPrefix: "DE" },
+  { code: "IT", name: "Italia", ibanLength: 27, ibanPrefix: "IT" },
+  { code: "PT", name: "Portugal", ibanLength: 25, ibanPrefix: "PT" },
+  { code: "UK", name: "Reino Unido", ibanLength: 22, ibanPrefix: "GB" },
+  { code: "US", name: "Estados Unidos", ibanLength: 0, ibanPrefix: "" },
 ];
 
 const STATUS_OPTIONS = [
@@ -135,6 +135,9 @@ export default function SuppliersPage() {
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const [showPaymentMethodDropdown, setShowPaymentMethodDropdown] = useState(false);
   const paymentMethodDropdownRef = useRef<HTMLDivElement>(null);
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
+  const countryDropdownRef = useRef<HTMLDivElement>(null);
+  const [countrySearch, setCountrySearch] = useState("");
 
   const [formData, setFormData] = useState({
     fiscalName: "", commercialName: "", country: "ES", taxId: "",
@@ -174,6 +177,10 @@ export default function SuppliersPage() {
       }
       if (paymentMethodDropdownRef.current && !paymentMethodDropdownRef.current.contains(event.target as Node)) {
         setShowPaymentMethodDropdown(false);
+      }
+      if (countryDropdownRef.current && !countryDropdownRef.current.contains(event.target as Node)) {
+        setShowCountryDropdown(false);
+        setCountrySearch("");
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -692,11 +699,46 @@ export default function SuppliersPage() {
                       <label className="block text-sm font-medium text-slate-700 mb-2">Nombre comercial</label>
                       <input type="text" value={formData.commercialName} onChange={(e) => setFormData({ ...formData, commercialName: e.target.value })} onBlur={handleCommercialNameBlur} placeholder="Ej: Neumáticos García" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
                     </div>
-                    <div>
+                    <div ref={countryDropdownRef} className="relative">
                       <label className="block text-sm font-medium text-slate-700 mb-2">País</label>
-                      <select value={formData.country} onChange={(e) => handleCountryChange(e.target.value)} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900">
-                        {COUNTRIES.map((country) => (<option key={country.code} value={country.code}>{country.name}</option>))}
-                      </select>
+                      <button
+                        type="button"
+                        onClick={() => { setShowCountryDropdown(!showCountryDropdown); setCountrySearch(""); }}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between hover:border-slate-300 transition-colors"
+                      >
+                        <span className="text-slate-900">{getCountryInfo(formData.country).name}</span>
+                        <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showCountryDropdown ? "rotate-180" : "")} />
+                      </button>
+                      {showCountryDropdown && (
+                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                          <div className="p-2 border-b border-slate-100">
+                            <input
+                              type="text"
+                              value={countrySearch}
+                              onChange={(e) => setCountrySearch(e.target.value)}
+                              placeholder="Buscar país..."
+                              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
+                              autoFocus
+                            />
+                          </div>
+                          <div className="max-h-48 overflow-y-auto py-1">
+                            {COUNTRIES.filter(c => 
+                              c.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
+                              c.code.toLowerCase().includes(countrySearch.toLowerCase())
+                            ).map((country) => (
+                              <button
+                                key={country.code}
+                                type="button"
+                                onClick={() => { handleCountryChange(country.code); setShowCountryDropdown(false); setCountrySearch(""); }}
+                                className={"w-full px-4 py-2 text-left text-sm hover:bg-slate-50 transition-colors flex items-center justify-between " + (formData.country === country.code ? "bg-slate-50 text-slate-900 font-medium" : "text-slate-600")}
+                              >
+                                <span>{country.name}</span>
+                                <span className="text-slate-400">{country.code}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">NIF/CIF *</label>
