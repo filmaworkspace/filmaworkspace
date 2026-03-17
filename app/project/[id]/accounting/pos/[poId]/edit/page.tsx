@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Inter } from "next/font/google";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { auth, db, storage } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs, updateDoc, query, orderBy, Timestamp } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, updateDoc, query, orderBy, Timestamp, deleteField } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   FileText, ArrowLeft, Save, Send, Building2, AlertCircle, Info, Upload, X, Plus, Trash2,
@@ -545,9 +545,14 @@ export default function EditPOPage() {
         paymentTerms: formData.paymentTerms, notes: formData.notes.trim(),
         items: itemsData, baseAmount: totals.baseAmount, vatAmount: totals.vatAmount,
         irpfAmount: totals.irpfAmount, totalAmount: totals.totalAmount,
-        attachmentUrl: fileUrl, attachmentFileName: fileName,
-        updatedAt: Timestamp.now(), updatedBy: permissions.userId, updatedByName: permissions.userName,
+        updatedAt: Timestamp.now(), updatedBy: permissions.userId || "", updatedByName: permissions.userName || "",
       };
+      
+      // Solo añadir attachment si existe
+      if (fileUrl) {
+        poData.attachmentUrl = fileUrl;
+        poData.attachmentFileName = fileName || "";
+      }
 
       // Si la PO tenía items comprometidos anteriormente, guardarlos para el cálculo de diferencia al aprobar
       if (wasApprovedBefore && originalCommittedItems && originalCommittedItems.length > 0) {
@@ -559,13 +564,13 @@ export default function EditPOPage() {
         if (shouldAutoApprove(approvalSteps)) {
           poData.status = "approved";
           poData.approvedAt = Timestamp.now();
-          poData.approvedBy = permissions.userId;
-          poData.approvedByName = permissions.userName;
+          poData.approvedBy = permissions.userId || "";
+          poData.approvedByName = permissions.userName || "";
           poData.autoApproved = true;
           poData.committedAmount = totals.baseAmount;
           poData.remainingAmount = totals.baseAmount;
           // Limpiar previousCommittedItems ya que se va a aprobar directamente
-          poData.previousCommittedItems = null;
+          poData.previousCommittedItems = deleteField();
         } else {
           poData.status = "pending";
           poData.approvalSteps = approvalSteps;
