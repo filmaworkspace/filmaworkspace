@@ -317,7 +317,7 @@ export default function EditPOPage() {
     if (approvalConfig.length === 0) return [];
     return approvalConfig.map((step) => {
       const { ids, names } = resolveApprovers(step, dept);
-      return { 
+      const stepData: any = { 
         id: step.id || "", 
         order: step.order || 0, 
         approverType: step.approverType || "role", 
@@ -330,10 +330,12 @@ export default function EditPOPage() {
         status: "pending" as const, 
         requireAll: step.requireAll ?? false,
         hasAmountThreshold: step.hasAmountThreshold || false,
-        amountThreshold: step.amountThreshold,
-        amountCondition: step.amountCondition,
-        amountThresholdMax: step.amountThresholdMax,
       };
+      // Solo añadir campos de threshold si existen
+      if (step.amountThreshold !== undefined) stepData.amountThreshold = step.amountThreshold;
+      if (step.amountCondition !== undefined) stepData.amountCondition = step.amountCondition;
+      if (step.amountThresholdMax !== undefined) stepData.amountThresholdMax = step.amountThresholdMax;
+      return stepData;
     });
   };
 
