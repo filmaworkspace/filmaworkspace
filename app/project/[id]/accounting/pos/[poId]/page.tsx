@@ -825,15 +825,13 @@ export default function PODetailPage() {
                       {po.status === "approved" && (
                         <>
                           <div className="border-t border-slate-100 my-1" />
-                          {permissions.isProjectRole && (
-                            <button 
-                              onClick={() => { resetModals(); setShowModifyModal(true); setShowActionsMenu(false); }} 
-                              className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3"
-                            >
-                              <FileEdit size={16} className="text-slate-400" />
-                              Modificar PO
-                            </button>
-                          )}
+                          <button 
+                            onClick={() => { resetModals(); setShowModifyModal(true); setShowActionsMenu(false); }} 
+                            className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3"
+                          >
+                            <FileEdit size={16} className="text-slate-400" />
+                            Modificar PO
+                          </button>
                           {poPerms.canClose && (
                             <button 
                               onClick={() => { resetModals(); setShowCloseModal(true); setShowActionsMenu(false); }} 
