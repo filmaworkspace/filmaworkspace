@@ -36,6 +36,8 @@ interface Invoice {
   issueDate: Date;
   dueDate?: Date;
   paidAt?: Date;
+  department?: string;
+  createdBy: string;
 }
 
 interface PO {
@@ -45,6 +47,8 @@ interface PO {
   baseAmount: number;
   status: string;
   createdAt: Date;
+  department?: string;
+  createdBy: string;
 }
 
 interface ProjectConfig {
@@ -73,6 +77,9 @@ export default function SupplierDetailPage() {
   const [pos, setPos] = useState<PO[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState("");
+  const [userRole, setUserRole] = useState("");
+  const [userDepartment, setUserDepartment] = useState("");
+  const [userPosition, setUserPosition] = useState("");
   const [canVerify, setCanVerify] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -111,14 +118,20 @@ export default function SupplierDetailPage() {
         setUserName(user.displayName || user.email || "Usuario");
         try {
           const memberDoc = await getDoc(doc(db, `projects/${projectId}/members`, user.uid));
-          if (memberDoc.exists()) setCanVerify(memberDoc.data().accountingAccessLevel === "accounting_extended");
+          if (memberDoc.exists()) {
+            const memberData = memberDoc.data();
+            setCanVerify(memberData.accountingAccessLevel === "accounting_extended");
+            setUserRole(memberData.role || "");
+            setUserDepartment(memberData.department || "");
+            setUserPosition(memberData.position || "");
+          }
         } catch (e) { console.error(e); }
       }
     });
     return () => unsubscribe();
   }, [projectId]);
 
-  useEffect(() => { if (userId && projectId && supplierId) loadData(); }, [userId, projectId, supplierId]);
+  useEffect(() => { if (userId && projectId && supplierId && userRole !== undefined) loadData(); }, [userId, projectId, supplierId, userRole, userDepartment, userPosition]);
 
   const loadData = async () => {
     try {
@@ -177,13 +190,23 @@ export default function SupplierDetailPage() {
         createdAt: data.createdAt?.toDate() || new Date(),
       });
 
+      // Determinar permisos de visibilidad
+      const isProjectRole = ["admin", "PM", "EP", "LP", "Coordinator", "Accounting"].includes(userRole);
+      const canViewAllPOs = isProjectRole;
+      const canViewDepartmentPOs = !isProjectRole && (
+        userPosition?.toLowerCase().includes("head") || 
+        userPosition?.toLowerCase().includes("jefe") ||
+        userRole === "HOD"
+      );
+      const canViewOwnPOs = !isProjectRole && !canViewDepartmentPOs;
+
       // Cargar facturas
       const invSnap = await getDocs(query(
         collection(db, `projects/${projectId}/invoices`), 
         where("supplierId", "==", supplierId),
         orderBy("createdAt", "desc")
       ));
-      setInvoices(invSnap.docs.map(d => {
+      const allInvoices = invSnap.docs.map(d => {
         const invData = d.data();
         return {
           id: d.id,
@@ -195,8 +218,19 @@ export default function SupplierDetailPage() {
           issueDate: invData.issueDate?.toDate() || invData.createdAt?.toDate() || new Date(),
           dueDate: invData.dueDate?.toDate(),
           paidAt: invData.paidAt?.toDate(),
+          department: invData.department || "",
+          createdBy: invData.createdBy || "",
         };
-      }));
+      });
+      
+      // Filtrar facturas según permisos
+      const filteredInvoices = allInvoices.filter((inv) => {
+        if (canViewAllPOs) return true;
+        if (canViewDepartmentPOs && inv.department === userDepartment) return true;
+        if (canViewOwnPOs && inv.createdBy === userId) return true;
+        return false;
+      });
+      setInvoices(filteredInvoices);
 
       // Cargar POs
       const posSnap = await getDocs(query(
@@ -204,7 +238,7 @@ export default function SupplierDetailPage() {
         where("supplierId", "==", supplierId),
         orderBy("createdAt", "desc")
       ));
-      setPos(posSnap.docs.map(d => {
+      const allPOs = posSnap.docs.map(d => {
         const poData = d.data();
         return {
           id: d.id,
@@ -213,8 +247,19 @@ export default function SupplierDetailPage() {
           baseAmount: poData.baseAmount || 0,
           status: poData.status || "draft",
           createdAt: poData.createdAt?.toDate() || new Date(),
+          department: poData.department || "",
+          createdBy: poData.createdBy || "",
         };
-      }));
+      });
+      
+      // Filtrar POs según permisos
+      const filteredPOs = allPOs.filter((po) => {
+        if (canViewAllPOs) return true;
+        if (canViewDepartmentPOs && po.department === userDepartment) return true;
+        if (canViewOwnPOs && po.createdBy === userId) return true;
+        return false;
+      });
+      setPos(filteredPOs);
 
       // Inicializar form de edición
       setEditForm({
