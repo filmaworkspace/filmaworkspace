@@ -2,10 +2,11 @@
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { useState, useEffect } from "react";
-import { auth, db } from "@/lib/firebase";
+import { useState, useEffect, useRef } from "react";
+import { auth, db, storage } from "@/lib/firebase";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-import { doc, getDoc, collection, getDocs, updateDoc, deleteDoc, query, where, orderBy, Timestamp } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, updateDoc, deleteDoc, query, where, orderBy, Timestamp, arrayUnion } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { FileText, ArrowLeft, Edit, Download, Receipt, Lock, Unlock, XCircle, CheckCircle, Clock, Ban, Archive, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, FileEdit, ExternalLink, MoreHorizontal, Layers, BookCheck, Wallet, Info, Trash2, Upload, Glasses, Check, X, MessageSquare, PenLine } from "lucide-react";
 import jsPDF from "jspdf";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
@@ -162,6 +163,8 @@ export default function PODetailPage() {
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showApprovalNoteModal, setShowApprovalNoteModal] = useState<ApprovalComment | null>(null);
+  const [replacingDocument, setReplacingDocument] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (projectId && poId && !permissionsLoading) loadData();
@@ -271,6 +274,71 @@ export default function PODetailPage() {
 
   // Verificar si se puede eliminar (borrador sin versión anterior)
   const canDeleteDraft = po?.status === "draft" && (!po.version || po.version === 1) && poPerms.canEdit;
+  
+  // Verificar si se puede reemplazar el documento
+  const canReplaceDocument = () => {
+    if (!po) return false;
+    if (po.status === "cancelled") return false;
+    // Cualquier usuario con acceso puede reemplazar, o contabilidad ampliada
+    return poPerms.canEdit || permissions.accountingAccessLevel === "accounting_extended";
+  };
+  
+  // Función para reemplazar documento
+  const handleReplaceDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !po) return;
+    
+    setReplacingDocument(true);
+    try {
+      // Subir nuevo archivo
+      const timestamp = Date.now();
+      const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+      const storageRef = ref(storage, `projects/${projectId}/pos/${poId}/${timestamp}_${safeFileName}`);
+      await uploadBytes(storageRef, file);
+      const newUrl = await getDownloadURL(storageRef);
+      
+      // Preparar datos de auditoría
+      const auditEntry = {
+        action: "document_replaced",
+        userId: permissions.userId || "",
+        userName: permissions.userName || "",
+        timestamp: Timestamp.now(),
+        previousFileName: po.attachmentFileName || "",
+        newFileName: file.name,
+      };
+      
+      // Actualizar documento
+      await updateDoc(doc(db, `projects/${projectId}/pos`, poId), {
+        attachmentUrl: newUrl,
+        attachmentFileName: file.name,
+        // Guardar documento anterior si no había original
+        ...(po.originalAttachmentUrl ? {} : {
+          originalAttachmentUrl: po.attachmentUrl,
+          originalAttachmentFileName: po.attachmentFileName,
+        }),
+        documentHistory: arrayUnion(auditEntry),
+        updatedAt: Timestamp.now(),
+        updatedBy: permissions.userId || "",
+        updatedByName: permissions.userName || "",
+      });
+      
+      // Actualizar estado local
+      setPO({
+        ...po,
+        attachmentUrl: newUrl,
+        attachmentFileName: file.name,
+      });
+      
+      setShowActionsMenu(false);
+      alert("Documento reemplazado correctamente");
+    } catch (error) {
+      console.error("Error replacing document:", error);
+      alert("Error al reemplazar el documento");
+    } finally {
+      setReplacingDocument(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
   const formatDate = (date: Date) => (date ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "long", year: "numeric" }).format(date) : "-");
@@ -725,6 +793,18 @@ export default function PODetailPage() {
                         <Download size={16} className="text-slate-400" />
                         Descargar PDF
                       </button>
+                      
+                      {/* Reemplazar documento */}
+                      {canReplaceDocument() && (
+                        <button 
+                          onClick={() => { fileInputRef.current?.click(); setShowActionsMenu(false); }} 
+                          disabled={replacingDocument}
+                          className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3 disabled:opacity-50"
+                        >
+                          <Upload size={16} className="text-slate-400" />
+                          {replacingDocument ? "Subiendo..." : "Reemplazar documento"}
+                        </button>
+                      )}
 
                       {/* Acciones para estado Aprobada */}
                       {po.status === "approved" && (
@@ -780,6 +860,15 @@ export default function PODetailPage() {
                   </>
                 )}
               </div>
+              
+              {/* Input oculto para reemplazar documento */}
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleReplaceDocument} 
+                accept=".pdf,.jpg,.jpeg,.png,.webp" 
+                className="hidden" 
+              />
             </div>
           </div>
         </div>
