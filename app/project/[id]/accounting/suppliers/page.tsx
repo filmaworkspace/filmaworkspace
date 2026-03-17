@@ -716,7 +716,7 @@ export default function SuppliersPage() {
                               type="text"
                               value={countrySearch}
                               onChange={(e) => setCountrySearch(e.target.value)}
-                              placeholder="Buscar país..."
+                              placeholder="Buscar país"
                               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
                               autoFocus
                             />
