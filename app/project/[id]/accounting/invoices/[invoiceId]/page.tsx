@@ -2,11 +2,12 @@
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { useState, useEffect } from "react";
-import { auth, db } from "@/lib/firebase";
+import { useState, useEffect, useRef } from "react";
+import { auth, db, storage } from "@/lib/firebase";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-import { doc, getDoc, collection, getDocs, updateDoc, query, where, orderBy, Timestamp } from "firebase/firestore";
-import { Receipt, Edit, Download, XCircle, CheckCircle, Clock, Ban, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, ExternalLink, MoreHorizontal, CreditCard, FileText, Link as LinkIcon, Eye, EyeOff, Code, Save, X, Plus, Trash2, Search, RefreshCw, Percent, Euro, FileCheck, ZoomIn, ZoomOut, RotateCw, Layers, Lock, Glasses, Check } from "lucide-react";
+import { doc, getDoc, collection, getDocs, updateDoc, query, where, orderBy, Timestamp, arrayUnion } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { Receipt, Edit, Download, XCircle, CheckCircle, Clock, Ban, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, ExternalLink, MoreHorizontal, CreditCard, FileText, Link as LinkIcon, Eye, EyeOff, Code, Save, X, Plus, Trash2, Search, RefreshCw, Percent, Euro, FileCheck, ZoomIn, ZoomOut, RotateCw, Layers, Lock, Glasses, Check, Upload } from "lucide-react";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
 import { unrealizeInvoice, updatePOItemsInvoiced, realizeInvoice } from "@/lib/budgetOperations";
@@ -90,6 +91,8 @@ export default function InvoiceDetailPage() {
   const [codingItems, setCodingItems] = useState<Array<{ description: string; subAccountId: string; subAccountCode: string; subAccountDescription: string; quantity: number; unitPrice: number; vatRate: number; irpfRate: number; poItemIndex?: number; isNewItem: boolean; }>>([]);
   const [searchSubAccount, setSearchSubAccount] = useState("");
   const [showApprovalNoteModal, setShowApprovalNoteModal] = useState<ApprovalComment | null>(null);
+  const [replacingDocument, setReplacingDocument] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const showToast = (type: "success" | "error", message: string) => { setToast({ type, message }); setTimeout(() => setToast(null), 3000); };
   const formatCurrency = (a: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(a || 0);
@@ -393,11 +396,85 @@ export default function InvoiceDetailPage() {
     if (invoice?.accounted) return false; // Bloqueada si está contabilizada
     return invoice && !["cancelled", "paid"].includes(invoice.status) && permissions.isProjectRole;
   };
+  // Cualquier usuario con acceso puede modificar (genera nueva versión y reinicia aprobaciones)
+  const canModify = () => {
+    if (invoice?.accounted) return false;
+    if (invoice?.status === "cancelled" || invoice?.status === "paid") return false;
+    return true; // Cualquier usuario con acceso al documento puede modificar
+  };
+  // Solo contabilidad ampliada puede hacer corrección administrativa (sin nueva versión)
+  const canAdminCorrect = () => {
+    if (invoice?.accounted) return false;
+    if (invoice?.status === "cancelled") return false;
+    return permissions.accountingAccessLevel === "accounting_extended";
+  };
   const canEdit = () => {
     if (invoice?.accounted) return false; // Bloqueada si está contabilizada
     return invoice && ["draft", "rejected"].includes(invoice.status);
   };
+  const canReplaceDocument = () => {
+    if (invoice?.accounted) return false;
+    if (invoice?.status === "cancelled") return false;
+    return canModify() || canAdminCorrect();
+  };
   const isPDF = (url?: string) => url?.toLowerCase().includes(".pdf") || url?.toLowerCase().includes("application/pdf");
+
+  const handleReplaceDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !invoice) return;
+    
+    setReplacingDocument(true);
+    try {
+      // Subir nuevo archivo
+      const timestamp = Date.now();
+      const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+      const storageRef = ref(storage, `projects/${projectId}/invoices/${invoiceId}/${timestamp}_${safeFileName}`);
+      await uploadBytes(storageRef, file);
+      const newUrl = await getDownloadURL(storageRef);
+      
+      // Preparar datos de auditoría
+      const auditEntry = {
+        action: "document_replaced",
+        userId: permissions.userId || "",
+        userName: permissions.userName || "",
+        timestamp: Timestamp.now(),
+        previousFileName: invoice.attachmentFileName || "",
+        newFileName: file.name,
+      };
+      
+      // Actualizar documento
+      await updateDoc(doc(db, `projects/${projectId}/invoices`, invoiceId), {
+        attachmentUrl: newUrl,
+        attachmentFileName: file.name,
+        // Guardar documento anterior si no había original
+        ...(invoice.originalAttachmentUrl ? {} : {
+          originalAttachmentUrl: invoice.attachmentUrl,
+          originalAttachmentFileName: invoice.attachmentFileName,
+        }),
+        documentHistory: arrayUnion(auditEntry),
+        updatedAt: Timestamp.now(),
+        updatedBy: permissions.userId || "",
+        updatedByName: permissions.userName || "",
+      });
+      
+      // Actualizar estado local
+      setInvoice({
+        ...invoice,
+        attachmentUrl: newUrl,
+        attachmentFileName: file.name,
+        originalAttachmentUrl: invoice.originalAttachmentUrl || invoice.attachmentUrl,
+        originalAttachmentFileName: invoice.originalAttachmentFileName || invoice.attachmentFileName,
+      });
+      
+      showToast("success", "Documento reemplazado correctamente");
+    } catch (error) {
+      console.error("Error replacing document:", error);
+      showToast("error", "Error al reemplazar el documento");
+    } finally {
+      setReplacingDocument(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   if (permissionsLoading || loading) {
     return (
@@ -447,7 +524,7 @@ export default function InvoiceDetailPage() {
             <button onClick={() => setCodingMode(false)} className="p-2 hover:bg-violet-700 rounded-lg"><X size={20} /></button>
             <div className="flex items-center gap-3">
               <Code size={20} />
-              <span className="font-semibold">Codificar</span>
+              <span className="font-semibold">CODIFICAR</span>
               <span className="bg-violet-500 px-2 py-0.5 rounded text-sm">{invoice.displayNumber}</span>
             </div>
           </div>
@@ -832,16 +909,40 @@ export default function InvoiceDetailPage() {
                 </button>
               )}
 
-              {canEdit() && <Link href={`/project/${projectId}/accounting/invoices/${invoice.id}/edit`} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium"><Edit size={16} />Editar</Link>}
+              {canModify() && (
+                <Link href={`/project/${projectId}/accounting/invoices/${invoice.id}/edit`} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium">
+                  <Edit size={16} />Modificar
+                </Link>
+              )}
               {invoice.status === "pending" && canPay() && <Link href={`/project/${projectId}/accounting/payments?invoice=${invoice.id}`} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium"><CreditCard size={16} />Ir a pagar</Link>}
 
               <div className="relative">
                 <button onClick={() => setShowActionsMenu(!showActionsMenu)} className="p-2.5 border border-slate-200 rounded-xl hover:bg-slate-50"><MoreHorizontal size={18} /></button>
                 {showActionsMenu && (<><div className="fixed inset-0 z-40" onClick={() => setShowActionsMenu(false)} /><div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1">
                   {invoice.attachmentUrl && <a href={invoice.attachmentUrl} target="_blank" rel="noopener noreferrer" onClick={() => setShowActionsMenu(false)} className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3"><Download size={16} className="text-slate-400" />Descargar</a>}
+                  {canReplaceDocument() && (
+                    <button 
+                      onClick={() => { fileInputRef.current?.click(); setShowActionsMenu(false); }} 
+                      disabled={replacingDocument}
+                      className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3 disabled:opacity-50"
+                    >
+                      <Upload size={16} className="text-slate-400" />
+                      {replacingDocument ? "Subiendo..." : "Reemplazar documento"}
+                    </button>
+                  )}
+                  {canAdminCorrect() && <Link href={`/project/${projectId}/accounting/invoices/${invoice.id}/edit?mode=correction`} onClick={() => setShowActionsMenu(false)} className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3"><FileCheck size={16} className="text-slate-400" />Corrección administrativa</Link>}
                   {canCancel() && <><div className="border-t border-slate-100 my-1" /><button onClick={() => { setShowCancelModal(true); setShowActionsMenu(false); }} className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"><XCircle size={16} />Anular</button></>}
                 </div></>)}
               </div>
+              
+              {/* Input oculto para reemplazar documento */}
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleReplaceDocument} 
+                accept=".pdf,.jpg,.jpeg,.png,.webp" 
+                className="hidden" 
+              />
             </div>
           </div>
         </div>
