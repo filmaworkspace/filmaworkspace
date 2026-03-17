@@ -5,7 +5,7 @@ import { Inter } from "next/font/google";
 import { useState, useEffect, useRef } from "react";
 import { auth, db, storage } from "@/lib/firebase";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-import { doc, getDoc, collection, getDocs, updateDoc, deleteDoc, query, where, orderBy, Timestamp, arrayUnion } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, updateDoc, deleteDoc, query, where, orderBy, Timestamp, arrayUnion, deleteField } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { FileText, ArrowLeft, Edit, Download, Receipt, Lock, Unlock, XCircle, CheckCircle, Clock, Ban, Archive, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, FileEdit, ExternalLink, MoreHorizontal, Layers, BookCheck, Wallet, Info, Trash2, Upload, Glasses, Check, X, MessageSquare, PenLine } from "lucide-react";
 import jsPDF from "jspdf";
@@ -591,6 +591,15 @@ export default function PODetailPage() {
     setProcessing(true);
     try {
       const newVersion = (po.version || 1) + 1;
+      
+      // Guardar los items comprometidos actuales para calcular la diferencia al aprobar la nueva versión
+      const committedItems = po.items
+        .filter(item => item.subAccountId && item.baseAmount > 0)
+        .map(item => ({
+          subAccountId: item.subAccountId,
+          baseAmount: item.baseAmount,
+        }));
+      
       await updateDoc(doc(db, `projects/${projectId}/pos`, po.id), {
         version: newVersion,
         status: "draft",
@@ -599,16 +608,19 @@ export default function PODetailPage() {
           {
             date: Timestamp.now(),
             userId: permissions.userId || "",
-            userName: permissions.userName,
+            userName: permissions.userName || "",
             reason: modificationReason.trim(),
             previousVersion: po.version || 1,
           },
         ],
-        approvedAt: null,
-        approvedBy: null,
-        approvedByName: null,
-        approvalSteps: null,
-        currentApprovalStep: null,
+        // Guardar items comprometidos anteriores para el cálculo de diferencia al aprobar
+        previousCommittedItems: committedItems.length > 0 ? committedItems : deleteField(),
+        // Limpiar campos de aprobación
+        approvedAt: deleteField(),
+        approvedBy: deleteField(),
+        approvedByName: deleteField(),
+        approvalSteps: deleteField(),
+        currentApprovalStep: deleteField(),
       });
       setShowModifyModal(false);
       router.push(`/project/${projectId}/accounting/pos/${po.id}/edit`);
