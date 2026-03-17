@@ -164,10 +164,20 @@ export default function InvoiceDetailPage() {
         }
       }
 
-      // Load invoice IDs for nav
+      // Load invoice IDs for nav - filtrar por permisos
       const invoicesSnap = await getDocs(query(collection(db, `projects/${projectId}/invoices`), orderBy("createdAt", "asc")));
-      setAllInvoiceIds(invoicesSnap.docs.map((d) => d.id));
-      setCurrentIndex(invoicesSnap.docs.findIndex((d) => d.id === invoiceId));
+      const accessibleInvoices = invoicesSnap.docs.filter((d) => {
+        const invData = d.data();
+        // Si es rol de proyecto, puede ver todas
+        if (permissions.isProjectRole) return true;
+        // Si es jefe de departamento, puede ver las de su departamento
+        if (permissions.canViewDepartmentPOs && invData.department === permissions.department) return true;
+        // Si solo puede ver las propias
+        if (permissions.canViewOwnPOs && invData.createdBy === permissions.userId) return true;
+        return false;
+      });
+      setAllInvoiceIds(accessibleInvoices.map((d) => d.id));
+      setCurrentIndex(accessibleInvoices.findIndex((d) => d.id === invoiceId));
 
       // Load suppliers
       const suppliersSnap = await getDocs(collection(db, `projects/${projectId}/suppliers`));
