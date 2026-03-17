@@ -308,19 +308,22 @@ export default function PODetailPage() {
       };
       
       // Actualizar documento
-      await updateDoc(doc(db, `projects/${projectId}/pos`, poId), {
+      const updateData: Record<string, any> = {
         attachmentUrl: newUrl,
         attachmentFileName: file.name,
-        // Guardar documento anterior si no había original
-        ...(po.originalAttachmentUrl ? {} : {
-          originalAttachmentUrl: po.attachmentUrl,
-          originalAttachmentFileName: po.attachmentFileName,
-        }),
         documentHistory: arrayUnion(auditEntry),
         updatedAt: Timestamp.now(),
         updatedBy: permissions.userId || "",
         updatedByName: permissions.userName || "",
-      });
+      };
+      
+      // Guardar documento anterior si no había original y existe uno actual
+      if (!po.originalAttachmentUrl && po.attachmentUrl) {
+        updateData.originalAttachmentUrl = po.attachmentUrl;
+        updateData.originalAttachmentFileName = po.attachmentFileName || "";
+      }
+      
+      await updateDoc(doc(db, `projects/${projectId}/pos`, poId), updateData);
       
       // Actualizar estado local
       setPO({
