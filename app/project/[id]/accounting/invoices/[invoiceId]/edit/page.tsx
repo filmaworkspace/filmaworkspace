@@ -32,6 +32,8 @@ interface ApprovalStep { id: string; order: number; approverType: "fixed" | "rol
 interface ApprovalStepStatus { id: string; order: number; approverType: "fixed" | "role" | "hod" | "coordinator"; approvers: string[]; approverNames: string[]; roles?: string[]; department?: string; approvedBy: string[]; rejectedBy: string[]; status: "pending" | "approved" | "rejected"; requireAll: boolean; }
 interface DueDateEntry { id: string; date: string; type: "percentage" | "amount"; percentage: number; amount: number; }
 interface PO { id: string; number: string; supplier: string; supplierId: string; department?: string; totalAmount: number; baseAmount?: number; items: any[]; }
+interface POItem { id?: string; description: string; subAccountId: string; subAccountCode: string; subAccountDescription: string; quantity: number; unitPrice: number; baseAmount: number; vatRate: number; vatAmount: number; irpfRate: number; irpfAmount: number; totalAmount: number; episodeAssignment?: "general" | "specific"; episodes?: EpisodeDistribution[]; }
+interface POItemWithInvoiced extends POItem { invoicedAmount: number; availableAmount: number; }
 
 const VAT_RATES = [{ value: 0, label: "0%" }, { value: 4, label: "4%" }, { value: 10, label: "10%" }, { value: 21, label: "21%" }];
 const IRPF_RATES = [{ value: 0, label: "0%" }, { value: 7, label: "7%" }, { value: 15, label: "15%" }, { value: 19, label: "19%" }];
@@ -98,9 +100,13 @@ export default function EditInvoicePage() {
   // Modales
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showPOItemsModal, setShowPOItemsModal] = useState(false);
   const [supplierSearch, setSupplierSearch] = useState("");
   const [accountSearch, setAccountSearch] = useState("");
   const [currentItemIndex, setCurrentItemIndex] = useState<number | null>(null);
+  
+  // Items de PO
+  const [poItemsWithInvoiced, setPOItemsWithInvoiced] = useState<POItemWithInvoiced[]>([]);
 
   // Dropdown departamento
   const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
@@ -297,6 +303,80 @@ export default function EditInvoicePage() {
   };
 
   const removeItem = (i: number) => { if (items.length > 1) setItems(items.filter((_, idx) => idx !== i)); };
+
+  // Cargar items de PO con facturado
+  const loadPOItemsWithInvoiced = async () => {
+    if (!linkedPO) return;
+    try {
+      // Obtener todas las facturas de esta PO (excluyendo la actual)
+      const invoicesSnap = await getDocs(query(
+        collection(db, `projects/${id}/invoices`),
+        where("poId", "==", linkedPO.id),
+        where("status", "in", ["pending", "pending_approval", "approved", "paid", "overdue"])
+      ));
+      
+      // Calcular cuánto está facturado por item
+      const itemInvoicedAmounts: Record<number, number> = {};
+      invoicesSnap.docs.forEach(invDoc => {
+        if (invDoc.id === invoiceId) return; // Excluir factura actual
+        const invData = invDoc.data();
+        (invData.items || []).forEach((item: any) => {
+          if (item.poItemIndex !== undefined && item.poItemIndex !== null) {
+            itemInvoicedAmounts[item.poItemIndex] = (itemInvoicedAmounts[item.poItemIndex] || 0) + (item.totalAmount || 0);
+          }
+        });
+      });
+
+      const poItemsEnriched: POItemWithInvoiced[] = (linkedPO.items || []).map((item: any, idx: number) => ({
+        id: item.id,
+        description: item.description || "",
+        subAccountId: item.subAccountId || "",
+        subAccountCode: item.subAccountCode || "",
+        subAccountDescription: item.subAccountDescription || "",
+        quantity: item.quantity || 1,
+        unitPrice: item.unitPrice || 0,
+        baseAmount: item.baseAmount || 0,
+        vatRate: item.vatRate ?? 21,
+        vatAmount: item.vatAmount || 0,
+        irpfRate: item.irpfRate || 0,
+        irpfAmount: item.irpfAmount || 0,
+        totalAmount: item.totalAmount || 0,
+        episodeAssignment: item.episodeAssignment || "general",
+        episodes: item.episodes,
+        invoicedAmount: itemInvoicedAmounts[idx] || 0,
+        availableAmount: (item.totalAmount || 0) - (itemInvoicedAmounts[idx] || 0),
+      }));
+
+      setPOItemsWithInvoiced(poItemsEnriched);
+      setShowPOItemsModal(true);
+    } catch (error) {
+      console.error("Error loading PO items:", error);
+    }
+  };
+
+  const addPOItemToInvoice = (poItem: POItemWithInvoiced, idx: number) => {
+    setItems([...items, {
+      id: String(Date.now()),
+      description: poItem.description,
+      poItemId: poItem.id,
+      poItemIndex: idx,
+      isNewItem: false,
+      subAccountId: poItem.subAccountId,
+      subAccountCode: poItem.subAccountCode,
+      subAccountDescription: poItem.subAccountDescription,
+      quantity: poItem.quantity,
+      unitPrice: poItem.unitPrice,
+      baseAmount: poItem.baseAmount,
+      vatRate: poItem.vatRate,
+      vatAmount: poItem.vatAmount,
+      irpfRate: poItem.irpfRate,
+      irpfAmount: poItem.irpfAmount,
+      totalAmount: poItem.totalAmount,
+      episodeAssignment: poItem.episodeAssignment || "general",
+      episodes: poItem.episodes ? [...poItem.episodes] : undefined,
+    }]);
+    setShowPOItemsModal(false);
+  };
 
   // Selección
   const selectSupplier = (s: Supplier) => {
@@ -829,10 +909,18 @@ export default function EditInvoicePage() {
                   <h2 className="font-semibold text-slate-900">Items</h2>
                   <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">{items.length}</span>
                 </div>
-                <button onClick={addNewItem} className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors">
-                  <Plus size={14} />
-                  Añadir
-                </button>
+                <div className="flex items-center gap-2">
+                  {linkedPO && (
+                    <button onClick={loadPOItemsWithInvoiced} className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium transition-colors">
+                      <Package size={14} />
+                      Items de PO
+                    </button>
+                  )}
+                  <button onClick={addNewItem} className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors">
+                    <Plus size={14} />
+                    Añadir
+                  </button>
+                </div>
               </div>
 
               <div className="p-6 space-y-4">
@@ -1086,6 +1174,77 @@ export default function EditInvoicePage() {
           </div>
         </div>
       </main>
+
+      {/* Modal items de PO */}
+      {showPOItemsModal && linkedPO && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowPOItemsModal(false)}>
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Items de PO-{linkedPO.number}</h2>
+                <p className="text-sm text-slate-500">Selecciona un item para añadirlo a la factura</p>
+              </div>
+              <button onClick={() => setShowPOItemsModal(false)} className="p-2 hover:bg-slate-100 rounded-xl"><X size={20} /></button>
+            </div>
+            <div className="p-6 max-h-96 overflow-y-auto space-y-3">
+              {poItemsWithInvoiced.map((poItem, idx) => {
+                const isOver = poItem.availableAmount < 0;
+                return (
+                  <button
+                    key={poItem.id || idx}
+                    onClick={() => addPOItemToInvoice(poItem, idx)}
+                    className={cx(
+                      "w-full text-left p-4 border rounded-xl transition-colors",
+                      isOver ? "border-red-200 bg-red-50 hover:border-red-300" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                    )}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <p className="font-medium text-slate-900">{poItem.description || "Sin descripción"}</p>
+                        <p className="text-xs text-slate-500 font-mono mt-1">{poItem.subAccountCode} - {poItem.subAccountDescription}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-slate-900">{formatCurrency(poItem.totalAmount)} €</p>
+                        <p className="text-xs text-slate-500">Total PO</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 text-sm mt-3 pt-3 border-t border-slate-100">
+                      <div>
+                        <p className="text-slate-500 text-xs">Facturado</p>
+                        <p className="font-medium text-slate-700">{formatCurrency(poItem.invoicedAmount)} €</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500 text-xs">Disponible</p>
+                        <p className={cx("font-medium", isOver ? "text-red-600" : poItem.availableAmount < poItem.totalAmount * 0.1 ? "text-amber-600" : "text-emerald-600")}>
+                          {formatCurrency(poItem.availableAmount)} €
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="inline-flex items-center gap-1 text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg">
+                          <Plus size={12} />
+                          Añadir
+                        </span>
+                      </div>
+                    </div>
+                    {isOver && (
+                      <div className="flex items-center gap-2 mt-3 text-xs text-red-600">
+                        <AlertTriangle size={12} />
+                        Este item ya está sobre-facturado
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+              {poItemsWithInvoiced.length === 0 && (
+                <div className="text-center py-8">
+                  <Package size={32} className="text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-500">No hay items en esta PO</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal proveedor */}
       {showSupplierModal && (
