@@ -323,41 +323,35 @@ export default function DocumentCenterPage() {
       return pdfDoc.save();
     };
 
-    // Helper to merge PDFs
+    // Helper to merge PDFs - INSERT banner into original doc (don't copy pages)
     const mergePdfs = async (bannerBytes: Uint8Array, docBytes: Uint8Array): Promise<Uint8Array> => {
-      console.log("[DocCenter] Starting merge...");
+      console.log("[DocCenter] Starting merge (insert approach)...");
       
-      const merged = await PDFDocument.create();
-      
-      // Add banner (we created this, safe to copy)
-      const bannerDoc = await PDFDocument.load(bannerBytes);
-      const bannerPages = await merged.copyPages(bannerDoc, bannerDoc.getPageIndices());
-      bannerPages.forEach(p => merged.addPage(p));
-      console.log("[DocCenter] Banner added");
-      
-      // Load original - the key is ignoreEncryption and NOT trying to decompress
       try {
+        // Load the ORIGINAL document - we'll modify it directly
         const docPdf = await PDFDocument.load(docBytes, { ignoreEncryption: true });
-        console.log("[DocCenter] Doc loaded, pages:", docPdf.getPageCount());
+        const originalPageCount = docPdf.getPageCount();
+        console.log("[DocCenter] Original doc loaded, pages:", originalPageCount);
         
-        // copyPages should work without decompressing content streams
-        const indices = docPdf.getPageIndices();
-        for (const idx of indices) {
-          try {
-            const [page] = await merged.copyPages(docPdf, [idx]);
-            merged.addPage(page);
-            console.log("[DocCenter] Copied page", idx + 1);
-          } catch (pageErr) {
-            console.error("[DocCenter] Failed page", idx + 1, ":", pageErr);
-          }
-        }
+        // Load banner
+        const bannerDoc = await PDFDocument.load(bannerBytes);
         
-        const result = await merged.save();
-        console.log("[DocCenter] Done, pages:", merged.getPageCount(), "size:", result.length);
+        // Copy banner page INTO the original document
+        const [bannerPage] = await docPdf.copyPages(bannerDoc, [0]);
+        
+        // Insert banner at position 0 (beginning)
+        docPdf.insertPage(0, bannerPage);
+        
+        console.log("[DocCenter] Banner inserted at beginning");
+        console.log("[DocCenter] Final page count:", docPdf.getPageCount());
+        
+        const result = await docPdf.save();
+        console.log("[DocCenter] Saved, size:", result.length);
         return result;
-      } catch (loadErr) {
-        console.error("[DocCenter] Load failed:", loadErr);
-        // Return just the original document without banner
+        
+      } catch (err) {
+        console.error("[DocCenter] Insert approach failed:", err);
+        // Fallback: return original without banner
         return docBytes;
       }
     };
