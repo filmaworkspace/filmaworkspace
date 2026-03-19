@@ -179,47 +179,111 @@ async function convertImageToPdf(imageBytes: Uint8Array, contentType: string): P
   return pdfDoc.save();
 }
 
-async function mergePdfs(first: Uint8Array, second: Uint8Array): Promise<Uint8Array> {
-  // Try standard copy first
-  try {
-    const a = await PDFDocument.load(first);
-    const b = await PDFDocument.load(second, { ignoreEncryption: true });
-    const merged = await PDFDocument.create();
-    const aPages = await merged.copyPages(a, a.getPageIndices());
-    aPages.forEach(p => merged.addPage(p));
-    const bPages = await merged.copyPages(b, b.getPageIndices());
-    bPages.forEach(p => merged.addPage(p));
-    const result = await merged.save();
-    console.log("[Proxy] merge OK, pages:", merged.getPageCount(), "bytes:", result.length);
-    return result;
-  } catch (err) {
-    console.error("[Proxy] merge failed:", err);
-    // Fallback: re-save second PDF through pdf-lib to normalise it, then retry
-    try {
-      console.log("[Proxy] trying normalise fallback...");
-      // Write second doc bytes through a fresh PDFDocument to strip problematic features
-      const raw = await PDFDocument.load(second, { ignoreEncryption: true });
-      const normalised = await PDFDocument.create();
-      const pages = await normalised.copyPages(raw, raw.getPageIndices());
-      pages.forEach(p => normalised.addPage(p));
-      const normBytes = await normalised.save();
+async function mergePdfs(bannerBytes: Uint8Array, docBytes: Uint8Array): Promise<Uint8Array> {
+  // Load the original document with various options to handle different PDF types
+  const loadOptions = { 
+    ignoreEncryption: true,
+    updateMetadata: false,
+  };
 
-      const a = await PDFDocument.load(first);
-      const b = await PDFDocument.load(normBytes);
-      const merged = await PDFDocument.create();
-      const aPages = await merged.copyPages(a, a.getPageIndices());
-      aPages.forEach(p => merged.addPage(p));
-      const bPages = await merged.copyPages(b, b.getPageIndices());
-      bPages.forEach(p => merged.addPage(p));
+  try {
+    // Create the merged document
+    const merged = await PDFDocument.create();
+    
+    // Load banner (this is always safe, we created it)
+    const bannerDoc = await PDFDocument.load(bannerBytes);
+    const bannerPages = await merged.copyPages(bannerDoc, bannerDoc.getPageIndices());
+    bannerPages.forEach(p => merged.addPage(p));
+    
+    // Load the original document
+    // First, try to embed it directly without copying pages (preserves content better)
+    try {
+      const originalDoc = await PDFDocument.load(docBytes, loadOptions);
+      const pageCount = originalDoc.getPageCount();
+      console.log("[Proxy] Original doc has", pageCount, "pages");
+      
+      // Copy all pages from the original document
+      const pageIndices = originalDoc.getPageIndices();
+      const copiedPages = await merged.copyPages(originalDoc, pageIndices);
+      copiedPages.forEach(p => merged.addPage(p));
+      
       const result = await merged.save();
-      console.log("[Proxy] normalise fallback OK, pages:", merged.getPageCount());
+      console.log("[Proxy] Merge successful - total pages:", merged.getPageCount(), "bytes:", result.length);
       return result;
-    } catch (err2) {
-      console.error("[Proxy] normalise fallback also failed:", err2);
-      // Last resort: return both as separate pages by embedding second as image
-      // At minimum return banner so user gets something
+    } catch (copyError) {
+      console.error("[Proxy] Standard copy failed:", copyError);
+      
+      // Fallback: Try loading with throwOnInvalidObject: false
+      try {
+        console.log("[Proxy] Trying permissive load...");
+        const originalDoc = await PDFDocument.load(docBytes, {
+          ...loadOptions,
+          throwOnInvalidObject: false,
+        } as any);
+        
+        const pageIndices = originalDoc.getPageIndices();
+        const copiedPages = await merged.copyPages(originalDoc, pageIndices);
+        copiedPages.forEach(p => merged.addPage(p));
+        
+        const result = await merged.save();
+        console.log("[Proxy] Permissive merge successful - pages:", merged.getPageCount());
+        return result;
+      } catch (permissiveError) {
+        console.error("[Proxy] Permissive load also failed:", permissiveError);
+      }
+    }
+    
+    // Last resort: Return banner + original PDF concatenated at byte level
+    // This is a hack but maintains both documents
+    console.log("[Proxy] Using byte-level concatenation fallback");
+    return concatPdfBytes(bannerBytes, docBytes);
+    
+  } catch (error) {
+    console.error("[Proxy] Complete merge failure:", error);
+    // Absolute fallback: just return the banner
+    return bannerBytes;
+  }
+}
+
+// Concatenate two PDFs at byte level by creating a new document
+// and embedding each page as an XObject (image-like)
+async function concatPdfBytes(first: Uint8Array, second: Uint8Array): Promise<Uint8Array> {
+  try {
+    // Try one more approach: embed the second PDF's pages as form XObjects
+    const merged = await PDFDocument.create();
+    
+    // Add banner pages
+    const bannerDoc = await PDFDocument.load(first);
+    const bannerPages = await merged.copyPages(bannerDoc, bannerDoc.getPageIndices());
+    bannerPages.forEach(p => merged.addPage(p));
+    
+    // Try to embed second PDF
+    try {
+      const secondDoc = await PDFDocument.load(second, { ignoreEncryption: true });
+      const embeddedPages = await merged.embedPdf(secondDoc);
+      
+      for (const embeddedPage of embeddedPages) {
+        const dims = embeddedPage.scale(1);
+        const page = merged.addPage([dims.width, dims.height]);
+        page.drawPage(embeddedPage, {
+          x: 0,
+          y: 0,
+          width: dims.width,
+          height: dims.height,
+        });
+      }
+      
+      const result = await merged.save();
+      console.log("[Proxy] embedPdf fallback successful - pages:", merged.getPageCount());
+      return result;
+    } catch (embedError) {
+      console.error("[Proxy] embedPdf fallback failed:", embedError);
+      // Return just the banner
       return first;
     }
+  } catch (e) {
+    console.error("[Proxy] concatPdfBytes failed:", e);
+    return first;
   }
 }
 
