@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import PDFMerger from "pdf-merger-js";
 
 interface ExpenseItem {
   baseAmount: number;
@@ -30,18 +31,18 @@ interface ExpenseData {
 }
 
 const DOC_TYPE_LABELS: Record<string, string> = {
-  invoice:   "Factura",
-  ticket:    "Ticket",
-  proforma:  "Proforma",
-  budget:    "Presupuesto",
+  invoice: "Factura",
+  ticket: "Ticket",
+  proforma: "Proforma",
+  budget: "Presupuesto",
   guarantee: "Fianza",
 };
 
 const PAYMENT_METHODS: Record<string, string> = {
-  transfer:     "Transferencia bancaria",
-  card:         "Tarjeta",
-  cash:         "Efectivo",
-  check:        "Cheque",
+  transfer: "Transferencia bancaria",
+  card: "Tarjeta",
+  cash: "Efectivo",
+  check: "Cheque",
   direct_debit: "Domiciliación",
 };
 
@@ -55,31 +56,33 @@ const fmtDate = (iso: string) => {
   try {
     const d = new Date(iso);
     return d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
-  } catch { return iso; }
+  } catch {
+    return iso;
+  }
 };
 
 async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
   const pageWidth = 595;
-  const padding   = 20;
-  const headerH   = 32;
-  const subH      = 24;
-  const lineH     = 15;
-  const itemsH    = Math.max(1, expense.items.length) * lineH + 8;
-  const paymentH  = (expense.status === "paid" && expense.paidAt) ? 20 : 0;
-  const footerH   = 26;
+  const padding = 20;
+  const headerH = 32;
+  const subH = 24;
+  const lineH = 15;
+  const itemsH = Math.max(1, expense.items.length) * lineH + 8;
+  const paymentH = expense.status === "paid" && expense.paidAt ? 20 : 0;
+  const footerH = 26;
   const pageHeight = headerH + subH + itemsH + paymentH + footerH + padding + 8;
 
   const pdfDoc = await PDFDocument.create();
-  const page   = pdfDoc.addPage([pageWidth, pageHeight]);
-  const fontR  = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontB  = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const page = pdfDoc.addPage([pageWidth, pageHeight]);
+  const fontR = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontB = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  const dark   = rgb(0.12, 0.16, 0.23);
+  const dark = rgb(0.12, 0.16, 0.23);
   const orange = rgb(0.976, 0.451, 0.086);
-  const mid    = rgb(0.44, 0.50, 0.56);
-  const white  = rgb(1, 1, 1);
-  const light  = rgb(0.95, 0.96, 0.97);
-  const green  = rgb(0.13, 0.77, 0.37);
+  const mid = rgb(0.44, 0.5, 0.56);
+  const white = rgb(1, 1, 1);
+  const light = rgb(0.95, 0.96, 0.97);
+  const green = rgb(0.13, 0.77, 0.37);
   const border = rgb(0.85, 0.87, 0.89);
 
   page.drawRectangle({ x: 0, y: 0, width: pageWidth, height: pageHeight, color: white });
@@ -89,24 +92,33 @@ async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
   page.drawRectangle({ x: 0, y: hY, width: 4, height: headerH, color: orange });
 
   page.drawText(expense.displayNumber, {
-    x: padding, y: hY + (headerH - 13) / 2,
-    size: 13, font: fontB, color: white,
+    x: padding,
+    y: hY + (headerH - 13) / 2,
+    size: 13,
+    font: fontB,
+    color: white,
   });
 
   const typeLabel = DOC_TYPE_LABELS[expense.type] || expense.type;
   const dateStr = `${fmtDate(expense.date)}  ·  ${typeLabel}`;
   const dateW = fontR.widthOfTextAtSize(dateStr, 9);
   page.drawText(dateStr, {
-    x: pageWidth - padding - dateW, y: hY + (headerH - 9) / 2,
-    size: 9, font: fontR, color: rgb(0.7, 0.75, 0.8),
+    x: pageWidth - padding - dateW,
+    y: hY + (headerH - 9) / 2,
+    size: 9,
+    font: fontR,
+    color: rgb(0.7, 0.75, 0.8),
   });
 
   const subY = hY - subH;
   page.drawLine({ start: { x: 0, y: subY }, end: { x: pageWidth, y: subY }, thickness: 0.5, color: border });
   const supplierParts = [expense.supplier, expense.supplierNumber].filter(Boolean).join("  ·  ");
   page.drawText(supplierParts, {
-    x: padding, y: subY + (subH - 10) / 2,
-    size: 10, font: fontB, color: dark,
+    x: padding,
+    y: subY + (subH - 10) / 2,
+    size: 10,
+    font: fontB,
+    color: dark,
   });
 
   const itemsTop = subY - 8;
@@ -128,15 +140,24 @@ async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
   if (expense.status === "paid" && expense.paidAt) {
     const payY = afterItemsY - 2;
     page.drawRectangle({ x: 0, y: payY - 3, width: pageWidth, height: paymentH, color: rgb(0.93, 0.99, 0.95) });
-    const payMethod = expense.paymentMethod ? (PAYMENT_METHODS[expense.paymentMethod] || expense.paymentMethod) : "";
-    const parts = ["✓ Pagada el " + fmtDate(expense.paidAt), payMethod, expense.paymentReference ? "Ref: " + expense.paymentReference : ""].filter(Boolean).join("  ·  ");
+    const payMethod = expense.paymentMethod ? PAYMENT_METHODS[expense.paymentMethod] || expense.paymentMethod : "";
+    const parts = [
+      "✓ Pagada el " + fmtDate(expense.paidAt),
+      payMethod,
+      expense.paymentReference ? "Ref: " + expense.paymentReference : "",
+    ]
+      .filter(Boolean)
+      .join("  ·  ");
     page.drawText(parts, { x: padding, y: payY + 4, size: 8, font: fontB, color: green });
   }
 
-  const divBase = (expense.status === "paid" && expense.paidAt)
-    ? afterItemsY - paymentH - 6
-    : afterItemsY - 4;
-  page.drawLine({ start: { x: padding, y: divBase }, end: { x: pageWidth - padding, y: divBase }, thickness: 0.5, color: border });
+  const divBase = expense.status === "paid" && expense.paidAt ? afterItemsY - paymentH - 6 : afterItemsY - 4;
+  page.drawLine({
+    start: { x: padding, y: divBase },
+    end: { x: pageWidth - padding, y: divBase },
+    thickness: 0.5,
+    color: border,
+  });
 
   const footerY = divBase - 16;
   page.drawText("Base imponible:", { x: padding, y: footerY, size: 8, font: fontR, color: mid });
@@ -151,12 +172,30 @@ async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
   const totalLabelStr = "Total:";
   const totalValW = fontB.widthOfTextAtSize(totalValStr, 9);
   const totalLabelW = fontR.widthOfTextAtSize(totalLabelStr, 8);
-  page.drawText(totalLabelStr, { x: pageWidth - padding - totalValW - totalLabelW - 6, y: footerY, size: 8, font: fontR, color: mid });
-  page.drawText(totalValStr, { x: pageWidth - padding - totalValW, y: footerY, size: 9, font: fontB, color: dark });
+  page.drawText(totalLabelStr, {
+    x: pageWidth - padding - totalValW - totalLabelW - 6,
+    y: footerY,
+    size: 8,
+    font: fontR,
+    color: mid,
+  });
+  page.drawText(totalValStr, {
+    x: pageWidth - padding - totalValW,
+    y: footerY,
+    size: 9,
+    font: fontB,
+    color: dark,
+  });
 
   const watermark = "Generado por Filma Workspace · filmaworkspace.com";
   const wmW = fontR.widthOfTextAtSize(watermark, 6);
-  page.drawText(watermark, { x: pageWidth - padding - wmW, y: 5, size: 6, font: fontR, color: rgb(0.75, 0.78, 0.82) });
+  page.drawText(watermark, {
+    x: pageWidth - padding - wmW,
+    y: 5,
+    size: 6,
+    font: fontR,
+    color: rgb(0.75, 0.78, 0.82),
+  });
 
   return pdfDoc.save();
 }
@@ -167,7 +206,8 @@ async function convertImageToPdf(imageBytes: Uint8Array, contentType: string): P
     ? await pdfDoc.embedPng(imageBytes)
     : await pdfDoc.embedJpg(imageBytes);
   const { width, height } = image.scale(1);
-  const maxW = 595, maxH = 842;
+  const maxW = 595,
+    maxH = 842;
   const scale = Math.min(maxW / width, maxH / height, 1);
   const page = pdfDoc.addPage([maxW, maxH]);
   page.drawImage(image, {
@@ -179,117 +219,25 @@ async function convertImageToPdf(imageBytes: Uint8Array, contentType: string): P
   return pdfDoc.save();
 }
 
-async function mergePdfs(bannerBytes: Uint8Array, docBytes: Uint8Array): Promise<Uint8Array> {
-  // Load the original document with various options to handle different PDF types
-  const loadOptions = { 
-    ignoreEncryption: true,
-    updateMetadata: false,
-  };
+async function mergePdfsWithMerger(bannerBytes: Uint8Array, docBytes: Uint8Array): Promise<Buffer> {
+  const merger = new PDFMerger();
 
-  try {
-    // Create the merged document
-    const merged = await PDFDocument.create();
-    
-    // Load banner (this is always safe, we created it)
-    const bannerDoc = await PDFDocument.load(bannerBytes);
-    const bannerPages = await merged.copyPages(bannerDoc, bannerDoc.getPageIndices());
-    bannerPages.forEach(p => merged.addPage(p));
-    
-    // Load the original document
-    // First, try to embed it directly without copying pages (preserves content better)
-    try {
-      const originalDoc = await PDFDocument.load(docBytes, loadOptions);
-      const pageCount = originalDoc.getPageCount();
-      console.log("[Proxy] Original doc has", pageCount, "pages");
-      
-      // Copy all pages from the original document
-      const pageIndices = originalDoc.getPageIndices();
-      const copiedPages = await merged.copyPages(originalDoc, pageIndices);
-      copiedPages.forEach(p => merged.addPage(p));
-      
-      const result = await merged.save();
-      console.log("[Proxy] Merge successful - total pages:", merged.getPageCount(), "bytes:", result.length);
-      return result;
-    } catch (copyError) {
-      console.error("[Proxy] Standard copy failed:", copyError);
-      
-      // Fallback: Try loading with throwOnInvalidObject: false
-      try {
-        console.log("[Proxy] Trying permissive load...");
-        const originalDoc = await PDFDocument.load(docBytes, {
-          ...loadOptions,
-          throwOnInvalidObject: false,
-        } as any);
-        
-        const pageIndices = originalDoc.getPageIndices();
-        const copiedPages = await merged.copyPages(originalDoc, pageIndices);
-        copiedPages.forEach(p => merged.addPage(p));
-        
-        const result = await merged.save();
-        console.log("[Proxy] Permissive merge successful - pages:", merged.getPageCount());
-        return result;
-      } catch (permissiveError) {
-        console.error("[Proxy] Permissive load also failed:", permissiveError);
-      }
-    }
-    
-    // Last resort: Return banner + original PDF concatenated at byte level
-    // This is a hack but maintains both documents
-    console.log("[Proxy] Using byte-level concatenation fallback");
-    return concatPdfBytes(bannerBytes, docBytes);
-    
-  } catch (error) {
-    console.error("[Proxy] Complete merge failure:", error);
-    // Absolute fallback: just return the banner
-    return bannerBytes;
-  }
-}
+  // Add banner first
+  await merger.add(Buffer.from(bannerBytes));
 
-// Concatenate two PDFs at byte level by creating a new document
-// and embedding each page as an XObject (image-like)
-async function concatPdfBytes(first: Uint8Array, second: Uint8Array): Promise<Uint8Array> {
-  try {
-    // Try one more approach: embed the second PDF's pages as form XObjects
-    const merged = await PDFDocument.create();
-    
-    // Add banner pages
-    const bannerDoc = await PDFDocument.load(first);
-    const bannerPages = await merged.copyPages(bannerDoc, bannerDoc.getPageIndices());
-    bannerPages.forEach(p => merged.addPage(p));
-    
-    // Try to embed second PDF
-    try {
-      const secondDoc = await PDFDocument.load(second, { ignoreEncryption: true });
-      const embeddedPages = await merged.embedPdf(secondDoc);
-      
-      for (const embeddedPage of embeddedPages) {
-        const dims = embeddedPage.scale(1);
-        const page = merged.addPage([dims.width, dims.height]);
-        page.drawPage(embeddedPage, {
-          x: 0,
-          y: 0,
-          width: dims.width,
-          height: dims.height,
-        });
-      }
-      
-      const result = await merged.save();
-      console.log("[Proxy] embedPdf fallback successful - pages:", merged.getPageCount());
-      return result;
-    } catch (embedError) {
-      console.error("[Proxy] embedPdf fallback failed:", embedError);
-      // Return just the banner
-      return first;
-    }
-  } catch (e) {
-    console.error("[Proxy] concatPdfBytes failed:", e);
-    return first;
-  }
+  // Add original document
+  await merger.add(Buffer.from(docBytes));
+
+  // Get merged result
+  const mergedBuffer = await merger.saveAsBuffer();
+  console.log("[Proxy] pdf-merger-js merge complete, size:", mergedBuffer.length);
+
+  return mergedBuffer;
 }
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const url        = searchParams.get("url");
+  const url = searchParams.get("url");
   const expenseRaw = searchParams.get("expense");
 
   if (!url) return NextResponse.json({ error: "Missing url" }, { status: 400 });
@@ -301,11 +249,12 @@ export async function GET(request: NextRequest) {
     if (!response.ok)
       return NextResponse.json({ error: `Storage fetch failed: ${response.status}` }, { status: response.status });
 
-    const fileBytes   = new Uint8Array(await response.arrayBuffer());
+    const fileBytes = new Uint8Array(await response.arrayBuffer());
     const contentType = response.headers.get("content-type") || "application/octet-stream";
 
     console.log("[Proxy] file fetched, contentType:", contentType, "bytes:", fileBytes.length);
 
+    // If no expense data, just return the raw file
     if (!expenseRaw) {
       return new NextResponse(fileBytes, {
         status: 200,
@@ -313,16 +262,17 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Parse expense data and generate banner
     const expense: ExpenseData = JSON.parse(expenseRaw);
     const bannerBytes = await generateBannerPdf(expense);
     console.log("[Proxy] banner generated:", bannerBytes.length, "bytes");
 
-    const docPdfBytes = contentType.includes("pdf")
-      ? fileBytes
-      : await convertImageToPdf(fileBytes, contentType);
+    // Convert image to PDF if needed
+    const docPdfBytes = contentType.includes("pdf") ? fileBytes : await convertImageToPdf(fileBytes, contentType);
     console.log("[Proxy] docPdfBytes:", docPdfBytes.length);
 
-    const merged = await mergePdfs(bannerBytes, docPdfBytes);
+    // Merge using pdf-merger-js (much more robust than pdf-lib for complex PDFs)
+    const merged = await mergePdfsWithMerger(bannerBytes, docPdfBytes);
 
     return new NextResponse(merged, {
       status: 200,
