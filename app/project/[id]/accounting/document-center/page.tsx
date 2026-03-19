@@ -323,70 +323,42 @@ export default function DocumentCenterPage() {
       return pdfDoc.save();
     };
 
-    // Helper to merge PDFs client-side using embedPdf for better compatibility
+    // Helper to merge PDFs
     const mergePdfs = async (bannerBytes: Uint8Array, docBytes: Uint8Array): Promise<Uint8Array> => {
+      console.log("[DocCenter] Starting merge...");
+      
+      const merged = await PDFDocument.create();
+      
+      // Add banner (we created this, safe to copy)
+      const bannerDoc = await PDFDocument.load(bannerBytes);
+      const bannerPages = await merged.copyPages(bannerDoc, bannerDoc.getPageIndices());
+      bannerPages.forEach(p => merged.addPage(p));
+      console.log("[DocCenter] Banner added");
+      
+      // Load original - the key is ignoreEncryption and NOT trying to decompress
       try {
-        // Create merged document
-        const merged = await PDFDocument.create();
-        
-        // Add banner first (this one we created, so copyPages is fine)
-        const bannerDoc = await PDFDocument.load(bannerBytes);
-        const bannerPages = await merged.copyPages(bannerDoc, bannerDoc.getPageIndices());
-        bannerPages.forEach(p => merged.addPage(p));
-        console.log("[DocCenter] Banner added");
-        
-        // Load original document
         const docPdf = await PDFDocument.load(docBytes, { ignoreEncryption: true });
-        const pageCount = docPdf.getPageCount();
-        console.log("[DocCenter] Original doc has", pageCount, "pages");
+        console.log("[DocCenter] Doc loaded, pages:", docPdf.getPageCount());
         
-        // Use embedPdf - this treats pages as XObjects (like vector images)
-        // Much better for preserving visual content from complex PDFs
-        const embeddedPages = await merged.embedPdf(docPdf, docPdf.getPageIndices());
-        console.log("[DocCenter] Embedded", embeddedPages.length, "pages");
-        
-        for (let i = 0; i < embeddedPages.length; i++) {
-          const embeddedPage = embeddedPages[i];
-          // Get dimensions from the embedded page
-          const { width, height } = embeddedPage;
-          console.log("[DocCenter] Page", i + 1, "dimensions:", width, "x", height);
-          
-          // Create a new page with the same dimensions
-          const newPage = merged.addPage([width, height]);
-          
-          // Draw the embedded page onto the new page
-          newPage.drawPage(embeddedPage, {
-            x: 0,
-            y: 0,
-            width: width,
-            height: height,
-          });
+        // copyPages should work without decompressing content streams
+        const indices = docPdf.getPageIndices();
+        for (const idx of indices) {
+          try {
+            const [page] = await merged.copyPages(docPdf, [idx]);
+            merged.addPage(page);
+            console.log("[DocCenter] Copied page", idx + 1);
+          } catch (pageErr) {
+            console.error("[DocCenter] Failed page", idx + 1, ":", pageErr);
+          }
         }
         
         const result = await merged.save();
-        console.log("[DocCenter] Final merge complete, total pages:", merged.getPageCount(), "size:", result.length);
+        console.log("[DocCenter] Done, pages:", merged.getPageCount(), "size:", result.length);
         return result;
-      } catch (err) {
-        console.error("[DocCenter] embedPdf failed:", err);
-        
-        // Fallback: try copyPages
-        try {
-          console.log("[DocCenter] Trying copyPages fallback...");
-          const merged = await PDFDocument.create();
-          
-          const bannerDoc = await PDFDocument.load(bannerBytes);
-          const bannerPages = await merged.copyPages(bannerDoc, bannerDoc.getPageIndices());
-          bannerPages.forEach(p => merged.addPage(p));
-          
-          const docPdf = await PDFDocument.load(docBytes, { ignoreEncryption: true });
-          const docPages = await merged.copyPages(docPdf, docPdf.getPageIndices());
-          docPages.forEach(p => merged.addPage(p));
-          
-          return merged.save();
-        } catch (copyErr) {
-          console.error("[DocCenter] copyPages also failed:", copyErr);
-          return bannerBytes;
-        }
+      } catch (loadErr) {
+        console.error("[DocCenter] Load failed:", loadErr);
+        // Return just the original document without banner
+        return docBytes;
       }
     };
 
