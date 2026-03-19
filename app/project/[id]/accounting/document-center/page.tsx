@@ -217,8 +217,10 @@ export default function DocumentCenterPage() {
   const toggleSelectAll = () => setSelectedIds(isAllSelected ? new Set() : new Set(filteredInvoices.map(i => i.id)));
   const hasFilters = searchTerm || statusFilter !== "all" || dateRange.from || dateRange.to;
 
-  // ── download — SAME pattern as BOX ──────────────────────────────────
+  // ── download — CLIENT-SIDE merge for better PDF handling ──────────────────
   const buildInvoicePdf = async (invoice: Invoice): Promise<Uint8Array | null> => {
+    const { PDFDocument, rgb, StandardFonts } = await import("pdf-lib");
+    
     const expenseData = {
       displayNumber: invoice.displayNumber,
       supplier: invoice.supplier,
@@ -243,57 +245,206 @@ export default function DocumentCenterPage() {
       paymentReference: invoice.paymentReference || null,
     };
 
-    // Case 1: has attachment → proxy merges banner+doc server-side (same as BOX)
+    // Helper to generate banner
+    const generateBanner = async (): Promise<Uint8Array> => {
+      const DOC_LABELS: Record<string, string> = { invoice: "Factura", ticket: "Ticket", proforma: "Proforma", budget: "Presupuesto", guarantee: "Fianza" };
+      const PAY_LABELS: Record<string, string> = { transfer: "Transferencia bancaria", card: "Tarjeta", cash: "Efectivo", check: "Cheque", direct_debit: "Domiciliación" };
+      const fmtN = (n: number) => n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const fmtM = (n: number) => fmtN(n) + " €";
+      const fmtD = (iso: string) => { try { return new Date(iso).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" }); } catch { return iso; } };
+
+      const pageWidth = 595, padding = 20, headerH = 32, subH = 24, lineH = 15;
+      const itemsH = Math.max(1, expenseData.items.length) * lineH + 8;
+      const paymentH = (expenseData.status === "paid" && expenseData.paidAt) ? 20 : 0;
+      const footerH = 26;
+      const pageHeight = headerH + subH + itemsH + paymentH + footerH + padding + 8;
+
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([pageWidth, pageHeight]);
+      const fontR = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const fontB = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+      const dark = rgb(0.12, 0.16, 0.23), orange = rgb(0.976, 0.451, 0.086), mid = rgb(0.44, 0.50, 0.56);
+      const white = rgb(1, 1, 1), light = rgb(0.95, 0.96, 0.97), green = rgb(0.13, 0.77, 0.37), border = rgb(0.85, 0.87, 0.89);
+
+      page.drawRectangle({ x: 0, y: 0, width: pageWidth, height: pageHeight, color: white });
+      const hY = pageHeight - headerH;
+      page.drawRectangle({ x: 0, y: hY, width: pageWidth, height: headerH, color: dark });
+      page.drawRectangle({ x: 0, y: hY, width: 4, height: headerH, color: orange });
+      page.drawText(expenseData.displayNumber, { x: padding, y: hY + (headerH - 13) / 2, size: 13, font: fontB, color: white });
+
+      const typeLabel = DOC_LABELS[expenseData.type] || expenseData.type;
+      const dateStr = `${fmtD(expenseData.date)}  ·  ${typeLabel}`;
+      const dateW = fontR.widthOfTextAtSize(dateStr, 9);
+      page.drawText(dateStr, { x: pageWidth - padding - dateW, y: hY + (headerH - 9) / 2, size: 9, font: fontR, color: rgb(0.7, 0.75, 0.8) });
+
+      const subY = hY - subH;
+      page.drawLine({ start: { x: 0, y: subY }, end: { x: pageWidth, y: subY }, thickness: 0.5, color: border });
+      const supplierParts = [expenseData.supplier, expenseData.supplierNumber].filter(Boolean).join("  ·  ");
+      page.drawText(supplierParts, { x: padding, y: subY + (subH - 10) / 2, size: 10, font: fontB, color: dark });
+
+      const itemsTop = subY - 8;
+      expenseData.items.forEach((item, i) => {
+        const y = itemsTop - i * lineH;
+        if (i % 2 === 0) page.drawRectangle({ x: 0, y: y - 3, width: pageWidth, height: lineH, color: light });
+        const account = [item.subAccountCode, item.subAccountDescription].filter(Boolean).join(" · ") || "—";
+        page.drawText(account, { x: padding, y: y + 2, size: 8, font: fontR, color: dark });
+        page.drawText(`Base: ${fmtN(item.baseAmount)}`, { x: 300, y: y + 2, size: 8, font: fontR, color: mid });
+        const vatStr = `IVA ${item.vatRate}%: ${fmtN(item.vatAmount)}`;
+        page.drawText(vatStr, { x: pageWidth - padding - fontR.widthOfTextAtSize(vatStr, 8), y: y + 2, size: 8, font: fontR, color: mid });
+      });
+
+      const afterItemsY = itemsTop - expenseData.items.length * lineH - 4;
+      if (expenseData.status === "paid" && expenseData.paidAt) {
+        const payY = afterItemsY - 2;
+        page.drawRectangle({ x: 0, y: payY - 3, width: pageWidth, height: paymentH, color: rgb(0.93, 0.99, 0.95) });
+        const payMethod = expenseData.paymentMethod ? (PAY_LABELS[expenseData.paymentMethod] || expenseData.paymentMethod) : "";
+        const parts = ["✓ Pagada el " + fmtD(expenseData.paidAt), payMethod, expenseData.paymentReference ? "Ref: " + expenseData.paymentReference : ""].filter(Boolean).join("  ·  ");
+        page.drawText(parts, { x: padding, y: payY + 4, size: 8, font: fontB, color: green });
+      }
+
+      const divBase = (expenseData.status === "paid" && expenseData.paidAt) ? afterItemsY - paymentH - 6 : afterItemsY - 4;
+      page.drawLine({ start: { x: padding, y: divBase }, end: { x: pageWidth - padding, y: divBase }, thickness: 0.5, color: border });
+
+      const footerY = divBase - 16;
+      page.drawText("Base imponible:", { x: padding, y: footerY, size: 8, font: fontR, color: mid });
+      page.drawText(fmtM(expenseData.baseAmount), { x: padding + 75, y: footerY, size: 8, font: fontB, color: dark });
+      if (expenseData.irpfRate > 0) page.drawText(`IRPF ${expenseData.irpfRate}%: ${fmtM(expenseData.irpfAmount)}`, { x: 260, y: footerY, size: 8, font: fontR, color: mid });
+
+      const totalValStr = fmtM(expenseData.totalAmount);
+      const totalValW = fontB.widthOfTextAtSize(totalValStr, 9);
+      const totalLabelW = fontR.widthOfTextAtSize("Total:", 8);
+      page.drawText("Total:", { x: pageWidth - padding - totalValW - totalLabelW - 6, y: footerY, size: 8, font: fontR, color: mid });
+      page.drawText(totalValStr, { x: pageWidth - padding - totalValW, y: footerY, size: 9, font: fontB, color: dark });
+
+      const wm = "Generado por Filma Workspace · filmaworkspace.com";
+      page.drawText(wm, { x: pageWidth - padding - fontR.widthOfTextAtSize(wm, 6), y: 5, size: 6, font: fontR, color: rgb(0.75, 0.78, 0.82) });
+
+      return pdfDoc.save();
+    };
+
+    // Helper to merge PDFs client-side
+    const mergePdfs = async (bannerBytes: Uint8Array, docBytes: Uint8Array): Promise<Uint8Array> => {
+      try {
+        // Load the original document first to check it
+        const docPdf = await PDFDocument.load(docBytes, { ignoreEncryption: true });
+        const pageCount = docPdf.getPageCount();
+        console.log("[DocCenter] Original doc has", pageCount, "pages, size:", docBytes.length);
+        
+        // Create merged document
+        const merged = await PDFDocument.create();
+        
+        // Add banner first
+        const bannerDoc = await PDFDocument.load(bannerBytes);
+        const bannerPages = await merged.copyPages(bannerDoc, bannerDoc.getPageIndices());
+        bannerPages.forEach(p => merged.addPage(p));
+        console.log("[DocCenter] Banner added, pages so far:", merged.getPageCount());
+        
+        // Copy pages one by one to better debug
+        for (let i = 0; i < pageCount; i++) {
+          try {
+            const [copiedPage] = await merged.copyPages(docPdf, [i]);
+            merged.addPage(copiedPage);
+            console.log("[DocCenter] Copied page", i + 1, "of", pageCount);
+          } catch (pageErr) {
+            console.error("[DocCenter] Failed to copy page", i + 1, ":", pageErr);
+            // Try embedPdf for this specific page as fallback
+            try {
+              const singlePageDoc = await PDFDocument.create();
+              const [sp] = await singlePageDoc.copyPages(docPdf, [i]);
+              singlePageDoc.addPage(sp);
+              const singleBytes = await singlePageDoc.save();
+              const reloaded = await PDFDocument.load(singleBytes);
+              const [recopied] = await merged.copyPages(reloaded, [0]);
+              merged.addPage(recopied);
+              console.log("[DocCenter] Page", i + 1, "recovered via re-save");
+            } catch (recoverErr) {
+              console.error("[DocCenter] Could not recover page", i + 1);
+            }
+          }
+        }
+        
+        const result = await merged.save();
+        console.log("[DocCenter] Final merge complete, total pages:", merged.getPageCount(), "size:", result.length);
+        return result;
+      } catch (err) {
+        console.error("[DocCenter] mergePdfs failed completely:", err);
+        // Return just banner as last resort
+        return bannerBytes;
+      }
+    };
+
+    // Main logic
     if (invoice.attachmentUrl) {
-      const proxyUrl = `/api/storage-proxy?url=${encodeURIComponent(invoice.attachmentUrl)}&expense=${encodeURIComponent(JSON.stringify(expenseData))}`;
-      console.log("[DocCenter] fetching proxy:", proxyUrl.substring(0, 120) + "...");
+      // Fetch raw file (no merge on server)
+      const proxyUrl = `/api/storage-proxy?url=${encodeURIComponent(invoice.attachmentUrl)}`;
+      console.log("[DocCenter] fetching raw file...");
       const resp = await fetch(proxyUrl);
-      console.log("[DocCenter] proxy status:", resp.status, "content-type:", resp.headers.get("content-type"));
       if (!resp.ok) return null;
-      const mainBytes = new Uint8Array(await resp.arrayBuffer());
-      console.log("[DocCenter] mainBytes:", mainBytes.length);
+      
+      const contentType = resp.headers.get("content-type") || "";
+      const fileBytes = new Uint8Array(await resp.arrayBuffer());
+      console.log("[DocCenter] raw file:", fileBytes.length, "bytes, type:", contentType);
+
+      // Generate banner client-side
+      const bannerBytes = await generateBanner();
+      console.log("[DocCenter] banner generated:", bannerBytes.length, "bytes");
+
+      // Convert image to PDF if needed
+      let docPdfBytes: Uint8Array;
+      if (contentType.includes("pdf")) {
+        docPdfBytes = fileBytes;
+      } else {
+        // Image → PDF
+        const imgDoc = await PDFDocument.create();
+        const img = contentType.includes("png") 
+          ? await imgDoc.embedPng(fileBytes) 
+          : await imgDoc.embedJpg(fileBytes);
+        const { width, height } = img.scale(1);
+        const scale = Math.min(595 / width, 842 / height, 1);
+        const page = imgDoc.addPage([595, 842]);
+        page.drawImage(img, { x: (595 - width * scale) / 2, y: (842 - height * scale) / 2, width: width * scale, height: height * scale });
+        docPdfBytes = await imgDoc.save();
+      }
+
+      // Merge banner + document
+      let result = await mergePdfs(bannerBytes, docPdfBytes);
 
       // If there's also a receipt, append it
       if (invoice.receiptUrl) {
-        const { PDFDocument } = await import("pdf-lib");
-        const final = await PDFDocument.create();
-        const mainDoc = await PDFDocument.load(mainBytes);
-        const mainPages = await final.copyPages(mainDoc, mainDoc.getPageIndices());
-        mainPages.forEach(p => final.addPage(p));
         try {
           const rResp = await fetch(`/api/storage-proxy?url=${encodeURIComponent(invoice.receiptUrl)}`);
           if (rResp.ok) {
-            const rBytes = await rResp.arrayBuffer();
-            try {
-              const rDoc = await PDFDocument.load(rBytes);
-              const rPages = await final.copyPages(rDoc, rDoc.getPageIndices());
-              rPages.forEach(p => final.addPage(p));
-            } catch {
-              // image receipt
-              const imgBytes = new Uint8Array(rBytes);
-              const isPng = invoice.receiptName?.toLowerCase().endsWith(".png");
-              const img = isPng ? await final.embedPng(imgBytes) : await final.embedJpg(imgBytes);
+            const rContentType = rResp.headers.get("content-type") || "";
+            const rBytes = new Uint8Array(await rResp.arrayBuffer());
+            
+            const final = await PDFDocument.load(result);
+            
+            if (rContentType.includes("pdf")) {
+              const rDoc = await PDFDocument.load(rBytes, { ignoreEncryption: true });
+              const embeddedPages = await final.embedPdf(rDoc);
+              for (const ep of embeddedPages) {
+                const page = final.addPage([ep.width, ep.height]);
+                page.drawPage(ep, { x: 0, y: 0, width: ep.width, height: ep.height });
+              }
+            } else {
+              // Image receipt
+              const img = rContentType.includes("png") ? await final.embedPng(rBytes) : await final.embedJpg(rBytes);
               const { width, height } = img.scale(1);
               const scale = Math.min(555 / width, 800 / height, 1);
               const page = final.addPage([595.28, 841.89]);
               page.drawImage(img, { x: 20, y: 841.89 - 20 - height * scale, width: width * scale, height: height * scale });
             }
+            result = await final.save();
           }
-        } catch (e) { console.warn("receipt failed:", e); }
-        return final.save();
+        } catch (e) { console.warn("[DocCenter] receipt failed:", e); }
       }
 
-      return mainBytes;
+      return result;
     }
 
-    // Case 2: no attachment → banner only via proxy (pass a dummy? No — use invoice-banner POST)
-    const resp = await fetch("/api/invoice-banner", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(expenseData),
-    });
-    if (!resp.ok) return null;
-    return new Uint8Array(await resp.arrayBuffer());
+    // No attachment → just banner
+    return generateBanner();
   };
 
   const triggerDownload = (bytes: Uint8Array, fileName: string) => {
