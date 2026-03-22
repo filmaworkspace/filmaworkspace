@@ -441,6 +441,8 @@ export default function InvoicesPage() {
       overdue: { bg: "bg-red-50", text: "text-red-700", label: "Vencida" },
       cancelled: { bg: "bg-slate-100", text: "text-slate-700", label: "Cancelada" },
       rejected: { bg: "bg-red-50", text: "text-red-700", label: "Rechazada" },
+      returned: { bg: "bg-teal-50", text: "text-teal-700", label: "Devuelta" },
+      partial_return: { bg: "bg-cyan-50", text: "text-cyan-700", label: "Dev. parcial" },
     };
     const c = config[status] || config.pending;
     return <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${c.bg} ${c.text}`}>{c.label}</span>;
