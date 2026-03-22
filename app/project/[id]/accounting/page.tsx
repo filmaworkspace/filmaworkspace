@@ -231,6 +231,8 @@ export default function AccountingPage() {
       pending_approval: { bg: "bg-purple-50", text: "text-purple-700", label: "Pend. aprob." },
       paid: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Pagada" },
       overdue: { bg: "bg-red-50", text: "text-red-700", label: "Vencida" },
+      returned: { bg: "bg-teal-50", text: "text-teal-700", label: "Devuelta" },
+      partial_return: { bg: "bg-cyan-50", text: "text-cyan-700", label: "Dev. parcial" },
     };
     const c = config[status] || config.pending;
     return <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${c.bg} ${c.text}`}>{c.label}</span>;
