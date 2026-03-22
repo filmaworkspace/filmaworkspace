@@ -14,18 +14,19 @@ import { unrealizeInvoice, updatePOItemsInvoiced, realizeInvoice } from "@/lib/b
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-type InvoiceStatus = "draft" | "pending" | "pending_approval" | "approved" | "rejected" | "paid" | "cancelled" | "coding" | "accounted";
-type DocumentType = "invoice" | "proforma" | "autonomo" | "ticket";
+type InvoiceStatus = "draft" | "pending" | "pending_approval" | "approved" | "rejected" | "paid" | "cancelled" | "coding" | "accounted" | "returned" | "partial_return";
+type DocumentType = "invoice" | "proforma" | "autonomo" | "ticket" | "budget" | "guarantee";
 
 interface EpisodeDistribution { episode: number; amount: number; percentage: number; }
 interface InvoiceItem { description: string; subAccountId: string; subAccountCode: string; subAccountDescription: string; quantity: number; unitPrice: number; baseAmount: number; vatRate: number; vatAmount: number; irpfRate: number; irpfAmount: number; totalAmount: number; poItemId?: string; poItemIndex?: number; isNewItem?: boolean; episodeAssignment?: "general" | "specific"; episodes?: EpisodeDistribution[]; }
 interface ApprovalStepStatus { id: string; order: number; approverType: "fixed" | "role" | "hod" | "coordinator"; approvers: string[]; approverNames?: string[]; roles?: string[]; department?: string; approvedBy: string[]; approvedByNames?: string[]; rejectedBy: string[]; status: "pending" | "approved" | "rejected"; requireAll: boolean; approvedAt?: Date; }
 interface ApprovalComment { id: string; userId: string; userName: string; text: string; createdAt: Date; type: "approval" | "rejection" | "info_request" | "comment"; stepOrder?: number; }
-interface Invoice { id: string; documentType: DocumentType; number: string; displayNumber: string; supplierNumber?: string; supplier: string; supplierId: string; supplierTaxId?: string; supplierIban?: string; supplierBic?: string; department?: string; description: string; notes?: string; items: InvoiceItem[]; baseAmount: number; vatAmount: number; irpfAmount: number; totalAmount: number; invoiceDate?: Date; dueDate: Date; status: InvoiceStatus; approvalStatus?: string; approvalSteps?: ApprovalStepStatus[]; currentApprovalStep?: number; comments?: ApprovalComment[]; attachmentUrl?: string; attachmentFileName?: string; createdAt: Date; createdBy: string; createdByName: string; codedAt?: Date; codedBy?: string; codedByName?: string; approvedAt?: Date; approvedBy?: string; approvedByName?: string; paidAt?: Date; paidAmount?: number; paymentMethod?: string; paymentReference?: string; cancelledAt?: Date; cancelledByName?: string; cancellationReason?: string; poId?: string; poNumber?: string; requiresReplacement?: boolean; replacedByInvoiceId?: string; isReplacement?: boolean; replacesDocumentId?: string; replacesDocumentNumber?: string; currency?: string; accountingEntry?: string; isAsset?: boolean; assetCategory?: string; replacedFromType?: string; replacedAt?: Date; originalAttachmentUrl?: string; originalAttachmentFileName?: string; accounted?: boolean; accountedAt?: Date; accountedBy?: string; accountedByName?: string; accountingEntryNumber?: string; accountingAccount?: string; delegatedToAccounting?: boolean; delegatedAt?: Date; delegatedBy?: string; delegatedByName?: string; }
+interface Invoice { id: string; documentType: DocumentType; number: string; displayNumber: string; supplierNumber?: string; supplier: string; supplierId: string; supplierTaxId?: string; supplierIban?: string; supplierBic?: string; department?: string; description: string; notes?: string; items: InvoiceItem[]; baseAmount: number; vatAmount: number; irpfAmount: number; totalAmount: number; invoiceDate?: Date; dueDate: Date; status: InvoiceStatus; approvalStatus?: string; approvalSteps?: ApprovalStepStatus[]; currentApprovalStep?: number; comments?: ApprovalComment[]; attachmentUrl?: string; attachmentFileName?: string; createdAt: Date; createdBy: string; createdByName: string; codedAt?: Date; codedBy?: string; codedByName?: string; approvedAt?: Date; approvedBy?: string; approvedByName?: string; paidAt?: Date; paidAmount?: number; paymentMethod?: string; paymentReference?: string; cancelledAt?: Date; cancelledByName?: string; cancellationReason?: string; poId?: string; poNumber?: string; requiresReplacement?: boolean; replacedByInvoiceId?: string; isReplacement?: boolean; replacesDocumentId?: string; replacesDocumentNumber?: string; currency?: string; accountingEntry?: string; isAsset?: boolean; assetCategory?: string; replacedFromType?: string; replacedAt?: Date; originalAttachmentUrl?: string; originalAttachmentFileName?: string; accounted?: boolean; accountedAt?: Date; accountedBy?: string; accountedByName?: string; accountingEntryNumber?: string; accountingAccount?: string; delegatedToAccounting?: boolean; delegatedAt?: Date; delegatedBy?: string; delegatedByName?: string; guaranteeReturns?: GuaranteeReturn[]; totalReturned?: number; }
 interface LinkedPO { id: string; number: string; supplier: string; baseAmount: number; invoicedAmount: number; status: string; items?: any[]; }
 interface Supplier { id: string; name: string; taxId?: string; iban?: string; bic?: string; }
 interface SubAccount { id: string; code: string; description: string; accountId: string; committed: number; actual: number; budgeted: number; }
 interface PaymentRecord { id: string; forecastId: string; forecastName: string; amount: number; paidAt: Date; paidByName: string; receiptUrl?: string; receiptName?: string; }
+interface GuaranteeReturn { id: string; amount: number; date: Date; receiptUrl?: string; receiptFileName?: string; notes?: string; createdAt: Date; createdBy: string; createdByName: string; }
 
 const STATUS_CONFIG: Record<InvoiceStatus, { bg: string; text: string; label: string; icon: typeof Clock }> = {
   draft: { bg: "bg-slate-100", text: "text-slate-700", label: "Borrador", icon: Edit },
@@ -37,6 +38,8 @@ const STATUS_CONFIG: Record<InvoiceStatus, { bg: string; text: string; label: st
   rejected: { bg: "bg-red-50", text: "text-red-700", label: "Rechazada", icon: XCircle },
   paid: { bg: "bg-blue-50", text: "text-blue-700", label: "Pagada", icon: CreditCard },
   cancelled: { bg: "bg-red-50", text: "text-red-700", label: "Anulada", icon: Ban },
+  returned: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Devuelta", icon: CheckCircle },
+  partial_return: { bg: "bg-amber-50", text: "text-amber-700", label: "Devolución parcial", icon: Clock },
 };
 
 const DOC_TYPE_CONFIG: Record<DocumentType, { label: string; code: string; color: string }> = {
@@ -44,6 +47,8 @@ const DOC_TYPE_CONFIG: Record<DocumentType, { label: string; code: string; color
   proforma: { label: "Proforma", code: "PRF", color: "text-violet-600" },
   autonomo: { label: "Autónomo", code: "AUT", color: "text-amber-600" },
   ticket: { label: "Ticket", code: "TKT", color: "text-emerald-600" },
+  budget: { label: "Presupuesto", code: "PRS", color: "text-cyan-600" },
+  guarantee: { label: "Fianza", code: "FNZ", color: "text-rose-600" },
 };
 
 const VAT_RATES = [0, 4, 10, 21];
@@ -93,6 +98,13 @@ export default function InvoiceDetailPage() {
   const [showApprovalNoteModal, setShowApprovalNoteModal] = useState<ApprovalComment | null>(null);
   const [replacingDocument, setReplacingDocument] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Guarantee return modal states
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [returnForm, setReturnForm] = useState({ amount: 0, date: "", notes: "" });
+  const [returnFile, setReturnFile] = useState<File | null>(null);
+  const [processingReturn, setProcessingReturn] = useState(false);
+  const returnFileInputRef = useRef<HTMLInputElement>(null);
 
   const showToast = (type: "success" | "error", message: string) => { setToast({ type, message }); setTimeout(() => setToast(null), 3000); };
   const formatCurrency = (a: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(a || 0);
@@ -129,6 +141,12 @@ export default function InvoiceDetailPage() {
         accounted: data.accounted || false, accountedAt: data.accountedAt?.toDate(), accountedBy: data.accountedBy,
         accountedByName: data.accountedByName, accountingEntryNumber: data.accountingEntryNumber, accountingAccount: data.accountingAccount,
         delegatedToAccounting: data.delegatedToAccounting || false, delegatedAt: data.delegatedAt?.toDate(), delegatedBy: data.delegatedBy, delegatedByName: data.delegatedByName,
+        guaranteeReturns: (data.guaranteeReturns || []).map((r: any) => ({
+          ...r,
+          date: r.date?.toDate ? r.date.toDate() : new Date(r.date),
+          createdAt: r.createdAt?.toDate ? r.createdAt.toDate() : new Date(),
+        })),
+        totalReturned: data.totalReturned || 0,
         approvalSteps: (data.approvalSteps || []).map((step: any) => ({
           ...step,
           approvedAt: step.approvedAt?.toDate ? step.approvedAt.toDate() : undefined,
@@ -427,6 +445,102 @@ export default function InvoiceDetailPage() {
     if (invoice?.status === "cancelled") return false;
     return permissions.accountingAccessLevel === "accounting_extended";
   };
+  
+  // Fianza: puede registrar devolución si es fianza pagada y tiene permisos
+  const canRegisterReturn = () => {
+    if (!invoice) return false;
+    if (invoice.documentType !== "guarantee") return false;
+    if (invoice.status !== "paid" && invoice.status !== "partial_return") return false;
+    return permissions.accountingAccessLevel === "accounting_extended";
+  };
+  
+  const getRemainingGuarantee = () => {
+    if (!invoice) return 0;
+    return invoice.totalAmount - (invoice.totalReturned || 0);
+  };
+  
+  const openReturnModal = () => {
+    const remaining = getRemainingGuarantee();
+    setReturnForm({ amount: remaining, date: new Date().toISOString().split("T")[0], notes: "" });
+    setReturnFile(null);
+    setShowReturnModal(true);
+  };
+  
+  const handleReturnFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) setReturnFile(file);
+  };
+  
+  const handleRegisterReturn = async () => {
+    if (!invoice || !returnForm.amount || !returnForm.date) {
+      showToast("error", "Completa el importe y la fecha");
+      return;
+    }
+    
+    const remaining = getRemainingGuarantee();
+    if (returnForm.amount > remaining) {
+      showToast("error", `El importe no puede superar el pendiente (${formatCurrency(remaining)} €)`);
+      return;
+    }
+    
+    setProcessingReturn(true);
+    try {
+      let receiptUrl = "";
+      let receiptFileName = "";
+      
+      // Subir extracto si existe
+      if (returnFile) {
+        const timestamp = Date.now();
+        const safeFileName = returnFile.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+        const storageRef = ref(storage, `projects/${projectId}/invoices/${invoiceId}/returns/${timestamp}_${safeFileName}`);
+        await uploadBytes(storageRef, returnFile);
+        receiptUrl = await getDownloadURL(storageRef);
+        receiptFileName = returnFile.name;
+      }
+      
+      const returnEntry: GuaranteeReturn = {
+        id: `return_${Date.now()}`,
+        amount: returnForm.amount,
+        date: new Date(returnForm.date),
+        receiptUrl,
+        receiptFileName,
+        notes: returnForm.notes,
+        createdAt: new Date(),
+        createdBy: permissions.userId || "",
+        createdByName: permissions.userName || "",
+      };
+      
+      const newTotalReturned = (invoice.totalReturned || 0) + returnForm.amount;
+      const isFullReturn = Math.abs(newTotalReturned - invoice.totalAmount) < 0.01;
+      
+      await updateDoc(doc(db, `projects/${projectId}/invoices`, invoiceId), {
+        guaranteeReturns: arrayUnion({
+          ...returnEntry,
+          date: Timestamp.fromDate(returnEntry.date),
+          createdAt: Timestamp.now(),
+        }),
+        totalReturned: newTotalReturned,
+        status: isFullReturn ? "returned" : "partial_return",
+      });
+      
+      // Actualizar estado local
+      setInvoice({
+        ...invoice,
+        guaranteeReturns: [...(invoice.guaranteeReturns || []), returnEntry],
+        totalReturned: newTotalReturned,
+        status: isFullReturn ? "returned" : "partial_return",
+      });
+      
+      setShowReturnModal(false);
+      showToast("success", isFullReturn ? "Fianza devuelta completamente" : "Devolución parcial registrada");
+    } catch (error) {
+      console.error("Error registering return:", error);
+      showToast("error", "Error al registrar la devolución");
+    } finally {
+      setProcessingReturn(false);
+    }
+  };
+  
   const isPDF = (url?: string) => url?.toLowerCase().includes(".pdf") || url?.toLowerCase().includes("application/pdf");
 
   const handleReplaceDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -539,7 +653,7 @@ export default function InvoiceDetailPage() {
             <button onClick={() => setCodingMode(false)} className="p-2 hover:bg-violet-700 rounded-lg"><X size={20} /></button>
             <div className="flex items-center gap-3">
               <Code size={20} />
-              <span className="font-semibold">CODIFICAR</span>
+              <span className="font-semibold">Codificar</span>
               <span className="bg-violet-500 px-2 py-0.5 rounded text-sm">{invoice.displayNumber}</span>
             </div>
           </div>
@@ -930,6 +1044,13 @@ export default function InvoiceDetailPage() {
                 </Link>
               )}
               {invoice.status === "pending" && canPay() && <Link href={`/project/${projectId}/accounting/payments?invoice=${invoice.id}`} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium"><CreditCard size={16} />Ir a pagar</Link>}
+              
+              {/* Botón de devolución para fianzas */}
+              {canRegisterReturn() && (
+                <button onClick={openReturnModal} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 text-sm font-medium">
+                  <RefreshCw size={16} />Registrar devolución
+                </button>
+              )}
 
               <div className="relative">
                 <button onClick={() => setShowActionsMenu(!showActionsMenu)} className="p-2.5 border border-slate-200 rounded-xl hover:bg-slate-50"><MoreHorizontal size={18} /></button>
@@ -1365,7 +1486,7 @@ export default function InvoiceDetailPage() {
                 <div className="flex items-center gap-2">
                   <Calendar size={14} className="text-amber-500" />
                   <div>
-                    <p className="text-xs text-slate-500">Vencimiento</p>
+                    <p className="text-xs text-slate-500">{invoice.documentType === "guarantee" ? "Fecha depósito" : "Vencimiento"}</p>
                     <p className="font-medium">{formatDate(invoice.dueDate)}</p>
                   </div>
                 </div>
@@ -1395,6 +1516,82 @@ export default function InvoiceDetailPage() {
                 </div>
                 <p className="text-sm text-red-700">{invoice.cancellationReason}</p>
                 <p className="text-xs text-red-500 mt-2">{invoice.cancelledByName} · {formatDateTime(invoice.cancelledAt!)}</p>
+              </div>
+            )}
+
+            {/* Guarantee Returns History */}
+            {invoice.documentType === "guarantee" && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw size={16} className="text-emerald-600" />
+                    <span className="font-semibold text-emerald-900">Estado de la fianza</span>
+                  </div>
+                  {invoice.status === "returned" ? (
+                    <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg font-medium">Devuelta completamente</span>
+                  ) : invoice.status === "partial_return" ? (
+                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-lg font-medium">Devolución parcial</span>
+                  ) : invoice.status === "paid" ? (
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-lg font-medium">Depositada</span>
+                  ) : (
+                    <span className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-lg font-medium">Pendiente</span>
+                  )}
+                </div>
+                
+                {/* Resumen de importes */}
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="bg-white rounded-xl p-3 text-center">
+                    <p className="text-xs text-slate-500 mb-1">Importe total</p>
+                    <p className="font-semibold text-slate-900">{formatCurrency(invoice.totalAmount)} €</p>
+                  </div>
+                  <div className="bg-white rounded-xl p-3 text-center">
+                    <p className="text-xs text-slate-500 mb-1">Devuelto</p>
+                    <p className="font-semibold text-emerald-600">{formatCurrency(invoice.totalReturned || 0)} €</p>
+                  </div>
+                  <div className="bg-white rounded-xl p-3 text-center">
+                    <p className="text-xs text-slate-500 mb-1">Pendiente</p>
+                    <p className="font-semibold text-amber-600">{formatCurrency(getRemainingGuarantee())} €</p>
+                  </div>
+                </div>
+                
+                {/* Historial de devoluciones */}
+                {invoice.guaranteeReturns && invoice.guaranteeReturns.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-emerald-700 mb-2">Historial de devoluciones</p>
+                    {invoice.guaranteeReturns.map((ret, idx) => (
+                      <div key={ret.id || idx} className="bg-white rounded-xl p-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
+                            <CheckCircle size={14} className="text-emerald-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-slate-900">{formatCurrency(ret.amount)} €</p>
+                            <p className="text-xs text-slate-500">{formatDate(ret.date)} · {ret.createdByName}</p>
+                            {ret.notes && <p className="text-xs text-slate-400 mt-0.5">{ret.notes}</p>}
+                          </div>
+                        </div>
+                        {ret.receiptUrl && (
+                          <a 
+                            href={ret.receiptUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
+                            title="Ver extracto"
+                          >
+                            <ExternalLink size={14} />
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Mensaje si no hay devoluciones */}
+                {(!invoice.guaranteeReturns || invoice.guaranteeReturns.length === 0) && invoice.status === "paid" && (
+                  <p className="text-sm text-emerald-700 text-center py-2">
+                    La fianza está depositada. Registra las devoluciones cuando se produzcan.
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -1590,6 +1787,146 @@ export default function InvoiceDetailPage() {
               <div className="mb-4"><label className="block text-sm font-medium text-slate-700 mb-2">Motivo *</label><textarea value={cancellationReason} onChange={(e) => setCancellationReason(e.target.value)} rows={3} className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-slate-900 outline-none" /></div>
               <div className="mb-6"><label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2"><KeyRound size={14} />Contraseña</label><input type="password" value={passwordInput} onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }} className={`w-full px-4 py-3 border rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"}`} />{passwordError && <p className="text-xs text-red-600 mt-1 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}</div>
               <div className="flex gap-3"><button onClick={() => { setShowCancelModal(false); setPasswordInput(""); setCancellationReason(""); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">Cancelar</button><button onClick={handleCancelInvoice} disabled={processing || !cancellationReason.trim() || !passwordInput.trim()} className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 text-sm font-medium disabled:opacity-50">{processing ? "Anulando..." : "Anular"}</button></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Guarantee Return Modal */}
+      {showReturnModal && invoice && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowReturnModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                <RefreshCw size={20} className="text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Registrar devolución de fianza</h3>
+                <p className="text-xs text-slate-500">{invoice.displayNumber} · {invoice.supplier}</p>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-5">
+              {/* Resumen de fianza */}
+              <div className="bg-slate-50 rounded-xl p-4">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Importe total</p>
+                    <p className="font-semibold text-slate-900">{formatCurrency(invoice.totalAmount)} €</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Devuelto</p>
+                    <p className="font-semibold text-emerald-600">{formatCurrency(invoice.totalReturned || 0)} €</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Pendiente</p>
+                    <p className="font-semibold text-amber-600">{formatCurrency(getRemainingGuarantee())} €</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Importe a devolver */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Importe devuelto *</label>
+                <div className="relative">
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    value={returnForm.amount || ""} 
+                    onChange={(e) => setReturnForm({ ...returnForm, amount: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-4 py-3 pr-10 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                    placeholder="0.00"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">€</span>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <button 
+                    onClick={() => setReturnForm({ ...returnForm, amount: getRemainingGuarantee() })}
+                    className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
+                  >
+                    Devolución completa
+                  </button>
+                  <span className="text-slate-300">·</span>
+                  <button 
+                    onClick={() => setReturnForm({ ...returnForm, amount: getRemainingGuarantee() / 2 })}
+                    className="text-xs text-slate-500 hover:text-slate-700"
+                  >
+                    50%
+                  </button>
+                </div>
+              </div>
+              
+              {/* Fecha de devolución */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Fecha de devolución *</label>
+                <input 
+                  type="date" 
+                  value={returnForm.date} 
+                  onChange={(e) => setReturnForm({ ...returnForm, date: e.target.value })}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                />
+              </div>
+              
+              {/* Extracto bancario */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Extracto bancario</label>
+                <input 
+                  type="file" 
+                  ref={returnFileInputRef}
+                  onChange={handleReturnFileSelect}
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="hidden"
+                />
+                {returnFile ? (
+                  <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                    <FileText size={18} className="text-emerald-600" />
+                    <span className="flex-1 text-sm text-emerald-700 truncate">{returnFile.name}</span>
+                    <button onClick={() => setReturnFile(null)} className="p-1 hover:bg-emerald-100 rounded">
+                      <X size={16} className="text-emerald-600" />
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => returnFileInputRef.current?.click()}
+                    className="w-full px-4 py-3 border-2 border-dashed border-slate-200 rounded-xl text-sm text-slate-500 hover:border-slate-300 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Upload size={16} />
+                    Subir extracto (opcional)
+                  </button>
+                )}
+              </div>
+              
+              {/* Observaciones */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Observaciones</label>
+                <textarea 
+                  value={returnForm.notes} 
+                  onChange={(e) => setReturnForm({ ...returnForm, notes: e.target.value })}
+                  rows={2}
+                  placeholder="Notas adicionales sobre la devolución..."
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-emerald-500 outline-none"
+                />
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-slate-200 flex gap-3">
+              <button 
+                onClick={() => setShowReturnModal(false)} 
+                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleRegisterReturn} 
+                disabled={processingReturn || !returnForm.amount || !returnForm.date}
+                className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {processingReturn ? (
+                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Registrando...</>
+                ) : (
+                  <><CheckCircle size={16} />Registrar devolución</>
+                )}
+              </button>
             </div>
           </div>
         </div>
