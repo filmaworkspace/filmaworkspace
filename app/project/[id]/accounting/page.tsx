@@ -10,7 +10,7 @@ import { FileText, Receipt, ArrowRight, Settings, ClipboardCheck, ChevronRight, 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
 interface PO { id: string; number: string; supplier: string; description: string; baseAmount: number; status: "draft" | "pending" | "approved" | "rejected" | "closed" | "cancelled"; createdAt: Date | null; department?: string; createdBy: string; }
-interface Invoice { id: string; number: string; supplier: string; description: string; baseAmount: number; status: "pending_approval" | "pending" | "paid" | "overdue" | "rejected" | "cancelled"; dueDate: Date | null; createdAt: Date | null; department?: string; createdBy: string; }
+interface Invoice { id: string; number: string; displayNumber: string; documentType: string; supplier: string; description: string; baseAmount: number; status: "pending_approval" | "pending" | "paid" | "overdue" | "rejected" | "cancelled"; dueDate: Date | null; createdAt: Date | null; department?: string; createdBy: string; }
 
 export default function AccountingPage() {
   const params = useParams();
@@ -185,9 +185,13 @@ export default function AccountingPage() {
         const invoicesRecentSnapshot = await getDocs(invoicesRecentQuery);
         const allInvoices = invoicesRecentSnapshot.docs.map(doc => {
           const data = doc.data();
+          const docType = data.documentType || "invoice";
+          const typePrefix = docType === "proforma" ? "PRF" : docType === "budget" ? "PRS" : docType === "guarantee" ? "FNZ" : "FAC";
           return { 
             id: doc.id, 
             number: data.number || "", 
+            displayNumber: data.displayNumber || `${typePrefix}-${data.number}`,
+            documentType: docType,
             supplier: data.supplier || "", 
             description: data.description || "", 
             baseAmount: data.baseAmount || 0, 
@@ -414,7 +418,7 @@ export default function AccountingPage() {
                         <div className="flex items-center justify-between px-3 py-3 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer group border border-transparent hover:border-slate-200">
                           <div className="flex-1 min-w-0 mr-3">
                             <div className="flex items-center gap-2 mb-0.5">
-                              <span className="text-sm font-semibold text-slate-900 font-mono">FAC-{invoice.number}</span>
+                              <span className="text-sm font-semibold text-slate-900 font-mono">{invoice.displayNumber}</span>
                               {isOverdue && <AlertCircle size={12} className="text-red-500" />}
                               <span className="text-slate-300">/</span>
                               <span className="text-sm font-medium text-slate-700 truncate">{invoice.supplier || "Sin proveedor"}</span>
