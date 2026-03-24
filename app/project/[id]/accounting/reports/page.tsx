@@ -5,7 +5,7 @@ import { Inter } from "next/font/google";
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
-import { Download, FileText, Receipt, Building2, Wallet, Settings2, ChevronDown, Check, X, Save, Trash2, BookMarked, Layers, GripVertical, Plus, Minus, FileSpreadsheet, Film, ShieldAlert, ArrowLeft, CreditCard, Banknote } from "lucide-react";
+import { Download, FileText, Receipt, Building2, Wallet, Settings2, ChevronDown, Check, X, Save, Trash2, BookMarked, Layers, GripVertical, Plus, Minus, FileSpreadsheet, Film, ShieldAlert, ArrowLeft, CreditCard, Banknote, Search, Calendar } from "lucide-react";
 import { getCostSettings, shouldCommitPO, shouldRealizeInvoice, CostSettings } from "@/lib/budgetRules";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
@@ -33,6 +33,21 @@ interface ReportPreset {
   reportType: ReportType;
   columns: { id: string; isBlank?: boolean }[];
   createdAt: string;
+}
+
+interface Supplier {
+  id: string;
+  fiscalName: string;
+  commercialName?: string;
+  taxId?: string;
+}
+
+interface InvoiceBookFilters {
+  supplierId: string;
+  supplierName: string;
+  dateFrom: string;
+  dateTo: string;
+  paymentStatus: "all" | "paid" | "pending";
 }
 
 const REPORT_COLUMNS: Record<ReportType, ReportColumn[]> = {
@@ -265,6 +280,20 @@ export default function ReportsPage() {
     invoiceActualTrigger: "on_paid",
   });
 
+  // Invoice Book Modal states
+  const [showInvoiceBookModal, setShowInvoiceBookModal] = useState(false);
+  const [invoiceBookFilters, setInvoiceBookFilters] = useState<InvoiceBookFilters>({
+    supplierId: "",
+    supplierName: "",
+    dateFrom: "",
+    dateTo: "",
+    paymentStatus: "all",
+  });
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierSearch, setSupplierSearch] = useState("");
+  const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+
   useEffect(() => {
     const savedPresets = localStorage.getItem(`report_presets_${id}`);
     if (savedPresets) setPresets(JSON.parse(savedPresets));
@@ -363,6 +392,67 @@ export default function ReportsPage() {
       setLoading(false); 
     }
   };
+
+  // Load suppliers for typeahead
+  const loadSuppliers = async () => {
+    if (suppliers.length > 0) return; // Already loaded
+    setLoadingSuppliers(true);
+    try {
+      const suppliersSnap = await getDocs(query(collection(db, `projects/${id}/suppliers`), orderBy("fiscalName", "asc")));
+      const loadedSuppliers: Supplier[] = suppliersSnap.docs.map(doc => ({
+        id: doc.id,
+        fiscalName: doc.data().fiscalName || "",
+        commercialName: doc.data().commercialName || "",
+        taxId: doc.data().taxId || "",
+      }));
+      setSuppliers(loadedSuppliers);
+    } catch (error) {
+      console.error("Error loading suppliers:", error);
+    } finally {
+      setLoadingSuppliers(false);
+    }
+  };
+
+  const openInvoiceBookModal = () => {
+    loadSuppliers();
+    setInvoiceBookFilters({
+      supplierId: "",
+      supplierName: "",
+      dateFrom: "",
+      dateTo: "",
+      paymentStatus: "all",
+    });
+    setSupplierSearch("");
+    setShowSupplierDropdown(false);
+    setShowInvoiceBookModal(true);
+  };
+
+  const selectSupplier = (supplier: Supplier) => {
+    setInvoiceBookFilters({
+      ...invoiceBookFilters,
+      supplierId: supplier.id,
+      supplierName: supplier.fiscalName,
+    });
+    setSupplierSearch(supplier.fiscalName);
+    setShowSupplierDropdown(false);
+  };
+
+  const clearSupplier = () => {
+    setInvoiceBookFilters({
+      ...invoiceBookFilters,
+      supplierId: "",
+      supplierName: "",
+    });
+    setSupplierSearch("");
+  };
+
+  const filteredSuppliers = supplierSearch.length >= 2
+    ? suppliers.filter(s => 
+        s.fiscalName.toLowerCase().includes(supplierSearch.toLowerCase()) ||
+        (s.commercialName && s.commercialName.toLowerCase().includes(supplierSearch.toLowerCase())) ||
+        (s.taxId && s.taxId.toLowerCase().includes(supplierSearch.toLowerCase()))
+      ).slice(0, 10)
+    : [];
 
   const openConfig = (reportType: ReportType) => {
     setConfigReportType(reportType);
@@ -677,13 +767,51 @@ export default function ReportsPage() {
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
-  const generateInvoicesAccountingReport = async (columns: SelectedColumn[]) => {
+  const generateInvoicesAccountingReport = async (columns: SelectedColumn[], filters?: InvoiceBookFilters) => {
     setGenerating("invoices_accounting");
     try {
-      const invoicesSnapshot = await getDocs(query(collection(db, `projects/${id}/invoices`), orderBy("accountedAt", "desc")));
+      const invoicesSnapshot = await getDocs(query(collection(db, `projects/${id}/invoices`), orderBy("invoiceDate", "desc")));
       const rows: string[][] = [columns.map(col => col.isBlank ? "" : col.label)];
-      const accountedInvoices = invoicesSnapshot.docs.filter(doc => doc.data().accounted === true);
-      accountedInvoices.forEach((docSnap) => {
+      
+      let filteredInvoices = invoicesSnapshot.docs;
+      
+      // Apply filters if provided
+      if (filters) {
+        filteredInvoices = filteredInvoices.filter(docSnap => {
+          const data = docSnap.data();
+          
+          // Supplier filter
+          if (filters.supplierId && data.supplierId !== filters.supplierId) return false;
+          
+          // Date range filter
+          if (filters.dateFrom || filters.dateTo) {
+            const invoiceDate = data.invoiceDate?.toDate ? data.invoiceDate.toDate() : null;
+            if (!invoiceDate) return false;
+            
+            if (filters.dateFrom) {
+              const fromDate = new Date(filters.dateFrom);
+              fromDate.setHours(0, 0, 0, 0);
+              if (invoiceDate < fromDate) return false;
+            }
+            if (filters.dateTo) {
+              const toDate = new Date(filters.dateTo);
+              toDate.setHours(23, 59, 59, 999);
+              if (invoiceDate > toDate) return false;
+            }
+          }
+          
+          // Payment status filter
+          if (filters.paymentStatus === "paid" && data.status !== "paid") return false;
+          if (filters.paymentStatus === "pending" && data.status === "paid") return false;
+          
+          return true;
+        });
+      } else {
+        // Without filters, only show accounted invoices (original behavior)
+        filteredInvoices = filteredInvoices.filter(doc => doc.data().accounted === true);
+      }
+      
+      filteredInvoices.forEach((docSnap) => {
         const data = docSnap.data();
         const items = data.items || [];
         const accountCode = items.length > 0 ? (items[0].subAccountCode || "") : "";
@@ -701,7 +829,16 @@ export default function ReportsPage() {
         };
         rows.push(columns.map(col => { if (col.isBlank) return ""; const val = rowData[col.originalId]; return typeof val === "number" ? formatCurrency(val) : val?.toString() || ""; }));
       });
-      downloadCSV(rows, `Libro_Facturas_${projectName}_${getCurrentDate()}.csv`);
+      
+      // Build filename
+      let filename = `Libro_Facturas`;
+      if (filters?.supplierName) filename += `_${filters.supplierName.replace(/[^a-zA-Z0-9]/g, "_")}`;
+      if (filters?.dateFrom) filename += `_desde_${filters.dateFrom}`;
+      if (filters?.dateTo) filename += `_hasta_${filters.dateTo}`;
+      filename += `_${getCurrentDate()}.csv`;
+      
+      downloadCSV(rows, filename);
+      setShowInvoiceBookModal(false);
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
@@ -960,7 +1097,11 @@ export default function ReportsPage() {
                           <button onClick={() => openConfig(reportType)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Configurar columnas">
                             <Settings2 size={16} />
                           </button>
-                          <button onClick={() => generateReport(reportType)} disabled={generating !== null} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 transition-colors disabled:opacity-50">
+                          <button 
+                            onClick={() => reportType === "invoices_accounting" ? openInvoiceBookModal() : generateReport(reportType)} 
+                            disabled={generating !== null} 
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
+                          >
                             {generating === reportType ? (<><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /><span>...</span></>) : (<><Download size={12} />Exportar</>)}
                           </button>
                           {reportPresets.length > 0 && (
@@ -1074,6 +1215,186 @@ export default function ReportsPage() {
                   <button onClick={savePreset} disabled={!newPresetName.trim()} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}><Check size={14} />Guardar</button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Book Modal */}
+      {showInvoiceBookModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowInvoiceBookModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+                  <BookMarked size={20} className="text-indigo-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Libro de facturas</h3>
+                  <p className="text-xs text-slate-500">Selecciona los filtros para el informe</p>
+                </div>
+              </div>
+              <button onClick={() => setShowInvoiceBookModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* Supplier search */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Proveedor</label>
+                <div className="relative">
+                  <div className="relative">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={supplierSearch}
+                      onChange={(e) => {
+                        setSupplierSearch(e.target.value);
+                        setShowSupplierDropdown(true);
+                        if (e.target.value !== invoiceBookFilters.supplierName) {
+                          setInvoiceBookFilters({ ...invoiceBookFilters, supplierId: "", supplierName: "" });
+                        }
+                      }}
+                      onFocus={() => setShowSupplierDropdown(true)}
+                      placeholder="Buscar proveedor (mín. 2 caracteres)..."
+                      className="w-full pl-10 pr-10 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                    />
+                    {invoiceBookFilters.supplierId && (
+                      <button onClick={clearSupplier} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600">
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Dropdown */}
+                  {showSupplierDropdown && supplierSearch.length >= 2 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                      {loadingSuppliers ? (
+                        <div className="px-4 py-3 text-sm text-slate-500 text-center">Cargando...</div>
+                      ) : filteredSuppliers.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-slate-500 text-center">No se encontraron proveedores</div>
+                      ) : (
+                        filteredSuppliers.map(supplier => (
+                          <button
+                            key={supplier.id}
+                            onClick={() => selectSupplier(supplier)}
+                            className="w-full px-4 py-2.5 text-left hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0"
+                          >
+                            <p className="text-sm font-medium text-slate-900">{supplier.fiscalName}</p>
+                            {(supplier.commercialName || supplier.taxId) && (
+                              <p className="text-xs text-slate-500">
+                                {[supplier.commercialName, supplier.taxId].filter(Boolean).join(" · ")}
+                              </p>
+                            )}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+                {invoiceBookFilters.supplierId && (
+                  <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                    <Check size={12} />
+                    Proveedor seleccionado
+                  </p>
+                )}
+              </div>
+
+              {/* Date range */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Desde</label>
+                  <div className="relative">
+                    <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="date"
+                      value={invoiceBookFilters.dateFrom}
+                      onChange={(e) => setInvoiceBookFilters({ ...invoiceBookFilters, dateFrom: e.target.value })}
+                      className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Hasta</label>
+                  <div className="relative">
+                    <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="date"
+                      value={invoiceBookFilters.dateTo}
+                      onChange={(e) => setInvoiceBookFilters({ ...invoiceBookFilters, dateTo: e.target.value })}
+                      className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment status */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Estado de pago</label>
+                <div className="flex gap-2">
+                  {[
+                    { value: "all", label: "Todas" },
+                    { value: "paid", label: "Pagadas" },
+                    { value: "pending", label: "Pendientes" },
+                  ].map(option => (
+                    <button
+                      key={option.value}
+                      onClick={() => setInvoiceBookFilters({ ...invoiceBookFilters, paymentStatus: option.value as "all" | "paid" | "pending" })}
+                      className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                        invoiceBookFilters.paymentStatus === option.value
+                          ? "bg-indigo-100 text-indigo-700 border-2 border-indigo-200"
+                          : "bg-slate-100 text-slate-600 border-2 border-transparent hover:bg-slate-200"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Info box */}
+              <div className="bg-slate-50 rounded-xl p-4">
+                <p className="text-xs text-slate-500">
+                  {!invoiceBookFilters.supplierId && !invoiceBookFilters.dateFrom && !invoiceBookFilters.dateTo ? (
+                    "Sin filtros seleccionados. Se exportarán todas las facturas."
+                  ) : (
+                    <>
+                      Se exportarán las facturas
+                      {invoiceBookFilters.supplierName && <span className="font-medium text-slate-700"> de {invoiceBookFilters.supplierName}</span>}
+                      {invoiceBookFilters.dateFrom && <span className="font-medium text-slate-700"> desde {invoiceBookFilters.dateFrom}</span>}
+                      {invoiceBookFilters.dateTo && <span className="font-medium text-slate-700"> hasta {invoiceBookFilters.dateTo}</span>}
+                      {invoiceBookFilters.paymentStatus !== "all" && (
+                        <span className="font-medium text-slate-700">
+                          {invoiceBookFilters.paymentStatus === "paid" ? " (solo pagadas)" : " (solo pendientes)"}
+                        </span>
+                      )}
+                      .
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex gap-3">
+              <button
+                onClick={() => setShowInvoiceBookModal(false)}
+                className="flex-1 px-4 py-2.5 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => generateInvoicesAccountingReport(getDefaultColumns("invoices_accounting"), invoiceBookFilters)}
+                disabled={generating !== null}
+                className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                style={{ backgroundColor: "#2F52E0" }}
+              >
+                {generating === "invoices_accounting" ? (
+                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Generando...</>
+                ) : (
+                  <><Download size={16} />Exportar CSV</>
+                )}
+              </button>
             </div>
           </div>
         </div>
