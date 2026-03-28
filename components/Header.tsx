@@ -127,14 +127,17 @@ export default function Header() {
           }
 
           const accessLevel = memberData.accountingAccessLevel || "user";
+          const boxAccess = memberData.boxAccess || false; // Lee boxAccess directamente
+          
           const accessLevels = {
-            visitor: { panel: true, suppliers: false, budget: false, users: false, reports: false, box: true },
-            user: { panel: true, suppliers: true, budget: false, users: false, reports: false, box: false },
-            accounting: { panel: true, suppliers: true, budget: false, users: false, reports: true, box: true },
-            accounting_extended: { panel: true, suppliers: true, budget: true, users: true, reports: true, box: true },
+            visitor: { panel: true, suppliers: false, budget: false, users: false, reports: false },
+            user: { panel: true, suppliers: true, budget: false, users: false, reports: false },
+            accounting: { panel: true, suppliers: true, budget: false, users: false, reports: true },
+            accounting_extended: { panel: true, suppliers: true, budget: true, users: true, reports: true },
           };
 
-          setAccountingAccess(accessLevels[accessLevel as keyof typeof accessLevels] || accessLevels.user);
+          const levelAccess = accessLevels[accessLevel as keyof typeof accessLevels] || accessLevels.user;
+          setAccountingAccess({ ...levelAccess, box: boxAccess }); // BOX viene del campo independiente
         } else {
           setAccountingAccess({ panel: false, suppliers: false, budget: false, users: false, reports: false, box: false });
         }
