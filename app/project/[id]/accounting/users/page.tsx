@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { UserCog, UserPlus, Search, Trash2, Shield, X, AlertCircle, CheckCircle2, UserCheck, UserX, Clock, Info, Edit, Briefcase, Users, ChevronDown } from "lucide-react";
+import { UserCog, UserPlus, Search, Trash2, Shield, X, AlertCircle, CheckCircle2, UserCheck, UserX, Clock, Info, Edit, Briefcase, Users, ChevronDown, Package } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, updateDoc, query, where, Timestamp } from "firebase/firestore";
@@ -20,8 +20,8 @@ const ACCOUNTING_ACCESS_LEVELS = {
   accounting_extended: { label: "Contabilidad ampliada", description: "Acceso completo", permissions: { panel: true, suppliers: true, budget: true, users: true, reports: true }, color: "bg-purple-50 text-purple-700", dot: "bg-purple-500" },
 };
 
-interface Member { userId: string; name: string; email: string; role?: string; department?: string; position?: string; permissions: { config: boolean; accounting: boolean; team: boolean }; accountingAccessLevel?: "visitor" | "user" | "accounting" | "accounting_extended"; addedAt: any; addedBy?: string; addedByName?: string; }
-interface PendingInvitation { id: string; invitedEmail: string; invitedName: string; roleType: "project" | "department"; role?: string; department?: string; position?: string; status: string; createdAt: any; invitedBy: string; invitedByName: string; accountingAccessLevel?: "visitor" | "user" | "accounting" | "accounting_extended"; }
+interface Member { userId: string; name: string; email: string; role?: string; department?: string; position?: string; permissions: { config: boolean; accounting: boolean; team: boolean }; accountingAccessLevel?: "visitor" | "user" | "accounting" | "accounting_extended"; boxAccess?: boolean; addedAt: any; addedBy?: string; addedByName?: string; }
+interface PendingInvitation { id: string; invitedEmail: string; invitedName: string; roleType: "project" | "department"; role?: string; department?: string; position?: string; status: string; createdAt: any; invitedBy: string; invitedByName: string; accountingAccessLevel?: "visitor" | "user" | "accounting" | "accounting_extended"; boxAccess?: boolean; }
 interface Department { name: string; }
 
 export default function AccountingUsersPage() {
@@ -50,6 +50,7 @@ export default function AccountingUsersPage() {
   const [inviteForm, setInviteForm] = useState({
     email: "", name: "", roleType: "project" as "project" | "department", role: "", department: "", position: "",
     accountingAccessLevel: "user" as "visitor" | "user" | "accounting" | "accounting_extended",
+    boxAccess: false,
   });
 
   // Dropdowns personalizados
@@ -116,7 +117,7 @@ export default function AccountingUsersPage() {
         const membersSnap = await getDocs(membersRef);
         const membersData: Member[] = membersSnap.docs.map((memberDoc) => {
           const data = memberDoc.data();
-          return { userId: memberDoc.id, name: data.name, email: data.email, role: data.role, department: data.department, position: data.position, permissions: data.permissions || { config: false, accounting: false, team: false }, accountingAccessLevel: data.accountingAccessLevel || "user", addedAt: data.addedAt, addedBy: data.addedBy, addedByName: data.addedByName };
+          return { userId: memberDoc.id, name: data.name, email: data.email, role: data.role, department: data.department, position: data.position, permissions: data.permissions || { config: false, accounting: false, team: false }, accountingAccessLevel: data.accountingAccessLevel || "user", boxAccess: data.boxAccess || false, addedAt: data.addedAt, addedBy: data.addedBy, addedByName: data.addedByName };
         });
         setMembers(membersData);
         setAccountingMembers(membersData.filter((m) => m.permissions.accounting));
@@ -126,7 +127,7 @@ export default function AccountingUsersPage() {
         const invitationsSnap = await getDocs(q);
         const invitationsData: PendingInvitation[] = invitationsSnap.docs.map((invDoc) => {
           const data = invDoc.data();
-          return { id: invDoc.id, invitedEmail: data.invitedEmail, invitedName: data.invitedName, roleType: data.roleType || "project", role: data.role, department: data.department, position: data.position, status: data.status, createdAt: data.createdAt, invitedBy: data.invitedBy, invitedByName: data.invitedByName, permissions: data.permissions, accountingAccessLevel: data.accountingAccessLevel || "user" };
+          return { id: invDoc.id, invitedEmail: data.invitedEmail, invitedName: data.invitedName, roleType: data.roleType || "project", role: data.role, department: data.department, position: data.position, status: data.status, createdAt: data.createdAt, invitedBy: data.invitedBy, invitedByName: data.invitedByName, permissions: data.permissions, accountingAccessLevel: data.accountingAccessLevel || "user", boxAccess: data.boxAccess || false };
         }).filter((inv: any) => inv.permissions?.accounting === true);
         setPendingInvitations(invitationsData);
         setLoading(false);
@@ -161,12 +162,12 @@ export default function AccountingUsersPage() {
       if (existingMember) { setErrorMessage("Este usuario ya tiene acceso a contabilidad"); setSaving(false); setTimeout(() => setErrorMessage(""), 3000); return; }
       const memberWithoutAccounting = members.find((m) => m.email === email && !m.permissions.accounting);
       if (memberWithoutAccounting) {
-        await updateDoc(doc(db, `projects/${id}/members`, memberWithoutAccounting.userId), { "permissions.accounting": true, accountingAccessLevel: inviteForm.accountingAccessLevel });
-        await updateDoc(doc(db, `userProjects/${memberWithoutAccounting.userId}/projects`, id as string), { "permissions.accounting": true, accountingAccessLevel: inviteForm.accountingAccessLevel });
+        await updateDoc(doc(db, `projects/${id}/members`, memberWithoutAccounting.userId), { "permissions.accounting": true, accountingAccessLevel: inviteForm.accountingAccessLevel, boxAccess: inviteForm.boxAccess });
+        await updateDoc(doc(db, `userProjects/${memberWithoutAccounting.userId}/projects`, id as string), { "permissions.accounting": true, accountingAccessLevel: inviteForm.accountingAccessLevel, boxAccess: inviteForm.boxAccess });
         setSuccessMessage(`Permiso de contabilidad añadido a ${memberWithoutAccounting.name}`); setTimeout(() => setSuccessMessage(""), 3000);
         const membersRef = collection(db, `projects/${id}/members`);
         const membersSnap = await getDocs(membersRef);
-        const membersData: Member[] = membersSnap.docs.map((memberDoc) => { const data = memberDoc.data(); return { userId: memberDoc.id, name: data.name, email: data.email, role: data.role, department: data.department, position: data.position, permissions: data.permissions || { config: false, accounting: false, team: false }, accountingAccessLevel: data.accountingAccessLevel || "user", addedAt: data.addedAt, addedBy: data.addedBy, addedByName: data.addedByName }; });
+        const membersData: Member[] = membersSnap.docs.map((memberDoc) => { const data = memberDoc.data(); return { userId: memberDoc.id, name: data.name, email: data.email, role: data.role, department: data.department, position: data.position, permissions: data.permissions || { config: false, accounting: false, team: false }, accountingAccessLevel: data.accountingAccessLevel || "user", boxAccess: data.boxAccess || false, addedAt: data.addedAt, addedBy: data.addedBy, addedByName: data.addedByName }; });
         setMembers(membersData); setAccountingMembers(membersData.filter((m) => m.permissions.accounting)); setShowInviteModal(false); resetForm(); setSaving(false); return;
       }
       const existingInvite = pendingInvitations.find((inv) => inv.invitedEmail === email);
@@ -176,7 +177,7 @@ export default function AccountingUsersPage() {
       const usersSnap = await getDocs(q);
       let invitedUserId: string | null = null;
       if (!usersSnap.empty) invitedUserId = usersSnap.docs[0].id;
-      const inviteData: any = { projectId: id, projectName: projectName, invitedEmail: email, invitedName: inviteForm.name.trim(), invitedUserId: invitedUserId, invitedBy: userId, invitedByName: userName, status: "pending", createdAt: Timestamp.now(), expiresAt: Timestamp.fromDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)), roleType: inviteForm.roleType, accountingAccessLevel: inviteForm.accountingAccessLevel };
+      const inviteData: any = { projectId: id, projectName: projectName, invitedEmail: email, invitedName: inviteForm.name.trim(), invitedUserId: invitedUserId, invitedBy: userId, invitedByName: userName, status: "pending", createdAt: Timestamp.now(), expiresAt: Timestamp.fromDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)), roleType: inviteForm.roleType, accountingAccessLevel: inviteForm.accountingAccessLevel, boxAccess: inviteForm.boxAccess };
       if (inviteForm.roleType === "project") { inviteData.role = inviteForm.role; inviteData.permissions = { config: false, accounting: true, team: false }; }
       else { inviteData.department = inviteForm.department; inviteData.position = inviteForm.position; inviteData.permissions = { config: false, accounting: true, team: false }; }
       await setDoc(doc(collection(db, "invitations")), inviteData);
@@ -184,7 +185,7 @@ export default function AccountingUsersPage() {
       const invitationsRef = collection(db, "invitations");
       const invQuery = query(invitationsRef, where("projectId", "==", id), where("status", "==", "pending"));
       const invitationsSnap = await getDocs(invQuery);
-      const invitationsData: PendingInvitation[] = invitationsSnap.docs.map((invDoc) => { const data = invDoc.data(); return { id: invDoc.id, invitedEmail: data.invitedEmail, invitedName: data.invitedName, roleType: data.roleType || "project", role: data.role, department: data.department, position: data.position, status: data.status, createdAt: data.createdAt, invitedBy: data.invitedBy, invitedByName: data.invitedByName, permissions: data.permissions, accountingAccessLevel: data.accountingAccessLevel || "user" }; }).filter((inv: any) => inv.permissions?.accounting === true);
+      const invitationsData: PendingInvitation[] = invitationsSnap.docs.map((invDoc) => { const data = invDoc.data(); return { id: invDoc.id, invitedEmail: data.invitedEmail, invitedName: data.invitedName, roleType: data.roleType || "project", role: data.role, department: data.department, position: data.position, status: data.status, createdAt: data.createdAt, invitedBy: data.invitedBy, invitedByName: data.invitedByName, permissions: data.permissions, accountingAccessLevel: data.accountingAccessLevel || "user", boxAccess: data.boxAccess || false }; }).filter((inv: any) => inv.permissions?.accounting === true);
       setPendingInvitations(invitationsData); resetForm(); setShowInviteModal(false);
     } catch (error) { console.error("Error enviando invitación:", error); setErrorMessage("Error al enviar la invitación"); setTimeout(() => setErrorMessage(""), 3000); } finally { setSaving(false); }
   };
@@ -194,9 +195,10 @@ export default function AccountingUsersPage() {
     setSaving(true);
     try {
       const newAccessLevel = editingMember.accountingAccessLevel || "user";
-      await updateDoc(doc(db, `projects/${id}/members`, editingMember.userId), { accountingAccessLevel: newAccessLevel });
-      await updateDoc(doc(db, `userProjects/${editingMember.userId}/projects`, id as string), { accountingAccessLevel: newAccessLevel });
-      setAccountingMembers(accountingMembers.map((m) => (m.userId === editingMember.userId ? { ...m, accountingAccessLevel: newAccessLevel } : m)));
+      const newBoxAccess = editingMember.boxAccess || false;
+      await updateDoc(doc(db, `projects/${id}/members`, editingMember.userId), { accountingAccessLevel: newAccessLevel, boxAccess: newBoxAccess });
+      await updateDoc(doc(db, `userProjects/${editingMember.userId}/projects`, id as string), { accountingAccessLevel: newAccessLevel, boxAccess: newBoxAccess });
+      setAccountingMembers(accountingMembers.map((m) => (m.userId === editingMember.userId ? { ...m, accountingAccessLevel: newAccessLevel, boxAccess: newBoxAccess } : m)));
       setSuccessMessage("Nivel de acceso actualizado correctamente"); setTimeout(() => setSuccessMessage(""), 3000); setShowEditAccessModal(false); setEditingMember(null);
     } catch (error) { console.error("Error actualizando acceso:", error); setErrorMessage("Error al actualizar el nivel de acceso"); setTimeout(() => setErrorMessage(""), 3000); } finally { setSaving(false); }
   };
@@ -211,15 +213,15 @@ export default function AccountingUsersPage() {
     if (!confirm(`¿Quitar acceso a contabilidad de ${member.name || member.email}?`)) return;
     setSaving(true);
     try {
-      await updateDoc(doc(db, `projects/${id}/members`, member.userId), { "permissions.accounting": false, accountingAccessLevel: null });
-      await updateDoc(doc(db, `userProjects/${member.userId}/projects`, id as string), { "permissions.accounting": false, accountingAccessLevel: null });
+      await updateDoc(doc(db, `projects/${id}/members`, member.userId), { "permissions.accounting": false, accountingAccessLevel: null, boxAccess: null });
+      await updateDoc(doc(db, `userProjects/${member.userId}/projects`, id as string), { "permissions.accounting": false, accountingAccessLevel: null, boxAccess: null });
       setAccountingMembers(accountingMembers.filter((m) => m.userId !== member.userId));
-      setMembers(members.map((m) => (m.userId === member.userId ? { ...m, permissions: { ...m.permissions, accounting: false }, accountingAccessLevel: undefined } : m)));
+      setMembers(members.map((m) => (m.userId === member.userId ? { ...m, permissions: { ...m.permissions, accounting: false }, accountingAccessLevel: undefined, boxAccess: undefined } : m)));
       setSuccessMessage("Acceso eliminado correctamente"); setTimeout(() => setSuccessMessage(""), 3000);
     } catch (error) { console.error("Error eliminando acceso:", error); setErrorMessage("Error al eliminar el acceso"); setTimeout(() => setErrorMessage(""), 3000); } finally { setSaving(false); }
   };
 
-  const resetForm = () => { setInviteForm({ email: "", name: "", roleType: "project", role: "", department: "", position: "", accountingAccessLevel: "user" }); setUserExists(null); setFoundUser(null); };
+  const resetForm = () => { setInviteForm({ email: "", name: "", roleType: "project", role: "", department: "", position: "", accountingAccessLevel: "user", boxAccess: false }); setUserExists(null); setFoundUser(null); };
 
   const filteredMembers = accountingMembers.filter((member) => member.name.toLowerCase().includes(searchTerm.toLowerCase()) || member.email.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -328,6 +330,11 @@ export default function AccountingUsersPage() {
                           <div className="flex items-center gap-2 mt-2">
                             {getAccessLevelDot(member.accountingAccessLevel)}
                             {getAccessLevelBadge(member.accountingAccessLevel)}
+                            {member.boxAccess && (
+                              <span className="flex items-center gap-1 text-[10px] font-medium bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                                <Package size={10} />BOX
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -365,6 +372,11 @@ export default function AccountingUsersPage() {
                           <div className="flex items-center gap-2 mt-2">
                             {getAccessLevelDot(member.accountingAccessLevel)}
                             {getAccessLevelBadge(member.accountingAccessLevel)}
+                            {member.boxAccess && (
+                              <span className="flex items-center gap-1 text-[10px] font-medium bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                                <Package size={10} />BOX
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -401,6 +413,11 @@ export default function AccountingUsersPage() {
                           <div className="flex items-center gap-2 mt-2">
                             {getAccessLevelDot(member.accountingAccessLevel)}
                             {getAccessLevelBadge(member.accountingAccessLevel)}
+                            {member.boxAccess && (
+                              <span className="flex items-center gap-1 text-[10px] font-medium bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                                <Package size={10} />BOX
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -433,7 +450,7 @@ export default function AccountingUsersPage() {
                 <p className="text-base font-semibold text-slate-900">{editingMember.name}</p>
                 <p className="text-xs text-slate-500">{editingMember.email}</p>
               </div>
-              <div className="space-y-3 mb-6">
+              <div className="space-y-3 mb-4">
                 <p className="text-sm font-medium text-slate-700">Seleccionar nivel</p>
                 {Object.entries(ACCOUNTING_ACCESS_LEVELS).map(([key, value]) => (
                   <label key={key} className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-all ${editingMember.accountingAccessLevel === key ? "border-slate-900 bg-slate-50" : "border-slate-200 hover:border-slate-300"}`}>
@@ -444,6 +461,20 @@ export default function AccountingUsersPage() {
                     </div>
                   </label>
                 ))}
+              </div>
+              <div className="mb-6">
+                <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-xl cursor-pointer hover:border-slate-300 transition-all">
+                  <input
+                    type="checkbox"
+                    checked={editingMember.boxAccess || false}
+                    onChange={(e) => setEditingMember({ ...editingMember, boxAccess: e.target.checked })}
+                    className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-slate-900">Acceso a BOX</p>
+                    <p className="text-xs text-slate-500">Permite ver y gestionar gastos de tarjetas y transferencias</p>
+                  </div>
+                </label>
               </div>
               <div className="flex gap-3">
                 <button onClick={() => { setShowEditAccessModal(false); setEditingMember(null); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium">Cancelar</button>
@@ -490,6 +521,20 @@ export default function AccountingUsersPage() {
                       </label>
                     ))}
                   </div>
+                </div>
+                <div>
+                  <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-xl cursor-pointer hover:border-slate-300 transition-all">
+                    <input
+                      type="checkbox"
+                      checked={inviteForm.boxAccess}
+                      onChange={(e) => setInviteForm({ ...inviteForm, boxAccess: e.target.checked })}
+                      className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-slate-900">Acceso a BOX</p>
+                      <p className="text-xs text-slate-500">Permite ver y gestionar gastos de tarjetas y transferencias</p>
+                    </div>
+                  </label>
                 </div>
                 <div ref={roleTypeDropdownRef} className="relative">
                   <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de rol</label>
