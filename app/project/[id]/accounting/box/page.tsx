@@ -2713,10 +2713,23 @@ export default function BoxesPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Código *</label>
-                <input type="text" value={boxForm.code}
-                  onChange={e => setBoxForm({ ...boxForm, code: e.target.value.toUpperCase().slice(0, 3) })}
-                  placeholder="Ej: LG" maxLength={3}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono uppercase" />
+                {(() => {
+                  const isDuplicate = boxForm.code.trim().length > 0 && boxes.some(b => b.code.toUpperCase() === boxForm.code.toUpperCase());
+                  return (
+                    <>
+                      <input type="text" value={boxForm.code}
+                        onChange={e => setBoxForm({ ...boxForm, code: e.target.value.toUpperCase().slice(0, 3) })}
+                        placeholder="Ej: LG" maxLength={3}
+                        className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 font-mono uppercase transition-colors ${isDuplicate ? "border-red-400 bg-red-50 focus:ring-red-400" : "border-slate-200 focus:ring-slate-900"}`} />
+                      {isDuplicate && (
+                        <p className="flex items-center gap-1.5 mt-1.5 text-xs text-red-600 font-medium">
+                          <AlertCircle size={12} />
+                          Este código ya está en uso — no se pueden repetir siglas
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
               <div ref={departmentDropdownRef} className="relative">
                 <label className="block text-sm font-medium text-slate-700 mb-2">Departamento</label>
@@ -2739,7 +2752,8 @@ export default function BoxesPage() {
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
               <button onClick={() => setShowCreateBoxModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
-              <button onClick={handleCreateBox} disabled={saving || !boxForm.name.trim() || !boxForm.code.trim()}
+              <button onClick={handleCreateBox}
+                disabled={saving || !boxForm.name.trim() || !boxForm.code.trim() || boxes.some(b => b.code.toUpperCase() === boxForm.code.toUpperCase())}
                 className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
                 {saving ? "Creando..." : "Crear caja"}
               </button>
@@ -2766,15 +2780,29 @@ export default function BoxesPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Código *</label>
-                <input type="text" value={editBoxForm.code}
-                  onChange={e => setEditBoxForm({ ...editBoxForm, code: e.target.value.toUpperCase().slice(0, 3) })}
-                  maxLength={3}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono uppercase" />
+                {(() => {
+                  const isDuplicate = editBoxForm.code.trim().length > 0 &&
+                    boxes.some(b => b.id !== selectedBox.id && b.code.toUpperCase() === editBoxForm.code.toUpperCase());
+                  return (
+                    <>
+                      <input type="text" value={editBoxForm.code}
+                        onChange={e => setEditBoxForm({ ...editBoxForm, code: e.target.value.toUpperCase().slice(0, 3) })}
+                        maxLength={3}
+                        className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 font-mono uppercase transition-colors ${isDuplicate ? "border-red-400 bg-red-50 focus:ring-red-400" : "border-slate-200 focus:ring-slate-900"}`} />
+                      {isDuplicate && (
+                        <p className="flex items-center gap-1.5 mt-1.5 text-xs text-red-600 font-medium">
+                          <AlertCircle size={12} />
+                          Este código ya está en uso — no se pueden repetir siglas
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
               <button onClick={() => setShowEditBoxModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
-              <button onClick={handleEditBox} disabled={saving || !editBoxForm.name.trim() || !editBoxForm.code.trim()}
+              <button onClick={handleEditBox} disabled={saving || !editBoxForm.name.trim() || !editBoxForm.code.trim() || boxes.some(b => b.id !== selectedBox.id && b.code.toUpperCase() === editBoxForm.code.toUpperCase())}
                 className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
                 {saving ? "Guardando..." : "Guardar"}
               </button>
