@@ -234,6 +234,34 @@ export default function NewPOPage() {
   const departmentDropdownRef = useRef<HTMLDivElement>(null);
   const currencyDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Generador de título
+  const [showTitleBuilder, setShowTitleBuilder] = useState(false);
+  const [titleConcept, setTitleConcept] = useState("");
+  const [titleReference, setTitleReference] = useState("");
+
+  const TITLE_SUGGESTIONS: Record<string, string[]> = {
+    rental:   ["ALQUILER CÁMARA", "ALQUILER ÓPTICA", "ALQUILER VEHÍCULO", "ALQUILER LOCALIZACIÓN", "ALQUILER EQUIPO LUZ", "ALQUILER SONIDO", "ALQUILER GRÚA"],
+    purchase: ["COMPRA ATREZZO", "COMPRA VESTUARIO", "COMPRA MATERIAL", "COMPRA CONSUMIBLES", "COMPRA MAQUILLAJE", "COMPRA UTILERÍA"],
+    service:  ["SERVICIOS PRODUCCIÓN", "SERVICIOS DIRECCIÓN", "CATERING", "TRANSPORTE", "SEGURIDAD", "LIMPIEZA", "POSTPRODUCCIÓN"],
+    deposit:  ["FIANZA LOCALIZACIÓN", "FIANZA VEHÍCULO", "FIANZA ESPACIO", "FIANZA EQUIPO"],
+  };
+
+  const titlePreview =
+    titleConcept && titleReference
+      ? `${titleConcept.toUpperCase()} · ${titleReference.toUpperCase()}`
+      : titleConcept
+      ? titleConcept.toUpperCase()
+      : "";
+
+  const applyTitle = () => {
+    if (!titlePreview) return;
+    setFormData((prev) => ({ ...prev, generalDescription: titlePreview }));
+    setTouched((prev) => ({ ...prev, generalDescription: true }));
+    setShowTitleBuilder(false);
+    setTitleConcept("");
+    setTitleReference("");
+  };
+
   // Configuración de episodios
   const [episodesEnabled, setEpisodesEnabled] = useState(false);
   const [episodesRequired, setEpisodesRequired] = useState(false);
@@ -1352,14 +1380,98 @@ export default function NewPOPage() {
 
                 {/* Descripción general */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Descripción general *</label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-slate-700">Descripción general *</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowTitleBuilder(!showTitleBuilder)}
+                      className={cx(
+                        "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all border",
+                        showTitleBuilder
+                          ? "bg-slate-900 text-white border-slate-900"
+                          : "text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700 bg-white"
+                      )}
+                    >
+                      <Layers size={11} />
+                      Generador
+                    </button>
+                  </div>
+
+                  {/* Generador de título */}
+                  {showTitleBuilder && (
+                    <div className="mb-3 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                      {/* Sugerencias de concepto */}
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Concepto</p>
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {TITLE_SUGGESTIONS[formData.poType]?.map((s) => (
+                            <button
+                              key={s}
+                              type="button"
+                              onClick={() => setTitleConcept(s)}
+                              className={cx(
+                                "px-2.5 py-1 rounded-lg text-xs font-medium transition-all border",
+                                titleConcept === s
+                                  ? "bg-slate-900 text-white border-slate-900"
+                                  : "bg-white border-slate-200 text-slate-600 hover:border-slate-400"
+                              )}
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          type="text"
+                          value={titleConcept}
+                          onChange={(e) => setTitleConcept(e.target.value.toUpperCase())}
+                          placeholder="O escribe el concepto..."
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-400 uppercase placeholder:normal-case"
+                        />
+                      </div>
+
+                      {/* Referencia */}
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Referencia <span className="text-slate-400 normal-case font-normal">(set, personaje, elemento…)</span></p>
+                        <input
+                          type="text"
+                          value={titleReference}
+                          onChange={(e) => setTitleReference(e.target.value.toUpperCase())}
+                          placeholder="CASA AZUL · PERSONAJE · SECUENCIA..."
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-400 uppercase placeholder:normal-case"
+                        />
+                      </div>
+
+                      {/* Preview + acción */}
+                      <div className="flex items-center justify-between gap-3 pt-1">
+                        <div className="flex-1 min-w-0">
+                          {titlePreview ? (
+                            <p className="text-xs font-mono font-semibold text-slate-800 truncate bg-white border border-slate-200 px-3 py-2 rounded-lg">
+                              {titlePreview}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-slate-400 italic px-1">La previsualización aparece aquí</p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={applyTitle}
+                          disabled={!titlePreview}
+                          className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium disabled:opacity-40 hover:bg-slate-700 transition-colors flex-shrink-0"
+                        >
+                          <CheckCircle2 size={12} />
+                          Aplicar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="relative">
                     <textarea
                       value={formData.generalDescription}
                       onChange={(e) => setFormData({ ...formData, generalDescription: e.target.value.toUpperCase() })}
                       onBlur={() => handleBlur("generalDescription")}
                       placeholder="CONCEPTO DE LA ORDEN DE COMPRA"
-                      rows={3}
+                      rows={2}
                       className={cx(
                         "w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm pr-10 uppercase",
                         hasError("generalDescription") ? "border-red-300 bg-red-50" : isValid("generalDescription") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"
