@@ -85,6 +85,8 @@ const PAYMENT_METHODS: Record<string, string> = {
   direct_debit: "Domiciliación",
 };
 
+const STATUS_FALLBACK = { bg: "bg-slate-100", text: "text-slate-600", label: "Sin estado" };
+
 const STATUS_CONFIG: Record<InvoiceStatus, { bg: string; text: string; label: string }> = {
   pending_approval: { bg: "bg-amber-50",   text: "text-amber-700",   label: "Pte. aprobación" },
   pending:          { bg: "bg-amber-50",   text: "text-amber-700",   label: "Pte. pago"        },
@@ -528,9 +530,9 @@ export default function DocumentCenterPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredInvoices.map(invoice => {
-                  const DocIcon = DOCUMENT_TYPES[invoice.documentType].icon;
+                  const DocIcon = DOCUMENT_TYPES[invoice.documentType]?.icon ?? FileText;
                   const isSelected = selectedIds.has(invoice.id);
-                  const sc = STATUS_CONFIG[invoice.status];
+                  const sc = STATUS_CONFIG[invoice.status] ?? STATUS_FALLBACK;
                   return (
                     <tr key={invoice.id} className={cx("hover:bg-slate-50 transition-colors", isSelected && "bg-blue-50")}>
                       <td className="px-4 py-4">
