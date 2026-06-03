@@ -25,16 +25,11 @@ import {
   BarChart3,
   Package,
 } from "lucide-react";
-import { Inter } from "next/font/google";
+import { inter } from "@/lib/fonts";
 import { auth, db } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { useUser } from "@/contexts/UserContext";
-
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-});
 
 // ── Accounts sub-nav items (no icons, no emojis) ───────────────────────────
 const ACCOUNTS_NAV = [

@@ -1,4 +1,4 @@
-import { doc, getDoc, getDocs, collection, updateDoc } from "firebase/firestore";
+import { doc, getDoc, getDocs, collection, runTransaction, DocumentReference } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { 
   getCostSettings, 
@@ -12,10 +12,35 @@ import {
 interface BudgetItem {
   subAccountId: string;
   baseAmount: number;
+  /**
+   * Importe ya realizado (facturado y contabilizado) de este item.
+   * Se usa en uncommitPO para no restar de committed lo que ya pasó a actual.
+   * Si se omite se asume 0 (comportamiento anterior).
+   */
+  invoicedAmount?: number;
 }
 
 /**
- * Busca y actualiza una subcuenta en el presupuesto
+ * Localiza la referencia de una subcuenta buscando en todas las cuentas del proyecto.
+ * Devuelve null si no existe.
+ */
+async function findSubAccountRef(
+  projectId: string,
+  subAccountId: string
+): Promise<DocumentReference | null> {
+  const accountsSnapshot = await getDocs(collection(db, `projects/${projectId}/accounts`));
+  for (const accountDoc of accountsSnapshot.docs) {
+    const ref = doc(db, `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`, subAccountId);
+    const snap = await getDoc(ref);
+    if (snap.exists()) return ref;
+  }
+  return null;
+}
+
+/**
+ * Busca y actualiza una subcuenta en el presupuesto usando una transacción atómica,
+ * eliminando la condición de carrera cuando dos usuarios modifican el mismo valor
+ * simultáneamente (p.ej. dos aprobaciones concurrentes de PO).
  */
 async function updateSubAccount(
   projectId: string,
@@ -23,52 +48,58 @@ async function updateSubAccount(
   updateFn: (currentData: { committed: number; actual: number }) => { committed: number; actual: number }
 ): Promise<boolean> {
   if (!subAccountId) return false;
-  
-  const accountsSnapshot = await getDocs(collection(db, `projects/${projectId}/accounts`));
-  
-  for (const accountDoc of accountsSnapshot.docs) {
-    try {
-      const subAccountRef = doc(
-        db,
-        `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`,
-        subAccountId
-      );
-      const subAccountSnap = await getDoc(subAccountRef);
-      
-      if (subAccountSnap.exists()) {
-        const data = subAccountSnap.data();
-        const currentCommitted = data.committed || 0;
-        const currentActual = data.actual || 0;
-        
-        const newValues = updateFn({ committed: currentCommitted, actual: currentActual });
-        
-        await updateDoc(subAccountRef, {
-          committed: Math.max(0, newValues.committed),
-          actual: Math.max(0, newValues.actual),
-        });
-        
-        return true;
-      }
-    } catch (e) {
-      console.error(`Error updating subaccount ${subAccountId}:`, e);
-    }
+
+  const ref = await findSubAccountRef(projectId, subAccountId);
+  if (!ref) return false;
+
+  try {
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) return;
+      const data = snap.data();
+      const newValues = updateFn({
+        committed: data.committed || 0,
+        actual: data.actual || 0,
+      });
+      tx.update(ref, {
+        committed: Math.max(0, newValues.committed),
+        actual: Math.max(0, newValues.actual),
+      });
+    });
+    return true;
+  } catch (e) {
+    console.error(`Error updating subaccount ${subAccountId}:`, e);
+    return false;
   }
-  
-  return false;
 }
 
 /**
- * Agrupa items por subAccountId y suma los importes
+ * Agrupa items por subAccountId y suma los importes base.
  */
 function groupAmountsByAccount(items: BudgetItem[]): Record<string, number> {
   const amounts: Record<string, number> = {};
-  
   for (const item of items) {
     if (item.subAccountId && item.baseAmount > 0) {
       amounts[item.subAccountId] = (amounts[item.subAccountId] || 0) + item.baseAmount;
     }
   }
-  
+  return amounts;
+}
+
+/**
+ * Agrupa por subAccountId el importe que todavía está en committed
+ * (baseAmount menos lo ya realizado/facturado).
+ * Evita restar de committed importes que ya pasaron a actual.
+ */
+function groupUncommittableAmounts(items: BudgetItem[]): Record<string, number> {
+  const amounts: Record<string, number> = {};
+  for (const item of items) {
+    if (!item.subAccountId) continue;
+    const uncommittable = Math.max(0, item.baseAmount - (item.invoicedAmount ?? 0));
+    if (uncommittable > 0) {
+      amounts[item.subAccountId] = (amounts[item.subAccountId] || 0) + uncommittable;
+    }
+  }
   return amounts;
 }
 
@@ -92,14 +123,18 @@ export async function commitPO(
 }
 
 /**
- * Descompromete presupuesto de una PO (resta de committed)
+ * Descompromete presupuesto de una PO (resta de committed).
+ *
+ * Solo resta la porción que aún no ha sido realizada: si un item tiene
+ * invoicedAmount > 0 esa parte ya pasó a actual mediante realizeInvoice y
+ * no debe volver a restarse de committed, evitando que el balance quede negativo.
  */
 export async function uncommitPO(
   projectId: string,
   poItems: BudgetItem[]
 ): Promise<void> {
-  const amountsByAccount = groupAmountsByAccount(poItems);
-  
+  const amountsByAccount = groupUncommittableAmounts(poItems);
+
   for (const [subAccountId, amount] of Object.entries(amountsByAccount)) {
     await updateSubAccount(projectId, subAccountId, (current) => ({
       committed: current.committed - amount,
@@ -109,10 +144,15 @@ export async function uncommitPO(
 }
 
 /**
- * Maneja el cambio de estado de una PO
- * - Si pasa a estado que debe comprometer → suma a committed
- * - Si pasa a rejected/cancelled → resta de committed
- * - Si tiene previousCommittedItems (edición de PO aprobada), hace la diferencia
+ * Maneja el cambio de estado de una PO:
+ * - Si pasa a estado que debe comprometer → suma a committed.
+ * - Si pasa a rejected/cancelled → resta de committed SOLO la porción no realizada.
+ * - Si tiene previousCommittedItems (edición de PO aprobada) → descompromete los
+ *   items anteriores (respetando invoicedAmount) y compromete los nuevos.
+ *
+ * IMPORTANTE para el caller en el caso de edición (previousCommittedItems):
+ * los items deben incluir el `invoicedAmount` actual de cada item para que
+ * uncommitPO no reste importes que ya pasaron a `actual` vía facturas pagadas.
  */
 export async function handlePOStatusChange(
   projectId: string,
@@ -122,23 +162,24 @@ export async function handlePOStatusChange(
   previousCommittedItems?: BudgetItem[] | null
 ): Promise<void> {
   const costSettings = await getCostSettings(projectId);
-  
-  // Caso especial: edición de PO que tenía comprometido anterior
+
+  // Caso especial: edición de PO que tenía comprometido anterior.
+  // previousCommittedItems DEBE llevar invoicedAmount por item para que
+  // uncommitPO solo reste la porción no realizada.
   if (previousCommittedItems && previousCommittedItems.length > 0 && newStatus === "approved") {
-    // Descomprometer los items anteriores
     await uncommitPO(projectId, previousCommittedItems);
-    // Comprometer los nuevos items
     await commitPO(projectId, poItems);
     return;
   }
-  
-  // ¿Hay que comprometer?
+
   if (shouldCommitOnStatusChange(oldStatus, newStatus, costSettings)) {
     await commitPO(projectId, poItems);
     return;
   }
-  
-  // ¿Hay que descomprometer?
+
+  // Al cancelar/rechazar, poItems debe llevar invoicedAmount por item.
+  // uncommitPO solo restará baseAmount - invoicedAmount, preservando en
+  // committed lo que ya pasó a actual mediante facturas realizadas.
   if (shouldUncommitPO(oldStatus, newStatus, costSettings)) {
     await uncommitPO(projectId, poItems);
     return;
@@ -270,7 +311,7 @@ interface BoxExpenseItem {
 }
 
 /**
- * Busca subcuentas por código y actualiza el campo box
+ * Busca subcuentas por código y actualiza el campo box usando transacciones atómicas.
  */
 async function updateBoxByCode(
   projectId: string,
@@ -278,32 +319,38 @@ async function updateBoxByCode(
   operation: "add" | "subtract"
 ): Promise<void> {
   const accountsSnapshot = await getDocs(collection(db, `projects/${projectId}/accounts`));
-  
+
+  // Recopilar todos los refs a actualizar antes de abrir transacciones
+  const targets: { ref: DocumentReference; code: string }[] = [];
   for (const accountDoc of accountsSnapshot.docs) {
     const subAccountsSnapshot = await getDocs(
       collection(db, `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`)
     );
-    
     for (const subDoc of subAccountsSnapshot.docs) {
-      const subData = subDoc.data();
-      const code = subData.code || "";
-      
+      const code = subDoc.data().code || "";
       if (amountsByCode[code]) {
-        const subAccountRef = doc(
-          db,
-          `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`,
-          subDoc.id
-        );
-        
-        const currentBox = subData.box || 0;
-        const newBox = operation === "add" 
-          ? currentBox + amountsByCode[code]
-          : Math.max(0, currentBox - amountsByCode[code]);
-          
-        await updateDoc(subAccountRef, { box: newBox });
+        targets.push({
+          ref: doc(db, `projects/${projectId}/accounts/${accountDoc.id}/subaccounts`, subDoc.id),
+          code,
+        });
       }
     }
   }
+
+  // Una transacción por subcuenta afectada
+  await Promise.all(
+    targets.map(({ ref, code }) =>
+      runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists()) return;
+        const currentBox = snap.data().box || 0;
+        const newBox = operation === "add"
+          ? currentBox + amountsByCode[code]
+          : Math.max(0, currentBox - amountsByCode[code]);
+        tx.update(ref, { box: newBox });
+      })
+    )
+  );
 }
 
 /**

@@ -4,8 +4,9 @@ import Link from "next/link";
 import { Inter } from "next/font/google";
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, orderBy, limit, getDocs, where } from "firebase/firestore";
+import { doc, getDoc, collection, query, orderBy, limit, getDocs, where, onSnapshot } from "firebase/firestore";
 import { FileText, Receipt, ArrowRight, Settings, ClipboardCheck, ChevronRight, Plus, Upload, Clock, AlertCircle, CreditCard, FolderDown } from "lucide-react";
+import { PROJECT_ROLES } from "@/hooks/useAccountingPermissions";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -54,13 +55,12 @@ export default function AccountingPage() {
           setAccountingAccessLevel(memberData.accountingAccessLevel || "user");
         }
         
-        // Determinar permisos de visibilidad
-        const isProjectRole = ["admin", "PM", "EP", "LP", "Coordinator", "Accounting"].includes(currentUserRole);
+        // Determinar permisos de visibilidad — usar PROJECT_ROLES como fuente única de verdad
+        const isProjectRole = PROJECT_ROLES.includes(currentUserRole);
         const canViewAllPOs = isProjectRole;
         const canViewDepartmentPOs = !isProjectRole && (
-          currentUserPosition?.toLowerCase().includes("head") || 
-          currentUserPosition?.toLowerCase().includes("jefe") ||
-          currentUserRole === "HOD"
+          currentUserPosition === "HOD" ||
+          currentUserPosition === "Coordinator"
         );
         const canViewOwnPOs = !isProjectRole && !canViewDepartmentPOs;
 
@@ -128,30 +128,9 @@ export default function AccountingPage() {
           }
         }
         
-        // Count pending approvals for this user
-        const posRef = collection(db, `projects/${id}/pos`);
-        const posQuery = query(posRef, where("status", "==", "pending"));
-        const posSnapshot = await getDocs(posQuery);
-        for (const poDoc of posSnapshot.docs) {
-          const poData = poDoc.data();
-          if (poData.approvalSteps && poData.currentApprovalStep !== undefined) {
-            const currentStep = poData.approvalSteps[poData.currentApprovalStep];
-            if (currentStep?.approvers?.includes(userId)) approvalCount++;
-          }
-        }
-
-        const invoicesRef = collection(db, `projects/${id}/invoices`);
-        const invoicesQuery = query(invoicesRef, where("status", "==", "pending_approval"));
-        const invoicesSnapshot = await getDocs(invoicesQuery);
-        for (const invDoc of invoicesSnapshot.docs) {
-          const invData = invDoc.data();
-          if (invData.approvalSteps && invData.currentApprovalStep !== undefined) {
-            const currentStep = invData.approvalSteps[invData.currentApprovalStep];
-            if (currentStep?.approvers?.includes(userId)) approvalCount++;
-          }
-        }
-        setPendingApprovalsCount(approvalCount);
         setIsApprover(userIsApprover);
+        // El conteo de aprobaciones pendientes se actualiza en tiempo real
+        // a través del useEffect de onSnapshot de abajo.
 
         // Cargar POs recientes con filtrado
         const posRecentQuery = query(collection(db, `projects/${id}/pos`), orderBy("createdAt", "desc"), limit(20));
@@ -218,6 +197,51 @@ export default function AccountingPage() {
       }
     };
     loadProjectData();
+  }, [id, userId]);
+
+  // Conteo de aprobaciones en tiempo real para que el badge se actualice
+  // sin recargar cuando otro usuario aprueba o rechaza un documento.
+  useEffect(() => {
+    if (!id || !userId) return;
+
+    let poCount = 0;
+    let invCount = 0;
+    const updateTotal = () => setPendingApprovalsCount(poCount + invCount);
+
+    const poUnsub = onSnapshot(
+      query(collection(db, `projects/${id}/pos`), where("status", "==", "pending")),
+      (snap) => {
+        poCount = 0;
+        snap.forEach((d) => {
+          const data = d.data();
+          if (data.approvalSteps && data.currentApprovalStep !== undefined) {
+            const step = data.approvalSteps[data.currentApprovalStep];
+            if (step?.approvers?.includes(userId)) poCount++;
+          }
+        });
+        updateTotal();
+      }
+    );
+
+    const invUnsub = onSnapshot(
+      query(collection(db, `projects/${id}/invoices`), where("status", "==", "pending_approval")),
+      (snap) => {
+        invCount = 0;
+        snap.forEach((d) => {
+          const data = d.data();
+          if (data.approvalSteps && data.currentApprovalStep !== undefined) {
+            const step = data.approvalSteps[data.currentApprovalStep];
+            if (step?.approvers?.includes(userId)) invCount++;
+          }
+        });
+        updateTotal();
+      }
+    );
+
+    return () => {
+      poUnsub();
+      invUnsub();
+    };
   }, [id, userId]);
 
   const getStatusBadge = (status: string) => {

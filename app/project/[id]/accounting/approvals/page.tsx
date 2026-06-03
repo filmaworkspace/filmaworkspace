@@ -430,10 +430,24 @@ export default function ApprovalsPage() {
           updates.committedAmount = totalBaseAmount;
           updates.remainingAmount = totalBaseAmount;
           
-          // Verificar si hay items comprometidos anteriores (edición de PO aprobada)
-          const previousCommittedItems = docData.previousCommittedItems || null;
-          
-          // Usar budgetOperations para manejar el comprometido
+          // Verificar si hay items comprometidos anteriores (edición de PO aprobada).
+          // Los enriquecemos con invoicedAmount para que uncommitPO no reste
+          // lo que ya pasó a actual vía facturas realizadas.
+          let previousCommittedItems = docData.previousCommittedItems || null;
+          if (previousCommittedItems && previousCommittedItems.length > 0) {
+            const invoicedBySubAccount: Record<string, number> = {};
+            for (const item of (docData.items || [])) {
+              if (item.subAccountId) {
+                invoicedBySubAccount[item.subAccountId] =
+                  (invoicedBySubAccount[item.subAccountId] || 0) + (item.invoicedAmount || 0);
+              }
+            }
+            previousCommittedItems = previousCommittedItems.map((item: any) => ({
+              ...item,
+              invoicedAmount: invoicedBySubAccount[item.subAccountId] || 0,
+            }));
+          }
+
           await handlePOStatusChange(approval.projectId, oldStatus, "approved", budgetItems, previousCommittedItems);
           
           // Limpiar previousCommittedItems después de aprobar
@@ -512,19 +526,36 @@ export default function ApprovalsPage() {
         
         // Manejar el presupuesto según tipo de documento
         if (selectedApproval.type === "po") {
-          // Verificar si hay items comprometidos anteriores (edición de PO aprobada)
+          // Agrupar invoicedAmount actual por subAccountId para no restar de committed
+          // lo que ya pasó a actual mediante facturas realizadas.
+          const invoicedBySubAccount: Record<string, number> = {};
+          for (const item of (docData.items || [])) {
+            if (item.subAccountId) {
+              invoicedBySubAccount[item.subAccountId] =
+                (invoicedBySubAccount[item.subAccountId] || 0) + (item.invoicedAmount || 0);
+            }
+          }
+
           const previousCommittedItems = docData.previousCommittedItems;
-          
+
           if (previousCommittedItems && previousCommittedItems.length > 0) {
-            // Si había items anteriores comprometidos, descomprometer esos (no los nuevos)
-            await handlePOStatusChange(selectedApproval.projectId, "approved", "rejected", previousCommittedItems);
+            // Enriquecer los items históricos con el invoicedAmount actual antes de descomprometer
+            const enrichedPrevious = previousCommittedItems.map((item: any) => ({
+              ...item,
+              invoicedAmount: invoicedBySubAccount[item.subAccountId] || 0,
+            }));
+            await handlePOStatusChange(selectedApproval.projectId, "approved", "rejected", enrichedPrevious);
           } else {
-            // Preparar items actuales para budgetOperations
-            const budgetItems: Array<{ subAccountId: string; baseAmount: number }> = [];
+            const budgetItems: Array<{ subAccountId: string; baseAmount: number; invoicedAmount: number }> = [];
             for (const item of (selectedApproval.items || [])) {
               const itemBaseAmount = item.baseAmount || (item.quantity && item.unitPrice ? item.quantity * item.unitPrice : item.totalAmount ? item.totalAmount / 1.21 : 0);
               if (item.subAccountId) {
-                budgetItems.push({ subAccountId: item.subAccountId, baseAmount: itemBaseAmount });
+                budgetItems.push({
+                  subAccountId: item.subAccountId,
+                  baseAmount: itemBaseAmount,
+                  // Incluir lo ya realizado para que uncommitPO solo reste el saldo pendiente
+                  invoicedAmount: invoicedBySubAccount[item.subAccountId] || 0,
+                });
               }
             }
             await handlePOStatusChange(selectedApproval.projectId, oldStatus, "rejected", budgetItems);

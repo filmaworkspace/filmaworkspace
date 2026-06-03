@@ -1,14 +1,11 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { Inter } from "next/font/google";
 import { Folder, Search, Users, Settings, Clock, Mail, Check, X as XIcon, Building2, Sparkles, BarChart3, Archive, ChevronDown, FolderOpen, Filter, ArrowUpDown, Bell, Info, AlertTriangle, CheckCircle, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { db, auth } from "@/lib/firebase";
 import { useUser } from "@/contexts/UserContext";
 import { collection, getDocs, getDoc, doc, query, where, updateDoc, setDoc, Timestamp, DocumentData, QueryDocumentSnapshot, orderBy, deleteDoc } from "firebase/firestore";
-
-const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+import { inter } from "@/lib/fonts";
 
 const phaseColors: Record<string, { bg: string; border: string; text: string; dot: string }> = {
   Desarrollo: { bg: "bg-sky-50", border: "border-sky-200", text: "text-sky-700", dot: "bg-sky-500" },
@@ -78,7 +75,6 @@ interface AdminMessage {
 }
 
 export default function Dashboard() {
-  const router = useRouter();
   const { user, isLoading: userLoading } = useUser();
   const [projects, setProjects] = useState<Project[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -93,6 +89,7 @@ export default function Dashboard() {
   const [showPhaseDropdown, setShowPhaseDropdown] = useState(false);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [expandedMessage, setExpandedMessage] = useState<string | null>(null);
+  const [reloadTrigger, setReloadTrigger] = useState(0);
   const phaseDropdownRef = useRef<HTMLDivElement>(null);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -113,17 +110,7 @@ export default function Dashboard() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    if (!userLoading && !user) {
-      router.push("/");
-      return;
-    }
-    if (!userLoading && user?.role === "admin") router.push("/admindashboard");
-    // Redirigir usuarios de productora a companydashboard
-    if (!userLoading && user?.companyId) {
-      router.push(`/companydashboard/${user.companyId}`);
-    }
-  }, [user, userLoading, router]);
+  // Las redirecciones por rol y autenticación las gestiona UserContext.
 
   useEffect(() => {
     if (!userId) return;
@@ -131,44 +118,56 @@ export default function Dashboard() {
       try {
         const userProjectsRef = collection(db, `userProjects/${userId}/projects`);
         const userProjectsSnapshot = await getDocs(userProjectsRef);
-        const projectsData: Project[] = [];
 
-        for (const userProjectDoc of userProjectsSnapshot.docs) {
-          const userProjectData = userProjectDoc.data();
-          const projectId = userProjectDoc.id;
-          const projectRef = doc(db, "projects", projectId);
-          const projectSnapshot = await getDoc(projectRef);
+        // Fetch all project docs in parallel instead of sequentially
+        const projectSnapshots = await Promise.all(
+          userProjectsSnapshot.docs.map((d) => getDoc(doc(db, "projects", d.id)))
+        );
 
-          if (projectSnapshot.exists()) {
-            const projectData = projectSnapshot.data();
-            let producerNames: string[] = [];
-            if (projectData.producers && Array.isArray(projectData.producers)) {
-              for (const producerId of projectData.producers) {
-                const producerDoc = await getDoc(doc(db, "producers", producerId));
-                if (producerDoc.exists()) producerNames.push(producerDoc.data().name);
-              }
-            }
-            const membersSnapshot = await getDocs(collection(db, `projects/${projectId}/members`));
+        const projectsData: Project[] = (
+          await Promise.all(
+            userProjectsSnapshot.docs.map(async (userProjectDoc, i) => {
+              const projectSnapshot = projectSnapshots[i];
+              if (!projectSnapshot.exists()) return null;
 
-            projectsData.push({
-              id: projectSnapshot.id,
-              name: projectData.name,
-              phase: projectData.phase,
-              description: projectData.description || "",
-              producers: projectData.producers || [],
-              producerNames: producerNames.length > 0 ? producerNames : undefined,
-              role: userProjectData.role,
-              department: userProjectData.department,
-              position: userProjectData.position,
-              permissions: userProjectData.permissions || { config: false, accounting: false, team: false },
-              createdAt: projectData.createdAt || null,
-              addedAt: userProjectData.addedAt || null,
-              memberCount: membersSnapshot.size,
-              archived: projectData.archived || false,
-              closingAt: projectData.closingAt || null,
-            });
-          }
-        }
+              const userProjectData = userProjectDoc.data();
+              const projectId = userProjectDoc.id;
+              const projectData = projectSnapshot.data();
+
+              // Fetch producers and members in parallel
+              const [producerDocs, membersSnapshot] = await Promise.all([
+                Promise.all(
+                  (projectData.producers || []).map((pid: string) =>
+                    getDoc(doc(db, "producers", pid))
+                  )
+                ),
+                getDocs(collection(db, `projects/${projectId}/members`)),
+              ]);
+
+              const producerNames = producerDocs
+                .filter((d) => d.exists())
+                .map((d) => d.data().name as string);
+
+              return {
+                id: projectSnapshot.id,
+                name: projectData.name,
+                phase: projectData.phase,
+                description: projectData.description || "",
+                producers: projectData.producers || [],
+                producerNames: producerNames.length > 0 ? producerNames : undefined,
+                role: userProjectData.role,
+                department: userProjectData.department,
+                position: userProjectData.position,
+                permissions: userProjectData.permissions || { config: false, accounting: false, team: false },
+                createdAt: projectData.createdAt || null,
+                addedAt: userProjectData.addedAt || null,
+                memberCount: membersSnapshot.size,
+                archived: projectData.archived || false,
+                closingAt: projectData.closingAt || null,
+              } as Project;
+            })
+          )
+        ).filter((p): p is Project => p !== null);
 
         projectsData.sort((a, b) => (b.addedAt?.toMillis() || 0) - (a.addedAt?.toMillis() || 0));
         setProjects(projectsData);
@@ -221,7 +220,7 @@ export default function Dashboard() {
       }
     };
     loadData();
-  }, [userId, userEmail]);
+  }, [userId, userEmail, reloadTrigger]);
 
   useEffect(() => {
     let filtered = [...projects].filter((p) => !p.archived);
@@ -282,7 +281,7 @@ export default function Dashboard() {
         },
         addedAt: new Date(),
       });
-      window.location.reload();
+      setReloadTrigger((t) => t + 1);
     } catch (error) {
       console.error("Error aceptando invitación:", error);
       alert("Error al aceptar la invitación");
