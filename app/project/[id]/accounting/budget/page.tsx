@@ -53,6 +53,8 @@ export default function BudgetPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [importFileName, setImportFileName] = useState("");
   const [expandedImportAccounts, setExpandedImportAccounts] = useState<Set<string>>(new Set());
+  // "separator" = primer segmento antes de punto/guión, "charsN" = N primeros caracteres
+  const [detectionPattern, setDetectionPattern] = useState<"separator" | "chars1" | "chars2" | "chars3" | "chars4">("separator");
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => { if (user) setUserId(user.uid); });
@@ -576,6 +578,49 @@ export default function BudgetPage() {
     ));
   };
 
+  // Extrae el código padre de una subcuenta según el patrón elegido
+  const extractParentCode = (code: string, pattern: typeof detectionPattern): string => {
+    if (pattern === "separator") return code.split(/[.\-\/]/)[0];
+    const n = parseInt(pattern.replace("chars", ""));
+    return code.slice(0, n);
+  };
+
+  // Aplica el patrón a todas las subcuentas de golpe
+  const applyPattern = (pattern: typeof detectionPattern) => {
+    setDetectionPattern(pattern);
+    setImportData(prev => prev.map(row => {
+      if (row.type !== "SUBCUENTA") return row;
+      const prefix = extractParentCode(row.code, pattern);
+      const existsInImport = prev.some(d => d.type === "CUENTA" && d.code === prefix);
+      const existsInDB = accounts.some(a => a.code === prefix);
+      return { ...row, parentCode: (existsInImport || existsInDB) ? prefix : null };
+    }));
+  };
+
+  // Detecta automáticamente el mejor patrón (el que asigna más subcuentas)
+  const autoDetectPattern = (data: typeof importData) => {
+    const patterns: (typeof detectionPattern)[] = ["separator", "chars1", "chars2", "chars3", "chars4"];
+    let bestPattern: typeof detectionPattern = "separator";
+    let bestScore = -1;
+    for (const p of patterns) {
+      const score = data.filter(row => {
+        if (row.type !== "SUBCUENTA") return false;
+        const prefix = extractParentCode(row.code, p);
+        return data.some(d => d.type === "CUENTA" && d.code === prefix) ||
+               accounts.some(a => a.code === prefix);
+      }).length;
+      if (score > bestScore) { bestScore = score; bestPattern = p; }
+    }
+    return bestPattern;
+  };
+
+  // Asignar todas las subcuentas sin padre a una cuenta concreta de golpe
+  const assignAllUnassigned = (parentCode: string) => {
+    setImportData(prev => prev.map(row =>
+      row.type === "SUBCUENTA" && !row.parentCode ? { ...row, parentCode } : row
+    ));
+  };
+
   // Mover una subcuenta arriba o abajo dentro de su cuenta (reordenar)
   const moveSubAccount = (index: number, direction: "up" | "down") => {
     setImportData(prev => {
@@ -605,7 +650,18 @@ export default function BudgetPage() {
       const bytes = new Uint8Array(e.target?.result as ArrayBuffer);
       const parsed = parseImportFile(bytes);
       if (parsed.length > 0) {
-        setImportData(parsed);
+        // Auto-detectar el mejor patrón y aplicarlo de inmediato
+        const bestPattern = autoDetectPattern(parsed);
+        setDetectionPattern(bestPattern);
+        const applied = parsed.map(row => {
+          if (row.type !== "SUBCUENTA") return row;
+          const prefix = extractParentCode(row.code, bestPattern);
+          const existsInImport = parsed.some(d => d.type === "CUENTA" && d.code === prefix);
+          const existsInDB = accounts.some(a => a.code === prefix);
+          return { ...row, parentCode: (existsInImport || existsInDB) ? prefix : null };
+        });
+        setImportData(applied);
+        setExpandedImportAccounts(new Set(applied.filter(d => d.type === "CUENTA").map(d => d.code)));
         setImportStep("preview");
       }
     };
@@ -1156,32 +1212,89 @@ export default function BudgetPage() {
                 <div className="p-5 space-y-4">
                   {/* Cabecera */}
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                        <FileSpreadsheet size={16} className="text-slate-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-900 text-sm">{importFileName}</p>
-                        <p className="text-xs text-slate-500">
-                          {importData.filter(d => d.type === "CUENTA").length} cuentas · {importData.filter(d => d.type === "SUBCUENTA").length} subcuentas
-                        </p>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <FileSpreadsheet size={15} className="text-slate-400" />
+                      <span className="font-medium text-slate-900 text-sm">{importFileName}</span>
+                      <span className="text-xs text-slate-400">
+                        · {importData.filter(d => d.type === "CUENTA").length} cuentas · {importData.filter(d => d.type === "SUBCUENTA").length} subcuentas
+                      </span>
                     </div>
-                    <button onClick={resetImport} className="text-xs text-slate-500 hover:text-slate-700">
-                      Cambiar archivo
-                    </button>
+                    <button onClick={resetImport} className="text-xs text-slate-400 hover:text-slate-600">Cambiar archivo</button>
                   </div>
 
-                  {/* Aviso subcuentas sin asignar */}
-                  {unassignedSubAccounts.length > 0 && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-2">
-                      <AlertCircle size={16} className="text-amber-600 flex-shrink-0" />
-                      <p className="text-xs text-amber-800">
-                        <span className="font-semibold">{unassignedSubAccounts.length} subcuenta{unassignedSubAccounts.length > 1 ? "s" : ""} sin asignar.</span>{" "}
-                        Usa el desplegable de cada una para colocarla en su cuenta.
-                      </p>
+                  {/* ── Barra de detección automática ── */}
+                  <div className="bg-slate-900 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-white">Asignación automática</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Elige cómo se detecta la cuenta padre a partir del código</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-emerald-400">
+                          {importData.filter(d => d.type === "SUBCUENTA" && d.parentCode).length}
+                          <span className="text-slate-500 text-sm font-normal">/{importData.filter(d => d.type === "SUBCUENTA").length}</span>
+                        </p>
+                        <p className="text-[10px] text-slate-500">asignadas</p>
+                      </div>
                     </div>
-                  )}
+
+                    {/* Selector de patrón */}
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {([
+                        { key: "separator", label: "Por punto", example: "01.01 → 01" },
+                        { key: "chars1",    label: "1 carácter", example: "A01 → A" },
+                        { key: "chars2",    label: "2 caracteres", example: "0101 → 01" },
+                        { key: "chars3",    label: "3 caracteres", example: "PRO01 → PRO" },
+                        { key: "chars4",    label: "4 caracteres", example: "PROD01 → PROD" },
+                      ] as { key: typeof detectionPattern; label: string; example: string }[]).map(opt => {
+                        // Calcular cuántas asigna este patrón
+                        const score = importData.filter(row => {
+                          if (row.type !== "SUBCUENTA") return false;
+                          const prefix = extractParentCode(row.code, opt.key);
+                          return importData.some(d => d.type === "CUENTA" && d.code === prefix) ||
+                                 accounts.some(a => a.code === prefix);
+                        }).length;
+                        const isActive = detectionPattern === opt.key;
+                        return (
+                          <button
+                            key={opt.key}
+                            onClick={() => applyPattern(opt.key)}
+                            title={opt.example}
+                            className={`flex flex-col items-center px-2 py-2 rounded-lg text-center transition-all ${
+                              isActive
+                                ? "bg-emerald-500 text-white"
+                                : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white"
+                            }`}
+                          >
+                            <span className="text-[10px] font-mono leading-tight">{opt.example.split(" → ")[0]}</span>
+                            <span className="text-[9px] mt-0.5 opacity-70">{score}/{importData.filter(d=>d.type==="SUBCUENTA").length}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Bulk assign para las que quedan sin asignar */}
+                    {unassignedSubAccounts.length > 0 && (
+                      <div className="flex items-center gap-2 pt-1 border-t border-slate-700">
+                        <AlertCircle size={13} className="text-amber-400 flex-shrink-0" />
+                        <span className="text-xs text-amber-300 flex-shrink-0">
+                          {unassignedSubAccounts.length} sin asignar →
+                        </span>
+                        <select
+                          defaultValue=""
+                          onChange={(e) => { if (e.target.value) assignAllUnassigned(e.target.value); e.target.value = ""; }}
+                          className="flex-1 text-xs bg-slate-800 border border-slate-600 text-slate-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                        >
+                          <option value="">Asignar todas a una cuenta…</option>
+                          {availableParentAccounts.map(a => (
+                            <option key={a.code} value={a.code}>
+                              {a.code} — {a.description}{a.source === "db" ? " ✓" : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Vista de carpetas */}
                   <div className="border border-slate-200 rounded-xl overflow-hidden">
