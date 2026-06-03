@@ -690,15 +690,10 @@ export default function BudgetPage() {
         setImportProgress(Math.round((processed / total) * 100));
       }
 
-      // Subcuentas sin asignar → contar como omitidas (no error, solo aviso)
+      // Subcuentas sin asignar → omitidas, no error
       const skipped = importData.filter(d => d.type === "SUBCUENTA" && !d.parentCode).length;
       if (skipped > 0) console.info(`${skipped} subcuentas sin asignar omitidas`);
 
-        }
-        processed++;
-        setImportProgress(Math.round((processed / total) * 100));
-      }
-      
       setImportResults({ accounts: accountsCreated, subaccounts: subAccountsCreated, errors });
       setImportStep("done");
       await loadData();
