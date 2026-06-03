@@ -446,21 +446,56 @@ export default function BudgetPage() {
 
   const isSubAccountCode = (code: string) => /[.\-\/]/.test(code.trim());
 
-  // Lee el XML de la primera hoja del xlsx y extrae filas como arrays de strings
-  const parseSheetXml = (xml: string): string[][] => {
+  // Convierte referencia de columna Excel (A, B, AA…) a índice 0-based
+  const colRefToIndex = (ref: string): number => {
+    let n = 0;
+    for (let i = 0; i < ref.length; i++) n = n * 26 + (ref.charCodeAt(i) - 64);
+    return n - 1;
+  };
+
+  // Extrae la tabla de cadenas compartidas de sharedStrings.xml
+  const parseSharedStrings = (xml: string): string[] => {
+    const strings: string[] = [];
+    const siMatches = xml.matchAll(/<si>([\s\S]*?)<\/si>/g);
+    for (const m of siMatches) {
+      // Concatena todos los <t> dentro del <si> (puede haber varios en rich-text)
+      const texts = [...m[1].matchAll(/<t(?:[^>]*)?>([^<]*)<\/t>/g)].map(t =>
+        t[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
+      );
+      strings.push(texts.join(""));
+    }
+    return strings;
+  };
+
+  // Lee el XML de la hoja y devuelve filas como arrays de strings,
+  // resolviendo shared strings (t="s") y valores inline / numéricos.
+  const parseSheetXml = (xml: string, sharedStrings: string[]): string[][] => {
     const rows: string[][] = [];
-    const rowMatches = xml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g);
-    for (const rowMatch of rowMatches) {
+    for (const rowMatch of xml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)) {
       const cells: string[] = [];
-      const cellMatches = rowMatch[1].matchAll(/<c r="([A-Z]+)(\d+)"[^>]*>([\s\S]*?)<\/c>/g);
-      for (const cellMatch of cellMatches) {
-        const col = cellMatch[1].charCodeAt(0) - 65; // A=0, B=1…
-        const inner = cellMatch[3];
+      for (const c of rowMatch[1].matchAll(/<c r="([A-Z]+)\d+"([^>]*)>([\s\S]*?)<\/c>/g)) {
+        const col = colRefToIndex(c[1]);
+        const attrs = c[2];
+        const inner = c[3];
         let val = "";
-        const tMatch = inner.match(/<t(?:\s[^>]*)?>([^<]*)<\/t>/);
-        const vMatch = inner.match(/<v>([^<]*)<\/v>/);
-        if (tMatch) val = tMatch[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
-        else if (vMatch) val = vMatch[1];
+
+        if (attrs.includes('t="s"')) {
+          // Shared string: <v> contiene el índice
+          const vm = inner.match(/<v>(\d+)<\/v>/);
+          if (vm) val = sharedStrings[parseInt(vm[1])] ?? "";
+        } else if (attrs.includes('t="inlineStr"')) {
+          const tm = inner.match(/<t(?:[^>]*)?>([^<]*)<\/t>/);
+          if (tm) val = tm[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
+        } else if (attrs.includes('t="str"')) {
+          // Fórmula con resultado string
+          const vm = inner.match(/<v>([^<]*)<\/v>/);
+          if (vm) val = vm[1];
+        } else {
+          // Numérico o fecha — devolver como string
+          const vm = inner.match(/<v>([^<]*)<\/v>/);
+          if (vm) val = vm[1];
+        }
+
         while (cells.length < col) cells.push("");
         cells[col] = val;
       }
@@ -469,19 +504,40 @@ export default function BudgetPage() {
     return rows;
   };
 
+  const validateRow = (
+    row: { code: string; description: string; type: string; budgeted: number },
+    previousData: { code: string; type: string }[]
+  ): { valid: boolean; error?: string } => {
+    if (!row.code) return { valid: false, error: "Código vacío" };
+    if (!row.description) return { valid: false, error: "Descripción vacía" };
+    if (row.type === "SUBCUENTA") {
+      const accountCode = row.code.split(/[.\-\/]/)[0];
+      const hasParentInData = previousData.some(d => d.code === accountCode && d.type === "CUENTA");
+      const hasParentInExisting = accounts.some(a => a.code === accountCode);
+      if (!hasParentInData && !hasParentInExisting)
+        return { valid: false, error: `Cuenta padre "${accountCode}" no encontrada` };
+    }
+    return { valid: true };
+  };
+
   const parseImportFile = (fileBytes: Uint8Array): { code: string; description: string; type: string; budgeted: number; valid: boolean; error?: string }[] => {
     try {
       const files = unzipSync(fileBytes);
-      // Leer la primera hoja (sheet1.xml)
+
+      // Shared strings (opcional — algunos xlsx no lo tienen)
+      const ssEntry = files["xl/sharedStrings.xml"];
+      const sharedStrings = ssEntry ? parseSharedStrings(new TextDecoder().decode(ssEntry)) : [];
+
+      // Primera hoja
       const sheetEntry = files["xl/worksheets/sheet1.xml"];
       if (!sheetEntry) throw new Error("sheet1.xml no encontrado");
       const sheetXml = new TextDecoder().decode(sheetEntry);
-      const allRows = parseSheetXml(sheetXml);
+      const allRows = parseSheetXml(sheetXml, sharedStrings);
 
-      // Buscar fila de cabecera (contiene "CÓDIGO" normalizado)
-      const headerIdx = allRows.findIndex(r =>
-        r.some(c => c.toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "").startsWith("CODIGO"))
-      );
+      // Localizar fila de cabecera (tolera tildes: CÓDIGO / CODIGO / Código)
+      const normalize = (s: string) =>
+        s.toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+      const headerIdx = allRows.findIndex(r => r.some(c => normalize(c).startsWith("CODIGO")));
       const dataRows = allRows.slice(headerIdx >= 0 ? headerIdx + 1 : 1);
 
       const data: { code: string; description: string; type: string; budgeted: number; valid: boolean; error?: string }[] = [];
@@ -489,33 +545,37 @@ export default function BudgetPage() {
       dataRows.forEach((row) => {
         const code = (row[0] ?? "").trim();
         const description = (row[1] ?? "").trim();
-        const budgetedRaw = row[2] ?? "";
+        const budgetedRaw = (row[2] ?? "").trim();
 
-        if (!code && !description) return;
+        if (!code && !description) return; // fila vacía
 
         const type = isSubAccountCode(code) ? "SUBCUENTA" : "CUENTA";
         const budgeted = budgetedRaw !== "" ? parseFloat(budgetedRaw.replace(",", ".")) || 0 : 0;
 
-        let valid = true;
-        let error = "";
-        if (!code) { valid = false; error = "Código vacío"; }
-        else if (!description) { valid = false; error = "Descripción vacía"; }
-        else if (type === "SUBCUENTA") {
-          const accountCode = code.split(/[.\-\/]/)[0];
-          const hasParentInData = data.some(d => d.code === accountCode && d.type === "CUENTA");
-          const hasParentInExisting = accounts.some(a => a.code === accountCode);
-          if (!hasParentInData && !hasParentInExisting) {
-            valid = false;
-            error = `Cuenta padre "${accountCode}" no encontrada`;
-          }
-        }
+        const { valid, error } = validateRow({ code, description, type, budgeted }, data);
         data.push({ code, description, type, budgeted, valid, error });
       });
       return data;
-    } catch {
+    } catch (e) {
       setErrorMessage("No se pudo leer el archivo. Asegúrate de que es un .xlsx válido.");
       return [];
     }
+  };
+
+  // Cambia el tipo de una fila en el preview y re-valida toda la lista
+  const toggleRowType = (index: number) => {
+    setImportData(prev => {
+      const updated = prev.map((row, i) => {
+        if (i !== index) return row;
+        const newType = row.type === "CUENTA" ? "SUBCUENTA" : "CUENTA";
+        return { ...row, type: newType };
+      });
+      // Re-validar todas las filas con el nuevo orden de tipos
+      return updated.map((row, i) => {
+        const { valid, error } = validateRow(row, updated.slice(0, i));
+        return { ...row, valid, error };
+      });
+    });
   };
 
   const handleFileSelect = (file: File) => {
@@ -1125,13 +1185,13 @@ export default function BudgetPage() {
                             <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Estado</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Código</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Descripción</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Tipo</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Tipo <span className="text-slate-400 normal-case font-normal">(clic para cambiar)</span></th>
                             <th className="px-3 py-2 text-right text-xs font-medium text-slate-500 uppercase">Presupuesto</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {importData.map((row, index) => (
-                            <tr key={index} className={row.valid ? "bg-white" : "bg-red-50"}>
+                            <tr key={index} className={row.valid ? "bg-white hover:bg-slate-50" : "bg-red-50 hover:bg-red-100"}>
                               <td className="px-3 py-2">
                                 {row.valid ? (
                                   <CheckCircle size={16} className="text-emerald-500" />
@@ -1147,14 +1207,21 @@ export default function BudgetPage() {
                               <td className="px-3 py-2 font-mono text-slate-900">{row.code}</td>
                               <td className="px-3 py-2 text-slate-700 truncate max-w-[200px]">{row.description}</td>
                               <td className="px-3 py-2">
-                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                  row.type === "CUENTA" ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"
-                                }`}>
-                                  {row.type}
-                                </span>
+                                {/* Botón clickable para cambiar tipo manualmente */}
+                                <button
+                                  onClick={() => toggleRowType(index)}
+                                  title="Clic para cambiar"
+                                  className={`px-2 py-0.5 rounded text-xs font-medium transition-all hover:ring-2 hover:ring-offset-1 cursor-pointer ${
+                                    row.type === "CUENTA"
+                                      ? "bg-blue-100 text-blue-700 hover:ring-blue-300"
+                                      : "bg-emerald-100 text-emerald-700 hover:ring-emerald-300"
+                                  }`}
+                                >
+                                  {row.type === "CUENTA" ? "Cuenta" : "Subcuenta"}
+                                </button>
                               </td>
                               <td className="px-3 py-2 text-right font-medium text-slate-900">
-                                {formatCurrency(row.budgeted)}
+                                {row.budgeted > 0 ? formatCurrency(row.budgeted) : <span className="text-slate-300">—</span>}
                               </td>
                             </tr>
                           ))}
