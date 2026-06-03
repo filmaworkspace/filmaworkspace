@@ -118,6 +118,7 @@ export default function PaymentsPage() {
   const [userName, setUserName] = useState("");
   const [forecasts, setForecasts] = useState<PaymentForecast[]>([]);
   const [availableInvoices, setAvailableInvoices] = useState<Invoice[]>([]);
+  const [invoiceIbans, setInvoiceIbans] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -242,7 +243,41 @@ export default function PaymentsPage() {
           dueDate: docSnap.data().dueDate?.toDate() || new Date(),
           createdAt: docSnap.data().createdAt?.toDate() || new Date(),
         })) as Invoice[];
+
+      // Enriquecer nombres de proveedor desde la colección suppliers cuando
+      // el campo supplier de la factura esté vacío pero haya supplierId.
+      const missingNameIds = [...new Set(
+        invoicesData.filter(inv => inv.supplierId && !inv.supplier).map(inv => inv.supplierId!)
+      )];
+      if (missingNameIds.length > 0) {
+        const supplierSnaps = await Promise.all(
+          missingNameIds.map(sid => getDoc(doc(db, `projects/${id}/suppliers`, sid)))
+        );
+        const nameMap: Record<string, string> = {};
+        supplierSnaps.forEach((snap, idx) => {
+          if (snap.exists()) nameMap[missingNameIds[idx]] = snap.data().name || "";
+        });
+        invoicesData.forEach(inv => {
+          if (inv.supplierId && nameMap[inv.supplierId]) inv.supplier = nameMap[inv.supplierId];
+        });
+      }
+
       setAvailableInvoices(invoicesData);
+
+      // Cargar estado IBAN de todos los suppliers para mostrar indicador en el panel
+      const allSupplierIds = [...new Set(
+        invoicesData.filter(inv => inv.supplierId).map(inv => inv.supplierId!)
+      )];
+      if (allSupplierIds.length > 0) {
+        const ibanSnaps = await Promise.all(
+          allSupplierIds.map(sid => getDoc(doc(db, `projects/${id}/suppliers`, sid)))
+        );
+        const ibanMap: Record<string, boolean> = {};
+        ibanSnaps.forEach((snap, idx) => {
+          ibanMap[allSupplierIds[idx]] = !!(snap.exists() && snap.data().iban);
+        });
+        setInvoiceIbans(ibanMap);
+      }
     } catch (error) {
       console.error("Error loading data:", error);
       showToast("error", "Error al cargar los datos");
@@ -730,6 +765,9 @@ export default function PaymentsPage() {
                           const days = getDaysUntilPayment(invoice.dueDate);
                           const isOverdue = days < 0;
                           const isDueSoon = days >= 0 && days <= 7;
+                          const hasIban = invoice.supplierId
+                            ? invoiceIbans[invoice.supplierId] ?? true
+                            : true;
                           return (
                             <div key={invoice.id} draggable onDragStart={() => handleDragStart(invoice)} onDragEnd={() => setDraggedInvoice(null)} className={cx("p-3 rounded-xl cursor-grab active:cursor-grabbing transition-all border group", draggedInvoice?.id === invoice.id ? "opacity-50 scale-95 border-slate-400" : "border-transparent", isOverdue ? "bg-red-50 hover:bg-red-100" : "bg-slate-50 hover:bg-slate-100")}>
                               <div className="flex items-start gap-2">
@@ -738,13 +776,18 @@ export default function PaymentsPage() {
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
                                       <p className="text-xs font-semibold text-slate-900 truncate font-mono">{invoice.displayNumber || ("FAC-" + invoice.number)}</p>
-                                      <p className="text-[11px] text-slate-600 truncate">{invoice.supplier}</p>
+                                      <p className="text-[11px] text-slate-600 truncate">{invoice.supplier || "—"}</p>
                                     </div>
                                     <p className="text-xs font-bold text-slate-900 flex-shrink-0">{formatCurrency(invoice.totalAmount)} €</p>
                                   </div>
                                   <div className="flex items-center justify-between mt-1.5">
                                     <span className={cx("text-[10px] px-1.5 py-0.5 rounded-full font-medium", isOverdue ? "bg-red-100 text-red-700" : isDueSoon ? "bg-amber-100 text-amber-700" : "bg-slate-200 text-slate-600")}>{isOverdue ? ("Vencida " + Math.abs(days) + "d") : isDueSoon ? (days + "d") : formatDateShort(invoice.dueDate)}</span>
-                                    <span className="text-[9px] text-slate-400 opacity-0 group-hover:opacity-100">Arrastra →</span>
+                                    <div className="flex items-center gap-1.5">
+                                      {!hasIban && (
+                                        <span className="text-[9px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded font-medium">Sin IBAN</span>
+                                      )}
+                                      <span className="text-[9px] text-slate-400 opacity-0 group-hover:opacity-100">Arrastra →</span>
+                                    </div>
                                   </div>
                                 </div>
                               </div>

@@ -6,6 +6,7 @@ import { Inter } from "next/font/google";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, Timestamp } from "firebase/firestore";
 import { Plus, ChevronDown, ChevronRight, Edit, Trash2, X, Search, Upload, AlertCircle, CheckCircle, FileSpreadsheet, Eye, EyeOff, Wallet, ShieldAlert, ArrowLeft, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import { getCostSettings, shouldCommitPO, shouldRealizeInvoice, CostSettings } from "@/lib/budgetRules";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
@@ -303,90 +304,141 @@ export default function BudgetPage() {
   const openCreateSubAccountModal = (account: Account) => { resetForm(); setSelectedAccount(account); setFormData({ code: "", description: "", budgeted: 0 }); setModalMode("subaccount"); setEditMode(false); setShowModal(true); };
   const openEditSubAccountModal = (account: Account, subAccount: SubAccount) => { setSelectedAccount(account); setSelectedSubAccount(subAccount); setFormData({ code: subAccount.code, description: subAccount.description, budgeted: subAccount.budgeted }); setModalMode("subaccount"); setEditMode(true); setShowModal(true); };
 
+  // ── XLSX import/export ────────────────────────────────────────────────────
+
   const downloadTemplate = () => {
-    const template = [["CÓDIGO", "DESCRIPCIÓN", "TIPO", "PRESUPUESTADO"], ["01", "GUION Y MÚSICA", "CUENTA", ""], ["01.01", "Derechos de autor", "SUBCUENTA", "5000"], ["01.02", "Música original", "SUBCUENTA", "3000"], ["02", "PRODUCCIÓN", "CUENTA", ""], ["02.01", "Equipo técnico", "SUBCUENTA", "10000"]];
-    const csvContent = template.map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a"); link.setAttribute("href", URL.createObjectURL(blob)); link.setAttribute("download", "plantilla_presupuesto.csv"); link.click();
+    const wb = XLSX.utils.book_new();
+
+    // Hoja de datos
+    const rows = [
+      ["CÓDIGO", "DESCRIPCIÓN", "PRESUPUESTADO"],
+      ["01", "GUION Y MÚSICA", null],
+      ["01.01", "Derechos de autor", 5000],
+      ["01.02", "Música original", 3000],
+      ["02", "PRODUCCIÓN", null],
+      ["02.01", "Equipo técnico", 50000],
+      ["02.02", "Material y consumibles", 10000],
+      ["03", "POSTPRODUCCIÓN", null],
+      ["03.01", "Montaje", 20000],
+      ["03.02", "Sonido", 8000],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    // Ancho de columnas
+    ws["!cols"] = [{ wch: 14 }, { wch: 40 }, { wch: 18 }];
+
+    // Estilos de cabecera (solo disponibles en xlsx-style; aquí usamos lo básico)
+    XLSX.utils.book_append_sheet(wb, ws, "Presupuesto");
+
+    // Hoja de instrucciones
+    const instrRows = [
+      ["INSTRUCCIONES DE IMPORTACIÓN"],
+      [""],
+      ["Columna A — CÓDIGO"],
+      ["  • Cuentas principales: un número entero  (01, 02, 03…)"],
+      ["  • Subcuentas: código con punto           (01.01, 01.02…)"],
+      ["  • El tipo (cuenta/subcuenta) se detecta automáticamente por el formato del código."],
+      [""],
+      ["Columna B — DESCRIPCIÓN"],
+      ["  • Texto libre. Puedes usar comas, tildes y cualquier carácter."],
+      [""],
+      ["Columna C — PRESUPUESTADO"],
+      ["  • Solo para subcuentas. Deja en blanco las filas de cuenta principal."],
+      ["  • Número sin símbolo de moneda ni puntos de millar (ej: 50000)."],
+      [""],
+      ["IMPORTANTE: No modifiques la fila de cabecera (fila 1)."],
+    ];
+    const wsInstr = XLSX.utils.aoa_to_sheet(instrRows);
+    wsInstr["!cols"] = [{ wch: 70 }];
+    XLSX.utils.book_append_sheet(wb, wsInstr, "Instrucciones");
+
+    XLSX.writeFile(wb, "plantilla_presupuesto.xlsx");
   };
 
-  const parseImportFile = (text: string): { code: string; description: string; type: string; budgeted: number; valid: boolean; error?: string }[] => {
-    const lines = text.split("\n").slice(1); // Skip header
+  const isSubAccountCode = (code: string) => /[.\-\/]/.test(code.trim());
+
+  const parseImportFile = (wb: XLSX.WorkBook): { code: string; description: string; type: string; budgeted: number; valid: boolean; error?: string }[] => {
+    // Leer la primera hoja que no se llame "Instrucciones"
+    const sheetName = wb.SheetNames.find(n => n !== "Instrucciones") ?? wb.SheetNames[0];
+    const ws = wb.Sheets[sheetName];
+    const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+    // Buscar la fila de cabecera (contiene "CÓDIGO" o "CÓDIGO")
+    const headerIndex = rows.findIndex(r =>
+      r.some((c: any) => String(c).toUpperCase().replace(/[^A-Z]/g, "").startsWith("CODIGO"))
+    );
+    const dataRows = rows.slice(headerIndex >= 0 ? headerIndex + 1 : 1);
+
     const data: { code: string; description: string; type: string; budgeted: number; valid: boolean; error?: string }[] = [];
-    
-    lines.forEach((line, index) => {
-      if (!line.trim()) return;
-      const [code, description, type, budgeted] = line.split(",").map((s) => s.trim().replace(/^"|"$/g, ""));
-      
+
+    dataRows.forEach((row) => {
+      const code = String(row[0] ?? "").trim();
+      const description = String(row[1] ?? "").trim();
+      const budgetedRaw = row[2];
+
+      if (!code && !description) return; // fila vacía
+
+      const type = isSubAccountCode(code) ? "SUBCUENTA" : "CUENTA";
+      const budgeted = budgetedRaw !== "" && budgetedRaw !== null && budgetedRaw !== undefined
+        ? parseFloat(String(budgetedRaw).replace(",", ".")) || 0
+        : 0;
+
       let valid = true;
       let error = "";
-      
+
       if (!code) { valid = false; error = "Código vacío"; }
       else if (!description) { valid = false; error = "Descripción vacía"; }
-      else if (!type || !["CUENTA", "SUBCUENTA"].includes(type.toUpperCase())) { 
-        valid = false; 
-        error = "Tipo debe ser CUENTA o SUBCUENTA"; 
-      }
-      else if (type.toUpperCase() === "SUBCUENTA") {
-        const accountCode = code.split(/[.\-]/)[0];
-        const hasParentInData = data.some(d => d.code === accountCode && d.type.toUpperCase() === "CUENTA");
+      else if (type === "SUBCUENTA") {
+        const accountCode = code.split(/[.\-\/]/)[0];
+        const hasParentInData = data.some(d => d.code === accountCode && d.type === "CUENTA");
         const hasParentInExisting = accounts.some(a => a.code === accountCode);
         if (!hasParentInData && !hasParentInExisting) {
           valid = false;
-          error = `Cuenta padre ${accountCode} no existe`;
+          error = `Cuenta padre "${accountCode}" no encontrada`;
         }
       }
-      
-      data.push({
-        code: code || "",
-        description: description || "",
-        type: type?.toUpperCase() || "",
-        budgeted: parseFloat(budgeted) || 0,
-        valid,
-        error,
-      });
+
+      data.push({ code, description, type, budgeted, valid, error });
     });
-    
+
     return data;
   };
 
   const handleFileSelect = (file: File) => {
     if (!file) return;
     setImportFileName(file.name);
-    
+
     const reader = new FileReader();
     reader.onload = (e) => {
-      const text = e.target?.result as string;
-      const parsed = parseImportFile(text);
-      setImportData(parsed);
-      setImportStep("preview");
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const wb = XLSX.read(data, { type: "array" });
+        const parsed = parseImportFile(wb);
+        setImportData(parsed);
+        setImportStep("preview");
+      } catch {
+        setErrorMessage("No se pudo leer el archivo. Asegúrate de que es un .xlsx válido.");
+      }
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   };
 
-  const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) handleFileSelect(file);
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
+  const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
-    if (file && file.name.endsWith(".csv")) {
+    if (file && (file.name.endsWith(".xlsx") || file.name.endsWith(".xls"))) {
       handleFileSelect(file);
     } else {
-      setErrorMessage("Por favor, sube un archivo CSV");
+      setErrorMessage("Por favor, sube un archivo .xlsx");
     }
   };
 
@@ -803,7 +855,7 @@ export default function BudgetPage() {
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Importar presupuesto</h2>
                   <p className="text-xs text-slate-500">
-                    {importStep === "upload" && "Sube un archivo CSV con tu presupuesto"}
+                    {importStep === "upload" && "Sube un archivo Excel (.xlsx) con tu presupuesto"}
                     {importStep === "preview" && `${importData.length} filas encontradas`}
                     {importStep === "importing" && "Importando datos..."}
                     {importStep === "done" && "¡Importación completada!"}
@@ -867,15 +919,15 @@ export default function BudgetPage() {
                       <FileSpreadsheet size={32} className={isDragging ? "text-emerald-600" : "text-slate-400"} />
                     </div>
                     <p className="text-lg font-medium text-slate-900 mb-1">
-                      {isDragging ? "¡Suelta el archivo aquí!" : "Arrastra tu archivo CSV aquí"}
+                      {isDragging ? "¡Suelta el archivo aquí!" : "Arrastra tu archivo Excel aquí"}
                     </p>
-                    <p className="text-sm text-slate-500 mb-4">o haz clic para seleccionar</p>
+                    <p className="text-sm text-slate-500 mb-4">o haz clic para seleccionar · .xlsx</p>
                     <label className="cursor-pointer">
                       <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors">
                         <Upload size={16} />
                         Seleccionar archivo
                       </span>
-                      <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
+                      <input type="file" accept=".xlsx,.xls" onChange={handleImportFile} className="hidden" />
                     </label>
                   </div>
 
@@ -890,12 +942,12 @@ export default function BudgetPage() {
                         <p className="text-sm text-slate-600 mb-3">
                           Descarga nuestra plantilla con el formato correcto y ejemplos incluidos.
                         </p>
-                        <button 
+                        <button
                           onClick={downloadTemplate}
                           className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
                         >
                           <Download size={14} />
-                          Descargar plantilla CSV
+                          Descargar plantilla Excel
                         </button>
                       </div>
                     </div>
@@ -903,13 +955,14 @@ export default function BudgetPage() {
 
                   {/* Format Info */}
                   <div className="bg-slate-50 rounded-xl p-4">
-                    <h4 className="font-medium text-slate-900 mb-2 text-sm">Formato esperado:</h4>
+                    <h4 className="font-medium text-slate-900 mb-2 text-sm">Formato de la plantilla:</h4>
                     <div className="font-mono text-xs bg-white border border-slate-200 rounded-lg p-3 overflow-x-auto">
-                      <div className="text-slate-500">Código, Descripción, Tipo, Presupuesto</div>
-                      <div className="text-slate-700">01, Producción, CUENTA, 0</div>
-                      <div className="text-slate-700">01.01, Equipo técnico, SUBCUENTA, 50000</div>
-                      <div className="text-slate-700">01.02, Material, SUBCUENTA, 25000</div>
+                      <div className="text-slate-400 mb-1">CÓDIGO · DESCRIPCIÓN · PRESUPUESTADO</div>
+                      <div className="text-slate-700">01 · Producción ·</div>
+                      <div className="text-slate-700 pl-4">01.01 · Equipo técnico · 50000</div>
+                      <div className="text-slate-700 pl-4">01.02 · Material · 25000</div>
                     </div>
+                    <p className="text-xs text-slate-500 mt-2">El tipo (cuenta / subcuenta) se detecta automáticamente según el formato del código. No hace falta columna TIPO.</p>
                   </div>
                 </div>
               )}

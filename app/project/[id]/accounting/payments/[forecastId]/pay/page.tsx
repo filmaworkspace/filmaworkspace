@@ -81,7 +81,18 @@ export default function PaymentPayPage() {
         if (sortedAccounts[0]) setSelectedBankAccount(sortedAccounts.find((a) => a.isDefault) || sortedAccounts[0]);
         
         const suppliersMap: Record<string, SupplierData> = {};
-        for (const item of forecastData.items) { if (item.supplierId && !suppliersMap[item.supplierId]) { const supplierSnap = await getDoc(doc(db, `projects/${id}/suppliers`, item.supplierId)); if (supplierSnap.exists()) { const sData = supplierSnap.data(); suppliersMap[item.supplierId] = { id: supplierSnap.id, name: sData.name, iban: sData.iban, bic: sData.bic }; } } }
+        const uniqueSupplierIds = [...new Set(
+          forecastData.items.filter(i => i.supplierId).map(i => i.supplierId!)
+        )];
+        const supplierSnaps = await Promise.all(
+          uniqueSupplierIds.map(sid => getDoc(doc(db, `projects/${id}/suppliers`, sid)))
+        );
+        supplierSnaps.forEach((snap, idx) => {
+          if (snap.exists()) {
+            const sData = snap.data();
+            suppliersMap[uniqueSupplierIds[idx]] = { id: snap.id, name: sData.name, iban: sData.iban, bic: sData.bic };
+          }
+        });
         setSuppliers(suppliersMap);
         setLoading(false);
       } catch (error) { console.error("Error:", error); showToast("error", "Error al cargar datos"); setLoading(false); }
@@ -478,7 +489,7 @@ export default function PaymentPayPage() {
           <button onClick={() => router.push(`/project/${id}/accounting/payments`)} className="p-2 hover:bg-emerald-700 rounded-lg"><X size={20} /></button>
           <div className="flex items-center gap-3">
             <CreditCard size={20} />
-            <span className="font-semibold">PAGAR REMESA</span>
+            <span className="font-semibold">Pagar remesa</span>
             <span className="bg-emerald-500 px-2 py-0.5 rounded text-sm">{forecast.name}</span>
           </div>
         </div>
@@ -498,7 +509,9 @@ export default function PaymentPayPage() {
         <div className="w-1/2 bg-slate-800 p-4 flex flex-col">
           <div className="flex items-center justify-between mb-3">
             <span className="text-slate-400 text-sm">
-              {selectedPayment ? `Documento: ${selectedPayment.supplier}` : "Selecciona un pago"}
+              {selectedPayment
+                ? `Documento: ${(selectedPayment.supplierId ? suppliers[selectedPayment.supplierId]?.name : null) || selectedPayment.supplier || "—"}`
+                : "Selecciona un pago"}
             </span>
             <div className="flex items-center gap-2">
               {selectedPayment && (itemReceipts[selectedPayment.id]?.url || selectedPayment.receiptUrl) && (
@@ -598,6 +611,9 @@ export default function PaymentPayPage() {
                   const isSelected = selectedPaymentId === item.id;
                   const hasReceipt = !!itemReceipts[item.id];
                   const payingAmount = tempAmounts[item.id] || item.partialAmount || item.amount;
+                  const enrichedSupplier = item.supplierId ? suppliers[item.supplierId] : null;
+                  const supplierName = enrichedSupplier?.name || item.supplier || "—";
+                  const hasIban = !!(enrichedSupplier?.iban || item.iban);
 
                   return (
                     <div key={item.id}>
@@ -610,8 +626,9 @@ export default function PaymentPayPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-slate-900 text-sm">{item.supplier}</span>
+                            <span className="font-medium text-slate-900 text-sm">{supplierName}</span>
                             {item.invoiceNumber && <span className="text-[10px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">FAC-{item.invoiceNumber}</span>}
+                            {!hasIban && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Sin IBAN</span>}
                           </div>
                           <p className="text-xs text-slate-500 truncate">{item.description}</p>
                         </div>
@@ -685,7 +702,9 @@ export default function PaymentPayPage() {
                 {completedItems.map((item) => {
                   const isSelected = selectedPaymentId === item.id;
                   const isPartialPayment = item.partialAmount && item.partialAmount < item.amount;
-                  
+                  const enrichedSupplierC = item.supplierId ? suppliers[item.supplierId] : null;
+                  const supplierNameC = enrichedSupplierC?.name || item.supplier || "—";
+
                   return (
                     <div key={item.id}>
                       <button
@@ -697,7 +716,7 @@ export default function PaymentPayPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-slate-900 text-sm">{item.supplier}</span>
+                            <span className="font-medium text-slate-900 text-sm">{supplierNameC}</span>
                             {item.invoiceNumber && <span className="text-[10px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">FAC-{item.invoiceNumber}</span>}
                             {isPartialPayment && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Parcial</span>}
                           </div>
@@ -838,6 +857,31 @@ export default function PaymentPayPage() {
                 <div className="flex justify-between text-sm mb-2"><span className="text-slate-600">Pagos</span><span className="font-semibold">{pendingItems.length}</span></div>
                 <div className="flex justify-between"><span className="text-slate-600">Total</span><span className="font-bold text-lg">{formatCurrency(totalPending)} €</span></div>
               </div>
+              {(() => {
+                const missing = pendingItems.filter(item => {
+                  const s = item.supplierId ? suppliers[item.supplierId] : null;
+                  return !s?.iban && !item.iban;
+                });
+                if (missing.length === 0) return null;
+                return (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-amber-900">{missing.length} pago{missing.length > 1 ? "s" : ""} sin IBAN</p>
+                        <ul className="mt-1 space-y-0.5">
+                          {missing.map(item => (
+                            <li key={item.id} className="text-xs text-amber-700 truncate">
+                              · {(item.supplierId ? suppliers[item.supplierId]?.name : null) || item.supplier || "—"}
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="text-xs text-amber-600 mt-1">Añade el IBAN en la ficha del proveedor antes de generar el XML.</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="flex gap-3">
                 <button onClick={() => setShowSepaModal(false)} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">Cancelar</button>
                 <button onClick={generateSepaXml} disabled={!selectedBankAccount} className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"><Download size={16} />Descargar XML</button>
