@@ -44,13 +44,15 @@ export default function BudgetPage() {
   const [formData, setFormData] = useState({ code: "", description: "", budgeted: 0 });
   const [summary, setSummary] = useState<BudgetSummary>({ totalBudgeted: 0, totalCommitted: 0, totalActual: 0, totalBox: 0, totalAvailable: 0 });
 
-  // Estados para el importador mejorado
+  // Estados para el importador
   const [importStep, setImportStep] = useState<"upload" | "preview" | "importing" | "done">("upload");
-  const [importData, setImportData] = useState<{ code: string; description: string; type: string; budgeted: number; valid: boolean; error?: string }[]>([]);
+  // parentCode = código de la cuenta padre (null = sin asignar)
+  const [importData, setImportData] = useState<{ code: string; description: string; type: string; budgeted: number; parentCode: string | null }[]>([]);
   const [importProgress, setImportProgress] = useState(0);
   const [importResults, setImportResults] = useState<{ accounts: number; subaccounts: number; errors: number }>({ accounts: 0, subaccounts: 0, errors: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [importFileName, setImportFileName] = useState("");
+  const [expandedImportAccounts, setExpandedImportAccounts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => { if (user) setUserId(user.uid); });
@@ -504,79 +506,96 @@ export default function BudgetPage() {
     return rows;
   };
 
-  const validateRow = (
-    row: { code: string; description: string; type: string; budgeted: number },
-    previousData: { code: string; type: string }[]
-  ): { valid: boolean; error?: string } => {
-    if (!row.code) return { valid: false, error: "Código vacío" };
-    if (!row.description) return { valid: false, error: "Descripción vacía" };
-    if (row.type === "SUBCUENTA") {
-      const accountCode = row.code.split(/[.\-\/]/)[0];
-      const hasParentInData = previousData.some(d => d.code === accountCode && d.type === "CUENTA");
-      const hasParentInExisting = accounts.some(a => a.code === accountCode);
-      if (!hasParentInData && !hasParentInExisting)
-        return { valid: false, error: `Cuenta padre "${accountCode}" no encontrada` };
-    }
-    return { valid: true };
-  };
-
-  const parseImportFile = (fileBytes: Uint8Array): { code: string; description: string; type: string; budgeted: number; valid: boolean; error?: string }[] => {
+  const parseImportFile = (fileBytes: Uint8Array): { code: string; description: string; type: string; budgeted: number; parentCode: string | null }[] => {
     try {
       const files = unzipSync(fileBytes);
-
-      // Shared strings (opcional — algunos xlsx no lo tienen)
       const ssEntry = files["xl/sharedStrings.xml"];
       const sharedStrings = ssEntry ? parseSharedStrings(new TextDecoder().decode(ssEntry)) : [];
-
-      // Primera hoja
       const sheetEntry = files["xl/worksheets/sheet1.xml"];
       if (!sheetEntry) throw new Error("sheet1.xml no encontrado");
       const sheetXml = new TextDecoder().decode(sheetEntry);
       const allRows = parseSheetXml(sheetXml, sharedStrings);
 
-      // Localizar fila de cabecera (tolera tildes: CÓDIGO / CODIGO / Código)
       const normalize = (s: string) =>
         s.toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
       const headerIdx = allRows.findIndex(r => r.some(c => normalize(c).startsWith("CODIGO")));
       const dataRows = allRows.slice(headerIdx >= 0 ? headerIdx + 1 : 1);
 
-      const data: { code: string; description: string; type: string; budgeted: number; valid: boolean; error?: string }[] = [];
+      const data: { code: string; description: string; type: string; budgeted: number; parentCode: string | null }[] = [];
 
       dataRows.forEach((row) => {
         const code = (row[0] ?? "").trim();
         const description = (row[1] ?? "").trim();
         const budgetedRaw = (row[2] ?? "").trim();
-
-        if (!code && !description) return; // fila vacía
+        if (!code && !description) return;
 
         const type = isSubAccountCode(code) ? "SUBCUENTA" : "CUENTA";
         const budgeted = budgetedRaw !== "" ? parseFloat(budgetedRaw.replace(",", ".")) || 0 : 0;
 
-        const { valid, error } = validateRow({ code, description, type, budgeted }, data);
-        data.push({ code, description, type, budgeted, valid, error });
+        // Intentar auto-asignar cuenta padre por prefijo del código
+        let parentCode: string | null = null;
+        if (type === "SUBCUENTA") {
+          const prefix = code.split(/[.\-\/]/)[0];
+          const existsInImport = data.some(d => d.type === "CUENTA" && d.code === prefix);
+          const existsInDB = accounts.some(a => a.code === prefix);
+          if (existsInImport || existsInDB) parentCode = prefix;
+          // Si no se encuentra → parentCode queda null (sin asignar, usuario la colocará)
+        }
+
+        data.push({ code, description, type, budgeted, parentCode });
       });
       return data;
-    } catch (e) {
+    } catch {
       setErrorMessage("No se pudo leer el archivo. Asegúrate de que es un .xlsx válido.");
       return [];
     }
   };
 
-  // Cambia el tipo de una fila en el preview y re-valida toda la lista
+  // Toggle cuenta ↔ subcuenta; las subcuentas recalculan su auto-parent
   const toggleRowType = (index: number) => {
     setImportData(prev => {
-      const updated = prev.map((row, i) => {
+      return prev.map((row, i) => {
         if (i !== index) return row;
         const newType = row.type === "CUENTA" ? "SUBCUENTA" : "CUENTA";
-        return { ...row, type: newType };
-      });
-      // Re-validar todas las filas con el nuevo orden de tipos
-      return updated.map((row, i) => {
-        const { valid, error } = validateRow(row, updated.slice(0, i));
-        return { ...row, valid, error };
+        let parentCode: string | null = null;
+        if (newType === "SUBCUENTA") {
+          const prefix = row.code.split(/[.\-\/]/)[0];
+          const existsInImport = prev.some((d, di) => di !== i && d.type === "CUENTA" && d.code === prefix);
+          const existsInDB = accounts.some(a => a.code === prefix);
+          if (existsInImport || existsInDB) parentCode = prefix;
+        }
+        return { ...row, type: newType, parentCode };
       });
     });
   };
+
+  // Reasignar una subcuenta a otra cuenta padre
+  const reassignParent = (index: number, newParentCode: string | null) => {
+    setImportData(prev => prev.map((row, i) =>
+      i === index ? { ...row, parentCode: newParentCode } : row
+    ));
+  };
+
+  // Mover una subcuenta arriba o abajo dentro de su cuenta (reordenar)
+  const moveSubAccount = (index: number, direction: "up" | "down") => {
+    setImportData(prev => {
+      const next = [...prev];
+      const target = direction === "up" ? index - 1 : index + 1;
+      if (target < 0 || target >= next.length) return prev;
+      // Solo intercambiar si el vecino es del mismo padre o también es subcuenta
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  // Cuentas disponibles para asignar como padre (importadas + existentes en BD)
+  const availableParentAccounts = [
+    ...importData.filter(d => d.type === "CUENTA").map(d => ({ code: d.code, description: d.description, source: "import" as const })),
+    ...accounts.filter(a => !importData.some(d => d.type === "CUENTA" && d.code === a.code))
+              .map(a => ({ code: a.code, description: a.description, source: "db" as const })),
+  ];
+
+  const unassignedSubAccounts = importData.filter(d => d.type === "SUBCUENTA" && !d.parentCode);
 
   const handleFileSelect = (file: File) => {
     if (!file) return;
@@ -616,66 +635,65 @@ export default function BudgetPage() {
     setImportStep("importing");
     setImportProgress(0);
     setSaving(true);
-    
-    const validItems = importData.filter(d => d.valid);
-    const total = validItems.length;
+
+    // Solo importar cuentas y subcuentas con padre asignado
+    const accountItems = importData.filter(d => d.type === "CUENTA");
+    const subItems = importData.filter(d => d.type === "SUBCUENTA" && d.parentCode);
+    const total = accountItems.length + subItems.length;
     let processed = 0;
     let accountsCreated = 0;
     let subAccountsCreated = 0;
     let errors = 0;
-    
-    const accountsMap = new Map<string, string>();
-    
+
+    const accountsMap = new Map<string, string>(); // code → firestoreId
+
     try {
-      // First pass: Create accounts
-      for (const item of validItems) {
-        if (item.type === "CUENTA") {
-          try {
-            const accountRef = await addDoc(collection(db, `projects/${id}/accounts`), {
-              code: item.code,
-              description: item.description,
-              createdAt: Timestamp.now(),
-              createdBy: userId || "",
-            });
-            accountsMap.set(item.code, accountRef.id);
-            accountsCreated++;
-          } catch (err) {
-            errors++;
-          }
-        }
+      // 1ª pasada: crear cuentas
+      for (const item of accountItems) {
+        try {
+          const accountRef = await addDoc(collection(db, `projects/${id}/accounts`), {
+            code: item.code,
+            description: item.description,
+            createdAt: Timestamp.now(),
+            createdBy: userId || "",
+          });
+          accountsMap.set(item.code, accountRef.id);
+          accountsCreated++;
+        } catch { errors++; }
         processed++;
         setImportProgress(Math.round((processed / total) * 100));
       }
-      
-      // Second pass: Create subaccounts
-      for (const item of validItems) {
-        if (item.type === "SUBCUENTA") {
-          try {
-            const accountCode = item.code.split(/[.\-]/)[0];
-            let accountId = accountsMap.get(accountCode);
-            if (!accountId) {
-              const existingAccount = accounts.find(a => a.code === accountCode);
-              if (existingAccount) accountId = existingAccount.id;
-            }
-            
-            if (accountId) {
-              await addDoc(collection(db, `projects/${id}/accounts/${accountId}/subaccounts`), {
-                code: item.code,
-                description: item.description,
-                budgeted: item.budgeted,
-                committed: 0,
-                actual: 0,
-                accountId,
-                createdAt: Timestamp.now(),
-                createdBy: userId || "",
-              });
-              subAccountsCreated++;
-            } else {
-              errors++;
-            }
-          } catch (err) {
-            errors++;
+
+      // 2ª pasada: crear subcuentas usando parentCode
+      for (const item of subItems) {
+        try {
+          let accountId = accountsMap.get(item.parentCode!);
+          if (!accountId) {
+            const existingAccount = accounts.find(a => a.code === item.parentCode);
+            if (existingAccount) accountId = existingAccount.id;
           }
+          if (accountId) {
+            await addDoc(collection(db, `projects/${id}/accounts/${accountId}/subaccounts`), {
+              code: item.code,
+              description: item.description,
+              budgeted: item.budgeted,
+              committed: 0,
+              actual: 0,
+              accountId,
+              createdAt: Timestamp.now(),
+              createdBy: userId || "",
+            });
+            subAccountsCreated++;
+          } else { errors++; }
+        } catch { errors++; }
+        processed++;
+        setImportProgress(Math.round((processed / total) * 100));
+      }
+
+      // Subcuentas sin asignar → contar como omitidas (no error, solo aviso)
+      const skipped = importData.filter(d => d.type === "SUBCUENTA" && !d.parentCode).length;
+      if (skipped > 0) console.info(`${skipped} subcuentas sin asignar omitidas`);
+
         }
         processed++;
         setImportProgress(Math.round((processed / total) * 100));
@@ -698,6 +716,7 @@ export default function BudgetPage() {
     setImportProgress(0);
     setImportResults({ accounts: 0, subaccounts: 0, errors: 0 });
     setImportFileName("");
+    setExpandedImportAccounts(new Set());
   };
 
   const closeImportModal = () => {
@@ -1137,9 +1156,10 @@ export default function BudgetPage() {
                 </div>
               )}
 
-              {/* Step 2: Preview */}
+              {/* Step 2: Organizar */}
               {importStep === "preview" && (
-                <div className="p-6 space-y-4">
+                <div className="p-5 space-y-4">
+                  {/* Cabecera */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
@@ -1147,98 +1167,188 @@ export default function BudgetPage() {
                       </div>
                       <div>
                         <p className="font-medium text-slate-900 text-sm">{importFileName}</p>
-                        <p className="text-xs text-slate-500">{importData.length} filas · {importData.filter(d => d.valid).length} válidas</p>
+                        <p className="text-xs text-slate-500">
+                          {importData.filter(d => d.type === "CUENTA").length} cuentas · {importData.filter(d => d.type === "SUBCUENTA").length} subcuentas
+                        </p>
                       </div>
                     </div>
-                    <button
-                      onClick={resetImport}
-                      className="text-sm text-slate-500 hover:text-slate-700"
-                    >
+                    <button onClick={resetImport} className="text-xs text-slate-500 hover:text-slate-700">
                       Cambiar archivo
                     </button>
                   </div>
 
-                  {/* Stats */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
-                      <p className="text-2xl font-bold text-blue-700">{importData.filter(d => d.type === "CUENTA").length}</p>
-                      <p className="text-xs text-blue-600">Cuentas</p>
-                    </div>
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
-                      <p className="text-2xl font-bold text-emerald-700">{importData.filter(d => d.type === "SUBCUENTA").length}</p>
-                      <p className="text-xs text-emerald-600">Subcuentas</p>
-                    </div>
-                    <div className={`border rounded-xl p-3 text-center ${importData.filter(d => !d.valid).length > 0 ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-200"}`}>
-                      <p className={`text-2xl font-bold ${importData.filter(d => !d.valid).length > 0 ? "text-red-700" : "text-slate-400"}`}>
-                        {importData.filter(d => !d.valid).length}
+                  {/* Aviso subcuentas sin asignar */}
+                  {unassignedSubAccounts.length > 0 && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-2">
+                      <AlertCircle size={16} className="text-amber-600 flex-shrink-0" />
+                      <p className="text-xs text-amber-800">
+                        <span className="font-semibold">{unassignedSubAccounts.length} subcuenta{unassignedSubAccounts.length > 1 ? "s" : ""} sin asignar.</span>{" "}
+                        Usa el desplegable de cada una para colocarla en su cuenta.
                       </p>
-                      <p className={`text-xs ${importData.filter(d => !d.valid).length > 0 ? "text-red-600" : "text-slate-500"}`}>Errores</p>
-                    </div>
-                  </div>
-
-                  {/* Table Preview */}
-                  <div className="border border-slate-200 rounded-xl overflow-hidden">
-                    <div className="max-h-64 overflow-auto">
-                      <table className="w-full text-sm">
-                        <thead className="bg-slate-50 sticky top-0">
-                          <tr>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Estado</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Código</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Descripción</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Tipo <span className="text-slate-400 normal-case font-normal">(clic para cambiar)</span></th>
-                            <th className="px-3 py-2 text-right text-xs font-medium text-slate-500 uppercase">Presupuesto</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {importData.map((row, index) => (
-                            <tr key={index} className={row.valid ? "bg-white hover:bg-slate-50" : "bg-red-50 hover:bg-red-100"}>
-                              <td className="px-3 py-2">
-                                {row.valid ? (
-                                  <CheckCircle size={16} className="text-emerald-500" />
-                                ) : (
-                                  <div className="group relative">
-                                    <AlertCircle size={16} className="text-red-500" />
-                                    <div className="absolute left-6 top-0 bg-red-600 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-10">
-                                      {row.error}
-                                    </div>
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 font-mono text-slate-900">{row.code}</td>
-                              <td className="px-3 py-2 text-slate-700 truncate max-w-[200px]">{row.description}</td>
-                              <td className="px-3 py-2">
-                                {/* Botón clickable para cambiar tipo manualmente */}
-                                <button
-                                  onClick={() => toggleRowType(index)}
-                                  title="Clic para cambiar"
-                                  className={`px-2 py-0.5 rounded text-xs font-medium transition-all hover:ring-2 hover:ring-offset-1 cursor-pointer ${
-                                    row.type === "CUENTA"
-                                      ? "bg-blue-100 text-blue-700 hover:ring-blue-300"
-                                      : "bg-emerald-100 text-emerald-700 hover:ring-emerald-300"
-                                  }`}
-                                >
-                                  {row.type === "CUENTA" ? "Cuenta" : "Subcuenta"}
-                                </button>
-                              </td>
-                              <td className="px-3 py-2 text-right font-medium text-slate-900">
-                                {row.budgeted > 0 ? formatCurrency(row.budgeted) : <span className="text-slate-300">—</span>}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {importData.filter(d => !d.valid).length > 0 && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-                      <AlertCircle size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-amber-900 text-sm">Hay {importData.filter(d => !d.valid).length} filas con errores</p>
-                        <p className="text-xs text-amber-700 mt-1">Las filas con errores serán ignoradas durante la importación.</p>
-                      </div>
                     </div>
                   )}
+
+                  {/* Vista de carpetas */}
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Estructura del presupuesto</span>
+                      <button
+                        onClick={() => {
+                          const allCodes = importData.filter(d => d.type === "CUENTA").map(d => d.code);
+                          setExpandedImportAccounts(
+                            expandedImportAccounts.size === allCodes.length ? new Set() : new Set(allCodes)
+                          );
+                        }}
+                        className="text-xs text-slate-500 hover:text-slate-700"
+                      >
+                        {expandedImportAccounts.size > 0 ? "Colapsar todo" : "Expandir todo"}
+                      </button>
+                    </div>
+
+                    <div className="max-h-[340px] overflow-y-auto divide-y divide-slate-100">
+                      {/* Cuentas con sus subcuentas */}
+                      {importData.filter(d => d.type === "CUENTA").map((account) => {
+                        const subs = importData.filter(d => d.type === "SUBCUENTA" && d.parentCode === account.code);
+                        const isExpanded = expandedImportAccounts.has(account.code);
+                        const accountIdx = importData.indexOf(account);
+                        return (
+                          <div key={account.code}>
+                            {/* Fila cuenta */}
+                            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 group">
+                              <button
+                                onClick={() => setExpandedImportAccounts(prev => {
+                                  const n = new Set(prev);
+                                  n.has(account.code) ? n.delete(account.code) : n.add(account.code);
+                                  return n;
+                                })}
+                                className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                              >
+                                <ChevronRight size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                                <span className="text-xs font-mono font-bold text-slate-500 w-16 flex-shrink-0">{account.code}</span>
+                                <span className="text-sm font-semibold text-slate-800 truncate">{account.description}</span>
+                                <span className="text-[10px] text-slate-400 ml-1">({subs.length})</span>
+                              </button>
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                                {/* Toggle tipo cuenta */}
+                                <button
+                                  onClick={() => toggleRowType(accountIdx)}
+                                  title="Convertir en subcuenta"
+                                  className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                                >
+                                  Cuenta
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Subcuentas de esta cuenta */}
+                            {isExpanded && (
+                              <div className="divide-y divide-slate-50">
+                                {subs.length === 0 ? (
+                                  <div className="pl-12 pr-4 py-2 text-xs text-slate-400 italic">Sin subcuentas — arrastra aquí o usa el desplegable</div>
+                                ) : (
+                                  subs.map((sub) => {
+                                    const subIdx = importData.indexOf(sub);
+                                    return (
+                                      <div key={sub.code} className="flex items-center gap-2 pl-10 pr-3 py-1.5 bg-white hover:bg-slate-50 group/sub">
+                                        <ChevronRight size={10} className="text-slate-300 flex-shrink-0" />
+                                        <span className="text-xs font-mono text-slate-400 w-16 flex-shrink-0">{sub.code}</span>
+                                        <span className="text-xs text-slate-700 flex-1 truncate">{sub.description}</span>
+                                        <span className="text-xs font-medium text-slate-600 tabular-nums flex-shrink-0">
+                                          {sub.budgeted > 0 ? `${formatCurrency(sub.budgeted)} €` : <span className="text-slate-300">—</span>}
+                                        </span>
+                                        {/* Reasignar a otra cuenta */}
+                                        <select
+                                          value={sub.parentCode ?? ""}
+                                          onChange={(e) => reassignParent(subIdx, e.target.value || null)}
+                                          className="opacity-0 group-hover/sub:opacity-100 transition-opacity text-[10px] border border-slate-200 rounded px-1 py-0.5 bg-white text-slate-600 max-w-[110px]"
+                                          title="Mover a otra cuenta"
+                                        >
+                                          {availableParentAccounts.map(a => (
+                                            <option key={a.code} value={a.code}>
+                                              {a.code} — {a.description}{a.source === "db" ? " (existente)" : ""}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        {/* Toggle tipo */}
+                                        <button
+                                          onClick={() => toggleRowType(subIdx)}
+                                          title="Convertir en cuenta principal"
+                                          className="opacity-0 group-hover/sub:opacity-100 transition-opacity text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded hover:bg-emerald-200 flex-shrink-0"
+                                        >
+                                          Subcuenta
+                                        </button>
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {/* Subcuentas sin asignar */}
+                      {unassignedSubAccounts.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border-t border-amber-100">
+                            <AlertCircle size={14} className="text-amber-500 flex-shrink-0" />
+                            <span className="text-xs font-semibold text-amber-700">Sin asignar ({unassignedSubAccounts.length})</span>
+                            <span className="text-[10px] text-amber-600">— selecciona la cuenta padre de cada una</span>
+                          </div>
+                          {unassignedSubAccounts.map((sub) => {
+                            const subIdx = importData.indexOf(sub);
+                            return (
+                              <div key={sub.code} className="flex items-center gap-2 pl-6 pr-3 py-2 bg-amber-50/50 hover:bg-amber-50 border-b border-amber-100 last:border-0">
+                                <span className="text-xs font-mono text-amber-600 w-16 flex-shrink-0">{sub.code}</span>
+                                <span className="text-xs text-slate-700 flex-1 truncate">{sub.description}</span>
+                                <span className="text-xs font-medium text-slate-600 tabular-nums flex-shrink-0">
+                                  {sub.budgeted > 0 ? `${formatCurrency(sub.budgeted)} €` : ""}
+                                </span>
+                                {/* Selector de cuenta padre — siempre visible */}
+                                <select
+                                  value=""
+                                  onChange={(e) => reassignParent(subIdx, e.target.value || null)}
+                                  className="text-xs border border-amber-300 rounded px-2 py-1 bg-white text-slate-700 max-w-[160px] flex-shrink-0"
+                                >
+                                  <option value="">Asignar a cuenta…</option>
+                                  {availableParentAccounts.map(a => (
+                                    <option key={a.code} value={a.code}>
+                                      {a.code} — {a.description}{a.source === "db" ? " ✓" : ""}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  onClick={() => toggleRowType(subIdx)}
+                                  title="Convertir en cuenta principal"
+                                  className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded hover:bg-slate-200 flex-shrink-0"
+                                >
+                                  → Cuenta
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Resumen */}
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-2">
+                      <p className="text-xl font-bold text-blue-700">{importData.filter(d => d.type === "CUENTA").length}</p>
+                      <p className="text-[10px] text-blue-600">Cuentas</p>
+                    </div>
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2">
+                      <p className="text-xl font-bold text-emerald-700">{importData.filter(d => d.type === "SUBCUENTA" && d.parentCode).length}</p>
+                      <p className="text-[10px] text-emerald-600">Subcuentas listas</p>
+                    </div>
+                    <div className={`border rounded-xl p-2 ${unassignedSubAccounts.length > 0 ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-200"}`}>
+                      <p className={`text-xl font-bold ${unassignedSubAccounts.length > 0 ? "text-amber-700" : "text-slate-400"}`}>
+                        {unassignedSubAccounts.length}
+                      </p>
+                      <p className={`text-[10px] ${unassignedSubAccounts.length > 0 ? "text-amber-600" : "text-slate-500"}`}>Sin asignar</p>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1301,21 +1411,30 @@ export default function BudgetPage() {
                   Cancelar
                 </button>
               )}
-              {importStep === "preview" && (
-                <>
-                  <button onClick={resetImport} className="px-4 py-2.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
-                    ← Volver
-                  </button>
-                  <button
-                    onClick={executeImport}
-                    disabled={importData.filter(d => d.valid).length === 0}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Upload size={16} />
-                    Importar {importData.filter(d => d.valid).length} filas
-                  </button>
-                </>
-              )}
+              {importStep === "preview" && (() => {
+                const readyCount = importData.filter(d => d.type === "CUENTA").length
+                  + importData.filter(d => d.type === "SUBCUENTA" && d.parentCode).length;
+                return (
+                  <>
+                    <button onClick={resetImport} className="px-4 py-2.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                      ← Volver
+                    </button>
+                    {unassignedSubAccounts.length > 0 && (
+                      <span className="text-xs text-amber-600 self-center">
+                        {unassignedSubAccounts.length} sin asignar se omitirán
+                      </span>
+                    )}
+                    <button
+                      onClick={executeImport}
+                      disabled={readyCount === 0}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Upload size={16} />
+                      Importar {readyCount} elementos
+                    </button>
+                  </>
+                );
+              })()}
               {importStep === "importing" && (
                 <div className="w-full text-center text-sm text-slate-500">
                   Procesando...
