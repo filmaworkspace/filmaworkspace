@@ -6,7 +6,7 @@ import { Inter } from "next/font/google";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, Timestamp } from "firebase/firestore";
 import { Plus, ChevronDown, ChevronRight, Edit, Trash2, X, Search, Upload, AlertCircle, CheckCircle, FileSpreadsheet, Eye, EyeOff, Wallet, ShieldAlert, ArrowLeft, Download } from "lucide-react";
-import * as XLSX from "xlsx";
+import { zipSync, strToU8, unzipSync } from "fflate";
 import { getCostSettings, shouldCommitPO, shouldRealizeInvoice, CostSettings } from "@/lib/budgetRules";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
@@ -304,120 +304,230 @@ export default function BudgetPage() {
   const openCreateSubAccountModal = (account: Account) => { resetForm(); setSelectedAccount(account); setFormData({ code: "", description: "", budgeted: 0 }); setModalMode("subaccount"); setEditMode(false); setShowModal(true); };
   const openEditSubAccountModal = (account: Account, subAccount: SubAccount) => { setSelectedAccount(account); setSelectedSubAccount(subAccount); setFormData({ code: subAccount.code, description: subAccount.description, budgeted: subAccount.budgeted }); setModalMode("subaccount"); setEditMode(true); setShowModal(true); };
 
-  // ── XLSX import/export ────────────────────────────────────────────────────
+  // ── XLSX import/export (usando fflate, igual que reports) ─────────────────
 
-  const downloadTemplate = () => {
-    const wb = XLSX.utils.book_new();
+  const esc = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-    // Hoja de datos
-    const rows = [
+  const buildTemplateXlsx = (): Uint8Array => {
+    // Filas de la hoja principal
+    const templateRows: [string, string, string | number][] = [
       ["CÓDIGO", "DESCRIPCIÓN", "PRESUPUESTADO"],
-      ["01", "GUION Y MÚSICA", null],
+      ["01", "GUION Y MÚSICA", ""],
       ["01.01", "Derechos de autor", 5000],
       ["01.02", "Música original", 3000],
-      ["02", "PRODUCCIÓN", null],
+      ["02", "PRODUCCIÓN", ""],
       ["02.01", "Equipo técnico", 50000],
       ["02.02", "Material y consumibles", 10000],
-      ["03", "POSTPRODUCCIÓN", null],
+      ["03", "POSTPRODUCCIÓN", ""],
       ["03.01", "Montaje", 20000],
       ["03.02", "Sonido", 8000],
     ];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
 
-    // Ancho de columnas
-    ws["!cols"] = [{ wch: 14 }, { wch: 40 }, { wch: 18 }];
+    const cellXml = (col: number, row: number, val: string | number, sIdx = 0): string => {
+      const colLetter = String.fromCharCode(65 + col);
+      const addr = `${colLetter}${row}`;
+      const s = sIdx > 0 ? ` s="${sIdx}"` : "";
+      if (typeof val === "number") return `<c r="${addr}"${s}><v>${val}</v></c>`;
+      if (val === "") return `<c r="${addr}"${s}/>`;
+      return `<c r="${addr}" t="inlineStr"${s}><is><t>${esc(String(val))}</t></is></c>`;
+    };
 
-    // Estilos de cabecera (solo disponibles en xlsx-style; aquí usamos lo básico)
-    XLSX.utils.book_append_sheet(wb, ws, "Presupuesto");
+    let sheetRows = "";
+    templateRows.forEach((row, ri) => {
+      const r = ri + 1;
+      const isHeader = ri === 0;
+      sheetRows += `<row r="${r}">${row.map((v, c) => cellXml(c, r, v, isHeader ? 2 : 0)).join("")}</row>`;
+    });
 
-    // Hoja de instrucciones
-    const instrRows = [
-      ["INSTRUCCIONES DE IMPORTACIÓN"],
-      [""],
-      ["Columna A — CÓDIGO"],
-      ["  • Cuentas principales: un número entero  (01, 02, 03…)"],
-      ["  • Subcuentas: código con punto           (01.01, 01.02…)"],
-      ["  • El tipo (cuenta/subcuenta) se detecta automáticamente por el formato del código."],
-      [""],
-      ["Columna B — DESCRIPCIÓN"],
-      ["  • Texto libre. Puedes usar comas, tildes y cualquier carácter."],
-      [""],
-      ["Columna C — PRESUPUESTADO"],
-      ["  • Solo para subcuentas. Deja en blanco las filas de cuenta principal."],
-      ["  • Número sin símbolo de moneda ni puntos de millar (ej: 50000)."],
-      [""],
-      ["IMPORTANTE: No modifiques la fila de cabecera (fila 1)."],
+    // Hoja instrucciones (texto plano)
+    const instrLines = [
+      "INSTRUCCIONES DE IMPORTACIÓN",
+      "",
+      "Columna A — CÓDIGO",
+      "  · Cuentas principales: número entero  (01, 02, 03…)",
+      "  · Subcuentas: código con punto        (01.01, 01.02…)",
+      "  · El tipo se detecta automáticamente: no hace falta columna TIPO.",
+      "",
+      "Columna B — DESCRIPCIÓN",
+      "  · Texto libre. Puedes usar comas, tildes y cualquier carácter.",
+      "",
+      "Columna C — PRESUPUESTADO",
+      "  · Solo para subcuentas. Deja en blanco las filas de cuenta principal.",
+      "  · Número sin símbolo de moneda ni puntos de millar (ej: 50000).",
+      "",
+      "IMPORTANTE: No modifiques la fila de cabecera (fila 1).",
     ];
-    const wsInstr = XLSX.utils.aoa_to_sheet(instrRows);
-    wsInstr["!cols"] = [{ wch: 70 }];
-    XLSX.utils.book_append_sheet(wb, wsInstr, "Instrucciones");
+    const instrRows = instrLines
+      .map((t, i) => `<row r="${i + 1}"><c r="A${i + 1}" t="inlineStr"><is><t>${esc(t)}</t></is></c></row>`)
+      .join("");
 
-    XLSX.writeFile(wb, "plantilla_presupuesto.xlsx");
+    const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="3">
+    <font><sz val="11"/><name val="Calibri"/></font>
+    <font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
+    <font><b/><sz val="11"/><name val="Calibri"/></font>
+  </fonts>
+  <fills count="4">
+    <fill><patternFill patternType="none"/></fill>
+    <fill><patternFill patternType="gray125"/></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FF1E293B"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FF2F52E0"/></patternFill></fill>
+  </fills>
+  <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+  <cellXfs count="3">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+    <xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
+    <xf numFmtId="0" fontId="1" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"><alignment horizontal="center" vertical="center"/></xf>
+  </cellXfs>
+</styleSheet>`;
+
+    const makeSheet = (rows: string, cols: string) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<cols>${cols}</cols><sheetData>${rows}</sheetData></worksheet>`;
+
+    const wbXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets>
+  <sheet name="Presupuesto" sheetId="1" r:id="rId1"/>
+  <sheet name="Instrucciones" sheetId="2" r:id="rId2"/>
+</sheets></workbook>`;
+
+    const wbRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
+<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+
+    const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+<Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>`;
+
+    const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+
+    const mainColsXml = `<col min="1" max="1" width="14" customWidth="1"/>
+<col min="2" max="2" width="42" customWidth="1"/>
+<col min="3" max="3" width="18" customWidth="1"/>`;
+
+    return zipSync({
+      "[Content_Types].xml": strToU8(contentTypes),
+      "_rels/.rels": strToU8(rootRels),
+      "xl/workbook.xml": strToU8(wbXml),
+      "xl/_rels/workbook.xml.rels": strToU8(wbRels),
+      "xl/worksheets/sheet1.xml": strToU8(makeSheet(sheetRows, mainColsXml)),
+      "xl/worksheets/sheet2.xml": strToU8(makeSheet(instrRows, `<col min="1" max="1" width="70" customWidth="1"/>`)),
+      "xl/styles.xml": strToU8(stylesXml),
+      "xl/sharedStrings.xml": strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="0" uniqueCount="0"/>`),
+    });
+  };
+
+  const downloadTemplate = () => {
+    const bytes = buildTemplateXlsx();
+    const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "plantilla_presupuesto.xlsx";
+    a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   const isSubAccountCode = (code: string) => /[.\-\/]/.test(code.trim());
 
-  const parseImportFile = (wb: XLSX.WorkBook): { code: string; description: string; type: string; budgeted: number; valid: boolean; error?: string }[] => {
-    // Leer la primera hoja que no se llame "Instrucciones"
-    const sheetName = wb.SheetNames.find(n => n !== "Instrucciones") ?? wb.SheetNames[0];
-    const ws = wb.Sheets[sheetName];
-    const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-
-    // Buscar la fila de cabecera (contiene "CÓDIGO" o "CÓDIGO")
-    const headerIndex = rows.findIndex(r =>
-      r.some((c: any) => String(c).toUpperCase().replace(/[^A-Z]/g, "").startsWith("CODIGO"))
-    );
-    const dataRows = rows.slice(headerIndex >= 0 ? headerIndex + 1 : 1);
-
-    const data: { code: string; description: string; type: string; budgeted: number; valid: boolean; error?: string }[] = [];
-
-    dataRows.forEach((row) => {
-      const code = String(row[0] ?? "").trim();
-      const description = String(row[1] ?? "").trim();
-      const budgetedRaw = row[2];
-
-      if (!code && !description) return; // fila vacía
-
-      const type = isSubAccountCode(code) ? "SUBCUENTA" : "CUENTA";
-      const budgeted = budgetedRaw !== "" && budgetedRaw !== null && budgetedRaw !== undefined
-        ? parseFloat(String(budgetedRaw).replace(",", ".")) || 0
-        : 0;
-
-      let valid = true;
-      let error = "";
-
-      if (!code) { valid = false; error = "Código vacío"; }
-      else if (!description) { valid = false; error = "Descripción vacía"; }
-      else if (type === "SUBCUENTA") {
-        const accountCode = code.split(/[.\-\/]/)[0];
-        const hasParentInData = data.some(d => d.code === accountCode && d.type === "CUENTA");
-        const hasParentInExisting = accounts.some(a => a.code === accountCode);
-        if (!hasParentInData && !hasParentInExisting) {
-          valid = false;
-          error = `Cuenta padre "${accountCode}" no encontrada`;
-        }
+  // Lee el XML de la primera hoja del xlsx y extrae filas como arrays de strings
+  const parseSheetXml = (xml: string): string[][] => {
+    const rows: string[][] = [];
+    const rowMatches = xml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g);
+    for (const rowMatch of rowMatches) {
+      const cells: string[] = [];
+      const cellMatches = rowMatch[1].matchAll(/<c r="([A-Z]+)(\d+)"[^>]*>([\s\S]*?)<\/c>/g);
+      for (const cellMatch of cellMatches) {
+        const col = cellMatch[1].charCodeAt(0) - 65; // A=0, B=1…
+        const inner = cellMatch[3];
+        let val = "";
+        const tMatch = inner.match(/<t(?:\s[^>]*)?>([^<]*)<\/t>/);
+        const vMatch = inner.match(/<v>([^<]*)<\/v>/);
+        if (tMatch) val = tMatch[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
+        else if (vMatch) val = vMatch[1];
+        while (cells.length < col) cells.push("");
+        cells[col] = val;
       }
+      if (cells.length > 0) rows.push(cells);
+    }
+    return rows;
+  };
 
-      data.push({ code, description, type, budgeted, valid, error });
-    });
+  const parseImportFile = (fileBytes: Uint8Array): { code: string; description: string; type: string; budgeted: number; valid: boolean; error?: string }[] => {
+    try {
+      const files = unzipSync(fileBytes);
+      // Leer la primera hoja (sheet1.xml)
+      const sheetEntry = files["xl/worksheets/sheet1.xml"];
+      if (!sheetEntry) throw new Error("sheet1.xml no encontrado");
+      const sheetXml = new TextDecoder().decode(sheetEntry);
+      const allRows = parseSheetXml(sheetXml);
 
-    return data;
+      // Buscar fila de cabecera (contiene "CÓDIGO" normalizado)
+      const headerIdx = allRows.findIndex(r =>
+        r.some(c => c.toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "").startsWith("CODIGO"))
+      );
+      const dataRows = allRows.slice(headerIdx >= 0 ? headerIdx + 1 : 1);
+
+      const data: { code: string; description: string; type: string; budgeted: number; valid: boolean; error?: string }[] = [];
+
+      dataRows.forEach((row) => {
+        const code = (row[0] ?? "").trim();
+        const description = (row[1] ?? "").trim();
+        const budgetedRaw = row[2] ?? "";
+
+        if (!code && !description) return;
+
+        const type = isSubAccountCode(code) ? "SUBCUENTA" : "CUENTA";
+        const budgeted = budgetedRaw !== "" ? parseFloat(budgetedRaw.replace(",", ".")) || 0 : 0;
+
+        let valid = true;
+        let error = "";
+        if (!code) { valid = false; error = "Código vacío"; }
+        else if (!description) { valid = false; error = "Descripción vacía"; }
+        else if (type === "SUBCUENTA") {
+          const accountCode = code.split(/[.\-\/]/)[0];
+          const hasParentInData = data.some(d => d.code === accountCode && d.type === "CUENTA");
+          const hasParentInExisting = accounts.some(a => a.code === accountCode);
+          if (!hasParentInData && !hasParentInExisting) {
+            valid = false;
+            error = `Cuenta padre "${accountCode}" no encontrada`;
+          }
+        }
+        data.push({ code, description, type, budgeted, valid, error });
+      });
+      return data;
+    } catch {
+      setErrorMessage("No se pudo leer el archivo. Asegúrate de que es un .xlsx válido.");
+      return [];
+    }
   };
 
   const handleFileSelect = (file: File) => {
     if (!file) return;
     setImportFileName(file.name);
-
     const reader = new FileReader();
     reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const wb = XLSX.read(data, { type: "array" });
-        const parsed = parseImportFile(wb);
+      const bytes = new Uint8Array(e.target?.result as ArrayBuffer);
+      const parsed = parseImportFile(bytes);
+      if (parsed.length > 0) {
         setImportData(parsed);
         setImportStep("preview");
-      } catch {
-        setErrorMessage("No se pudo leer el archivo. Asegúrate de que es un .xlsx válido.");
       }
     };
     reader.readAsArrayBuffer(file);
