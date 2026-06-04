@@ -1,11 +1,25 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Inter } from "next/font/google";
-import { ArrowLeft, AlertCircle, CheckCircle, Mail, ArrowRight } from "lucide-react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth } from "@/lib/firebase";
 import { sendPasswordResetEmail } from "firebase/auth";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle,
+  Mail,
+} from "lucide-react";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600"] });
 

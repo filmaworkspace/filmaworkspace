@@ -1,15 +1,73 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { useState, useEffect } from "react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs, updateDoc, deleteDoc, query, where, Timestamp, orderBy } from "firebase/firestore";
-import { ArrowLeft, Edit, Trash2, Mail, Phone, User, CreditCard, FileText, AlertCircle, CheckCircle, X, Download, FileSpreadsheet, Send, Copy, ExternalLink, Calendar, Building2, MapPin, ChevronRight, ChevronDown, ShieldCheck, Receipt, Package, Lock, Upload, FileCheck, RotateCcw, Search } from "lucide-react";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  getDoc,
+  orderBy,
+  query,
+  Timestamp,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  ArrowLeft,
+  Building2,
+  Calendar,
+  CheckCircle,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  CreditCard,
+  Download,
+  Edit,
+  ExternalLink,
+  FileCheck,
+  FileSpreadsheet,
+  FileText,
+  Lock,
+  Mail,
+  MapPin,
+  Package,
+  Phone,
+  Receipt,
+  RotateCcw,
+  Search,
+  Send,
+  ShieldCheck,
+  Trash2,
+  Upload,
+  User,
+  X,
+} from "lucide-react";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-interface Certificate { expiryDate?: Date; uploaded: boolean; fileName?: string; verified?: boolean; verifiedByName?: string; verifiedAt?: Date; }
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface Certificate {
+  expiryDate?: Date;
+  uploaded: boolean;
+  fileName?: string;
+  verified?: boolean;
+  verifiedByName?: string;
+  verifiedAt?: Date;
+}
 
 interface Supplier {
   id: string;
@@ -59,8 +117,12 @@ interface ProjectConfig {
   postalCode: string;
 }
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const COUNTRIES: Record<string, string> = { ES: "España", FR: "Francia", DE: "Alemania", IT: "Italia", PT: "Portugal", UK: "Reino Unido", US: "Estados Unidos" };
 const PAYMENT_METHODS: Record<string, string> = { transferencia: "Transferencia", tb30: "Transf. 30 días", tb60: "Transf. 60 días", tarjeta: "Tarjeta", efectivo: "Efectivo" };
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function SupplierDetailPage() {
   const params = useParams();

@@ -1,20 +1,74 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Inter } from "next/font/google";
-import {
-  User, ArrowLeft, CheckCircle, Lock, Eye, EyeOff, Bell, Shield, AlertCircle, LogOut,
-  FolderOpen, Archive, ArchiveRestore, Settings, ChevronRight, BellOff, BellRing,
-  FileText, Receipt, CreditCard, Users, Check, Sparkles, Calendar, Building2,
-  MoreHorizontal, ExternalLink, Star, StarOff, Clock, Layers
-} from "lucide-react";
 import Link from "next/link";
+import { Inter } from "next/font/google";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
-import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential, signOut } from "firebase/auth";
-import { doc, getDoc, updateDoc, collection, getDocs, query, where, Timestamp } from "firebase/firestore";
+import {
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  signOut,
+  updatePassword,
+  updateProfile,
+} from "firebase/auth";
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  query,
+  Timestamp,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  Archive,
+  ArchiveRestore,
+  ArrowLeft,
+  Bell,
+  BellOff,
+  BellRing,
+  Building2,
+  Calendar,
+  Check,
+  CheckCircle,
+  ChevronRight,
+  Clock,
+  CreditCard,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  FileText,
+  FolderOpen,
+  Layers,
+  Lock,
+  LogOut,
+  MoreHorizontal,
+  Receipt,
+  Settings,
+  Shield,
+  Sparkles,
+  Star,
+  StarOff,
+  User,
+  Users,
+} from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface ProjectMembership {
   projectId: string;
@@ -39,6 +93,8 @@ interface ProjectMembership {
   phase?: string;
 }
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const PHASES: Record<string, { label: string; color: string }> = {
   development: { label: "Desarrollo", color: "bg-violet-100 text-violet-700" },
   preproduction: { label: "Preproducción", color: "bg-amber-100 text-amber-700" },
@@ -53,6 +109,8 @@ const NOTIFICATION_TYPES = [
   { id: "invoices", label: "Facturas", description: "Nuevas facturas y cambios", icon: Receipt, color: "blue" },
   { id: "team", label: "Equipo", description: "Cambios en el equipo", icon: Users, color: "green" },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ProfilePage() {
   const router = useRouter();

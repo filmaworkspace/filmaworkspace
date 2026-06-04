@@ -1,17 +1,58 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Inter } from "next/font/google";
-import { Plus, Trash2, AlertCircle, CheckCircle, ArrowLeft, ChevronDown, MoreHorizontal, Users, Briefcase, X } from "lucide-react";
 import Link from "next/link";
+import { Inter } from "next/font/google";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, updateDoc, collection, getDocs, arrayUnion, arrayRemove } from "firebase/firestore";
+import {
+  arrayRemove,
+  arrayUnion,
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  updateDoc,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  ArrowLeft,
+  Briefcase,
+  CheckCircle,
+  ChevronDown,
+  MoreHorizontal,
+  Plus,
+  Trash2,
+  Users,
+  X,
+} from "lucide-react";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-interface Member { userId: string; name: string; email: string; department?: string; position?: string; }
-interface DepartmentData { name: string; members: Member[]; }
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface Member {
+  userId: string;
+  name: string;
+  email: string;
+  department?: string;
+  position?: string;
+}
+
+interface DepartmentData {
+  name: string;
+  members: Member[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ConfigDepartments() {
   const { id } = useParams();

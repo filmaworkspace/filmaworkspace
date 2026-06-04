@@ -1,19 +1,88 @@
 "use client";
-import React, { useState, useEffect, Fragment } from "react";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
+import React, { Fragment, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, Timestamp } from "firebase/firestore";
-import { Plus, ChevronDown, ChevronRight, Edit, Trash2, X, Search, Upload, AlertCircle, CheckCircle, FileSpreadsheet, Eye, EyeOff, Wallet, ShieldAlert, ArrowLeft, Download } from "lucide-react";
-import { zipSync, strToU8, unzipSync } from "fflate";
-import { getCostSettings, shouldCommitPO, shouldRealizeInvoice, CostSettings } from "@/lib/budgetRules";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  getDoc,
+  orderBy,
+  query,
+  Timestamp,
+  updateDoc,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  Edit,
+  Eye,
+  EyeOff,
+  FileSpreadsheet,
+  Plus,
+  Search,
+  ShieldAlert,
+  Trash2,
+  Upload,
+  Wallet,
+  X,
+} from "lucide-react";
+
+// ─── Libraries ───────────────────────────────────────────────────────────────
+import { strToU8, unzipSync, zipSync } from "fflate";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
+import { CostSettings, getCostSettings, shouldCommitPO, shouldRealizeInvoice } from "@/lib/budgetRules";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-interface SubAccount { id: string; code: string; description: string; budgeted: number; committed: number; actual: number; box: number; accountId: string; createdAt: Date; }
-interface Account { id: string; code: string; description: string; subAccounts: SubAccount[]; createdAt: Date; }
-interface BudgetSummary { totalBudgeted: number; totalCommitted: number; totalActual: number; totalBox: number; totalAvailable: number; }
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface SubAccount {
+  id: string;
+  code: string;
+  description: string;
+  budgeted: number;
+  committed: number;
+  actual: number;
+  box: number;
+  accountId: string;
+  createdAt: Date;
+}
+
+interface Account {
+  id: string;
+  code: string;
+  description: string;
+  subAccounts: SubAccount[];
+  createdAt: Date;
+}
+
+interface BudgetSummary {
+  totalBudgeted: number;
+  totalCommitted: number;
+  totalActual: number;
+  totalBox: number;
+  totalAvailable: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function BudgetPage() {
   const params = useParams();

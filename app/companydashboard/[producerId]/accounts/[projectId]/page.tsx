@@ -1,26 +1,57 @@
 "use client";
 
-// app/companydashboard/[producerId]/accounts/[projectId]/page.tsx
-
+// ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
 import {
-  collection, getDocs, getDoc, doc, updateDoc, setDoc, query, orderBy,
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  orderBy,
+  query,
+  setDoc,
+  updateDoc,
 } from "firebase/firestore";
-import { handleInvoiceStatusChange } from "@/lib/budgetOperations";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  Search, Filter, ChevronDown, ChevronLeft, ChevronRight, Eye,
-  CheckCircle, Clock, AlertTriangle, Lock, Unlock, Euro, X,
-  AlertCircle, RefreshCw, ExternalLink, Plus, Trash2, Save, Info,
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Euro,
+  ExternalLink,
+  Eye,
+  Filter,
+  Info,
+  Lock,
+  Plus,
+  RefreshCw,
+  Save,
+  Search,
+  Trash2,
+  Unlock,
+  X,
 } from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
+import { handleInvoiceStatusChange } from "@/lib/budgetOperations";
 import { useUser } from "@/contexts/UserContext";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface JournalLine {
   id: string;
@@ -59,9 +90,15 @@ interface Invoice {
   paidAmount?: number;
 }
 
-interface ChartAccount { code: string; name: string; type: string; group: string; parent?: string | null; }
+interface ChartAccount {
+  code: string;
+  name: string;
+  type: string;
+  group: string;
+  parent?: string | null;
+}
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string }> = {
   draft:            { bg: "bg-slate-100",  text: "text-slate-600",  label: "Borrador"      },
@@ -260,7 +297,10 @@ function AccountCombobox({
 
 // ── Smart invoice validation ───────────────────────────────────────────────────
 
-interface ValidationWarning { level: "error" | "warn" | "info"; msg: string; }
+interface ValidationWarning {
+  level: "error" | "warn" | "info";
+  msg: string;
+}
 
 function validateInvoice(inv: Invoice): ValidationWarning[] {
   const warnings: ValidationWarning[] = [];

@@ -1,19 +1,85 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { useState, useEffect, useRef } from "react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-import { doc, getDoc, collection, getDocs, updateDoc, deleteDoc, query, where, orderBy, Timestamp, arrayUnion, deleteField } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { FileText, ArrowLeft, Edit, Download, Receipt, Lock, Unlock, XCircle, CheckCircle, Clock, Ban, Archive, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, FileEdit, ExternalLink, MoreHorizontal, Layers, BookCheck, Wallet, Info, Trash2, Upload, Glasses, Check, X, MessageSquare, PenLine } from "lucide-react";
+import {
+  arrayUnion,
+  collection,
+  deleteDoc,
+  deleteField,
+  doc,
+  getDocs,
+  getDoc,
+  orderBy,
+  query,
+  Timestamp,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  AlertTriangle,
+  Archive,
+  ArrowLeft,
+  Ban,
+  BookCheck,
+  Building2,
+  Calendar,
+  Check,
+  CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Download,
+  Edit,
+  ExternalLink,
+  FileEdit,
+  FileText,
+  FileUp,
+  Glasses,
+  Hash,
+  Info,
+  KeyRound,
+  Layers,
+  Lock,
+  MessageSquare,
+  MoreHorizontal,
+  PenLine,
+  Receipt,
+  ShieldAlert,
+  Trash2,
+  Unlock,
+  Upload,
+  User,
+  Wallet,
+  X,
+  XCircle,
+} from "lucide-react";
+
+// ─── Libraries ───────────────────────────────────────────────────────────────
 import jsPDF from "jspdf";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldCommitPO } from "@/lib/budgetRules";
 import { uncommitPO, closePoItem, reopenPoItem } from "@/lib/budgetOperations";
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 type POStatus = "draft" | "pending" | "approved" | "rejected" | "closed" | "cancelled";
 
 interface EpisodeDistribution {
@@ -124,6 +190,8 @@ interface PO {
   comments?: ApprovalComment[];
 }
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const STATUS_CONFIG: Record<POStatus, { bg: string; text: string; label: string; icon: typeof Clock; gradient: string }> = {
   draft: { bg: "bg-slate-100", text: "text-slate-700", label: "Borrador", icon: Edit, gradient: "from-slate-500 to-slate-600" },
   pending: { bg: "bg-amber-50", text: "text-amber-700", label: "Pendiente", icon: Clock, gradient: "from-amber-500 to-orange-500" },
@@ -132,6 +200,8 @@ const STATUS_CONFIG: Record<POStatus, { bg: string; text: string; label: string;
   closed: { bg: "bg-blue-50", text: "text-blue-700", label: "Cerrada", icon: Archive, gradient: "from-blue-500 to-indigo-500" },
   cancelled: { bg: "bg-red-50", text: "text-red-700", label: "Anulada", icon: Ban, gradient: "from-red-500 to-rose-500" },
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function PODetailPage() {
   const params = useParams();

@@ -1,5 +1,8 @@
+// ─── Framework ────────────────────────────────────────────────────────────────
 import type { Metadata } from "next";
 import { inter } from "@/lib/fonts";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import ClientLayout from "./layout-client";
 import "./globals.css";
 

@@ -1,20 +1,46 @@
 "use client";
 
+// ─── Framework ────────────────────────────────────────────────────────────────
+import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { useState, useEffect, useMemo } from "react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { collection, getDocs, orderBy, query } from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  FileText, Download, Search, Calendar, Receipt,
-  FileCheck, Shield, X, CheckCircle, FolderDown,
-  ShieldAlert, CheckSquare, Square, ArrowLeft,
-  Building2, Eye, Paperclip, FileImage, ChevronDown,
+  ArrowLeft,
+  Building2,
+  Calendar,
+  CheckCircle,
+  CheckSquare,
+  ChevronDown,
+  Download,
+  Eye,
+  FileCheck,
+  FileImage,
+  FileText,
+  FolderDown,
+  Paperclip,
+  Receipt,
+  Search,
+  Shield,
+  ShieldAlert,
+  Square,
+  X,
 } from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 type DocumentType = "invoice" | "proforma" | "budget" | "guarantee";
 type InvoiceStatus = "pending_approval" | "pending" | "paid" | "overdue" | "cancelled" | "rejected";
@@ -70,6 +96,8 @@ interface Invoice {
   poNumber?: string;
 }
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const DOCUMENT_TYPES: Record<DocumentType, { label: string; icon: React.ElementType }> = {
   invoice:   { label: "Factura",     icon: Receipt   },
   proforma:  { label: "Proforma",    icon: FileText  },
@@ -110,6 +138,8 @@ const fmtMoney = (amount: number, currency = "EUR") => {
   const symbol = currency === "EUR" ? "€" : currency === "USD" ? "$" : "€";
   return new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount) + " " + symbol;
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function DocumentCenterPage() {
   const params = useParams();

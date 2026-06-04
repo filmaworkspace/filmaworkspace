@@ -1,30 +1,204 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Inter } from "next/font/google";
-import {
-  CheckCircle, XCircle, ChevronLeft, ChevronRight, FileText, Receipt, AlertCircle,
-  Clock, User, Calendar, Building2, Eye, Check, X, AlertTriangle,
-  MessageSquare, History, TrendingUp, DollarSign, Shield, FileCheck, Zap,
-  ChevronDown, ChevronUp, ExternalLink, Send, Info, Flame, Award, Target,
-  PieChart, HelpCircle, Link as LinkIcon, ClipboardCheck, Layers, CreditCard, Banknote, Package,
-} from "lucide-react";
 import Link from "next/link";
+import { Inter } from "next/font/google";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, query, where, getDocs, doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  query,
+  Timestamp,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  AlertTriangle,
+  Award,
+  Banknote,
+  Building2,
+  Calendar,
+  Check,
+  CheckCircle,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  ClipboardCheck,
+  Clock,
+  CreditCard,
+  DollarSign,
+  ExternalLink,
+  Eye,
+  FileCheck,
+  FileText,
+  Flame,
+  HelpCircle,
+  History,
+  Info,
+  Layers,
+  Link as LinkIcon,
+  MessageSquare,
+  Package,
+  PieChart,
+  Receipt,
+  Send,
+  Shield,
+  Target,
+  TrendingUp,
+  User,
+  X,
+  XCircle,
+  Zap,
+} from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { handlePOStatusChange, handleInvoiceStatusChange, updatePOItemsInvoiced } from "@/lib/budgetOperations";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-interface ApprovalStepStatus { id: string; order: number; approverType: "fixed" | "role" | "hod" | "coordinator"; approvers: string[]; approverNames?: string[]; roles?: string[]; department?: string; approvedBy: string[]; rejectedBy: string[]; status: "pending" | "approved" | "rejected"; requireAll: boolean; hasAmountThreshold?: boolean; amountThreshold?: number; amountCondition?: string; }
-interface TimelineEvent { id: string; type: "created" | "approved" | "rejected" | "comment" | "info_requested"; date: Date; userId: string; userName: string; stepOrder?: number; comment?: string; }
-interface AutoCheck { id: string; label: string; status: "pass" | "warning" | "fail" | "info"; message: string; details?: string; }
-interface POComparison { poNumber: string; poBaseAmount: number; invoicedBefore: number; thisInvoice: number; remaining: number; percentageUsed: number; itemDiscrepancies: { description: string; poAmount: number; invoiceAmount: number; difference: number; }[]; }
-interface SupplierStats { totalPOs: number; totalInvoices: number; pendingAmount: number; avgApprovalTime: number; lastTransaction: Date | null; }
-interface BoxExpensePreview { id: string; supplier: string; subAccountCode: string; baseAmount: number; vatAmount: number; totalAmount: number; date?: string; personName?: string; }
-interface PendingApproval { id: string; type: "po" | "invoice" | "box"; documentId: string; documentNumber: string; displayNumber?: string; projectId: string; projectName: string; supplier: string; supplierId?: string; amount: number; baseAmount: number; description: string; createdAt: Date; createdBy: string; createdByName: string; currentApprovalStep: number; approvalSteps: ApprovalStepStatus[]; attachmentUrl?: string; attachmentFileName?: string; items?: any[]; department?: string; poType?: string; currency?: string; poId?: string; poNumber?: string; timeline: TimelineEvent[]; autoChecks: AutoCheck[]; poComparison?: POComparison; supplierStats?: SupplierStats; daysWaiting: number; isUrgent: boolean; budgetImpact?: { accountCode: string; accountName: string; budgeted: number; committed: number; actual: number; available: number; afterApproval: number; committedAfter?: number; actualAfter?: number; }[]; boxType?: "card" | "transfer"; boxExpenses?: BoxExpensePreview[]; expenseCount?: number; cardName?: string; paymentDate?: string; }
-interface UserStats { approvedToday: number; approvedThisWeek: number; approvedThisMonth: number; avgResponseTime: number; pendingCount: number; }
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface ApprovalStepStatus {
+  id: string;
+  order: number;
+  approverType: "fixed" | "role" | "hod" | "coordinator";
+  approvers: string[];
+  approverNames?: string[];
+  roles?: string[];
+  department?: string;
+  approvedBy: string[];
+  rejectedBy: string[];
+  status: "pending" | "approved" | "rejected";
+  requireAll: boolean;
+  hasAmountThreshold?: boolean;
+  amountThreshold?: number;
+  amountCondition?: string;
+}
+
+interface TimelineEvent {
+  id: string;
+  type: "created" | "approved" | "rejected" | "comment" | "info_requested";
+  date: Date;
+  userId: string;
+  userName: string;
+  stepOrder?: number;
+  comment?: string;
+}
+
+interface AutoCheck {
+  id: string;
+  label: string;
+  status: "pass" | "warning" | "fail" | "info";
+  message: string;
+  details?: string;
+}
+
+interface POComparison {
+  poNumber: string;
+  poBaseAmount: number;
+  invoicedBefore: number;
+  thisInvoice: number;
+  remaining: number;
+  percentageUsed: number;
+  itemDiscrepancies: {
+    description: string;
+    poAmount: number;
+    invoiceAmount: number;
+    difference: number;
+  }[];
+}
+
+interface SupplierStats {
+  totalPOs: number;
+  totalInvoices: number;
+  pendingAmount: number;
+  avgApprovalTime: number;
+  lastTransaction: Date | null;
+}
+
+interface BoxExpensePreview {
+  id: string;
+  supplier: string;
+  subAccountCode: string;
+  baseAmount: number;
+  vatAmount: number;
+  totalAmount: number;
+  date?: string;
+  personName?: string;
+}
+
+interface PendingApproval {
+  id: string;
+  type: "po" | "invoice" | "box";
+  documentId: string;
+  documentNumber: string;
+  displayNumber?: string;
+  projectId: string;
+  projectName: string;
+  supplier: string;
+  supplierId?: string;
+  amount: number;
+  baseAmount: number;
+  description: string;
+  createdAt: Date;
+  createdBy: string;
+  createdByName: string;
+  currentApprovalStep: number;
+  approvalSteps: ApprovalStepStatus[];
+  attachmentUrl?: string;
+  attachmentFileName?: string;
+  items?: any[];
+  department?: string;
+  poType?: string;
+  currency?: string;
+  poId?: string;
+  poNumber?: string;
+  timeline: TimelineEvent[];
+  autoChecks: AutoCheck[];
+  poComparison?: POComparison;
+  supplierStats?: SupplierStats;
+  daysWaiting: number;
+  isUrgent: boolean;
+  budgetImpact?: {
+    accountCode: string;
+    accountName: string;
+    budgeted: number;
+    committed: number;
+    actual: number;
+    available: number;
+    afterApproval: number;
+    committedAfter?: number;
+    actualAfter?: number;
+  }[];
+  boxType?: "card" | "transfer";
+  boxExpenses?: BoxExpensePreview[];
+  expenseCount?: number;
+  cardName?: string;
+  paymentDate?: string;
+}
+
+interface UserStats {
+  approvedToday: number;
+  approvedThisWeek: number;
+  approvedThisMonth: number;
+  avgResponseTime: number;
+  pendingCount: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ApprovalsPage() {
   const params = useParams();

@@ -1,11 +1,19 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
-import { Users } from "lucide-react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import { Users } from "lucide-react";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 

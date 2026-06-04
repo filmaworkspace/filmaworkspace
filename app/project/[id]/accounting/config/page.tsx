@@ -1,47 +1,67 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Inter } from "next/font/google";
-import {
-  Settings,
-  Save,
-  AlertCircle,
-  CheckCircle2,
-  FileText,
-  Receipt,
-  Plus,
-  X,
-  ArrowUp,
-  ArrowDown,
-  Trash2,
-  Info,
-  ChevronRight,
-  ChevronDown,
-  Users,
-  UserCheck,
-  Briefcase,
-  Shield,
-  ArrowLeft,
-  DollarSign,
-  TrendingUp,
-  Zap,
-  FileCheck,
-  Clock,
-  Building2,
-  Landmark,
-  CreditCard,
-  Star,
-  Edit2,
-  Film,
-  Layers,
-  Package,
-} from "lucide-react";
 import Link from "next/link";
+import { Inter } from "next/font/google";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc, collection, getDocs, Timestamp, addDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  getDoc,
+  setDoc,
+  Timestamp,
+  updateDoc,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  Briefcase,
+  Building2,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  CreditCard,
+  DollarSign,
+  Edit2,
+  FileCheck,
+  FileText,
+  Film,
+  Info,
+  Landmark,
+  Layers,
+  Package,
+  Plus,
+  Receipt,
+  Save,
+  Settings,
+  Shield,
+  Star,
+  Trash2,
+  TrendingUp,
+  UserCheck,
+  Users,
+  X,
+  Zap,
+} from "lucide-react";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Member {
   userId: string;
@@ -85,6 +105,8 @@ interface BankAccount {
   bic?: string;
   isDefault?: boolean;
 }
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const emptyCompanyData: CompanyData = {
   fiscalName: "",
@@ -219,6 +241,8 @@ interface PermissionSettings {
     users: string[];
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function AccountingConfigPage() {
   const { id } = useParams();

@@ -1,35 +1,96 @@
 "use client";
 
-// app/companydashboard/[producerId]/accounts/[projectId]/ledger/page.tsx
-
+// ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
-import { collection, getDocs, getDoc, doc, query, orderBy } from "firebase/firestore";
-import { useUser } from "@/contexts/UserContext";
 import {
-  Search, RefreshCw, CheckCircle, X, Filter,
-  FileSpreadsheet, FileText, Download, TrendingUp, TrendingDown,
-  ChevronDown, BarChart2,
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  orderBy,
+  query,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  BarChart2,
+  CheckCircle,
+  ChevronDown,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Filter,
+  RefreshCw,
+  Search,
+  TrendingDown,
+  TrendingUp,
+  X,
 } from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
+import { useUser } from "@/contexts/UserContext";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-interface JLine { id: string; code: string; name: string; debe: number; haber: number; }
-interface Invoice {
-  id: string; displayNumber: string; supplier: string; description: string;
-  baseAmount: number; vatAmount: number; irpfAmount: number; totalAmount: number;
-  accounted: boolean; accountingEntryNumber?: string; invoiceDate: Date;
-  items: any[]; journalLines?: JLine[];
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface JLine {
+  id: string;
+  code: string;
+  name: string;
+  debe: number;
+  haber: number;
 }
-interface ManualEntry { id: string; numero: string; date: string; concepto: string; lines: JLine[]; tipo?: string; }
-interface Movement { fecha: string; concepto: string; entry: string; debe: number; haber: number; saldo: number; tipo: string; }
+
+interface Invoice {
+  id: string;
+  displayNumber: string;
+  supplier: string;
+  description: string;
+  baseAmount: number;
+  vatAmount: number;
+  irpfAmount: number;
+  totalAmount: number;
+  accounted: boolean;
+  accountingEntryNumber?: string;
+  invoiceDate: Date;
+  items: any[];
+  journalLines?: JLine[];
+}
+
+interface ManualEntry {
+  id: string;
+  numero: string;
+  date: string;
+  concepto: string;
+  lines: JLine[];
+  tipo?: string;
+}
+
+interface Movement {
+  fecha: string;
+  concepto: string;
+  entry: string;
+  debe: number;
+  haber: number;
+  saldo: number;
+  tipo: string;
+}
 interface LedgerAccount {
-  code: string; name: string; group: string;
+  code: string;
+  name: string;
+  group: string;
   movimientos: Movement[];
-  totalDebe: number; totalHaber: number; saldoFinal: number;
+  totalDebe: number;
+  totalHaber: number;
+  saldoFinal: number;
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────

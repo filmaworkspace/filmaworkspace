@@ -1,48 +1,60 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
 import {
   collection,
+  deleteDoc,
+  doc,
   getDocs,
   getDoc,
-  doc,
-  deleteDoc,
-  updateDoc,
-  setDoc,
   serverTimestamp,
+  setDoc,
   Timestamp,
+  updateDoc,
 } from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
 import {
+  AlertCircle,
+  AlertTriangle,
   ArrowLeft,
   Briefcase,
-  Users,
-  Trash2,
-  CheckCircle,
-  AlertCircle,
-  X,
-  RefreshCw,
-  ExternalLink,
-  MessageSquare,
-  Send,
-  Info,
-  AlertTriangle,
-  Clock,
-  Calendar,
-  Edit2,
-  UserPlus,
-  Shield,
-  Settings,
-  FolderOpen,
   Building2,
-  Layers,
+  Calendar,
+  CheckCircle,
   ChevronDown,
+  Clock,
+  Edit2,
+  ExternalLink,
+  FolderOpen,
+  Info,
+  Layers,
+  MessageSquare,
+  RefreshCw,
+  Send,
+  Settings,
+  Shield,
+  Trash2,
+  UserPlus,
+  Users,
+  X,
 } from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const PHASES = ["Desarrollo", "Preproducción", "Rodaje", "Postproducción", "Finalizado"];
 
@@ -55,6 +67,8 @@ const phaseConfig: Record<string, { bg: string; text: string }> = {
 };
 
 const PROJECT_ROLES = ["EP", "PM", "Controller", "PC", "Supervisor"];
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface ProjectData {
   id: string;
@@ -88,6 +102,8 @@ interface DepartmentData {
   color: string;
   memberCount: number;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function AdminProjectPage() {
   const params = useParams();

@@ -1,22 +1,87 @@
 "use client";
 
-// app/companydashboard/[producerId]/accounts/[projectId]/chart-of-accounts/page.tsx
-
+// ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
-import { collection, getDocs, getDoc, doc, setDoc, query, orderBy } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  orderBy,
+  query,
+  setDoc,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  RefreshCw,
+  Save,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
-import { Search, Plus, Trash2, ChevronDown, ChevronRight, RefreshCw, Save, X } from "lucide-react";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-interface ChartAccount { code: string; name: string; type: string; group: string; parent?: string | null; }
-interface JLine { id: string; code: string; name: string; debe: number; haber: number; }
-interface Invoice { id: string; accounted: boolean; accountingEntryNumber?: string; invoiceDate: Date; description: string; displayNumber: string; items: any[]; journalLines?: JLine[]; vatAmount: number; irpfAmount: number; totalAmount: number; supplier: string; }
-interface ManualEntry { id: string; lines: JLine[]; }
-interface LiveBalance { code: string; totalDebe: number; totalHaber: number; saldo: number; }
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface ChartAccount {
+  code: string;
+  name: string;
+  type: string;
+  group: string;
+  parent?: string | null;
+}
+
+interface JLine {
+  id: string;
+  code: string;
+  name: string;
+  debe: number;
+  haber: number;
+}
+
+interface Invoice {
+  id: string;
+  accounted: boolean;
+  accountingEntryNumber?: string;
+  invoiceDate: Date;
+  description: string;
+  displayNumber: string;
+  items: any[];
+  journalLines?: JLine[];
+  vatAmount: number;
+  irpfAmount: number;
+  totalAmount: number;
+  supplier: string;
+}
+
+interface ManualEntry {
+  id: string;
+  lines: JLine[];
+}
+
+interface LiveBalance {
+  code: string;
+  totalDebe: number;
+  totalHaber: number;
+  saldo: number;
+}
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const DEFAULT_PLAN: ChartAccount[] = [
   { code: "400", name: "Proveedores",                            type: "pasivo",  group: "4" },

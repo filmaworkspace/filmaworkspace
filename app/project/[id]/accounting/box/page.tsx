@@ -1,64 +1,165 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
 import {
-  doc, getDoc, collection, getDocs, addDoc, updateDoc, deleteDoc,
-  query, orderBy, Timestamp, writeBatch, setDoc
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  getDoc,
+  orderBy,
+  query,
+  setDoc,
+  Timestamp,
+  updateDoc,
+  writeBatch,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, getBlob } from "firebase/storage";
+import { getBlob, getDownloadURL, ref, uploadBytes } from "firebase/storage";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  Package, Plus, Search, ChevronDown, ChevronRight, X, Check, AlertCircle, CheckCircle,
-  Trash2, Edit, Upload, FileText, Receipt, ArrowLeft, Layers, ShieldAlert, FileSpreadsheet,
-  ExternalLink, Lock, Send, Banknote, UserCircle, CreditCard, CheckSquare, AlertTriangle,
-  Calendar, Users, Paperclip, Eye, Info, SplitSquareHorizontal, Scissors, FileX, PanelRightOpen,
-  RotateCcw, Save, ChevronLeft, Download, ZoomIn, ZoomOut, Maximize2
+  AlertCircle,
+  AlertTriangle,
+  ArrowLeft,
+  Banknote,
+  Calendar,
+  Check,
+  CheckCircle,
+  CheckSquare,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CreditCard,
+  Download,
+  Edit,
+  ExternalLink,
+  Eye,
+  FileSpreadsheet,
+  FileText,
+  FileX,
+  Info,
+  Layers,
+  Lock,
+  Maximize2,
+  Package,
+  PanelRightOpen,
+  Paperclip,
+  Plus,
+  Receipt,
+  RotateCcw,
+  Save,
+  Scissors,
+  Search,
+  Send,
+  ShieldAlert,
+  SplitSquareHorizontal,
+  Trash2,
+  Upload,
+  UserCircle,
+  Users,
+  X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
+
+// ─── Libraries ───────────────────────────────────────────────────────────────
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
-import { unzipSync, strFromU8, zipSync, strToU8 } from "fflate";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// INTERFACES
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Box {
-  id: string; name: string; code: string; department?: string;
+  id: string;
+  name: string;
+  code: string;
+  department?: string;
   nextEnvelopeNumber: number;
-  createdAt: Date; createdBy: string; createdByName: string;
+  createdAt: Date;
+  createdBy: string;
+  createdByName: string;
 }
 
 interface Envelope {
-  id: string; boxId: string; boxCode: string; number: number; displayNumber: string;
+  id: string;
+  boxId: string;
+  boxCode: string;
+  number: number;
+  displayNumber: string;
   status: "open" | "reviewing" | "closed";
-  totalBase: number; totalVat: number; totalAmount: number;
-  expenseCount: number; reviewedCount: number;
-  nextInvoiceNumber: number; nextTicketNumber: number;
-  createdAt: Date; createdBy: string; createdByName: string;
-  closedAt?: Date; closedBy?: string; closedByName?: string;
+  totalBase: number;
+  totalVat: number;
+  totalAmount: number;
+  expenseCount: number;
+  reviewedCount: number;
+  nextInvoiceNumber: number;
+  nextTicketNumber: number;
+  createdAt: Date;
+  createdBy: string;
+  createdByName: string;
+  closedAt?: Date;
+  closedBy?: string;
+  closedByName?: string;
 }
 
-interface ExpenseItem { baseAmount: number; vatRate: number; vatAmount: number; subAccountCode?: string; subAccountDescription?: string; }
+interface ExpenseItem {
+  baseAmount: number;
+  vatRate: number;
+  vatAmount: number;
+  subAccountCode?: string;
+  subAccountDescription?: string;
+}
 
 type ConflictType = "amount_diff" | "invoice_covers_multiple" | "partial_invoice" | "missing_document";
 
 // For invoice_covers_multiple: list of card charges that this invoice covers
-interface LinkedCharge { amount: number; date: string; }
+interface LinkedCharge {
+  amount: number;
+  date: string;
+}
 
 interface BoxExpense {
-  id: string; envelopeId: string; boxId: string; boxCode: string;
-  number: number; displayNumber: string; type: "invoice" | "ticket";
-  pleoReceiptId: string; pleoUrl?: string; documentUrl?: string;
-  supplier: string; supplierTaxId: string; supplierNumber: string;
-  subAccountCode: string; subAccountDescription: string; description: string;
-  date: Date; items: ExpenseItem[];
-  baseAmount: number; vatAmount: number; irpfRate: number; irpfAmount: number; totalAmount: number;
+  id: string;
+  envelopeId: string;
+  boxId: string;
+  boxCode: string;
+  number: number;
+  displayNumber: string;
+  type: "invoice" | "ticket";
+  pleoReceiptId: string;
+  pleoUrl?: string;
+  documentUrl?: string;
+  supplier: string;
+  supplierTaxId: string;
+  supplierNumber: string;
+  subAccountCode: string;
+  subAccountDescription: string;
+  description: string;
+  date: Date;
+  items: ExpenseItem[];
+  baseAmount: number;
+  vatAmount: number;
+  irpfRate: number;
+  irpfAmount: number;
+  totalAmount: number;
   pleoAmount?: number;
   status: "pending" | "reviewed" | "accounted";
-  reviewedAt?: Date; reviewedBy?: string; reviewedByName?: string;
+  reviewedAt?: Date;
+  reviewedBy?: string;
+  reviewedByName?: string;
   conflictType?: ConflictType | null;
   conflictNote?: string;
   conflictAnnotatedAt?: Date;
@@ -70,14 +171,31 @@ interface BoxExpense {
   conflictResolvedByName?: string;
 }
 
-interface BoxSupplier { taxId: string; name: string; originalName: string; updatedAt?: Date; }
+interface BoxSupplier {
+  taxId: string;
+  name: string;
+  originalName: string;
+  updatedAt?: Date;
+}
 
 interface TransferEnvelope {
-  id: string; number: number; displayNumber: string;
-  paymentDate: string; status: "draft" | "pending" | "transferred";
-  totalBase: number; totalVat: number; totalAmount: number; expenseCount: number; notes?: string;
-  createdAt: Date; createdBy: string; createdByName: string;
-  transferredAt?: Date; transferredBy?: string; transferredByName?: string; transferReference?: string;
+  id: string;
+  number: number;
+  displayNumber: string;
+  paymentDate: string;
+  status: "draft" | "pending" | "transferred";
+  totalBase: number;
+  totalVat: number;
+  totalAmount: number;
+  expenseCount: number;
+  notes?: string;
+  createdAt: Date;
+  createdBy: string;
+  createdByName: string;
+  transferredAt?: Date;
+  transferredBy?: string;
+  transferredByName?: string;
+  transferReference?: string;
 }
 
 interface TransferExpenseItem {
@@ -90,26 +208,41 @@ interface TransferExpenseItem {
 }
 
 interface TransferExpense {
-  id: string; envelopeId: string; type: "invoice" | "ticket";
-  personName: string; personDepartment?: string; personIban?: string;
-  supplier: string; supplierTaxId?: string;
+  id: string;
+  envelopeId: string;
+  type: "invoice" | "ticket";
+  personName: string;
+  personDepartment?: string;
+  personIban?: string;
+  supplier: string;
+  supplierTaxId?: string;
   items: TransferExpenseItem[];
-  subAccountCode?: string; subAccountDescription?: string; description?: string;
+  subAccountCode?: string;
+  subAccountDescription?: string;
+  description?: string;
   date: string;
-  baseAmount: number; vatAmount: number;
-  irpfRate: number; irpfAmount: number; totalAmount: number;
-  attachmentUrl?: string; attachmentFileName?: string;
-  createdAt: Date; createdBy: string; createdByName: string;
+  baseAmount: number;
+  vatAmount: number;
+  irpfRate: number;
+  irpfAmount: number;
+  totalAmount: number;
+  attachmentUrl?: string;
+  attachmentFileName?: string;
+  createdAt: Date;
+  createdBy: string;
+  createdByName: string;
 }
 
 interface SubAccount {
-  id: string; code: string; description: string;
-  accountId: string; accountCode: string; accountDescription: string;
+  id: string;
+  code: string;
+  description: string;
+  accountId: string;
+  accountCode: string;
+  accountDescription: string;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// HELPERS
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const capitalizeSupplierName = (name: string): string => {
   if (!name) return "";
@@ -194,9 +327,7 @@ const CONFLICT_CONFIG: Record<ConflictType, {
 
 type MainTab = "tarjetas" | "transfers";
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// COMPONENT
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function BoxesPage() {
   const params = useParams();

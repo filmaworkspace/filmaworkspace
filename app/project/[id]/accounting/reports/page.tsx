@@ -1,15 +1,61 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { useState, useEffect } from "react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
-import { Download, FileText, Receipt, Building2, Wallet, Settings2, ChevronDown, Check, X, Save, Trash2, BookMarked, Layers, GripVertical, Plus, Minus, FileSpreadsheet, Film, ShieldAlert, ArrowLeft, CreditCard, Banknote, Search, Calendar } from "lucide-react";
-import { getCostSettings, shouldCommitPO, shouldRealizeInvoice, CostSettings } from "@/lib/budgetRules";
-import { zipSync, strToU8 } from "fflate";
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  orderBy,
+  query,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  ArrowLeft,
+  Banknote,
+  BookMarked,
+  Building2,
+  Calendar,
+  Check,
+  ChevronDown,
+  CreditCard,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Film,
+  GripVertical,
+  Layers,
+  Minus,
+  Plus,
+  Receipt,
+  Save,
+  Search,
+  Settings2,
+  ShieldAlert,
+  Trash2,
+  Wallet,
+  X,
+} from "lucide-react";
+
+// ─── Libraries ───────────────────────────────────────────────────────────────
+import { strToU8, zipSync } from "fflate";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
+import { CostSettings, getCostSettings, shouldCommitPO, shouldRealizeInvoice } from "@/lib/budgetRules";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 type ReportType = "budget" | "pos_list" | "pos_items" | "invoices" | "invoices_accounting" | "suppliers" | "payments" | "cost_report" | "box_cards" | "box_transfers";
 
@@ -50,6 +96,8 @@ interface InvoiceBookFilters {
   dateTo: string;
   paymentStatus: "all" | "paid" | "pending";
 }
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const REPORT_COLUMNS: Record<ReportType, ReportColumn[]> = {
   budget: [

@@ -1,11 +1,57 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
-import { Folder, Search, Users, Settings, Clock, Mail, Check, X as XIcon, Building2, Sparkles, BarChart3, Archive, ChevronDown, FolderOpen, Filter, ArrowUpDown, Bell, Info, AlertTriangle, CheckCircle, MessageSquare } from "lucide-react";
 import Link from "next/link";
-import { db, auth } from "@/lib/firebase";
-import { useUser } from "@/contexts/UserContext";
-import { collection, getDocs, getDoc, doc, query, where, updateDoc, setDoc, Timestamp, DocumentData, QueryDocumentSnapshot, orderBy, deleteDoc } from "firebase/firestore";
 import { inter } from "@/lib/fonts";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
+import { db, auth } from "@/lib/firebase";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  DocumentData,
+  getDocs,
+  getDoc,
+  orderBy,
+  query,
+  QueryDocumentSnapshot,
+  setDoc,
+  Timestamp,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertTriangle,
+  Archive,
+  ArrowUpDown,
+  BarChart3,
+  Bell,
+  Building2,
+  Check,
+  CheckCircle,
+  ChevronDown,
+  Clock,
+  Filter,
+  Folder,
+  FolderOpen,
+  Info,
+  Mail,
+  MessageSquare,
+  Search,
+  Settings,
+  Sparkles,
+  Users,
+  X as XIcon,
+} from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
+import { useUser } from "@/contexts/UserContext";
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const phaseColors: Record<string, { bg: string; border: string; text: string; dot: string }> = {
   Desarrollo: { bg: "bg-sky-50", border: "border-sky-200", text: "text-sky-700", dot: "bg-sky-500" },
@@ -29,6 +75,8 @@ const SORT_OPTIONS = [
   { value: "name", label: "Nombre" },
   { value: "phase", label: "Fase" },
 ];
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Project {
   id: string;
@@ -73,6 +121,8 @@ interface AdminMessage {
   sentByName: string;
   read: boolean;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const { user, isLoading: userLoading } = useUser();

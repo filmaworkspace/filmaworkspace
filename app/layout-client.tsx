@@ -1,5 +1,9 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
 import { usePathname } from "next/navigation";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { UserProvider } from "@/contexts/UserContext";

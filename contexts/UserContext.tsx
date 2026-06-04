@@ -1,6 +1,10 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";

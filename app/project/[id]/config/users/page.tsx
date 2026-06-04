@@ -1,34 +1,56 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Inter } from "next/font/google";
-import {
-  UserCog,
-  UserPlus,
-  Search,
-  Trash2,
-  X,
-  AlertCircle,
-  CheckCircle,
-  ArrowLeft,
-  Clock,
-  MoreHorizontal,
-  Mail,
-  Shield,
-  Briefcase,
-  Edit,
-  Settings,
-  ChevronDown,
-} from "lucide-react";
 import Link from "next/link";
+import { Inter } from "next/font/google";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, query, where, updateDoc } from "firebase/firestore";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  getDoc,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  ArrowLeft,
+  Briefcase,
+  CheckCircle,
+  ChevronDown,
+  Clock,
+  Edit,
+  Mail,
+  MoreHorizontal,
+  Search,
+  Settings,
+  Shield,
+  Trash2,
+  UserCog,
+  UserPlus,
+  X,
+} from "lucide-react";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const PROJECT_ROLES = ["EP", "PM", "Controller", "PC"];
 const DEPARTMENT_POSITIONS = ["HOD", "Coordinator", "Crew"];
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Member {
   userId: string;
@@ -53,6 +75,8 @@ interface PendingInvitation {
 interface Department {
   name: string;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ConfigUsers() {
   const { id } = useParams();

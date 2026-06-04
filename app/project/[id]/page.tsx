@@ -1,19 +1,47 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import {
-  Settings, BarChart3, Users, Building2, Clock,
-  Film, Tv, Briefcase, ChevronRight, Shield, Copy, CheckCircle
-} from "lucide-react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, collection, getDocs, Timestamp } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  Timestamp,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  BarChart3,
+  Briefcase,
+  Building2,
+  CheckCircle,
+  ChevronRight,
+  Clock,
+  Copy,
+  Film,
+  Settings,
+  Shield,
+  Tv,
+  Users,
+} from "lucide-react";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const PROJECT_ROLES = ["EP", "PM", "Controller", "PC"];
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Member {
   userId: string;
@@ -42,6 +70,8 @@ interface UserPermissions {
   accounting: boolean;
   team: boolean;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ProjectOverviewPage() {
   const params = useParams();

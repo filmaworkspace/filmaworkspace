@@ -1,31 +1,42 @@
 "use client";
 
+// ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
 import {
   collection,
+  doc,
   getDocs,
   getDoc,
-  doc,
   query,
-  where,
   Timestamp,
+  where,
 } from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
 import {
   Building2,
-  Users,
-  FolderOpen,
-  ExternalLink,
-  Eye,
   Clock,
   ClipboardList,
+  ExternalLink,
+  Eye,
+  FolderOpen,
+  Users,
 } from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const PHASES = ["Desarrollo", "Preproducción", "Rodaje", "Postproducción", "Finalizado"];
 
@@ -36,6 +47,8 @@ const phaseConfig: Record<string, { bg: string; text: string; dot: string }> = {
   Postproducción: { bg: "bg-violet-50", text: "text-violet-700", dot: "bg-violet-500" },
   Finalizado: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
 };
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Project {
   id: string;
@@ -50,6 +63,8 @@ interface Producer {
   id: string;
   name: string;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function CompanyDashboardPage() {
   const params = useParams();

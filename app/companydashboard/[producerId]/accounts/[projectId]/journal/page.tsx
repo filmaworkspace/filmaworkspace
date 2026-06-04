@@ -1,36 +1,86 @@
 "use client";
 
-// app/companydashboard/[producerId]/accounts/[projectId]/journal/page.tsx
-
+// ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
 import {
-  collection, getDocs, getDoc, doc, setDoc, deleteDoc, query, orderBy,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  getDoc,
+  orderBy,
+  query,
+  setDoc,
 } from "firebase/firestore";
-import { useUser } from "@/contexts/UserContext";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  Search, Download, CheckCircle, RefreshCw, Plus, Trash2, X,
-  ChevronDown, Copy, Repeat, Users, Filter, Calendar, Info,
+  Calendar,
+  CheckCircle,
+  ChevronDown,
+  Copy,
+  Download,
+  Filter,
+  Info,
+  Plus,
+  RefreshCw,
+  Repeat,
+  Search,
+  Trash2,
+  Users,
+  X,
 } from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
+import { useUser } from "@/contexts/UserContext";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-interface JLine { id: string; code: string; name: string; debe: number; haber: number; }
+// ─── Types ───────────────────────────────────────────────────────────────────
+interface JLine {
+  id: string;
+  code: string;
+  name: string;
+  debe: number;
+  haber: number;
+}
 interface Invoice {
-  id: string; displayNumber: string; supplier: string; description: string;
-  baseAmount: number; vatAmount: number; irpfAmount: number; totalAmount: number;
-  accounted: boolean; accountingEntryNumber?: string; invoiceDate: Date;
-  items: any[]; journalLines?: JLine[];
+  id: string;
+  displayNumber: string;
+  supplier: string;
+  description: string;
+  baseAmount: number;
+  vatAmount: number;
+  irpfAmount: number;
+  totalAmount: number;
+  accounted: boolean;
+  accountingEntryNumber?: string;
+  invoiceDate: Date;
+  items: any[];
+  journalLines?: JLine[];
 }
 interface ManualEntry {
-  id: string; numero: string; date: string; concepto: string;
-  lines: JLine[]; tipo: string; createdAt: Date;
-  recurrente?: boolean; frecuencia?: string;
+  id: string;
+  numero: string;
+  date: string;
+  concepto: string;
+  lines: JLine[];
+  tipo: string;
+  createdAt: Date;
+  recurrente?: boolean;
+  frecuencia?: string;
 }
-interface ChartAccount { code: string; name: string; }
+interface ChartAccount {
+  code: string;
+  name: string;
+}
 
 // ── Nómina worker — expanded ──────────────────────────────────────────────────
 interface NominaWorker {

@@ -1,57 +1,78 @@
 "use client";
 
+// ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
-import { collection, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, Timestamp, serverTimestamp } from "firebase/firestore";
 import {
-  LayoutDashboard,
-  FolderPlus,
-  Users,
-  Building2,
-  Search,
-  X,
-  Edit2,
-  Trash2,
-  UserPlus,
-  Briefcase,
-  CheckCircle,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+  Timestamp,
+  updateDoc,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  Activity,
   AlertCircle,
-  Shield,
-  Plus,
-  Eye,
-  ExternalLink,
+  AlertTriangle,
+  ArrowRight,
+  Bell,
+  Briefcase,
+  Building2,
+  Calendar,
+  CheckCircle,
+  CheckSquare,
   ChevronDown,
   ChevronRight,
-  RefreshCw,
-  Clock,
-  FolderOpen,
-  Folder,
-  MoreHorizontal,
-  Settings,
-  TrendingUp,
-  Activity,
-  Film,
   Clapperboard,
-  Sparkles,
-  ArrowRight,
+  Clock,
   Crown,
-  Mail,
+  Edit2,
+  ExternalLink,
+  Eye,
+  Film,
+  Folder,
+  FolderOpen,
+  FolderPlus,
   Hash,
-  Calendar,
-  MessageSquare,
-  Send,
-  Bell,
   Info,
-  AlertTriangle,
-  CheckSquare,
+  LayoutDashboard,
+  Mail,
+  MessageSquare,
+  MoreHorizontal,
+  Plus,
+  RefreshCw,
+  Search,
+  Send,
+  Settings,
+  Shield,
+  Sparkles,
   Square,
+  Trash2,
+  TrendingUp,
+  UserPlus,
+  Users,
+  X,
 } from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const PHASES = ["Desarrollo", "Preproducción", "Rodaje", "Postproducción", "Finalizado"];
 
@@ -75,6 +96,8 @@ const DEFAULT_DEPARTMENTS = [
   { name: "Maquillaje", color: "#14B8A6" },
   { name: "Localizaciones", color: "#F97316" },
 ];
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Project {
   id: string;
@@ -119,6 +142,8 @@ interface Producer {
   projectCount: number;
   users?: { id: string; name: string; email: string }[];
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
   const router = useRouter();

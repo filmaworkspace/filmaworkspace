@@ -1,14 +1,53 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { UserCog, UserPlus, Search, Trash2, Shield, X, AlertCircle, CheckCircle2, UserCheck, UserX, Clock, Info, Edit, Briefcase, Users, ChevronDown, Package } from "lucide-react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, updateDoc, query, where, Timestamp } from "firebase/firestore";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  getDoc,
+  query,
+  setDoc,
+  Timestamp,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  Briefcase,
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  Edit,
+  Info,
+  Package,
+  Search,
+  Shield,
+  Trash2,
+  UserCheck,
+  UserCog,
+  UserPlus,
+  Users,
+  UserX,
+  X,
+} from "lucide-react";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const PROJECT_ROLES = ["EP", "PM", "Controller", "PC"];
 const DEPARTMENT_POSITIONS = ["HOD", "Coordinator", "Crew"];
@@ -20,9 +59,44 @@ const ACCOUNTING_ACCESS_LEVELS = {
   accounting_extended: { label: "Contabilidad ampliada", description: "Acceso completo", permissions: { panel: true, suppliers: true, budget: true, users: true, reports: true }, color: "bg-purple-50 text-purple-700", dot: "bg-purple-500" },
 };
 
-interface Member { userId: string; name: string; email: string; role?: string; department?: string; position?: string; permissions: { config: boolean; accounting: boolean; team: boolean }; accountingAccessLevel?: "visitor" | "user" | "accounting" | "accounting_extended"; boxAccess?: boolean; addedAt: any; addedBy?: string; addedByName?: string; }
-interface PendingInvitation { id: string; invitedEmail: string; invitedName: string; roleType: "project" | "department"; role?: string; department?: string; position?: string; status: string; createdAt: any; invitedBy: string; invitedByName: string; accountingAccessLevel?: "visitor" | "user" | "accounting" | "accounting_extended"; boxAccess?: boolean; }
-interface Department { name: string; }
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface Member {
+  userId: string;
+  name: string;
+  email: string;
+  role?: string;
+  department?: string;
+  position?: string;
+  permissions: { config: boolean; accounting: boolean; team: boolean };
+  accountingAccessLevel?: "visitor" | "user" | "accounting" | "accounting_extended";
+  boxAccess?: boolean;
+  addedAt: any;
+  addedBy?: string;
+  addedByName?: string;
+}
+
+interface PendingInvitation {
+  id: string;
+  invitedEmail: string;
+  invitedName: string;
+  roleType: "project" | "department";
+  role?: string;
+  department?: string;
+  position?: string;
+  status: string;
+  createdAt: any;
+  invitedBy: string;
+  invitedByName: string;
+  accountingAccessLevel?: "visitor" | "user" | "accounting" | "accounting_extended";
+  boxAccess?: boolean;
+}
+
+interface Department {
+  name: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function AccountingUsersPage() {
   const { id } = useParams();

@@ -1,36 +1,57 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Inter } from "next/font/google";
-import {
-  Edit2,
-  Save,
-  Building2,
-  AlertCircle,
-  CheckCircle,
-  ArrowLeft,
-  Archive,
-  Copy,
-  Trash2,
-  MoreHorizontal,
-  Calendar,
-  RefreshCw,
-  X,
-  Clapperboard,
-  Hash,
-  Clock,
-  Users,
-  MapPin,
-  Settings,
-} from "lucide-react";
 import Link from "next/link";
+import { Inter } from "next/font/google";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, updateDoc, collection, getDocs, Timestamp, deleteDoc, setDoc } from "firebase/firestore";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  getDoc,
+  setDoc,
+  Timestamp,
+  updateDoc,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  Archive,
+  ArrowLeft,
+  Building2,
+  Calendar,
+  CheckCircle,
+  Clapperboard,
+  Clock,
+  Copy,
+  Edit2,
+  Hash,
+  MapPin,
+  MoreHorizontal,
+  RefreshCw,
+  Save,
+  Settings,
+  Trash2,
+  Users,
+  X,
+} from "lucide-react";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const PHASES = ["Desarrollo", "Preproducción", "Rodaje", "Postproducción", "Finalizado"];
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface ProjectData {
   name: string;
@@ -76,6 +97,8 @@ const emptyProductionData: ProductionData = {
   originalTitle: "",
   workingTitle: "",
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ConfigGeneral() {
   const { id } = useParams();

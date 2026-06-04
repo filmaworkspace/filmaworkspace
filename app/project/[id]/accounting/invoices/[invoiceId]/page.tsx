@@ -1,32 +1,266 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { useState, useEffect, useRef } from "react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-import { doc, getDoc, collection, getDocs, updateDoc, query, where, orderBy, Timestamp, arrayUnion } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { Receipt, Edit, Download, XCircle, CheckCircle, Clock, Ban, Building2, Calendar, User, Hash, FileUp, ChevronLeft, ChevronRight, AlertTriangle, KeyRound, AlertCircle, ShieldAlert, ExternalLink, MoreHorizontal, CreditCard, FileText, Link as LinkIcon, Eye, EyeOff, Code, Save, X, Plus, Trash2, Search, RefreshCw, Percent, Euro, FileCheck, ZoomIn, ZoomOut, RotateCw, Layers, Lock, Glasses, Check, Upload } from "lucide-react";
+import {
+  arrayUnion,
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  orderBy,
+  query,
+  Timestamp,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  AlertTriangle,
+  Ban,
+  Building2,
+  Calendar,
+  Check,
+  CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Code,
+  CreditCard,
+  Download,
+  Edit,
+  Euro,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  FileCheck,
+  FileText,
+  FileUp,
+  Glasses,
+  Hash,
+  KeyRound,
+  Layers,
+  Link as LinkIcon,
+  Lock,
+  MoreHorizontal,
+  Percent,
+  Plus,
+  Receipt,
+  RefreshCw,
+  RotateCw,
+  Save,
+  Search,
+  ShieldAlert,
+  Trash2,
+  Upload,
+  User,
+  X,
+  XCircle,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
 import { unrealizeInvoice, updatePOItemsInvoiced, realizeInvoice } from "@/lib/budgetOperations";
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 type InvoiceStatus = "draft" | "pending" | "pending_approval" | "approved" | "rejected" | "paid" | "cancelled" | "coding" | "accounted" | "returned" | "partial_return";
 type DocumentType = "invoice" | "proforma" | "autonomo" | "ticket" | "budget" | "guarantee";
 
-interface EpisodeDistribution { episode: number; amount: number; percentage: number; }
-interface InvoiceItem { description: string; subAccountId: string; subAccountCode: string; subAccountDescription: string; quantity: number; unitPrice: number; baseAmount: number; vatRate: number; vatAmount: number; irpfRate: number; irpfAmount: number; totalAmount: number; poItemId?: string; poItemIndex?: number; isNewItem?: boolean; episodeAssignment?: "general" | "specific"; episodes?: EpisodeDistribution[]; }
-interface ApprovalStepStatus { id: string; order: number; approverType: "fixed" | "role" | "hod" | "coordinator"; approvers: string[]; approverNames?: string[]; roles?: string[]; department?: string; approvedBy: string[]; approvedByNames?: string[]; rejectedBy: string[]; status: "pending" | "approved" | "rejected"; requireAll: boolean; approvedAt?: Date; }
-interface ApprovalComment { id: string; userId: string; userName: string; text: string; createdAt: Date; type: "approval" | "rejection" | "info_request" | "comment"; stepOrder?: number; }
-interface Invoice { id: string; documentType: DocumentType; number: string; displayNumber: string; supplierNumber?: string; supplier: string; supplierId: string; supplierTaxId?: string; supplierIban?: string; supplierBic?: string; department?: string; description: string; notes?: string; items: InvoiceItem[]; baseAmount: number; vatAmount: number; irpfAmount: number; totalAmount: number; invoiceDate?: Date; dueDate: Date; status: InvoiceStatus; approvalStatus?: string; approvalSteps?: ApprovalStepStatus[]; currentApprovalStep?: number; comments?: ApprovalComment[]; attachmentUrl?: string; attachmentFileName?: string; createdAt: Date; createdBy: string; createdByName: string; codedAt?: Date; codedBy?: string; codedByName?: string; approvedAt?: Date; approvedBy?: string; approvedByName?: string; paidAt?: Date; paidAmount?: number; paymentMethod?: string; paymentReference?: string; cancelledAt?: Date; cancelledByName?: string; cancellationReason?: string; poId?: string; poNumber?: string; requiresReplacement?: boolean; replacedByInvoiceId?: string; isReplacement?: boolean; replacesDocumentId?: string; replacesDocumentNumber?: string; currency?: string; accountingEntry?: string; isAsset?: boolean; assetCategory?: string; replacedFromType?: string; replacedAt?: Date; originalAttachmentUrl?: string; originalAttachmentFileName?: string; accounted?: boolean; accountedAt?: Date; accountedBy?: string; accountedByName?: string; accountingEntryNumber?: string; accountingAccount?: string; delegatedToAccounting?: boolean; delegatedAt?: Date; delegatedBy?: string; delegatedByName?: string; guaranteeReturns?: GuaranteeReturn[]; totalReturned?: number; }
-interface LinkedPO { id: string; number: string; supplier: string; baseAmount: number; invoicedAmount: number; status: string; items?: any[]; }
-interface Supplier { id: string; name: string; taxId?: string; iban?: string; bic?: string; }
-interface SubAccount { id: string; code: string; description: string; accountId: string; committed: number; actual: number; budgeted: number; }
-interface PaymentRecord { id: string; forecastId: string; forecastName: string; amount: number; paidAt: Date; paidByName: string; receiptUrl?: string; receiptName?: string; }
-interface GuaranteeReturn { id: string; amount: number; date: Date; receiptUrl?: string; receiptFileName?: string; notes?: string; createdAt: Date; createdBy: string; createdByName: string; }
+interface EpisodeDistribution {
+  episode: number;
+  amount: number;
+  percentage: number;
+}
+
+interface InvoiceItem {
+  description: string;
+  subAccountId: string;
+  subAccountCode: string;
+  subAccountDescription: string;
+  quantity: number;
+  unitPrice: number;
+  baseAmount: number;
+  vatRate: number;
+  vatAmount: number;
+  irpfRate: number;
+  irpfAmount: number;
+  totalAmount: number;
+  poItemId?: string;
+  poItemIndex?: number;
+  isNewItem?: boolean;
+  episodeAssignment?: "general" | "specific";
+  episodes?: EpisodeDistribution[];
+}
+
+interface ApprovalStepStatus {
+  id: string;
+  order: number;
+  approverType: "fixed" | "role" | "hod" | "coordinator";
+  approvers: string[];
+  approverNames?: string[];
+  roles?: string[];
+  department?: string;
+  approvedBy: string[];
+  approvedByNames?: string[];
+  rejectedBy: string[];
+  status: "pending" | "approved" | "rejected";
+  requireAll: boolean;
+  approvedAt?: Date;
+}
+
+interface ApprovalComment {
+  id: string;
+  userId: string;
+  userName: string;
+  text: string;
+  createdAt: Date;
+  type: "approval" | "rejection" | "info_request" | "comment";
+  stepOrder?: number;
+}
+
+interface Invoice {
+  id: string;
+  documentType: DocumentType;
+  number: string;
+  displayNumber: string;
+  supplierNumber?: string;
+  supplier: string;
+  supplierId: string;
+  supplierTaxId?: string;
+  supplierIban?: string;
+  supplierBic?: string;
+  department?: string;
+  description: string;
+  notes?: string;
+  items: InvoiceItem[];
+  baseAmount: number;
+  vatAmount: number;
+  irpfAmount: number;
+  totalAmount: number;
+  invoiceDate?: Date;
+  dueDate: Date;
+  status: InvoiceStatus;
+  approvalStatus?: string;
+  approvalSteps?: ApprovalStepStatus[];
+  currentApprovalStep?: number;
+  comments?: ApprovalComment[];
+  attachmentUrl?: string;
+  attachmentFileName?: string;
+  createdAt: Date;
+  createdBy: string;
+  createdByName: string;
+  codedAt?: Date;
+  codedBy?: string;
+  codedByName?: string;
+  approvedAt?: Date;
+  approvedBy?: string;
+  approvedByName?: string;
+  paidAt?: Date;
+  paidAmount?: number;
+  paymentMethod?: string;
+  paymentReference?: string;
+  cancelledAt?: Date;
+  cancelledByName?: string;
+  cancellationReason?: string;
+  poId?: string;
+  poNumber?: string;
+  requiresReplacement?: boolean;
+  replacedByInvoiceId?: string;
+  isReplacement?: boolean;
+  replacesDocumentId?: string;
+  replacesDocumentNumber?: string;
+  currency?: string;
+  accountingEntry?: string;
+  isAsset?: boolean;
+  assetCategory?: string;
+  replacedFromType?: string;
+  replacedAt?: Date;
+  originalAttachmentUrl?: string;
+  originalAttachmentFileName?: string;
+  accounted?: boolean;
+  accountedAt?: Date;
+  accountedBy?: string;
+  accountedByName?: string;
+  accountingEntryNumber?: string;
+  accountingAccount?: string;
+  delegatedToAccounting?: boolean;
+  delegatedAt?: Date;
+  delegatedBy?: string;
+  delegatedByName?: string;
+  guaranteeReturns?: GuaranteeReturn[];
+  totalReturned?: number;
+}
+
+interface LinkedPO {
+  id: string;
+  number: string;
+  supplier: string;
+  baseAmount: number;
+  invoicedAmount: number;
+  status: string;
+  items?: any[];
+}
+
+interface Supplier {
+  id: string;
+  name: string;
+  taxId?: string;
+  iban?: string;
+  bic?: string;
+}
+
+interface SubAccount {
+  id: string;
+  code: string;
+  description: string;
+  accountId: string;
+  committed: number;
+  actual: number;
+  budgeted: number;
+}
+
+interface PaymentRecord {
+  id: string;
+  forecastId: string;
+  forecastName: string;
+  amount: number;
+  paidAt: Date;
+  paidByName: string;
+  receiptUrl?: string;
+  receiptName?: string;
+}
+
+interface GuaranteeReturn {
+  id: string;
+  amount: number;
+  date: Date;
+  receiptUrl?: string;
+  receiptFileName?: string;
+  notes?: string;
+  createdAt: Date;
+  createdBy: string;
+  createdByName: string;
+}
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<InvoiceStatus, { bg: string; text: string; label: string; icon: typeof Clock }> = {
   draft: { bg: "bg-slate-100", text: "text-slate-700", label: "Borrador", icon: Edit },
@@ -60,6 +294,8 @@ const PAYMENT_METHODS = [
   { value: "check", label: "Cheque" },
   { value: "direct_debit", label: "Domiciliación" },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function InvoiceDetailPage() {
   const params = useParams();

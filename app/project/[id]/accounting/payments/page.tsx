@@ -1,17 +1,73 @@
 "use client";
-import React from "react";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
-import { useState, useEffect, useRef } from "react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, Timestamp } from "firebase/firestore";
-import { CreditCard, Plus, Search, Trash2, X, CheckCircle2, Calendar, FileText, MoreHorizontal, Receipt, GripVertical, Upload, Clock, Banknote, Shield, Landmark, ChevronRight, Eye, Edit3, Send, LayoutGrid, List, Wallet, PiggyBank, CircleDollarSign, FolderOpen, Download, ChevronDown, AlertTriangle, FileCheck, ExternalLink, Filter, HelpCircle, ShieldAlert } from "lucide-react";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  getDoc,
+  orderBy,
+  query,
+  Timestamp,
+  updateDoc,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertTriangle,
+  Banknote,
+  Calendar,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  CircleDollarSign,
+  Clock,
+  CreditCard,
+  Download,
+  Edit3,
+  ExternalLink,
+  Eye,
+  FileCheck,
+  FileText,
+  Filter,
+  FolderOpen,
+  GripVertical,
+  HelpCircle,
+  Landmark,
+  LayoutGrid,
+  List,
+  MoreHorizontal,
+  PiggyBank,
+  Plus,
+  Receipt,
+  Search,
+  Send,
+  Shield,
+  ShieldAlert,
+  Trash2,
+  Upload,
+  Wallet,
+  X,
+} from "lucide-react";
+
+// ─── Libraries ───────────────────────────────────────────────────────────────
 import jsPDF from "jspdf";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-// Helper para clases condicionales
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 function cx(...args: (string | boolean | null | undefined)[]): string {
   return args.filter(Boolean).join(" ");
 }
@@ -24,6 +80,8 @@ const PAYMENT_TYPES = {
   deposit: { label: "Pago de depósito", icon: PiggyBank, color: "indigo" },
   guarantee: { label: "Pago de fianza", icon: Shield, color: "slate" },
 };
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 type PaymentType = keyof typeof PAYMENT_TYPES;
 
@@ -105,6 +163,8 @@ const INVOICE_SORT_OPTIONS = [
   { value: "amount", label: "Importe (mayor)" },
   { value: "supplier", label: "Proveedor A-Z" },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function PaymentsPage() {
   const params = useParams();

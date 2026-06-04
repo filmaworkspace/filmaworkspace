@@ -1,37 +1,46 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import {
-  Menu,
-  X,
-  Users,
-  LogOut,
-  Settings,
-  Folder,
-  LayoutDashboard,
-  Wallet,
-  Briefcase,
-  Info,
-  UserCog,
-  Building2,
-  Shield,
-  User,
-  FileText,
-  Receipt,
-  FileSpreadsheet,
-  ArrowLeftRight,
-  BarChart3,
-  Package,
-} from "lucide-react";
 import { inter } from "@/lib/fonts";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  ArrowLeftRight,
+  BarChart3,
+  Briefcase,
+  Building2,
+  FileSpreadsheet,
+  FileText,
+  Folder,
+  Info,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Package,
+  Receipt,
+  Settings,
+  Shield,
+  User,
+  UserCog,
+  Users,
+  Wallet,
+  X,
+} from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 
-// ── Accounts sub-nav items (no icons, no emojis) ───────────────────────────
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const ACCOUNTS_NAV = [
   { id: "accounts",        label: "Cuentas",        path: ""                  },
   { id: "journal",         label: "Libro Diario",   path: "journal"            },
@@ -39,6 +48,8 @@ const ACCOUNTS_NAV = [
   { id: "trial-balance",   label: "Sumas y Saldos", path: "trial-balance"     },
   { id: "chart",           label: "Plan Cuentas",   path: "chart-of-accounts" },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);

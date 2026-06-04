@@ -1,21 +1,81 @@
 "use client";
 
-// app/companydashboard/[producerId]/accounts/[projectId]/trial-balance/page.tsx
-
+// ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
-import { collection, getDocs, getDoc, doc, query, orderBy } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  orderBy,
+  query,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  CheckCircle,
+  Download,
+  RefreshCw,
+  Search,
+} from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
-import { Search, Download, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-interface JLine  { id: string; code: string; name: string; debe: number; haber: number; }
-interface Invoice { id: string; displayNumber: string; supplier: string; description: string; baseAmount: number; vatAmount: number; irpfAmount: number; totalAmount: number; accounted: boolean; accountingEntryNumber?: string; invoiceDate: Date; items: any[]; journalLines?: JLine[]; }
-interface ManualEntry { id: string; numero: string; date: string; concepto: string; lines: JLine[]; }
-interface TrialRow { code: string; name: string; totalDebe: number; totalHaber: number; saldoDeudor: number; saldoAcreedor: number; }
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface JLine {
+  id: string;
+  code: string;
+  name: string;
+  debe: number;
+  haber: number;
+}
+
+interface Invoice {
+  id: string;
+  displayNumber: string;
+  supplier: string;
+  description: string;
+  baseAmount: number;
+  vatAmount: number;
+  irpfAmount: number;
+  totalAmount: number;
+  accounted: boolean;
+  accountingEntryNumber?: string;
+  invoiceDate: Date;
+  items: any[];
+  journalLines?: JLine[];
+}
+
+interface ManualEntry {
+  id: string;
+  numero: string;
+  date: string;
+  concepto: string;
+  lines: JLine[];
+}
+
+interface TrialRow {
+  code: string;
+  name: string;
+  totalDebe: number;
+  totalHaber: number;
+  saldoDeudor: number;
+  saldoAcreedor: number;
+}
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const fmt = (n: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
 const fmtDate = (d: Date | undefined) => d ? new Intl.DateTimeFormat("es-ES").format(d) : "—";

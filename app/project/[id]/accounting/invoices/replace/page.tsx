@@ -1,43 +1,53 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import {
-  ArrowLeft,
-  FileText,
-  Receipt,
-  FileCheck,
-  Search,
-  Building2,
-  Calendar,
-  Hash,
-  CheckCircle,
-  Clock,
-  Wallet,
-  BookCheck,
-  AlertCircle,
-  Upload,
-  X,
-  ChevronDown,
-  RefreshCw,
-  AlertTriangle,
-} from "lucide-react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
-  getDocs,
   doc,
-  updateDoc,
-  query,
+  getDocs,
   orderBy,
+  query,
   Timestamp,
+  updateDoc,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowLeft,
+  BookCheck,
+  Building2,
+  Calendar,
+  CheckCircle,
+  ChevronDown,
+  Clock,
+  FileCheck,
+  FileText,
+  Hash,
+  Receipt,
+  RefreshCw,
+  Search,
+  Upload,
+  Wallet,
+  X,
+} from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const DOCUMENT_TYPES = {
   proforma: {
@@ -79,6 +89,8 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; i
   paid: { label: "Pagada", bg: "bg-blue-50", text: "text-blue-700", icon: Wallet },
 };
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 type DocumentType = keyof typeof DOCUMENT_TYPES;
 
 interface PendingDocument {
@@ -101,6 +113,8 @@ interface PendingDocument {
   attachmentUrl?: string;
   attachmentFileName?: string;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ReplaceDocumentPage() {
   const params = useParams();

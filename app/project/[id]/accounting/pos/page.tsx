@@ -1,24 +1,70 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { useState, useEffect, useRef } from "react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-import { doc, getDoc, collection, getDocs, updateDoc, query, orderBy, Timestamp } from "firebase/firestore";
-import { FileText, Plus, Search, Eye, Edit, X, FileEdit, Download, Receipt, MoreHorizontal, Lock, Unlock, XCircle, ExternalLink, AlertTriangle, Clock, CheckCircle2, Ban, Archive, Calendar, Building2, Hash, KeyRound, AlertCircle, ShieldAlert, ArrowUpDown, ChevronDown } from "lucide-react";
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  orderBy,
+  query,
+  Timestamp,
+  updateDoc,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  AlertTriangle,
+  Archive,
+  ArrowUpDown,
+  Ban,
+  Building2,
+  Calendar,
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  Download,
+  Edit,
+  ExternalLink,
+  Eye,
+  FileEdit,
+  FileText,
+  Hash,
+  KeyRound,
+  Lock,
+  MoreHorizontal,
+  Plus,
+  Receipt,
+  Search,
+  ShieldAlert,
+  Unlock,
+  X,
+  XCircle,
+} from "lucide-react";
+
+// ─── Libraries ───────────────────────────────────────────────────────────────
 import jsPDF from "jspdf";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 type POStatus = "draft" | "pending" | "approved" | "closed" | "cancelled";
 type SortOrder = "desc" | "asc";
-
-const SORT_OPTIONS = [
-  { value: "desc", label: "Más recientes primero" },
-  { value: "asc", label: "Más antiguas primero" },
-];
 
 interface POItem {
   id?: string;
@@ -55,6 +101,13 @@ interface PO {
   modificationHistory?: any[];
 }
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const SORT_OPTIONS = [
+  { value: "desc", label: "Más recientes primero" },
+  { value: "asc", label: "Más antiguas primero" },
+];
+
 const STATUS_CONFIG: Record<POStatus, { bg: string; text: string; label: string; icon: typeof Clock; gradient: string }> = {
   draft: { bg: "bg-slate-100", text: "text-slate-700", label: "Borrador", icon: Edit, gradient: "from-slate-500 to-slate-600" },
   pending: { bg: "bg-amber-50", text: "text-amber-700", label: "Pendiente", icon: Clock, gradient: "from-amber-500 to-orange-500" },
@@ -62,6 +115,8 @@ const STATUS_CONFIG: Record<POStatus, { bg: string; text: string; label: string;
   closed: { bg: "bg-slate-100", text: "text-slate-600", label: "Cerrada", icon: Archive, gradient: "from-slate-500 to-slate-600" },
   cancelled: { bg: "bg-red-50", text: "text-red-700", label: "Anulada", icon: Ban, gradient: "from-red-500 to-rose-500" },
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function POsPage() {
   const params = useParams();

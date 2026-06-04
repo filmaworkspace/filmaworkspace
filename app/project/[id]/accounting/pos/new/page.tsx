@@ -1,63 +1,73 @@
 "use client";
-import React from "react";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { useState, useEffect, useCallback, useRef } from "react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
 import {
-  doc,
-  getDoc,
-  collection,
-  getDocs,
   addDoc,
-  updateDoc,
-  query,
+  collection,
+  doc,
+  getDocs,
+  getDoc,
   orderBy,
+  query,
   Timestamp,
+  updateDoc,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  FileText,
-  ArrowLeft,
-  Save,
-  Send,
-  Building2,
   AlertCircle,
-  Info,
-  Upload,
-  X,
-  Plus,
-  Trash2,
-  Search,
-  Hash,
-  FileUp,
-  ShoppingCart,
-  Package,
-  Wrench,
-  Shield,
+  AlertTriangle,
+  ArrowLeft,
+  Building2,
   CheckCircle,
   CheckCircle2,
-  Clock,
-  Users,
-  ChevronRight,
-  AlertTriangle,
-  Circle,
-  ShieldAlert,
-  Lock,
   ChevronDown,
-  Layers,
-  Percent,
+  ChevronRight,
+  Circle,
+  Clock,
   FileBox,
+  FileText,
+  FileUp,
+  Hash,
+  Info,
+  Layers,
+  Lock,
+  Package,
+  Percent,
+  Plus,
   RotateCcw,
+  Save,
+  Search,
+  Send,
+  Shield,
+  ShieldAlert,
+  ShoppingCart,
+  Trash2,
+  Upload,
+  Users,
+  Wrench,
+  X,
 } from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldCommitPO } from "@/lib/budgetRules";
 import { commitPO } from "@/lib/budgetOperations";
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-// Helper para clases condicionales
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 function cx(...args: (string | boolean | null | undefined)[]): string {
   return args.filter(Boolean).join(" ");
 }
@@ -151,6 +161,8 @@ interface Member {
   position?: string;
 }
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const PO_TYPES = [
   { value: "rental", label: "Alquiler", icon: ShoppingCart, description: "Equipos, vehículos, espacios" },
   { value: "purchase", label: "Compra", icon: Package, description: "Material, consumibles" },
@@ -177,6 +189,8 @@ const IRPF_RATES = [
   { value: 15, label: "15%" },
   { value: 19, label: "19%" },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function NewPOPage() {
   const params = useParams();

@@ -1,42 +1,217 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { useState, useEffect, useRef } from "react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { db, storage } from "@/lib/firebase";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { doc, getDoc, collection, getDocs, updateDoc, query, orderBy, Timestamp, deleteField, arrayUnion, where } from "firebase/firestore";
-import { Receipt, ArrowLeft, Building2, AlertCircle, Info, Upload, X, Plus, Trash2, Search, Calendar, Hash, FileText, CheckCircle, CheckCircle2, AlertTriangle, Send, Save, ShieldAlert, Lock, Percent, Euro, Layers, ChevronDown, Eye, Clock, Users, ChevronRight, Circle, FileCheck, Shield, Package, RefreshCw } from "lucide-react";
+import {
+  arrayUnion,
+  collection,
+  deleteField,
+  doc,
+  getDocs,
+  getDoc,
+  orderBy,
+  query,
+  Timestamp,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowLeft,
+  Building2,
+  Calendar,
+  CheckCircle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Circle,
+  Clock,
+  Euro,
+  Eye,
+  FileCheck,
+  FileText,
+  Hash,
+  Info,
+  Layers,
+  Lock,
+  Package,
+  Percent,
+  Plus,
+  Receipt,
+  RefreshCw,
+  Save,
+  Search,
+  Send,
+  Shield,
+  ShieldAlert,
+  Trash2,
+  Upload,
+  Users,
+  X,
+} from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
 import { realizeInvoice, unrealizeInvoice } from "@/lib/budgetOperations";
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-// Tipos de documento
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const DOCUMENT_TYPES = {
   invoice: { code: "FAC", label: "Factura", icon: Receipt, bgColor: "bg-emerald-50", textColor: "text-emerald-700" },
   proforma: { code: "PRF", label: "Proforma", icon: FileText, bgColor: "bg-violet-50", textColor: "text-violet-700" },
   budget: { code: "PRS", label: "Presupuesto", icon: FileCheck, bgColor: "bg-amber-50", textColor: "text-amber-700" },
   guarantee: { code: "FNZ", label: "Fianza", icon: Shield, bgColor: "bg-slate-100", textColor: "text-slate-700" },
 };
-type DocumentType = keyof typeof DOCUMENT_TYPES;
-
-// Interfaces
-interface EpisodeDistribution { episode: number; amount: number; percentage: number; }
-interface InvoiceItem { id: string; description: string; poItemId?: string; poItemIndex?: number; isNewItem: boolean; subAccountId: string; subAccountCode: string; subAccountDescription: string; quantity: number; unitPrice: number; baseAmount: number; vatRate: number; vatAmount: number; irpfRate: number; irpfAmount: number; totalAmount: number; episodeAssignment?: "general" | "specific"; episodes?: EpisodeDistribution[]; }
-interface SubAccount { id: string; code: string; description: string; budgeted: number; committed: number; actual: number; available: number; accountId: string; accountCode: string; accountDescription: string; }
-interface Supplier { id: string; fiscalName: string; commercialName?: string; taxId: string; }
-interface Member { userId: string; name?: string; email?: string; role?: string; department?: string; position?: string; }
-interface ApprovalStep { id: string; order: number; approverType: "fixed" | "role" | "hod" | "coordinator"; approvers?: string[]; roles?: string[]; department?: string; requireAll: boolean; hasAmountThreshold?: boolean; amountThreshold?: number; amountCondition?: "above" | "below" | "between"; amountThresholdMax?: number; }
-interface ApprovalStepStatus { id: string; order: number; approverType: "fixed" | "role" | "hod" | "coordinator"; approvers: string[]; approverNames: string[]; roles?: string[]; department?: string; approvedBy: string[]; rejectedBy: string[]; status: "pending" | "approved" | "rejected"; requireAll: boolean; }
-interface DueDateEntry { id: string; date: string; type: "percentage" | "amount"; percentage: number; amount: number; }
-interface PO { id: string; number: string; supplier: string; supplierId: string; department?: string; totalAmount: number; baseAmount?: number; items: any[]; }
-interface POItem { id?: string; description: string; subAccountId: string; subAccountCode: string; subAccountDescription: string; quantity: number; unitPrice: number; baseAmount: number; vatRate: number; vatAmount: number; irpfRate: number; irpfAmount: number; totalAmount: number; episodeAssignment?: "general" | "specific"; episodes?: EpisodeDistribution[]; }
-interface POItemWithInvoiced extends POItem { invoicedAmount: number; availableAmount: number; }
 
 const VAT_RATES = [{ value: 0, label: "0%" }, { value: 4, label: "4%" }, { value: 10, label: "10%" }, { value: 21, label: "21%" }];
 const IRPF_RATES = [{ value: 0, label: "0%" }, { value: 7, label: "7%" }, { value: 15, label: "15%" }, { value: 19, label: "19%" }];
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type DocumentType = keyof typeof DOCUMENT_TYPES;
+
+interface EpisodeDistribution {
+  episode: number;
+  amount: number;
+  percentage: number;
+}
+
+interface InvoiceItem {
+  id: string;
+  description: string;
+  poItemId?: string;
+  poItemIndex?: number;
+  isNewItem: boolean;
+  subAccountId: string;
+  subAccountCode: string;
+  subAccountDescription: string;
+  quantity: number;
+  unitPrice: number;
+  baseAmount: number;
+  vatRate: number;
+  vatAmount: number;
+  irpfRate: number;
+  irpfAmount: number;
+  totalAmount: number;
+  episodeAssignment?: "general" | "specific";
+  episodes?: EpisodeDistribution[];
+}
+
+interface SubAccount {
+  id: string;
+  code: string;
+  description: string;
+  budgeted: number;
+  committed: number;
+  actual: number;
+  available: number;
+  accountId: string;
+  accountCode: string;
+  accountDescription: string;
+}
+
+interface Supplier {
+  id: string;
+  fiscalName: string;
+  commercialName?: string;
+  taxId: string;
+}
+
+interface Member {
+  userId: string;
+  name?: string;
+  email?: string;
+  role?: string;
+  department?: string;
+  position?: string;
+}
+
+interface ApprovalStep {
+  id: string;
+  order: number;
+  approverType: "fixed" | "role" | "hod" | "coordinator";
+  approvers?: string[];
+  roles?: string[];
+  department?: string;
+  requireAll: boolean;
+  hasAmountThreshold?: boolean;
+  amountThreshold?: number;
+  amountCondition?: "above" | "below" | "between";
+  amountThresholdMax?: number;
+}
+
+interface ApprovalStepStatus {
+  id: string;
+  order: number;
+  approverType: "fixed" | "role" | "hod" | "coordinator";
+  approvers: string[];
+  approverNames: string[];
+  roles?: string[];
+  department?: string;
+  approvedBy: string[];
+  rejectedBy: string[];
+  status: "pending" | "approved" | "rejected";
+  requireAll: boolean;
+}
+
+interface DueDateEntry {
+  id: string;
+  date: string;
+  type: "percentage" | "amount";
+  percentage: number;
+  amount: number;
+}
+
+interface PO {
+  id: string;
+  number: string;
+  supplier: string;
+  supplierId: string;
+  department?: string;
+  totalAmount: number;
+  baseAmount?: number;
+  items: any[];
+}
+
+interface POItem {
+  id?: string;
+  description: string;
+  subAccountId: string;
+  subAccountCode: string;
+  subAccountDescription: string;
+  quantity: number;
+  unitPrice: number;
+  baseAmount: number;
+  vatRate: number;
+  vatAmount: number;
+  irpfRate: number;
+  irpfAmount: number;
+  totalAmount: number;
+  episodeAssignment?: "general" | "specific";
+  episodes?: EpisodeDistribution[];
+}
+
+interface POItemWithInvoiced extends POItem {
+  invoicedAmount: number;
+  availableAmount: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function cx(...args: (string | boolean | null | undefined)[]): string { return args.filter(Boolean).join(" "); }
 

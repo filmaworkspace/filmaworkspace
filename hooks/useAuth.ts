@@ -1,21 +1,24 @@
+// ─── Framework ────────────────────────────────────────────────────────────────
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  updateProfile,
-} from "firebase/auth";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
 import {
-  doc,
-  setDoc,
-  getDoc,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
+import {
   collection,
-  query,
-  where,
+  doc,
   getDocs,
-  updateDoc,
+  getDoc,
+  query,
   serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
 } from "firebase/firestore";
 
 export function useAuth() {

@@ -1,7 +1,10 @@
-// app/api/storage-proxy/route.ts
-
+// ─── Framework ────────────────────────────────────────────────────────────────
 import { NextRequest, NextResponse } from "next/server";
+
+// ─── Libraries ───────────────────────────────────────────────────────────────
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface ExpenseItem {
   baseAmount: number;
@@ -28,6 +31,8 @@ interface ExpenseData {
   paymentMethod?: string | null;
   paymentReference?: string | null;
 }
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   invoice: "Factura",

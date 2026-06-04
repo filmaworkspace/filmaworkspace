@@ -1,67 +1,75 @@
 "use client";
-import React from "react";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { useState, useEffect, useCallback } from "react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { db, storage } from "@/lib/firebase";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
-  doc,
-  getDoc,
-  collection,
-  getDocs,
   addDoc,
-  query,
+  collection,
+  doc,
+  getDocs,
+  getDoc,
   orderBy,
-  Timestamp,
-  where,
-  updateDoc,
+  query,
   runTransaction,
+  Timestamp,
+  updateDoc,
+  where,
 } from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  Receipt,
-  ArrowLeft,
-  Building2,
   AlertCircle,
-  Info,
-  Upload,
-  X,
-  Plus,
-  Trash2,
-  Search,
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  Building2,
   Calendar,
-  Hash,
-  FileText,
-  ShoppingCart,
   CheckCircle,
   CheckCircle2,
-  AlertTriangle,
-  Send,
-  Shield,
-  FileCheck,
-  Clock,
-  Users,
+  ChevronDown,
   ChevronRight,
   Circle,
-  ShieldAlert,
-  RefreshCw,
-  ArrowRight,
-  Lock,
-  Split,
-  Percent,
+  Clock,
   Euro,
-  Layers,
-  ChevronDown,
   FileBox,
+  FileCheck,
+  FileText,
+  Hash,
+  Info,
+  Layers,
+  Lock,
+  Percent,
+  Plus,
+  Receipt,
+  RefreshCw,
+  Search,
+  Send,
+  Shield,
+  ShieldAlert,
+  ShoppingCart,
+  Split,
+  Trash2,
+  Upload,
+  Users,
+  X,
 } from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
 import { realizeInvoice, updatePOItemsInvoiced } from "@/lib/budgetOperations";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-// Interface para vencimientos múltiples
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 interface DueDateEntry {
   id: string;
   date: string;
@@ -75,7 +83,8 @@ function cx(...args: (string | boolean | null | undefined)[]): string {
   return args.filter(Boolean).join(" ");
 }
 
-// Tipos de documento
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const DOCUMENT_TYPES = {
   invoice: {
     code: "FAC",
@@ -267,6 +276,8 @@ const IRPF_RATES = [
   { value: 15, label: "15%" },
   { value: 19, label: "19%" },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function NewInvoicePage() {
   const params = useParams();

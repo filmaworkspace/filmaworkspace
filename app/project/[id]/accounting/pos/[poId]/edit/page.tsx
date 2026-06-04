@@ -1,30 +1,167 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { useState, useEffect, useCallback, useRef } from "react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs, updateDoc, query, orderBy, Timestamp, deleteField } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
-  FileText, ArrowLeft, Save, Send, Building2, AlertCircle, Info, Upload, X, Plus, Trash2,
-  Search, Hash, FileUp, ShoppingCart, Package, Wrench, Shield, CheckCircle, CheckCircle2,
-  Clock, Users, ChevronRight, AlertTriangle, Circle, Eye, ShieldAlert, Lock, Layers, ChevronDown
+  collection,
+  deleteField,
+  doc,
+  getDocs,
+  getDoc,
+  orderBy,
+  query,
+  Timestamp,
+  updateDoc,
+} from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowLeft,
+  Building2,
+  CheckCircle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Circle,
+  Clock,
+  Eye,
+  FileText,
+  FileUp,
+  Hash,
+  Info,
+  Layers,
+  Lock,
+  Package,
+  Plus,
+  Save,
+  Search,
+  Send,
+  Shield,
+  ShieldAlert,
+  ShoppingCart,
+  Trash2,
+  Upload,
+  Users,
+  Wrench,
+  X,
 } from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldCommitPO } from "@/lib/budgetRules";
 import { commitPO } from "@/lib/budgetOperations";
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-interface Supplier { id: string; fiscalName: string; commercialName: string; country: string; taxId: string; paymentMethod: string; }
-interface SubAccount { id: string; code: string; description: string; budgeted: number; committed: number; actual: number; available: number; accountId: string; accountCode: string; accountDescription: string; }
-interface EpisodeDistribution { episode: number; amount: number; percentage: number; }
-interface POItem { id: string; description: string; subAccountId: string; subAccountCode: string; subAccountDescription: string; date: string; quantity: number; unitPrice: number; baseAmount: number; vatRate: number; vatAmount: number; irpfRate: number; irpfAmount: number; totalAmount: number; episodeAssignment?: "general" | "specific"; episodes?: EpisodeDistribution[]; }
-interface ApprovalStep { id: string; order: number; approverType: "fixed" | "role" | "hod" | "coordinator"; approvers?: string[]; approverNames?: string[]; roles?: string[]; department?: string; requireAll: boolean; hasAmountThreshold?: boolean; amountThreshold?: number; amountCondition?: "above" | "below" | "between"; amountThresholdMax?: number; }
-interface ApprovalStepStatus { id: string; order: number; approverType: "fixed" | "role" | "hod" | "coordinator"; approvers: string[]; approverNames: string[]; roles?: string[]; department?: string; approvedBy: string[]; rejectedBy: string[]; status: "pending" | "approved" | "rejected"; requireAll: boolean; hasAmountThreshold?: boolean; amountThreshold?: number; amountCondition?: "above" | "below" | "between"; amountThresholdMax?: number; }
-interface Member { userId: string; name?: string; email?: string; role?: string; department?: string; position?: string; }
-interface ItemInvoiceStatus { hasInvoices: boolean; hasAccountedInvoices: boolean; invoiceNumbers: string[]; }
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface Supplier {
+  id: string;
+  fiscalName: string;
+  commercialName: string;
+  country: string;
+  taxId: string;
+  paymentMethod: string;
+}
+
+interface SubAccount {
+  id: string;
+  code: string;
+  description: string;
+  budgeted: number;
+  committed: number;
+  actual: number;
+  available: number;
+  accountId: string;
+  accountCode: string;
+  accountDescription: string;
+}
+
+interface EpisodeDistribution {
+  episode: number;
+  amount: number;
+  percentage: number;
+}
+
+interface POItem {
+  id: string;
+  description: string;
+  subAccountId: string;
+  subAccountCode: string;
+  subAccountDescription: string;
+  date: string;
+  quantity: number;
+  unitPrice: number;
+  baseAmount: number;
+  vatRate: number;
+  vatAmount: number;
+  irpfRate: number;
+  irpfAmount: number;
+  totalAmount: number;
+  episodeAssignment?: "general" | "specific";
+  episodes?: EpisodeDistribution[];
+}
+
+interface ApprovalStep {
+  id: string;
+  order: number;
+  approverType: "fixed" | "role" | "hod" | "coordinator";
+  approvers?: string[];
+  approverNames?: string[];
+  roles?: string[];
+  department?: string;
+  requireAll: boolean;
+  hasAmountThreshold?: boolean;
+  amountThreshold?: number;
+  amountCondition?: "above" | "below" | "between";
+  amountThresholdMax?: number;
+}
+
+interface ApprovalStepStatus {
+  id: string;
+  order: number;
+  approverType: "fixed" | "role" | "hod" | "coordinator";
+  approvers: string[];
+  approverNames: string[];
+  roles?: string[];
+  department?: string;
+  approvedBy: string[];
+  rejectedBy: string[];
+  status: "pending" | "approved" | "rejected";
+  requireAll: boolean;
+  hasAmountThreshold?: boolean;
+  amountThreshold?: number;
+  amountCondition?: "above" | "below" | "between";
+  amountThresholdMax?: number;
+}
+
+interface Member {
+  userId: string;
+  name?: string;
+  email?: string;
+  role?: string;
+  department?: string;
+  position?: string;
+}
+
+interface ItemInvoiceStatus {
+  hasInvoices: boolean;
+  hasAccountedInvoices: boolean;
+  invoiceNumbers: string[];
+}
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const PO_TYPES = [
   { value: "rental", label: "Alquiler", icon: ShoppingCart, description: "Equipos, vehículos, espacios" },
@@ -41,6 +178,8 @@ const CURRENCIES = [
 
 const VAT_RATES = [{ value: 0, label: "0%" }, { value: 4, label: "4%" }, { value: 10, label: "10%" }, { value: 21, label: "21%" }];
 const IRPF_RATES = [{ value: 0, label: "0%" }, { value: 7, label: "7%" }, { value: 15, label: "15%" }, { value: 19, label: "19%" }];
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function EditPOPage() {
   const params = useParams();

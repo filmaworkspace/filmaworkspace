@@ -1,20 +1,117 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { useState, useEffect, useRef } from "react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs, addDoc, updateDoc, deleteDoc, query, Timestamp, orderBy } from "firebase/firestore";
-import { Plus, Search, Download, Edit, Trash2, X, FileCheck, FileX, AlertCircle, CheckCircle, Building2, MapPin, CreditCard, Globe, FileText, Clock, Eye, ArrowLeft, User, Mail, Phone, ShieldCheck, Hash, Lock, ChevronDown, Filter } from "lucide-react";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  getDoc,
+  orderBy,
+  query,
+  Timestamp,
+  updateDoc,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  ArrowLeft,
+  Building2,
+  CheckCircle,
+  ChevronDown,
+  Clock,
+  CreditCard,
+  Download,
+  Edit,
+  Eye,
+  FileCheck,
+  FileText,
+  FileX,
+  Filter,
+  Globe,
+  Hash,
+  Lock,
+  Mail,
+  MapPin,
+  Phone,
+  Plus,
+  Search,
+  ShieldCheck,
+  Trash2,
+  User,
+  X,
+} from "lucide-react";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-interface Address { street: string; number: string; city: string; province: string; postalCode: string; }
-interface Contact { name: string; email: string; phone: string; }
-interface Certificate { url?: string; expiryDate?: Date; uploaded: boolean; fileName?: string; verified?: boolean; verifiedBy?: string; verifiedByName?: string; verifiedAt?: Date; }
-interface Supplier { id: string; fiscalName: string; commercialName: string; country: string; taxId: string; address: Address; contact: Contact; paymentMethod: string; bankAccount: string; bic?: string; certificates: { bankOwnership: Certificate; contractorsCertificate: Certificate & { aeatVerified?: boolean }; }; createdAt: Date; createdBy: string; hasAssignedPOs: boolean; hasAssignedInvoices: boolean; closure?: { closedAt: Date; closedByName: string; notes?: string; }; }
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface Address {
+  street: string;
+  number: string;
+  city: string;
+  province: string;
+  postalCode: string;
+}
+
+interface Contact {
+  name: string;
+  email: string;
+  phone: string;
+}
+
+interface Certificate {
+  url?: string;
+  expiryDate?: Date;
+  uploaded: boolean;
+  fileName?: string;
+  verified?: boolean;
+  verifiedBy?: string;
+  verifiedByName?: string;
+  verifiedAt?: Date;
+}
+
+interface Supplier {
+  id: string;
+  fiscalName: string;
+  commercialName: string;
+  country: string;
+  taxId: string;
+  address: Address;
+  contact: Contact;
+  paymentMethod: string;
+  bankAccount: string;
+  bic?: string;
+  certificates: {
+    bankOwnership: Certificate;
+    contractorsCertificate: Certificate & { aeatVerified?: boolean };
+  };
+  createdAt: Date;
+  createdBy: string;
+  hasAssignedPOs: boolean;
+  hasAssignedInvoices: boolean;
+  closure?: {
+    closedAt: Date;
+    closedByName: string;
+    notes?: string;
+  };
+}
 
 type PaymentMethod = "transferencia" | "tb30" | "tb60" | "tarjeta" | "efectivo";
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: "transferencia", label: "Transferencia bancaria" },
   { value: "tb30", label: "Transferencia 30 días" },
@@ -108,6 +205,8 @@ const validateSpanishTaxId = (taxId: string): boolean => {
   }
   return /^[ABCDEFGHJKLMNPQRSUVW][0-9]{7}[0-9A-J]$/.test(clean);
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function SuppliersPage() {
   const params = useParams();

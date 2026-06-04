@@ -1,14 +1,64 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { useState, useEffect, useRef } from "react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs, deleteDoc, query, orderBy, updateDoc, Timestamp } from "firebase/firestore";
-import { Receipt, Plus, Search, Download, Trash2, X, CheckCircle, XCircle, Calendar, FileText, Eye, MoreHorizontal, Shield, FileCheck, AlertTriangle, Link as LinkIcon, Clock, Building2, ShieldAlert, User, ChevronDown, Filter, HelpCircle, Upload, Code, RefreshCw, Lock } from "lucide-react";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  getDoc,
+  orderBy,
+  query,
+  Timestamp,
+  updateDoc,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertTriangle,
+  Building2,
+  Calendar,
+  CheckCircle,
+  ChevronDown,
+  Clock,
+  Code,
+  Download,
+  Eye,
+  FileCheck,
+  FileText,
+  Filter,
+  HelpCircle,
+  Link as LinkIcon,
+  Lock,
+  MoreHorizontal,
+  Plus,
+  Receipt,
+  RefreshCw,
+  Search,
+  Shield,
+  ShieldAlert,
+  Trash2,
+  Upload,
+  User,
+  X,
+  XCircle,
+} from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const DOCUMENT_TYPES = {
   invoice: { code: "FAC", label: "Factura", icon: Receipt, bgColor: "bg-emerald-50", textColor: "text-emerald-700", borderColor: "border-emerald-200" },
@@ -26,6 +76,8 @@ const STATUS_OPTIONS = [
   { value: "rejected", label: "Rechazadas" },
   { value: "cancelled", label: "Canceladas" },
 ];
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 type DocumentType = keyof typeof DOCUMENT_TYPES;
 
@@ -95,6 +147,8 @@ interface CompanyData {
   email?: string;
   phone?: string;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function InvoicesPage() {
   const params = useParams();

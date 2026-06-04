@@ -1,17 +1,67 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Inter } from "next/font/google";
-import { auth, db, storage } from "@/lib/firebase";
-import { doc, getDoc, getDocs, collection, updateDoc, Timestamp } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { CheckCircle2, AlertCircle, Receipt, FileText, Wallet, PiggyBank, Shield, CircleDollarSign, Download, Upload, X, Clock, Banknote, FileCheck, ExternalLink, AlertTriangle, Landmark, Trash2, Info, Euro, FileUp, CheckCircle, XCircle, CreditCard, Undo2, ChevronDown, ChevronUp, MoreHorizontal, ShieldAlert, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { Inter } from "next/font/google";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
+import { auth, db, storage } from "@/lib/firebase";
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  Timestamp,
+  updateDoc,
+} from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowLeft,
+  Banknote,
+  CheckCircle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  CircleDollarSign,
+  Clock,
+  CreditCard,
+  Download,
+  Euro,
+  ExternalLink,
+  FileCheck,
+  FileText,
+  FileUp,
+  Info,
+  Landmark,
+  MoreHorizontal,
+  PiggyBank,
+  Receipt,
+  Shield,
+  ShieldAlert,
+  Trash2,
+  Undo2,
+  Upload,
+  Wallet,
+  X,
+  XCircle,
+} from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { getCostSettings, shouldRealizeInvoice, shouldRealizeOnStatusChange } from "@/lib/budgetRules";
 import { realizeInvoice, unrealizeInvoice } from "@/lib/budgetOperations";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const PAYMENT_TYPES = {
   invoice: { label: "Factura", icon: Receipt, bgColor: "bg-emerald-50", textColor: "text-emerald-600" },
@@ -21,12 +71,64 @@ const PAYMENT_TYPES = {
   deposit: { label: "Depósito", icon: PiggyBank, bgColor: "bg-indigo-50", textColor: "text-indigo-600" },
   guarantee: { label: "Fianza", icon: Shield, bgColor: "bg-slate-100", textColor: "text-slate-600" },
 };
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 type PaymentType = keyof typeof PAYMENT_TYPES;
 
-interface PaymentItem { id: string; type: PaymentType; invoiceId?: string; invoiceNumber?: string; supplier: string; supplierId?: string; description: string; amount: number; partialAmount?: number; addedAt: Date; status: "pending" | "completed"; receiptUrl?: string; receiptName?: string; completedAt?: Date; completedBy?: string; completedByName?: string; iban?: string; bic?: string; attachmentUrl?: string; }
-interface PaymentForecast { id: string; name: string; paymentDate: Date; type: "remesa" | "fuera_remesa"; status: "draft" | "pending" | "completed"; items: PaymentItem[]; totalAmount: number; createdAt: Date; createdBy: string; createdByName: string; }
-interface BankAccount { id: string; alias: string; fiscalName: string; taxId: string; iban: string; bic?: string; isDefault?: boolean; }
-interface SupplierData { id: string; name: string; iban?: string; bic?: string; }
+interface PaymentItem {
+  id: string;
+  type: PaymentType;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  supplier: string;
+  supplierId?: string;
+  description: string;
+  amount: number;
+  partialAmount?: number;
+  addedAt: Date;
+  status: "pending" | "completed";
+  receiptUrl?: string;
+  receiptName?: string;
+  completedAt?: Date;
+  completedBy?: string;
+  completedByName?: string;
+  iban?: string;
+  bic?: string;
+  attachmentUrl?: string;
+}
+
+interface PaymentForecast {
+  id: string;
+  name: string;
+  paymentDate: Date;
+  type: "remesa" | "fuera_remesa";
+  status: "draft" | "pending" | "completed";
+  items: PaymentItem[];
+  totalAmount: number;
+  createdAt: Date;
+  createdBy: string;
+  createdByName: string;
+}
+
+interface BankAccount {
+  id: string;
+  alias: string;
+  fiscalName: string;
+  taxId: string;
+  iban: string;
+  bic?: string;
+  isDefault?: boolean;
+}
+
+interface SupplierData {
+  id: string;
+  name: string;
+  iban?: string;
+  bic?: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function PaymentPayPage() {
   const params = useParams();
