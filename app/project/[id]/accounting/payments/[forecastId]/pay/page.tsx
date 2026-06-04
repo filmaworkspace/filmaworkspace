@@ -54,7 +54,7 @@ import {
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { getCostSettings, shouldRealizeInvoice, shouldRealizeOnStatusChange } from "@/lib/budgetRules";
-import { realizeInvoice, unrealizeInvoice } from "@/lib/budgetOperations";
+import { realizeInvoice, unrealizeInvoice, updatePOItemsInvoiced } from "@/lib/budgetOperations";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -298,9 +298,14 @@ export default function PaymentPayPage() {
                   subAccountId: i.subAccountId,
                   baseAmount: i.baseAmount,
                 }));
-              
+
               if (budgetItems.length > 0) {
                 await realizeInvoice(id, budgetItems);
+              }
+
+              // Actualizar el seguimiento de la PO (invoicedAmount / remainingAmount)
+              if (invoiceData.poId) {
+                await updatePOItemsInvoiced(id, invoiceData.poId, invoiceData.items, "add");
               }
             }
           }
@@ -436,9 +441,14 @@ export default function PaymentPayPage() {
                   subAccountId: i.subAccountId,
                   baseAmount: i.baseAmount,
                 }));
-              
+
               if (budgetItems.length > 0) {
                 await unrealizeInvoice(id, budgetItems);
+              }
+
+              // Revertir el seguimiento de la PO
+              if (invoiceData.poId) {
+                await updatePOItemsInvoiced(id, invoiceData.poId, invoiceData.items, "subtract");
               }
             }
           }

@@ -3,12 +3,13 @@ import { db } from "@/lib/firebase";
 
 export interface CostSettings {
   poCommitmentTrigger: "on_create" | "on_approve";
+  // "on_paid" se mantiene solo por compatibilidad con datos antiguos; el UI ya no lo ofrece
   invoiceActualTrigger: "on_approve" | "on_account" | "on_paid";
 }
 
 const DEFAULT_SETTINGS: CostSettings = {
   poCommitmentTrigger: "on_approve",
-  invoiceActualTrigger: "on_paid",
+  invoiceActualTrigger: "on_account",
 };
 
 /**
@@ -21,9 +22,11 @@ export async function getCostSettings(projectId: string): Promise<CostSettings> 
     
     if (costConfigSnap.exists()) {
       const data = costConfigSnap.data();
+      // Migrar "on_paid" (opción eliminada) → "on_account"
+      const rawInvoice = data.invoiceActualTrigger || DEFAULT_SETTINGS.invoiceActualTrigger;
       return {
         poCommitmentTrigger: data.poCommitmentTrigger || DEFAULT_SETTINGS.poCommitmentTrigger,
-        invoiceActualTrigger: data.invoiceActualTrigger || DEFAULT_SETTINGS.invoiceActualTrigger,
+        invoiceActualTrigger: rawInvoice === "on_paid" ? "on_account" : rawInvoice,
       };
     }
     

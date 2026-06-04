@@ -27,7 +27,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   Clock,
-  CreditCard,
+  Banknote,
   FileText,
   FolderDown,
   Plus,
@@ -469,7 +469,7 @@ export default function AccountingPage() {
                     className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors" 
                     title="Pagos"
                   >
-                    <CreditCard size={16} />
+                    <Banknote size={16} />
                   </Link>
                 )}
                 <Link 

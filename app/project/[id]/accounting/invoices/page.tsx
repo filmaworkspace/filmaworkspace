@@ -359,25 +359,8 @@ export default function InvoicesPage() {
           }
         }
 
-        if (invoice.poId) {
-          try {
-            const poRef = doc(db, `projects/${id}/pos`, invoice.poId);
-            const poSnap = await getDoc(poRef);
-
-            if (poSnap.exists()) {
-              const currentInvoiced = poSnap.data().invoicedAmount || 0;
-              const poBaseAmount = poSnap.data().baseAmount || poSnap.data().totalAmount || 0;
-              const newInvoiced = currentInvoiced + invoice.baseAmount;
-
-              await updateDoc(poRef, {
-                invoicedAmount: newInvoiced,
-                remainingAmount: Math.max(0, poBaseAmount - newInvoiced),
-              });
-            }
-          } catch (e) {
-            console.error("Error updating PO invoiced amount:", e);
-          }
-        }
+        // El tracking de PO (invoicedAmount/remainingAmount) se actualiza
+        // al crear la factura en invoices/new/page.tsx, no al pagarla.
       }
 
       loadData();

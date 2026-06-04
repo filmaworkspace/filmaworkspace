@@ -1435,9 +1435,12 @@ export default function NewInvoicePage() {
       // Actualizar presupuesto solo si corresponde según configuración
       if (shouldRealizeInvoice(finalStatus, costSettings)) {
         await updateSubAccountsBudget(items, !!selectedPO);
-        if (selectedPO) {
-          await updatePOInvoicedAmount(selectedPO.id, items);
-        }
+      }
+
+      // Actualizar tracking de PO siempre que haya PO vinculada,
+      // independientemente de cuándo se realice el presupuesto
+      if (selectedPO) {
+        await updatePOInvoicedAmount(selectedPO.id, items);
       }
 
       // Actualizar documento reemplazado
