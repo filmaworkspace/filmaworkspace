@@ -191,7 +191,7 @@ export default function AdminDashboard() {
   const [showAssignCompanyUser, setShowAssignCompanyUser] = useState<string | null>(null);
   const [companyUserSearch, setCompanyUserSearch] = useState("");
 
-  const [newProject, setNewProject] = useState({ name: "", description: "", phase: "Desarrollo", producers: [] as string[] });
+  const [newProject, setNewProject] = useState({ name: "", description: "", phase: "Desarrollo", producers: [] as string[], customId: "", useCustomId: false });
   const [newProducer, setNewProducer] = useState({ name: "" });
   const [assignUserForm, setAssignUserForm] = useState({ odId: "", role: "" });
 
@@ -283,18 +283,6 @@ export default function AdminDashboard() {
             role: m.data().role,
             position: m.data().position,
           }));
-          const [posSnap, invoicesSnap, accountsSnap] = await Promise.all([
-            getDocs(collection(db, `projects/${projectDoc.id}/pos`)),
-            getDocs(collection(db, `projects/${projectDoc.id}/invoices`)),
-            getDocs(collection(db, `projects/${projectDoc.id}/accounts`)),
-          ]);
-          let budgetTotal = 0;
-          for (const accDoc of accountsSnap.docs) {
-            const subaccountsSnap = await getDocs(collection(db, `projects/${projectDoc.id}/accounts/${accDoc.id}/subaccounts`));
-            subaccountsSnap.docs.forEach((s) => {
-              budgetTotal += s.data().budgeted || 0;
-            });
-          }
           return {
             id: projectDoc.id,
             name: data.name,
@@ -305,7 +293,6 @@ export default function AdminDashboard() {
             createdAt: data.createdAt,
             memberCount: membersSnap.size,
             members,
-            stats: { poCount: posSnap.size, invoiceCount: invoicesSnap.size, budgetTotal },
           };
         })
       );
@@ -443,9 +430,16 @@ export default function AdminDashboard() {
       showToast("error", "El nombre es obligatorio");
       return;
     }
+    if (newProject.useCustomId) {
+      const raw = newProject.customId.trim();
+      if (!raw) { showToast("error", "Introduce un ID para el proyecto"); return; }
+      if (!/^[a-zA-Z0-9_-]+$/.test(raw)) { showToast("error", "El ID solo puede contener letras, números, guiones y guiones bajos"); return; }
+      const existing = await getDoc(doc(db, "projects", raw));
+      if (existing.exists()) { showToast("error", `Ya existe un proyecto con el ID "${raw}"`); return; }
+    }
     setSaving(true);
     try {
-      const projectId = generateShortId();
+      const projectId = newProject.useCustomId ? newProject.customId.trim() : generateShortId();
       const projectRef = doc(db, "projects", projectId);
       
       // Crear proyecto con departamentos como array (igual que el resto de la app)
@@ -468,7 +462,7 @@ export default function AdminDashboard() {
         });
       }
       
-      setNewProject({ name: "", description: "", phase: "Desarrollo", producers: [] });
+      setNewProject({ name: "", description: "", phase: "Desarrollo", producers: [], customId: "", useCustomId: false });
       setShowCreateProject(false);
       showToast("success", "Proyecto creado correctamente");
       await loadData();
@@ -1357,12 +1351,6 @@ export default function AdminDashboard() {
                           <Users size={12} className="text-slate-400" />
                           <span>{project.memberCount} miembros</span>
                         </div>
-                        {project.stats && (
-                          <div className="flex items-center gap-1.5">
-                            <Briefcase size={12} className="text-slate-400" />
-                            <span>{project.stats.poCount} POs · {project.stats.invoiceCount} facturas</span>
-                          </div>
-                        )}
                       </div>
 
                       {/* Actions */}
@@ -1763,7 +1751,7 @@ export default function AdminDashboard() {
                 onClick={() => {
                   setShowCreateProject(false);
                   setShowEditProject(null);
-                  setNewProject({ name: "", description: "", phase: "Desarrollo", producers: [] });
+                  setNewProject({ name: "", description: "", phase: "Desarrollo", producers: [], customId: "", useCustomId: false });
                   setProducerModalSearch("");
                 }}
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
@@ -1783,6 +1771,43 @@ export default function AdminDashboard() {
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
                 />
               </div>
+
+              {/* ID del proyecto — solo en creación */}
+              {!showEditProject && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-slate-700">ID del proyecto</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500">{newProject.useCustomId ? "Personalizado" : "Automático"}</span>
+                      <button
+                        type="button"
+                        onClick={() => setNewProject({ ...newProject, useCustomId: !newProject.useCustomId, customId: "" })}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${newProject.useCustomId ? "bg-slate-900" : "bg-slate-200"}`}
+                      >
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${newProject.useCustomId ? "translate-x-[18px]" : "translate-x-[3px]"}`} />
+                      </button>
+                    </div>
+                  </div>
+                  {newProject.useCustomId ? (
+                    <div>
+                      <input
+                        type="text"
+                        value={newProject.customId}
+                        onChange={(e) => setNewProject({ ...newProject, customId: e.target.value.replace(/[^a-zA-Z0-9_-]/g, "") })}
+                        placeholder="ej: mi-proyecto-2025"
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm font-mono"
+                      />
+                      {newProject.customId && (
+                        <p className="mt-1.5 text-xs text-slate-400">
+                          URL: <span className="font-mono text-slate-600">/project/{newProject.customId}</span>
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 px-1">Se generará un código aleatorio de 6 caracteres. Puedes activar el toggle para definirlo tú.</p>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Descripción</label>
