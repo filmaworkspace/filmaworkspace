@@ -36,7 +36,9 @@ import {
   ChevronRight,
   Clapperboard,
   Clock,
+  Copy,
   Crown,
+  Download,
   Edit2,
   ExternalLink,
   Eye,
@@ -108,6 +110,7 @@ interface Project {
   createdAt: Timestamp;
   memberCount: number;
   members?: Member[];
+  stats?: { poCount: number; invoiceCount: number; budgetTotal: number };
 }
 
 interface Member {
@@ -207,6 +210,21 @@ export default function AdminDashboard() {
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Copy suppliers modal
+  const [showCopySuppliers, setShowCopySuppliers] = useState<string | null>(null);
+  const [copySupplierTargetId, setCopySupplierTargetId] = useState("");
+
+  // Copy budget modal
+  const [showCopyBudget, setShowCopyBudget] = useState<string | null>(null);
+  const [copyBudgetTargetId, setCopyBudgetTargetId] = useState("");
+  const [copyBudgetAmounts, setCopyBudgetAmounts] = useState(true);
+
+  // Clone project modal
+  const [showCloneProject, setShowCloneProject] = useState<string | null>(null);
+  const [cloneProjectName, setCloneProjectName] = useState("");
+  const [cloneIncludeBudget, setCloneIncludeBudget] = useState(true);
+  const [cloneIncludeSuppliers, setCloneIncludeSuppliers] = useState(true);
+
   const menuRef = useRef<HTMLDivElement>(null);
   const phaseDropdownRef = useRef<HTMLDivElement>(null);
   const roleDropdownRef = useRef<HTMLDivElement>(null);
@@ -265,6 +283,18 @@ export default function AdminDashboard() {
             role: m.data().role,
             position: m.data().position,
           }));
+          const [posSnap, invoicesSnap, accountsSnap] = await Promise.all([
+            getDocs(collection(db, `projects/${projectDoc.id}/pos`)),
+            getDocs(collection(db, `projects/${projectDoc.id}/invoices`)),
+            getDocs(collection(db, `projects/${projectDoc.id}/accounts`)),
+          ]);
+          let budgetTotal = 0;
+          for (const accDoc of accountsSnap.docs) {
+            const subaccountsSnap = await getDocs(collection(db, `projects/${projectDoc.id}/accounts/${accDoc.id}/subaccounts`));
+            subaccountsSnap.docs.forEach((s) => {
+              budgetTotal += s.data().budgeted || 0;
+            });
+          }
           return {
             id: projectDoc.id,
             name: data.name,
@@ -275,6 +305,7 @@ export default function AdminDashboard() {
             createdAt: data.createdAt,
             memberCount: membersSnap.size,
             members,
+            stats: { poCount: posSnap.size, invoiceCount: invoicesSnap.size, budgetTotal },
           };
         })
       );
@@ -796,6 +827,196 @@ export default function AdminDashboard() {
     }
   };
 
+  // Copy suppliers between projects
+  const handleCopySuppliers = async () => {
+    if (!showCopySuppliers || !copySupplierTargetId) return;
+    setSaving(true);
+    try {
+      const sourceSnap = await getDocs(collection(db, `projects/${showCopySuppliers}/suppliers`));
+      const targetSnap = await getDocs(collection(db, `projects/${copySupplierTargetId}/suppliers`));
+      const existingKeys = new Set(
+        targetSnap.docs.map((d) => d.data().taxId || d.data().fiscalName || d.id)
+      );
+      let copied = 0;
+      for (const supplierDoc of sourceSnap.docs) {
+        const data = supplierDoc.data();
+        const key = data.taxId || data.fiscalName || supplierDoc.id;
+        if (!existingKeys.has(key)) {
+          await setDoc(doc(db, `projects/${copySupplierTargetId}/suppliers`, supplierDoc.id), data);
+          copied++;
+        }
+      }
+      setShowCopySuppliers(null);
+      setCopySupplierTargetId("");
+      showToast("success", `${copied} proveedor${copied !== 1 ? "es" : ""} copiado${copied !== 1 ? "s" : ""}`);
+    } catch (error) {
+      console.error(error);
+      showToast("error", "Error al copiar proveedores");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Copy budget between projects
+  const handleCopyBudget = async () => {
+    if (!showCopyBudget || !copyBudgetTargetId) return;
+    setSaving(true);
+    try {
+      const sourceAccountsSnap = await getDocs(collection(db, `projects/${showCopyBudget}/accounts`));
+      const targetAccountsSnap = await getDocs(collection(db, `projects/${copyBudgetTargetId}/accounts`));
+      const overwrite = targetAccountsSnap.size > 0
+        ? confirm(`El proyecto destino ya tiene ${targetAccountsSnap.size} cuenta(s). ¿Sobreescribir? Pulsa Cancelar para añadir sin borrar.`)
+        : false;
+      if (overwrite) {
+        for (const accDoc of targetAccountsSnap.docs) {
+          const subSnap = await getDocs(collection(db, `projects/${copyBudgetTargetId}/accounts/${accDoc.id}/subaccounts`));
+          for (const subDoc of subSnap.docs) {
+            await deleteDoc(doc(db, `projects/${copyBudgetTargetId}/accounts/${accDoc.id}/subaccounts`, subDoc.id));
+          }
+          await deleteDoc(doc(db, `projects/${copyBudgetTargetId}/accounts`, accDoc.id));
+        }
+      }
+      for (const accDoc of sourceAccountsSnap.docs) {
+        const accData = accDoc.data();
+        await setDoc(doc(db, `projects/${copyBudgetTargetId}/accounts`, accDoc.id), {
+          code: accData.code,
+          description: accData.description,
+          createdAt: serverTimestamp(),
+          createdBy: accData.createdBy || "",
+        });
+        const subSnap = await getDocs(collection(db, `projects/${showCopyBudget}/accounts/${accDoc.id}/subaccounts`));
+        for (const subDoc of subSnap.docs) {
+          const subData = subDoc.data();
+          await setDoc(doc(db, `projects/${copyBudgetTargetId}/accounts/${accDoc.id}/subaccounts`, subDoc.id), {
+            code: subData.code,
+            description: subData.description,
+            budgeted: copyBudgetAmounts ? (subData.budgeted || 0) : 0,
+            committed: 0,
+            actual: 0,
+            box: 0,
+            accountId: accDoc.id,
+            createdAt: serverTimestamp(),
+          });
+        }
+      }
+      setShowCopyBudget(null);
+      setCopyBudgetTargetId("");
+      showToast("success", "Presupuesto copiado correctamente");
+    } catch (error) {
+      console.error(error);
+      showToast("error", "Error al copiar presupuesto");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Clone project
+  const handleCloneProject = async () => {
+    if (!showCloneProject || !cloneProjectName.trim()) return;
+    setSaving(true);
+    try {
+      const sourceProject = projects.find((p) => p.id === showCloneProject);
+      if (!sourceProject) return;
+      const newId = generateShortId();
+      await setDoc(doc(db, "projects", newId), {
+        name: cloneProjectName.trim(),
+        description: sourceProject.description || "",
+        phase: sourceProject.phase,
+        producers: sourceProject.producers || [],
+        departments: DEFAULT_DEPARTMENTS.map((d) => d.name),
+        createdAt: serverTimestamp(),
+      });
+      // Copy producers companyProjects entries
+      for (const producerId of sourceProject.producers || []) {
+        await setDoc(doc(db, `companyProjects/${producerId}/projects`, newId), {
+          projectId: newId,
+          name: cloneProjectName.trim(),
+          phase: sourceProject.phase,
+          addedAt: serverTimestamp(),
+        });
+      }
+      // Copy departments subcollection if exists
+      try {
+        const depsSnap = await getDocs(collection(db, `projects/${showCloneProject}/departments`));
+        for (const depDoc of depsSnap.docs) {
+          await setDoc(doc(db, `projects/${newId}/departments`, depDoc.id), depDoc.data());
+        }
+      } catch {
+        // departments may not exist as subcollection
+      }
+      // Optionally copy budget
+      if (cloneIncludeBudget) {
+        const sourceAccountsSnap = await getDocs(collection(db, `projects/${showCloneProject}/accounts`));
+        for (const accDoc of sourceAccountsSnap.docs) {
+          const accData = accDoc.data();
+          await setDoc(doc(db, `projects/${newId}/accounts`, accDoc.id), {
+            code: accData.code,
+            description: accData.description,
+            createdAt: serverTimestamp(),
+            createdBy: accData.createdBy || "",
+          });
+          const subSnap = await getDocs(collection(db, `projects/${showCloneProject}/accounts/${accDoc.id}/subaccounts`));
+          for (const subDoc of subSnap.docs) {
+            const subData = subDoc.data();
+            await setDoc(doc(db, `projects/${newId}/accounts/${accDoc.id}/subaccounts`, subDoc.id), {
+              code: subData.code,
+              description: subData.description,
+              budgeted: subData.budgeted || 0,
+              committed: 0,
+              actual: 0,
+              box: 0,
+              accountId: accDoc.id,
+              createdAt: serverTimestamp(),
+            });
+          }
+        }
+      }
+      // Optionally copy suppliers
+      if (cloneIncludeSuppliers) {
+        const sourceSuppliersSnap = await getDocs(collection(db, `projects/${showCloneProject}/suppliers`));
+        for (const supDoc of sourceSuppliersSnap.docs) {
+          await setDoc(doc(db, `projects/${newId}/suppliers`, supDoc.id), supDoc.data());
+        }
+      }
+      setShowCloneProject(null);
+      setCloneProjectName("");
+      setCloneIncludeBudget(true);
+      setCloneIncludeSuppliers(true);
+      showToast("success", `Proyecto "${cloneProjectName.trim()}" creado`);
+      await loadData();
+    } catch (error) {
+      console.error(error);
+      showToast("error", "Error al clonar el proyecto");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Export users to CSV
+  const handleExportUsersCSV = () => {
+    const header = ["Nombre", "Email", "Rol", "Nº proyectos", "Proyectos"];
+    const rows = filteredUsers.map((u) => [
+      u.name,
+      u.email,
+      u.role === "admin" ? "Administrador" : "Usuario",
+      String(u.projectCount),
+      u.projects.map((p) => p.name).join(" | "),
+    ]);
+    const csvContent = [header, ...rows]
+      .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob(["﻿" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `usuarios_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast("success", "CSV exportado");
+  };
+
   const toggleProjectInMessage = (projectId: string) => {
     setMessageForm((prev) => ({
       ...prev,
@@ -1072,6 +1293,44 @@ export default function AdminDashboard() {
                               </Link>
                               <div className="border-t border-slate-100 my-1" />
                               <button
+                                onClick={() => {
+                                  setShowCopySuppliers(project.id);
+                                  setCopySupplierTargetId("");
+                                  setActiveMenu(null);
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                              >
+                                <Copy size={14} className="text-slate-400" />
+                                Copiar proveedores a...
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setShowCopyBudget(project.id);
+                                  setCopyBudgetTargetId("");
+                                  setCopyBudgetAmounts(true);
+                                  setActiveMenu(null);
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                              >
+                                <Copy size={14} className="text-slate-400" />
+                                Copiar presupuesto a...
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const src = projects.find((p) => p.id === project.id);
+                                  setCloneProjectName(src ? src.name + " (copia)" : "");
+                                  setCloneIncludeBudget(true);
+                                  setCloneIncludeSuppliers(true);
+                                  setShowCloneProject(project.id);
+                                  setActiveMenu(null);
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                              >
+                                <FolderPlus size={14} className="text-slate-400" />
+                                Clonar proyecto
+                              </button>
+                              <div className="border-t border-slate-100 my-1" />
+                              <button
                                 onClick={() => handleDeleteProject(project.id)}
                                 className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                               >
@@ -1098,6 +1357,12 @@ export default function AdminDashboard() {
                           <Users size={12} className="text-slate-400" />
                           <span>{project.memberCount} miembros</span>
                         </div>
+                        {project.stats && (
+                          <div className="flex items-center gap-1.5">
+                            <Briefcase size={12} className="text-slate-400" />
+                            <span>{project.stats.poCount} POs · {project.stats.invoiceCount} facturas</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Actions */}
@@ -1180,6 +1445,13 @@ export default function AdminDashboard() {
                   </div>
                 )}
               </div>
+              <button
+                onClick={handleExportUsersCSV}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 ml-auto"
+              >
+                <Download size={14} />
+                Exportar CSV
+              </button>
             </div>
 
             {/* Users List */}
@@ -2201,6 +2473,196 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+      {/* Copy Suppliers Modal */}
+      {showCopySuppliers && (() => {
+        const sourceProject = projects.find((p) => p.id === showCopySuppliers);
+        const targetProject = projects.find((p) => p.id === copySupplierTargetId);
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-lg font-semibold text-slate-900">Copiar proveedores a...</h3>
+                <button
+                  onClick={() => { setShowCopySuppliers(null); setCopySupplierTargetId(""); }}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 mb-4">
+                Copiar proveedores de <span className="font-medium text-slate-700">{sourceProject?.name}</span> a otro proyecto. Se omitirán los que ya existan por NIF o nombre fiscal.
+              </p>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-2">Proyecto destino</label>
+                <select
+                  value={copySupplierTargetId}
+                  onChange={(e) => setCopySupplierTargetId(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white"
+                >
+                  <option value="">Seleccionar proyecto...</option>
+                  {projects.filter((p) => p.id !== showCopySuppliers).map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              {targetProject && (
+                <p className="text-xs text-slate-500 mb-4 bg-slate-50 rounded-xl px-3 py-2">
+                  Destino: <span className="font-medium">{targetProject.name}</span> ({targetProject.memberCount} miembros)
+                </p>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setShowCopySuppliers(null); setCopySupplierTargetId(""); }}
+                  className="flex-1 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCopySuppliers}
+                  disabled={saving || !copySupplierTargetId}
+                  className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? "Copiando..." : "Copiar proveedores"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Copy Budget Modal */}
+      {showCopyBudget && (() => {
+        const sourceProject = projects.find((p) => p.id === showCopyBudget);
+        const targetProject = projects.find((p) => p.id === copyBudgetTargetId);
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-lg font-semibold text-slate-900">Copiar presupuesto a...</h3>
+                <button
+                  onClick={() => { setShowCopyBudget(null); setCopyBudgetTargetId(""); }}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 mb-4">
+                Copiar estructura de cuentas y subcuentas de <span className="font-medium text-slate-700">{sourceProject?.name}</span>.
+              </p>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-2">Proyecto destino</label>
+                <select
+                  value={copyBudgetTargetId}
+                  onChange={(e) => setCopyBudgetTargetId(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white"
+                >
+                  <option value="">Seleccionar proyecto...</option>
+                  {projects.filter((p) => p.id !== showCopyBudget).map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              {targetProject && (
+                <p className="text-xs text-slate-500 mb-4 bg-slate-50 rounded-xl px-3 py-2">
+                  Destino: <span className="font-medium">{targetProject.name}</span>
+                </p>
+              )}
+              <label className="flex items-center gap-3 mb-5 cursor-pointer">
+                <div
+                  onClick={() => setCopyBudgetAmounts(!copyBudgetAmounts)}
+                  className={`w-10 h-5 rounded-full relative transition-colors ${copyBudgetAmounts ? "bg-slate-900" : "bg-slate-200"}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${copyBudgetAmounts ? "translate-x-5" : "translate-x-0.5"}`} />
+                </div>
+                <span className="text-sm text-slate-700">Copiar importes presupuestados</span>
+              </label>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setShowCopyBudget(null); setCopyBudgetTargetId(""); }}
+                  className="flex-1 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCopyBudget}
+                  disabled={saving || !copyBudgetTargetId}
+                  className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? "Copiando..." : "Copiar presupuesto"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Clone Project Modal */}
+      {showCloneProject && (() => {
+        const sourceProject = projects.find((p) => p.id === showCloneProject);
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-lg font-semibold text-slate-900">Clonar proyecto</h3>
+                <button
+                  onClick={() => setShowCloneProject(null)}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 mb-4">
+                Creando copia de <span className="font-medium text-slate-700">{sourceProject?.name}</span>.
+              </p>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-2">Nombre del nuevo proyecto *</label>
+                <input
+                  type="text"
+                  value={cloneProjectName}
+                  onChange={(e) => setCloneProjectName(e.target.value)}
+                  placeholder="Nombre del proyecto clonado"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
+                />
+              </div>
+              <div className="space-y-3 mb-5">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <div
+                    onClick={() => setCloneIncludeBudget(!cloneIncludeBudget)}
+                    className={`w-10 h-5 rounded-full relative transition-colors ${cloneIncludeBudget ? "bg-slate-900" : "bg-slate-200"}`}
+                  >
+                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cloneIncludeBudget ? "translate-x-5" : "translate-x-0.5"}`} />
+                  </div>
+                  <span className="text-sm text-slate-700">Incluir presupuesto</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <div
+                    onClick={() => setCloneIncludeSuppliers(!cloneIncludeSuppliers)}
+                    className={`w-10 h-5 rounded-full relative transition-colors ${cloneIncludeSuppliers ? "bg-slate-900" : "bg-slate-200"}`}
+                  >
+                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cloneIncludeSuppliers ? "translate-x-5" : "translate-x-0.5"}`} />
+                  </div>
+                  <span className="text-sm text-slate-700">Incluir proveedores</span>
+                </label>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowCloneProject(null)}
+                  className="flex-1 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCloneProject}
+                  disabled={saving || !cloneProjectName.trim()}
+                  className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? "Clonando..." : "Clonar proyecto"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
