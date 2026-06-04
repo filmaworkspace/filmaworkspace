@@ -276,7 +276,7 @@ const STATUS_CONFIG: Record<InvoiceStatus, { bg: string; text: string; label: st
 };
 
 const DOC_TYPE_CONFIG: Record<DocumentType, { label: string; code: string; color: string }> = {
-  invoice: { label: "Factura", code: "FAC", color: "text-indigo-600" },
+  invoice: { label: "Factura", code: "FRA", color: "text-indigo-600" },
   proforma: { label: "Proforma", code: "PRF", color: "text-violet-600" },
   autonomo: { label: "Autónomo", code: "AUT", color: "text-amber-600" },
   ticket: { label: "Ticket", code: "TKT", color: "text-emerald-600" },
@@ -356,7 +356,7 @@ export default function InvoiceDetailPage() {
       if (!invoiceDoc.exists()) { router.push(`/project/${projectId}/accounting/invoices`); return; }
       const data = invoiceDoc.data();
       const invoiceData: Invoice = {
-        id: invoiceDoc.id, documentType: data.documentType || "invoice", number: data.number || "", displayNumber: data.displayNumber || `FAC-${data.number}`,
+        id: invoiceDoc.id, documentType: data.documentType || "invoice", number: data.number || "", displayNumber: data.displayNumber || `FRA-${data.number}`,
         supplierNumber: data.supplierNumber, supplier: data.supplier || "", supplierId: data.supplierId || "", supplierTaxId: data.supplierTaxId, supplierIban: data.supplierIban, supplierBic: data.supplierBic,
         department: data.department, description: data.description || "", notes: data.notes, items: data.items || [],
         baseAmount: data.baseAmount || 0, vatAmount: data.vatAmount || 0, irpfAmount: data.irpfAmount || 0, totalAmount: data.totalAmount || 0,

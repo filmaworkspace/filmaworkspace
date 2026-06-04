@@ -533,7 +533,7 @@ export default function PaymentPayPage() {
     const total = items.reduce((sum, i) => sum + (tempAmounts[i.id] || i.partialAmount || i.amount), 0);
     const msgId = `REMESA-${forecast.id.substring(0, 8)}-${Date.now()}`;
     let txs = "";
-    items.forEach((item, idx) => { const s = item.supplierId ? suppliers[item.supplierId] : null; const iban = s?.iban || item.iban || ""; const bic = s?.bic || item.bic || ""; const amt = (tempAmounts[item.id] || item.partialAmount || item.amount).toFixed(2); const r = item.invoiceNumber ? `FAC-${item.invoiceNumber}` : item.description.substring(0, 35); txs += `<CdtTrfTxInf><PmtId><EndToEndId>${msgId}-${idx + 1}</EndToEndId></PmtId><Amt><InstdAmt Ccy="EUR">${amt}</InstdAmt></Amt>${bic ? `<CdtrAgt><FinInstnId><BIC>${bic}</BIC></FinInstnId></CdtrAgt>` : ""}<Cdtr><Nm>${escapeXml(item.supplier.substring(0, 70))}</Nm></Cdtr><CdtrAcct><Id><IBAN>${iban.replace(/\s/g, "")}</IBAN></Id></CdtrAcct><RmtInf><Ustrd>${escapeXml(r)}</Ustrd></RmtInf></CdtTrfTxInf>`; });
+    items.forEach((item, idx) => { const s = item.supplierId ? suppliers[item.supplierId] : null; const iban = s?.iban || item.iban || ""; const bic = s?.bic || item.bic || ""; const amt = (tempAmounts[item.id] || item.partialAmount || item.amount).toFixed(2); const r = item.invoiceNumber ? `FRA-${item.invoiceNumber}` : item.description.substring(0, 35); txs += `<CdtTrfTxInf><PmtId><EndToEndId>${msgId}-${idx + 1}</EndToEndId></PmtId><Amt><InstdAmt Ccy="EUR">${amt}</InstdAmt></Amt>${bic ? `<CdtrAgt><FinInstnId><BIC>${bic}</BIC></FinInstnId></CdtrAgt>` : ""}<Cdtr><Nm>${escapeXml(item.supplier.substring(0, 70))}</Nm></Cdtr><CdtrAcct><Id><IBAN>${iban.replace(/\s/g, "")}</IBAN></Id></CdtrAcct><RmtInf><Ustrd>${escapeXml(r)}</Ustrd></RmtInf></CdtTrfTxInf>`; });
     const xml = `<?xml version="1.0" encoding="UTF-8"?><Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.03"><CstmrCdtTrfInitn><GrpHdr><MsgId>${msgId}</MsgId><CreDtTm>${new Date().toISOString()}</CreDtTm><NbOfTxs>${items.length}</NbOfTxs><CtrlSum>${total.toFixed(2)}</CtrlSum><InitgPty><Nm>${escapeXml(selectedBankAccount.fiscalName)}</Nm><Id><OrgId><Othr><Id>${selectedBankAccount.taxId}</Id></Othr></OrgId></Id></InitgPty></GrpHdr><PmtInf><PmtInfId>${msgId}-INFO</PmtInfId><PmtMtd>TRF</PmtMtd><BtchBookg>true</BtchBookg><NbOfTxs>${items.length}</NbOfTxs><CtrlSum>${total.toFixed(2)}</CtrlSum><PmtTpInf><SvcLvl><Cd>SEPA</Cd></SvcLvl></PmtTpInf><ReqdExctnDt>${sepaDate}</ReqdExctnDt><Dbtr><Nm>${escapeXml(selectedBankAccount.fiscalName)}</Nm></Dbtr><DbtrAcct><Id><IBAN>${selectedBankAccount.iban.replace(/\s/g, "")}</IBAN></Id></DbtrAcct>${selectedBankAccount.bic ? `<DbtrAgt><FinInstnId><BIC>${selectedBankAccount.bic}</BIC></FinInstnId></DbtrAgt>` : ""}<ChrgBr>SLEV</ChrgBr>${txs}</PmtInf></CstmrCdtTrfInitn></Document>`;
     const blob = new Blob([xml], { type: "application/xml" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `SEPA_${forecast.name.replace(/\s/g, "_")}_${sepaDate}.xml`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
     setShowSepaModal(false); showToast("success", "SEPA generado");
@@ -699,7 +699,7 @@ export default function PaymentPayPage() {
                 <FileUp size={20} className={dragOver ? "text-emerald-500" : "text-slate-400"} />
                 <div>
                   <p className="text-sm font-medium text-slate-700">Arrastra justificantes aquí</p>
-                  <p className="text-xs text-slate-500">Nombra con nº factura (FAC-001.pdf)</p>
+                  <p className="text-xs text-slate-500">Nombra con nº factura (FRA-001.pdf)</p>
                 </div>
                 <button onClick={() => bulkFileInputRef.current?.click()} className="px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg font-medium">Seleccionar</button>
               </div>
@@ -738,7 +738,7 @@ export default function PaymentPayPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-slate-900 text-sm">{supplierName}</span>
-                            {item.invoiceNumber && <span className="text-[10px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">FAC-{item.invoiceNumber}</span>}
+                            {item.invoiceNumber && <span className="text-[10px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">FRA-{item.invoiceNumber}</span>}
                             {!hasIban && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Sin IBAN</span>}
                           </div>
                           <p className="text-xs text-slate-500 truncate">{item.description}</p>
@@ -828,7 +828,7 @@ export default function PaymentPayPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-slate-900 text-sm">{supplierNameC}</span>
-                            {item.invoiceNumber && <span className="text-[10px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">FAC-{item.invoiceNumber}</span>}
+                            {item.invoiceNumber && <span className="text-[10px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">FRA-{item.invoiceNumber}</span>}
                             {isPartialPayment && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Parcial</span>}
                           </div>
                           <p className="text-xs text-slate-500">{item.description}</p>

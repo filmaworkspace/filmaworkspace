@@ -225,7 +225,7 @@ export default function AccountingPage() {
         const allInvoices = invoicesRecentSnapshot.docs.map(doc => {
           const data = doc.data();
           const docType = data.documentType || "invoice";
-          const typePrefix = docType === "proforma" ? "PRF" : docType === "budget" ? "PRS" : docType === "guarantee" ? "FNZ" : "FAC";
+          const typePrefix = docType === "proforma" ? "PRF" : docType === "budget" ? "PRS" : docType === "guarantee" ? "FNZ" : "FRA";
           return { 
             id: doc.id, 
             number: data.number || "", 

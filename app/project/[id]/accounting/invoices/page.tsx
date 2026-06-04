@@ -60,7 +60,7 @@ import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DOCUMENT_TYPES = {
-  invoice: { code: "FAC", label: "Factura", icon: Receipt, bgColor: "bg-emerald-50", textColor: "text-emerald-700", borderColor: "border-emerald-200" },
+  invoice: { code: "FRA", label: "Factura", icon: Receipt, bgColor: "bg-emerald-50", textColor: "text-emerald-700", borderColor: "border-emerald-200" },
   proforma: { code: "PRF", label: "Proforma", icon: FileText, bgColor: "bg-violet-50", textColor: "text-violet-700", borderColor: "border-violet-200" },
   budget: { code: "PRS", label: "Presupuesto", icon: FileCheck, bgColor: "bg-amber-50", textColor: "text-amber-700", borderColor: "border-amber-200" },
   guarantee: { code: "FNZ", label: "Fianza", icon: Shield, bgColor: "bg-slate-100", textColor: "text-slate-700", borderColor: "border-slate-300" },
@@ -217,7 +217,7 @@ export default function InvoicesPage() {
           id: docSnap.id,
           ...data,
           documentType: data.documentType || "invoice",
-          displayNumber: data.displayNumber || `FAC-${data.number}`,
+          displayNumber: data.displayNumber || `FRA-${data.number}`,
           createdAt: data.createdAt?.toDate() || new Date(),
           dueDate: data.dueDate?.toDate() || new Date(),
           paymentDate: data.paymentDate?.toDate(),

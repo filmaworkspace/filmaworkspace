@@ -1208,7 +1208,7 @@ export default function PODetailPage() {
                     <Link key={invoice.id} href={`/project/${projectId}/accounting/invoices/${invoice.id}`} className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
                       <div className="flex items-center gap-3">
                         <div>
-                          <p className="font-medium text-slate-900">FAC-{invoice.number}</p>
+                          <p className="font-medium text-slate-900">FRA-{invoice.number}</p>
                           <p className="text-xs text-slate-500">{formatDate(invoice.createdAt)}</p>
                         </div>
                         <div className="flex items-center gap-1.5">

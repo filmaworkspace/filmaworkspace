@@ -71,7 +71,7 @@ import { realizeInvoice, unrealizeInvoice } from "@/lib/budgetOperations";
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DOCUMENT_TYPES = {
-  invoice: { code: "FAC", label: "Factura", icon: Receipt, bgColor: "bg-emerald-50", textColor: "text-emerald-700" },
+  invoice: { code: "FRA", label: "Factura", icon: Receipt, bgColor: "bg-emerald-50", textColor: "text-emerald-700" },
   proforma: { code: "PRF", label: "Proforma", icon: FileText, bgColor: "bg-violet-50", textColor: "text-violet-700" },
   budget: { code: "PRS", label: "Presupuesto", icon: FileCheck, bgColor: "bg-amber-50", textColor: "text-amber-700" },
   guarantee: { code: "FNZ", label: "Fianza", icon: Shield, bgColor: "bg-slate-100", textColor: "text-slate-700" },

@@ -297,7 +297,7 @@ export default function ReplaceDocumentPage() {
       const attachmentUrl = await getDownloadURL(fileRef);
 
       // Actualizar el documento: cambiar tipo a factura, descodificar, mantener número correlativo
-      const newDisplayNumber = `FAC-${selectedDoc.number}`;
+      const newDisplayNumber = `FRA-${selectedDoc.number}`;
 
       await updateDoc(doc(db, `projects/${projectId}/invoices`, selectedDoc.id), {
         documentType: "invoice",
@@ -551,7 +551,7 @@ export default function ReplaceDocumentPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Sustituir por factura</h2>
-                  <p className="text-xs text-slate-500">{selectedDoc.displayNumber} → FAC-{selectedDoc.number}</p>
+                  <p className="text-xs text-slate-500">{selectedDoc.displayNumber} → FRA-{selectedDoc.number}</p>
                 </div>
               </div>
               <button onClick={closeReplaceModal} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">

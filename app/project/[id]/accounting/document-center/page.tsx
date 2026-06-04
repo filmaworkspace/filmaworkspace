@@ -179,7 +179,7 @@ export default function DocumentCenterPage() {
           id: d.id,
           documentType: raw.documentType || "invoice",
           number: raw.number,
-          displayNumber: raw.displayNumber || `FAC-${raw.number}`,
+          displayNumber: raw.displayNumber || `FRA-${raw.number}`,
           supplierNumber: raw.supplierNumber,
           supplier: raw.supplier,
           supplierId: raw.supplierId,

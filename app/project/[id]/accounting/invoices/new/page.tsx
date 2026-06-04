@@ -86,7 +86,7 @@ function cx(...args: (string | boolean | null | undefined)[]): string {
 
 const DOCUMENT_TYPES = {
   invoice: {
-    code: "FAC",
+    code: "FRA",
     label: "Factura",
     article: "de la",
     icon: Receipt,

@@ -30,7 +30,6 @@ import {
   ChevronRight,
   CircleDollarSign,
   Clock,
-  CreditCard,
   Download,
   Edit3,
   ExternalLink,
@@ -603,7 +602,7 @@ export default function PaymentsPage() {
       pdf.setFillColor(index % 2 === 0 ? 255 : 248, index % 2 === 0 ? 255 : 250, index % 2 === 0 ? 255 : 252);
       pdf.roundedRect(margin, y, pageWidth - margin * 2, 20, 0, 0, "F");
       pdf.setTextColor(30, 41, 59); pdf.setFontSize(9); pdf.setFont("helvetica", "bold");
-      pdf.text((item.invoiceNumber ? "FAC-" + item.invoiceNumber : item.description).substring(0, 40), margin + 5, y + 7);
+      pdf.text((item.invoiceNumber ? "FRA-" + item.invoiceNumber : item.description).substring(0, 40), margin + 5, y + 7);
       pdf.setFont("helvetica", "normal"); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139);
       pdf.text(item.supplier.substring(0, 40), margin + 5, y + 14);
       if (item.status === "completed") { pdf.setTextColor(16, 185, 129); pdf.text("Completado", pageWidth - margin - 50, y + 7); }
@@ -664,7 +663,7 @@ export default function PaymentsPage() {
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
-              <CreditCard size={24} style={{ color: "#2F52E0" }} />
+              <Banknote size={24} style={{ color: "#2F52E0" }} />
               <div>
                 <h1 className="text-2xl font-semibold text-slate-900">Previsiones de pago</h1>
                 <p className="text-sm text-slate-500 mt-0.5">{forecasts.length} previsiones · {formatCurrency(forecasts.reduce((s, f) => s + f.totalAmount, 0))} € total</p>
@@ -834,7 +833,7 @@ export default function PaymentsPage() {
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
-                                      <p className="text-xs font-semibold text-slate-900 truncate font-mono">{invoice.displayNumber || ("FAC-" + invoice.number)}</p>
+                                      <p className="text-xs font-semibold text-slate-900 truncate font-mono">{invoice.displayNumber || ("FRA-" + invoice.number)}</p>
                                       <p className="text-[11px] text-slate-600 truncate">{invoice.supplier || "—"}</p>
                                     </div>
                                     <p className="text-xs font-bold text-slate-900 flex-shrink-0">{formatCurrency(invoice.totalAmount)} €</p>
@@ -865,7 +864,7 @@ export default function PaymentsPage() {
           <div className="flex-1">
             {filteredForecasts.length === 0 ? (
               <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
-                <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><CreditCard size={28} className="text-slate-400" /></div>
+                <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><Banknote size={28} className="text-slate-400" /></div>
                 <h3 className="text-lg font-semibold text-slate-900 mb-2">{searchTerm || statusFilter !== "all" || dateRange !== "all" ? "No se encontraron resultados" : "Sin previsiones de pago"}</h3>
                 <p className="text-slate-500 text-sm">{searchTerm || statusFilter !== "all" || dateRange !== "all" ? "Prueba a ajustar los filtros" : "Crea tu primera previsión para organizar los pagos"}</p>
               </div>
@@ -922,7 +921,7 @@ export default function PaymentsPage() {
                                     <div className={cx("w-5 h-5 rounded flex items-center justify-center flex-shrink-0", item.status === "completed" ? "bg-emerald-100" : "bg-slate-100")}>{item.status === "completed" ? <CheckCircle2 size={10} className="text-emerald-600" /> : <ItemIcon size={10} className="text-slate-500" />}</div>
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center justify-between gap-1">
-                                        <p className="text-[11px] font-medium text-slate-900 truncate font-mono">{item.invoiceNumber ? ("FAC-" + item.invoiceNumber) : item.description}</p>
+                                        <p className="text-[11px] font-medium text-slate-900 truncate font-mono">{item.invoiceNumber ? ("FRA-" + item.invoiceNumber) : item.description}</p>
                                         {forecast.status === "draft" && (<button onClick={() => handleRemovePaymentItem(forecast.id, item.id)} className="p-0.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><X size={10} /></button>)}
                                       </div>
                                       <div className="flex items-center justify-between mt-0.5">
@@ -1001,7 +1000,7 @@ export default function PaymentsPage() {
                                     <div key={item.id} className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200">
                                       <div className="flex items-center gap-3">
                                         <div className={cx("w-8 h-8 rounded-lg flex items-center justify-center", item.status === "completed" ? "bg-emerald-100" : "bg-slate-100")}>{item.status === "completed" ? <CheckCircle2 size={16} className="text-emerald-600" /> : <ItemIcon size={16} className="text-slate-500" />}</div>
-                                        <div><p className="text-sm font-medium text-slate-900 font-mono">{item.invoiceNumber ? ("FAC-" + item.invoiceNumber) : item.description}</p><p className="text-xs text-slate-500">{item.supplier}</p></div>
+                                        <div><p className="text-sm font-medium text-slate-900 font-mono">{item.invoiceNumber ? ("FRA-" + item.invoiceNumber) : item.description}</p><p className="text-xs text-slate-500">{item.supplier}</p></div>
                                       </div>
                                       <div className="flex items-center gap-4">
                                         <span className={cx("text-xs px-2 py-1 rounded-lg", item.status === "completed" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")}>{item.status === "completed" ? "Completado" : "Pendiente"}</span>
@@ -1089,7 +1088,7 @@ export default function PaymentsPage() {
                   <label className="block text-sm font-medium text-slate-700 mb-2">Seleccionar factura</label>
                   <select value={newPayment.invoiceId} onChange={(e) => { const inv = availableInvoices.find((i) => i.id === e.target.value); if (inv) { setNewPayment({ ...newPayment, invoiceId: inv.id, supplier: inv.supplier, description: inv.description, amount: inv.totalAmount }); } }} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900">
                     <option value="">Seleccionar...</option>
-                    {availableInvoices.map((inv) => (<option key={inv.id} value={inv.id}>{inv.displayNumber || ("FAC-" + inv.number)} · {inv.supplier} · {formatCurrency(inv.totalAmount)} €</option>))}
+                    {availableInvoices.map((inv) => (<option key={inv.id} value={inv.id}>{inv.displayNumber || ("FRA-" + inv.number)} · {inv.supplier} · {formatCurrency(inv.totalAmount)} €</option>))}
                   </select>
                 </div>
               )}
@@ -1159,7 +1158,7 @@ export default function PaymentsPage() {
                             <div className="flex-1">
                               <div className="flex items-start justify-between">
                                 <div>
-                                  <p className="font-semibold text-slate-900 font-mono">{item.invoiceNumber ? ("FAC-" + item.invoiceNumber) : item.description}</p>
+                                  <p className="font-semibold text-slate-900 font-mono">{item.invoiceNumber ? ("FRA-" + item.invoiceNumber) : item.description}</p>
                                   <p className="text-sm text-slate-600">{item.supplier}</p>
                                   <p className="text-xs text-slate-400 mt-1">{typeInfo.label} · Añadido por {item.addedByName}</p>
                                 </div>

@@ -3,8 +3,9 @@ import { db } from "@/lib/firebase";
 
 export interface CostSettings {
   poCommitmentTrigger: "on_create" | "on_approve";
-  // "on_paid" se mantiene solo por compatibilidad con datos antiguos; el UI ya no lo ofrece
-  invoiceActualTrigger: "on_approve" | "on_account" | "on_paid";
+  // "on_create" = realiza en cuanto se crea (sin aprobaciones)
+  // "on_paid"   = compatibilidad con datos antiguos; el UI ya no lo ofrece
+  invoiceActualTrigger: "on_create" | "on_approve" | "on_account" | "on_paid";
 }
 
 const DEFAULT_SETTINGS: CostSettings = {
@@ -24,9 +25,10 @@ export async function getCostSettings(projectId: string): Promise<CostSettings> 
       const data = costConfigSnap.data();
       // Migrar "on_paid" (opción eliminada) → "on_account"
       const rawInvoice = data.invoiceActualTrigger || DEFAULT_SETTINGS.invoiceActualTrigger;
+      const migratedInvoice = rawInvoice === "on_paid" ? "on_account" : rawInvoice;
       return {
         poCommitmentTrigger: data.poCommitmentTrigger || DEFAULT_SETTINGS.poCommitmentTrigger,
-        invoiceActualTrigger: rawInvoice === "on_paid" ? "on_account" : rawInvoice,
+        invoiceActualTrigger: migratedInvoice as CostSettings["invoiceActualTrigger"],
       };
     }
     
@@ -114,9 +116,17 @@ export function shouldRealizeInvoice(
     return false;
   }
   
+  if (costSettings.invoiceActualTrigger === "on_create") {
+    // Realizar en cuanto se crea (sale del estado draft), sin esperar aprobación
+    return invoiceStatus !== "draft" &&
+           invoiceStatus !== "rejected" &&
+           invoiceStatus !== "void" &&
+           invoiceStatus !== "cancelled";
+  }
+
   if (costSettings.invoiceActualTrigger === "on_approve") {
     // Realizar cuando se aprueba (pending = aprobada pendiente de pago), contabiliza o paga
-    return invoiceStatus === "pending" || invoiceStatus === "approved" || 
+    return invoiceStatus === "pending" || invoiceStatus === "approved" ||
            invoiceStatus === "accounted" || invoiceStatus === "paid";
   }
   

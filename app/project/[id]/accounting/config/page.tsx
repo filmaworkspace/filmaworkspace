@@ -179,22 +179,24 @@ const COMMITMENT_TRIGGERS = [
   { value: "on_approve", label: "Al aprobar", description: "Se compromete cuando la PO es aprobada" },
 ];
 
-// "Al pagar" se elimina: la realización debe ocurrir antes del pago
-// (el importe no puede permanecer en comprometido hasta el momento del pago)
+// "Al pagar" se elimina: la realización debe ocurrir antes del pago.
+// "on_create" es la opción para cuando no hay aprobaciones configuradas.
 const ACTUAL_TRIGGERS = [
-  { value: "on_approve", label: "Al aprobar factura", description: "Pasa a realizado cuando la factura es aprobada — requiere pasos de aprobación configurados" },
-  { value: "on_account", label: "Al contabilizar", description: "Pasa a realizado cuando se marca como contabilizada (recomendado)" },
+  { value: "on_create",  label: "Al enviar (inmediato)",  description: "Pasa a realizado en cuanto se crea la factura — úsalo cuando no hay flujo de aprobación", requiresNoApprovals: true },
+  { value: "on_approve", label: "Al aprobar factura",     description: "Pasa a realizado cuando la factura es aprobada — requiere pasos de aprobación configurados", requiresApprovals: true },
+  { value: "on_account", label: "Al contabilizar",        description: "Pasa a realizado cuando se marca como contabilizada (recomendado)" },
 ];
 
 const BOX_TRIGGERS = [
-  { value: "on_approve", label: "Al aprobar sobre", description: "Pasa a realizado cuando el sobre es aprobado — requiere pasos de aprobación configurados" },
-  { value: "on_account", label: "Al contabilizar", description: "Pasa a realizado cuando se marca como contabilizado (recomendado)" },
+  { value: "on_create",  label: "Al enviar (inmediato)",  description: "Pasa a realizado en cuanto se abre el sobre — úsalo cuando no hay flujo de aprobación", requiresNoApprovals: true },
+  { value: "on_approve", label: "Al aprobar sobre",       description: "Pasa a realizado cuando el sobre es aprobado — requiere pasos de aprobación configurados", requiresApprovals: true },
+  { value: "on_account", label: "Al contabilizar",        description: "Pasa a realizado cuando se marca como contabilizado (recomendado)" },
 ];
 
 interface CostSettings {
   poCommitmentTrigger: "on_create" | "on_approve";
-  invoiceActualTrigger: "on_approve" | "on_account";
-  boxActualTrigger: "on_approve" | "on_account";
+  invoiceActualTrigger: "on_create" | "on_approve" | "on_account";
+  boxActualTrigger: "on_create" | "on_approve" | "on_account";
 }
 
 // Configuración específica del proyecto para contabilidad
@@ -396,6 +398,11 @@ export default function AccountingConfigPage() {
 
       const approvalConfigRef = doc(db, `projects/${id}/config/approvals`);
       const approvalConfigSnap = await getDoc(approvalConfigRef);
+      // Variables locales para poder usarlas en la migración de costSettings más abajo
+      let localPoApprovals: ApprovalStep[] = [];
+      let localInvoiceApprovals: ApprovalStep[] = [];
+      let localBoxApprovals: ApprovalStep[] = [];
+
       if (approvalConfigSnap.exists()) {
         const c = approvalConfigSnap.data();
         const migrateSteps = (steps: any[]): ApprovalStep[] =>
@@ -406,9 +413,12 @@ export default function AccountingConfigPage() {
             amountCondition: s.amountCondition || "above",
             amountThresholdMax: s.amountThresholdMax || undefined,
           }));
-        setPoApprovals(migrateSteps(c.poApprovals || []));
-        setInvoiceApprovals(migrateSteps(c.invoiceApprovals || []));
-        setBoxApprovals(migrateSteps(c.boxApprovals || []));
+        localPoApprovals = migrateSteps(c.poApprovals || []);
+        localInvoiceApprovals = migrateSteps(c.invoiceApprovals || []);
+        localBoxApprovals = migrateSteps(c.boxApprovals || []);
+        setPoApprovals(localPoApprovals);
+        setInvoiceApprovals(localInvoiceApprovals);
+        setBoxApprovals(localBoxApprovals);
         
         // Guardar info de auditoría
         if (c.updatedAt && c.updatedBy) {
@@ -490,13 +500,21 @@ export default function AccountingConfigPage() {
       const costConfigSnap = await getDoc(costConfigRef);
       if (costConfigSnap.exists()) {
         const data = costConfigSnap.data();
-        // Migrar "on_paid" (eliminado) a "on_account"
-        const rawInvoice = data.invoiceActualTrigger || "on_account";
-        const rawBox = data.boxActualTrigger || "on_account";
+        // Migrar valores obsoletos y ajustar según aprobaciones disponibles
+        let rawInvoice = data.invoiceActualTrigger || "on_account";
+        let rawBox     = data.boxActualTrigger     || "on_account";
+        let rawPO      = data.poCommitmentTrigger  || "on_approve";
+        // "on_paid" eliminado → "on_account"
+        if (rawInvoice === "on_paid") rawInvoice = "on_account";
+        if (rawBox     === "on_paid") rawBox     = "on_account";
+        // "on_approve" sin aprobaciones → "on_create"
+        if (rawInvoice === "on_approve" && localInvoiceApprovals.length === 0) rawInvoice = "on_create";
+        if (rawBox     === "on_approve" && localBoxApprovals.length     === 0) rawBox     = "on_create";
+        if (rawPO      === "on_approve" && localPoApprovals.length      === 0) rawPO      = "on_create";
         setCostSettings({
-          poCommitmentTrigger: data.poCommitmentTrigger || "on_approve",
-          invoiceActualTrigger: rawInvoice === "on_paid" ? "on_account" : rawInvoice,
-          boxActualTrigger: rawBox === "on_paid" ? "on_account" : rawBox,
+          poCommitmentTrigger: rawPO as any,
+          invoiceActualTrigger: rawInvoice as any,
+          boxActualTrigger: rawBox as any,
         });
       }
 
@@ -1503,30 +1521,50 @@ export default function AccountingConfigPage() {
 
         <div className="p-6">
           <div className="space-y-3">
-            {COMMITMENT_TRIGGERS.map((trigger) => (
-              <label
-                key={trigger.value}
-                className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                  costSettings.poCommitmentTrigger === trigger.value
-                    ? "border-slate-900 bg-slate-50"
-                    : "border-slate-200 hover:border-slate-300"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="poCommitmentTrigger"
-                  value={trigger.value}
-                  checked={costSettings.poCommitmentTrigger === trigger.value}
-                  onChange={(e) => setCostSettings({ ...costSettings, poCommitmentTrigger: e.target.value as any })}
-                  className="mt-1 w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-500"
-                />
-                <div className="flex-1">
-                  <p className="font-medium text-slate-900">{trigger.label}</p>
-                  <p className="text-sm text-slate-500 mt-0.5">{trigger.description}</p>
-                </div>
-              </label>
-            ))}
+            {COMMITMENT_TRIGGERS.map((trigger) => {
+              const needsApprovals = trigger.value === "on_approve";
+              const hasApprovals = poApprovals.length > 0;
+              const isDisabled = needsApprovals && !hasApprovals;
+              const isSelected = costSettings.poCommitmentTrigger === trigger.value;
+              return (
+                <label
+                  key={trigger.value}
+                  className={`flex items-start gap-4 p-4 rounded-xl border-2 transition-all ${
+                    isDisabled
+                      ? "border-slate-100 bg-slate-50 opacity-50 cursor-not-allowed"
+                      : isSelected
+                      ? "border-slate-900 bg-slate-50 cursor-pointer"
+                      : "border-slate-200 hover:border-slate-300 cursor-pointer"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="poCommitmentTrigger"
+                    value={trigger.value}
+                    checked={isSelected}
+                    disabled={isDisabled}
+                    onChange={(e) => !isDisabled && setCostSettings({ ...costSettings, poCommitmentTrigger: e.target.value as any })}
+                    className="mt-1 w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-500"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className={`font-medium ${isDisabled ? "text-slate-400" : "text-slate-900"}`}>{trigger.label}</p>
+                      {isDisabled && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">Sin aprobaciones configuradas</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-slate-500 mt-0.5">{trigger.description}</p>
+                  </div>
+                </label>
+              );
+            })}
           </div>
+          {costSettings.poCommitmentTrigger === "on_approve" && poApprovals.length === 0 && (
+            <div className="mt-3 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+              <AlertCircle size={15} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-700">No hay pasos de aprobación configurados para POs. Se usará <strong>Al enviar</strong> hasta que se configuren aprobaciones.</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1539,10 +1577,12 @@ export default function AccountingConfigPage() {
 
         <div className="p-6">
           <div className="space-y-3">
-            {ACTUAL_TRIGGERS.map((trigger) => {
-              const needsApprovals = trigger.value === "on_approve";
-              const hasApprovals = invoiceApprovals.length > 0;
-              const isDisabled = needsApprovals && !hasApprovals;
+            {ACTUAL_TRIGGERS.filter((trigger) => {
+              if ((trigger as any).requiresNoApprovals) return invoiceApprovals.length === 0;
+              if ((trigger as any).requiresApprovals)   return invoiceApprovals.length > 0;
+              return true;
+            }).map((trigger) => {
+              const isDisabled = trigger.value === "on_approve" && invoiceApprovals.length === 0;
               const isSelected = costSettings.invoiceActualTrigger === trigger.value;
               return (
                 <label
@@ -1565,24 +1605,13 @@ export default function AccountingConfigPage() {
                     className="mt-1 w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-500"
                   />
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className={`font-medium ${isDisabled ? "text-slate-400" : "text-slate-900"}`}>{trigger.label}</p>
-                      {isDisabled && (
-                        <span className="text-[10px] font-medium px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">Sin aprobaciones configuradas</span>
-                      )}
-                    </div>
+                    <p className={`font-medium ${isDisabled ? "text-slate-400" : "text-slate-900"}`}>{trigger.label}</p>
                     <p className="text-sm text-slate-500 mt-0.5">{trigger.description}</p>
                   </div>
                 </label>
               );
             })}
           </div>
-          {costSettings.invoiceActualTrigger === "on_approve" && invoiceApprovals.length === 0 && (
-            <div className="mt-3 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-              <AlertCircle size={15} className="text-amber-600 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-700">No hay pasos de aprobación configurados para facturas. Se usará <strong>Al contabilizar</strong> hasta que se configuren aprobaciones.</p>
-            </div>
-          )}
         </div>
       </div>
 
@@ -1595,10 +1624,12 @@ export default function AccountingConfigPage() {
 
         <div className="p-6">
           <div className="space-y-3">
-            {BOX_TRIGGERS.map((trigger) => {
-              const needsApprovals = trigger.value === "on_approve";
-              const hasApprovals = boxApprovals.length > 0;
-              const isDisabled = needsApprovals && !hasApprovals;
+            {BOX_TRIGGERS.filter((trigger) => {
+              if ((trigger as any).requiresNoApprovals) return boxApprovals.length === 0;
+              if ((trigger as any).requiresApprovals)   return boxApprovals.length > 0;
+              return true;
+            }).map((trigger) => {
+              const isDisabled = trigger.value === "on_approve" && boxApprovals.length === 0;
               const isSelected = costSettings.boxActualTrigger === trigger.value;
               return (
                 <label
@@ -1621,24 +1652,13 @@ export default function AccountingConfigPage() {
                     className="mt-1 w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-500"
                   />
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className={`font-medium ${isDisabled ? "text-slate-400" : "text-slate-900"}`}>{trigger.label}</p>
-                      {isDisabled && (
-                        <span className="text-[10px] font-medium px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">Sin aprobaciones configuradas</span>
-                      )}
-                    </div>
+                    <p className={`font-medium ${isDisabled ? "text-slate-400" : "text-slate-900"}`}>{trigger.label}</p>
                     <p className="text-sm text-slate-500 mt-0.5">{trigger.description}</p>
                   </div>
                 </label>
               );
             })}
           </div>
-          {costSettings.boxActualTrigger === "on_approve" && boxApprovals.length === 0 && (
-            <div className="mt-3 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-              <AlertCircle size={15} className="text-amber-600 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-700">No hay pasos de aprobación configurados para BOX. Se usará <strong>Al contabilizar</strong> hasta que se configuren aprobaciones.</p>
-            </div>
-          )}
         </div>
       </div>
 
