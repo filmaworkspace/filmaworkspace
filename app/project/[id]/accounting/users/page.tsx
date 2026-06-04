@@ -106,6 +106,8 @@ export default function AccountingUsersPage() {
   const [userName, setUserName] = useState("");
   const [hasAccountingAccess, setHasAccountingAccess] = useState(false);
   const [isProjectRole, setIsProjectRole] = useState(false);
+  const [isAccountingExtended, setIsAccountingExtended] = useState(false);
+  const [currentUserAccessLevel, setCurrentUserAccessLevel] = useState<string>("user");
   const [projectName, setProjectName] = useState("");
   const [members, setMembers] = useState<Member[]>([]);
   const [accountingMembers, setAccountingMembers] = useState<Member[]>([]);
@@ -176,11 +178,13 @@ export default function AccountingUsersPage() {
         
         // Solo accounting_extended o EP/PM pueden acceder a esta página
         const hasExtendedAccess = accountingLevel === "accounting_extended";
-        if (!hasAccounting || (!isEPorPM && !hasExtendedAccess)) { 
-          setErrorMessage("No tienes permisos para gestionar usuarios de contabilidad"); 
-          setLoading(false); 
-          return; 
+        if (!hasAccounting || (!isEPorPM && !hasExtendedAccess)) {
+          setErrorMessage("No tienes permisos para gestionar usuarios de contabilidad");
+          setLoading(false);
+          return;
         }
+        setIsAccountingExtended(hasExtendedAccess);
+        setCurrentUserAccessLevel(accountingLevel || "user");
 
         const projectRef = doc(db, "projects", id as string);
         const projectSnap = await getDoc(projectRef);
@@ -263,17 +267,34 @@ export default function AccountingUsersPage() {
     } catch (error) { console.error("Error enviando invitación:", error); setErrorMessage("Error al enviar la invitación"); setTimeout(() => setErrorMessage(""), 3000); } finally { setSaving(false); }
   };
 
+  const ACCESS_LEVEL_RANK: Record<string, number> = { visitor: 1, user: 2, accounting: 3, accounting_extended: 4 };
+
   const handleUpdateAccessLevel = async () => {
     if (!editingMember) return;
+    const newAccessLevel = editingMember.accountingAccessLevel || "user";
+    const newBoxAccess = editingMember.boxAccess || false;
+
+    // Si el usuario se edita a sí mismo y baja de nivel, ya fue confirmado en el modal
     setSaving(true);
     try {
-      const newAccessLevel = editingMember.accountingAccessLevel || "user";
-      const newBoxAccess = editingMember.boxAccess || false;
       await updateDoc(doc(db, `projects/${id}/members`, editingMember.userId), { accountingAccessLevel: newAccessLevel, boxAccess: newBoxAccess });
       await updateDoc(doc(db, `userProjects/${editingMember.userId}/projects`, id as string), { accountingAccessLevel: newAccessLevel, boxAccess: newBoxAccess });
       setAccountingMembers(accountingMembers.map((m) => (m.userId === editingMember.userId ? { ...m, accountingAccessLevel: newAccessLevel, boxAccess: newBoxAccess } : m)));
-      setSuccessMessage("Nivel de acceso actualizado correctamente"); setTimeout(() => setSuccessMessage(""), 3000); setShowEditAccessModal(false); setEditingMember(null);
-    } catch (error) { console.error("Error actualizando acceso:", error); setErrorMessage("Error al actualizar el nivel de acceso"); setTimeout(() => setErrorMessage(""), 3000); } finally { setSaving(false); }
+      if (editingMember.userId === userId) {
+        setCurrentUserAccessLevel(newAccessLevel);
+        setIsAccountingExtended(newAccessLevel === "accounting_extended");
+      }
+      setSuccessMessage("Nivel de acceso actualizado correctamente");
+      setTimeout(() => setSuccessMessage(""), 3000);
+      setShowEditAccessModal(false);
+      setEditingMember(null);
+    } catch (error) {
+      console.error("Error actualizando acceso:", error);
+      setErrorMessage("Error al actualizar el nivel de acceso");
+      setTimeout(() => setErrorMessage(""), 3000);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancelInvitation = async (invitationId: string) => {
@@ -411,10 +432,12 @@ export default function AccountingUsersPage() {
                           </div>
                         </div>
                       </div>
-                      {member.userId !== userId && isProjectRole && (
+                      {(member.userId !== userId ? isProjectRole : isAccountingExtended) && (
                         <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => { setEditingMember(member); setShowEditAccessModal(true); }} className="flex-1 flex items-center justify-center gap-1 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50 py-1.5 rounded-lg"><Edit size={12} />Cambiar</button>
-                          <button onClick={() => handleRemoveAccountingAccess(member)} disabled={saving} className="flex-1 flex items-center justify-center gap-1 text-xs text-red-600 hover:bg-red-50 py-1.5 rounded-lg disabled:opacity-50"><Trash2 size={12} />Quitar</button>
+                          <button onClick={() => { setEditingMember(member); setShowEditAccessModal(true); }} className="flex-1 flex items-center justify-center gap-1 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50 py-1.5 rounded-lg"><Edit size={12} />{member.userId === userId ? "Mis permisos" : "Cambiar"}</button>
+                          {member.userId !== userId && isProjectRole && (
+                            <button onClick={() => handleRemoveAccountingAccess(member)} disabled={saving} className="flex-1 flex items-center justify-center gap-1 text-xs text-red-600 hover:bg-red-50 py-1.5 rounded-lg disabled:opacity-50"><Trash2 size={12} />Quitar</button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -453,10 +476,12 @@ export default function AccountingUsersPage() {
                           </div>
                         </div>
                       </div>
-                      {member.userId !== userId && isProjectRole && (
+                      {(member.userId !== userId ? isProjectRole : isAccountingExtended) && (
                         <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => { setEditingMember(member); setShowEditAccessModal(true); }} className="flex-1 flex items-center justify-center gap-1 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50 py-1.5 rounded-lg"><Edit size={12} />Cambiar</button>
-                          <button onClick={() => handleRemoveAccountingAccess(member)} disabled={saving} className="flex-1 flex items-center justify-center gap-1 text-xs text-red-600 hover:bg-red-50 py-1.5 rounded-lg disabled:opacity-50"><Trash2 size={12} />Quitar</button>
+                          <button onClick={() => { setEditingMember(member); setShowEditAccessModal(true); }} className="flex-1 flex items-center justify-center gap-1 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50 py-1.5 rounded-lg"><Edit size={12} />{member.userId === userId ? "Mis permisos" : "Cambiar"}</button>
+                          {member.userId !== userId && isProjectRole && (
+                            <button onClick={() => handleRemoveAccountingAccess(member)} disabled={saving} className="flex-1 flex items-center justify-center gap-1 text-xs text-red-600 hover:bg-red-50 py-1.5 rounded-lg disabled:opacity-50"><Trash2 size={12} />Quitar</button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -494,10 +519,12 @@ export default function AccountingUsersPage() {
                           </div>
                         </div>
                       </div>
-                      {member.userId !== userId && isProjectRole && (
+                      {(member.userId !== userId ? isProjectRole : isAccountingExtended) && (
                         <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => { setEditingMember(member); setShowEditAccessModal(true); }} className="flex-1 flex items-center justify-center gap-1 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50 py-1.5 rounded-lg"><Edit size={12} />Cambiar</button>
-                          <button onClick={() => handleRemoveAccountingAccess(member)} disabled={saving} className="flex-1 flex items-center justify-center gap-1 text-xs text-red-600 hover:bg-red-50 py-1.5 rounded-lg disabled:opacity-50"><Trash2 size={12} />Quitar</button>
+                          <button onClick={() => { setEditingMember(member); setShowEditAccessModal(true); }} className="flex-1 flex items-center justify-center gap-1 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50 py-1.5 rounded-lg"><Edit size={12} />{member.userId === userId ? "Mis permisos" : "Cambiar"}</button>
+                          {member.userId !== userId && isProjectRole && (
+                            <button onClick={() => handleRemoveAccountingAccess(member)} disabled={saving} className="flex-1 flex items-center justify-center gap-1 text-xs text-red-600 hover:bg-red-50 py-1.5 rounded-lg disabled:opacity-50"><Trash2 size={12} />Quitar</button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -510,53 +537,129 @@ export default function AccountingUsersPage() {
       </main>
 
       {/* Edit Access Modal */}
-      {showEditAccessModal && editingMember && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowEditAccessModal(false); setEditingMember(null); }}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">Cambiar nivel de acceso</h3>
-              <button onClick={() => { setShowEditAccessModal(false); setEditingMember(null); }} className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
-            </div>
-            <div className="p-6">
-              <div className="mb-6">
-                <p className="text-sm text-slate-500 mb-1">Usuario</p>
-                <p className="text-base font-semibold text-slate-900">{editingMember.name}</p>
-                <p className="text-xs text-slate-500">{editingMember.email}</p>
+      {showEditAccessModal && editingMember && (() => {
+        const isSelf = editingMember.userId === userId;
+        const selectedLevel = editingMember.accountingAccessLevel || "user";
+        const isDowngrade = isSelf && ACCESS_LEVEL_RANK[selectedLevel] < ACCESS_LEVEL_RANK[currentUserAccessLevel];
+
+        // Calcula qué módulos se perderían al bajar de nivel
+        const currentPerms = ACCOUNTING_ACCESS_LEVELS[currentUserAccessLevel as keyof typeof ACCOUNTING_ACCESS_LEVELS]?.permissions || {};
+        const newPerms = ACCOUNTING_ACCESS_LEVELS[selectedLevel as keyof typeof ACCOUNTING_ACCESS_LEVELS]?.permissions || {};
+        const lostModules = [
+          !newPerms.suppliers && currentPerms.suppliers ? "Proveedores" : null,
+          !newPerms.budget && currentPerms.budget ? "Presupuesto" : null,
+          !newPerms.users && currentPerms.users ? "Gestión de usuarios" : null,
+          !newPerms.reports && currentPerms.reports ? "Informes" : null,
+        ].filter(Boolean);
+
+        return (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowEditAccessModal(false); setEditingMember(null); }}>
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-slate-900">
+                  {isSelf ? "Mis permisos de contabilidad" : "Cambiar nivel de acceso"}
+                </h3>
+                <button onClick={() => { setShowEditAccessModal(false); setEditingMember(null); }} className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
               </div>
-              <div className="space-y-3 mb-4">
-                <p className="text-sm font-medium text-slate-700">Seleccionar nivel</p>
-                {Object.entries(ACCOUNTING_ACCESS_LEVELS).map(([key, value]) => (
-                  <label key={key} className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-all ${editingMember.accountingAccessLevel === key ? "border-slate-900 bg-slate-50" : "border-slate-200 hover:border-slate-300"}`}>
-                    <input type="radio" name="accessLevel" value={key} checked={editingMember.accountingAccessLevel === key} onChange={(e) => setEditingMember({ ...editingMember, accountingAccessLevel: e.target.value as any })} className="mt-1" />
+              <div className="p-6">
+                <div className="mb-6">
+                  <p className="text-sm text-slate-500 mb-1">{isSelf ? "Tu cuenta" : "Usuario"}</p>
+                  <p className="text-base font-semibold text-slate-900">{editingMember.name}</p>
+                  <p className="text-xs text-slate-500">{editingMember.email}</p>
+                </div>
+
+                <div className="space-y-3 mb-4">
+                  <p className="text-sm font-medium text-slate-700">Nivel de acceso</p>
+                  {Object.entries(ACCOUNTING_ACCESS_LEVELS).map(([key, value]) => {
+                    const isDisabled = isSelf && ACCESS_LEVEL_RANK[key] > ACCESS_LEVEL_RANK[currentUserAccessLevel];
+                    return (
+                      <label
+                        key={key}
+                        className={`flex items-start gap-3 p-4 border rounded-xl transition-all
+                          ${isDisabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}
+                          ${editingMember.accountingAccessLevel === key ? "border-slate-900 bg-slate-50" : "border-slate-200 hover:border-slate-300"}
+                        `}
+                      >
+                        <input
+                          type="radio"
+                          name="accessLevel"
+                          value={key}
+                          checked={editingMember.accountingAccessLevel === key}
+                          disabled={isDisabled}
+                          onChange={(e) => !isDisabled && setEditingMember({ ...editingMember, accountingAccessLevel: e.target.value as any })}
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold text-slate-900">{value.label}</p>
+                            {isSelf && key === currentUserAccessLevel && (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">nivel actual</span>
+                            )}
+                            {isDisabled && (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 bg-slate-100 text-slate-400 rounded">no disponible</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500">{value.description}</p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                <div className="mb-4">
+                  <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-xl cursor-pointer hover:border-slate-300 transition-all">
+                    <input
+                      type="checkbox"
+                      checked={editingMember.boxAccess || false}
+                      onChange={(e) => setEditingMember({ ...editingMember, boxAccess: e.target.checked })}
+                      className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-slate-900">{value.label}</p>
-                      <p className="text-xs text-slate-500">{value.description}</p>
+                      <p className="text-sm font-semibold text-slate-900">Acceso a BOX</p>
+                      <p className="text-xs text-slate-500">Ver y gestionar gastos de tarjetas y transferencias</p>
                     </div>
                   </label>
-                ))}
-              </div>
-              <div className="mb-6">
-                <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-xl cursor-pointer hover:border-slate-300 transition-all">
-                  <input
-                    type="checkbox"
-                    checked={editingMember.boxAccess || false}
-                    onChange={(e) => setEditingMember({ ...editingMember, boxAccess: e.target.checked })}
-                    className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-slate-900">Acceso a BOX</p>
-                    <p className="text-xs text-slate-500">Permite ver y gestionar gastos de tarjetas y transferencias</p>
+                </div>
+
+                {/* Aviso de degradación — solo visible cuando el usuario baja su propio nivel */}
+                {isDowngrade && lostModules.length > 0 && (
+                  <div className="mb-5 p-4 bg-amber-50 border border-amber-300 rounded-xl flex gap-3">
+                    <AlertCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-amber-900">Perderás acceso a estos módulos</p>
+                      <ul className="mt-1 space-y-0.5">
+                        {lostModules.map((m) => (
+                          <li key={m} className="text-xs text-amber-800 flex items-center gap-1.5">
+                            <span className="w-1 h-1 rounded-full bg-amber-500 inline-block" />
+                            {m}
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="text-xs text-amber-700 mt-2">Este cambio es inmediato. Necesitarás que otro usuario con permisos amplíe tu acceso de nuevo.</p>
+                    </div>
                   </div>
-                </label>
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => { setShowEditAccessModal(false); setEditingMember(null); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium">Cancelar</button>
-                <button onClick={handleUpdateAccessLevel} disabled={saving} className="flex-1 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-medium disabled:opacity-50">{saving ? "Guardando..." : "Guardar"}</button>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setShowEditAccessModal(false); setEditingMember(null); }}
+                    className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleUpdateAccessLevel}
+                    disabled={saving}
+                    className={`flex-1 px-4 py-2.5 rounded-xl font-medium disabled:opacity-50 text-white ${isDowngrade ? "bg-amber-600 hover:bg-amber-700" : "bg-slate-900 hover:bg-slate-800"}`}
+                  >
+                    {saving ? "Guardando..." : isDowngrade ? "Confirmar y bajar acceso" : "Guardar"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Invite Modal */}
       {showInviteModal && (
