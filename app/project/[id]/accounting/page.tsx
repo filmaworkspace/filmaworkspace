@@ -1,17 +1,78 @@
 "use client";
+
+// ─── Framework ────────────────────────────────────────────────────────────────
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { useState, useEffect } from "react";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, orderBy, limit, getDocs, where, onSnapshot } from "firebase/firestore";
-import { FileText, Receipt, ArrowRight, Settings, ClipboardCheck, ChevronRight, Plus, Upload, Clock, AlertCircle, CreditCard, FolderDown } from "lucide-react";
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  where,
+} from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+import {
+  AlertCircle,
+  ArrowRight,
+  ChevronRight,
+  ClipboardCheck,
+  Clock,
+  CreditCard,
+  FileText,
+  FolderDown,
+  Plus,
+  Receipt,
+  Settings,
+  Upload,
+} from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import { PROJECT_ROLES } from "@/hooks/useAccountingPermissions";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-interface PO { id: string; number: string; supplier: string; description: string; baseAmount: number; status: "draft" | "pending" | "approved" | "rejected" | "closed" | "cancelled"; createdAt: Date | null; department?: string; createdBy: string; }
-interface Invoice { id: string; number: string; displayNumber: string; documentType: string; supplier: string; description: string; baseAmount: number; status: "pending_approval" | "pending" | "paid" | "overdue" | "rejected" | "cancelled"; dueDate: Date | null; createdAt: Date | null; department?: string; createdBy: string; }
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface PO {
+  id: string;
+  number: string;
+  supplier: string;
+  description: string;
+  baseAmount: number;
+  status: "draft" | "pending" | "approved" | "rejected" | "closed" | "cancelled";
+  createdAt: Date | null;
+  department?: string;
+  createdBy: string;
+}
+
+interface Invoice {
+  id: string;
+  number: string;
+  displayNumber: string;
+  documentType: string;
+  supplier: string;
+  description: string;
+  baseAmount: number;
+  status: "pending_approval" | "pending" | "paid" | "overdue" | "rejected" | "cancelled";
+  dueDate: Date | null;
+  createdAt: Date | null;
+  department?: string;
+  createdBy: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function AccountingPage() {
   const params = useParams();
