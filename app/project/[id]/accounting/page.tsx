@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Inter } from "next/font/google";
+import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
@@ -41,7 +41,6 @@ import { PROJECT_ROLES } from "@/hooks/useAccountingPermissions";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

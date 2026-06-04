@@ -3,7 +3,7 @@
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Inter } from "next/font/google";
+import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
@@ -15,7 +15,6 @@ import { Users } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
 export default function TeamPage() {
   const { id } = useParams();

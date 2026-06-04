@@ -5,7 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Inter } from "next/font/google";
+import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
@@ -22,7 +22,6 @@ import {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600"] });
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -53,6 +52,7 @@ export default function RegisterPage() {
       await setDoc(doc(db, "users", user.uid), {
         name,
         email,
+        role: "user",
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       });

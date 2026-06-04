@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Inter } from "next/font/google";
+import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
@@ -77,7 +77,6 @@ import { unrealizeInvoice, updatePOItemsInvoiced, realizeInvoice } from "@/lib/b
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

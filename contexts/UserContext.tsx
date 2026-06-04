@@ -103,7 +103,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const isDashboardPage = pathname === "/dashboard";
     const isCompanyPage = pathname.startsWith("/companydashboard");
 
-    if (isAdmin) return;
+    if (isAdmin) {
+      if (isDashboardPage) router.push("/admindashboard");
+      return;
+    }
 
     if (isCompanyUser) {
       if (isDashboardPage || isAdminPage) {

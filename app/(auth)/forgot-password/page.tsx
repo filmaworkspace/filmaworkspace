@@ -4,7 +4,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Inter } from "next/font/google";
+import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth } from "@/lib/firebase";
@@ -21,7 +21,6 @@ import {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600"] });
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
