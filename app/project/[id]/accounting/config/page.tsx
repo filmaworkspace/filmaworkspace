@@ -259,6 +259,13 @@ export default function AccountingConfigPage() {
   const [departments, setDepartments] = useState<string[]>([]);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    danger?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
   
   // Sección activa
   const [activeSection, setActiveSection] = useState("company");
@@ -317,6 +324,18 @@ export default function AccountingConfigPage() {
   useEffect(() => {
     if (userId && id) loadData();
   }, [userId, id]);
+
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest(".custom-dropdown")) {
+        setOpenDropdown(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const toggleExpanded = (stepId: string) => {
     const newExpanded = new Set(expandedSteps);
@@ -648,16 +667,33 @@ export default function AccountingConfigPage() {
     }
   };
 
+  const openConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    options?: { confirmLabel?: string; danger?: boolean }
+  ) => {
+    setConfirmDialog({ title, message, onConfirm, ...options });
+  };
+
   const handleDeleteBankAccount = async (accountId: string) => {
-    if (!id || !confirm("¿Eliminar esta cuenta bancaria?")) return;
-    try {
-      await deleteDoc(doc(db, `projects/${id}/config/company/bankAccounts`, accountId));
-      setBankAccounts(bankAccounts.filter(a => a.id !== accountId));
-      setSuccessMessage("Cuenta eliminada");
-      setTimeout(() => setSuccessMessage(""), 3000);
-    } catch {
-      setErrorMessage("Error al eliminar");
-    }
+    if (!id) return;
+    openConfirm(
+      "Eliminar cuenta bancaria",
+      "¿Estás seguro de que quieres eliminar esta cuenta bancaria? Esta acción no se puede deshacer.",
+      async () => {
+        setConfirmDialog(null);
+        try {
+          await deleteDoc(doc(db, `projects/${id}/config/company/bankAccounts`, accountId));
+          setBankAccounts(bankAccounts.filter(a => a.id !== accountId));
+          setSuccessMessage("Cuenta eliminada");
+          setTimeout(() => setSuccessMessage(""), 3000);
+        } catch {
+          setErrorMessage("Error al eliminar");
+        }
+      },
+      { danger: true, confirmLabel: "Eliminar" }
+    );
   };
 
   const openEditBankAccount = (account: BankAccount) => {
@@ -1228,18 +1264,37 @@ export default function AccountingConfigPage() {
                 <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">
                   Departamento
                 </label>
-                <select
-                  value={step.department || ""}
-                  onChange={(e) => updateStep(type, step.id, "department", e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent bg-white text-sm"
-                >
-                  <option value="">Departamento del solicitante</option>
-                  {departments.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative custom-dropdown">
+                  <button
+                    type="button"
+                    onClick={() => setOpenDropdown(openDropdown === `dept-${step.id}` ? null : `dept-${step.id}`)}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors"
+                  >
+                    <span className="text-slate-900 truncate">{step.department || "Departamento del solicitante"}</span>
+                    <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `dept-${step.id}` ? "rotate-180" : ""}`} />
+                  </button>
+                  {openDropdown === `dept-${step.id}` && (
+                    <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                      <button
+                        type="button"
+                        onClick={() => { updateStep(type, step.id, "department", ""); setOpenDropdown(null); }}
+                        className={`w-full px-4 py-2 text-left text-sm transition-colors ${!step.department ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                      >
+                        Departamento del solicitante
+                      </button>
+                      {departments.map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => { updateStep(type, step.id, "department", d); setOpenDropdown(null); }}
+                          className={`w-full px-4 py-2 text-left text-sm transition-colors ${step.department === d ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                        >
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <p className="text-xs text-slate-500 mt-2">
                   {step.department
                     ? `El ${step.approverType === "hod" ? "HOD" : "Coordinator"} de "${step.department}" aprobará`
@@ -2328,6 +2383,30 @@ export default function AccountingConfigPage() {
               >
                 <Save size={16} />
                 {savingBankAccount ? "Guardando..." : editingBankAccount ? "Guardar cambios" : "Añadir cuenta"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
+            <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDialog.onConfirm}
+                className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-sm text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
+              >
+                {confirmDialog.confirmLabel || "Confirmar"}
               </button>
             </div>
           </div>

@@ -94,6 +94,7 @@ interface InvoiceBookFilters {
   dateFrom: string;
   dateTo: string;
   paymentStatus: "all" | "paid" | "pending";
+  includeCancelled: boolean;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -512,6 +513,7 @@ export default function ReportsPage() {
     dateFrom: "",
     dateTo: "",
     paymentStatus: "all",
+    includeCancelled: false,
   });
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [supplierSearch, setSupplierSearch] = useState("");
@@ -639,7 +641,7 @@ export default function ReportsPage() {
 
   const openInvoiceBookModal = () => {
     loadSuppliers();
-    setInvoiceBookFilters({ supplierId: "", supplierName: "", dateFrom: "", dateTo: "", paymentStatus: "all" });
+    setInvoiceBookFilters({ supplierId: "", supplierName: "", dateFrom: "", dateTo: "", paymentStatus: "all", includeCancelled: false });
     setSupplierSearch("");
     setShowSupplierDropdown(false);
     setShowInvoiceBookModal(true);
@@ -969,6 +971,8 @@ export default function ReportsPage() {
       if (filters) {
         filteredInvoices = filteredInvoices.filter(docSnap => {
           const data = docSnap.data();
+          // Excluir anuladas salvo que se soliciten explícitamente
+          if (!filters.includeCancelled && data.status === "cancelled") return false;
           if (filters.supplierId && data.supplierId !== filters.supplierId) return false;
           if (filters.dateFrom || filters.dateTo) {
             const invoiceDate = data.invoiceDate?.toDate ? data.invoiceDate.toDate() : null;
@@ -987,6 +991,8 @@ export default function ReportsPage() {
           return true;
         });
       } else {
+        // Sin filtros explícitos: excluir anuladas por defecto
+        filteredInvoices = filteredInvoices.filter(d => d.data().status !== "cancelled");
         filteredInvoices = filteredInvoices.filter(doc => doc.data().accounted === true);
       }
       
@@ -1488,6 +1494,22 @@ export default function ReportsPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div>
+                    <p className="text-sm font-medium text-slate-700">Incluir anuladas</p>
+                    <p className="text-xs text-slate-500">Por defecto las facturas anuladas no aparecen en el informe</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setInvoiceBookFilters({ ...invoiceBookFilters, includeCancelled: !invoiceBookFilters.includeCancelled })}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ml-4 ${invoiceBookFilters.includeCancelled ? "bg-indigo-600" : "bg-slate-200"}`}
+                  >
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${invoiceBookFilters.includeCancelled ? "translate-x-[18px]" : "translate-x-[3px]"}`} />
+                  </button>
+                </label>
               </div>
 
               <div className="bg-slate-50 rounded-xl p-4">

@@ -112,7 +112,7 @@ const STATUS_CONFIG: Record<POStatus, { bg: string; text: string; label: string;
   pending: { bg: "bg-amber-50", text: "text-amber-700", label: "Pendiente", icon: Clock, gradient: "from-amber-500 to-orange-500" },
   approved: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Aprobada", icon: CheckCircle2, gradient: "from-emerald-500 to-teal-500" },
   closed: { bg: "bg-slate-100", text: "text-slate-600", label: "Cerrada", icon: Archive, gradient: "from-slate-500 to-slate-600" },
-  cancelled: { bg: "bg-red-50", text: "text-red-700", label: "Anulada", icon: Ban, gradient: "from-red-500 to-rose-500" },
+  cancelled: { bg: "bg-red-100", text: "text-red-800", label: "Anulada", icon: Ban, gradient: "from-red-600 to-rose-600" },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -878,12 +878,12 @@ export default function POsPage() {
                   const invoiceProgress = po.status === "approved" && baseAmount > 0 ? Math.min(100, (po.invoicedAmount / baseAmount) * 100) : 0;
                   const poPerms = getPOPermissions(po);
                   return (
-                    <tr key={po.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <tr key={po.id} className={`transition-colors group ${po.status === "cancelled" ? "bg-red-50/40 opacity-60 hover:opacity-80" : "hover:bg-slate-50/50"}`}>
                       <td className="px-6 py-4">
                         <button onClick={() => setPreviewPO(po)} className="text-left transition-colors group/po">
                           <div className="flex items-center gap-2">
-                            <p className="font-semibold text-slate-900 font-mono" style={{ color: undefined }}>
-                              <span className="group-hover/po:text-[#2F52E0] transition-colors">PO-{po.number}</span>
+                            <p className="font-semibold font-mono" style={{ color: undefined }}>
+                              <span className={po.status === "cancelled" ? "line-through text-slate-400" : "text-slate-900 group-hover/po:text-[#2F52E0] transition-colors"}>PO-{po.number}</span>
                             </p>
                             {po.version > 1 && <span className="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-md font-medium">V{String(po.version).padStart(2, "0")}</span>}
                             {!permissions.isProjectRole && poPerms.isOwn && <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">Mía</span>}

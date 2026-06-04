@@ -265,11 +265,14 @@ export default function EditPOPage() {
   useEffect(() => { calculateTotals(); }, [items]);
   useEffect(() => { if (Object.keys(touched).length > 0) validateForm(true); }, [formData, items]);
 
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (departmentDropdownRef.current && !departmentDropdownRef.current.contains(event.target as Node)) {
         setShowDepartmentDropdown(false);
       }
+      if (!(event.target as HTMLElement).closest(".custom-dropdown")) setOpenDropdown(null);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -1258,15 +1261,57 @@ export default function EditPOPage() {
                         <div className="grid grid-cols-4 gap-3">
                           <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">IVA</label>
-                            <select value={item.vatRate} onChange={(e) => updateItem(index, "vatRate", parseFloat(e.target.value))} disabled={!canEdit()} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white disabled:bg-slate-50 disabled:cursor-not-allowed">
-                              {VAT_RATES.map((rate) => <option key={rate.value} value={rate.value}>{rate.label}</option>)}
-                            </select>
+                            <div className="relative custom-dropdown">
+                              <button
+                                type="button"
+                                onClick={() => { if (canEdit()) setOpenDropdown(openDropdown === `vat-${index}` ? null : `vat-${index}`); }}
+                                className={`w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors ${!canEdit() ? "opacity-50 cursor-not-allowed bg-slate-50" : ""}`}
+                              >
+                                <span className="text-slate-900 truncate">{VAT_RATES.find(r => r.value === item.vatRate)?.label ?? `${item.vatRate}%`}</span>
+                                <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `vat-${index}` ? "rotate-180" : ""}`} />
+                              </button>
+                              {openDropdown === `vat-${index}` && (
+                                <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                                  {VAT_RATES.map(opt => (
+                                    <button
+                                      key={opt.value}
+                                      type="button"
+                                      onClick={() => { updateItem(index, "vatRate", parseFloat(String(opt.value))); setOpenDropdown(null); }}
+                                      className={`w-full px-4 py-2 text-left text-sm transition-colors ${item.vatRate === opt.value ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                                    >
+                                      {opt.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">IRPF</label>
-                            <select value={item.irpfRate} onChange={(e) => updateItem(index, "irpfRate", parseFloat(e.target.value))} disabled={!canEdit()} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white disabled:bg-slate-50 disabled:cursor-not-allowed">
-                              {IRPF_RATES.map((rate) => <option key={rate.value} value={rate.value}>{rate.label}</option>)}
-                            </select>
+                            <div className="relative custom-dropdown">
+                              <button
+                                type="button"
+                                onClick={() => { if (canEdit()) setOpenDropdown(openDropdown === `irpf-${index}` ? null : `irpf-${index}`); }}
+                                className={`w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors ${!canEdit() ? "opacity-50 cursor-not-allowed bg-slate-50" : ""}`}
+                              >
+                                <span className="text-slate-900 truncate">{IRPF_RATES.find(r => r.value === item.irpfRate)?.label ?? `${item.irpfRate}%`}</span>
+                                <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `irpf-${index}` ? "rotate-180" : ""}`} />
+                              </button>
+                              {openDropdown === `irpf-${index}` && (
+                                <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                                  {IRPF_RATES.map(opt => (
+                                    <button
+                                      key={opt.value}
+                                      type="button"
+                                      onClick={() => { updateItem(index, "irpfRate", parseFloat(String(opt.value))); setOpenDropdown(null); }}
+                                      className={`w-full px-4 py-2 text-left text-sm transition-colors ${item.irpfRate === opt.value ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                                    >
+                                      {opt.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">+IVA</label>

@@ -104,6 +104,13 @@ export default function BudgetPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    danger?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
   const [costConfig, setCostConfig] = useState<CostSettings>({
     poCommitmentTrigger: "on_approve",
     invoiceActualTrigger: "on_paid",
@@ -351,22 +358,62 @@ export default function BudgetPage() {
     } catch (error: any) { setErrorMessage(`Error actualizando subcuenta: ${error.message}`); } finally { setSaving(false); }
   };
 
+  const openConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    options?: { confirmLabel?: string; danger?: boolean }
+  ) => {
+    setConfirmDialog({ title, message, onConfirm, ...options });
+  };
+
   const handleDeleteAccount = async (accountId: string) => {
     const account = accounts.find((a) => a.id === accountId);
-    if (account && account.subAccounts.length > 0) { setErrorMessage("No se puede eliminar una cuenta con subcuentas"); setTimeout(() => setErrorMessage(""), 5000); return; }
-    if (!confirm("¿Eliminar esta cuenta?")) return;
-    try {
-      await deleteDoc(doc(db, `projects/${id}/accounts`, accountId));
-      setSuccessMessage("Cuenta eliminada"); setTimeout(() => setSuccessMessage(""), 3000); await loadData();
-    } catch (error: any) { setErrorMessage(`Error eliminando cuenta: ${error.message}`); }
+    if (!account) return;
+    if (account.subAccounts.length > 0) {
+      setErrorMessage("No se puede eliminar una cuenta que tiene subcuentas");
+      setTimeout(() => setErrorMessage(""), 5000);
+      return;
+    }
+    openConfirm(
+      "Eliminar cuenta",
+      "¿Estás seguro de que quieres eliminar esta cuenta? Esta acción no se puede deshacer.",
+      async () => {
+        setConfirmDialog(null);
+        try {
+          await deleteDoc(doc(db, `projects/${id}/accounts`, accountId));
+          setSuccessMessage("Cuenta eliminada"); setTimeout(() => setSuccessMessage(""), 3000); await loadData();
+        } catch (error: any) { setErrorMessage(`Error eliminando cuenta: ${error.message}`); }
+      },
+      { danger: true, confirmLabel: "Eliminar" }
+    );
   };
 
   const handleDeleteSubAccount = async (accountId: string, subAccountId: string) => {
-    if (!confirm("¿Eliminar esta subcuenta?")) return;
-    try {
-      await deleteDoc(doc(db, `projects/${id}/accounts/${accountId}/subaccounts`, subAccountId));
-      setSuccessMessage("Subcuenta eliminada"); setTimeout(() => setSuccessMessage(""), 3000); await loadData();
-    } catch (error: any) { setErrorMessage(`Error eliminando subcuenta: ${error.message}`); }
+    const account = accounts.find((a) => a.id === accountId);
+    const sub = account?.subAccounts.find((s) => s.id === subAccountId);
+    if (sub) {
+      const hasActivity = (sub.committed || 0) > 0 || (sub.actual || 0) > 0 || (sub.box || 0) > 0;
+      if (hasActivity) {
+        setErrorMessage(
+          `No se puede eliminar "${sub.description}": tiene importes comprometidos (${sub.committed > 0 ? formatCurrency(sub.committed) + " €" : "—"}), realizados (${sub.actual > 0 ? formatCurrency(sub.actual) + " €" : "—"}) o de caja (${sub.box > 0 ? formatCurrency(sub.box) + " €" : "—"}) asociados a POs o facturas.`
+        );
+        setTimeout(() => setErrorMessage(""), 8000);
+        return;
+      }
+    }
+    openConfirm(
+      "Eliminar subcuenta",
+      "¿Estás seguro de que quieres eliminar esta subcuenta? Esta acción no se puede deshacer.",
+      async () => {
+        setConfirmDialog(null);
+        try {
+          await deleteDoc(doc(db, `projects/${id}/accounts/${accountId}/subaccounts`, subAccountId));
+          setSuccessMessage("Subcuenta eliminada"); setTimeout(() => setSuccessMessage(""), 3000); await loadData();
+        } catch (error: any) { setErrorMessage(`Error eliminando subcuenta: ${error.message}`); }
+      },
+      { danger: true, confirmLabel: "Eliminar" }
+    );
   };
 
   const resetForm = () => { setFormData({ code: "", description: "", budgeted: 0 }); setSelectedAccount(null); setSelectedSubAccount(null); setEditMode(false); setErrorMessage(""); };
@@ -382,18 +429,21 @@ export default function BudgetPage() {
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
   const buildTemplateXlsx = (): Uint8Array => {
-    // Filas de la hoja principal
-    const templateRows: [string, string, string | number][] = [
-      ["CÓDIGO", "DESCRIPCIÓN", "PRESUPUESTADO"],
-      ["01", "GUION Y MÚSICA", ""],
-      ["01.01", "Derechos de autor", 5000],
-      ["01.02", "Música original", 3000],
-      ["02", "PRODUCCIÓN", ""],
-      ["02.01", "Equipo técnico", 50000],
-      ["02.02", "Material y consumibles", 10000],
-      ["03", "POSTPRODUCCIÓN", ""],
-      ["03.01", "Montaje", 20000],
-      ["03.02", "Sonido", 8000],
+    // Nueva plantilla: 4 columnas  CUENTA | SUBCUENTA | DESCRIPCIÓN | PRESUPUESTO
+    // Si SUBCUENTA está vacía → fila de cuenta padre.
+    // Si SUBCUENTA tiene valor → fila de subcuenta hija de la cuenta indicada en CUENTA.
+    const templateRows: [string, string, string, string | number][] = [
+      ["CUENTA", "SUBCUENTA", "DESCRIPCIÓN", "PRESUPUESTO"],
+      ["01", "", "GUION Y MÚSICA", ""],
+      ["01", "01-01-0100", "Derechos de autor", 10000],
+      ["01", "01-01-0200", "Argumento original", 5000],
+      ["01", "01-01-0300", "Música original", 3000],
+      ["02", "", "PRODUCCIÓN", ""],
+      ["02", "02-01-0100", "Equipo técnico", 50000],
+      ["02", "02-01-0200", "Material y consumibles", 10000],
+      ["03", "", "POSTPRODUCCIÓN", ""],
+      ["03", "03-01-0100", "Montaje", 20000],
+      ["03", "03-01-0200", "Sonido", 8000],
     ];
 
     const cellXml = (col: number, row: number, val: string | number, sIdx = 0): string => {
@@ -412,21 +462,33 @@ export default function BudgetPage() {
       sheetRows += `<row r="${r}">${row.map((v, c) => cellXml(c, r, v, isHeader ? 2 : 0)).join("")}</row>`;
     });
 
-    // Hoja instrucciones (texto plano)
+    // Hoja instrucciones
     const instrLines = [
       "INSTRUCCIONES DE IMPORTACIÓN",
       "",
-      "Columna A — CÓDIGO",
-      "  · Cuentas principales: número entero  (01, 02, 03…)",
-      "  · Subcuentas: código con punto        (01.01, 01.02…)",
-      "  · El tipo se detecta automáticamente: no hace falta columna TIPO.",
+      "La plantilla tiene 4 columnas: CUENTA · SUBCUENTA · DESCRIPCIÓN · PRESUPUESTO",
       "",
-      "Columna B — DESCRIPCIÓN",
-      "  · Texto libre. Puedes usar comas, tildes y cualquier carácter.",
+      "Columna A — CUENTA",
+      "  · Código de la cuenta padre a la que pertenece la fila (ej: 01, 02, 03).",
+      "  · Se rellena en todas las filas, tanto cuentas como subcuentas.",
       "",
-      "Columna C — PRESUPUESTADO",
-      "  · Solo para subcuentas. Deja en blanco las filas de cuenta principal.",
+      "Columna B — SUBCUENTA",
+      "  · VACÍA → la fila es una cuenta principal (carpeta).",
+      "  · Con valor → la fila es una subcuenta hija de la cuenta indicada en A.",
+      "  · Puedes usar el formato que prefieras: 01-01-0100, 01.01, 0100, etc.",
+      "",
+      "Columna C — DESCRIPCIÓN",
+      "  · Nombre de la cuenta o subcuenta. Texto libre.",
+      "",
+      "Columna D — PRESUPUESTO",
+      "  · Solo para subcuentas. Deja en blanco la celda de la cuenta principal.",
       "  · Número sin símbolo de moneda ni puntos de millar (ej: 50000).",
+      "",
+      "EJEMPLO:",
+      "  CUENTA | SUBCUENTA   | DESCRIPCIÓN         | PRESUPUESTO",
+      "  01     |             | GUION Y MÚSICA      |",
+      "  01     | 01-01-0100  | Derechos de autor   | 10000",
+      "  01     | 01-01-0200  | Argumento original  | 5000",
       "",
       "IMPORTANTE: No modifiques la fila de cabecera (fila 1).",
     ];
@@ -490,9 +552,10 @@ export default function BudgetPage() {
 <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
 </Relationships>`;
 
-    const mainColsXml = `<col min="1" max="1" width="14" customWidth="1"/>
-<col min="2" max="2" width="42" customWidth="1"/>
-<col min="3" max="3" width="18" customWidth="1"/>`;
+    const mainColsXml = `<col min="1" max="1" width="12" customWidth="1"/>
+<col min="2" max="2" width="18" customWidth="1"/>
+<col min="3" max="3" width="38" customWidth="1"/>
+<col min="4" max="4" width="16" customWidth="1"/>`;
 
     return zipSync({
       "[Content_Types].xml": strToU8(contentTypes),
@@ -586,34 +649,42 @@ export default function BudgetPage() {
       const sheetXml = new TextDecoder().decode(sheetEntry);
       const allRows = parseSheetXml(sheetXml, sharedStrings);
 
+      // Localizar fila de cabecera buscando "CUENTA" en cualquier celda
       const normalize = (s: string) =>
         s.toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
-      const headerIdx = allRows.findIndex(r => r.some(c => normalize(c).startsWith("CODIGO")));
+      const headerIdx = allRows.findIndex(r => r.some(c => normalize(c) === "CUENTA"));
       const dataRows = allRows.slice(headerIdx >= 0 ? headerIdx + 1 : 1);
 
       const data: { code: string; description: string; type: string; budgeted: number; parentCode: string | null }[] = [];
 
+      // Nueva lógica: 4 columnas — CUENTA | SUBCUENTA | DESCRIPCIÓN | PRESUPUESTO
+      // · Si SUBCUENTA (col B) está vacía → es cuenta padre (CUENTA)
+      // · Si SUBCUENTA tiene valor → es subcuenta; el padre es el código de CUENTA (col A)
       dataRows.forEach((row) => {
-        const code = (row[0] ?? "").trim();
-        const description = (row[1] ?? "").trim();
-        const budgetedRaw = (row[2] ?? "").trim();
-        if (!code && !description) return;
+        const accountCode   = (row[0] ?? "").trim();   // A: código de cuenta
+        const subAccountCode = (row[1] ?? "").trim();  // B: código de subcuenta (vacío = cuenta)
+        const description   = (row[2] ?? "").trim();   // C: descripción
+        const budgetedRaw   = (row[3] ?? "").trim();   // D: presupuesto
 
-        const type = isSubAccountCode(code) ? "SUBCUENTA" : "CUENTA";
-        const budgeted = budgetedRaw !== "" ? parseFloat(budgetedRaw.replace(",", ".")) || 0 : 0;
+        if (!accountCode && !description) return; // Fila vacía → ignorar
 
-        // Intentar auto-asignar cuenta padre por prefijo del código
-        let parentCode: string | null = null;
-        if (type === "SUBCUENTA") {
-          const prefix = code.split(/[.\-\/]/)[0];
-          const existsInImport = data.some(d => d.type === "CUENTA" && d.code === prefix);
-          const existsInDB = accounts.some(a => a.code === prefix);
-          if (existsInImport || existsInDB) parentCode = prefix;
-          // Si no se encuentra → parentCode queda null (sin asignar, usuario la colocará)
-        }
+        const isSubAccount = subAccountCode !== "";
+        const type = isSubAccount ? "SUBCUENTA" : "CUENTA";
+        const code = isSubAccount ? subAccountCode : accountCode;
+        const parentCode = isSubAccount ? accountCode : null;
+
+        // Parsear presupuesto: admite 10.000,50 (ES) o 10000.50 (EN)
+        const normalizedBudget = budgetedRaw
+          .replace(/[€$\s]/g, "")                  // quitar símbolo de moneda y espacios
+          .replace(/\.(?=\d{3}([.,]|$))/g, "")     // eliminar puntos de millar
+          .replace(",", ".");                        // coma decimal → punto
+        const budgeted = isSubAccount && normalizedBudget !== ""
+          ? parseFloat(normalizedBudget) || 0
+          : 0;
 
         data.push({ code, description, type, budgeted, parentCode });
       });
+
       return data;
     } catch {
       setErrorMessage("No se pudo leer el archivo. Asegúrate de que es un .xlsx válido.");
@@ -709,7 +780,9 @@ export default function BudgetPage() {
       const parsed = parseImportFile(bytes);
       if (parsed.length > 0) {
         setImportData(parsed);
-        setImportPhase("select");
+        // Expandir todas las cuentas por defecto en la vista previa
+        const accountCodes = new Set(parsed.filter(d => d.type === "CUENTA").map(d => d.code));
+        setExpandedImportAccounts(accountCodes);
         setImportStep("preview");
       }
     };
@@ -1246,12 +1319,20 @@ export default function BudgetPage() {
                   <div className="bg-slate-50 rounded-xl p-4">
                     <h4 className="font-medium text-slate-900 mb-2 text-sm">Formato de la plantilla:</h4>
                     <div className="font-mono text-xs bg-white border border-slate-200 rounded-lg p-3 overflow-x-auto">
-                      <div className="text-slate-400 mb-1">CÓDIGO · DESCRIPCIÓN · PRESUPUESTADO</div>
-                      <div className="text-slate-700">01 · Producción ·</div>
-                      <div className="text-slate-700 pl-4">01.01 · Equipo técnico · 50000</div>
-                      <div className="text-slate-700 pl-4">01.02 · Material · 25000</div>
+                      <div className="grid grid-cols-4 gap-2 text-slate-400 mb-1 border-b border-slate-100 pb-1">
+                        <span>CUENTA</span><span>SUBCUENTA</span><span>DESCRIPCIÓN</span><span>PRESUPUESTO</span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 text-blue-700 font-semibold">
+                        <span>01</span><span className="text-slate-300">—</span><span>GUION Y MÚSICA</span><span className="text-slate-300">—</span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 text-slate-600 pl-2">
+                        <span>01</span><span>01-01-0100</span><span>Derechos de autor</span><span>10000</span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 text-slate-600 pl-2">
+                        <span>01</span><span>01-01-0200</span><span>Argumento original</span><span>5000</span>
+                      </div>
                     </div>
-                    <p className="text-xs text-slate-500 mt-2">El tipo (cuenta / subcuenta) se detecta automáticamente según el formato del código. No hace falta columna TIPO.</p>
+                    <p className="text-xs text-slate-500 mt-2">Si SUBCUENTA está vacía → cuenta padre. Si tiene valor → subcuenta de la cuenta indicada en CUENTA.</p>
                   </div>
                 </div>
               )}
@@ -1260,200 +1341,79 @@ export default function BudgetPage() {
               {importStep === "preview" && (
                 <div className="p-5 space-y-4">
 
-                  {/* Cabecera */}
+                  {/* Cabecera con stats */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <FileSpreadsheet size={15} className="text-slate-400" />
                       <span className="font-medium text-slate-900 text-sm">{importFileName}</span>
-                      <span className="text-xs text-slate-400">· {importData.length} filas</span>
                     </div>
                     <button onClick={resetImport} className="text-xs text-slate-400 hover:text-slate-600">Cambiar archivo</button>
                   </div>
 
-                  {/* ── FASE 1: el usuario marca cuáles son cuentas ── */}
-                  {importPhase === "select" && (
-                    <>
-                      <div className="bg-slate-900 rounded-xl px-4 py-3 flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-white">Paso 1 — Marca las cuentas principales</p>
-                          <p className="text-xs text-slate-400 mt-0.5">Las marcadas como cuenta serán las carpetas. El resto son subcuentas.</p>
-                        </div>
-                        <div className="text-right flex-shrink-0 ml-4">
-                          <p className="text-lg font-bold text-blue-400">{importData.filter(d => d.type === "CUENTA").length}</p>
-                          <p className="text-[10px] text-slate-500">cuentas</p>
-                        </div>
-                      </div>
+                  {/* Estadísticas rápidas */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
+                      <p className="text-xl font-bold text-blue-700">{importData.filter(d => d.type === "CUENTA").length}</p>
+                      <p className="text-[10px] text-blue-600">Cuentas</p>
+                    </div>
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+                      <p className="text-xl font-bold text-emerald-700">{importData.filter(d => d.type === "SUBCUENTA").length}</p>
+                      <p className="text-[10px] text-emerald-600">Subcuentas</p>
+                    </div>
+                  </div>
 
-                      <div className="border border-slate-200 rounded-xl overflow-hidden">
-                        <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
-                          {importData.map((row, index) => (
-                            <div
-                              key={index}
-                              className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
-                                row.type === "CUENTA" ? "bg-blue-50 hover:bg-blue-100" : "bg-white hover:bg-slate-50"
-                              }`}
-                              onClick={() => toggleRowType(index)}
-                            >
-                              {/* Icono tipo */}
-                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                                row.type === "CUENTA" ? "bg-blue-500" : "bg-slate-100"
-                              }`}>
-                                {row.type === "CUENTA"
-                                  ? <FileSpreadsheet size={13} className="text-white" />
-                                  : <ChevronRight size={13} className="text-slate-400" />
-                                }
-                              </div>
-
-                              <span className="font-mono text-xs text-slate-500 w-20 flex-shrink-0">{row.code}</span>
-                              <span className={`text-sm flex-1 truncate ${row.type === "CUENTA" ? "font-semibold text-slate-900" : "text-slate-600"}`}>
-                                {row.description}
-                              </span>
-                              {row.budgeted > 0 && (
-                                <span className="text-xs text-slate-500 tabular-nums flex-shrink-0">{formatCurrency(row.budgeted)} €</span>
-                              )}
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
-                                row.type === "CUENTA" ? "bg-blue-200 text-blue-800" : "bg-slate-100 text-slate-500"
-                              }`}>
-                                {row.type === "CUENTA" ? "Cuenta" : "Subcuenta"}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <p className="text-xs text-slate-400 text-center">Clic en cualquier fila para cambiar su tipo</p>
-                    </>
-                  )}
-
-                  {/* ── FASE 2: resultado de distribución automática ── */}
-                  {importPhase === "organize" && (
-                    <>
-                      {/* Estadísticas */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
-                          <p className="text-xl font-bold text-blue-700">{importData.filter(d => d.type === "CUENTA").length}</p>
-                          <p className="text-[10px] text-blue-600">Cuentas</p>
-                        </div>
-                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
-                          <p className="text-xl font-bold text-emerald-700">{importData.filter(d => d.type === "SUBCUENTA" && d.parentCode).length}</p>
-                          <p className="text-[10px] text-emerald-600">Asignadas auto</p>
-                        </div>
-                        <div className={`border rounded-xl p-3 text-center ${unassignedSubAccounts.length > 0 ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-200"}`}>
-                          <p className={`text-xl font-bold ${unassignedSubAccounts.length > 0 ? "text-amber-700" : "text-slate-400"}`}>
-                            {unassignedSubAccounts.length}
-                          </p>
-                          <p className={`text-[10px] ${unassignedSubAccounts.length > 0 ? "text-amber-600" : "text-slate-500"}`}>Sin asignar</p>
-                        </div>
-                      </div>
-
-                      {/* Excepciones: subcuentas sin asignar */}
-                      {unassignedSubAccounts.length > 0 && (
-                        <div className="border border-amber-200 rounded-xl overflow-hidden">
-                          <div className="bg-amber-50 px-4 py-2.5 border-b border-amber-200 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <AlertCircle size={14} className="text-amber-600" />
-                              <span className="text-xs font-semibold text-amber-800">
-                                {unassignedSubAccounts.length} excepción{unassignedSubAccounts.length > 1 ? "es" : ""} — asignar manualmente
-                              </span>
-                            </div>
-                            {/* Asignar todas de golpe */}
-                            <select
-                              defaultValue=""
-                              onChange={(e) => { if (e.target.value) assignAllUnassigned(e.target.value); e.target.value = ""; }}
-                              className="text-xs border border-amber-300 rounded-lg px-2 py-1 bg-white text-slate-700"
-                            >
-                              <option value="">Todas a… ▾</option>
-                              {availableParentAccounts.map(a => (
-                                <option key={a.code} value={a.code}>{a.code} — {a.description}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="divide-y divide-amber-100 max-h-48 overflow-y-auto">
-                            {unassignedSubAccounts.map((sub) => {
-                              const subIdx = importData.indexOf(sub);
-                              return (
-                                <div key={sub.code} className="flex items-center gap-3 px-4 py-2.5 bg-white hover:bg-amber-50">
-                                  <span className="font-mono text-xs text-amber-600 w-20 flex-shrink-0">{sub.code}</span>
-                                  <span className="text-xs text-slate-700 flex-1 truncate">{sub.description}</span>
-                                  {sub.budgeted > 0 && <span className="text-xs text-slate-500 tabular-nums flex-shrink-0">{formatCurrency(sub.budgeted)} €</span>}
-                                  <select
-                                    value=""
-                                    onChange={(e) => reassignParent(subIdx, e.target.value || null)}
-                                    className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 max-w-[170px] flex-shrink-0"
-                                  >
-                                    <option value="">Asignar a…</option>
-                                    {availableParentAccounts.map(a => (
-                                      <option key={a.code} value={a.code}>{a.code} — {a.description}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Vista de carpetas (colapsada por defecto, expandible) */}
-                      <div className="border border-slate-200 rounded-xl overflow-hidden">
-                        <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex items-center justify-between">
-                          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Vista previa del presupuesto</span>
-                          <div className="flex items-center gap-3">
-                            <button onClick={() => setImportPhase("select")} className="text-xs text-slate-400 hover:text-slate-600">← Cambiar cuentas</button>
+                  {/* Vista previa agrupada — expandida por defecto */}
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Vista previa</span>
+                      <button
+                        onClick={() => {
+                          const allCodes = importData.filter(d => d.type === "CUENTA").map(d => d.code);
+                          setExpandedImportAccounts(expandedImportAccounts.size > 0 ? new Set() : new Set(allCodes));
+                        }}
+                        className="text-xs text-slate-500 hover:text-slate-700"
+                      >
+                        {expandedImportAccounts.size > 0 ? "Colapsar todo" : "Expandir todo"}
+                      </button>
+                    </div>
+                    <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
+                      {importData.filter(d => d.type === "CUENTA").map((account) => {
+                        const subs = importData.filter(d => d.type === "SUBCUENTA" && d.parentCode === account.code);
+                        const isExpanded = expandedImportAccounts.has(account.code);
+                        const accountTotal = subs.reduce((sum, s) => sum + s.budgeted, 0);
+                        return (
+                          <div key={account.code}>
                             <button
-                              onClick={() => {
-                                const allCodes = importData.filter(d => d.type === "CUENTA").map(d => d.code);
-                                setExpandedImportAccounts(expandedImportAccounts.size > 0 ? new Set() : new Set(allCodes));
-                              }}
-                              className="text-xs text-slate-500 hover:text-slate-700"
+                              onClick={() => setExpandedImportAccounts(prev => {
+                                const n = new Set(prev);
+                                n.has(account.code) ? n.delete(account.code) : n.add(account.code);
+                                return n;
+                              })}
+                              className="w-full flex items-center gap-2 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-left"
                             >
-                              {expandedImportAccounts.size > 0 ? "Colapsar" : "Expandir todo"}
+                              <ChevronRight size={13} className={`text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? "rotate-90" : ""}`} />
+                              <span className="font-mono text-xs font-bold text-slate-500 w-10 flex-shrink-0">{account.code}</span>
+                              <span className="text-sm font-semibold text-slate-800 flex-1 truncate">{account.description}</span>
+                              <span className="text-[10px] text-slate-400 mr-2">{subs.length} subcuentas</span>
+                              {accountTotal > 0 && (
+                                <span className="text-xs font-medium text-slate-600 tabular-nums">{formatCurrency(accountTotal)} €</span>
+                              )}
                             </button>
-                          </div>
-                        </div>
-                        <div className="max-h-[260px] overflow-y-auto divide-y divide-slate-100">
-                          {importData.filter(d => d.type === "CUENTA").map((account) => {
-                            const subs = importData.filter(d => d.type === "SUBCUENTA" && d.parentCode === account.code);
-                            const isExpanded = expandedImportAccounts.has(account.code);
-                            return (
-                              <div key={account.code}>
-                                <button
-                                  onClick={() => setExpandedImportAccounts(prev => {
-                                    const n = new Set(prev);
-                                    n.has(account.code) ? n.delete(account.code) : n.add(account.code);
-                                    return n;
-                                  })}
-                                  className="w-full flex items-center gap-2 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-left"
-                                >
-                                  <ChevronRight size={13} className={`text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? "rotate-90" : ""}`} />
-                                  <span className="font-mono text-xs font-bold text-slate-500 w-16 flex-shrink-0">{account.code}</span>
-                                  <span className="text-sm font-semibold text-slate-800 flex-1 truncate">{account.description}</span>
-                                  <span className="text-[10px] text-slate-400">{subs.length} subcuentas</span>
-                                </button>
-                                {isExpanded && subs.map(sub => {
-                                  const subIdx = importData.indexOf(sub);
-                                  return (
-                                    <div key={sub.code} className="flex items-center gap-2 pl-12 pr-4 py-2 bg-white hover:bg-slate-50 group/s">
-                                      <span className="font-mono text-xs text-slate-400 w-16 flex-shrink-0">{sub.code}</span>
-                                      <span className="text-xs text-slate-600 flex-1 truncate">{sub.description}</span>
-                                      {sub.budgeted > 0 && <span className="text-xs text-slate-500 tabular-nums">{formatCurrency(sub.budgeted)} €</span>}
-                                      <select
-                                        value={sub.parentCode ?? ""}
-                                        onChange={(e) => reassignParent(subIdx, e.target.value || null)}
-                                        className="opacity-0 group-hover/s:opacity-100 transition-opacity text-[10px] border border-slate-200 rounded px-1 py-0.5 bg-white text-slate-600 max-w-[120px] flex-shrink-0"
-                                      >
-                                        {availableParentAccounts.map(a => (
-                                          <option key={a.code} value={a.code}>{a.code} — {a.description}</option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                  );
-                                })}
+                            {isExpanded && subs.map(sub => (
+                              <div key={sub.code} className="flex items-center gap-2 pl-10 pr-4 py-2 bg-white hover:bg-slate-50">
+                                <ChevronRight size={11} className="text-slate-300 flex-shrink-0" />
+                                <span className="font-mono text-xs text-slate-400 w-24 flex-shrink-0">{sub.code}</span>
+                                <span className="text-xs text-slate-600 flex-1 truncate">{sub.description}</span>
+                                {sub.budgeted > 0 && (
+                                  <span className="text-xs text-slate-500 tabular-nums flex-shrink-0">{formatCurrency(sub.budgeted)} €</span>
+                                )}
                               </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </>
-                  )}
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1516,45 +1476,26 @@ export default function BudgetPage() {
                   Cancelar
                 </button>
               )}
-              {importStep === "preview" && (
-                <>
-                  <button onClick={resetImport} className="px-4 py-2.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
-                    ← Volver
-                  </button>
-
-                  {importPhase === "select" && (
-                    <button
-                      onClick={confirmAccountsAndDistribute}
-                      disabled={importData.filter(d => d.type === "CUENTA").length === 0}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Distribuir automáticamente →
+              {importStep === "preview" && (() => {
+                const accounts = importData.filter(d => d.type === "CUENTA").length;
+                const subs = importData.filter(d => d.type === "SUBCUENTA").length;
+                const total = accounts + subs;
+                return (
+                  <>
+                    <button onClick={resetImport} className="px-4 py-2.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                      ← Volver
                     </button>
-                  )}
-
-                  {importPhase === "organize" && (() => {
-                    const readyCount = importData.filter(d => d.type === "CUENTA").length
-                      + importData.filter(d => d.type === "SUBCUENTA" && d.parentCode).length;
-                    return (
-                      <>
-                        {unassignedSubAccounts.length > 0 && (
-                          <span className="text-xs text-amber-600 self-center">
-                            {unassignedSubAccounts.length} sin asignar se omitirán
-                          </span>
-                        )}
-                        <button
-                          onClick={executeImport}
-                          disabled={readyCount === 0}
-                          className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Upload size={16} />
-                          Importar {readyCount} elementos
-                        </button>
-                      </>
-                    );
-                  })()}
-                </>
-              )}
+                    <button
+                      onClick={executeImport}
+                      disabled={total === 0}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Upload size={16} />
+                      Importar {total} elementos ({accounts} cuentas · {subs} subcuentas)
+                    </button>
+                  </>
+                );
+              })()}
               {importStep === "importing" && (
                 <div className="w-full text-center text-sm text-slate-500">
                   Procesando...
@@ -1568,6 +1509,30 @@ export default function BudgetPage() {
                   Cerrar
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
+            <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDialog.onConfirm}
+                className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-sm text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
+              >
+                {confirmDialog.confirmLabel || "Confirmar"}
+              </button>
             </div>
           </div>
         </div>

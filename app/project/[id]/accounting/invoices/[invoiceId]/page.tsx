@@ -32,6 +32,7 @@ import {
   Calendar,
   Check,
   CheckCircle,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -340,6 +341,17 @@ export default function InvoiceDetailPage() {
   const [returnFile, setReturnFile] = useState<File | null>(null);
   const [processingReturn, setProcessingReturn] = useState(false);
   const returnFileInputRef = useRef<HTMLInputElement>(null);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest(".custom-dropdown")) {
+        setOpenDropdown(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const showToast = (type: "success" | "error", message: string) => { setToast({ type, message }); setTimeout(() => setToast(null), 3000); };
   const formatCurrency = (a: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(a || 0);
@@ -1138,25 +1150,98 @@ export default function InvoiceDetailPage() {
                       {linkedPO && linkedPO.items && !item.isNewItem && (
                         <div className="col-span-3">
                           <label className="text-xs text-slate-500 block mb-1">Línea de PO</label>
-                          <select value={item.poItemIndex ?? ""} onChange={(e) => updateCodingItem(idx, "poItemIndex", e.target.value ? Number(e.target.value) : undefined)} className="w-full px-2 py-2 border border-indigo-200 bg-indigo-50 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none">
-                            <option value="">Seleccionar...</option>
-                            {linkedPO.items.map((poItem: any, i: number) => <option key={i} value={i}>#{i + 1} - {poItem.description?.substring(0, 30) || `Línea ${i + 1}`}</option>)}
-                          </select>
+                          <div className="relative custom-dropdown">
+                            <button
+                              type="button"
+                              onClick={() => setOpenDropdown(openDropdown === `poitem-${idx}` ? null : `poitem-${idx}`)}
+                              className="w-full px-3 py-2 border border-indigo-200 bg-indigo-50 rounded-lg text-sm text-left flex items-center justify-between gap-2 hover:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors"
+                            >
+                              <span className="text-slate-900 truncate">
+                                {item.poItemIndex !== undefined && item.poItemIndex !== null
+                                  ? `#${item.poItemIndex + 1} - ${linkedPO.items[item.poItemIndex]?.description?.substring(0, 30) || `Línea ${item.poItemIndex + 1}`}`
+                                  : "Seleccionar..."}
+                              </span>
+                              <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `poitem-${idx}` ? "rotate-180" : ""}`} />
+                            </button>
+                            {openDropdown === `poitem-${idx}` && (
+                              <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => { updateCodingItem(idx, "poItemIndex", undefined); setOpenDropdown(null); }}
+                                  className={`w-full px-4 py-2 text-left text-sm transition-colors ${item.poItemIndex === undefined || item.poItemIndex === null ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                                >
+                                  Seleccionar...
+                                </button>
+                                {linkedPO.items.map((poItem: any, i: number) => (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    onClick={() => { updateCodingItem(idx, "poItemIndex", i); setOpenDropdown(null); }}
+                                    className={`w-full px-4 py-2 text-left text-sm transition-colors ${item.poItemIndex === i ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                                  >
+                                    #{i + 1} - {poItem.description?.substring(0, 30) || `Línea ${i + 1}`}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
 
                       <div className="col-span-2">
                         <label className="text-xs text-slate-500 block mb-1">IVA %</label>
-                        <select value={item.vatRate} onChange={(e) => updateCodingItem(idx, "vatRate", Number(e.target.value))} className="w-full px-2 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none">
-                          {VAT_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
-                        </select>
+                        <div className="relative custom-dropdown">
+                          <button
+                            type="button"
+                            onClick={() => setOpenDropdown(openDropdown === `vat-${idx}` ? null : `vat-${idx}`)}
+                            className="w-full px-2 py-2 border border-slate-200 rounded-lg text-sm bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors"
+                          >
+                            <span className="text-slate-900 truncate">{item.vatRate}%</span>
+                            <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `vat-${idx}` ? "rotate-180" : ""}`} />
+                          </button>
+                          {openDropdown === `vat-${idx}` && (
+                            <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                              {VAT_RATES.map((r) => (
+                                <button
+                                  key={r}
+                                  type="button"
+                                  onClick={() => { updateCodingItem(idx, "vatRate", Number(r)); setOpenDropdown(null); }}
+                                  className={`w-full px-4 py-2 text-left text-sm transition-colors ${item.vatRate === r ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                                >
+                                  {r}%
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <div className="col-span-2">
                         <label className="text-xs text-slate-500 block mb-1">IRPF %</label>
-                        <select value={item.irpfRate} onChange={(e) => updateCodingItem(idx, "irpfRate", Number(e.target.value))} className="w-full px-2 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none">
-                          {IRPF_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
-                        </select>
+                        <div className="relative custom-dropdown">
+                          <button
+                            type="button"
+                            onClick={() => setOpenDropdown(openDropdown === `irpf-${idx}` ? null : `irpf-${idx}`)}
+                            className="w-full px-2 py-2 border border-slate-200 rounded-lg text-sm bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors"
+                          >
+                            <span className="text-slate-900 truncate">{item.irpfRate}%</span>
+                            <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `irpf-${idx}` ? "rotate-180" : ""}`} />
+                          </button>
+                          {openDropdown === `irpf-${idx}` && (
+                            <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                              {IRPF_RATES.map((r) => (
+                                <button
+                                  key={r}
+                                  type="button"
+                                  onClick={() => { updateCodingItem(idx, "irpfRate", Number(r)); setOpenDropdown(null); }}
+                                  className={`w-full px-4 py-2 text-left text-sm transition-colors ${item.irpfRate === r ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                                >
+                                  {r}%
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <div className="col-span-3">
@@ -1195,9 +1280,30 @@ export default function InvoiceDetailPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="text-xs text-slate-500 block mb-1">Método de pago</label>
-                  <select value={codingForm.paymentMethod} onChange={(e) => setCodingForm({ ...codingForm, paymentMethod: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none">
-                    {PAYMENT_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-                  </select>
+                  <div className="relative custom-dropdown">
+                    <button
+                      type="button"
+                      onClick={() => setOpenDropdown(openDropdown === "paymentMethod" ? null : "paymentMethod")}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors"
+                    >
+                      <span className="text-slate-900 truncate">{PAYMENT_METHODS.find(m => m.value === codingForm.paymentMethod)?.label ?? codingForm.paymentMethod}</span>
+                      <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === "paymentMethod" ? "rotate-180" : ""}`} />
+                    </button>
+                    {openDropdown === "paymentMethod" && (
+                      <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                        {PAYMENT_METHODS.map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => { setCodingForm({ ...codingForm, paymentMethod: opt.value }); setOpenDropdown(null); }}
+                            className={`w-full px-4 py-2 text-left text-sm transition-colors ${codingForm.paymentMethod === opt.value ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="col-span-2">
                   <label className="flex items-center gap-2 cursor-pointer">

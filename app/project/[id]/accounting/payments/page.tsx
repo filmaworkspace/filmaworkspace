@@ -214,8 +214,16 @@ export default function PaymentsPage() {
   const [dragOverForecast, setDragOverForecast] = useState<string | null>(null);
   
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    danger?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
   
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const dateDropdownRef = useRef<HTMLDivElement>(null);
@@ -243,14 +251,17 @@ export default function PaymentsPage() {
     if (userId && id) loadData();
   }, [userId, id]);
 
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest(".menu-container")) setOpenMenuId(null);
+      if (!target.closest(".menu-container")) { setOpenMenuId(null); setMenuPosition(null); }
       if (statusDropdownRef.current && !statusDropdownRef.current.contains(target)) setShowStatusDropdown(false);
       if (dateDropdownRef.current && !dateDropdownRef.current.contains(target)) setShowDateDropdown(false);
       if (invoiceFilterRef.current && !invoiceFilterRef.current.contains(target)) setShowInvoiceFilterDropdown(false);
       if (invoiceSortRef.current && !invoiceSortRef.current.contains(target)) setShowInvoiceSortDropdown(false);
+      if (!target.closest(".custom-dropdown")) setOpenDropdown(null);
     };
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
@@ -526,15 +537,31 @@ export default function PaymentsPage() {
     } catch (error) { console.error("Error:", error); }
   };
 
+  const openConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    options?: { confirmLabel?: string; danger?: boolean }
+  ) => {
+    setConfirmDialog({ title, message, onConfirm, ...options });
+  };
+
   const handleDeleteForecast = async (forecastId: string) => {
     const forecast = forecasts.find((f) => f.id === forecastId);
     if (!forecast) return;
     if (forecast.items.some((item) => item.status === "completed")) { showToast("error", "No se puede eliminar una previsión con pagos completados"); return; }
-    if (!confirm("¿Eliminar esta previsión de pago?")) return;
-    try {
-      await deleteDoc(doc(db, "projects/" + id + "/paymentForecasts", forecastId));
-      showToast("success", "Previsión eliminada"); loadData();
-    } catch (error) { console.error("Error:", error); }
+    openConfirm(
+      "Eliminar previsión de pago",
+      "¿Estás seguro de que quieres eliminar esta previsión de pago? Esta acción no se puede deshacer.",
+      async () => {
+        setConfirmDialog(null);
+        try {
+          await deleteDoc(doc(db, "projects/" + id + "/paymentForecasts", forecastId));
+          showToast("success", "Previsión eliminada"); loadData();
+        } catch (error) { console.error("Error:", error); }
+      },
+      { danger: true, confirmLabel: "Eliminar" }
+    );
   };
 
   const handleDragStart = (invoice: Invoice) => setDraggedInvoice(invoice);
@@ -889,15 +916,33 @@ export default function PaymentsPage() {
                             </div>
                           </div>
                           <div className="relative menu-container">
-                            <button onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === forecast.id ? null : forecast.id); }} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"><MoreHorizontal size={16} /></button>
-                            {openMenuId === forecast.id && (
-                              <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1">
-                                <button onClick={() => { setShowForecastDetail(forecast); setOpenMenuId(null); }} className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"><Eye size={14} /> Ver detalles</button>
-                                <button onClick={() => { exportForecastPDF(forecast); setOpenMenuId(null); }} className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"><Download size={14} /> Exportar PDF</button>
-                                {forecast.status === "draft" && (<><button onClick={() => { setSelectedForecastId(forecast.id); setShowAddPaymentModal(true); setOpenMenuId(null); }} className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"><Plus size={14} /> Añadir pago</button>{forecast.items.length > 0 && (<button onClick={() => { handleSendForecast(forecast.id); setOpenMenuId(null); }} className="w-full px-4 py-2 text-left text-sm text-amber-600 hover:bg-amber-50 flex items-center gap-2"><Send size={14} /> Enviar</button>)}</>)}
-                                {(forecast.status === "pending" || forecast.status === "completed") && (<button onClick={() => { router.push("/project/" + id + "/accounting/payments/" + forecast.id + "/pay"); setOpenMenuId(null); }} className="w-full px-4 py-2 text-left text-sm text-emerald-600 hover:bg-emerald-50 flex items-center gap-2"><Banknote size={14} /> {forecast.status === "completed" ? "Ver pagos" : "Ir a pagar"}</button>)}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (openMenuId === forecast.id) {
+                                  setOpenMenuId(null);
+                                  setMenuPosition(null);
+                                } else {
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  setMenuPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                                  setOpenMenuId(forecast.id);
+                                }
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
+                            >
+                              <MoreHorizontal size={16} />
+                            </button>
+                            {openMenuId === forecast.id && menuPosition && (
+                              <div
+                                className="fixed w-48 bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] py-1"
+                                style={{ top: menuPosition.top, right: menuPosition.right }}
+                              >
+                                <button onClick={() => { setShowForecastDetail(forecast); setOpenMenuId(null); setMenuPosition(null); }} className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"><Eye size={14} /> Ver detalles</button>
+                                <button onClick={() => { exportForecastPDF(forecast); setOpenMenuId(null); setMenuPosition(null); }} className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"><Download size={14} /> Exportar PDF</button>
+                                {forecast.status === "draft" && (<><button onClick={() => { setSelectedForecastId(forecast.id); setShowAddPaymentModal(true); setOpenMenuId(null); setMenuPosition(null); }} className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"><Plus size={14} /> Añadir pago</button>{forecast.items.length > 0 && (<button onClick={() => { handleSendForecast(forecast.id); setOpenMenuId(null); setMenuPosition(null); }} className="w-full px-4 py-2 text-left text-sm text-amber-600 hover:bg-amber-50 flex items-center gap-2"><Send size={14} /> Enviar</button>)}</>)}
+                                {(forecast.status === "pending" || forecast.status === "completed") && (<button onClick={() => { router.push("/project/" + id + "/accounting/payments/" + forecast.id + "/pay"); setOpenMenuId(null); setMenuPosition(null); }} className="w-full px-4 py-2 text-left text-sm text-emerald-600 hover:bg-emerald-50 flex items-center gap-2"><Banknote size={14} /> {forecast.status === "completed" ? "Ver pagos" : "Ir a pagar"}</button>)}
                                 <div className="border-t border-slate-100 my-1" />
-                                <button onClick={() => { handleDeleteForecast(forecast.id); setOpenMenuId(null); }} className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"><Trash2 size={14} /> Eliminar</button>
+                                <button onClick={() => { handleDeleteForecast(forecast.id); setOpenMenuId(null); setMenuPosition(null); }} className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"><Trash2 size={14} /> Eliminar</button>
                               </div>
                             )}
                           </div>
@@ -1086,10 +1131,41 @@ export default function PaymentsPage() {
               {(newPayment.type === "invoice" || newPayment.type === "partial") && availableInvoices.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Seleccionar factura</label>
-                  <select value={newPayment.invoiceId} onChange={(e) => { const inv = availableInvoices.find((i) => i.id === e.target.value); if (inv) { setNewPayment({ ...newPayment, invoiceId: inv.id, supplier: inv.supplier, description: inv.description, amount: inv.totalAmount }); } }} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900">
-                    <option value="">Seleccionar...</option>
-                    {availableInvoices.map((inv) => (<option key={inv.id} value={inv.id}>{inv.displayNumber || ("FRA-" + inv.number)} · {inv.supplier} · {formatCurrency(inv.totalAmount)} €</option>))}
-                  </select>
+                  <div className="relative custom-dropdown">
+                    <button
+                      type="button"
+                      onClick={() => setOpenDropdown(openDropdown === "invoiceSelect" ? null : "invoiceSelect")}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors"
+                    >
+                      <span className="text-slate-900 truncate">
+                        {newPayment.invoiceId
+                          ? (() => { const inv = availableInvoices.find(i => i.id === newPayment.invoiceId); return inv ? `${inv.displayNumber || "FRA-" + inv.number} · ${inv.supplier} · ${formatCurrency(inv.totalAmount)} €` : "Seleccionar..."; })()
+                          : "Seleccionar..."}
+                      </span>
+                      <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === "invoiceSelect" ? "rotate-180" : ""}`} />
+                    </button>
+                    {openDropdown === "invoiceSelect" && (
+                      <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                        <button
+                          type="button"
+                          onClick={() => { setNewPayment({ ...newPayment, invoiceId: "" }); setOpenDropdown(null); }}
+                          className={`w-full px-4 py-2 text-left text-sm transition-colors ${!newPayment.invoiceId ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                        >
+                          Seleccionar...
+                        </button>
+                        {availableInvoices.map((inv) => (
+                          <button
+                            key={inv.id}
+                            type="button"
+                            onClick={() => { setNewPayment({ ...newPayment, invoiceId: inv.id, supplier: inv.supplier, description: inv.description, amount: inv.totalAmount }); setOpenDropdown(null); }}
+                            className={`w-full px-4 py-2 text-left text-sm transition-colors ${newPayment.invoiceId === inv.id ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                          >
+                            {inv.displayNumber || ("FRA-" + inv.number)} · {inv.supplier} · {formatCurrency(inv.totalAmount)} €
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
               {newPayment.type === "partial" && newPayment.invoiceId && (
@@ -1309,6 +1385,29 @@ export default function PaymentsPage() {
         </div>
       )}
 
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
+            <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDialog.onConfirm}
+                className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-sm text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
+              >
+                {confirmDialog.confirmLabel || "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

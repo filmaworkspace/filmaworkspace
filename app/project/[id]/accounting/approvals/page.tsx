@@ -848,8 +848,6 @@ export default function ApprovalsPage() {
       </div>
 
       <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
-        {successMessage && (<div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3"><CheckCircle size={18} className="text-emerald-600" /><span className="text-sm text-emerald-700 font-medium">{successMessage}</span></div>)}
-        {errorMessage && (<div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3"><AlertCircle size={18} className="text-red-600" /><span className="text-sm text-red-700">{errorMessage}</span><button onClick={() => setErrorMessage("")} className="ml-auto text-red-400 hover:text-red-600"><X size={16} /></button></div>)}
 
         {filteredApprovals.length === 0 ? (
           <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
@@ -1165,6 +1163,22 @@ export default function ApprovalsPage() {
             <div className="px-6 py-4 border-b border-slate-200"><h3 className="text-lg font-semibold text-slate-900">Solicitar información</h3><p className="text-sm text-slate-500">{selectedApproval.displayNumber}</p></div>
             <div className="p-6"><label className="block text-sm font-medium text-slate-700 mb-2">¿Qué información necesitas?</label><textarea value={infoRequestMessage} onChange={(e) => setInfoRequestMessage(e.target.value)} placeholder="Describe qué información adicional necesitas..." rows={4} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none text-sm" /><div className="flex gap-3 mt-6"><button onClick={() => { setShowInfoRequestModal(false); setInfoRequestMessage(""); setSelectedApproval(null); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">Cancelar</button><button onClick={handleRequestInfo} disabled={processing || !infoRequestMessage.trim()} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-medium disabled:opacity-50"><Send size={16} />{processing ? "Enviando..." : "Enviar solicitud"}</button></div></div>
           </div>
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
+          <CheckCircle size={16} />
+          {successMessage}
+        </div>
+      )}
+      {errorMessage && (
+        <div className="fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
+          <AlertCircle size={16} />
+          {errorMessage}
+          <button onClick={() => setErrorMessage("")} className="ml-2 hover:bg-white/20 rounded p-0.5">
+            <X size={14} />
+          </button>
         </div>
       )}
     </div>

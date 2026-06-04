@@ -144,6 +144,13 @@ export default function SupplierDetailPage() {
   const [canVerify, setCanVerify] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    danger?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
   const [editingFiscal, setEditingFiscal] = useState(false);
@@ -193,6 +200,18 @@ export default function SupplierDetailPage() {
   }, [projectId]);
 
   useEffect(() => { if (userId && projectId && supplierId && userRole !== undefined) loadData(); }, [userId, projectId, supplierId, userRole, userDepartment, userPosition]);
+
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest(".custom-dropdown")) {
+        setOpenDropdown(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const loadData = async () => {
     try {
@@ -382,13 +401,29 @@ export default function SupplierDetailPage() {
     } catch (e: any) { setErrorMessage(e.message); }
   };
 
+  const openConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    options?: { confirmLabel?: string; danger?: boolean }
+  ) => {
+    setConfirmDialog({ title, message, onConfirm, ...options });
+  };
+
   const handleDelete = async () => {
     if (invoices.length > 0 || pos.length > 0) { setErrorMessage("No se puede eliminar: tiene documentos asociados"); return; }
-    if (!confirm(`¿Eliminar a ${supplier?.fiscalName}?`)) return;
-    try {
-      await deleteDoc(doc(db, `projects/${projectId}/suppliers`, supplierId));
-      router.push(`/project/${projectId}/accounting/suppliers`);
-    } catch (e: any) { setErrorMessage(e.message); }
+    openConfirm(
+      "Eliminar proveedor",
+      `¿Estás seguro de que quieres eliminar a ${supplier?.fiscalName}? Esta acción no se puede deshacer.`,
+      async () => {
+        setConfirmDialog(null);
+        try {
+          await deleteDoc(doc(db, `projects/${projectId}/suppliers`, supplierId));
+          router.push(`/project/${projectId}/accounting/suppliers`);
+        } catch (e: any) { setErrorMessage(e.message); }
+      },
+      { danger: true, confirmLabel: "Eliminar" }
+    );
   };
 
   const handleSaveFiscal = async () => {
@@ -450,21 +485,28 @@ export default function SupplierDetailPage() {
 
   const handleReopenProject = async () => {
     if (!supplier || !supplierClosure) return;
-    if (!confirm("¿Reabrir la relación con este proveedor? Se eliminará el registro de cierre.")) return;
-    setSaving(true);
-    try {
-      await updateDoc(doc(db, `projects/${projectId}/suppliers`, supplierId), {
-        closure: null,
-        status: "active",
-      });
-      setSuccessMessage("Relación reabierta");
-      setTimeout(() => setSuccessMessage(""), 3000);
-      await loadData();
-    } catch (e: any) {
-      setErrorMessage(e.message);
-    } finally {
-      setSaving(false);
-    }
+    openConfirm(
+      "Reabrir relación con proveedor",
+      "¿Reabrir la relación con este proveedor? Se eliminará el registro de cierre.",
+      async () => {
+        setConfirmDialog(null);
+        setSaving(true);
+        try {
+          await updateDoc(doc(db, `projects/${projectId}/suppliers`, supplierId), {
+            closure: null,
+            status: "active",
+          });
+          setSuccessMessage("Relación reabierta");
+          setTimeout(() => setSuccessMessage(""), 3000);
+          await loadData();
+        } catch (e: any) {
+          setErrorMessage(e.message);
+        } finally {
+          setSaving(false);
+        }
+      },
+      { confirmLabel: "Reabrir" }
+    );
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -527,11 +569,16 @@ export default function SupplierDetailPage() {
       paid: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Pagada" },
       rejected: { bg: "bg-red-50", text: "text-red-700", label: "Rechazada" },
       closed: { bg: "bg-blue-50", text: "text-blue-700", label: "Cerrada" },
-      cancelled: { bg: "bg-slate-100", text: "text-slate-500", label: "Anulada" },
+      cancelled: { bg: "bg-red-100", text: "text-red-800", label: "Anulada" },
       overdue: { bg: "bg-red-50", text: "text-red-700", label: "Vencida" },
     };
     const c = config[status] || config.pending;
-    return <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${c.bg} ${c.text}`}>{c.label}</span>;
+    return (
+      <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-xs font-medium ${c.bg} ${c.text} ${status === "cancelled" ? "line-through" : ""}`}>
+        {status === "cancelled" && <span className="font-bold">✕</span>}
+        {c.label}
+      </span>
+    );
   };
 
   // Generar PDF de listado de facturas
@@ -1354,15 +1401,30 @@ export default function SupplierDetailPage() {
                           maxLength={11}
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-slate-900"
                         />
-                        <select
-                          value={editForm.paymentMethod}
-                          onChange={(e) => setEditForm({ ...editForm, paymentMethod: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                        >
-                          {Object.entries(PAYMENT_METHODS).map(([value, label]) => (
-                            <option key={value} value={value}>{label}</option>
-                          ))}
-                        </select>
+                        <div className="relative custom-dropdown">
+                          <button
+                            type="button"
+                            onClick={() => setOpenDropdown(openDropdown === "editPaymentMethod" ? null : "editPaymentMethod")}
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors"
+                          >
+                            <span className="text-slate-900 truncate">{PAYMENT_METHODS[editForm.paymentMethod as keyof typeof PAYMENT_METHODS] || editForm.paymentMethod}</span>
+                            <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === "editPaymentMethod" ? "rotate-180" : ""}`} />
+                          </button>
+                          {openDropdown === "editPaymentMethod" && (
+                            <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                              {Object.entries(PAYMENT_METHODS).map(([value, label]) => (
+                                <button
+                                  key={value}
+                                  type="button"
+                                  onClick={() => { setEditForm({ ...editForm, paymentMethod: value }); setOpenDropdown(null); }}
+                                  className={`w-full px-4 py-2 text-left text-sm transition-colors ${editForm.paymentMethod === value ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                                >
+                                  {label as string}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1394,23 +1456,26 @@ export default function SupplierDetailPage() {
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100">
-                  {invoices.slice(0, 5).map(inv => (
-                    <Link 
-                      key={inv.id} 
-                      href={`/project/${projectId}/accounting/invoices/${inv.id}`}
-                      className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors group"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="font-mono text-sm font-semibold text-slate-900">{inv.number}</span>
-                        <span className="text-sm text-slate-500 truncate">{inv.description || formatDate(inv.issueDate)}</span>
-                      </div>
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <span className="font-mono text-sm font-semibold text-slate-900">{formatCurrency(inv.totalAmount)}</span>
-                        {getStatusBadge(inv.status)}
-                        <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-500" />
-                      </div>
-                    </Link>
-                  ))}
+                  {invoices.slice(0, 5).map(inv => {
+                    const isCancelled = inv.status === "cancelled";
+                    return (
+                      <Link
+                        key={inv.id}
+                        href={`/project/${projectId}/accounting/invoices/${inv.id}`}
+                        className={`flex items-center justify-between px-5 py-3.5 transition-colors group ${isCancelled ? "bg-red-50/40 opacity-60 hover:opacity-80" : "hover:bg-slate-50"}`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className={`font-mono text-sm font-semibold ${isCancelled ? "line-through text-slate-400" : "text-slate-900"}`}>{inv.number}</span>
+                          <span className="text-sm text-slate-500 truncate">{inv.description || formatDate(inv.issueDate)}</span>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <span className={`font-mono text-sm font-semibold ${isCancelled ? "line-through text-slate-400" : "text-slate-900"}`}>{formatCurrency(inv.totalAmount)}</span>
+                          {getStatusBadge(inv.status)}
+                          <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-500" />
+                        </div>
+                      </Link>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1431,23 +1496,26 @@ export default function SupplierDetailPage() {
                   </Link>
                 </div>
                 <div className="divide-y divide-slate-100">
-                  {pos.slice(0, 5).map(po => (
-                    <Link 
-                      key={po.id} 
-                      href={`/project/${projectId}/accounting/pos/${po.id}`}
-                      className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors group"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="font-mono text-sm font-semibold text-slate-900">PO-{po.number}</span>
-                        <span className="text-sm text-slate-500 truncate max-w-[200px]">{po.description || "-"}</span>
-                      </div>
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <span className="font-mono text-sm font-semibold text-slate-900">{formatCurrency(po.baseAmount)}</span>
-                        {getStatusBadge(po.status)}
-                        <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-500" />
-                      </div>
-                    </Link>
-                  ))}
+                  {pos.slice(0, 5).map(po => {
+                    const isCancelled = po.status === "cancelled";
+                    return (
+                      <Link
+                        key={po.id}
+                        href={`/project/${projectId}/accounting/pos/${po.id}`}
+                        className={`flex items-center justify-between px-5 py-3.5 transition-colors group ${isCancelled ? "bg-red-50/40 opacity-60 hover:opacity-80" : "hover:bg-slate-50"}`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className={`font-mono text-sm font-semibold ${isCancelled ? "line-through text-slate-400" : "text-slate-900"}`}>PO-{po.number}</span>
+                          <span className="text-sm text-slate-500 truncate max-w-[200px]">{po.description || "-"}</span>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <span className={`font-mono text-sm font-semibold ${isCancelled ? "line-through text-slate-400" : "text-slate-900"}`}>{formatCurrency(po.baseAmount)}</span>
+                          {getStatusBadge(po.status)}
+                          <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-500" />
+                        </div>
+                      </Link>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -1737,6 +1805,30 @@ export default function SupplierDetailPage() {
           <button onClick={() => setErrorMessage("")} className="ml-2 hover:bg-white/20 rounded p-0.5">
             <X size={14} />
           </button>
+        </div>
+      )}
+
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
+            <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDialog.onConfirm}
+                className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-sm text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
+              >
+                {confirmDialog.confirmLabel || "Confirmar"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

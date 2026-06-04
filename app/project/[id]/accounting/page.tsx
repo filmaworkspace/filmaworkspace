@@ -311,7 +311,7 @@ export default function AccountingPage() {
       approved: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Aprobada" },
       rejected: { bg: "bg-red-50", text: "text-red-700", label: "Rechazada" },
       closed: { bg: "bg-blue-50", text: "text-blue-700", label: "Cerrada" },
-      cancelled: { bg: "bg-slate-100", text: "text-slate-600", label: "Anulada" },
+      cancelled: { bg: "bg-red-100", text: "text-red-800", label: "Anulada" },
       pending_approval: { bg: "bg-purple-50", text: "text-purple-700", label: "Pend. aprob." },
       paid: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Pagada" },
       overdue: { bg: "bg-red-50", text: "text-red-700", label: "Vencida" },
@@ -319,7 +319,12 @@ export default function AccountingPage() {
       partial_return: { bg: "bg-cyan-50", text: "text-cyan-700", label: "Dev. parcial" },
     };
     const c = config[status] || config.pending;
-    return <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${c.bg} ${c.text}`}>{c.label}</span>;
+    return (
+      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${c.bg} ${c.text} ${status === "cancelled" ? "line-through" : ""}`}>
+        {status === "cancelled" && <span className="font-bold not-italic">✕</span>}
+        {c.label}
+      </span>
+    );
   };
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
@@ -428,10 +433,10 @@ export default function AccountingPage() {
                 <div className="space-y-2">
                   {recentPOs.map((po) => (
                     <Link key={po.id} href={`/project/${id}/accounting/pos/${po.id}`} className="block">
-                      <div className="flex items-center justify-between px-3 py-3 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer group border border-transparent hover:border-slate-200">
+                      <div className={`flex items-center justify-between px-3 py-3 rounded-xl transition-colors cursor-pointer group border ${po.status === "cancelled" ? "bg-red-50/40 border-red-100 opacity-60 hover:opacity-80" : "bg-slate-50 hover:bg-slate-100 border-transparent hover:border-slate-200"}`}>
                         <div className="flex-1 min-w-0 mr-3">
                           <div className="flex items-center gap-2 mb-0.5">
-                            <span className="text-sm font-semibold text-slate-900 font-mono">PO-{po.number}</span>
+                            <span className={`text-sm font-semibold font-mono ${po.status === "cancelled" ? "line-through text-slate-400" : "text-slate-900"}`}>PO-{po.number}</span>
                             <span className="text-slate-300">/</span>
                             <span className="text-sm font-medium text-slate-700 truncate">{po.supplier || "Sin proveedor"}</span>
                           </div>
@@ -501,10 +506,10 @@ export default function AccountingPage() {
                     const isOverdue = invoice.status === "overdue" || (invoice.dueDate && invoice.dueDate < new Date() && invoice.status === "pending");
                     return (
                       <Link key={invoice.id} href={`/project/${id}/accounting/invoices/${invoice.id}`} className="block">
-                        <div className="flex items-center justify-between px-3 py-3 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer group border border-transparent hover:border-slate-200">
+                        <div className={`flex items-center justify-between px-3 py-3 rounded-xl transition-colors cursor-pointer group border ${invoice.status === "cancelled" ? "bg-red-50/40 border-red-100 opacity-60 hover:opacity-80" : "bg-slate-50 hover:bg-slate-100 border-transparent hover:border-slate-200"}`}>
                           <div className="flex-1 min-w-0 mr-3">
                             <div className="flex items-center gap-2 mb-0.5">
-                              <span className="text-sm font-semibold text-slate-900 font-mono">{invoice.displayNumber}</span>
+                              <span className={`text-sm font-semibold font-mono ${invoice.status === "cancelled" ? "line-through text-slate-400" : "text-slate-900"}`}>{invoice.displayNumber}</span>
                               {isOverdue && <AlertCircle size={12} className="text-red-500" />}
                               <span className="text-slate-300">/</span>
                               <span className="text-sm font-medium text-slate-700 truncate">{invoice.supplier || "Sin proveedor"}</span>

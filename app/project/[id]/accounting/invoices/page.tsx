@@ -171,6 +171,13 @@ export default function InvoicesPage() {
   const [pendingReplacementCount, setPendingReplacementCount] = useState(0);
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
   const [showCompanyTooltip, setShowCompanyTooltip] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    danger?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
 
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
@@ -301,24 +308,52 @@ export default function InvoicesPage() {
     return false;
   };
 
+  const openConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    options?: { confirmLabel?: string; danger?: boolean }
+  ) => {
+    setConfirmDialog({ title, message, onConfirm, ...options });
+  };
+
   const handleDeleteInvoice = async (invoiceId: string) => {
     const invoice = invoices.find((i) => i.id === invoiceId);
-    if (!invoice || !canDeleteInvoice(invoice) || !confirm(`¿Eliminar ${invoice.displayNumber}?`)) return;
-    try {
-      await deleteDoc(doc(db, `projects/${id}/invoices`, invoiceId));
-      loadData();
-    } catch (error) {
-      console.error("Error:", error);
-    }
-    closeMenu();
+    if (!invoice || !canDeleteInvoice(invoice)) return;
+    openConfirm(
+      "Eliminar factura",
+      `¿Eliminar ${invoice.displayNumber}? Esta acción no se puede deshacer.`,
+      async () => {
+        setConfirmDialog(null);
+        try {
+          await deleteDoc(doc(db, `projects/${id}/invoices`, invoiceId));
+          loadData();
+        } catch (error) {
+          console.error("Error:", error);
+        }
+        closeMenu();
+      },
+      { danger: true, confirmLabel: "Eliminar" }
+    );
   };
 
   const handleMarkAsPaid = async (invoiceId: string) => {
     const invoice = invoices.find((i) => i.id === invoiceId);
-    if (!invoice || !canMarkAsPaid(invoice) || !confirm(`¿Marcar ${invoice.displayNumber} como pagada?`)) return;
+    if (!invoice || !canMarkAsPaid(invoice)) return;
+    openConfirm(
+      "Marcar como pagada",
+      `¿Marcar ${invoice.displayNumber} como pagada? Esta acción no se puede deshacer.`,
+      async () => {
+        setConfirmDialog(null);
+        await doMarkAsPaid(invoice);
+      },
+      { confirmLabel: "Marcar como pagada" }
+    );
+  };
 
+  const doMarkAsPaid = async (invoice: Invoice) => {
     try {
-      await updateDoc(doc(db, `projects/${id}/invoices`, invoiceId), {
+      await updateDoc(doc(db, `projects/${id}/invoices`, invoice.id), {
         status: "paid",
         paidAt: Timestamp.now(),
         paidBy: permissions.userId,
@@ -475,13 +510,18 @@ export default function InvoicesPage() {
       pending: { bg: "bg-amber-50", text: "text-amber-700", label: "Pte. pago" },
       paid: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Pagada" },
       overdue: { bg: "bg-red-50", text: "text-red-700", label: "Vencida" },
-      cancelled: { bg: "bg-slate-100", text: "text-slate-700", label: "Cancelada" },
+      cancelled: { bg: "bg-red-100", text: "text-red-700", label: "Anulada" },
       rejected: { bg: "bg-red-50", text: "text-red-700", label: "Rechazada" },
       returned: { bg: "bg-teal-50", text: "text-teal-700", label: "Devuelta" },
       partial_return: { bg: "bg-cyan-50", text: "text-cyan-700", label: "Dev. parcial" },
     };
     const c = config[status] || config.pending;
-    return <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${c.bg} ${c.text}`}>{c.label}</span>;
+    return (
+      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${c.bg} ${c.text} ${status === "cancelled" ? "line-through" : ""}`}>
+        {status === "cancelled" && <span className="font-bold">✕</span>}
+        {c.label}
+      </span>
+    );
   };
 
   const getApprovalProgress = (invoice: Invoice) => {
@@ -771,16 +811,22 @@ export default function InvoicesPage() {
                     const isDueSoon = daysUntilDue <= 7 && daysUntilDue > 0 && invoice.status === "pending";
                     const needsReplacement = invoice.requiresReplacement && invoice.status === "paid" && !invoice.replacedByInvoiceId;
                     return (
-                      <tr 
-                        key={invoice.id} 
-                        className={`hover:bg-slate-50 transition-colors cursor-pointer ${needsReplacement ? "bg-amber-50/50" : ""}`}
+                      <tr
+                        key={invoice.id}
+                        className={`transition-colors cursor-pointer ${
+                          invoice.status === "cancelled"
+                            ? "bg-red-50/40 opacity-60 hover:opacity-80"
+                            : needsReplacement
+                            ? "bg-amber-50/50 hover:bg-amber-50"
+                            : "hover:bg-slate-50"
+                        }`}
                         onClick={() => router.push(`/project/${id}/accounting/invoices/${invoice.id}`)}
                       >
                         <td className="px-6 py-4">
                           <div className="text-left group/inv">
                             <div className="flex items-center gap-2">
                               {getDocumentTypeBadge(invoice.documentType)}
-                              <p className="font-semibold text-slate-900 font-mono group-hover/inv:text-[#2F52E0] transition-colors">{invoice.displayNumber}</p>
+                              <p className={`font-semibold font-mono transition-colors ${invoice.status === "cancelled" ? "line-through text-slate-400" : "text-slate-900 group-hover/inv:text-[#2F52E0]"}`}>{invoice.displayNumber}</p>
                               {invoice.accounted && (
                                 <span className="flex items-center gap-1 text-xs text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded" title={`Contabilizada - Asiento: ${invoice.accountingEntryNumber}`}>
                                   <Lock size={10} />
@@ -1066,6 +1112,30 @@ export default function InvoicesPage() {
               )}
               <button onClick={() => { setShowDetailModal(false); setSelectedInvoice(null); }} className="px-4 py-2 text-sm border border-slate-200 text-slate-700 hover:bg-white rounded-lg transition-colors">
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
+            <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDialog.onConfirm}
+                className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-sm text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
+              >
+                {confirmDialog.confirmLabel || "Confirmar"}
               </button>
             </div>
           </div>

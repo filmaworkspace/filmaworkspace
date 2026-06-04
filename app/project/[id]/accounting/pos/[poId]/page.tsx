@@ -1204,32 +1204,42 @@ export default function PODetailPage() {
                   <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium">{invoices.length}</span>
                 </div>
                 <div className="divide-y divide-slate-100">
-                  {invoices.map((invoice) => (
-                    <Link key={invoice.id} href={`/project/${projectId}/accounting/invoices/${invoice.id}`} className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div>
-                          <p className="font-medium text-slate-900">FRA-{invoice.number}</p>
-                          <p className="text-xs text-slate-500">{formatDate(invoice.createdAt)}</p>
+                  {invoices.map((invoice) => {
+                    const isCancelled = invoice.status === "cancelled";
+                    return (
+                      <Link
+                        key={invoice.id}
+                        href={`/project/${projectId}/accounting/invoices/${invoice.id}`}
+                        className={`flex items-center justify-between p-4 transition-colors ${isCancelled ? "bg-red-50/40 opacity-60 hover:opacity-80" : "hover:bg-slate-50"}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div>
+                            <p className={`font-medium ${isCancelled ? "line-through text-slate-400" : "text-slate-900"}`}>FRA-{invoice.number}</p>
+                            <p className="text-xs text-slate-500">{formatDate(invoice.createdAt)}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            {isCancelled && (
+                              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium line-through">✕ Anulada</span>
+                            )}
+                            {!isCancelled && (invoice.status === "accounted" || invoice.status === "paid") && (
+                              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded text-xs" title="Codificada">
+                                <BookCheck size={12} />
+                              </span>
+                            )}
+                            {!isCancelled && invoice.status === "paid" && (
+                              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs" title="Pagada">
+                                <Wallet size={12} />
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          {(invoice.status === "accounted" || invoice.status === "paid") && (
-                            <span className="flex items-center gap-1 px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded text-xs" title="Codificada">
-                              <BookCheck size={12} />
-                            </span>
-                          )}
-                          {invoice.status === "paid" && (
-                            <span className="flex items-center gap-1 px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs" title="Pagada">
-                              <Wallet size={12} />
-                            </span>
-                          )}
+                        <div className="flex items-center gap-3">
+                          <p className={`font-semibold ${isCancelled ? "line-through text-slate-400" : "text-slate-900"}`}>{formatCurrency(invoice.totalAmount)} {getCurrencySymbol()}</p>
+                          <ExternalLink size={14} className="text-slate-400" />
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <p className="font-semibold text-slate-900">{formatCurrency(invoice.totalAmount)} {getCurrencySymbol()}</p>
-                        <ExternalLink size={14} className="text-slate-400" />
-                      </div>
-                    </Link>
-                  ))}
+                      </Link>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -1672,7 +1682,7 @@ export default function PODetailPage() {
                   <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
                   <div className="text-sm text-amber-800">
                     <p className="font-medium">Se restaurará el presupuesto comprometido</p>
-                    <p className="text-xs mt-1">Se volverá a comprometer: {formatCurrency(po.baseAmount - po.invoicedAmount)} {getCurrencySymbol()}</p>
+                    <p className="text-xs mt-1">Se volverá a comprometer: {formatCurrency(Math.max(0, po.baseAmount - po.invoicedAmount))} {getCurrencySymbol()}</p>
                   </div>
                 </div>
               </div>

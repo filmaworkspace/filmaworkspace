@@ -119,6 +119,13 @@ export default function AccountingUsersPage() {
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    danger?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
   const [userExists, setUserExists] = useState<boolean | null>(null);
   const [foundUser, setFoundUser] = useState<{ name: string; email: string } | null>(null);
 
@@ -297,22 +304,45 @@ export default function AccountingUsersPage() {
     }
   };
 
+  const openConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    options?: { confirmLabel?: string; danger?: boolean }
+  ) => {
+    setConfirmDialog({ title, message, onConfirm, ...options });
+  };
+
   const handleCancelInvitation = async (invitationId: string) => {
-    if (!confirm("¿Cancelar esta invitación?")) return;
-    try { await deleteDoc(doc(db, "invitations", invitationId)); setPendingInvitations(pendingInvitations.filter((inv) => inv.id !== invitationId)); setSuccessMessage("Invitación cancelada"); setTimeout(() => setSuccessMessage(""), 3000); }
-    catch (error) { console.error("Error cancelando invitación:", error); setErrorMessage("Error al cancelar la invitación"); setTimeout(() => setErrorMessage(""), 3000); }
+    openConfirm(
+      "Cancelar invitación",
+      "¿Estás seguro de que quieres cancelar esta invitación?",
+      async () => {
+        setConfirmDialog(null);
+        try { await deleteDoc(doc(db, "invitations", invitationId)); setPendingInvitations(pendingInvitations.filter((inv) => inv.id !== invitationId)); setSuccessMessage("Invitación cancelada"); setTimeout(() => setSuccessMessage(""), 3000); }
+        catch (error) { console.error("Error cancelando invitación:", error); setErrorMessage("Error al cancelar la invitación"); setTimeout(() => setErrorMessage(""), 3000); }
+      },
+      { danger: true, confirmLabel: "Cancelar invitación" }
+    );
   };
 
   const handleRemoveAccountingAccess = async (member: Member) => {
-    if (!confirm(`¿Quitar acceso a contabilidad de ${member.name || member.email}?`)) return;
-    setSaving(true);
-    try {
-      await updateDoc(doc(db, `projects/${id}/members`, member.userId), { "permissions.accounting": false, accountingAccessLevel: null, boxAccess: null });
-      await updateDoc(doc(db, `userProjects/${member.userId}/projects`, id as string), { "permissions.accounting": false, accountingAccessLevel: null, boxAccess: null });
-      setAccountingMembers(accountingMembers.filter((m) => m.userId !== member.userId));
-      setMembers(members.map((m) => (m.userId === member.userId ? { ...m, permissions: { ...m.permissions, accounting: false }, accountingAccessLevel: undefined, boxAccess: undefined } : m)));
-      setSuccessMessage("Acceso eliminado correctamente"); setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (error) { console.error("Error eliminando acceso:", error); setErrorMessage("Error al eliminar el acceso"); setTimeout(() => setErrorMessage(""), 3000); } finally { setSaving(false); }
+    openConfirm(
+      "Quitar acceso a contabilidad",
+      `¿Quitar acceso a contabilidad de ${member.name || member.email}? Esta acción no se puede deshacer.`,
+      async () => {
+        setConfirmDialog(null);
+        setSaving(true);
+        try {
+          await updateDoc(doc(db, `projects/${id}/members`, member.userId), { "permissions.accounting": false, accountingAccessLevel: null, boxAccess: null });
+          await updateDoc(doc(db, `userProjects/${member.userId}/projects`, id as string), { "permissions.accounting": false, accountingAccessLevel: null, boxAccess: null });
+          setAccountingMembers(accountingMembers.filter((m) => m.userId !== member.userId));
+          setMembers(members.map((m) => (m.userId === member.userId ? { ...m, permissions: { ...m.permissions, accounting: false }, accountingAccessLevel: undefined, boxAccess: undefined } : m)));
+          setSuccessMessage("Acceso eliminado correctamente"); setTimeout(() => setSuccessMessage(""), 3000);
+        } catch (error) { console.error("Error eliminando acceso:", error); setErrorMessage("Error al eliminar el acceso"); setTimeout(() => setErrorMessage(""), 3000); } finally { setSaving(false); }
+      },
+      { danger: true, confirmLabel: "Quitar acceso" }
+    );
   };
 
   const resetForm = () => { setInviteForm({ email: "", name: "", roleType: "project", role: "", department: "", position: "", accountingAccessLevel: "user", boxAccess: false }); setUserExists(null); setFoundUser(null); };
@@ -809,6 +839,30 @@ export default function AccountingUsersPage() {
           <button onClick={() => setErrorMessage("")} className="ml-2 hover:bg-white/20 rounded p-0.5">
             <X size={14} />
           </button>
+        </div>
+      )}
+
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
+            <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDialog.onConfirm}
+                className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-sm text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
+              >
+                {confirmDialog.confirmLabel || "Confirmar"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
