@@ -300,26 +300,29 @@ export default function ProjectOverviewPage() {
           )}
         </div>
 
-        {/* Entornos - Estilo Dashboard */}
+        {/* Entornos */}
         <div className="mb-12">
-          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Entornos</h2>
-          <div className="flex gap-2">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Entornos</h2>
             {userPermissions.config && (
-              <Link href={`/project/${id}/config`}>
-                <div className="flex items-center justify-center gap-1.5 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 text-slate-600 text-xs font-medium transition-colors">
-                  <Settings size={12} />
-                  Config
-                </div>
+              <Link
+                href={`/project/${id}/config`}
+                className="flex items-center gap-1.5 p-1.5 rounded-lg text-slate-300 hover:text-slate-600 transition-colors"
+                title="Configuración"
+              >
+                <Settings size={14} />
               </Link>
             )}
+          </div>
+          <div className="flex gap-2">
             {userPermissions.accounting && (
               <Link href={`/project/${id}/accounting`}>
-                <div 
+                <div
                   className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium border transition-colors"
-                  style={{ 
-                    backgroundColor: 'rgba(47, 82, 224, 0.1)',
-                    borderColor: 'rgba(47, 82, 224, 0.3)',
-                    color: '#2F52E0'
+                  style={{
+                    backgroundColor: "rgba(47, 82, 224, 0.1)",
+                    borderColor: "rgba(47, 82, 224, 0.3)",
+                    color: "#2F52E0",
                   }}
                 >
                   <BarChart3 size={12} />
@@ -329,12 +332,12 @@ export default function ProjectOverviewPage() {
             )}
             {userPermissions.team && (
               <Link href={`/project/${id}/team`}>
-                <div 
+                <div
                   className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium border transition-colors"
-                  style={{ 
-                    backgroundColor: 'rgba(137, 211, 34, 0.15)',
-                    borderColor: 'rgba(137, 211, 34, 0.4)',
-                    color: '#6BA319'
+                  style={{
+                    backgroundColor: "rgba(137, 211, 34, 0.15)",
+                    borderColor: "rgba(137, 211, 34, 0.4)",
+                    color: "#6BA319",
                   }}
                 >
                   <Users size={12} />
