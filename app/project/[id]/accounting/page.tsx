@@ -115,7 +115,6 @@ export default function AccountingPage() {
           setAccountingAccessLevel(memberData.accountingAccessLevel || "user");
         }
         
-        // Determinar permisos de visibilidad — usar PROJECT_ROLES como fuente única de verdad
         const isProjectRole = PROJECT_ROLES.includes(currentUserRole);
         const canViewAllPOs = isProjectRole;
         const canViewDepartmentPOs = !isProjectRole && (
@@ -124,75 +123,45 @@ export default function AccountingPage() {
         );
         const canViewOwnPOs = !isProjectRole && !canViewDepartmentPOs;
 
-        let approvalCount = 0;
         let userIsApprover = false;
         
-        // Check if user is configured as approver in approval flows
         const approvalConfigDoc = await getDoc(doc(db, `projects/${id}/config`, "approvals"));
         if (approvalConfigDoc.exists()) {
           const config = approvalConfigDoc.data();
           
           const checkStepForUser = (step: any): boolean => {
             if (!step) return false;
-            
-            // Type: fixed - check if user is in approvers array
-            if (step.approverType === "fixed" && step.approvers?.includes(userId)) {
-              return true;
-            }
-            
-            // Type: role - check if user has one of the required roles
-            if (step.approverType === "role" && step.roles?.includes(currentUserRole)) {
-              return true;
-            }
-            
-            // Type: hod - check if user is HOD of the department
+            if (step.approverType === "fixed" && step.approvers?.includes(userId)) return true;
+            if (step.approverType === "role" && step.roles?.includes(currentUserRole)) return true;
             if (step.approverType === "hod") {
               const isHOD = currentUserPosition?.toLowerCase().includes("head") || 
                            currentUserPosition?.toLowerCase().includes("jefe") ||
                            currentUserRole === "HOD";
-              if (isHOD && (!step.department || step.department === currentUserDepartment)) {
-                return true;
-              }
+              if (isHOD && (!step.department || step.department === currentUserDepartment)) return true;
             }
-            
-            // Type: coordinator - check if user is coordinator
             if (step.approverType === "coordinator") {
               const isCoordinator = currentUserPosition?.toLowerCase().includes("coordinator") || 
                                    currentUserPosition?.toLowerCase().includes("coordinador") ||
                                    currentUserRole === "Coordinator";
-              if (isCoordinator && (!step.department || step.department === currentUserDepartment)) {
-                return true;
-              }
+              if (isCoordinator && (!step.department || step.department === currentUserDepartment)) return true;
             }
-            
             return false;
           };
           
-          // Check PO approval flow
           if (config.poApprovals) {
             for (const step of config.poApprovals) {
-              if (checkStepForUser(step)) {
-                userIsApprover = true;
-                break;
-              }
+              if (checkStepForUser(step)) { userIsApprover = true; break; }
             }
           }
-          // Check Invoice approval flow
           if (!userIsApprover && config.invoiceApprovals) {
             for (const step of config.invoiceApprovals) {
-              if (checkStepForUser(step)) {
-                userIsApprover = true;
-                break;
-              }
+              if (checkStepForUser(step)) { userIsApprover = true; break; }
             }
           }
         }
         
         setIsApprover(userIsApprover);
-        // El conteo de aprobaciones pendientes se actualiza en tiempo real
-        // a través del useEffect de onSnapshot de abajo.
 
-        // Cargar POs recientes con filtrado
         const posRecentQuery = query(collection(db, `projects/${id}/pos`), orderBy("createdAt", "desc"), limit(20));
         const posRecentSnapshot = await getDocs(posRecentQuery);
         const allPOs = posRecentSnapshot.docs.map(doc => {
@@ -210,7 +179,6 @@ export default function AccountingPage() {
           };
         });
         
-        // Filtrar según permisos
         const filteredPOs = allPOs.filter((po) => {
           if (canViewAllPOs) return true;
           if (canViewDepartmentPOs && po.department === currentUserDepartment) return true;
@@ -219,7 +187,6 @@ export default function AccountingPage() {
         }).slice(0, 5);
         setRecentPOs(filteredPOs);
 
-        // Cargar Invoices recientes con filtrado
         const invoicesRecentQuery = query(collection(db, `projects/${id}/invoices`), orderBy("createdAt", "desc"), limit(20));
         const invoicesRecentSnapshot = await getDocs(invoicesRecentQuery);
         const allInvoices = invoicesRecentSnapshot.docs.map(doc => {
@@ -242,7 +209,6 @@ export default function AccountingPage() {
           };
         });
         
-        // Filtrar según permisos
         const filteredInvoices = allInvoices.filter((inv) => {
           if (canViewAllPOs) return true;
           if (canViewDepartmentPOs && inv.department === currentUserDepartment) return true;
@@ -259,8 +225,6 @@ export default function AccountingPage() {
     loadProjectData();
   }, [id, userId]);
 
-  // Conteo de aprobaciones en tiempo real para que el badge se actualice
-  // sin recargar cuando otro usuario aprueba o rechaza un documento.
   useEffect(() => {
     if (!id || !userId) return;
 
@@ -331,7 +295,11 @@ export default function AccountingPage() {
   const hasExtendedAccess = accountingAccessLevel === "accounting_extended";
 
   if (loading) {
-    return (<div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}><div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" /></div>);
+    return (
+      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
+        <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+      </div>
+    );
   }
 
   return (
@@ -339,50 +307,47 @@ export default function AccountingPage() {
       {/* Header */}
       <div className="mt-[4.5rem]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
-          <h1 className="text-3xl font-bold text-slate-900 text-center">Panel de contabilidad</h1>
+          <div className="relative flex items-center justify-center">
+            <h1 className="text-3xl font-bold text-slate-900 text-center">Panel de contabilidad</h1>
+
+            {/* Iconos top-right */}
+            <div className="absolute right-0 flex items-center gap-1">
+              {isApprover && (
+                <Link
+                  href={`/project/${id}/accounting/approvals`}
+                  className="relative p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+                  title="Aprobaciones"
+                >
+                  <ClipboardCheck size={18} />
+                  {pendingApprovalsCount > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-500 rounded-full" />
+                  )}
+                </Link>
+              )}
+              {(userRole === "EP" || userRole === "PM" || userRole === "Controller") && (
+                <>
+                  <Link
+                    href={`/project/${id}/accounting/document-center`}
+                    className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+                    title="Documentos"
+                  >
+                    <FolderDown size={18} />
+                  </Link>
+                  <Link
+                    href={`/project/${id}/accounting/config`}
+                    className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+                    title="Configuración"
+                  >
+                    <Settings size={18} />
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
-        {/* Stats / Quick Actions row */}
-        <div className="flex flex-wrap items-center justify-center gap-6 mb-8 text-sm">
-          {isApprover && (
-            <Link
-              href={`/project/${id}/accounting/approvals`}
-              className="relative flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
-            >
-              <ClipboardCheck size={16} className="text-slate-400" />
-              <span>Aprobaciones</span>
-              {pendingApprovalsCount > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.5 bg-amber-500 text-white text-[10px] rounded-full font-bold min-w-[18px] text-center">
-                  {pendingApprovalsCount}
-                </span>
-              )}
-            </Link>
-          )}
-
-          {(userRole === "EP" || userRole === "PM" || userRole === "Controller") && (
-            <>
-              {isApprover && <span className="text-slate-300">·</span>}
-              <Link
-                href={`/project/${id}/accounting/document-center`}
-                className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
-              >
-                <FolderDown size={16} className="text-slate-400" />
-                <span>Documentos</span>
-              </Link>
-              <span className="text-slate-300">·</span>
-              <Link
-                href={`/project/${id}/accounting/config`}
-                className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
-              >
-                <Settings size={16} className="text-slate-400" />
-                <span>Configuración</span>
-              </Link>
-            </>
-          )}
-        </div>
-
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
         {/* Pending Approvals Alert */}
         {pendingApprovalsCount > 0 && (
           <Link href={`/project/${id}/accounting/approvals`}>
@@ -393,10 +358,7 @@ export default function AccountingPage() {
                     <Clock size={24} className="text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-white">
-                      {pendingApprovalsCount}{" "}
-                      {pendingApprovalsCount === 1 ? "documento pendiente" : "documentos pendientes"} de tu aprobación
-                    </h3>
+                    <h3 className="text-lg font-semibold text-white">{pendingApprovalsCount} {pendingApprovalsCount === 1 ? "documento pendiente" : "documentos pendientes"} de tu aprobación</h3>
                     <p className="text-white/80 text-sm">Revisa y aprueba para continuar el flujo</p>
                   </div>
                 </div>
