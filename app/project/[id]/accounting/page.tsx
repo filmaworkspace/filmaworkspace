@@ -338,43 +338,51 @@ export default function AccountingPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
-          {/* Page header */}
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div>
-              <h1 className="text-2xl font-semibold text-slate-900">Panel de contabilidad</h1>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {isApprover && (
-                <Link href={`/project/${id}/accounting/approvals`} className="relative flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors">
-                  <ClipboardCheck size={15} />
-                  <span>Aprobaciones</span>
-                  {pendingApprovalsCount > 0 && (
-                    <span className="ml-0.5 px-1.5 py-0.5 bg-amber-500 text-white text-[10px] rounded-full font-bold min-w-[18px] text-center">{pendingApprovalsCount}</span>
-                  )}
-                </Link>
-              )}
-              {(userRole === "EP" || userRole === "PM" || userRole === "Controller") && (
-                <>
-                  <span className="text-slate-200">·</span>
-                  <Link href={`/project/${id}/accounting/document-center`} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors">
-                    <FolderDown size={15} />
-                    <span>Documentos</span>
-                  </Link>
-                  <span className="text-slate-200">·</span>
-                  <Link href={`/project/${id}/accounting/config`} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors">
-                    <Settings size={15} />
-                    <span>Configuración</span>
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
+          <h1 className="text-3xl font-bold text-slate-900 text-center">Panel de contabilidad</h1>
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        {/* Stats / Quick Actions row */}
+        <div className="flex flex-wrap items-center justify-center gap-6 mb-8 text-sm">
+          {isApprover && (
+            <Link
+              href={`/project/${id}/accounting/approvals`}
+              className="relative flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              <ClipboardCheck size={16} className="text-slate-400" />
+              <span>Aprobaciones</span>
+              {pendingApprovalsCount > 0 && (
+                <span className="ml-0.5 px-1.5 py-0.5 bg-amber-500 text-white text-[10px] rounded-full font-bold min-w-[18px] text-center">
+                  {pendingApprovalsCount}
+                </span>
+              )}
+            </Link>
+          )}
+
+          {(userRole === "EP" || userRole === "PM" || userRole === "Controller") && (
+            <>
+              {isApprover && <span className="text-slate-300">·</span>}
+              <Link
+                href={`/project/${id}/accounting/document-center`}
+                className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                <FolderDown size={16} className="text-slate-400" />
+                <span>Documentos</span>
+              </Link>
+              <span className="text-slate-300">·</span>
+              <Link
+                href={`/project/${id}/accounting/config`}
+                className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                <Settings size={16} className="text-slate-400" />
+                <span>Configuración</span>
+              </Link>
+            </>
+          )}
+        </div>
+
         {/* Pending Approvals Alert */}
         {pendingApprovalsCount > 0 && (
           <Link href={`/project/${id}/accounting/approvals`}>
@@ -385,7 +393,10 @@ export default function AccountingPage() {
                     <Clock size={24} className="text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-white">{pendingApprovalsCount} {pendingApprovalsCount === 1 ? "documento pendiente" : "documentos pendientes"} de tu aprobación</h3>
+                    <h3 className="text-lg font-semibold text-white">
+                      {pendingApprovalsCount}{" "}
+                      {pendingApprovalsCount === 1 ? "documento pendiente" : "documentos pendientes"} de tu aprobación
+                    </h3>
                     <p className="text-white/80 text-sm">Revisa y aprueba para continuar el flujo</p>
                   </div>
                 </div>
