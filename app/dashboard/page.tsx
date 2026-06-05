@@ -413,27 +413,47 @@ export default function Dashboard() {
     const hasAccounting = project.permissions.accounting;
     const hasTeam = project.permissions.team;
     const daysUntilClose = getDaysUntilClose(project.closingAt);
-
+  
     return (
       <div key={project.id} className="group relative bg-white border border-slate-200 rounded-2xl p-5 hover:border-slate-300 hover:shadow-lg">
         {/* Aviso de cierre - Badge absoluto */}
         {daysUntilClose !== null && (
           <div className="absolute -top-2 -right-2 px-2 py-1 bg-red-500 text-white rounded-lg flex items-center gap-1 shadow-sm">
             <Clock size={10} />
-            <span className="text-[10px] font-semibold">
-              {daysUntilClose}d
-            </span>
+            <span className="text-[10px] font-semibold">{daysUntilClose}d</span>
           </div>
         )}
-
+  
+        {/* Config - icono discreto esquina superior derecha (solo si no hay badge de cierre) */}
+        {hasConfig && daysUntilClose === null && (
+          <Link
+            href={`/project/${project.id}/config`}
+            className="absolute top-3.5 right-4 p-1.5 rounded-lg text-slate-300 hover:text-slate-600 transition-colors"
+            title="Configuración"
+          >
+            <Settings size={14} />
+          </Link>
+        )}
+  
+        {/* Config - icono discreto cuando hay badge de cierre (desplazado) */}
+        {hasConfig && daysUntilClose !== null && (
+          <Link
+            href={`/project/${project.id}/config`}
+            className="absolute top-3.5 right-12 p-1.5 rounded-lg text-slate-300 hover:text-slate-600 transition-colors"
+            title="Configuración"
+          >
+            <Settings size={14} />
+          </Link>
+        )}
+  
         {/* Nombre y fase */}
-        <div className="flex items-start justify-between mb-2">
+        <div className="flex items-start justify-between mb-2 pr-8">
           <h2 className="text-base font-semibold text-slate-900 truncate flex-1 min-w-0">{project.name}</h2>
           <span className="text-[10px] font-medium px-2 py-0.5 rounded-lg bg-slate-100 text-slate-500 ml-2 flex-shrink-0">
             {project.phase}
           </span>
         </div>
-
+  
         {/* Productoras */}
         {project.producerNames && project.producerNames.length > 0 && (
           <div className="flex items-center gap-1.5 mb-2">
@@ -441,7 +461,7 @@ export default function Dashboard() {
             <span className="text-[11px] text-slate-500 truncate">{project.producerNames.join(", ")}</span>
           </div>
         )}
-
+  
         {/* Rol */}
         <div className="flex flex-wrap items-center gap-1.5 mb-3">
           {project.role && (
@@ -451,48 +471,42 @@ export default function Dashboard() {
             <span className="text-[10px] text-slate-600 bg-slate-100 rounded-lg px-2 py-0.5">{project.position}</span>
           )}
         </div>
-
-        {/* Botones */}
-        <div className="flex gap-2 pt-3 border-t border-slate-100">
-          {hasConfig && (
-            <Link href={`/project/${project.id}/config`} className="flex-1">
-              <div className="flex items-center justify-center gap-1.5 p-2 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 text-slate-600 text-xs font-medium">
-                <Settings size={12} />
-                Config
-              </div>
-            </Link>
-          )}
-          {hasAccounting && (
-            <Link href={`/project/${project.id}/accounting`} className="flex-1">
-              <div 
-                className="flex items-center justify-center gap-1.5 p-2 rounded-xl text-xs font-medium border"
-                style={{ 
-                  backgroundColor: 'rgba(47, 82, 224, 0.1)',
-                  borderColor: 'rgba(47, 82, 224, 0.3)',
-                  color: '#2F52E0'
-                }}
-              >
-                <BarChart3 size={12} />
-                Accounting
-              </div>
-            </Link>
-          )}
-          {hasTeam && (
-            <Link href={`/project/${project.id}/team`} className="flex-1">
-              <div 
-                className="flex items-center justify-center gap-1.5 p-2 rounded-xl text-xs font-medium border"
-                style={{ 
-                  backgroundColor: 'rgba(137, 211, 34, 0.15)',
-                  borderColor: 'rgba(137, 211, 34, 0.4)',
-                  color: '#6BA319'
-                }}
-              >
-                <Users size={12} />
-                Team
-              </div>
-            </Link>
-          )}
-        </div>
+  
+        {/* Botones principales */}
+        {(hasAccounting || hasTeam) && (
+          <div className="flex gap-2 pt-3 border-t border-slate-100">
+            {hasAccounting && (
+              <Link href={`/project/${project.id}/accounting`} className="flex-1">
+                <div
+                  className="flex items-center justify-center gap-1.5 p-2 rounded-xl text-xs font-medium border"
+                  style={{
+                    backgroundColor: "rgba(47, 82, 224, 0.1)",
+                    borderColor: "rgba(47, 82, 224, 0.3)",
+                    color: "#2F52E0",
+                  }}
+                >
+                  <BarChart3 size={12} />
+                  Accounting
+                </div>
+              </Link>
+            )}
+            {hasTeam && (
+              <Link href={`/project/${project.id}/team`} className="flex-1">
+                <div
+                  className="flex items-center justify-center gap-1.5 p-2 rounded-xl text-xs font-medium border"
+                  style={{
+                    backgroundColor: "rgba(137, 211, 34, 0.15)",
+                    borderColor: "rgba(137, 211, 34, 0.4)",
+                    color: "#6BA319",
+                  }}
+                >
+                  <Users size={12} />
+                  Team
+                </div>
+              </Link>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -501,17 +515,28 @@ export default function Dashboard() {
     const hasConfig = project.permissions.config;
     const hasAccounting = project.permissions.accounting;
     const hasTeam = project.permissions.team;
-
+  
     return (
-      <div key={project.id} className="group bg-slate-50/50 border border-slate-200 rounded-2xl p-5 hover:bg-white hover:border-slate-300 hover:shadow-md transition-all">
+      <div key={project.id} className="group relative bg-slate-50/50 border border-slate-200 rounded-2xl p-5 hover:bg-white hover:border-slate-300 hover:shadow-md transition-all">
+        {/* Config - icono discreto */}
+        {hasConfig && (
+          <Link
+            href={`/project/${project.id}/config`}
+            className="absolute top-3.5 right-4 p-1.5 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors"
+            title="Configuración"
+          >
+            <Settings size={14} />
+          </Link>
+        )}
+  
         {/* Nombre y badge archivado */}
-        <div className="flex items-start justify-between mb-2">
+        <div className="flex items-start justify-between mb-2 pr-8">
           <h2 className="text-base font-semibold text-slate-600 truncate flex-1 min-w-0">{project.name}</h2>
           <span className="text-[10px] font-medium px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 ml-2 flex-shrink-0">
             Archivado
           </span>
         </div>
-
+  
         {/* Productoras */}
         {project.producerNames && project.producerNames.length > 0 && (
           <div className="flex items-center gap-1.5 mb-2">
@@ -519,7 +544,7 @@ export default function Dashboard() {
             <span className="text-[11px] text-slate-400 truncate">{project.producerNames.join(", ")}</span>
           </div>
         )}
-
+  
         {/* Fase y rol */}
         <div className="flex flex-wrap items-center gap-1.5 mb-3">
           <span className="text-[10px] font-medium px-2 py-0.5 rounded-lg bg-slate-100 text-slate-400">
@@ -532,34 +557,28 @@ export default function Dashboard() {
             <span className="text-[10px] text-slate-500 bg-slate-100 rounded-lg px-2 py-0.5">{project.position}</span>
           )}
         </div>
-
-        {/* Botones */}
-        <div className="flex gap-2 pt-3 border-t border-slate-200">
-          {hasConfig && (
-            <Link href={`/project/${project.id}/config`} className="flex-1">
-              <div className="flex items-center justify-center gap-1.5 p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-slate-500 text-xs font-medium">
-                <Settings size={12} />
-                Config
-              </div>
-            </Link>
-          )}
-          {hasAccounting && (
-            <Link href={`/project/${project.id}/accounting`} className="flex-1">
-              <div className="flex items-center justify-center gap-1.5 p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-slate-500 text-xs font-medium">
-                <BarChart3 size={12} />
-                Accounting
-              </div>
-            </Link>
-          )}
-          {hasTeam && (
-            <Link href={`/project/${project.id}/team`} className="flex-1">
-              <div className="flex items-center justify-center gap-1.5 p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-slate-500 text-xs font-medium">
-                <Users size={12} />
-                Team
-              </div>
-            </Link>
-          )}
-        </div>
+  
+        {/* Botones principales */}
+        {(hasAccounting || hasTeam) && (
+          <div className="flex gap-2 pt-3 border-t border-slate-200">
+            {hasAccounting && (
+              <Link href={`/project/${project.id}/accounting`} className="flex-1">
+                <div className="flex items-center justify-center gap-1.5 p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-slate-500 text-xs font-medium">
+                  <BarChart3 size={12} />
+                  Accounting
+                </div>
+              </Link>
+            )}
+            {hasTeam && (
+              <Link href={`/project/${project.id}/team`} className="flex-1">
+                <div className="flex items-center justify-center gap-1.5 p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-slate-500 text-xs font-medium">
+                  <Users size={12} />
+                  Team
+                </div>
+              </Link>
+            )}
+          </div>
+        )}
       </div>
     );
   };
