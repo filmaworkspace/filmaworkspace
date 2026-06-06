@@ -199,7 +199,6 @@ export default function ConfigDepartments() {
               <Briefcase size={24} className="text-slate-900" />
               <h1 className="text-2xl font-semibold text-slate-900">Departamentos del proyecto</h1>
             </div>
-      
             <button
               onClick={() => setShowAddForm(!showAddForm)}
               className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors bg-slate-900"
@@ -241,9 +240,9 @@ export default function ConfigDepartments() {
             {departmentsData.map((dept) => {
               const isExpanded = expandedDept === dept.name;
               return (
-                <div key={dept.name} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                  <div 
-                    className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/50 transition-colors cursor-pointer group" 
+                <div key={dept.name} className="bg-white rounded-2xl border border-slate-200">
+                  <div
+                    className={`flex items-center justify-between px-6 py-4 hover:bg-slate-50/50 transition-colors cursor-pointer group ${isExpanded ? "rounded-t-2xl" : "rounded-2xl"}`}
                     onClick={() => setExpandedDept(isExpanded ? null : dept.name)}
                   >
                     <div className="flex items-center gap-4">
@@ -257,8 +256,8 @@ export default function ConfigDepartments() {
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="relative">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === dept.name ? null : dept.name); }} 
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === dept.name ? null : dept.name); }}
                           className="p-2 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors opacity-0 group-hover:opacity-100"
                         >
                           <MoreHorizontal size={16} />
@@ -267,13 +266,13 @@ export default function ConfigDepartments() {
                           <>
                             <div className="fixed inset-0 z-10" onClick={() => setActiveMenu(null)} />
                             <div className="absolute right-0 top-full mt-2 w-40 bg-white border border-slate-200 rounded-2xl shadow-xl py-1.5 z-20">
-                              <button 
-                                onClick={(e) => { 
-                                  e.stopPropagation(); 
-                                  setActiveMenu(null); 
-                                  if (dept.members.length > 0) showToast("error", "Tiene miembros asignados"); 
-                                  else setConfirmDelete(dept.name); 
-                                }} 
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenu(null);
+                                  if (dept.members.length > 0) showToast("error", "Tiene miembros asignados");
+                                  else setConfirmDelete(dept.name);
+                                }}
                                 className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                               >
                                 <Trash2 size={14} />
@@ -286,9 +285,9 @@ export default function ConfigDepartments() {
                       <ChevronDown size={18} className={`text-slate-400 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                     </div>
                   </div>
-                  
+
                   {isExpanded && (
-                    <div className="px-6 pb-5 pt-2 border-t border-slate-100 bg-slate-50/30">
+                    <div className="px-6 pb-5 pt-2 border-t border-slate-100 bg-slate-50/30 rounded-b-2xl">
                       {dept.members.length > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                           {dept.members.map((m) => (
