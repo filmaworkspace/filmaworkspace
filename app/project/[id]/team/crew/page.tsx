@@ -120,9 +120,7 @@ const EMPTY_FORM: FormData = {
   section: "technical", firstName: "", lastName1: "", lastName2: "",
   artisticName: "", role: "", department: "", company: "", status: "active",
   phone: "", email: "", character: "",
-  sessions: undefined, salaryPerSession: undefined,
-  salaryType: "monthly", salaryAmount: undefined,
-  grossSalary: undefined, irpfRate: undefined, regime: "",
+  salaryType: "monthly", regime: "",
   startDate: "", endDateApprox: "", contractReason: "", notes: "",
 };
 
@@ -301,7 +299,7 @@ function SalarySection({
             <input
               type="number" min={0}
               value={formData.salaryAmount ?? ""}
-              onChange={(e) => setFormData({ ...formData, salaryAmount: e.target.value ? Number(e.target.value) : undefined })}
+              onChange={(e) => setFormData({ ...formData, salaryAmount: e.target.value ? Number(e.target.value) : null })}
               placeholder="0.00"
               className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]"
             />
@@ -461,9 +459,13 @@ export default function CrewPage() {
   };
 
   // Guarda sin enviar formulario
-  // Firestore no acepta undefined — elimina cualquier campo con valor undefined
+  // Firestore no acepta undefined ni null en campos numéricos — los elimina
   const sanitize = (obj: Record<string, any>): Record<string, any> =>
-    Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+    Object.fromEntries(
+      Object.entries(obj)
+        .filter(([, v]) => v !== undefined && v !== null)
+        .map(([k, v]) => [k, v !== null && typeof v === "object" && !Array.isArray(v) && !(v?.toMillis) ? sanitize(v) : v])
+    );
 
   const handleSave = async () => {
     if (!formData.firstName.trim() || !formData.lastName1.trim() || !formData.role.trim()) return;
@@ -945,14 +947,14 @@ export default function CrewPage() {
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Nº sesiones</label>
                       <input type="number" min={0} value={formData.sessions ?? ""}
-                        onChange={(e) => setFormData({ ...formData, sessions: e.target.value ? Number(e.target.value) : undefined })}
+                        onChange={(e) => setFormData({ ...formData, sessions: e.target.value ? Number(e.target.value) : null })}
                         placeholder="0"
                         className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Salario / sesión (€)</label>
                       <input type="number" min={0} value={formData.salaryPerSession ?? ""}
-                        onChange={(e) => setFormData({ ...formData, salaryPerSession: e.target.value ? Number(e.target.value) : undefined })}
+                        onChange={(e) => setFormData({ ...formData, salaryPerSession: e.target.value ? Number(e.target.value) : null })}
                         placeholder="0.00"
                         className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
                     </div>
@@ -966,14 +968,14 @@ export default function CrewPage() {
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Nº sesiones</label>
                     <input type="number" min={0} value={formData.sessions ?? ""}
-                      onChange={(e) => setFormData({ ...formData, sessions: e.target.value ? Number(e.target.value) : undefined })}
+                      onChange={(e) => setFormData({ ...formData, sessions: e.target.value ? Number(e.target.value) : null })}
                       placeholder="0"
                       className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Salario / sesión (€)</label>
                     <input type="number" min={0} value={formData.salaryPerSession ?? ""}
-                      onChange={(e) => setFormData({ ...formData, salaryPerSession: e.target.value ? Number(e.target.value) : undefined })}
+                      onChange={(e) => setFormData({ ...formData, salaryPerSession: e.target.value ? Number(e.target.value) : null })}
                       placeholder="0.00"
                       className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
                   </div>
