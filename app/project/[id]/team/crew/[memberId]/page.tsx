@@ -22,21 +22,13 @@ import {
   Camera,
   Check,
   ChevronDown,
-  Clapperboard,
-  Clock,
-  Edit2,
   Mail,
   MailCheck,
-  MoreHorizontal,
   Pencil,
   Phone,
   RefreshCw,
   Save,
   Send,
-  Shield,
-  Swords,
-  Upload,
-  User,
   Users,
   X,
 } from "lucide-react";
@@ -47,9 +39,9 @@ import { useUser } from "@/contexts/UserContext";
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const CREW_SECTIONS = {
-  technical:   { label: "Equipo Técnico", icon: Camera,      textColor: "text-sky-700",    bgColor: "bg-sky-50",    borderColor: "border-sky-200"    },
-  cast:        { label: "Cast",           icon: Clapperboard, textColor: "text-violet-700", bgColor: "bg-violet-50", borderColor: "border-violet-200" },
-  specialists: { label: "Especialistas", icon: Swords,       textColor: "text-amber-700",  bgColor: "bg-amber-50",  borderColor: "border-amber-200"  },
+  technical:   { label: "Equipo Técnico", textColor: "text-sky-700",    bgColor: "bg-sky-50",    borderColor: "border-sky-200"    },
+  cast:        { label: "Cast",           textColor: "text-violet-700", bgColor: "bg-violet-50", borderColor: "border-violet-200" },
+  specialists: { label: "Especialistas",  textColor: "text-amber-700",  bgColor: "bg-amber-50",  borderColor: "border-amber-200"  },
 } as const;
 
 type CrewSection = keyof typeof CREW_SECTIONS;
@@ -408,7 +400,6 @@ export default function CrewMemberPage() {
   if (!member) return null;
 
   const sc     = CREW_SECTIONS[member.section];
-  const SI     = sc.icon;
   const stConf = STATUS_MAP[member.status] || STATUS_MAP.active;
   const isEdit = (s: string) => editingSection === s;
 
@@ -531,8 +522,7 @@ export default function CrewMemberPage() {
                 <p className="text-sm text-slate-400 italic mt-0.5">"{member.artisticName}"</p>
               )}
               <div className="flex items-center gap-1.5 mt-2">
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${sc.bgColor} ${sc.textColor}`}>
-                  <SI size={11} />
+                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${sc.bgColor} ${sc.textColor}`}>
                   {sc.label}
                 </span>
               </div>
@@ -597,7 +587,7 @@ export default function CrewMemberPage() {
                   <p className={`text-xs font-semibold ${member.formSentAt ? "text-emerald-800" : "text-slate-700"}`}>
                     {member.formSentAt ? "Formulario enviado" : "Formulario pendiente"}
                   </p>
-                  <p className={`text-xs mt-0.5 truncate ${member.formSentAt ? "text-emerald-600" : "text-slate-400"}`}>
+                  <p className={`text-xs mt-0.5 ${member.formSentAt ? "text-emerald-600" : "text-slate-400"}`}>
                     {member.formSentAt ? fmtTs(member.formSentAt) : "No se ha enviado aún"}
                   </p>
                 </div>
