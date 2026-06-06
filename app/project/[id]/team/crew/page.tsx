@@ -461,20 +461,23 @@ export default function CrewPage() {
   };
 
   // Guarda sin enviar formulario
+  // Firestore no acepta undefined — elimina cualquier campo con valor undefined
+  const sanitize = (obj: Record<string, any>): Record<string, any> =>
+    Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+
   const handleSave = async () => {
     if (!formData.firstName.trim() || !formData.lastName1.trim() || !formData.role.trim()) return;
     setSaving(true);
     try {
       if (editingMember) {
-        await updateDoc(doc(db, `projects/${id}/crew`, editingMember.id), {
-          ...formData, updatedAt: Timestamp.now(), updatedBy: userId,
-        });
+        await updateDoc(doc(db, `projects/${id}/crew`, editingMember.id),
+          sanitize({ ...formData, updatedAt: Timestamp.now(), updatedBy: userId })
+        );
       } else {
         const crewNumber = await getNextCrewNumber();
-        await setDoc(doc(collection(db, `projects/${id}/crew`)), {
-          ...formData, crewNumber,
-          createdAt: Timestamp.now(), createdBy: userId, createdByName: userName,
-        });
+        await setDoc(doc(collection(db, `projects/${id}/crew`)),
+          sanitize({ ...formData, crewNumber, createdAt: Timestamp.now(), createdBy: userId, createdByName: userName })
+        );
       }
       await loadData();
       setShowModal(false);
@@ -492,17 +495,12 @@ export default function CrewPage() {
       const ref = editingMember
         ? doc(db, `projects/${id}/crew`, editingMember.id)
         : doc(collection(db, `projects/${id}/crew`));
-      await setDoc(ref, {
+      await setDoc(ref, sanitize({
         ...formData, crewNumber,
-        createdAt:     editingMember ? undefined : Timestamp.now(),
-        createdBy:     editingMember ? undefined : userId,
-        createdByName: editingMember ? undefined : userName,
-        updatedAt:     Timestamp.now(),
-        updatedBy:     userId,
-        formSentAt:    Timestamp.now(),
-        formSentBy:    userId,
-        formSentByName: userName,
-      }, { merge: true });
+        ...(editingMember ? {} : { createdAt: Timestamp.now(), createdBy: userId, createdByName: userName }),
+        updatedAt: Timestamp.now(), updatedBy: userId,
+        formSentAt: Timestamp.now(), formSentBy: userId, formSentByName: userName,
+      }), { merge: true });
       // → aquí irá la llamada a Cloud Function / API de email
       await loadData();
       setShowModal(false);
