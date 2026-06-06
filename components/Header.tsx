@@ -217,6 +217,11 @@ export default function Header() {
     : "panel"
     : null;
 
+  // ── Team page detection ───────────────────────────────────────────────────
+  const teamPage = isTeamSection
+    ? pathname.includes("/crew") ? "crew" : "panel"
+    : null;
+
   const configTab = isConfigSection
     ? pathname.includes("/users") ? "users"
     : pathname.includes("/departments") ? "departments"
@@ -374,10 +379,16 @@ export default function Header() {
 
           {/* ── Team ── */}
           {isTeamSection && projectId && (
-            <NavLink href={`/project/${projectId}/team`} isActive={true}>
-              <Users size={14} />
-              <span>Equipo</span>
-            </NavLink>
+            <>
+              <NavLink href={`/project/${projectId}/team`} isActive={teamPage === "panel"}>
+                <LayoutDashboard size={14} />
+                <span>Panel</span>
+              </NavLink>
+              <NavLink href={`/project/${projectId}/team/crew`} isActive={teamPage === "crew"}>
+                <Users size={14} />
+                <span>Crew</span>
+              </NavLink>
+            </>
           )}
         </nav>
 
@@ -494,7 +505,7 @@ export default function Header() {
               </>
             )}
 
-            {/* All other sections — unchanged */}
+            {/* All other sections */}
             {!isAccountsSection && (
               <>
                 {isInProjectSection && projectId && projectName && (
@@ -551,13 +562,28 @@ export default function Header() {
                     <div className="border-t border-slate-100 my-1" />
                     <button onClick={() => { setMenuOpen(false); handleLogout(); }} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-600 hover:text-red-600 hover:bg-red-50 text-left"><LogOut size={14} />Cerrar sesión</button>
                   </>
-                ) : (
+                ) : isTeamSection ? (
                   <>
-                    <Link href={`/project/${projectId}/team`} onClick={() => setMenuOpen(false)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50"><Users size={14} />Equipo</Link>
+                    <Link href={`/project/${projectId}/team`} onClick={() => setMenuOpen(false)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${
+                        teamPage === "panel"
+                          ? "text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                      }`}>
+                      <LayoutDashboard size={14} />Panel
+                    </Link>
+                    <Link href={`/project/${projectId}/team/crew`} onClick={() => setMenuOpen(false)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${
+                        teamPage === "crew"
+                          ? "text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                      }`}>
+                      <Users size={14} />Crew
+                    </Link>
                     <div className="border-t border-slate-100 my-1" />
                     <button onClick={() => { setMenuOpen(false); handleLogout(); }} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-600 hover:text-red-600 hover:bg-red-50 text-left"><LogOut size={14} />Cerrar sesión</button>
                   </>
-                )}
+                ) : null}
               </>
             )}
           </nav>
