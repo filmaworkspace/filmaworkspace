@@ -709,7 +709,6 @@ export default function Dashboard() {
                   <h2 className="text-lg font-semibold text-white">
                     Tienes {invitations.length} {invitations.length === 1 ? "invitación pendiente" : "invitaciones pendientes"}
                   </h2>
-                  <p className="text-sm text-white/70">Te han invitado a unirte a nuevos proyectos</p>
                 </div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
