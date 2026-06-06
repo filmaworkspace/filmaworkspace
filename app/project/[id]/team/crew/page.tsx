@@ -12,11 +12,13 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  getDoc,
   orderBy,
   query,
   Timestamp,
   updateDoc,
   setDoc,
+  where,
 } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -30,6 +32,7 @@ import {
   Phone,
   Plus,
   Search,
+  Send,
   Trash2,
   UserCheck,
   UserMinus,
@@ -43,7 +46,7 @@ import { useUser } from "@/contexts/UserContext";
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const CREW_SECTIONS = {
-  technical:   { key: "technical",   label: "Equipo Técnico", bgColor: "bg-sky-50",    textColor: "text-sky-700",    borderColor: "border-sky-200"    },
+  technical:   { key: "technical",   label: "Equipo técnico", bgColor: "bg-sky-50",    textColor: "text-sky-700",    borderColor: "border-sky-200"    },
   cast:        { key: "cast",        label: "Cast",           bgColor: "bg-violet-50", textColor: "text-violet-700", borderColor: "border-violet-200" },
   specialists: { key: "specialists", label: "Especialistas",  bgColor: "bg-amber-50",  textColor: "text-amber-700",  borderColor: "border-amber-200"  },
 } as const;
@@ -79,8 +82,11 @@ const STATUS_MEMBER_OPTIONS = [
 
 interface CrewMember {
   id: string;
+  crewNumber: string;       // e.g. "0001"
   section: CrewSection;
-  name: string;
+  firstName: string;
+  lastName1: string;
+  lastName2?: string;
   artisticName?: string;
   role: string;
   department: string;
@@ -88,9 +94,14 @@ interface CrewMember {
   status: "active" | "inactive" | "pending";
   phone?: string;
   email?: string;
+  // Cast & Especialistas
   character?: string;
   sessions?: number;
   salaryPerSession?: number;
+  // Técnicos
+  salaryType?: "weekly" | "monthly"; // semanal o mensual
+  salaryAmount?: number;             // importe bruto
+  // Común (ficha detalle)
   grossSalary?: number;
   irpfRate?: number;
   regime?: string;
@@ -103,14 +114,16 @@ interface CrewMember {
   createdByName: string;
 }
 
-type FormData = Omit<CrewMember, "id" | "createdAt" | "createdBy" | "createdByName">;
+type FormData = Omit<CrewMember, "id" | "crewNumber" | "createdAt" | "createdBy" | "createdByName">;
 
 const EMPTY_FORM: FormData = {
-  section: "technical", name: "", artisticName: "", role: "", department: "",
-  company: "", status: "active", phone: "", email: "", character: "",
-  sessions: undefined, salaryPerSession: undefined, grossSalary: undefined,
-  irpfRate: undefined, regime: "", startDate: "", endDateApprox: "",
-  contractReason: "", notes: "",
+  section: "technical", firstName: "", lastName1: "", lastName2: "",
+  artisticName: "", role: "", department: "", company: "", status: "active",
+  phone: "", email: "", character: "",
+  sessions: undefined, salaryPerSession: undefined,
+  salaryType: "monthly", salaryAmount: undefined,
+  grossSalary: undefined, irpfRate: undefined, regime: "",
+  startDate: "", endDateApprox: "", contractReason: "", notes: "",
 };
 
 // ─── CustomSelect ─────────────────────────────────────────────────────────────
@@ -151,13 +164,10 @@ function CustomSelect({
         <div className="absolute z-[200] top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
           {options.map((o) => (
             <button
-              key={o.value}
-              type="button"
+              key={o.value} type="button"
               onMouseDown={() => { onChange(o.value); setOpen(false); }}
               className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${
-                value === o.value
-                  ? "bg-[rgba(107,163,25,0.08)] text-[#6BA319] font-medium"
-                  : "text-slate-700 hover:bg-slate-50"
+                value === o.value ? "bg-[rgba(107,163,25,0.08)] text-[#6BA319] font-medium" : "text-slate-700 hover:bg-slate-50"
               }`}
             >
               {o.label}
@@ -201,9 +211,7 @@ function DepartmentSelect({
   return (
     <div className="relative" ref={ref}>
       <input
-        type="text"
-        value={q}
-        placeholder={placeholder}
+        type="text" value={q} placeholder={placeholder}
         onFocus={() => setOpen(true)}
         onChange={(e) => { setQ(e.target.value); onChange(e.target.value); setOpen(true); }}
         className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319] pr-8 bg-white"
@@ -213,8 +221,7 @@ function DepartmentSelect({
         <div className="absolute z-[200] top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
           {filtered.map((opt) => (
             <button
-              key={opt}
-              type="button"
+              key={opt} type="button"
               onMouseDown={() => { onChange(opt); setQ(opt); setOpen(false); }}
               className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${
                 value === opt ? "bg-[rgba(107,163,25,0.08)] text-[#6BA319] font-medium" : "text-slate-700 hover:bg-slate-50"
@@ -230,6 +237,81 @@ function DepartmentSelect({
   );
 }
 
+// ─── SalarySection (colapsable, solo técnicos) ───────────────────────────────
+
+function SalarySection({
+  formData,
+  setFormData,
+}: {
+  formData: FormData;
+  setFormData: (d: FormData) => void;
+}) {
+  const [open, setOpen] = useState(!!(formData.salaryAmount));
+
+  return (
+    <div className="border border-slate-200 rounded-xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Remuneración</span>
+          {formData.salaryAmount && (
+            <span className="text-xs font-medium text-[#6BA319] bg-[rgba(107,163,25,0.1)] px-2 py-0.5 rounded-md">
+              {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(formData.salaryAmount)} € /
+              {formData.salaryType === "weekly" ? " sem." : " mes"}
+            </span>
+          )}
+        </div>
+        <ChevronDown size={14} className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="p-4 space-y-3">
+          {/* Tipo: semanal / mensual */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Periodicidad</label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { value: "weekly",  label: "Semanal" },
+                { value: "monthly", label: "Mensual" },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, salaryType: opt.value })}
+                  className={`py-2.5 rounded-xl border text-xs font-medium transition-all ${
+                    formData.salaryType === opt.value
+                      ? "border-[#6BA319] bg-[rgba(107,163,25,0.08)] text-[#6BA319]"
+                      : "border-slate-200 text-slate-600 hover:border-slate-300"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Importe */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+              Salario bruto {formData.salaryType === "weekly" ? "semanal" : "mensual"} (€)
+            </label>
+            <input
+              type="number" min={0}
+              value={formData.salaryAmount ?? ""}
+              onChange={(e) => setFormData({ ...formData, salaryAmount: e.target.value ? Number(e.target.value) : undefined })}
+              placeholder="0.00"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function CrewPage() {
@@ -238,19 +320,20 @@ export default function CrewPage() {
   const id = params?.id as string;
   const { user, isLoading: userLoading } = useUser();
 
-  const [loading, setLoading]           = useState(true);
-  const [crew, setCrew]                 = useState<CrewMember[]>([]);
-  const [filteredCrew, setFilteredCrew] = useState<CrewMember[]>([]);
-  const [searchTerm, setSearchTerm]     = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [loading, setLoading]             = useState(true);
+  const [crew, setCrew]                   = useState<CrewMember[]>([]);
+  const [filteredCrew, setFilteredCrew]   = useState<CrewMember[]>([]);
+  const [searchTerm, setSearchTerm]       = useState("");
+  const [statusFilter, setStatusFilter]   = useState("all");
   const [sectionFilter, setSectionFilter] = useState<CrewSection | "all">("all");
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
-  const [openMenuId, setOpenMenuId]     = useState<string | null>(null);
-  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
-  const [showModal, setShowModal]       = useState(false);
+  const [openMenuId, setOpenMenuId]       = useState<string | null>(null);
+  const [menuPosition, setMenuPosition]   = useState<{ top: number; left: number } | null>(null);
+  const [showModal, setShowModal]         = useState(false);
   const [editingMember, setEditingMember] = useState<CrewMember | null>(null);
-  const [formData, setFormData]         = useState<FormData>(EMPTY_FORM);
-  const [saving, setSaving]             = useState(false);
+  const [formData, setFormData]           = useState<FormData>(EMPTY_FORM);
+  const [saving, setSaving]               = useState(false);
+  const [sendingForm, setSendingForm]     = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
@@ -261,7 +344,6 @@ export default function CrewPage() {
 
   useEffect(() => { if (userId && id) loadData(); }, [userId, id]);
   useEffect(() => { filterCrew(); }, [searchTerm, statusFilter, sectionFilter, crew]);
-
   useEffect(() => {
     const h = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
@@ -272,6 +354,23 @@ export default function CrewPage() {
     return () => document.removeEventListener("click", h);
   }, []);
 
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+
+  const fullName = (m: CrewMember) =>
+    [m.firstName, m.lastName1, m.lastName2].filter(Boolean).join(" ");
+
+  // Genera el siguiente número correlativo 0001, 0002…
+  const getNextCrewNumber = async (): Promise<string> => {
+    const snap = await getDocs(collection(db, `projects/${id}/crew`));
+    const numbers = snap.docs
+      .map((d) => parseInt(d.data().crewNumber || "0", 10))
+      .filter((n) => !isNaN(n));
+    const next = numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
+    return String(next).padStart(4, "0");
+  };
+
+  // ── Data ─────────────────────────────────────────────────────────────────────
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -279,15 +378,34 @@ export default function CrewPage() {
       const data: CrewMember[] = snap.docs.map((d) => {
         const v = d.data();
         return {
-          id: d.id, section: v.section || "technical", name: v.name || "",
-          artisticName: v.artisticName || "", role: v.role || "", department: v.department || "",
-          company: v.company || "", status: v.status || "active", phone: v.phone || "",
-          email: v.email || "", character: v.character || "", sessions: v.sessions,
-          salaryPerSession: v.salaryPerSession, grossSalary: v.grossSalary,
-          irpfRate: v.irpfRate, regime: v.regime || "", startDate: v.startDate || "",
-          endDateApprox: v.endDateApprox || "", contractReason: v.contractReason || "",
-          notes: v.notes || "", createdAt: v.createdAt?.toDate() || new Date(),
-          createdBy: v.createdBy || "", createdByName: v.createdByName || "",
+          id: d.id,
+          crewNumber:       v.crewNumber       || "0000",
+          section:          v.section          || "technical",
+          firstName:        v.firstName        || v.name || "",
+          lastName1:        v.lastName1        || "",
+          lastName2:        v.lastName2        || "",
+          artisticName:     v.artisticName     || "",
+          role:             v.role             || "",
+          department:       v.department       || "",
+          company:          v.company          || "",
+          status:           v.status           || "active",
+          phone:            v.phone            || "",
+          email:            v.email            || "",
+          character:        v.character        || "",
+          sessions:         v.sessions,
+          salaryPerSession: v.salaryPerSession,
+          salaryType:       v.salaryType       || "monthly",
+          salaryAmount:     v.salaryAmount,
+          grossSalary:      v.grossSalary,
+          irpfRate:         v.irpfRate,
+          regime:           v.regime           || "",
+          startDate:        v.startDate        || "",
+          endDateApprox:    v.endDateApprox    || "",
+          contractReason:   v.contractReason   || "",
+          notes:            v.notes            || "",
+          createdAt:        v.createdAt?.toDate() || new Date(),
+          createdBy:        v.createdBy        || "",
+          createdByName:    v.createdByName    || "",
         };
       });
       setCrew(data);
@@ -302,8 +420,10 @@ export default function CrewPage() {
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
       f = f.filter((m) =>
-        m.name.toLowerCase().includes(s) || m.role.toLowerCase().includes(s) ||
-        m.department.toLowerCase().includes(s) || m.email?.toLowerCase().includes(s) ||
+        fullName(m).toLowerCase().includes(s) ||
+        m.role.toLowerCase().includes(s) ||
+        m.department.toLowerCase().includes(s) ||
+        m.email?.toLowerCase().includes(s) ||
         m.character?.toLowerCase().includes(s)
       );
     }
@@ -311,6 +431,8 @@ export default function CrewPage() {
   };
 
   const closeMenu = () => { setOpenMenuId(null); setMenuPosition(null); };
+
+  // ── CRUD ─────────────────────────────────────────────────────────────────────
 
   const openCreate = () => {
     setEditingMember(null);
@@ -321,11 +443,15 @@ export default function CrewPage() {
   const openEdit = (member: CrewMember) => {
     setEditingMember(member);
     setFormData({
-      section: member.section, name: member.name, artisticName: member.artisticName || "",
+      section: member.section, firstName: member.firstName, lastName1: member.lastName1,
+      lastName2: member.lastName2 || "", artisticName: member.artisticName || "",
       role: member.role, department: member.department, company: member.company || "",
       status: member.status, phone: member.phone || "", email: member.email || "",
       character: member.character || "", sessions: member.sessions,
-      salaryPerSession: member.salaryPerSession, grossSalary: member.grossSalary,
+      salaryPerSession: member.salaryPerSession,
+      salaryType: member.salaryType || "monthly",
+      salaryAmount: member.salaryAmount,
+      grossSalary: member.grossSalary,
       irpfRate: member.irpfRate, regime: member.regime || "", startDate: member.startDate || "",
       endDateApprox: member.endDateApprox || "", contractReason: member.contractReason || "",
       notes: member.notes || "",
@@ -334,14 +460,21 @@ export default function CrewPage() {
     closeMenu();
   };
 
+  // Guarda sin enviar formulario
   const handleSave = async () => {
-    if (!formData.name.trim() || !formData.role.trim()) return;
+    if (!formData.firstName.trim() || !formData.lastName1.trim() || !formData.role.trim()) return;
     setSaving(true);
     try {
       if (editingMember) {
-        await updateDoc(doc(db, `projects/${id}/crew`, editingMember.id), { ...formData, updatedAt: Timestamp.now(), updatedBy: userId });
+        await updateDoc(doc(db, `projects/${id}/crew`, editingMember.id), {
+          ...formData, updatedAt: Timestamp.now(), updatedBy: userId,
+        });
       } else {
-        await setDoc(doc(collection(db, `projects/${id}/crew`)), { ...formData, createdAt: Timestamp.now(), createdBy: userId, createdByName: userName });
+        const crewNumber = await getNextCrewNumber();
+        await setDoc(doc(collection(db, `projects/${id}/crew`)), {
+          ...formData, crewNumber,
+          createdAt: Timestamp.now(), createdBy: userId, createdByName: userName,
+        });
       }
       await loadData();
       setShowModal(false);
@@ -349,9 +482,38 @@ export default function CrewPage() {
     finally { setSaving(false); }
   };
 
+  // Guarda Y envía el formulario de alta al miembro
+  const handleSaveAndSend = async () => {
+    if (!formData.firstName.trim() || !formData.lastName1.trim() || !formData.role.trim()) return;
+    if (!formData.email?.trim()) return;
+    setSendingForm(true);
+    try {
+      const crewNumber = editingMember ? editingMember.crewNumber : await getNextCrewNumber();
+      const ref = editingMember
+        ? doc(db, `projects/${id}/crew`, editingMember.id)
+        : doc(collection(db, `projects/${id}/crew`));
+      await setDoc(ref, {
+        ...formData, crewNumber,
+        createdAt:     editingMember ? undefined : Timestamp.now(),
+        createdBy:     editingMember ? undefined : userId,
+        createdByName: editingMember ? undefined : userName,
+        updatedAt:     Timestamp.now(),
+        updatedBy:     userId,
+        formSentAt:    Timestamp.now(),
+        formSentBy:    userId,
+        formSentByName: userName,
+      }, { merge: true });
+      // → aquí irá la llamada a Cloud Function / API de email
+      await loadData();
+      setShowModal(false);
+    } catch (e) { console.error(e); }
+    finally { setSendingForm(false); }
+  };
+
   const handleDelete = (member: CrewMember) => {
     setConfirmDialog({
-      title: "Eliminar miembro", message: `¿Eliminar a ${member.name}? Esta acción no se puede deshacer.`,
+      title: "Eliminar miembro",
+      message: `¿Eliminar a ${fullName(member)}? Esta acción no se puede deshacer.`,
       confirmLabel: "Eliminar", danger: true,
       onConfirm: async () => {
         setConfirmDialog(null);
@@ -364,9 +526,13 @@ export default function CrewPage() {
 
   const handleToggleStatus = async (member: CrewMember) => {
     const next = member.status === "active" ? "inactive" : "active";
-    await updateDoc(doc(db, `projects/${id}/crew`, member.id), { status: next, updatedAt: Timestamp.now(), updatedBy: userId });
+    await updateDoc(doc(db, `projects/${id}/crew`, member.id), {
+      status: next, updatedAt: Timestamp.now(), updatedBy: userId,
+    });
     await loadData(); closeMenu();
   };
+
+  // ── UI helpers ────────────────────────────────────────────────────────────────
 
   const getStatusBadge = (status: CrewMember["status"]) => {
     const map: Record<string, { bg: string; text: string; label: string }> = {
@@ -390,6 +556,9 @@ export default function CrewPage() {
     total:       crew.length,
   };
 
+  const canSend = formData.firstName.trim() && formData.lastName1.trim() && formData.role.trim() && formData.email?.trim();
+  const canSave = formData.firstName.trim() && formData.lastName1.trim() && formData.role.trim();
+
   if (loading || userLoading) {
     return (
       <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
@@ -398,35 +567,50 @@ export default function CrewPage() {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
 
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="mt-[4.5rem]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div className="flex items-center gap-4">
-              <Users size={24} style={{ color: "#6BA319" }} />
-              <div>
-                <h1 className="text-2xl font-semibold text-slate-900">Crew</h1>
-                <p className="text-sm text-slate-500 mt-0.5">
-                  {stats.active} activo{stats.active !== 1 ? "s" : ""} · {stats.total} en total
-                </p>
-              </div>
+          <div className="flex items-center justify-between border-b border-slate-200 pb-6">
+
+            {/* Left: título solo */}
+            <div className="flex items-center gap-3">
+              <Users size={22} style={{ color: "#6BA319" }} />
+              <h1 className="text-2xl font-semibold text-slate-900">Crew</h1>
             </div>
-            <button
-              onClick={openCreate}
-              className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: "#6BA319" }}
-            >
-              <Plus size={15} />
-              Añadir miembro
-            </button>
+
+            {/* Right: stats + botón */}
+            <div className="flex items-center gap-4">
+              {/* Stats pill */}
+              <div className="hidden md:flex items-center gap-4 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl">
+                <div className="text-center">
+                  <p className="text-xs text-slate-400 leading-none mb-0.5">Activos</p>
+                  <p className="text-base font-bold text-slate-900 leading-none">{stats.active}</p>
+                </div>
+                <div className="w-px h-6 bg-slate-200" />
+                <div className="text-center">
+                  <p className="text-xs text-slate-400 leading-none mb-0.5">Total</p>
+                  <p className="text-base font-bold text-slate-900 leading-none">{stats.total}</p>
+                </div>
+              </div>
+
+              <button
+                onClick={openCreate}
+                className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+                style={{ backgroundColor: "#6BA319" }}
+              >
+                <Plus size={15} />
+                Añadir miembro
+              </button>
+            </div>
           </div>
 
-          {/* Section tabs — sin iconos */}
+          {/* Section tabs */}
           <div className="grid grid-cols-3 gap-3 mt-6">
-            {(Object.values(CREW_SECTIONS)).map((section) => {
+            {Object.values(CREW_SECTIONS).map((section) => {
               const count  = stats[section.key as keyof typeof stats] as number;
               const active = sectionFilter === section.key;
               return (
@@ -461,7 +645,7 @@ export default function CrewPage() {
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar por nombre, cargo, departamento…"
+              placeholder="Buscar por nombre, cargo, departamento"
               className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6BA319] bg-white text-sm"
             />
           </div>
@@ -479,16 +663,14 @@ export default function CrewPage() {
                 {STATUS_OPTIONS.map((o) => (
                   <button key={o.value} onClick={() => { setStatusFilter(o.value); setShowStatusDropdown(false); }}
                     className={`w-full text-left px-4 py-2.5 text-sm whitespace-nowrap ${statusFilter === o.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"}`}
-                  >
-                    {o.label}
-                  </button>
+                  >{o.label}</button>
                 ))}
               </div>
             )}
           </div>
         </div>
 
-        {/* Empty state — sin botón duplicado */}
+        {/* Empty */}
         {filteredCrew.length === 0 ? (
           <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
             <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -509,6 +691,7 @@ export default function CrewPage() {
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
+                    <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-12">#</th>
                     <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Miembro</th>
                     <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Sección</th>
                     <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Cargo · Depto.</th>
@@ -527,20 +710,24 @@ export default function CrewPage() {
                         onClick={() => router.push(`/project/${id}/team/crew/${member.id}`)}
                         className={`transition-colors cursor-pointer ${dim ? "opacity-50 hover:opacity-70" : "hover:bg-slate-50"}`}
                       >
+                        {/* Número */}
+                        <td className="px-6 py-4">
+                          <span className="text-xs font-mono text-slate-400">{member.crewNumber}</span>
+                        </td>
                         {/* Miembro */}
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-slate-600">
-                              {member.name.charAt(0).toUpperCase()}
+                              {member.firstName.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <p className="text-sm font-semibold text-slate-900">{member.name}</p>
+                              <p className="text-sm font-semibold text-slate-900">{fullName(member)}</p>
                               {member.artisticName && <p className="text-xs text-slate-400 italic mt-0.5">"{member.artisticName}"</p>}
                               {member.section === "cast" && member.character && <p className="text-xs text-violet-500 mt-0.5">{member.character}</p>}
                             </div>
                           </div>
                         </td>
-                        {/* Sección — sin icono */}
+                        {/* Sección */}
                         <td className="px-6 py-4">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${sc.bgColor} ${sc.textColor}`}>
                             {sc.label}
@@ -550,6 +737,19 @@ export default function CrewPage() {
                         <td className="px-6 py-4">
                           <p className="text-sm text-slate-900 font-medium">{member.role}</p>
                           {member.department && <p className="text-xs text-slate-500 mt-0.5">{member.department}</p>}
+                          {/* Salario resumido */}
+                          {member.section === "technical" && member.salaryAmount && (
+                            <p className="text-xs text-[#6BA319] mt-0.5 font-medium">
+                              {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(member.salaryAmount)} €
+                              <span className="text-slate-400 font-normal"> / {member.salaryType === "weekly" ? "sem." : "mes"}</span>
+                            </p>
+                          )}
+                          {(member.section === "cast" || member.section === "specialists") && member.salaryPerSession && (
+                            <p className="text-xs text-[#6BA319] mt-0.5 font-medium">
+                              {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(member.salaryPerSession)} €
+                              <span className="text-slate-400 font-normal"> / sesión{member.sessions ? ` · ${member.sessions} ses.` : ""}</span>
+                            </p>
+                          )}
                         </td>
                         {/* Contacto */}
                         <td className="px-6 py-4">
@@ -627,24 +827,32 @@ export default function CrewPage() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
 
+            {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-              <h2 className="text-base font-semibold text-slate-900">{editingMember ? "Editar miembro" : "Nuevo miembro"}</h2>
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">
+                  {editingMember ? `Editar · ${editingMember.crewNumber}` : "Nuevo miembro"}
+                </h2>
+                {!editingMember && (
+                  <p className="text-xs text-slate-400 mt-0.5">Se asignará número automáticamente</p>
+                )}
+              </div>
               <button onClick={() => setShowModal(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
                 <X size={16} />
               </button>
             </div>
 
+            {/* Body */}
             <div className="p-6 overflow-y-auto space-y-5 flex-1">
 
-              {/* Sección — sin icono */}
+              {/* Sección */}
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Sección</label>
                 <div className="grid grid-cols-3 gap-2">
                   {Object.values(CREW_SECTIONS).map((s) => {
                     const on = formData.section === s.key;
                     return (
-                      <button
-                        key={s.key} type="button"
+                      <button key={s.key} type="button"
                         onClick={() => setFormData({ ...formData, section: s.key, department: "" })}
                         className={`py-2.5 rounded-xl border text-xs font-medium transition-all ${
                           on ? `${s.borderColor} ${s.bgColor} ${s.textColor}` : "border-slate-200 text-slate-600 hover:border-slate-300"
@@ -657,30 +865,60 @@ export default function CrewPage() {
                 </div>
               </div>
 
-              {/* Nombre + Nombre artístico */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Nombre + Apellido 1 + Apellido 2 */}
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Nombre <span className="text-red-400">*</span></label>
-                  <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Nombre completo"
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Nombre <span className="text-red-400">*</span>
+                  </label>
+                  <input type="text" value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    placeholder="Nombre"
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Nombre artístico</label>
-                  <input type="text" value={formData.artisticName || ""} onChange={(e) => setFormData({ ...formData, artisticName: e.target.value })} placeholder="Alias o nombre de cartel"
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Apellido 1 <span className="text-red-400">*</span>
+                  </label>
+                  <input type="text" value={formData.lastName1}
+                    onChange={(e) => setFormData({ ...formData, lastName1: e.target.value })}
+                    placeholder="Primer apellido"
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
                 </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Apellido 2</label>
+                  <input type="text" value={formData.lastName2 || ""}
+                    onChange={(e) => setFormData({ ...formData, lastName2: e.target.value })}
+                    placeholder="Segundo apellido"
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
+                </div>
+              </div>
+
+              {/* Nombre artístico */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Nombre artístico</label>
+                <input type="text" value={formData.artisticName || ""}
+                  onChange={(e) => setFormData({ ...formData, artisticName: e.target.value })}
+                  placeholder="Alias o nombre de cartel"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
               </div>
 
               {/* Cargo + Empresa */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Cargo <span className="text-red-400">*</span></label>
-                  <input type="text" value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value })} placeholder="p.ej. Director de fotografía"
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Cargo <span className="text-red-400">*</span>
+                  </label>
+                  <input type="text" value={formData.role}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                    placeholder="p.ej. Director de fotografía"
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Empresa</label>
-                  <input type="text" value={formData.company || ""} onChange={(e) => setFormData({ ...formData, company: e.target.value })} placeholder="Razón social"
+                  <input type="text" value={formData.company || ""}
+                    onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                    placeholder="Razón social"
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
                 </div>
               </div>
@@ -689,91 +927,149 @@ export default function CrewPage() {
               {formData.section !== "cast" && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Departamento</label>
-                  <DepartmentSelect value={formData.department} onChange={(v) => setFormData({ ...formData, department: v })} options={deptOptions} placeholder="Selecciona o escribe un departamento" />
+                  <DepartmentSelect value={formData.department}
+                    onChange={(v) => setFormData({ ...formData, department: v })}
+                    options={deptOptions} placeholder="Selecciona o escribe un departamento" />
                 </div>
               )}
 
-              {/* Cast: personaje + sesiones */}
+              {/* Cast: personaje + sesiones + salario */}
               {formData.section === "cast" && (
                 <>
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Personaje</label>
-                    <input type="text" value={formData.character || ""} onChange={(e) => setFormData({ ...formData, character: e.target.value })} placeholder="Nombre del personaje"
+                    <input type="text" value={formData.character || ""}
+                      onChange={(e) => setFormData({ ...formData, character: e.target.value })}
+                      placeholder="Nombre del personaje"
                       className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Nº sesiones</label>
-                      <input type="number" min={0} value={formData.sessions ?? ""} onChange={(e) => setFormData({ ...formData, sessions: e.target.value ? Number(e.target.value) : undefined })} placeholder="0"
+                      <input type="number" min={0} value={formData.sessions ?? ""}
+                        onChange={(e) => setFormData({ ...formData, sessions: e.target.value ? Number(e.target.value) : undefined })}
+                        placeholder="0"
                         className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Salario / sesión (€)</label>
-                      <input type="number" min={0} value={formData.salaryPerSession ?? ""} onChange={(e) => setFormData({ ...formData, salaryPerSession: e.target.value ? Number(e.target.value) : undefined })} placeholder="0.00"
+                      <input type="number" min={0} value={formData.salaryPerSession ?? ""}
+                        onChange={(e) => setFormData({ ...formData, salaryPerSession: e.target.value ? Number(e.target.value) : undefined })}
+                        placeholder="0.00"
                         className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
                     </div>
                   </div>
                 </>
               )}
 
+              {/* Especialistas: igual que cast, por sesión */}
+              {formData.section === "specialists" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Nº sesiones</label>
+                    <input type="number" min={0} value={formData.sessions ?? ""}
+                      onChange={(e) => setFormData({ ...formData, sessions: e.target.value ? Number(e.target.value) : undefined })}
+                      placeholder="0"
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Salario / sesión (€)</label>
+                    <input type="number" min={0} value={formData.salaryPerSession ?? ""}
+                      onChange={(e) => setFormData({ ...formData, salaryPerSession: e.target.value ? Number(e.target.value) : undefined })}
+                      placeholder="0.00"
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
+                  </div>
+                </div>
+              )}
+
+              {/* Técnicos: remuneración colapsable */}
+              {formData.section === "technical" && (
+                <SalarySection formData={formData} setFormData={setFormData} />
+              )}
+
               {/* Email + Teléfono */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Email</label>
-                  <input type="email" value={formData.email || ""} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="correo@ejemplo.com"
+                  <input type="email" value={formData.email || ""}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="correo@ejemplo.com"
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Teléfono</label>
-                  <input type="tel" value={formData.phone || ""} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="+34 600 000 000"
+                  <input type="tel" value={formData.phone || ""}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="+34 600 000 000"
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
                 </div>
               </div>
 
-              {/* Fechas + Estado — Estado con CustomSelect */}
+              {/* Fechas + Estado */}
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Fecha alta</label>
-                  <input type="date" value={formData.startDate || ""} onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                  <input type="date" value={formData.startDate || ""}
+                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319] bg-white" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Baja aprox.</label>
-                  <input type="date" value={formData.endDateApprox || ""} onChange={(e) => setFormData({ ...formData, endDateApprox: e.target.value })}
+                  <input type="date" value={formData.endDateApprox || ""}
+                    onChange={(e) => setFormData({ ...formData, endDateApprox: e.target.value })}
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319] bg-white" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Estado</label>
-                  <CustomSelect
-                    value={formData.status}
+                  <CustomSelect value={formData.status}
                     onChange={(v) => setFormData({ ...formData, status: v as CrewMember["status"] })}
-                    options={STATUS_MEMBER_OPTIONS}
-                  />
+                    options={STATUS_MEMBER_OPTIONS} />
                 </div>
               </div>
 
               {/* Notas */}
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Notas</label>
-                <textarea value={formData.notes || ""} onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Observaciones, disponibilidad, condiciones especiales…" rows={2}
+                <textarea value={formData.notes || ""}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Observaciones, disponibilidad, condiciones especiales"
+                  rows={2}
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319] resize-none" />
               </div>
 
               <p className="text-xs text-slate-400 bg-slate-50 rounded-xl px-3 py-2.5">
-                Los datos fiscales y laborales completos (DNI, NSS, salario, IRPF…) se gestionan en la ficha individual de cada miembro.
+                Los datos fiscales completos (DNI, NSS, IRPF, cuenta bancaria) se gestionan en la ficha individual de cada miembro.
               </p>
             </div>
 
-            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-3 flex-shrink-0 rounded-b-2xl">
-              <button onClick={() => setShowModal(false)} className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-white text-sm font-medium transition-colors">
-                Cancelar
-              </button>
-              <button onClick={handleSave} disabled={saving || !formData.name.trim() || !formData.role.trim()}
-                className="px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
-                style={{ backgroundColor: "#6BA319" }}>
-                {saving ? "Guardando…" : editingMember ? "Guardar cambios" : "Añadir"}
-              </button>
+            {/* Footer — dos acciones */}
+            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <button onClick={() => setShowModal(false)}
+                  className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-white text-sm font-medium transition-colors">
+                  Cancelar
+                </button>
+                <div className="flex-1" />
+                {/* Guardar sin enviar */}
+                <button onClick={handleSave} disabled={saving || !canSave}
+                  className="px-4 py-2.5 border border-slate-300 text-slate-700 bg-white rounded-xl text-sm font-medium hover:bg-slate-50 disabled:opacity-40 transition-colors">
+                  {saving ? "Guardando…" : editingMember ? "Guardar cambios" : "Guardar"}
+                </button>
+                {/* Guardar + enviar ficha */}
+                <button onClick={handleSaveAndSend} disabled={sendingForm || !canSend}
+                  className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
+                  style={{ backgroundColor: "#6BA319" }}
+                  title={!formData.email?.trim() ? "Añade un email para enviar la ficha" : "Guarda y envía la ficha al miembro"}
+                >
+                  <Send size={14} />
+                  {sendingForm ? "Enviando…" : "Guardar y enviar ficha"}
+                </button>
+              </div>
+              {!formData.email?.trim() && canSave && (
+                <p className="text-xs text-slate-400 mt-2 text-right">
+                  Añade un email para poder enviar la ficha
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -786,8 +1082,10 @@ export default function CrewPage() {
             <h3 className="text-base font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
             <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
             <div className="flex gap-3">
-              <button onClick={() => setConfirmDialog(null)} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">Cancelar</button>
-              <button onClick={confirmDialog.onConfirm} className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}>
+              <button onClick={() => setConfirmDialog(null)}
+                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">Cancelar</button>
+              <button onClick={confirmDialog.onConfirm}
+                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}>
                 {confirmDialog.confirmLabel || "Confirmar"}
               </button>
             </div>
