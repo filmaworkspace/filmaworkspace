@@ -25,7 +25,9 @@ export default function ClientLayout({
     <UserProvider>
       <div className="flex flex-col min-h-screen">
         {!isAuthPage && <Header />}
-        <main className="flex flex-col flex-grow">{children}</main>
+        <main className={`flex flex-col flex-grow ${!isAuthPage ? "pt-[3.5rem]" : ""}`}>
+          {children}
+        </main>
         {!isAuthPage && <Footer />}
       </div>
     </UserProvider>
