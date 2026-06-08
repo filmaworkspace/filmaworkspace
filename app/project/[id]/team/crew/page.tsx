@@ -578,7 +578,7 @@ export default function CrewPage() {
 
             {/* Left: título solo */}
             <div className="flex items-center gap-3">
-              <Users size={22} style={{ color: "#6BA319" }} />
+              <Users size={24} style={{ color: "#6BA319" }} />
               <h1 className="text-2xl font-semibold text-slate-900">Crew</h1>
             </div>
 
