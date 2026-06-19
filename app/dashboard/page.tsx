@@ -447,7 +447,7 @@ export default function Dashboard() {
         )}
   
         {/* Nombre y fase */}
-        <div className="flex items-start justify-between mb-2 pr-8">
+        <div className={`flex items-start justify-between mb-2 ${hasConfig ? "pr-8" : ""}`}>
           <h2 className="text-base font-semibold text-slate-900 truncate flex-1 min-w-0">{project.name}</h2>
           <span className="text-[10px] font-medium px-2 py-0.5 rounded-lg bg-slate-100 text-slate-500 ml-2 flex-shrink-0">
             {project.phase}
