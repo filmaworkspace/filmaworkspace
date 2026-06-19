@@ -53,6 +53,7 @@ interface CrewFormResponse {
   ssNumber: string; ssRegime: string; irpfRate: string; contractReason: string;
   iban: string; bankName: string; accountHolder: string;
   docs: Record<string, UploadedFile>;
+  photoUrl?: string;
   privacyAccepted: boolean;
 }
 
@@ -64,7 +65,7 @@ const CREW_EMPTY: CrewFormResponse = {
   address: "", postalCode: "", city: "", province: "", country: "España",
   ssNumber: "", ssRegime: "", irpfRate: "", contractReason: "",
   iban: "", bankName: "", accountHolder: "",
-  docs: {}, privacyAccepted: false,
+  docs: {}, photoUrl: "", privacyAccepted: false,
 };
 
 const SS_REGIMES = ["Régimen General", "Régimen Especial Artistas", "Autónomo (RETA)", "Trabajador/a Extranjero/a"];
@@ -463,6 +464,7 @@ export default function FormPage() {
   const [boxSubmitting,setBoxSubmitting]= useState(false);
 
   const [submitting, setSubmitting] = useState(false);
+  const [openSelectKey, setOpenSelectKey] = useState<string | null>(null);
 
   // ── Load ──────────────────────────────────────────────────────────────────
 
@@ -555,6 +557,21 @@ export default function FormPage() {
       await updateDoc(doc(db, "forms", formId), {
         status: "submitted", submittedAt: Timestamp.now(), responseData: payload,
       });
+      // Sync photo and key data back to the crew member profile
+      if (formDoc?.crewMemberId && formDoc?.projectId) {
+        const patch: Record<string, unknown> = {
+          phone: crewData.phone, email: crewData.email,
+          address: crewData.address, postalCode: crewData.postalCode,
+          municipality: crewData.city,
+          birthDate: crewData.birthDate, birthPlace: crewData.birthPlace,
+          nationality: crewData.nationality,
+          dni: crewData.docNumber,
+          socialSecurityNumber: crewData.ssNumber,
+          iban: crewData.iban, bankAccount: crewData.iban,
+        };
+        if (crewData.photoUrl) patch.photoUrl = crewData.photoUrl;
+        await updateDoc(doc(db, `projects/${formDoc.projectId}/crew`, formDoc.crewMemberId), patch);
+      }
       setSubmittedData(payload);
       setSubmitted(true);
     } catch (e) { console.error(e); }
@@ -608,7 +625,7 @@ export default function FormPage() {
     const { type = "text", placeholder = "", required = false, readonly = false } = opts || {};
     const err = crewErrors[key];
     return (
-      <div className={opts?.half ? "col-span-1" : "col-span-2"}>
+      <div className={opts?.half ? "col-span-1" : "col-span-2 sm:col-span-2"}>
         <label className="block text-sm font-medium text-stone-700 mb-1.5">
           {label} {required && <span className="text-red-400">*</span>}
         </label>
@@ -626,17 +643,33 @@ export default function FormPage() {
 
   const crewSelect = (label: string, key: keyof CrewFormResponse, options: string[], required = false) => {
     const err = crewErrors[key];
+    const current = crewData[key] as string;
+    const isOpen = openSelectKey === key;
     return (
-      <div className="col-span-2">
+      <div className="col-span-2 sm:col-span-2">
         <label className="block text-sm font-medium text-stone-700 mb-1.5">
           {label} {required && <span className="text-red-400">*</span>}
         </label>
-        <select value={crewData[key] as string}
-          onChange={(e) => { setCrewData((d) => ({ ...d, [key]: e.target.value })); setCrewErrors((er) => ({ ...er, [key]: undefined })); }}
-          className={`w-full px-4 py-3 border rounded-xl text-sm focus:outline-none bg-white ${err ? "border-red-300" : "border-stone-200 text-stone-900"}`}>
-          <option value="">Seleccionar…</option>
-          {options.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
+        <div className="relative">
+          <button type="button"
+            onClick={() => setOpenSelectKey(isOpen ? null : key as string)}
+            className={`w-full px-4 py-3 border rounded-xl text-sm text-left flex items-center justify-between bg-white transition-all ${err ? "border-red-300" : isOpen ? "border-stone-400" : "border-stone-200 hover:border-stone-300"}`}>
+            <span className={current ? "text-stone-900" : "text-stone-400"}>{current || "Seleccionar"}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className={`w-4 h-4 text-stone-400 transition-transform ${isOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+          </button>
+          {isOpen && (
+            <div className="absolute z-20 mt-1 w-full bg-white border border-stone-200 rounded-xl shadow-lg py-1 max-h-52 overflow-y-auto">
+              {options.map((o) => (
+                <button key={o} type="button"
+                  onClick={() => { setCrewData((d) => ({ ...d, [key]: o })); setCrewErrors((er) => ({ ...er, [key]: undefined })); setOpenSelectKey(null); }}
+                  className={`w-full px-4 py-2.5 text-left text-sm flex items-center justify-between transition-colors hover:bg-stone-50 ${current === o ? "font-medium text-stone-900" : "text-stone-700"}`}>
+                  {o}
+                  {current === o && <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {err && <p className="text-xs text-red-500 mt-1">{err}</p>}
       </div>
     );
@@ -899,7 +932,43 @@ export default function FormPage() {
 
           <div className="p-5">
             {step === 0 && (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Photo upload */}
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-stone-700 mb-2">Foto de perfil <span className="text-xs text-stone-400">(aparecerá en tu ficha)</span></label>
+                  <div className="flex items-center gap-4">
+                    <div className="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 border border-stone-200 bg-stone-50 flex items-center justify-center">
+                      {crewData.photoUrl
+                        ? <img src={crewData.photoUrl} alt="Foto" className="w-full h-full object-cover" />
+                        : <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-stone-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                      }
+                    </div>
+                    <div className="flex-1">
+                      <label className="cursor-pointer">
+                        <input type="file" accept="image/*" className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const { ref: sRef, uploadBytesResumable, getDownloadURL } = await import("firebase/storage");
+                            const { storage } = await import("@/lib/firebase");
+                            const storageRef = sRef(storage, `forms/${formId}/photo/${file.name}`);
+                            const task = uploadBytesResumable(storageRef, file);
+                            task.on("state_changed", () => {}, console.error, async () => {
+                              const url = await getDownloadURL(storageRef);
+                              setCrewData((d) => ({ ...d, photoUrl: url }));
+                            });
+                          }}
+                        />
+                        <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors cursor-pointer"
+                          style={{ borderColor: L, color: D, backgroundColor: "rgba(201,183,156,0.1)" }}>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                          {crewData.photoUrl ? "Cambiar foto" : "Subir foto"}
+                        </span>
+                      </label>
+                      <p className="text-xs text-stone-400 mt-1.5">JPG, PNG o WEBP. Recomendado: fondo neutro.</p>
+                    </div>
+                  </div>
+                </div>
                 {crewField("Nombre", "firstName", { required: true, placeholder: "Tu nombre" })}
                 {crewField("Primer apellido", "lastName1", { required: true, half: true })}
                 {crewField("Segundo apellido", "lastName2", { half: true })}
@@ -924,7 +993,7 @@ export default function FormPage() {
               </div>
             )}
             {step === 1 && (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {crewField("Email", "email", { type: "email", required: true, readonly: !!formDoc?.prefilled.email, placeholder: "correo@ejemplo.com" })}
                 {crewField("Teléfono", "phone", { type: "tel", required: true, placeholder: "+34 600 000 000" })}
                 {crewField("Dirección", "address", { required: true, placeholder: "Calle Mayor, 10, 2º A" })}
@@ -935,7 +1004,7 @@ export default function FormPage() {
               </div>
             )}
             {step === 2 && (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {crewField("Nº Seguridad Social", "ssNumber", { required: true, placeholder: "12/1234567/89" })}
                 {crewSelect("Régimen de la SS", "ssRegime", SS_REGIMES, true)}
                 {crewField("% IRPF aplicable", "irpfRate", { half: true, placeholder: "15" })}

@@ -426,6 +426,7 @@ export default function BoxesPage() {
   const [volcandoFormId, setVolcandoFormId] = useState<string | null>(null);
   const [showVolcarModal, setShowVolcarModal] = useState<string | null>(null);
   const [volcarTargetEnvelopeId, setVolcarTargetEnvelopeId] = useState("");
+  const [showVolcarEnvDropdown, setShowVolcarEnvDropdown] = useState(false);
 
   // TRANSFERS State
   const [transferEnvelopes, setTransferEnvelopes] = useState<TransferEnvelope[]>([]);
@@ -2879,7 +2880,7 @@ export default function BoxesPage() {
                         <label className="block text-xs font-medium text-slate-600 mb-1">Nota explicativa</label>
                         <textarea value={drawerForm.conflictNote}
                           onChange={e => setDrawerForm(f => ({ ...f, conflictNote: e.target.value }))}
-                          rows={2} placeholder="Explica la incidencia..."
+                          rows={2} placeholder="Explica la incidencia"
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none" />
                       </div>
                     )}
@@ -3972,7 +3973,7 @@ export default function BoxesPage() {
                     value={boxFormMessage}
                     onChange={e => setBoxFormMessage(e.target.value)}
                     rows={2}
-                    placeholder="Instrucciones adicionales para el solicitante..."
+                    placeholder="Instrucciones adicionales para el solicitante"
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 resize-none"
                   />
                 </div>
@@ -4018,53 +4019,78 @@ export default function BoxesPage() {
       )}
 
       {/* ── Volcar a sobre Modal ───────────────────────────────────────────── */}
-      {showVolcarModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100">
-              <h3 className="text-base font-semibold text-slate-900">Volcar a sobre de transferencia</h3>
-              <button onClick={() => setShowVolcarModal(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
-            </div>
-            <div className="px-6 py-5 space-y-4">
-              {(() => {
-                const fs = formSubmissions.find(f => f.id === showVolcarModal);
-                return fs ? (
+      {showVolcarModal && (() => {
+        const fs = formSubmissions.find(f => f.id === showVolcarModal);
+        const openEnvelopes = transferEnvelopes.filter(e => e.status === "draft" || e.status === "pending");
+        const selectedEnv = openEnvelopes.find(e => e.id === volcarTargetEnvelopeId);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+            onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); }}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100">
+                <h3 className="text-base font-semibold text-slate-900">Volcar a sobre de transferencia</h3>
+                <button onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); }} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+              </div>
+              <div className="px-6 py-5 space-y-4">
+                {fs && (
                   <div className="bg-slate-50 rounded-xl p-3 text-sm text-slate-600">
                     <p className="font-medium text-slate-900">{fs.requesterName}</p>
-                    <p>{fs.expenseCount} gasto{fs.expenseCount !== 1 ? "s" : ""} · {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(fs.totalAmount)} €</p>
+                    <p>{fs.expenseCount} gasto{fs.expenseCount !== 1 ? "s" : ""} · <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(fs.totalAmount)} €</strong></p>
                   </div>
-                ) : null;
-              })()}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Sobre de destino</label>
-                <select
-                  value={volcarTargetEnvelopeId}
-                  onChange={e => setVolcarTargetEnvelopeId(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 bg-white">
-                  <option value="">Seleccionar sobre...</option>
-                  {transferEnvelopes.filter(e => e.status === "open").map(e => (
-                    <option key={e.id} value={e.id}>{e.name || `Sobre ${e.id.slice(-4)}`} · {e.recipientName}</option>
-                  ))}
-                </select>
-                {transferEnvelopes.filter(e => e.status === "open").length === 0 && (
-                  <p className="text-xs text-amber-600 mt-1">No hay sobres abiertos. Crea uno primero.</p>
                 )}
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => setShowVolcarModal(null)} className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => handleVolcarToEnvelope(showVolcarModal!)}
-                  disabled={!volcarTargetEnvelopeId || volcandoFormId === showVolcarModal}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
-                  {volcandoFormId === showVolcarModal ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Volcando...</> : "Volcar"}
-                </button>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Sobre de destino</label>
+                  {openEnvelopes.length === 0 ? (
+                    <div className="border border-amber-200 bg-amber-50 rounded-xl px-4 py-3 text-sm text-amber-700">
+                      No hay sobres abiertos. Crea uno en la pestaña de Transferencias primero.
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <button type="button"
+                        onClick={() => setShowVolcarEnvDropdown(!showVolcarEnvDropdown)}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white">
+                        <span className={selectedEnv ? "text-slate-900 text-sm" : "text-slate-400 text-sm"}>
+                          {selectedEnv
+                            ? `${selectedEnv.displayNumber}${selectedEnv.paymentDate ? ` · ${selectedEnv.paymentDate}` : ""}`
+                            : "Seleccionar sobre"}
+                        </span>
+                        <ChevronDown size={15} className={`text-slate-400 transition-transform ${showVolcarEnvDropdown ? "rotate-180" : ""}`} />
+                      </button>
+                      {showVolcarEnvDropdown && (
+                        <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-52 overflow-y-auto">
+                          {openEnvelopes.map(env => (
+                            <button key={env.id} type="button"
+                              onClick={() => { setVolcarTargetEnvelopeId(env.id); setShowVolcarEnvDropdown(false); }}
+                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 flex items-center justify-between transition-colors ${volcarTargetEnvelopeId === env.id ? "bg-slate-50 font-medium" : ""}`}>
+                              <div>
+                                <p className="text-slate-900">{env.displayNumber}</p>
+                                {env.paymentDate && <p className="text-xs text-slate-400">{env.paymentDate}</p>}
+                              </div>
+                              {volcarTargetEnvelopeId === env.id && <Check size={14} className="text-slate-600 flex-shrink-0" />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); }}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => handleVolcarToEnvelope(showVolcarModal!)}
+                    disabled={!volcarTargetEnvelopeId || volcandoFormId === showVolcarModal}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
+                    {volcandoFormId === showVolcarModal ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Volcando</> : "Volcar"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

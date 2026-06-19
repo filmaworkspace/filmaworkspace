@@ -21,8 +21,10 @@ import {
 import {
   ChevronRight,
   Clapperboard,
+  ClipboardCheck,
   MailPlus,
   Plus,
+  Settings,
   Shield,
   Users,
 } from "lucide-react";
@@ -71,6 +73,7 @@ export default function TeamPage() {
   const [loading, setLoading]           = useState(true);
   const [recentCrew, setRecentCrew]     = useState<CrewMember[]>([]);
   const [stats, setStats]               = useState({ total: 0, active: 0, technical: 0, cast: 0, specialists: 0 });
+  const [pendingApprovals, setPendingApprovals] = useState(0);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -110,6 +113,7 @@ export default function TeamPage() {
         cast:        allCrew.filter((m) => m.section === "cast").length,
         specialists: allCrew.filter((m) => m.section === "specialists").length,
       });
+      setPendingApprovals(allCrew.filter((m) => (m as any).approvalStatus === "pending_approval").length);
 
       // Recent 5 for the summary list
       const recentSnap = await getDocs(
@@ -323,6 +327,45 @@ export default function TeamPage() {
                 </Link>
               </div>
             )}
+          </div>
+
+          {/* Quick links column */}
+          <div className="flex flex-col gap-4 w-full lg:w-64 flex-shrink-0">
+
+            {/* Approvals card */}
+            <Link href={`/project/${id}/team/approvals`}
+              className="bg-white border border-slate-200 rounded-2xl p-5 hover:border-slate-300 hover:shadow-sm transition-all group">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-amber-50">
+                  <ClipboardCheck size={18} className="text-amber-600" />
+                </div>
+                {pendingApprovals > 0 && (
+                  <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2.5 py-1 rounded-full">{pendingApprovals}</span>
+                )}
+              </div>
+              <p className="text-sm font-semibold text-slate-900 group-hover:text-[#6BA319] transition-colors">Aprobaciones</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {pendingApprovals > 0 ? `${pendingApprovals} alta${pendingApprovals > 1 ? "s" : ""} pendiente${pendingApprovals > 1 ? "s" : ""}` : "Sin altas pendientes"}
+              </p>
+              <div className="flex items-center gap-1 mt-3 text-xs text-slate-400 group-hover:text-[#6BA319] transition-colors">
+                Ver aprobaciones <ChevronRight size={12} />
+              </div>
+            </Link>
+
+            {/* Config card */}
+            <Link href={`/project/${id}/team/config`}
+              className="bg-white border border-slate-200 rounded-2xl p-5 hover:border-slate-300 hover:shadow-sm transition-all group">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100">
+                  <Settings size={18} className="text-slate-500" />
+                </div>
+              </div>
+              <p className="text-sm font-semibold text-slate-900 group-hover:text-[#6BA319] transition-colors">Configuración</p>
+              <p className="text-xs text-slate-400 mt-0.5">Flujo de aprobación y permisos</p>
+              <div className="flex items-center gap-1 mt-3 text-xs text-slate-400 group-hover:text-[#6BA319] transition-colors">
+                Configurar <ChevronRight size={12} />
+              </div>
+            </Link>
           </div>
         </div>
 

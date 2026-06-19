@@ -500,7 +500,7 @@ export default function CrewPage() {
       } else {
         const crewNumber = await getNextCrewNumber();
         await setDoc(doc(collection(db, `projects/${id}/crew`)),
-          sanitize({ ...formData, crewNumber, createdAt: Timestamp.now(), createdBy: userId, createdByName: userName })
+          sanitize({ ...formData, crewNumber, approvalStatus: "draft", createdAt: Timestamp.now(), createdBy: userId, createdByName: userName })
         );
       }
       await loadData();
@@ -521,7 +521,7 @@ export default function CrewPage() {
         : doc(collection(db, `projects/${id}/crew`));
       await setDoc(ref, sanitize({
         ...formData, crewNumber,
-        ...(editingMember ? {} : { createdAt: Timestamp.now(), createdBy: userId, createdByName: userName }),
+        ...(editingMember ? {} : { approvalStatus: "draft", createdAt: Timestamp.now(), createdBy: userId, createdByName: userName }),
         updatedAt: Timestamp.now(), updatedBy: userId,
         formSentAt: Timestamp.now(), formSentBy: userId, formSentByName: userName,
       }), { merge: true });
