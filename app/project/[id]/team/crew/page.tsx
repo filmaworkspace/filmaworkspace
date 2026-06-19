@@ -617,6 +617,12 @@ export default function CrewPage() {
     else                { setCopiedPin(true); setTimeout(() => setCopiedPin(false), 2000); }
   };
 
+  const copyFormMessage = async (url: string, pin: string) => {
+    const msg = `Este es el enlace al formulario:\n${url}\n\nPara acceder a él, tendrás que usar esta clave: ${pin}`;
+    await navigator.clipboard.writeText(msg);
+    setCopiedUrl(true); setTimeout(() => setCopiedUrl(false), 2000);
+  };
+
   const openCrewListModal = () => {
     const depts = Array.from(
       new Set(
@@ -1433,11 +1439,11 @@ export default function CrewPage() {
                     <p className="text-xs text-slate-600 break-all font-mono bg-slate-50 rounded-lg px-2 py-1.5">{generatedResult.url}</p>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => copyToClipboard(generatedResult.url, "url")}
+                        onClick={() => copyFormMessage(generatedResult.url, generatedResult.pin)}
                         className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-slate-200 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-50 transition-colors"
                       >
                         {copiedUrl ? <Check size={12} className="text-emerald-500" /> : <ClipboardCopy size={12} />}
-                        {copiedUrl ? "Copiado" : "Copiar enlace"}
+                        {copiedUrl ? "Copiado" : "Copiar mensaje"}
                       </button>
                       <a
                         href={generatedResult.url}

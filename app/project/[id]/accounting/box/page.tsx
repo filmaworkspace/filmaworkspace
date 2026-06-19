@@ -20,6 +20,7 @@ import {
   setDoc,
   Timestamp,
   updateDoc,
+  where,
   writeBatch,
 } from "firebase/firestore";
 import { getBlob, getDownloadURL, ref, uploadBytes } from "firebase/storage";
@@ -30,6 +31,9 @@ import {
   AlertTriangle,
   ArrowLeft,
   Banknote,
+  ClipboardCopy,
+  ExternalLink,
+  Link2,
   Calendar,
   Check,
   CheckCircle,
@@ -406,6 +410,24 @@ export default function BoxesPage() {
   const [drawerAccountSearch, setDrawerAccountSearch] = useState("");
   const [drawerAccountSelectorItemIdx, setDrawerAccountSelectorItemIdx] = useState<number | null>(null);
 
+  // FORM SUBMISSIONS State (box_request)
+  const [formSubmissions, setFormSubmissions] = useState<{
+    id: string; requesterName: string; createdByName: string; submittedAt: Date;
+    totalAmount: number; expenseCount: number; importedToEnvelopeId?: string | null;
+    expenses: { description: string; amount: number; fileUrl?: string; fileName?: string }[];
+    notes?: string;
+  }[]>([]);
+  const [showSendBoxFormModal, setShowSendBoxFormModal] = useState(false);
+  const [boxFormRequesterName, setBoxFormRequesterName] = useState("");
+  const [boxFormMessage, setBoxFormMessage] = useState("");
+  const [generatingBoxForm, setGeneratingBoxForm] = useState(false);
+  const [generatedBoxResult, setGeneratedBoxResult] = useState<{ url: string; pin: string } | null>(null);
+  const [copiedBoxUrl, setCopiedBoxUrl] = useState(false);
+  const [copiedBoxPin, setCopiedBoxPin] = useState(false);
+  const [volcandoFormId, setVolcandoFormId] = useState<string | null>(null);
+  const [showVolcarModal, setShowVolcarModal] = useState<string | null>(null);
+  const [volcarTargetEnvelopeId, setVolcarTargetEnvelopeId] = useState("");
+
   // TRANSFERS State
   const [transferEnvelopes, setTransferEnvelopes] = useState<TransferEnvelope[]>([]);
   const [transferExpenses, setTransferExpenses] = useState<TransferExpense[]>([]);
@@ -553,6 +575,30 @@ export default function BoxesPage() {
       setTransferExpenses(trfExpSnap.docs.map(d => ({
         id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate() || new Date(),
       })) as TransferExpense[]);
+
+      // Load submitted box_request forms for this project
+      const formsSnap = await getDocs(query(
+        collection(db, "forms"),
+        where("projectId", "==", projectId),
+        where("type", "==", "box_request"),
+        where("status", "==", "submitted"),
+        orderBy("submittedAt", "desc"),
+      ));
+      setFormSubmissions(formsSnap.docs.map(d => {
+        const v = d.data();
+        const rd = v.responseData || {};
+        return {
+          id: d.id,
+          requesterName: rd.requesterName || v.prefilled?.requesterName || "—",
+          createdByName: v.createdByName || "",
+          submittedAt: v.submittedAt?.toDate() || new Date(),
+          totalAmount: rd.totalAmount || 0,
+          expenseCount: (rd.expenses || []).length,
+          importedToEnvelopeId: v.importedToEnvelopeId ?? null,
+          expenses: rd.expenses || [],
+          notes: rd.notes || "",
+        };
+      }));
 
     } catch (e) {
       console.error(e);
@@ -1502,6 +1548,117 @@ export default function BoxesPage() {
   // TRANSFER FUNCTIONS
   // ═══════════════════════════════════════════════════════════════════════════════
 
+  // ─── Send Box Form ────────────────────────────────────────────────────────────
+
+  const handleGenerateBoxForm = async () => {
+    if (!boxFormRequesterName.trim()) return;
+    setGeneratingBoxForm(true);
+    try {
+      const pin = String(Math.floor(1000 + Math.random() * 9000));
+      const expires = new Date();
+      expires.setDate(expires.getDate() + 30);
+      const docRef = await addDoc(collection(db, "forms"), {
+        type: "box_request",
+        pin,
+        status: "pending",
+        projectId,
+        projectName,
+        createdBy: userId,
+        createdByName: userName,
+        coordinatorMessage: boxFormMessage.trim() || null,
+        createdAt: Timestamp.now(),
+        expiresAt: Timestamp.fromDate(expires),
+        importedToEnvelopeId: null,
+        prefilled: { requesterName: boxFormRequesterName.trim() },
+      });
+      setGeneratedBoxResult({ url: `${window.location.origin}/form/${docRef.id}`, pin });
+    } catch (e) { console.error(e); showToast("error", "Error al generar el formulario"); }
+    finally { setGeneratingBoxForm(false); }
+  };
+
+  const copyBox = async (text: string, type: "url" | "pin") => {
+    await navigator.clipboard.writeText(text);
+    if (type === "url") { setCopiedBoxUrl(true); setTimeout(() => setCopiedBoxUrl(false), 2000); }
+    else { setCopiedBoxPin(true); setTimeout(() => setCopiedBoxPin(false), 2000); }
+  };
+
+  const copyBoxMessage = async (url: string, pin: string) => {
+    const msg = `Este es el enlace al formulario:\n${url}\n\nPara acceder a él, tendrás que usar esta clave: ${pin}`;
+    await navigator.clipboard.writeText(msg);
+    setCopiedBoxUrl(true); setTimeout(() => setCopiedBoxUrl(false), 2000);
+  };
+
+  const closeBoxFormModal = () => {
+    setShowSendBoxFormModal(false);
+    setBoxFormRequesterName("");
+    setBoxFormMessage("");
+    setGeneratedBoxResult(null);
+  };
+
+  // ─── Volcar solicitud a sobre ─────────────────────────────────────────────────
+
+  const handleVolcarToEnvelope = async (formId: string) => {
+    if (!volcarTargetEnvelopeId) return showToast("error", "Selecciona un sobre de transferencia");
+    const submission = formSubmissions.find((f) => f.id === formId);
+    if (!submission) return;
+    setVolcandoFormId(formId);
+    try {
+      const envelope = transferEnvelopes.find((e) => e.id === volcarTargetEnvelopeId);
+      if (!envelope) return;
+      const today = new Date().toISOString().slice(0, 10);
+      const batch = writeBatch(db);
+      let addedTotal = 0;
+
+      for (const exp of submission.expenses) {
+        const amount = Number(exp.amount) || 0;
+        const newExpRef = doc(collection(db, `projects/${projectId}/transferExpenses`));
+        batch.set(newExpRef, {
+          envelopeId: volcarTargetEnvelopeId,
+          type: "ticket",
+          personName: submission.requesterName,
+          personDepartment: "",
+          personIban: "",
+          supplier: submission.requesterName,
+          supplierTaxId: "",
+          items: [{ subAccountCode: "", subAccountDescription: "", description: exp.description, baseAmount: amount, vatRate: 0, vatAmount: 0 }],
+          date: today,
+          baseAmount: amount,
+          vatAmount: 0,
+          irpfRate: 0,
+          irpfAmount: 0,
+          totalAmount: amount,
+          attachmentUrl: exp.fileUrl || null,
+          attachmentFileName: exp.fileName || null,
+          fromFormId: formId,
+          fromFormRequester: submission.requesterName,
+          createdAt: Timestamp.now(),
+          createdBy: userId,
+          createdByName: userName,
+        });
+        addedTotal += amount;
+      }
+
+      // Update envelope totals
+      batch.update(doc(db, `projects/${projectId}/transferEnvelopes`, volcarTargetEnvelopeId), {
+        totalBase: (envelope.totalBase || 0) + addedTotal,
+        totalAmount: (envelope.totalAmount || 0) + addedTotal,
+        expenseCount: (envelope.expenseCount || 0) + submission.expenses.length,
+      });
+
+      // Mark form as imported
+      batch.update(doc(db, "forms", formId), { importedToEnvelopeId: volcarTargetEnvelopeId });
+
+      await batch.commit();
+      setShowVolcarModal(null);
+      setVolcarTargetEnvelopeId("");
+      showToast("success", `${submission.expenses.length} gasto${submission.expenses.length !== 1 ? "s" : ""} volcado${submission.expenses.length !== 1 ? "s" : ""} al sobre`);
+      await loadData();
+    } catch (e) { console.error(e); showToast("error", "Error al volcar los gastos"); }
+    finally { setVolcandoFormId(null); }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────────
+
   const handleCreateTransferEnvelope = async () => {
     if (!transferEnvelopeForm.paymentDate.trim()) return showToast("error", "Fecha de pago obligatoria");
     setSaving(true);
@@ -1703,6 +1860,7 @@ export default function BoxesPage() {
     : [];
   const openEnvelopes = envelopes.filter(e => e.status === "open").length;
   const pendingTransfers = transferEnvelopes.filter(e => e.status === "pending").length;
+  const pendingFormSubmissions = formSubmissions.filter((f) => !f.importedToEnvelopeId).length;
   const totalTarjetasAmount = expenses.reduce((s, e) => s + e.totalAmount, 0);
   const totalTransferAmount = transferEnvelopes.reduce((s, e) => s + e.totalAmount, 0);
 
@@ -1781,13 +1939,13 @@ export default function BoxesPage() {
                   onClick={() => { setMainTab("transfers"); setSelectedBox(null); setSelectedEnvelope(null); setSelectedTransferEnvelope(null); setSearchTerm(""); }}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${mainTab === "transfers" ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"}`}>
                   <Banknote size={15} /> Transferencias
-                  {pendingTransfers > 0 && (
-                    <span className="bg-amber-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{pendingTransfers}</span>
+                  {(pendingTransfers + pendingFormSubmissions) > 0 && (
+                    <span className="bg-amber-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{pendingTransfers + pendingFormSubmissions}</span>
                   )}
                 </button>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <div className="flex items-center gap-4 text-xs text-slate-500">
                 {mainTab === "tarjetas" ? (
                   <>
@@ -1799,10 +1957,18 @@ export default function BoxesPage() {
                   <>
                     <span><strong className="text-slate-900">{transferEnvelopes.length}</strong> sobres</span>
                     <span><strong className="text-amber-600">{pendingTransfers}</strong> pendientes</span>
+                    {pendingFormSubmissions > 0 && <span><strong className="text-amber-600">{pendingFormSubmissions}</strong> solicitudes</span>}
                     <span><strong className="text-slate-900">{fmt(totalTransferAmount)} €</strong></span>
                   </>
                 )}
               </div>
+              {mainTab === "transfers" && (
+                <button
+                  onClick={() => { setBoxFormRequesterName(""); setBoxFormMessage(""); setGeneratedBoxResult(null); setShowSendBoxFormModal(true); }}
+                  className="flex items-center gap-2 px-3 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+                  <Link2 size={14} /> Enviar solicitud
+                </button>
+              )}
               <button
                 onClick={() => mainTab === "tarjetas"
                   ? (setBoxForm({ name: "", code: "", department: "" }), setShowCreateBoxModal(true))
@@ -1870,6 +2036,43 @@ export default function BoxesPage() {
                   )}
                 </div>
               ) : (
+                <>
+                {/* Solicitudes recibidas */}
+                {mainTab === "transfers" && formSubmissions.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">
+                      Solicitudes recibidas
+                      {pendingFormSubmissions > 0 && (
+                        <span className="ml-1.5 bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5 text-xs">{pendingFormSubmissions}</span>
+                      )}
+                    </p>
+                    <div className="space-y-1">
+                      {formSubmissions.map((fs) => (
+                        <div key={fs.id} className={`p-3 rounded-xl border text-left ${fs.importedToEnvelopeId ? "border-emerald-100 bg-emerald-50/50" : "border-amber-100 bg-amber-50"}`}>
+                          <div className="flex items-start justify-between gap-1 mb-1">
+                            <p className="text-sm font-medium text-slate-900 leading-tight">{fs.requesterName}</p>
+                            {fs.importedToEnvelopeId
+                              ? <span className="text-xs text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full flex-shrink-0">Volcado</span>
+                              : <span className="text-xs text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full flex-shrink-0">Pendiente</span>
+                            }
+                          </div>
+                          <p className="text-xs text-slate-500">
+                            {fs.expenseCount} gasto{fs.expenseCount !== 1 ? "s" : ""} · <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(fs.totalAmount)} €</strong>
+                          </p>
+                          <p className="text-xs text-slate-400 mt-0.5">{fs.submittedAt.toLocaleDateString("es-ES")}</p>
+                          {!fs.importedToEnvelopeId && (
+                            <button
+                              onClick={() => { setShowVolcarModal(fs.id); setVolcarTargetEnvelopeId(""); }}
+                              className="mt-2 w-full text-xs font-medium py-1.5 px-2 rounded-lg border border-amber-300 text-amber-800 bg-white hover:bg-amber-50 transition-colors">
+                              Volcar a sobre →
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="border-t border-slate-100 mt-3 mb-3" />
+                  </div>
+                )}
                 <div className="space-y-1">
                   {filteredTransferEnvelopes.map(envelope => {
                     const sc = TRANSFER_STATUS_CONFIG[envelope.status];
@@ -1898,6 +2101,7 @@ export default function BoxesPage() {
                     <p className="text-center py-8 text-slate-400 text-sm">{searchTerm ? "Sin resultados" : "No hay sobres"}</p>
                   )}
                 </div>
+                </>
               )}
             </div>
           </div>
@@ -3738,6 +3942,129 @@ export default function BoxesPage() {
             </div>
           </div>
         </>
+      )}
+
+      {/* ── Send Box Form Modal ────────────────────────────────────────────── */}
+      {showSendBoxFormModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100">
+              <h3 className="text-base font-semibold text-slate-900">Enviar solicitud de caja</h3>
+              <button onClick={() => { setShowSendBoxFormModal(false); setGeneratedBoxResult(null); }} className="text-slate-400 hover:text-slate-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            {!generatedBoxResult ? (
+              <div className="px-6 py-5 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Nombre del solicitante</label>
+                  <input
+                    type="text"
+                    value={boxFormRequesterName}
+                    onChange={e => setBoxFormRequesterName(e.target.value)}
+                    placeholder="Ej: Juan García"
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Mensaje opcional</label>
+                  <textarea
+                    value={boxFormMessage}
+                    onChange={e => setBoxFormMessage(e.target.value)}
+                    rows={2}
+                    placeholder="Instrucciones adicionales para el solicitante..."
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 resize-none"
+                  />
+                </div>
+                <button
+                  onClick={handleGenerateBoxForm}
+                  disabled={generatingBoxForm || !boxFormRequesterName.trim()}
+                  className="w-full py-2.5 rounded-xl text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
+                  {generatingBoxForm ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Generando...</> : <><Link2 size={15} /> Generar enlace</>}
+                </button>
+              </div>
+            ) : (
+              <div className="px-6 py-5 space-y-4">
+                <p className="text-sm text-slate-600">Comparte este enlace y PIN con <strong>{boxFormRequesterName}</strong>.</p>
+                {/* PIN */}
+                <div className="bg-slate-900 rounded-xl p-4 text-center">
+                  <p className="text-xs text-slate-400 mb-2 tracking-widest uppercase">PIN de acceso</p>
+                  <div className="flex justify-center gap-3">
+                    {generatedBoxResult.pin.split("").map((d, i) => (
+                      <span key={i} className="w-12 h-14 flex items-center justify-center bg-white/10 rounded-lg text-3xl font-bold text-white tracking-widest">{d}</span>
+                    ))}
+                  </div>
+                </div>
+                {/* URL */}
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Enlace del formulario</p>
+                  <p className="text-xs text-slate-600 break-all font-mono bg-slate-50 rounded-lg px-2 py-1.5">{generatedBoxResult.url}</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => copyBoxMessage(generatedBoxResult!.url, generatedBoxResult!.pin)} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-colors ${copiedBoxUrl ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"}`}>
+                      {copiedBoxUrl ? <><Check size={12} /> Copiado</> : <><ClipboardCopy size={12} /> Copiar mensaje</>}
+                    </button>
+                    <a href={generatedBoxResult.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
+                      <ExternalLink size={12} /> Abrir
+                    </a>
+                  </div>
+                </div>
+                <button onClick={() => { setShowSendBoxFormModal(false); setGeneratedBoxResult(null); }} className="w-full py-2.5 rounded-xl text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
+                  Cerrar
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Volcar a sobre Modal ───────────────────────────────────────────── */}
+      {showVolcarModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100">
+              <h3 className="text-base font-semibold text-slate-900">Volcar a sobre de transferencia</h3>
+              <button onClick={() => setShowVolcarModal(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              {(() => {
+                const fs = formSubmissions.find(f => f.id === showVolcarModal);
+                return fs ? (
+                  <div className="bg-slate-50 rounded-xl p-3 text-sm text-slate-600">
+                    <p className="font-medium text-slate-900">{fs.requesterName}</p>
+                    <p>{fs.expenseCount} gasto{fs.expenseCount !== 1 ? "s" : ""} · {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(fs.totalAmount)} €</p>
+                  </div>
+                ) : null;
+              })()}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Sobre de destino</label>
+                <select
+                  value={volcarTargetEnvelopeId}
+                  onChange={e => setVolcarTargetEnvelopeId(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 bg-white">
+                  <option value="">Seleccionar sobre...</option>
+                  {transferEnvelopes.filter(e => e.status === "open").map(e => (
+                    <option key={e.id} value={e.id}>{e.name || `Sobre ${e.id.slice(-4)}`} · {e.recipientName}</option>
+                  ))}
+                </select>
+                {transferEnvelopes.filter(e => e.status === "open").length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">No hay sobres abiertos. Crea uno primero.</p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setShowVolcarModal(null)} className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => handleVolcarToEnvelope(showVolcarModal!)}
+                  disabled={!volcarTargetEnvelopeId || volcandoFormId === showVolcarModal}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
+                  {volcandoFormId === showVolcarModal ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Volcando...</> : "Volcar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
