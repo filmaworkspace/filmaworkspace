@@ -8,6 +8,7 @@ import { inter } from "@/lib/fonts";
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
 import {
+  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -25,7 +26,11 @@ import {
 import {
   Check,
   ChevronDown,
-  Filter,
+  ChevronUp,
+  ClipboardCopy,
+  ExternalLink,
+  FileDown,
+  Link2,
   MailPlus,
   MoreHorizontal,
   Pencil,
@@ -335,6 +340,18 @@ export default function CrewPage() {
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
+  const [projectName, setProjectName]       = useState("");
+  const [showCrewListModal, setShowCrewListModal] = useState(false);
+  const [deptOrder, setDeptOrder]           = useState<string[]>([]);
+  const [exportingPdf, setExportingPdf]     = useState(false);
+
+  // Send form modal
+  const [formTarget, setFormTarget]         = useState<CrewMember | null>(null);
+  const [formMessage, setFormMessage]       = useState("");
+  const [generatingForm, setGeneratingForm] = useState(false);
+  const [generatedResult, setGeneratedResult] = useState<{ url: string; pin: string } | null>(null);
+  const [copiedUrl, setCopiedUrl]           = useState(false);
+  const [copiedPin, setCopiedPin]           = useState(false);
 
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const userId   = user?.uid  || "";
@@ -372,7 +389,11 @@ export default function CrewPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const snap = await getDocs(query(collection(db, `projects/${id}/crew`), orderBy("createdAt", "desc")));
+      const [projectSnap, snap] = await Promise.all([
+        getDoc(doc(db, `projects/${id}`)),
+        getDocs(query(collection(db, `projects/${id}/crew`), orderBy("createdAt", "desc"))),
+      ]);
+      if (projectSnap.exists()) setProjectName(projectSnap.data().name || "");
       const data: CrewMember[] = snap.docs.map((d) => {
         const v = d.data();
         return {
@@ -532,6 +553,234 @@ export default function CrewPage() {
     await loadData(); closeMenu();
   };
 
+  // ── Crew List PDF ─────────────────────────────────────────────────────────────
+
+  const creditName = (m: CrewMember) => m.artisticName?.trim() || fullName(m);
+
+  const openSendForm = (member: CrewMember) => {
+    setFormTarget(member);
+    setFormMessage("");
+    setGeneratedResult(null);
+    closeMenu();
+  };
+
+  const closeSendForm = () => {
+    setFormTarget(null);
+    setGeneratedResult(null);
+    setFormMessage("");
+  };
+
+  const handleGenerateForm = async () => {
+    if (!formTarget) return;
+    setGeneratingForm(true);
+    try {
+      const pin = String(Math.floor(1000 + Math.random() * 9000));
+      const expires = new Date();
+      expires.setDate(expires.getDate() + 14);
+      const docRef = await addDoc(collection(db, "forms"), {
+        type: "crew_onboarding",
+        pin,
+        status: "pending",
+        projectId: id,
+        projectName,
+        crewMemberId: formTarget.id,
+        createdBy: userId,
+        createdByName: userName,
+        coordinatorMessage: formMessage.trim() || null,
+        createdAt: Timestamp.now(),
+        expiresAt: Timestamp.fromDate(expires),
+        prefilled: {
+          firstName:    formTarget.firstName,
+          lastName1:    formTarget.lastName1,
+          lastName2:    formTarget.lastName2    || "",
+          artisticName: formTarget.artisticName || "",
+          email:        formTarget.email        || "",
+          phone:        formTarget.phone        || "",
+          role:         formTarget.role,
+          department:   formTarget.department,
+          section:      formTarget.section,
+        },
+      });
+      const url = `${window.location.origin}/form/${docRef.id}`;
+      setGeneratedResult({ url, pin });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setGeneratingForm(false);
+    }
+  };
+
+  const copyToClipboard = async (text: string, type: "url" | "pin") => {
+    await navigator.clipboard.writeText(text);
+    if (type === "url") { setCopiedUrl(true); setTimeout(() => setCopiedUrl(false), 2000); }
+    else                { setCopiedPin(true); setTimeout(() => setCopiedPin(false), 2000); }
+  };
+
+  const openCrewListModal = () => {
+    const depts = Array.from(
+      new Set(
+        crew
+          .filter((m) => m.status !== "inactive")
+          .map((m) => m.department?.trim() || CREW_SECTIONS[m.section].label)
+      )
+    );
+    setDeptOrder(depts);
+    setShowCrewListModal(true);
+  };
+
+  const moveDept = (idx: number, dir: -1 | 1) => {
+    const next = [...deptOrder];
+    const swap = idx + dir;
+    if (swap < 0 || swap >= next.length) return;
+    [next[idx], next[swap]] = [next[swap], next[idx]];
+    setDeptOrder(next);
+  };
+
+  const handleExportPdf = async () => {
+    setExportingPdf(true);
+    try {
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+      const pageW = 210;
+      const pageH = 297;
+      const mL = 18;
+      const mR = 18;
+      const cW = pageW - mL - mR;
+      const green: [number, number, number] = [107, 163, 25];
+      const dark: [number, number, number]  = [22, 22, 22];
+      const mid: [number, number, number]   = [110, 110, 110];
+      const light: [number, number, number] = [245, 245, 245];
+
+      const colW = [52, 55, 36, 31] as const; // PUESTO | NOMBRE | TELÉFONO | EMAIL
+      const col = [mL, mL + colW[0], mL + colW[0] + colW[1], mL + colW[0] + colW[1] + colW[2]];
+
+      const now = new Date();
+      const dateStr = now.toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+
+      let y = 22;
+
+      // ── Header ─────────────────────────────────────────────────────────────
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...mid);
+      doc.text((projectName || "Proyecto").toUpperCase(), mL, y);
+      doc.text(dateStr, pageW - mR, y, { align: "right" });
+
+      y += 9;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(26);
+      doc.setTextColor(...dark);
+      doc.text("CREW LIST", pageW / 2, y, { align: "center" });
+
+      y += 5;
+      doc.setDrawColor(...green);
+      doc.setLineWidth(0.6);
+      doc.line(mL, y, pageW - mR, y);
+      y += 11;
+
+      // ── Per department ─────────────────────────────────────────────────────
+      for (const dept of deptOrder) {
+        const members = crew.filter(
+          (m) =>
+            m.status !== "inactive" &&
+            (m.department?.trim() || CREW_SECTIONS[m.section].label) === dept
+        );
+        if (members.length === 0) continue;
+
+        const blockHeight = 10 + members.length * 7 + 8;
+        if (y + blockHeight > pageH - 14) {
+          doc.addPage();
+          y = 22;
+          // mini-header on continuation pages
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(7);
+          doc.setTextColor(...mid);
+          doc.text((projectName || "Proyecto").toUpperCase(), mL, 14);
+          doc.text("CREW LIST", pageW / 2, 14, { align: "center" });
+          doc.text(dateStr, pageW - mR, 14, { align: "right" });
+          doc.setDrawColor(...light);
+          doc.setLineWidth(0.3);
+          doc.line(mL, 17, pageW - mR, 17);
+        }
+
+        // Department header bar
+        doc.setFillColor(...light);
+        doc.roundedRect(mL, y - 4.5, cW, 9, 1.2, 1.2, "F");
+        doc.setFillColor(...green);
+        doc.roundedRect(mL, y - 4.5, 2.5, 9, 0.5, 0.5, "F");
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        doc.setTextColor(...dark);
+        doc.text(dept.toUpperCase(), mL + 6, y + 0.5);
+
+        // member count badge
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(...mid);
+        doc.text(`${members.length} miembro${members.length !== 1 ? "s" : ""}`, pageW - mR, y + 0.5, { align: "right" });
+
+        y += 8;
+
+        // Column headers
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(6.5);
+        doc.setTextColor(...mid);
+        doc.text("PUESTO",             col[0], y);
+        doc.text("NOMBRE EN CRÉDITOS", col[1], y);
+        doc.text("TELÉFONO",           col[2], y);
+        doc.text("EMAIL",              col[3], y);
+
+        y += 2;
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.25);
+        doc.line(mL, y, pageW - mR, y);
+        y += 4.5;
+
+        // Rows
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        members.forEach((m, i) => {
+          if (i % 2 === 0) {
+            doc.setFillColor(251, 252, 250);
+            doc.rect(mL, y - 3.5, cW, 7, "F");
+          }
+          doc.setTextColor(...dark);
+          doc.text(doc.splitTextToSize(m.role || "—", colW[0] - 3)[0], col[0], y);
+          doc.text(doc.splitTextToSize(creditName(m), colW[1] - 3)[0], col[1], y);
+          doc.setTextColor(...mid);
+          doc.text(m.phone || "—", col[2], y);
+          doc.text(doc.splitTextToSize(m.email || "—", colW[3] - 1)[0], col[3], y);
+          y += 7;
+        });
+
+        y += 7;
+      }
+
+      // ── Footer ─────────────────────────────────────────────────────────────
+      const totalPages = (doc as any).internal.getNumberOfPages();
+      for (let p = 1; p <= totalPages; p++) {
+        doc.setPage(p);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.5);
+        doc.setTextColor(...mid);
+        doc.text(`${p} / ${totalPages}`, pageW / 2, pageH - 8, { align: "center" });
+        doc.setDrawColor(...light);
+        doc.setLineWidth(0.3);
+        doc.line(mL, pageH - 11, pageW - mR, pageH - 11);
+      }
+
+      doc.save(`crew-list_${(projectName || "proyecto").replace(/\s+/g, "-").toLowerCase()}_${now.toISOString().slice(0, 10)}.pdf`);
+      setShowCrewListModal(false);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   // ── UI helpers ────────────────────────────────────────────────────────────────
 
   const getStatusBadge = (status: CrewMember["status"]) => {
@@ -596,6 +845,15 @@ export default function CrewPage() {
                   <p className="text-base font-bold text-slate-900 leading-none">{stats.total}</p>
                 </div>
               </div>
+
+              <button
+                onClick={openCrewListModal}
+                disabled={crew.length === 0}
+                className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 disabled:opacity-40 transition-colors"
+              >
+                <FileDown size={15} className="text-slate-500" />
+                Crew List
+              </button>
 
               <button
                 onClick={openCreate}
@@ -805,6 +1063,9 @@ export default function CrewPage() {
                 <>
                   <button onClick={() => openEdit(member)} className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3">
                     <Pencil size={14} className="text-slate-400" />Editar datos
+                  </button>
+                  <button onClick={() => openSendForm(member)} className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3">
+                    <Link2 size={14} className="text-slate-400" />Enviar ficha
                   </button>
                   <button onClick={() => handleToggleStatus(member)} className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3">
                     {member.status === "active"
@@ -1070,6 +1331,262 @@ export default function CrewPage() {
                   Añade un email para poder enviar la ficha
                 </p>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Send Form Modal ──────────────────────────────────────────────────── */}
+      {formTarget && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={closeSendForm}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col" onClick={(e) => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(107,163,25,0.1)" }}>
+                  <Link2 size={16} style={{ color: "#6BA319" }} />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-slate-900">Enviar ficha de alta</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {formTarget.firstName} {formTarget.lastName1} · {formTarget.role}
+                  </p>
+                </div>
+              </div>
+              <button onClick={closeSendForm} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {!generatedResult ? (
+                <>
+                  {/* Pre-filled preview */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl divide-y divide-slate-100 text-sm">
+                    {[
+                      ["Nombre", `${formTarget.firstName} ${formTarget.lastName1}${formTarget.lastName2 ? " " + formTarget.lastName2 : ""}`],
+                      formTarget.email ? ["Email", formTarget.email] : null,
+                      formTarget.phone ? ["Teléfono", formTarget.phone] : null,
+                      ["Cargo", formTarget.role],
+                      formTarget.department ? ["Departamento", formTarget.department] : null,
+                    ].filter(Boolean).map(([label, value]) => (
+                      <div key={label} className="flex items-center justify-between px-4 py-2.5 gap-3">
+                        <span className="text-xs text-slate-400 flex-shrink-0">{label}</span>
+                        <span className="text-sm text-slate-700 text-right truncate">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Optional message */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                      Mensaje para {formTarget.firstName} <span className="font-normal text-slate-400">(opcional)</span>
+                    </label>
+                    <textarea
+                      value={formMessage}
+                      onChange={(e) => setFormMessage(e.target.value)}
+                      placeholder={`Hola ${formTarget.firstName}, adjunto la ficha de alta para ${projectName || "la producción"}. Rellena todos los campos y adjunta los documentos indicados. ¡Gracias!`}
+                      rows={3}
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319] resize-none"
+                    />
+                  </div>
+
+                  <p className="text-xs text-slate-400 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
+                    Se generará un enlace único y un código de 4 dígitos válido durante 14 días.
+                  </p>
+                </>
+              ) : (
+                /* Result */
+                <div className="space-y-4">
+                  <div className="text-center py-2">
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: "rgba(107,163,25,0.1)" }}>
+                      <Check size={22} style={{ color: "#6BA319" }} />
+                    </div>
+                    <h3 className="text-base font-semibold text-slate-900">¡Ficha generada!</h3>
+                    <p className="text-xs text-slate-500 mt-1">Comparte el enlace y el código con {formTarget.firstName}</p>
+                  </div>
+
+                  {/* PIN */}
+                  <div className="bg-slate-900 rounded-2xl p-5 text-center">
+                    <p className="text-xs text-slate-400 mb-2 uppercase tracking-wider font-medium">Código de acceso</p>
+                    <div className="flex items-center justify-center gap-2 mb-3">
+                      {generatedResult.pin.split("").map((d, i) => (
+                        <div key={i} className="w-12 h-14 bg-white/10 rounded-xl flex items-center justify-center">
+                          <span className="text-2xl font-bold text-white">{d}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => copyToClipboard(generatedResult.pin, "pin")}
+                      className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors mx-auto"
+                    >
+                      {copiedPin ? <Check size={11} className="text-emerald-400" /> : <ClipboardCopy size={11} />}
+                      {copiedPin ? "Copiado" : "Copiar código"}
+                    </button>
+                  </div>
+
+                  {/* URL */}
+                  <div className="border border-slate-200 rounded-xl p-4 space-y-2">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Enlace del formulario</p>
+                    <p className="text-xs text-slate-600 break-all font-mono bg-slate-50 rounded-lg px-2 py-1.5">{generatedResult.url}</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => copyToClipboard(generatedResult.url, "url")}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-slate-200 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-50 transition-colors"
+                      >
+                        {copiedUrl ? <Check size={12} className="text-emerald-500" /> : <ClipboardCopy size={12} />}
+                        {copiedUrl ? "Copiado" : "Copiar enlace"}
+                      </button>
+                      <a
+                        href={generatedResult.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-50 transition-colors"
+                      >
+                        <ExternalLink size={12} /> Abrir
+                      </a>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-400 text-center">
+                    Válido durante 14 días · El código solo sirve para este formulario
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            {!generatedResult && (
+              <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex gap-3">
+                <button onClick={closeSendForm} className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-white text-sm font-medium transition-colors">
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleGenerateForm}
+                  disabled={generatingForm}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
+                  style={{ backgroundColor: "#6BA319" }}
+                >
+                  {generatingForm
+                    ? <><Send size={14} className="animate-pulse" /> Generando…</>
+                    : <><Link2 size={14} /> Generar enlace y código</>}
+                </button>
+              </div>
+            )}
+            {generatedResult && (
+              <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl">
+                <button onClick={closeSendForm} className="w-full py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-white text-sm font-medium transition-colors">
+                  Cerrar
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Crew List Modal ──────────────────────────────────────────────────── */}
+      {showCrewListModal && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowCrewListModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col"
+            style={{ maxHeight: "80vh" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(107,163,25,0.1)" }}>
+                  <FileDown size={16} style={{ color: "#6BA319" }} />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-slate-900">Exportar Crew List</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">Ordena los departamentos antes de exportar</p>
+                </div>
+              </div>
+              <button onClick={() => setShowCrewListModal(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Department list */}
+            <div className="p-4 overflow-y-auto flex-1 space-y-1.5">
+              {deptOrder.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-8">No hay miembros activos</p>
+              ) : (
+                deptOrder.map((dept, idx) => {
+                  const count = crew.filter(
+                    (m) =>
+                      m.status !== "inactive" &&
+                      (m.department?.trim() || CREW_SECTIONS[m.section].label) === dept
+                  ).length;
+                  return (
+                    <div
+                      key={dept}
+                      className="flex items-center gap-3 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl group"
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          onClick={() => moveDept(idx, -1)}
+                          disabled={idx === 0}
+                          className="p-0.5 text-slate-300 hover:text-slate-600 disabled:opacity-20 transition-colors rounded"
+                        >
+                          <ChevronUp size={13} />
+                        </button>
+                        <button
+                          onClick={() => moveDept(idx, 1)}
+                          disabled={idx === deptOrder.length - 1}
+                          className="p-0.5 text-slate-300 hover:text-slate-600 disabled:opacity-20 transition-colors rounded"
+                        >
+                          <ChevronDown size={13} />
+                        </button>
+                      </div>
+
+                      <div
+                        className="w-0.5 h-8 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: "#6BA319" }}
+                      />
+
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">{dept}</p>
+                        <p className="text-xs text-slate-400">{count} miembro{count !== 1 ? "s" : ""}</p>
+                      </div>
+
+                      <span className="text-xs font-mono text-slate-300 w-5 text-right">{idx + 1}</span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex-shrink-0">
+              {/* PDF preview info */}
+              <div className="flex items-center gap-2 text-xs text-slate-400 mb-3">
+                <div className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 font-mono truncate text-slate-500">
+                  {projectName || "Proyecto"} · CREW LIST · {new Date().toLocaleDateString("es-ES")}
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowCrewListModal(false)}
+                  className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-white text-sm font-medium transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleExportPdf}
+                  disabled={exportingPdf || deptOrder.length === 0}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
+                  style={{ backgroundColor: "#6BA319" }}
+                >
+                  <FileDown size={15} />
+                  {exportingPdf ? "Generando PDF…" : "Exportar PDF"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

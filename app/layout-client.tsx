@@ -15,7 +15,8 @@ export default function ClientLayout({
     pathname === "/" ||
     pathname === "/login" ||
     pathname === "/register" ||
-    pathname === "/forgot-password";
+    pathname === "/forgot-password" ||
+    pathname?.startsWith("/form");
   return (
     <UserProvider>
       <div className="flex flex-col min-h-screen">
