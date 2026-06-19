@@ -30,6 +30,7 @@ import {
   ClipboardCopy,
   ExternalLink,
   FileDown,
+  Filter,
   Link2,
   MailPlus,
   MoreHorizontal,
