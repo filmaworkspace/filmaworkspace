@@ -196,8 +196,8 @@ export default function Header() {
 
   const isAdminSection      = pathname.includes("/admin");
   const isAccountingSection = pathname.includes("/accounting");
-  const isTeamSection       = pathname.includes("/team") && !pathname.includes("/config");
-  const isConfigSection     = pathname.includes("/config") && !pathname.includes("/accounting/config");
+  const isTeamSection       = pathname.includes("/team");
+  const isConfigSection     = pathname.includes("/config") && !pathname.includes("/accounting/config") && !pathname.includes("/team/");
   const isInProjectSection  = isAccountingSection || isTeamSection || isConfigSection;
 
   const currentSection = isAdminSection ? "admin"
@@ -217,8 +217,10 @@ export default function Header() {
 
   // ── Team page detection ───────────────────────────────────────────────────
   const teamPage = isTeamSection
-    ? pathname.includes("/crew")     ? "crew"
-    : pathname.includes("/calendar") ? "calendar"
+    ? pathname.includes("/crew")      ? "crew"
+    : pathname.includes("/calendar")  ? "calendar"
+    : pathname.includes("/approvals") ? "approvals"
+    : pathname.includes("/config")    ? "config"
     : "panel"
     : null;
 

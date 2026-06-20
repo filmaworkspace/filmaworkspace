@@ -10,8 +10,8 @@ import {
   collection, doc, getDocs, Timestamp, updateDoc,
 } from "firebase/firestore";
 import {
-  ArrowLeft, Check, CheckCircle, ChevronRight, Clock,
-  ClipboardCheck, FileText, User, Users, X, XCircle,
+  Check, CheckCircle, ChevronRight, Clock,
+  ClipboardCheck, FileText, Users, X, XCircle,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 
@@ -219,76 +219,52 @@ export default function TeamApprovalsPage() {
   return (
     <div className={`min-h-screen bg-slate-50 ${inter.className}`}>
 
-      {/* ── Top breadcrumb ──────────────────────────────────────────────────── */}
-      <div className="mt-[53px] bg-white border-b border-slate-200 px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-3">
-        <div className="flex items-center gap-2 text-sm">
-          <Link href={`/project/${projectId}/team`}
-            className="flex items-center gap-1.5 text-slate-500 hover:text-slate-900 transition-colors">
-            <ArrowLeft size={14} /> Team
-          </Link>
-          <span className="text-slate-300">/</span>
-          <span className="text-slate-900 font-medium">Aprobaciones</span>
-        </div>
-      </div>
-
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-slate-200 px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(107,163,25,0.1)" }}>
-              <ClipboardCheck size={22} style={{ color: TEAM_COLOR }} />
-            </div>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-slate-900">Aprobaciones</h1>
-                {pendingCount > 0 && (
-                  <span className="flex items-center gap-1 bg-amber-100 text-amber-700 text-sm font-semibold px-3 py-1 rounded-full">
-                    <Clock size={13} /> {pendingCount} pendiente{pendingCount !== 1 ? "s" : ""}
-                  </span>
-                )}
+      {/* ── Header (mismo patrón que accounting/approvals) ─────────────────── */}
+      <div className="mt-[4.5rem]">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
+            <div className="flex items-center gap-4">
+              <ClipboardCheck size={24} style={{ color: TEAM_COLOR }} />
+              <div>
+                <h1 className="text-2xl font-semibold text-slate-900">Aprobaciones</h1>
+                <p className="text-slate-500 text-sm mt-0.5">
+                  {pendingCount} pendiente{pendingCount !== 1 ? "s" : ""}
+                </p>
               </div>
-              <p className="text-sm text-slate-500 mt-0.5">Altas de crew que requieren aprobación</p>
+            </div>
+
+            {/* Stats */}
+            <div className="hidden md:flex items-center gap-4">
+              <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-xl border border-slate-200">
+                <div className="text-center">
+                  <p className="text-lg font-bold text-slate-900">{approvedToday}</p>
+                  <p className="text-xs text-slate-500">Hoy</p>
+                </div>
+                <div className="w-px h-8 bg-slate-200" />
+                <div className="text-center">
+                  <p className="text-lg font-bold text-slate-900">{approvedThisWeek}</p>
+                  <p className="text-xs text-slate-500">Semana</p>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="hidden md:flex items-center gap-4">
-            <div className="text-center px-4 py-2 bg-slate-50 rounded-xl">
-              <p className="text-2xl font-bold text-slate-900">{approvedToday}</p>
-              <p className="text-xs text-slate-500 mt-0.5">aprobadas hoy</p>
-            </div>
-            <div className="text-center px-4 py-2 rounded-xl" style={{ backgroundColor: "rgba(107,163,25,0.08)" }}>
-              <p className="text-2xl font-bold" style={{ color: TEAM_COLOR }}>{approvedThisWeek}</p>
-              <p className="text-xs text-slate-500 mt-0.5">esta semana</p>
+          {/* Filter tabs */}
+          <div className="flex items-center gap-4 pt-4">
+            <div className="flex items-center gap-1 border border-slate-200 rounded-xl p-1">
+              {([
+                { key: "pending_approval", label: "Pendientes", count: pendingCount },
+                { key: "approved",         label: "Aprobadas",  count: members.filter((m) => m.approvalStatus === "approved").length },
+                { key: "rejected",         label: "Rechazadas", count: members.filter((m) => m.approvalStatus === "rejected").length },
+              ] as const).map((t) => (
+                <button key={t.key} onClick={() => { setTab(t.key); setSelected(null); }}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.key ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900"}`}>
+                  {t.label}
+                  <span className="ml-1.5 text-xs opacity-70">({t.count})</span>
+                </button>
+              ))}
             </div>
           </div>
-        </div>
-
-        {/* Filter tabs */}
-        <div className="mt-5 flex items-center gap-1 border-b border-slate-100 -mb-6 pb-0">
-          {([
-            { key: "pending_approval", label: "Pendientes", count: pendingCount },
-            { key: "approved",         label: "Aprobadas",  count: members.filter((m) => m.approvalStatus === "approved").length },
-            { key: "rejected",         label: "Rechazadas", count: members.filter((m) => m.approvalStatus === "rejected").length },
-          ] as const).map((t) => (
-            <button key={t.key} onClick={() => { setTab(t.key); setSelected(null); }}
-              className={`relative flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                tab === t.key
-                  ? "border-current text-slate-900"
-                  : "border-transparent text-slate-500 hover:text-slate-700"
-              }`}
-              style={tab === t.key ? { borderColor: TEAM_COLOR, color: TEAM_COLOR } : {}}>
-              {t.label}
-              {t.count > 0 && (
-                <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
-                  t.key === "pending_approval" ? "bg-amber-100 text-amber-700" :
-                  t.key === "approved" ? "bg-emerald-100 text-emerald-700" :
-                  "bg-red-100 text-red-700"}`}>
-                  {t.count}
-                </span>
-              )}
-            </button>
-          ))}
         </div>
       </div>
 

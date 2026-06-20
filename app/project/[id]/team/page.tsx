@@ -9,7 +9,7 @@ import {
   collection, doc, getDocs, getDoc, limit, orderBy, query,
 } from "firebase/firestore";
 import {
-  AlertCircle, ArrowRight, ChevronRight, Clapperboard,
+  ArrowRight, ChevronRight, Clapperboard,
   ClipboardCheck, Clock, MailPlus, Plus, Settings, Shield, Users,
 } from "lucide-react";
 
@@ -211,7 +211,7 @@ export default function TeamPage() {
         <div className="flex flex-col lg:flex-row gap-6 items-start">
 
           {/* Crew reciente */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1 lg:max-w-[50%]">
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1">
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <Users size={18} style={{ color: TEAM_COLOR }} />
@@ -330,48 +330,6 @@ export default function TeamPage() {
             )}
           </div>
 
-          {/* Calendario placeholder */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1 lg:max-w-[50%]">
-            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <ClipboardCheck size={18} style={{ color: TEAM_COLOR }} />
-                <h3 className="font-semibold text-slate-900">Aprobaciones</h3>
-                <span className="text-xs text-slate-400">altas de crew</span>
-              </div>
-              <Link href={`/project/${id}/team/approvals`}
-                className="text-xs font-medium flex items-center gap-0.5 px-2 py-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors">
-                Ver todas <ChevronRight size={12} />
-              </Link>
-            </div>
-            <div className="p-5">
-              {pendingApprovals === 0 ? (
-                <div className="text-center py-12">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: "rgba(107,163,25,0.08)" }}>
-                    <ClipboardCheck size={24} style={{ color: TEAM_COLOR }} />
-                  </div>
-                  <p className="text-sm font-medium text-slate-700">Sin altas pendientes</p>
-                  <p className="text-xs text-slate-400 mt-1">Estás al día con todas las aprobaciones</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 p-4 rounded-xl border border-amber-100 bg-amber-50">
-                    <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <Clock size={18} className="text-amber-600" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-slate-900">{pendingApprovals} alta{pendingApprovals !== 1 ? "s" : ""} pendiente{pendingApprovals !== 1 ? "s" : ""}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">Requieren tu aprobación para activarse</p>
-                    </div>
-                    <Link href={`/project/${id}/team/approvals`}
-                      className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg text-white transition-colors"
-                      style={{ backgroundColor: TEAM_COLOR }}>
-                      Revisar <ArrowRight size={12} />
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       </main>
     </div>
