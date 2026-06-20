@@ -26,7 +26,6 @@ import {
 import {
   Check,
   ChevronDown,
-  ChevronUp,
   ClipboardCopy,
   ExternalLink,
   FileDown,
@@ -390,9 +389,10 @@ export default function CrewPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [projectSnap, snap] = await Promise.all([
+      const [projectSnap, snap, deptOrderSnap] = await Promise.all([
         getDoc(doc(db, `projects/${id}`)),
         getDocs(query(collection(db, `projects/${id}/crew`), orderBy("createdAt", "desc"))),
+        getDoc(doc(db, `projects/${id}/teamConfig`, "departmentOrder")),
       ]);
       if (projectSnap.exists()) setProjectName(projectSnap.data().name || "");
       const data: CrewMember[] = snap.docs.map((d) => {
@@ -429,6 +429,22 @@ export default function CrewPage() {
         };
       });
       setCrew(data);
+
+      // Apply saved department order from teamConfig
+      if (deptOrderSnap.exists()) {
+        const savedOrder: string[] = deptOrderSnap.data().order || [];
+        // Map saved dept IDs to dept labels used in crew members
+        // (departments collection names vs crew member strings may differ)
+        // We'll use the order to sort the crew dept strings
+        const allDepts = Array.from(
+          new Set(data.filter((m) => m.status !== "inactive").map((m) => m.department?.trim() || CREW_SECTIONS[m.section].label))
+        );
+        const ordered = [
+          ...savedOrder.filter((id) => allDepts.includes(id)),
+          ...allDepts.filter((d) => !savedOrder.includes(d)),
+        ];
+        setDeptOrder(ordered);
+      }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
@@ -624,23 +640,20 @@ export default function CrewPage() {
   };
 
   const openCrewListModal = () => {
-    const depts = Array.from(
+    // Use pre-loaded saved order; add any crew depts not in saved order at the end
+    const activeDepts = Array.from(
       new Set(
         crew
           .filter((m) => m.status !== "inactive")
           .map((m) => m.department?.trim() || CREW_SECTIONS[m.section].label)
       )
     );
-    setDeptOrder(depts);
+    const merged = [
+      ...deptOrder.filter((d) => activeDepts.includes(d)),
+      ...activeDepts.filter((d) => !deptOrder.includes(d)),
+    ];
+    setDeptOrder(merged);
     setShowCrewListModal(true);
-  };
-
-  const moveDept = (idx: number, dir: -1 | 1) => {
-    const next = [...deptOrder];
-    const swap = idx + dir;
-    if (swap < 0 || swap >= next.length) return;
-    [next[idx], next[swap]] = [next[swap], next[idx]];
-    setDeptOrder(next);
   };
 
   const handleExportPdf = async () => {
@@ -1511,7 +1524,7 @@ export default function CrewPage() {
                 </div>
                 <div>
                   <h2 className="text-base font-semibold text-slate-900">Exportar Crew List</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">Ordena los departamentos antes de exportar</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Orden según configuración de team</p>
                 </div>
               </div>
               <button onClick={() => setShowCrewListModal(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
@@ -1533,24 +1546,9 @@ export default function CrewPage() {
                   return (
                     <div
                       key={dept}
-                      className="flex items-center gap-3 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl group"
+                      className="flex items-center gap-3 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl"
                     >
-                      <div className="flex flex-col gap-0.5">
-                        <button
-                          onClick={() => moveDept(idx, -1)}
-                          disabled={idx === 0}
-                          className="p-0.5 text-slate-300 hover:text-slate-600 disabled:opacity-20 transition-colors rounded"
-                        >
-                          <ChevronUp size={13} />
-                        </button>
-                        <button
-                          onClick={() => moveDept(idx, 1)}
-                          disabled={idx === deptOrder.length - 1}
-                          className="p-0.5 text-slate-300 hover:text-slate-600 disabled:opacity-20 transition-colors rounded"
-                        >
-                          <ChevronDown size={13} />
-                        </button>
-                      </div>
+                      <span className="text-xs font-mono text-slate-300 w-5 text-right flex-shrink-0">{idx + 1}</span>
 
                       <div
                         className="w-0.5 h-8 rounded-full flex-shrink-0"
@@ -1561,8 +1559,6 @@ export default function CrewPage() {
                         <p className="text-sm font-medium text-slate-900 truncate">{dept}</p>
                         <p className="text-xs text-slate-400">{count} miembro{count !== 1 ? "s" : ""}</p>
                       </div>
-
-                      <span className="text-xs font-mono text-slate-300 w-5 text-right">{idx + 1}</span>
                     </div>
                   );
                 })

@@ -625,7 +625,7 @@ export default function FormPage() {
     const { type = "text", placeholder = "", required = false, readonly = false } = opts || {};
     const err = crewErrors[key];
     return (
-      <div className={opts?.half ? "col-span-1" : "col-span-2 sm:col-span-2"}>
+      <div className={opts?.half ? "col-span-2 sm:col-span-1" : "col-span-2"}>
         <label className="block text-sm font-medium text-stone-700 mb-1.5">
           {label} {required && <span className="text-red-400">*</span>}
         </label>
@@ -646,7 +646,7 @@ export default function FormPage() {
     const current = crewData[key] as string;
     const isOpen = openSelectKey === key;
     return (
-      <div className="col-span-2 sm:col-span-2">
+      <div className="col-span-2">
         <label className="block text-sm font-medium text-stone-700 mb-1.5">
           {label} {required && <span className="text-red-400">*</span>}
         </label>
