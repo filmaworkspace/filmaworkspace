@@ -427,6 +427,19 @@ export default function BoxesPage() {
   const [showVolcarModal, setShowVolcarModal] = useState<string | null>(null);
   const [volcarTargetEnvelopeId, setVolcarTargetEnvelopeId] = useState("");
   const [showVolcarEnvDropdown, setShowVolcarEnvDropdown] = useState(false);
+  // Per-expense completion data when volcando
+  const [volcarExpenseData, setVolcarExpenseData] = useState<Array<{
+    supplier: string;
+    supplierTaxId: string;
+    subAccountCode: string;
+    subAccountDescription: string;
+    date: string;
+    vatRate: number;
+    irpfRate: number;
+    showSubAccountDropdown: boolean;
+    subAccountSearch: string;
+  }>>([]);
+  const [showVolcarSupplierDropdown, setShowVolcarSupplierDropdown] = useState<number | null>(null);
 
   // TRANSFERS State
   const [transferEnvelopes, setTransferEnvelopes] = useState<TransferEnvelope[]>([]);
@@ -1605,12 +1618,22 @@ export default function BoxesPage() {
     try {
       const envelope = transferEnvelopes.find((e) => e.id === volcarTargetEnvelopeId);
       if (!envelope) return;
-      const today = new Date().toISOString().slice(0, 10);
       const batch = writeBatch(db);
+      let addedBase = 0;
+      let addedVat = 0;
       let addedTotal = 0;
 
-      for (const exp of submission.expenses) {
-        const amount = Number(exp.amount) || 0;
+      for (let i = 0; i < submission.expenses.length; i++) {
+        const exp = submission.expenses[i];
+        const ed = volcarExpenseData[i] || { supplier: submission.requesterName, supplierTaxId: "", subAccountCode: "", subAccountDescription: "", date: new Date().toISOString().slice(0, 10), vatRate: 21, irpfRate: 0 };
+        const totalAmount = Number(exp.amount) || 0;
+
+        // Back-calculate base and VAT from total
+        const vatMultiplier = 1 + (ed.vatRate / 100);
+        const baseAmount = Math.round((totalAmount / vatMultiplier) * 100) / 100;
+        const vatAmount = Math.round((totalAmount - baseAmount) * 100) / 100;
+        const irpfAmount = Math.round((baseAmount * ed.irpfRate / 100) * 100) / 100;
+
         const newExpRef = doc(collection(db, `projects/${projectId}/transferExpenses`));
         batch.set(newExpRef, {
           envelopeId: volcarTargetEnvelopeId,
@@ -1618,15 +1641,24 @@ export default function BoxesPage() {
           personName: submission.requesterName,
           personDepartment: "",
           personIban: "",
-          supplier: submission.requesterName,
-          supplierTaxId: "",
-          items: [{ subAccountCode: "", subAccountDescription: "", description: exp.description, baseAmount: amount, vatRate: 0, vatAmount: 0 }],
-          date: today,
-          baseAmount: amount,
-          vatAmount: 0,
-          irpfRate: 0,
-          irpfAmount: 0,
-          totalAmount: amount,
+          supplier: ed.supplier || submission.requesterName,
+          supplierTaxId: ed.supplierTaxId || "",
+          items: [{
+            subAccountCode: ed.subAccountCode,
+            subAccountDescription: ed.subAccountDescription,
+            description: exp.description,
+            baseAmount,
+            vatRate: ed.vatRate,
+            vatAmount,
+          }],
+          subAccountCode: ed.subAccountCode,
+          subAccountDescription: ed.subAccountDescription,
+          date: ed.date,
+          baseAmount,
+          vatAmount,
+          irpfRate: ed.irpfRate,
+          irpfAmount,
+          totalAmount,
           attachmentUrl: exp.fileUrl || null,
           attachmentFileName: exp.fileName || null,
           fromFormId: formId,
@@ -1635,22 +1667,25 @@ export default function BoxesPage() {
           createdBy: userId,
           createdByName: userName,
         });
-        addedTotal += amount;
+
+        addedBase  += baseAmount;
+        addedVat   += vatAmount;
+        addedTotal += totalAmount;
       }
 
-      // Update envelope totals
       batch.update(doc(db, `projects/${projectId}/transferEnvelopes`, volcarTargetEnvelopeId), {
-        totalBase: (envelope.totalBase || 0) + addedTotal,
-        totalAmount: (envelope.totalAmount || 0) + addedTotal,
+        totalBase:    (envelope.totalBase   || 0) + addedBase,
+        totalVat:     (envelope.totalVat    || 0) + addedVat,
+        totalAmount:  (envelope.totalAmount || 0) + addedTotal,
         expenseCount: (envelope.expenseCount || 0) + submission.expenses.length,
       });
 
-      // Mark form as imported
       batch.update(doc(db, "forms", formId), { importedToEnvelopeId: volcarTargetEnvelopeId });
 
       await batch.commit();
       setShowVolcarModal(null);
       setVolcarTargetEnvelopeId("");
+      setVolcarExpenseData([]);
       showToast("success", `${submission.expenses.length} gasto${submission.expenses.length !== 1 ? "s" : ""} volcado${submission.expenses.length !== 1 ? "s" : ""} al sobre`);
       await loadData();
     } catch (e) { console.error(e); showToast("error", "Error al volcar los gastos"); }
@@ -2062,7 +2097,23 @@ export default function BoxesPage() {
                           <p className="text-xs text-slate-400 mt-0.5">{fs.submittedAt.toLocaleDateString("es-ES")}</p>
                           {!fs.importedToEnvelopeId && (
                             <button
-                              onClick={() => { setShowVolcarModal(fs.id); setVolcarTargetEnvelopeId(""); }}
+                              onClick={() => {
+                                setShowVolcarModal(fs.id);
+                                setVolcarTargetEnvelopeId("");
+                                const today = new Date().toISOString().slice(0, 10);
+                                setVolcarExpenseData(fs.expenses.map(() => ({
+                                  supplier: fs.requesterName,
+                                  supplierTaxId: "",
+                                  subAccountCode: "",
+                                  subAccountDescription: "",
+                                  date: today,
+                                  vatRate: 21,
+                                  irpfRate: 0,
+                                  showSubAccountDropdown: false,
+                                  subAccountSearch: "",
+                                })));
+                                setShowVolcarSupplierDropdown(null);
+                              }}
                               className="mt-2 w-full text-xs font-medium py-1.5 px-2 rounded-lg border border-amber-300 text-amber-800 bg-white hover:bg-amber-50 transition-colors">
                               Volcar a sobre →
                             </button>
@@ -4023,41 +4074,46 @@ export default function BoxesPage() {
         const fs = formSubmissions.find(f => f.id === showVolcarModal);
         const openEnvelopes = transferEnvelopes.filter(e => e.status === "draft" || e.status === "pending");
         const selectedEnv = openEnvelopes.find(e => e.id === volcarTargetEnvelopeId);
+        const updateEd = (i: number, patch: Partial<typeof volcarExpenseData[0]>) =>
+          setVolcarExpenseData(prev => prev.map((ed, idx) => idx === i ? { ...ed, ...patch } : ed));
+        const VAT_RATES = [0, 4, 10, 21];
+        const IRPF_RATES = [0, 7, 15, 19];
+
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-            onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); }}>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100">
-                <h3 className="text-base font-semibold text-slate-900">Volcar a sobre de transferencia</h3>
-                <button onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); }} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
-              </div>
-              <div className="px-6 py-5 space-y-4">
-                {fs && (
-                  <div className="bg-slate-50 rounded-xl p-3 text-sm text-slate-600">
-                    <p className="font-medium text-slate-900">{fs.requesterName}</p>
-                    <p>{fs.expenseCount} gasto{fs.expenseCount !== 1 ? "s" : ""} · <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(fs.totalAmount)} €</strong></p>
-                  </div>
-                )}
+            onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); setShowVolcarSupplierDropdown(null); }}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 flex-shrink-0">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Sobre de destino</label>
+                  <h3 className="text-base font-semibold text-slate-900">Volcar a sobre de transferencia</h3>
+                  {fs && <p className="text-xs text-slate-500 mt-0.5">{fs.requesterName} · {fs.expenseCount} gasto{fs.expenseCount !== 1 ? "s" : ""} · <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(fs.totalAmount)} €</strong></p>}
+                </div>
+                <button onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); }} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"><X size={18} /></button>
+              </div>
+
+              {/* Scrollable body */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+
+                {/* Sobre de destino */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Sobre de destino</label>
                   {openEnvelopes.length === 0 ? (
                     <div className="border border-amber-200 bg-amber-50 rounded-xl px-4 py-3 text-sm text-amber-700">
                       No hay sobres abiertos. Crea uno en la pestaña de Transferencias primero.
                     </div>
                   ) : (
                     <div className="relative">
-                      <button type="button"
-                        onClick={() => setShowVolcarEnvDropdown(!showVolcarEnvDropdown)}
+                      <button type="button" onClick={() => setShowVolcarEnvDropdown(!showVolcarEnvDropdown)}
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white">
                         <span className={selectedEnv ? "text-slate-900 text-sm" : "text-slate-400 text-sm"}>
-                          {selectedEnv
-                            ? `${selectedEnv.displayNumber}${selectedEnv.paymentDate ? ` · ${selectedEnv.paymentDate}` : ""}`
-                            : "Seleccionar sobre"}
+                          {selectedEnv ? `${selectedEnv.displayNumber}${selectedEnv.paymentDate ? ` · ${selectedEnv.paymentDate}` : ""}` : "Seleccionar sobre"}
                         </span>
                         <ChevronDown size={15} className={`text-slate-400 transition-transform ${showVolcarEnvDropdown ? "rotate-180" : ""}`} />
                       </button>
                       {showVolcarEnvDropdown && (
-                        <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-52 overflow-y-auto">
+                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
                           {openEnvelopes.map(env => (
                             <button key={env.id} type="button"
                               onClick={() => { setVolcarTargetEnvelopeId(env.id); setShowVolcarEnvDropdown(false); }}
@@ -4074,18 +4130,161 @@ export default function BoxesPage() {
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); }}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={() => handleVolcarToEnvelope(showVolcarModal!)}
-                    disabled={!volcarTargetEnvelopeId || volcandoFormId === showVolcarModal}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
-                    {volcandoFormId === showVolcarModal ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Volcando</> : "Volcar"}
-                  </button>
-                </div>
+
+                {/* Per-expense detail completion */}
+                {fs && fs.expenses.map((exp, i) => {
+                  const ed = volcarExpenseData[i];
+                  if (!ed) return null;
+                  const totalAmt = Number(exp.amount) || 0;
+                  const vatMult = 1 + (ed.vatRate / 100);
+                  const base = Math.round((totalAmt / vatMult) * 100) / 100;
+                  const vat  = Math.round((totalAmt - base) * 100) / 100;
+                  const filteredAccounts = subAccounts.filter(a =>
+                    !ed.subAccountSearch ||
+                    a.code.includes(ed.subAccountSearch) ||
+                    a.description.toLowerCase().includes(ed.subAccountSearch.toLowerCase())
+                  );
+                  const filteredSuppliers = cardSuppliers.filter(s =>
+                    s.name.toLowerCase().includes(ed.supplier.toLowerCase()) ||
+                    s.taxId.includes(ed.supplier)
+                  );
+
+                  return (
+                    <div key={i} className="border border-slate-200 rounded-2xl overflow-hidden">
+                      {/* Expense header */}
+                      <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-start gap-3">
+                        {exp.fileUrl && (
+                          <a href={exp.fileUrl} target="_blank" rel="noopener noreferrer"
+                            className="w-10 h-10 rounded-lg bg-slate-200 flex-shrink-0 overflow-hidden hover:opacity-80 transition-opacity">
+                            <img src={exp.fileUrl} alt="recibo" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                          </a>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-900 truncate">{exp.description || `Gasto ${i + 1}`}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Total: <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(totalAmt)} €</strong>
+                            {ed.vatRate > 0 && <span className="ml-2 text-slate-400">Base: {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(base)} € · IVA {ed.vatRate}%: {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(vat)} €</span>}
+                          </p>
+                        </div>
+                        {exp.fileUrl && (
+                          <a href={exp.fileUrl} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-slate-600 p-1">
+                            <ExternalLink size={13} />
+                          </a>
+                        )}
+                      </div>
+
+                      {/* Fields */}
+                      <div className="p-4 grid grid-cols-2 gap-3">
+
+                        {/* Proveedor */}
+                        <div className="col-span-2 relative">
+                          <label className="block text-xs font-medium text-slate-500 mb-1">Proveedor</label>
+                          <input type="text" value={ed.supplier}
+                            onChange={e => { updateEd(i, { supplier: e.target.value }); setShowVolcarSupplierDropdown(i); }}
+                            onFocus={() => setShowVolcarSupplierDropdown(i)}
+                            placeholder="Nombre del proveedor"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
+                          {showVolcarSupplierDropdown === i && filteredSuppliers.length > 0 && (
+                            <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-40 overflow-y-auto">
+                              {filteredSuppliers.slice(0, 8).map(s => (
+                                <button key={s.taxId} type="button"
+                                  onClick={() => { updateEd(i, { supplier: s.name, supplierTaxId: s.taxId }); setShowVolcarSupplierDropdown(null); }}
+                                  className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center justify-between">
+                                  <span className="text-slate-900">{s.name}</span>
+                                  <span className="text-xs text-slate-400">{s.taxId}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* CIF/NIF proveedor */}
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">CIF / NIF</label>
+                          <input type="text" value={ed.supplierTaxId}
+                            onChange={e => updateEd(i, { supplierTaxId: e.target.value })}
+                            placeholder="B12345678"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
+                        </div>
+
+                        {/* Fecha */}
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">Fecha del gasto</label>
+                          <input type="date" value={ed.date}
+                            onChange={e => updateEd(i, { date: e.target.value })}
+                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
+                        </div>
+
+                        {/* Cuenta de presupuesto */}
+                        <div className="col-span-2 relative">
+                          <label className="block text-xs font-medium text-slate-500 mb-1">Cuenta de presupuesto</label>
+                          <input type="text"
+                            value={ed.subAccountCode ? `${ed.subAccountCode} · ${ed.subAccountDescription}` : ed.subAccountSearch}
+                            onChange={e => { updateEd(i, { subAccountSearch: e.target.value, subAccountCode: "", subAccountDescription: "" }); }}
+                            onFocus={() => updateEd(i, { showSubAccountDropdown: true })}
+                            placeholder="Buscar cuenta..."
+                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
+                          {ed.showSubAccountDropdown && filteredAccounts.length > 0 && (
+                            <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                              {filteredAccounts.slice(0, 10).map(a => (
+                                <button key={a.id} type="button"
+                                  onClick={() => updateEd(i, { subAccountCode: a.code, subAccountDescription: a.description, subAccountSearch: "", showSubAccountDropdown: false })}
+                                  className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50">
+                                  <span className="font-mono text-slate-500 mr-2">{a.code}</span>
+                                  <span className="text-slate-900">{a.description}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* IVA */}
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">IVA</label>
+                          <div className="flex gap-1">
+                            {VAT_RATES.map(r => (
+                              <button key={r} type="button"
+                                onClick={() => updateEd(i, { vatRate: r })}
+                                className={`flex-1 py-2 rounded-lg text-xs font-medium border transition-colors ${ed.vatRate === r ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                                {r}%
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* IRPF */}
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">IRPF</label>
+                          <div className="flex gap-1">
+                            {IRPF_RATES.map(r => (
+                              <button key={r} type="button"
+                                onClick={() => updateEd(i, { irpfRate: r })}
+                                className={`flex-1 py-2 rounded-lg text-xs font-medium border transition-colors ${ed.irpfRate === r ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                                {r}%
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Footer */}
+              <div className="flex gap-2 px-6 py-4 border-t border-slate-100 flex-shrink-0">
+                <button onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); }}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
+                  Cancelar
+                </button>
+                <button onClick={() => handleVolcarToEnvelope(showVolcarModal!)}
+                  disabled={!volcarTargetEnvelopeId || volcandoFormId === showVolcarModal}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
+                  {volcandoFormId === showVolcarModal
+                    ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Volcando</>
+                    : "Volcar al sobre"}
+                </button>
               </div>
             </div>
           </div>

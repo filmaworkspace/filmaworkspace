@@ -17,7 +17,7 @@ const D = "#342A21";
 const L = "#C9B79C";
 
 function FormLogo() {
-  return <Image src="/logo-forms.svg" alt="Forms" width={148} height={48} priority />;
+  return <Image src="/logo-forms.svg" alt="Forms" width={110} height={36} priority />;
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
