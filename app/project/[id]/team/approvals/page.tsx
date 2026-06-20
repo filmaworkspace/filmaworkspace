@@ -217,13 +217,13 @@ export default function TeamApprovalsPage() {
   }
 
   return (
-    <div className={`min-h-screen bg-slate-50 ${inter.className}`}>
+    <div className={`min-h-screen bg-white ${inter.className}`}>
 
       {/* ── Header (mismo patrón que accounting/approvals) ─────────────────── */}
       <div className="mt-[4.5rem]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <ClipboardCheck size={24} style={{ color: TEAM_COLOR }} />
               <div>
                 <h1 className="text-2xl font-semibold text-slate-900">Aprobaciones</h1>
