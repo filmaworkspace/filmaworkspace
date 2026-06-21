@@ -10,9 +10,9 @@ import {
   Timestamp, query, orderBy, where,
 } from "firebase/firestore";
 import {
-  Banknote, Car, ChevronLeft, ChevronRight, Copy, Download, Globe,
-  Home, Lock, Plane, Plus, Send, TrendingUp, Unlock, Utensils,
-  Users, X, Check, ChevronDown, AlertTriangle, Calendar, Link as LinkIcon,
+  Banknote, CalendarRange, Car, ChevronLeft, ChevronRight, Copy, Download, Globe,
+  Home, Lock, Plane, Plus, Printer, Send, TrendingUp, Unlock, Utensils,
+  Users, X, Check, ChevronDown, AlertTriangle, Calendar, Link as LinkIcon, Zap,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 
@@ -63,32 +63,39 @@ const EMPTY_DAY: DayEntry = {
 type MonthData = Record<string, Record<string, DayEntry>>;
 
 interface PayrollConfig {
-  mealRate: number; halfPerDiemRate: number; perDiemRate: number;
-  halfIntlPerDiemRate: number; intlPerDiemRate: number;
+  mealRate: number;
+  halfPerDiemRate: number;     halfPerDiemRateArtistic: number;
+  perDiemRate: number;         perDiemRateArtistic: number;
+  halfIntlPerDiemRate: number; halfIntlPerDiemRateArtistic: number;
+  intlPerDiemRate: number;     intlPerDiemRateArtistic: number;
   accommodationRate: number; carRate: number;
 }
 
 const DEFAULT_CONFIG: PayrollConfig = {
-  mealRate: 15, halfPerDiemRate: 18.5, perDiemRate: 37,
-  halfIntlPerDiemRate: 47.5, intlPerDiemRate: 95,
+  mealRate: 15,
+  halfPerDiemRate: 18.5,    halfPerDiemRateArtistic: 18.5,
+  perDiemRate: 37,           perDiemRateArtistic: 37,
+  halfIntlPerDiemRate: 47.5, halfIntlPerDiemRateArtistic: 47.5,
+  intlPerDiemRate: 95,       intlPerDiemRateArtistic: 95,
   accommodationRate: 80, carRate: 40,
 };
 
 interface AllowanceDef {
-  key:         keyof Pick<DayEntry,"meals"|"halfPerDiem"|"perDiem"|"halfIntlPerDiem"|"intlPerDiem"|"accommodation"|"car">;
-  overrideKey: keyof Pick<DayEntry,"mealRateOverride"|"halfPerDiemRateOverride"|"perDiemRateOverride"|"halfIntlPerDiemRateOverride"|"intlPerDiemRateOverride"|"accommodationRateOverride"|"carRateOverride">;
-  rateKey:     keyof PayrollConfig;
-  label:       string;
-  dot:         string;
-  Icon:        React.FC<{ size?: number; style?: React.CSSProperties; className?: string }>;
+  key:              keyof Pick<DayEntry,"meals"|"halfPerDiem"|"perDiem"|"halfIntlPerDiem"|"intlPerDiem"|"accommodation"|"car">;
+  overrideKey:      keyof Pick<DayEntry,"mealRateOverride"|"halfPerDiemRateOverride"|"perDiemRateOverride"|"halfIntlPerDiemRateOverride"|"intlPerDiemRateOverride"|"accommodationRateOverride"|"carRateOverride">;
+  rateKey:          keyof PayrollConfig;
+  artisticRateKey?: keyof PayrollConfig;
+  label:            string;
+  dot:              string;
+  Icon:             React.FC<{ size?: number; style?: React.CSSProperties; className?: string }>;
 }
 
 const ALLOWANCES: AllowanceDef[] = [
   { key:"meals",           overrideKey:"mealRateOverride",            rateKey:"mealRate",            label:"Comidas",              dot:"#f97316", Icon:Utensils },
-  { key:"halfPerDiem",     overrideKey:"halfPerDiemRateOverride",     rateKey:"halfPerDiemRate",     label:"Media dieta nac.",     dot:"#7dd3fc", Icon:Plane    },
-  { key:"perDiem",         overrideKey:"perDiemRateOverride",         rateKey:"perDiemRate",         label:"Dieta nacional",       dot:"#0ea5e9", Icon:Plane    },
-  { key:"halfIntlPerDiem", overrideKey:"halfIntlPerDiemRateOverride", rateKey:"halfIntlPerDiemRate", label:"Media dieta inter.",   dot:"#a5b4fc", Icon:Globe    },
-  { key:"intlPerDiem",     overrideKey:"intlPerDiemRateOverride",     rateKey:"intlPerDiemRate",     label:"Dieta inter.",         dot:"#6366f1", Icon:Globe    },
+  { key:"halfPerDiem",     overrideKey:"halfPerDiemRateOverride",     rateKey:"halfPerDiemRate",     artisticRateKey:"halfPerDiemRateArtistic",     label:"Media dieta nac.",     dot:"#7dd3fc", Icon:Plane    },
+  { key:"perDiem",         overrideKey:"perDiemRateOverride",         rateKey:"perDiemRate",         artisticRateKey:"perDiemRateArtistic",         label:"Dieta nacional",       dot:"#0ea5e9", Icon:Plane    },
+  { key:"halfIntlPerDiem", overrideKey:"halfIntlPerDiemRateOverride", rateKey:"halfIntlPerDiemRate", artisticRateKey:"halfIntlPerDiemRateArtistic", label:"Media dieta inter.",   dot:"#a5b4fc", Icon:Globe    },
+  { key:"intlPerDiem",     overrideKey:"intlPerDiemRateOverride",     rateKey:"intlPerDiemRate",     artisticRateKey:"intlPerDiemRateArtistic",     label:"Dieta inter.",         dot:"#6366f1", Icon:Globe    },
   { key:"accommodation",   overrideKey:"accommodationRateOverride",   rateKey:"accommodationRate",   label:"Alojamiento",          dot:"#a855f7", Icon:Home     },
   { key:"car",             overrideKey:"carRateOverride",             rateKey:"carRate",             label:"Vehículo",             dot:"#10b981", Icon:Car      },
 ];
@@ -168,6 +175,24 @@ export default function PayrollPage() {
   const [copiedKey,     setCopiedKey]         = useState<string|null>(null);
   const [projectName,   setProjectName]       = useState("");
 
+  // Period config
+  const [period,        setPeriod]            = useState<{from:string;to:string}|null>(null);
+  const [showPeriodCfg, setShowPeriodCfg]     = useState(false);
+  const [periodDraft,   setPeriodDraft]       = useState({from:"",to:""});
+
+  // Range fill
+  const [rfTarget,      setRfTarget]          = useState<string|null>(null);
+  const [rfDay1,        setRfDay1]            = useState(1);
+  const [rfDay2,        setRfDay2]            = useState(1);
+  const [rfMode,        setRfMode]            = useState<"mark"|"clear">("mark");
+  const [rfTypes,       setRfTypes]           = useState<Record<string,boolean>>({});
+
+  // Person detail modal
+  const [detailId,      setDetailId]          = useState<string|null>(null);
+
+  // Department order
+  const [deptOrder,     setDeptOrder]         = useState<string[]>([]);
+
   // Pending dietas imports
   const [pendingForms,  setPendingForms]      = useState<Array<{
     formId:string; dateFrom:string; dateTo:string; peopleNames:string[]; status:string;
@@ -192,11 +217,12 @@ export default function PayrollPage() {
   useEffect(() => { if (!loading) loadMonth(); }, [monthKey]);
 
   const loadBase = async () => {
-    const [crewSnap, cfgSnap, projSnap, pendingSnap] = await Promise.all([
+    const [crewSnap, cfgSnap, projSnap, pendingSnap, orderSnap] = await Promise.all([
       getDocs(query(collection(db, `projects/${projectId}/crew`), orderBy("createdAt"))),
       getDoc(doc(db, `projects/${projectId}/teamConfig`, "payrollConfig")),
       getDoc(doc(db, "projects", projectId)),
       getDocs(query(collection(db, `projects/${projectId}/dietasForms`), where("status", "!=", "imported"))),
+      getDoc(doc(db, `projects/${projectId}/teamConfig`, "departmentOrder")),
     ]);
     setCrew(
       crewSnap.docs
@@ -214,6 +240,7 @@ export default function PayrollPage() {
     );
     if (cfgSnap.exists()) setCfg({ ...DEFAULT_CONFIG, ...cfgSnap.data() });
     if (projSnap.exists()) setProjectName(projSnap.data().name || "");
+    if (orderSnap.exists()) setDeptOrder(orderSnap.data().order || []);
     setPendingForms(pendingSnap.docs.map(d => ({
       formId: d.data().formId || d.id,
       dateFrom: d.data().dateFrom || "",
@@ -226,7 +253,13 @@ export default function PayrollPage() {
 
   const loadMonth = async () => {
     const snap = await getDoc(doc(db, `projects/${projectId}/payrollMonths`, monthKey));
-    setMonthData(snap.exists() ? (snap.data().entries || {}) : {});
+    if (snap.exists()) {
+      setMonthData(snap.data().entries || {});
+      setPeriod(snap.data().period || null);
+    } else {
+      setMonthData({});
+      setPeriod(null);
+    }
   };
 
   const saveData = async (data: MonthData) => {
@@ -249,12 +282,18 @@ export default function PayrollPage() {
     saveData(next);
   };
 
-  const getRate = (entry: DayEntry, a: AllowanceDef): number =>
-    (entry[a.overrideKey] as number | undefined) ?? cfg[a.rateKey];
+  const getRate = (entry: DayEntry, a: AllowanceDef, member?: CrewMember): number => {
+    const override = entry[a.overrideKey] as number | undefined;
+    if (override !== undefined) return override;
+    const isArtistic = member?.section === "cast";
+    if (isArtistic && a.artisticRateKey) return cfg[a.artisticRateKey];
+    return cfg[a.rateKey];
+  };
 
   const cellTotal = (mId: string, d: number): number => {
     const e = getEntry(mId, d);
-    return ALLOWANCES.reduce((s, a) => s + (e[a.key] ? getRate(e, a) : 0), 0)
+    const member = crew.find(m => m.id === mId);
+    return ALLOWANCES.reduce((s, a) => s + (e[a.key] ? getRate(e, a, member) : 0), 0)
       + (e.other ? (e.otherAmount || 0) : 0);
   };
 
@@ -285,8 +324,12 @@ export default function PayrollPage() {
       const k = m.department || SECTION_LABELS[m.section] || "Sin departamento";
       (g[k] ||= []).push(m);
     }
-    return g;
-  }, [filtered]);
+    if (deptOrder.length === 0) return g;
+    const ordered: Record<string, CrewMember[]> = {};
+    for (const d of deptOrder) if (g[d]) ordered[d] = g[d];
+    for (const d of Object.keys(g)) if (!ordered[d]) ordered[d] = g[d];
+    return ordered;
+  }, [filtered, deptOrder]);
 
   const grandTotal = filtered.reduce((s, m) => s + memberMonthAllowances(m.id), 0);
 
@@ -298,21 +341,20 @@ export default function PayrollPage() {
   // ── Export CSV ───────────────────────────────────────────────────────────────
 
   const exportCSV = () => {
-    const header = ["Nombre","Departamento","Sección","Régimen","Salario/día","Días","Dietas totales","Neto estimado",
+    const header = ["Nombre","Departamento","Sección","Régimen","Salario/día","Días","Complementos totales","Total bruto",
       ...days.map(d => `${d}/${month+1}`)];
     const rows = filtered.map(m => {
       const ds = dailySalary(m);
       const wd = workingDays(m.id);
       const all = memberMonthAllowances(m.id);
       const sal = ds * wd;
-      const irpf = m.irpfRate ? sal * m.irpfRate / 100 : 0;
       return [
         `${m.firstName} ${m.lastName1}`,
         m.department || SECTION_LABELS[m.section] || "—",
         SECTION_LABELS[m.section] || m.section,
         m.regime || "—",
         ds.toFixed(2), String(wd), all.toFixed(2),
-        (all + sal - irpf).toFixed(2),
+        (all + sal).toFixed(2),
         ...days.map(d => cellTotal(m.id, d).toFixed(2)),
       ];
     });
@@ -426,6 +468,59 @@ export default function PayrollPage() {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
+  // ── Period helpers ────────────────────────────────────────────────────────────
+
+  const dayOutsidePeriod = (d: number): boolean => {
+    if (!period) return false;
+    const dt = new Date(year, month, d);
+    if (period.from) {
+      const from = new Date(period.from);
+      from.setHours(0,0,0,0);
+      if (dt < from) return true;
+    }
+    if (period.to) {
+      const to = new Date(period.to);
+      to.setHours(23,59,59,999);
+      if (dt > to) return true;
+    }
+    return false;
+  };
+
+  const savePeriod = async (p: {from:string;to:string}|null) => {
+    await setDoc(doc(db, `projects/${projectId}/payrollMonths`, monthKey), {
+      entries: monthData, period: p || null, updatedAt: Timestamp.now(), updatedBy: user?.uid || "",
+    });
+    setPeriod(p);
+  };
+
+  // ── Range fill ────────────────────────────────────────────────────────────────
+
+  const openRangeFill = (memberId: string) => {
+    setRfTarget(memberId);
+    setRfDay1(1); setRfDay2(numDays); setRfMode("mark");
+    setRfTypes(Object.fromEntries(ALLOWANCES.map(a => [a.key, false])));
+  };
+
+  const applyRangeFill = () => {
+    if (!rfTarget) return;
+    const d1 = Math.min(rfDay1, rfDay2);
+    const d2 = Math.max(rfDay1, rfDay2);
+    const next = { ...monthData, [rfTarget]: { ...(monthData[rfTarget] || {}) } };
+    for (let d = d1; d <= d2; d++) {
+      const existing = next[rfTarget][dk(d)] || { ...EMPTY_DAY };
+      if (rfMode === "clear") {
+        const cleared = { ...existing };
+        Object.keys(rfTypes).forEach(k => { if (rfTypes[k]) (cleared as any)[k] = false; });
+        next[rfTarget][dk(d)] = cleared;
+      } else {
+        next[rfTarget][dk(d)] = { ...existing, ...Object.fromEntries(Object.entries(rfTypes).filter(([,v])=>v)) };
+      }
+    }
+    setMonthData(next);
+    saveData(next);
+    setRfTarget(null);
+  };
+
   // ── Modal helpers ────────────────────────────────────────────────────────────
 
   const openEdit = (mId: string, d: number) => {
@@ -438,8 +533,9 @@ export default function PayrollPage() {
     updateEntry(editTarget.memberId, editTarget.day, editData);
     setEditTarget(null);
   };
+  const editModalMember = editTarget ? crew.find(m => m.id === editTarget.memberId) : undefined;
   const editModalTotal =
-    ALLOWANCES.reduce((s, a) => s + (editData[a.key] ? ((editData[a.overrideKey] as number|undefined) ?? cfg[a.rateKey]) : 0), 0)
+    ALLOWANCES.reduce((s, a) => s + (editData[a.key] ? getRate(editData, a, editModalMember) : 0), 0)
     + (editData.other ? (editData.otherAmount || 0) : 0);
 
   const editMember = crew.find(m => m.id === editTarget?.memberId);
@@ -520,20 +616,14 @@ export default function PayrollPage() {
           ))}
         </div>
 
-        {/* Section filter */}
-        <div className="flex items-center gap-0.5 border border-slate-200 rounded-xl p-0.5">
-          {[
-            { k:"all",         l:"Todos"         },
-            { k:"technical",   l:"Técnico"       },
-            { k:"cast",        l:"Cast"          },
-            { k:"specialists", l:"Especialistas" },
-          ].map(s => (
-            <button key={s.k} onClick={() => setFilterSection(s.k)}
-              className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${filterSection===s.k ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>
-              {s.l}
-            </button>
-          ))}
-        </div>
+        {/* Period config */}
+        <button
+          onClick={() => { setPeriodDraft(period || {from:"",to:""}); setShowPeriodCfg(true); }}
+          className={`flex items-center gap-2 px-3 py-2 border rounded-xl text-xs font-medium transition-colors ${period ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+          <CalendarRange size={13} />
+          {period ? `${period.from.slice(5).replace("-","/")} → ${period.to.slice(5).replace("-","/")}` : "Período"}
+        </button>
+
       </div>
 
       {/* ── Legend ───────────────────────────────────────────────────────── */}
@@ -578,14 +668,13 @@ export default function PayrollPage() {
                   }`}>
                     {pf.status === "submitted" ? "Completado" : "Pendiente"}
                   </span>
-                  {pf.status === "submitted" ? (
-                    <button
-                      onClick={() => importDietasForm(pf.formId)}
-                      disabled={importingId === pf.formId}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50">
-                      {importingId === pf.formId ? "Importando…" : "Importar"}
-                    </button>
-                  ) : (
+                  <button
+                    onClick={() => importDietasForm(pf.formId)}
+                    disabled={importingId === pf.formId}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50">
+                    {importingId === pf.formId ? "Importando…" : "Importar"}
+                  </button>
+                  {pf.status !== "submitted" ? (
                     <button
                       onClick={() => copyToClipboard(`${window.location.origin}/form/${pf.formId}`, `link-${pf.formId}`)}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors">
@@ -602,6 +691,350 @@ export default function PayrollPage() {
 
       {/* ── Main content ─────────────────────────────────────────────────── */}
       {viewMode === "grid" ? <GridView /> : <SummaryView />}
+
+      {/* ── Period config modal ──────────────────────────────────────────── */}
+      {showPeriodCfg && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CalendarRange size={16} className="text-amber-500" />
+                <p className="text-sm font-semibold text-slate-900">Período de nómina</p>
+              </div>
+              <button onClick={() => setShowPeriodCfg(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"><X size={15} /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-slate-500">Define el rango de fechas que cubre esta nómina. Los días fuera del período aparecerán marcados en la tabla.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1.5">Desde</label>
+                  <input type="date" value={periodDraft.from} onChange={e => setPeriodDraft(p=>({...p,from:e.target.value}))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1.5">Hasta</label>
+                  <input type="date" value={periodDraft.to} min={periodDraft.from} onChange={e => setPeriodDraft(p=>({...p,to:e.target.value}))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300" />
+                </div>
+              </div>
+              {period && (
+                <button onClick={() => { savePeriod(null); setShowPeriodCfg(false); }}
+                  className="text-xs text-slate-400 hover:text-red-500 transition-colors underline">
+                  Quitar período
+                </button>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
+              <button onClick={() => setShowPeriodCfg(false)}
+                className="flex-1 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+                Cancelar
+              </button>
+              <button
+                disabled={!periodDraft.from || !periodDraft.to}
+                onClick={() => { savePeriod(periodDraft); setShowPeriodCfg(false); }}
+                className="flex-1 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+                style={{ backgroundColor: "#d97706" }}>
+                Guardar período
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Range fill modal ─────────────────────────────────────────────── */}
+      {rfTarget && (() => {
+        const rfMember = crew.find(m => m.id === rfTarget);
+        if (!rfMember) return null;
+        const anyType = Object.values(rfTypes).some(Boolean);
+        return (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Zap size={15} className="text-amber-500" />
+                  <p className="text-sm font-semibold text-slate-900">{rfMember.firstName} {rfMember.lastName1}</p>
+                </div>
+                <button onClick={() => setRfTarget(null)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"><X size={15} /></button>
+              </div>
+              <div className="p-6 space-y-5">
+                {/* Day range */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-2">Rango de días</label>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <label className="block text-[10px] text-slate-400 mb-1">Día inicio</label>
+                      <input type="number" min={1} max={numDays} value={rfDay1}
+                        onChange={e => setRfDay1(Math.max(1, Math.min(numDays, parseInt(e.target.value)||1)))}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-center font-semibold focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                    </div>
+                    <span className="text-slate-400 text-sm mt-4">→</span>
+                    <div className="flex-1">
+                      <label className="block text-[10px] text-slate-400 mb-1">Día fin</label>
+                      <input type="number" min={rfDay1} max={numDays} value={rfDay2}
+                        onChange={e => setRfDay2(Math.max(rfDay1, Math.min(numDays, parseInt(e.target.value)||numDays)))}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-center font-semibold focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1 text-center">
+                    {Math.max(0, rfDay2 - rfDay1 + 1)} días · {MONTH_NAMES[month]} {year}
+                  </p>
+                </div>
+
+                {/* Action */}
+                <div className="flex items-center gap-2">
+                  {(["mark","clear"] as const).map(m => (
+                    <button key={m} onClick={() => setRfMode(m)}
+                      className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${rfMode===m ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                      {m === "mark" ? "✓ Marcar" : "✕ Borrar"}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Types */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-slate-700">Complementos</label>
+                    <div className="flex gap-2">
+                      <button onClick={() => setRfTypes(Object.fromEntries(ALLOWANCES.map(a=>[a.key,true])))} className="text-[10px] text-slate-500 hover:text-slate-800 underline">Todos</button>
+                      <button onClick={() => setRfTypes(Object.fromEntries(ALLOWANCES.map(a=>[a.key,false])))} className="text-[10px] text-slate-400 hover:text-slate-600 underline">Ninguno</button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {ALLOWANCES.map(a => {
+                      const Icon = a.Icon;
+                      return (
+                        <label key={a.key} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all text-xs ${rfTypes[a.key] ? "border-slate-300 bg-slate-50" : "border-slate-100"}`}>
+                          <input type="checkbox" checked={!!rfTypes[a.key]} onChange={() => setRfTypes(t=>({...t,[a.key]:!t[a.key]}))} className="sr-only" />
+                          <Icon size={11} style={{ color: a.dot }} />
+                          <span className="text-slate-700 truncate flex-1">{a.label}</span>
+                          <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border flex-shrink-0 transition-all ${rfTypes[a.key] ? "border-slate-900 bg-slate-900" : "border-slate-300"}`}>
+                            {rfTypes[a.key] && <Check size={8} className="text-white" />}
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
+                <button onClick={() => setRfTarget(null)}
+                  className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+                  Cancelar
+                </button>
+                <button onClick={applyRangeFill} disabled={!anyType}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+                  style={{ backgroundColor: TEAM_COLOR }}>
+                  <Zap size={13} />
+                  {rfMode === "mark" ? "Aplicar" : "Borrar"} días {rfDay1}–{rfDay2}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Person detail modal ───────────────────────────────────────────── */}
+      {detailId && (() => {
+        const m = crew.find(x => x.id === detailId);
+        if (!m) return null;
+        const ds       = dailySalary(m);
+        const regime   = regimeBadge(m.regime || m.ssRegime);
+        const allDays  = days.map(d => ({
+          d, entry: getEntry(m.id, d), outside: dayOutsidePeriod(d),
+          total: cellTotal(m.id, d),
+        }));
+        const activeDays = allDays.filter(x => x.total > 0 || ALLOWANCES.some(a => x.entry[a.key]) || x.entry.other);
+        const wd       = workingDays(m.id);
+        const allw     = memberMonthAllowances(m.id);
+        const sal      = ds * wd;
+        const bruto    = allw + sal;
+
+        const byType = ALLOWANCES.map(a => ({
+          ...a,
+          count: allDays.filter(x => x.entry[a.key]).length,
+          total: allDays.reduce((s,x) => s + (x.entry[a.key] ? getRate(x.entry, a, m) : 0), 0),
+        })).filter(a => a.total > 0);
+
+        const otherTotal = allDays.reduce((s,x) => s + (x.entry.other ? (x.entry.otherAmount||0) : 0), 0);
+
+        return (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-start justify-end">
+            <div className="bg-white h-full w-full max-w-xl shadow-2xl flex flex-col">
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-slate-100 flex items-start justify-between flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-sm font-bold text-white"
+                    style={{ backgroundColor: TEAM_COLOR + "cc" }}>
+                    {m.firstName[0]}{m.lastName1[0]}
+                  </div>
+                  <div>
+                    <p className="text-base font-semibold text-slate-900">{m.firstName} {m.lastName1}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {m.role && <span className="text-xs text-slate-400">{m.role}</span>}
+                      {m.department && <span className="text-xs text-slate-400">· {m.department}</span>}
+                      <span className={`text-xs font-semibold ${regime.color}`}>{regime.label}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => window.print()}
+                    className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="Imprimir">
+                    <Printer size={15} />
+                  </button>
+                  <button onClick={() => setDetailId(null)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                    <X size={15} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Period */}
+              {period && (
+                <div className="px-6 py-2.5 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
+                  <CalendarRange size={12} className="text-amber-500 flex-shrink-0" />
+                  <p className="text-xs text-amber-700">Período: <strong>{period.from}</strong> → <strong>{period.to}</strong></p>
+                </div>
+              )}
+
+              {/* Scrollable content */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                {/* Salary */}
+                {ds > 0 && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Banknote size={14} className="text-slate-400" />
+                      <p className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Salario</p>
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-500">Tipo</span>
+                        <span className="text-slate-700 font-medium capitalize">{m.salaryType || "—"}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-500">Tarifa diaria</span>
+                        <span className="text-slate-700 font-medium">{fmt(ds)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-500">Días con complementos</span>
+                        <span className="text-slate-700 font-medium">{wd} días</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-semibold pt-1 border-t border-slate-200 mt-1">
+                        <span className="text-slate-700">Salario estimado</span>
+                        <span className="text-slate-900">{fmt(sal)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Allowances by type */}
+                {byType.length > 0 && (
+                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+                      <p className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Complementos</p>
+                      <span className="text-xs text-slate-400">{byType.reduce((s,a)=>s+a.count,0)} días totales</span>
+                    </div>
+                    <div className="divide-y divide-slate-50">
+                      {byType.map(a => {
+                        const Icon = a.Icon;
+                        return (
+                          <div key={a.key} className="flex items-center gap-3 px-4 py-2.5">
+                            <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: a.dot + "22" }}>
+                              <Icon size={11} style={{ color: a.dot }} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-slate-700">{a.label}</p>
+                              <p className="text-[10px] text-slate-400">{a.count} día{a.count!==1?"s":""} × {fmt(cfg[a.rateKey])}</p>
+                            </div>
+                            <span className="text-sm font-semibold text-slate-900">{fmt(a.total)}</span>
+                          </div>
+                        );
+                      })}
+                      {otherTotal > 0 && (
+                        <div className="flex items-center gap-3 px-4 py-2.5">
+                          <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 bg-slate-100">
+                            <Plus size={11} className="text-slate-400" />
+                          </div>
+                          <p className="text-xs font-medium text-slate-700 flex-1">Otros</p>
+                          <span className="text-sm font-semibold text-slate-900">{fmt(otherTotal)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Day-by-day table */}
+                {activeDays.length > 0 && (
+                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-100">
+                      <p className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Detalle por día</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-100">
+                            <th className="text-left px-4 py-2 font-medium text-slate-500">Día</th>
+                            {ALLOWANCES.filter(a => byType.some(x=>x.key===a.key)).map(a => (
+                              <th key={a.key} className="text-center px-2 py-2 font-medium text-slate-500" style={{ color: a.dot }}>
+                                {a.label.split(" ")[0]}
+                              </th>
+                            ))}
+                            {otherTotal > 0 && <th className="text-center px-2 py-2 font-medium text-slate-500">Otros</th>}
+                            <th className="text-right px-4 py-2 font-medium text-slate-500">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {activeDays.map(({ d, entry, outside, total }) => (
+                            <tr key={d} className={outside ? "bg-amber-50/50" : ""}>
+                              <td className="px-4 py-2 font-medium text-slate-700 whitespace-nowrap">
+                                {DAY_SHORT[dow(year, month, d)]} {d}
+                                {outside && <span className="ml-1 text-[9px] text-amber-400">◆</span>}
+                              </td>
+                              {ALLOWANCES.filter(a => byType.some(x=>x.key===a.key)).map(a => (
+                                <td key={a.key} className="text-center px-2 py-2">
+                                  {entry[a.key]
+                                    ? <div className="w-2 h-2 rounded-full mx-auto" style={{ backgroundColor: a.dot }} />
+                                    : <span className="text-slate-200">—</span>}
+                                </td>
+                              ))}
+                              {otherTotal > 0 && (
+                                <td className="text-center px-2 py-2 text-slate-600">
+                                  {entry.other ? fmt(entry.otherAmount || 0) : <span className="text-slate-200">—</span>}
+                                </td>
+                              )}
+                              <td className="text-right px-4 py-2 font-semibold text-slate-900">{fmt(total)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {activeDays.length === 0 && (
+                  <div className="py-12 text-center text-slate-400 text-sm">Sin complementos registrados este mes</div>
+                )}
+              </div>
+
+              {/* Footer totals */}
+              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex-shrink-0 space-y-1.5">
+                <div className="flex justify-between text-xs text-slate-500">
+                  <span>Total complementos</span><span className="font-medium text-slate-700">{fmt(allw)}</span>
+                </div>
+                {ds > 0 && (
+                  <div className="flex justify-between text-xs text-slate-500">
+                    <span>Salario estimado ({wd} días)</span><span className="font-medium text-slate-700">{fmt(sal)}</span>
+                  </div>
+                )}
+                {bruto > 0 && (
+                  <div className="flex justify-between text-sm font-semibold text-slate-900 pt-1 border-t border-slate-200">
+                    <span>Total bruto</span><span>{fmt(bruto)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Solicitar dietas modal ───────────────────────────────────────── */}
       {showSolicitar && (
@@ -960,7 +1393,7 @@ export default function PayrollPage() {
             {/* Footer */}
             <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex-shrink-0">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-slate-600">Total dietas del día</span>
+                <span className="text-sm text-slate-600">Total complementos del día</span>
                 <span className="text-lg font-bold text-slate-900">{fmt(editModalTotal)}</span>
               </div>
               <div className="flex gap-3">
@@ -1006,19 +1439,22 @@ export default function PayrollPage() {
                   {days.map(d => {
                     const w = isWknd(year, month, d);
                     const isM = dow(year, month, d) === 0;
+                    const outside = dayOutsidePeriod(d);
                     return (
                       <th key={d}
                         className={`w-9 min-w-[36px] text-center py-3 text-xs font-medium select-none
-                          ${w ? "text-slate-300" : "text-slate-500"}
+                          ${w ? "text-slate-300" : outside ? "text-amber-400" : "text-slate-500"}
                           ${isM && d > 1 ? "border-l border-slate-300" : ""}
-                        `}>
+                        `}
+                        style={outside ? { backgroundColor: "#fef3c720" } : {}}>
                         <div className="leading-tight">{DAY_SHORT[dow(year, month, d)]}</div>
                         <div className="font-bold leading-tight">{d}</div>
+                        {outside && <div className="w-1 h-1 rounded-full bg-amber-300 mx-auto mt-0.5" />}
                       </th>
                     );
                   })}
                   <th className="min-w-[88px] text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider border-l border-slate-200">
-                    Dietas
+                    Complementos
                   </th>
                 </tr>
               </thead>
@@ -1045,45 +1481,58 @@ export default function PayrollPage() {
                       return (
                         <tr key={m.id} className="border-b border-slate-100 group hover:bg-slate-50/60 transition-colors">
                           {/* Sticky info cell */}
-                          <td className="sticky left-0 z-10 bg-white group-hover:bg-slate-50/60 border-r border-slate-100 px-4 py-2.5 w-56 min-w-[224px] transition-colors">
-                            <div className="flex items-center gap-2.5">
+                          <td className="sticky left-0 z-10 bg-white group-hover:bg-slate-50/60 border-r border-slate-100 px-3 py-2 w-56 min-w-[224px] transition-colors">
+                            <div className="flex items-center gap-2">
                               <div className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center text-xs font-bold text-white select-none"
                                 style={{ backgroundColor: TEAM_COLOR + "cc" }}>
                                 {m.firstName[0]}{m.lastName1[0]}
                               </div>
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium text-slate-900 truncate leading-tight">
+                              <div className="min-w-0 flex-1">
+                                <button
+                                  onClick={() => setDetailId(m.id)}
+                                  className="text-sm font-medium text-slate-900 truncate leading-tight hover:text-slate-600 transition-colors text-left w-full">
                                   {m.firstName} {m.lastName1}
-                                </p>
+                                </button>
                                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                  {m.role && <span className="text-xs text-slate-400 truncate max-w-[70px]" title={m.role}>{m.role}</span>}
+                                  {m.role && <span className="text-xs text-slate-400 truncate max-w-[60px]" title={m.role}>{m.role}</span>}
                                   {ds > 0 && <span className="text-xs text-slate-600 font-medium whitespace-nowrap">{fmt(ds)}/d</span>}
                                   <span className={`text-xs font-semibold ${regime.color}`}>{regime.label}</span>
                                 </div>
                               </div>
+                              <button
+                                onClick={() => openRangeFill(m.id)}
+                                title="Relleno rápido por rango"
+                                className="flex-shrink-0 p-1 rounded-md text-slate-300 hover:text-amber-500 hover:bg-amber-50 transition-colors opacity-0 group-hover:opacity-100">
+                                <Zap size={12} />
+                              </button>
                             </div>
                           </td>
 
                           {/* Day cells */}
                           {days.map(d => {
-                            const w   = isWknd(year, month, d);
-                            const ir  = inRange(m, year, month, d);
-                            const ds2 = dots(m.id, d);
-                            const isM = dow(year, month, d) === 0;
+                            const w       = isWknd(year, month, d);
+                            const ir      = inRange(m, year, month, d);
+                            const ds2     = dots(m.id, d);
+                            const isM     = dow(year, month, d) === 0;
                             const hasData = ds2.length > 0;
+                            const outside = dayOutsidePeriod(d);
                             return (
                               <td key={d}
                                 onClick={() => openEdit(m.id, d)}
-                                title={`${m.firstName} ${m.lastName1} · ${d} ${MONTH_NAMES[month]}`}
+                                title={`${m.firstName} ${m.lastName1} · ${d} ${MONTH_NAMES[month]}${outside ? " (fuera de período)" : ""}`}
                                 className={`w-9 min-w-[36px] cursor-pointer text-center align-middle transition-colors
                                   ${isM && d > 1 ? "border-l border-slate-200" : ""}
-                                  ${w ? "bg-slate-50" : ""}
+                                  ${w && !outside ? "bg-slate-50" : ""}
                                   hover:bg-[#6BA31918]
                                 `}
-                                style={!w && ir && !hasData ? { backgroundColor: "#6BA31910" } : {}}>
+                                style={
+                                  outside ? { backgroundColor: "#fef9c320" } :
+                                  !w && ir && !hasData ? { backgroundColor: "#6BA31910" } : {}
+                                }>
                                 <div className="flex flex-wrap justify-center gap-[3px] py-2.5 px-1">
                                   {hasData ? ds2.slice(0, 6).map((c, i) => (
-                                    <div key={i} className="w-[7px] h-[7px] rounded-full flex-shrink-0" style={{ backgroundColor: c }} />
+                                    <div key={i} className="w-[7px] h-[7px] rounded-full flex-shrink-0"
+                                      style={{ backgroundColor: c, opacity: outside ? 0.5 : 1 }} />
                                   )) : <div className="w-[7px] h-[7px]" />}
                                 </div>
                               </td>
@@ -1151,9 +1600,7 @@ export default function PayrollPage() {
             const wd      = workingDays(m.id);
             const allw    = memberMonthAllowances(m.id);
             const sal     = ds * wd;
-            const irpf    = m.irpfRate ? sal * m.irpfRate / 100 : 0;
             const bruto   = allw + sal;
-            const neto    = bruto - irpf;
             const regime  = regimeBadge(m.regime || m.ssRegime);
 
             const breakdown = ALLOWANCES.map(a => ({
@@ -1182,7 +1629,6 @@ export default function PayrollPage() {
                     <div className="flex items-center gap-2 mt-0.5">
                       {m.role && <span className="text-xs text-slate-400 truncate">{m.role}</span>}
                       <span className={`text-xs font-semibold ${regime.color}`}>{regime.label}</span>
-                      {m.irpfRate && <span className="text-xs text-slate-400">IRPF {m.irpfRate}%</span>}
                     </div>
                   </div>
                   <div className="text-right">
@@ -1226,26 +1672,12 @@ export default function PayrollPage() {
                     </div>
                   )}
 
-                  {/* IRPF */}
-                  {irpf > 0 && (
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                      <span className="text-xs text-red-500">IRPF ({m.irpfRate}%)</span>
-                      <span className="text-xs font-semibold text-red-500">- {fmt(irpf)}</span>
-                    </div>
-                  )}
-
                   {/* Totals */}
-                  <div className="pt-2 border-t-2 border-slate-200 space-y-1">
+                  <div className="pt-2 border-t-2 border-slate-200">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-slate-900">Total bruto</span>
                       <span className="text-sm font-bold text-slate-900">{fmt(bruto)}</span>
                     </div>
-                    {irpf > 0 && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-slate-500">Neto estimado</span>
-                        <span className="text-sm font-bold" style={{ color: TEAM_COLOR }}>{fmt(neto)}</span>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -1257,7 +1689,7 @@ export default function PayrollPage() {
         {filtered.length > 0 && (
           <div className="mt-6 bg-slate-900 rounded-2xl px-8 py-6 flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-400">Total dietas · {MONTH_NAMES[month]} {year}</p>
+              <p className="text-sm text-slate-400">Total nómina · {MONTH_NAMES[month]} {year}</p>
               <p className="text-xs text-slate-500 mt-0.5">{filtered.length} personas · {
                 filtered.reduce((s, m) => s + workingDays(m.id), 0)
               } días con dietas</p>

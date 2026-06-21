@@ -91,18 +91,25 @@ const CONFIG_SECTIONS = [
 ];
 
 interface PayrollRatesConfig {
-  mealRate:             number;
-  halfPerDiemRate:      number;
-  perDiemRate:          number;
-  halfIntlPerDiemRate:  number;
-  intlPerDiemRate:      number;
-  accommodationRate:    number;
-  carRate:              number;
+  mealRate:                   number;
+  halfPerDiemRate:            number;
+  halfPerDiemRateArtistic:    number;
+  perDiemRate:                number;
+  perDiemRateArtistic:        number;
+  halfIntlPerDiemRate:        number;
+  halfIntlPerDiemRateArtistic:number;
+  intlPerDiemRate:            number;
+  intlPerDiemRateArtistic:    number;
+  accommodationRate:          number;
+  carRate:                    number;
 }
 
 const DEFAULT_PAYROLL_RATES: PayrollRatesConfig = {
-  mealRate: 15, halfPerDiemRate: 18.5, perDiemRate: 37,
-  halfIntlPerDiemRate: 47.5, intlPerDiemRate: 95,
+  mealRate: 15,
+  halfPerDiemRate: 18.5,    halfPerDiemRateArtistic: 18.5,
+  perDiemRate: 37,          perDiemRateArtistic: 37,
+  halfIntlPerDiemRate: 47.5, halfIntlPerDiemRateArtistic: 47.5,
+  intlPerDiemRate: 95,      intlPerDiemRateArtistic: 95,
   accommodationRate: 80, carRate: 40,
 };
 
@@ -256,8 +263,6 @@ export default function TeamConfigPage() {
       const SECTION_LABELS: Record<string, string> = {
         technical: "Equipo técnico", cast: "Cast", specialists: "Especialistas",
       };
-      const FIXED_AT_END = ["Localizaciones", "Otros"];
-
       const crewSnap = await getDocs(
         query(collection(db, `projects/${projectId}/crew`), fbOrderBy("createdAt", "desc"))
       );
@@ -270,22 +275,19 @@ export default function TeamConfigPage() {
               return dept || SECTION_LABELS[d.data().section || "technical"] || "Equipo técnico";
             })
         )
-      ).filter((d) => !FIXED_AT_END.includes(d));
-
-      // Always include fixed departments at the end
-      const allDepts = [...crewDepts, ...FIXED_AT_END];
+      );
 
       // Apply saved order
       const deptOrderSnap = await getDoc(doc(db, `projects/${projectId}/teamConfig`, "departmentOrder"));
       if (deptOrderSnap.exists()) {
         const savedOrder: string[] = deptOrderSnap.data().order || [];
         const ordered = [
-          ...savedOrder.filter((d) => allDepts.includes(d)),
-          ...allDepts.filter((d) => !savedOrder.includes(d)),
+          ...savedOrder.filter((d) => crewDepts.includes(d)),
+          ...crewDepts.filter((d) => !savedOrder.includes(d)),
         ];
         setDepartments(ordered);
       } else {
-        setDepartments(allDepts);
+        setDepartments(crewDepts);
       }
 
       // Export config
@@ -375,15 +377,10 @@ export default function TeamConfigPage() {
     });
   };
 
-  const FIXED_DEPT_NAMES = ["Localizaciones", "Otros"];
-
   // Department order helpers
   const moveDept = (index: number, dir: -1 | 1) => {
     const next = index + dir;
     if (next < 0 || next >= departments.length) return;
-    // Don't allow moving past fixed departments at the end
-    if (FIXED_DEPT_NAMES.includes(departments[next]) && dir === 1) return;
-    if (FIXED_DEPT_NAMES.includes(departments[index]) && dir === -1) return;
     setDepartments((prev) => {
       const arr = [...prev];
       [arr[index], arr[next]] = [arr[next], arr[index]];
@@ -480,7 +477,7 @@ export default function TeamConfigPage() {
         <div className="px-6 py-4 border-b border-slate-100">
           <p className="text-sm font-semibold text-slate-900">Orden de departamentos</p>
           <p className="text-xs text-slate-500 mt-0.5">
-            Define el orden en que aparecen en los listados y exportaciones. Localizaciones y Otros van siempre al final.
+            Define el orden en que aparecen en los listados y exportaciones.
           </p>
         </div>
 
@@ -492,36 +489,28 @@ export default function TeamConfigPage() {
         ) : (
           <div className="divide-y divide-slate-100">
             {departments.map((dept, i) => {
-              const isFixed = FIXED_DEPT_NAMES.includes(dept);
-              const isFirst = i === 0 || (i === 1 && FIXED_DEPT_NAMES.includes(departments[0]));
-              const isLast = i === departments.length - 1;
-              const canMoveUp = !isFixed && i > 0 && !FIXED_DEPT_NAMES.includes(departments[i - 1]);
-              const canMoveDown = !isFixed && i < departments.length - 1 && !FIXED_DEPT_NAMES.includes(departments[i + 1]);
+              const canMoveUp = i > 0;
+              const canMoveDown = i < departments.length - 1;
               return (
-                <div key={dept} className={`flex items-center gap-3 px-6 py-3 ${isFixed ? "bg-slate-50" : ""}`}>
+                <div key={dept} className="flex items-center gap-3 px-6 py-3">
                   <span className="w-5 text-center text-xs font-mono text-slate-400 flex-shrink-0">{i + 1}</span>
                   <div
                     className="w-0.5 h-6 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: isFixed ? "#cbd5e1" : TEAM_COLOR }}
+                    style={{ backgroundColor: TEAM_COLOR }}
                   />
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${isFixed ? "text-slate-400" : "text-slate-900"}`}>{dept}</p>
-                    {isFixed && <p className="text-xs text-slate-400">Siempre al final</p>}
+                    <p className="text-sm font-medium text-slate-900">{dept}</p>
                   </div>
-                  {isFixed ? (
-                    <Lock size={13} className="text-slate-300 flex-shrink-0" />
-                  ) : (
-                    <div className="flex items-center gap-0.5">
-                      <button onClick={() => moveDept(i, -1)} disabled={!canMoveUp}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-20 transition-colors">
-                        <ArrowUp size={13} />
-                      </button>
-                      <button onClick={() => moveDept(i, 1)} disabled={!canMoveDown}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-20 transition-colors">
-                        <ArrowDown size={13} />
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-0.5">
+                    <button onClick={() => moveDept(i, -1)} disabled={!canMoveUp}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-20 transition-colors">
+                      <ArrowUp size={13} />
+                    </button>
+                    <button onClick={() => moveDept(i, 1)} disabled={!canMoveDown}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-20 transition-colors">
+                      <ArrowDown size={13} />
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -539,14 +528,51 @@ export default function TeamConfigPage() {
     setPayrollRates(r => ({ ...r, [key]: value }));
 
   const renderPayrollRates = () => {
-    const rateFields: { key: keyof PayrollRatesConfig; label: string; description: string; icon: React.ReactNode }[] = [
-      { key: "mealRate",            label: "Comidas",                  description: "Por día o comida",               icon: <Utensils size={15} className="text-orange-500" />  },
-      { key: "halfPerDiemRate",     label: "Media dieta nacional",     description: "Nacional — media dieta por día",  icon: <Plane size={15} className="text-sky-300" />       },
-      { key: "perDiemRate",         label: "Dieta nacional",           description: "Nacional — dieta completa/día",   icon: <Plane size={15} className="text-sky-500" />       },
-      { key: "halfIntlPerDiemRate", label: "Media dieta internacional",description: "Internacional — media dieta/día", icon: <Globe size={15} className="text-indigo-300" />    },
-      { key: "intlPerDiemRate",     label: "Dieta internacional",      description: "Internacional — dieta completa",  icon: <Globe size={15} className="text-indigo-500" />    },
-      { key: "accommodationRate",   label: "Alojamiento",              description: "Por noche",                       icon: <Home size={15} className="text-purple-500" />     },
-      { key: "carRate",             label: "Vehículo",                 description: "Por día (o €/km si se prefiere)", icon: <Car size={15} className="text-emerald-500" />     },
+    type RateGroup = {
+      label: string; description: string; icon: React.ReactNode;
+      fields: { key: keyof PayrollRatesConfig; badge: string; badgeColor: string }[];
+    };
+    const groups: RateGroup[] = [
+      {
+        label: "Comidas", description: "Por día o comida", icon: <Utensils size={15} className="text-orange-500" />,
+        fields: [{ key: "mealRate", badge: "Todos", badgeColor: "bg-slate-100 text-slate-500" }],
+      },
+      {
+        label: "Media dieta nacional", description: "Nacional — media dieta por día", icon: <Plane size={15} className="text-sky-300" />,
+        fields: [
+          { key: "halfPerDiemRate", badge: "R. General", badgeColor: "bg-blue-50 text-blue-600" },
+          { key: "halfPerDiemRateArtistic", badge: "R. Artistas", badgeColor: "bg-violet-50 text-violet-600" },
+        ],
+      },
+      {
+        label: "Dieta nacional", description: "Nacional — dieta completa/día", icon: <Plane size={15} className="text-sky-500" />,
+        fields: [
+          { key: "perDiemRate", badge: "R. General", badgeColor: "bg-blue-50 text-blue-600" },
+          { key: "perDiemRateArtistic", badge: "R. Artistas", badgeColor: "bg-violet-50 text-violet-600" },
+        ],
+      },
+      {
+        label: "Media dieta internacional", description: "Internacional — media dieta/día", icon: <Globe size={15} className="text-indigo-300" />,
+        fields: [
+          { key: "halfIntlPerDiemRate", badge: "R. General", badgeColor: "bg-blue-50 text-blue-600" },
+          { key: "halfIntlPerDiemRateArtistic", badge: "R. Artistas", badgeColor: "bg-violet-50 text-violet-600" },
+        ],
+      },
+      {
+        label: "Dieta internacional", description: "Internacional — dieta completa", icon: <Globe size={15} className="text-indigo-500" />,
+        fields: [
+          { key: "intlPerDiemRate", badge: "R. General", badgeColor: "bg-blue-50 text-blue-600" },
+          { key: "intlPerDiemRateArtistic", badge: "R. Artistas", badgeColor: "bg-violet-50 text-violet-600" },
+        ],
+      },
+      {
+        label: "Alojamiento", description: "Por noche", icon: <Home size={15} className="text-purple-500" />,
+        fields: [{ key: "accommodationRate", badge: "Todos", badgeColor: "bg-slate-100 text-slate-500" }],
+      },
+      {
+        label: "Vehículo", description: "Por día (o €/km si se prefiere)", icon: <Car size={15} className="text-emerald-500" />,
+        fields: [{ key: "carRate", badge: "Todos", badgeColor: "bg-slate-100 text-slate-500" }],
+      },
     ];
     return (
       <div className="space-y-4">
@@ -554,12 +580,12 @@ export default function TeamConfigPage() {
           <div className="px-6 py-4 border-b border-slate-100">
             <p className="text-sm font-semibold text-slate-900">Tarifas globales</p>
             <p className="text-xs text-slate-500 mt-0.5">
-              Importes que se aplican por defecto en la página de Nóminas. Se pueden sobrescribir día a día para cada persona.
+              Importes por defecto en Nóminas. Las dietas tienen tarifa separada para Equipo técnico (R. General) y Equipo artístico (R. Artistas).
             </p>
           </div>
           <div className="divide-y divide-slate-100">
-            {rateFields.map(({ key, label, description, icon }) => (
-              <div key={key} className="flex items-center gap-4 px-6 py-3.5">
+            {groups.map(({ label, description, icon, fields }) => (
+              <div key={label} className="flex items-center gap-4 px-6 py-3.5">
                 <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center flex-shrink-0">
                   {icon}
                 </div>
@@ -567,16 +593,23 @@ export default function TeamConfigPage() {
                   <p className="text-sm font-medium text-slate-900">{label}</p>
                   <p className="text-xs text-slate-400 mt-0.5">{description}</p>
                 </div>
-                <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-slate-300">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={payrollRates[key]}
-                    onChange={e => setPayrollRate(key, parseFloat(e.target.value) || 0)}
-                    className="w-20 text-sm text-right px-3 py-2 focus:outline-none text-slate-900 font-medium"
-                  />
-                  <span className="px-2.5 py-2 text-sm text-slate-400 bg-slate-50 border-l border-slate-200">€</span>
+                <div className="flex items-center gap-2">
+                  {fields.map(({ key, badge, badgeColor }) => (
+                    <div key={key} className="flex flex-col items-end gap-1">
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md ${badgeColor}`}>{badge}</span>
+                      <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-slate-300">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={payrollRates[key]}
+                          onChange={e => setPayrollRate(key, parseFloat(e.target.value) || 0)}
+                          className="w-20 text-sm text-right px-3 py-2 focus:outline-none text-slate-900 font-medium"
+                        />
+                        <span className="px-2.5 py-2 text-sm text-slate-400 bg-slate-50 border-l border-slate-200">€</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}

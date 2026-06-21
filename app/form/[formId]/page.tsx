@@ -882,12 +882,6 @@ export default function FormPage() {
           submittedAt: Timestamp.now(),
           response: { entries: dietasData },
         });
-        // Update dietasForms status so payroll page can detect it
-        try {
-          await setDoc(doc(db, `projects/${formDoc.projectId}/dietasForms`, formId), {
-            status: "submitted", submittedAt: Timestamp.now(),
-          }, { merge: true });
-        } catch { /* ignore */ }
         setSubmittedData({ entries: dietasData });
         setSubmitted(true);
       } catch (e) { console.error(e); }
