@@ -674,7 +674,7 @@ export default function PayrollPage() {
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50">
                     {importingId === pf.formId ? "Importando…" : "Importar"}
                   </button>
-                  {pf.status !== "submitted" ? (
+                  {pf.status !== "submitted" && (
                     <button
                       onClick={() => copyToClipboard(`${window.location.origin}/form/${pf.formId}`, `link-${pf.formId}`)}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors">
