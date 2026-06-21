@@ -62,6 +62,8 @@ const EMPTY_DAY: DayEntry = {
 };
 
 type MonthData = Record<string, Record<string, DayEntry>>;
+// salaryOverrides: per-member override of the base rate (monthly or weekly amount) for this month
+type SalaryOverrides = Record<string, number>;
 
 interface PayrollConfig {
   mealRate: number;
@@ -118,7 +120,7 @@ function inRange(m: CrewMember, y: number, mo: number, d: number): boolean {
   return true;
 }
 
-function dailySalary(m: CrewMember): number {
+function baseDailySalary(m: CrewMember): number {
   if ((m.salaryType === "monthly") && m.grossSalary) return m.grossSalary / 30;
   if ((m.salaryType === "weekly")  && m.salaryAmount) return m.salaryAmount / 5;
   if (m.salaryPerSession) return m.salaryPerSession;
@@ -148,6 +150,7 @@ export default function PayrollPage() {
 
   const [crew,          setCrew]          = useState<CrewMember[]>([]);
   const [monthData,     setMonthData]     = useState<MonthData>({});
+  const [salaryOverrides, setSalaryOverrides] = useState<SalaryOverrides>({});
   const [cfg,           setCfg]           = useState<PayrollConfig>(DEFAULT_CONFIG);
   const [loading,       setLoading]       = useState(true);
   const [saving,        setSaving]        = useState(false);
@@ -191,6 +194,10 @@ export default function PayrollPage() {
 
   // Person detail modal
   const [detailId,      setDetailId]          = useState<string|null>(null);
+  const [editingSalary, setEditingSalary]      = useState(false);
+  const [salaryDraft,   setSalaryDraft]        = useState("");
+  const [notes,         setNotes]             = useState<Record<string,string>>({});
+  const [noteDraft,     setNoteDraft]         = useState<string|null>(null);
 
   // Department order
   const [deptOrder,     setDeptOrder]         = useState<string[]>([]);
@@ -258,22 +265,55 @@ export default function PayrollPage() {
     if (snap.exists()) {
       setMonthData(snap.data().entries || {});
       setPeriods(snap.data().periods || {});
+      setSalaryOverrides(snap.data().salaryOverrides || {});
+      setNotes(snap.data().notes || {});
     } else {
       setMonthData({});
       setPeriods({});
+      setSalaryOverrides({});
+      setNotes({});
     }
   };
 
-  const saveData = async (data: MonthData) => {
+  const saveData = async (data: MonthData, overrides?: SalaryOverrides, notesMap?: Record<string,string>) => {
     setSaving(true);
     try {
       await setDoc(doc(db, `projects/${projectId}/payrollMonths`, monthKey), {
-        entries: data, updatedAt: Timestamp.now(), updatedBy: user?.uid || "",
+        entries: data,
+        periods,
+        salaryOverrides: overrides ?? salaryOverrides,
+        notes: notesMap ?? notes,
+        updatedAt: Timestamp.now(), updatedBy: user?.uid || "",
       });
     } finally { setSaving(false); }
   };
 
+  const saveNote = async (memberId: string, text: string) => {
+    const next = { ...notes };
+    if (text.trim()) next[memberId] = text.trim(); else delete next[memberId];
+    setNotes(next);
+    await saveData(monthData, undefined, next);
+  };
+
+  const saveSalaryOverride = async (memberId: string, value: number | null) => {
+    const next = { ...salaryOverrides };
+    if (value === null) delete next[memberId]; else next[memberId] = value;
+    setSalaryOverrides(next);
+    await saveData(monthData, next);
+  };
+
   // ── Data helpers ────────────────────────────────────────────────────────────
+
+  // Override base rate with month-specific value if set
+  const dailySalary = (m: CrewMember): number => {
+    const ov = salaryOverrides[m.id];
+    if (ov !== undefined) {
+      if (m.salaryType === "monthly") return ov / 30;
+      if (m.salaryType === "weekly")  return ov / 5;
+      return ov; // session
+    }
+    return baseDailySalary(m);
+  };
 
   const getEntry = (mId: string, d: number): DayEntry =>
     monthData[mId]?.[dk(d)] || EMPTY_DAY;
@@ -940,7 +980,7 @@ export default function PayrollPage() {
                     className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="Imprimir">
                     <Printer size={15} />
                   </button>
-                  <button onClick={() => setDetailId(null)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                  <button onClick={() => { setDetailId(null); setEditingSalary(false); setNoteDraft(null); }} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
                     <X size={15} />
                   </button>
                 </div>
@@ -959,32 +999,89 @@ export default function PayrollPage() {
               {/* Scrollable content */}
               <div className="flex-1 overflow-y-auto p-6 space-y-5">
                 {/* Salary */}
-                {ds > 0 && (
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Banknote size={14} className="text-slate-400" />
-                      <p className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Salario</p>
-                    </div>
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-500">Tipo</span>
-                        <span className="text-slate-700 font-medium capitalize">{m.salaryType || "—"}</span>
+                {(ds > 0 || m.salaryType) && (() => {
+                  const hasOverride = salaryOverrides[m.id] !== undefined;
+                  const baseRate = m.salaryType === "monthly" ? (m.grossSalary || 0)
+                    : m.salaryType === "weekly" ? (m.salaryAmount || 0)
+                    : (m.salaryPerSession || 0);
+                  const currentRate = hasOverride ? salaryOverrides[m.id] : baseRate;
+                  const rateLabel = m.salaryType === "monthly" ? "€/mes" : m.salaryType === "weekly" ? "€/semana" : "€/sesión";
+                  return (
+                    <div className={`border rounded-xl p-4 ${hasOverride ? "border-amber-200 bg-amber-50" : "bg-slate-50 border-slate-200"}`}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Banknote size={14} className={hasOverride ? "text-amber-500" : "text-slate-400"} />
+                        <p className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex-1">Salario</p>
+                        {hasOverride ? (
+                          <button
+                            onClick={() => saveSalaryOverride(m.id, null)}
+                            className="flex items-center gap-1 text-[10px] text-amber-600 hover:text-red-500 transition-colors"
+                            title="Importe personalizado este mes — click para volver al base">
+                            <Unlock size={10} /><span>Personalizado este mes</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => { setSalaryDraft(String(baseRate)); setEditingSalary(true); }}
+                            className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-slate-700 transition-colors"
+                            title="Cambiar salario solo para este mes">
+                            <Lock size={10} /><span>Cambiar este mes</span>
+                          </button>
+                        )}
                       </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-500">Tarifa diaria</span>
-                        <span className="text-slate-700 font-medium">{fmt(ds)}</span>
-                      </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-500">Días con complementos</span>
+
+                      {editingSalary && !hasOverride ? (
+                        <div className="flex items-center gap-2 mb-3">
+                          <input
+                            type="number" autoFocus min="0" step="0.01"
+                            value={salaryDraft}
+                            onChange={e => setSalaryDraft(e.target.value)}
+                            className="flex-1 border border-amber-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white"
+                            placeholder={`Importe ${rateLabel}`}
+                          />
+                          <span className="text-xs text-slate-500">{rateLabel}</span>
+                          <button
+                            onClick={() => {
+                              const v = parseFloat(salaryDraft);
+                              if (!isNaN(v) && v >= 0) saveSalaryOverride(m.id, v);
+                              setEditingSalary(false);
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium text-white rounded-lg"
+                            style={{ backgroundColor: TEAM_COLOR }}>
+                            OK
+                          </button>
+                          <button onClick={() => setEditingSalary(false)} className="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-700">✕</button>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">Tarifa {m.salaryType === "monthly" ? "mensual" : m.salaryType === "weekly" ? "semanal" : "por sesión"}</span>
+                            <span className={`font-medium ${hasOverride ? "text-amber-700" : "text-slate-700"}`}>
+                              {new Intl.NumberFormat("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2}).format(currentRate)} {rateLabel}
+                              {hasOverride && (
+                                <button onClick={() => { setSalaryDraft(String(currentRate)); setEditingSalary(true); }}
+                                  className="ml-1.5 text-amber-500 hover:text-amber-700">
+                                  <Lock size={9} style={{display:"inline"}} />
+                                </button>
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">Tarifa diaria</span>
+                            <span className="text-slate-700 font-medium">{fmt(ds)}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between text-xs pt-1.5 mt-1.5 border-t border-slate-200">
+                        <span className="text-slate-500">Días trabajados</span>
                         <span className="text-slate-700 font-medium">{wd} días</span>
                       </div>
-                      <div className="flex justify-between text-sm font-semibold pt-1 border-t border-slate-200 mt-1">
+                      <div className="flex justify-between text-sm font-semibold pt-1.5 mt-1 border-t border-slate-200">
                         <span className="text-slate-700">Salario estimado</span>
                         <span className="text-slate-900">{fmt(sal)}</span>
                       </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Allowances by type */}
                 {byType.length > 0 && (
@@ -1090,6 +1187,57 @@ export default function PayrollPage() {
                     <span>Total bruto</span><span>{fmt(bruto)}</span>
                   </div>
                 )}
+
+                {/* Note */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex-1">Nota de nómina</p>
+                    {notes[m.id] && noteDraft === null && (
+                      <button onClick={() => setNoteDraft(notes[m.id])}
+                        className="text-[10px] text-slate-400 hover:text-slate-700 transition-colors underline">
+                        Editar
+                      </button>
+                    )}
+                  </div>
+                  {noteDraft !== null ? (
+                    <div className="space-y-2">
+                      <textarea
+                        autoFocus rows={3}
+                        value={noteDraft}
+                        onChange={e => setNoteDraft(e.target.value)}
+                        placeholder="Añade una nota visible en el informe de esta persona…"
+                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-300 resize-none bg-white"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => { saveNote(m.id, noteDraft); setNoteDraft(null); }}
+                          className="flex-1 py-1.5 text-xs font-medium text-white rounded-lg"
+                          style={{ backgroundColor: TEAM_COLOR }}>
+                          Guardar
+                        </button>
+                        {notes[m.id] && (
+                          <button
+                            onClick={() => { saveNote(m.id, ""); setNoteDraft(null); }}
+                            className="px-3 py-1.5 text-xs text-red-400 hover:text-red-600 border border-red-100 rounded-lg transition-colors">
+                            Quitar
+                          </button>
+                        )}
+                        <button onClick={() => setNoteDraft(null)}
+                          className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-600 border border-slate-200 rounded-lg transition-colors">
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : notes[m.id] ? (
+                    <p className="text-xs text-slate-600 leading-relaxed">{notes[m.id]}</p>
+                  ) : (
+                    <button
+                      onClick={() => setNoteDraft("")}
+                      className="text-xs text-slate-400 hover:text-slate-600 transition-colors">
+                      + Añadir nota…
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

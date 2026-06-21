@@ -230,23 +230,6 @@ export default function TeamPage() {
               </div>
             </div>
 
-            {/* Section stats */}
-            <div className="px-5 pt-4 pb-2 grid grid-cols-3 gap-3">
-              {(["technical", "cast", "specialists"] as CrewSection[]).map((section) => {
-                const cfg  = SECTION_CONFIG[section];
-                const Icon = cfg.icon;
-                return (
-                  <Link key={section} href={`/project/${id}/team/crew`}
-                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border border-transparent hover:border-slate-200 transition-all ${cfg.bg}`}>
-                    <Icon size={14} className={cfg.text} />
-                    <div>
-                      <p className={`text-sm font-bold leading-none ${cfg.text}`}>{stats[section]}</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5 leading-none">{cfg.label}</p>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
 
             {/* List */}
             <div className="p-5">
