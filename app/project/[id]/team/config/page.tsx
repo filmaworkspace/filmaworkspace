@@ -6,12 +6,13 @@ import { inter } from "@/lib/fonts";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
-  collection, doc, getDocs, getDoc, setDoc, Timestamp,
+  collection, doc, getDocs, getDoc, query, orderBy as fbOrderBy, setDoc, Timestamp,
 } from "firebase/firestore";
 import {
-  AlertCircle, ArrowDown, ArrowUp, Check, CheckCircle2,
-  FileCheck, FileDown, GripVertical, Info, Plus,
-  Save, Settings, Shield, Trash2, User, Users, X,
+  AlertCircle, ArrowDown, ArrowUp, Banknote, Car, Check, CheckCircle2,
+  ClipboardList, FileCheck, FileDown, Globe, GripVertical, Home,
+  Info, Lock, Plane, Plus, Save, Settings, Shield, Trash2, Utensils,
+  User, Users, X,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 
@@ -33,13 +34,6 @@ interface ApprovalConfig {
   updatedBy?: string;
 }
 
-interface Department {
-  id: string;
-  name: string;
-  section?: string;
-  order?: number;
-}
-
 interface ExportConfig {
   includePhoto: boolean;
   includePhone: boolean;
@@ -54,14 +48,133 @@ interface ExportConfig {
   groupByDepartment: boolean;
 }
 
+interface FormBuilderConfig {
+  showPhoto: boolean;
+  showLastName2: boolean;
+  showArtisticName: boolean;
+  showDocExpiry: boolean;
+  showBirthPlace: boolean;
+  showNationality: boolean;
+  showProvince: boolean;
+  showCountry: boolean;
+  showIrpfRate: boolean;
+  showContractReason: boolean;
+  showBankName: boolean;
+  showAccountHolder: boolean;
+  showBankCert: boolean;
+  showCv: boolean;
+}
+
+interface FormField {
+  key: keyof FormBuilderConfig | null;
+  label: string;
+  description?: string;
+  required?: boolean;
+}
+
+interface FormSection {
+  id: string;
+  label: string;
+  fields: FormField[];
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const TEAM_COLOR = "#6BA319";
 
 const CONFIG_SECTIONS = [
-  { id: "approvals",    label: "Aprobaciones", icon: FileCheck, description: "Flujo de aprobación para altas de crew" },
-  { id: "departments",  label: "Departamentos", icon: GripVertical, description: "Orden de los departamentos en listados" },
-  { id: "export",       label: "Exportación",  icon: FileDown, description: "Configuración de exportaciones de crew" },
+  { id: "approvals",    label: "Aprobaciones",  icon: FileCheck,     description: "Flujo de aprobación para altas de crew" },
+  { id: "departments",  label: "Departamentos", icon: GripVertical,  description: "Orden de los departamentos en listados" },
+  { id: "payroll",      label: "Nóminas",       icon: Banknote,      description: "Tarifas globales de dietas y complementos" },
+  { id: "form",         label: "Formulario",    icon: ClipboardList, description: "Preguntas del formulario de alta de crew" },
+  { id: "export",       label: "Exportación",   icon: FileDown,      description: "Configuración de exportaciones de crew" },
+];
+
+interface PayrollRatesConfig {
+  mealRate:             number;
+  halfPerDiemRate:      number;
+  perDiemRate:          number;
+  halfIntlPerDiemRate:  number;
+  intlPerDiemRate:      number;
+  accommodationRate:    number;
+  carRate:              number;
+}
+
+const DEFAULT_PAYROLL_RATES: PayrollRatesConfig = {
+  mealRate: 15, halfPerDiemRate: 18.5, perDiemRate: 37,
+  halfIntlPerDiemRate: 47.5, intlPerDiemRate: 95,
+  accommodationRate: 80, carRate: 40,
+};
+
+const FORM_BUILDER_DEFAULTS: FormBuilderConfig = {
+  showPhoto: true,
+  showLastName2: true,
+  showArtisticName: false,
+  showDocExpiry: true,
+  showBirthPlace: false,
+  showNationality: true,
+  showProvince: true,
+  showCountry: true,
+  showIrpfRate: true,
+  showContractReason: false,
+  showBankName: false,
+  showAccountHolder: false,
+  showBankCert: false,
+  showCv: false,
+};
+
+const FORM_SECTIONS: FormSection[] = [
+  {
+    id: "identity",
+    label: "Datos personales",
+    fields: [
+      { key: "showPhoto",        label: "Foto de perfil",           description: "El crew puede subir una foto" },
+      { key: null,               label: "Nombre",                   required: true },
+      { key: "showLastName2",    label: "Segundo apellido" },
+      { key: "showArtisticName", label: "Nombre artístico / en créditos", description: "Nombre que aparecerá en los créditos" },
+      { key: null,               label: "Tipo de documento",        required: true },
+      { key: null,               label: "Número de documento",      required: true },
+      { key: "showDocExpiry",    label: "Caducidad del documento" },
+      { key: null,               label: "Fecha de nacimiento",      required: true },
+      { key: "showBirthPlace",   label: "Lugar de nacimiento" },
+      { key: "showNationality",  label: "Nacionalidad" },
+    ],
+  },
+  {
+    id: "contact",
+    label: "Contacto",
+    fields: [
+      { key: null, label: "Email",          required: true },
+      { key: null, label: "Teléfono",       required: true },
+      { key: null, label: "Dirección",      required: true },
+      { key: null, label: "Código postal",  required: true },
+      { key: null, label: "Ciudad",         required: true },
+      { key: "showProvince", label: "Provincia" },
+      { key: "showCountry",  label: "País" },
+    ],
+  },
+  {
+    id: "fiscal",
+    label: "Fiscal y bancario",
+    fields: [
+      { key: null, label: "Nº Seguridad Social", required: true },
+      { key: null, label: "Régimen de la SS",    required: true },
+      { key: "showIrpfRate",       label: "% IRPF aplicable" },
+      { key: "showContractReason", label: "Causa del contrato" },
+      { key: null, label: "IBAN", required: true },
+      { key: "showBankName",       label: "Nombre del banco" },
+      { key: "showAccountHolder",  label: "Titular de la cuenta" },
+    ],
+  },
+  {
+    id: "documents",
+    label: "Documentos adjuntos",
+    fields: [
+      { key: null,             label: "DNI / NIE (anverso y reverso)", required: true },
+      { key: "showBankCert",   label: "Certificado de cuenta bancaria" },
+      { key: "showCv",         label: "Curriculum Vitae" },
+    ],
+  },
 ];
 
 const DEFAULT_EXPORT: ExportConfig = {
@@ -97,8 +210,10 @@ export default function TeamConfigPage() {
   const [approvalConfig, setApprovalConfig]     = useState<ApprovalConfig>({
     approverUserIds: [], approverNames: {}, requireApproval: false,
   });
-  const [departments, setDepartments]           = useState<Department[]>([]);
+  const [departments, setDepartments]           = useState<string[]>([]);
   const [exportConfig, setExportConfig]         = useState<ExportConfig>(DEFAULT_EXPORT);
+  const [formBuilderConfig, setFormBuilderConfig] = useState<FormBuilderConfig>(FORM_BUILDER_DEFAULTS);
+  const [payrollRates, setPayrollRates]           = useState<PayrollRatesConfig>(DEFAULT_PAYROLL_RATES);
   const [showMemberPicker, setShowMemberPicker] = useState(false);
 
   const userId = user?.uid || "";
@@ -137,36 +252,58 @@ export default function TeamConfigPage() {
         });
       }
 
-      // Departments — load from project departments collection, apply saved order
-      const deptSnap = await getDocs(collection(db, `projects/${projectId}/departments`));
-      const rawDepts: Department[] = deptSnap.docs.map((d) => ({
-        id: d.id,
-        name: d.data().name || d.id,
-        section: d.data().section || "",
-        order: d.data().order ?? 999,
-      }));
+      // Departments — extract from crew members (same source as crew list)
+      const SECTION_LABELS: Record<string, string> = {
+        technical: "Equipo técnico", cast: "Cast", specialists: "Especialistas",
+      };
+      const FIXED_AT_END = ["Localizaciones", "Otros"];
 
-      // Load saved crew department order
+      const crewSnap = await getDocs(
+        query(collection(db, `projects/${projectId}/crew`), fbOrderBy("createdAt", "desc"))
+      );
+      const crewDepts = Array.from(
+        new Set(
+          crewSnap.docs
+            .filter((d) => (d.data().status || "active") !== "inactive")
+            .map((d) => {
+              const dept = (d.data().department || "").trim();
+              return dept || SECTION_LABELS[d.data().section || "technical"] || "Equipo técnico";
+            })
+        )
+      ).filter((d) => !FIXED_AT_END.includes(d));
+
+      // Always include fixed departments at the end
+      const allDepts = [...crewDepts, ...FIXED_AT_END];
+
+      // Apply saved order
       const deptOrderSnap = await getDoc(doc(db, `projects/${projectId}/teamConfig`, "departmentOrder"));
       if (deptOrderSnap.exists()) {
         const savedOrder: string[] = deptOrderSnap.data().order || [];
-        const ordered = [...rawDepts].sort((a, b) => {
-          const ai = savedOrder.indexOf(a.id);
-          const bi = savedOrder.indexOf(b.id);
-          if (ai === -1 && bi === -1) return (a.order || 0) - (b.order || 0);
-          if (ai === -1) return 1;
-          if (bi === -1) return -1;
-          return ai - bi;
-        });
+        const ordered = [
+          ...savedOrder.filter((d) => allDepts.includes(d)),
+          ...allDepts.filter((d) => !savedOrder.includes(d)),
+        ];
         setDepartments(ordered);
       } else {
-        setDepartments([...rawDepts].sort((a, b) => (a.order || 0) - (b.order || 0)));
+        setDepartments(allDepts);
       }
 
       // Export config
       const expSnap = await getDoc(doc(db, `projects/${projectId}/teamConfig`, "exportConfig"));
       if (expSnap.exists()) {
         setExportConfig({ ...DEFAULT_EXPORT, ...expSnap.data() });
+      }
+
+      // Form builder config
+      const formSnap = await getDoc(doc(db, `projects/${projectId}/teamConfig`, "formConfig"));
+      if (formSnap.exists()) {
+        setFormBuilderConfig({ ...FORM_BUILDER_DEFAULTS, ...formSnap.data() });
+      }
+
+      // Payroll rates
+      const payrollSnap = await getDoc(doc(db, `projects/${projectId}/teamConfig`, "payrollConfig"));
+      if (payrollSnap.exists()) {
+        setPayrollRates({ ...DEFAULT_PAYROLL_RATES, ...payrollSnap.data() });
       }
     } catch (e) { console.error(e); }
   };
@@ -191,13 +328,25 @@ export default function TeamConfigPage() {
       });
       // Department order
       await setDoc(doc(db, `projects/${projectId}/teamConfig`, "departmentOrder"), {
-        order: departments.map((d) => d.id),
+        order: departments,
         updatedAt: Timestamp.now(),
         updatedBy: userId,
       });
       // Export config
       await setDoc(doc(db, `projects/${projectId}/teamConfig`, "exportConfig"), {
         ...exportConfig,
+        updatedAt: Timestamp.now(),
+        updatedBy: userId,
+      });
+      // Form builder config
+      await setDoc(doc(db, `projects/${projectId}/teamConfig`, "formConfig"), {
+        ...formBuilderConfig,
+        updatedAt: Timestamp.now(),
+        updatedBy: userId,
+      });
+      // Payroll rates
+      await setDoc(doc(db, `projects/${projectId}/teamConfig`, "payrollConfig"), {
+        ...payrollRates,
         updatedAt: Timestamp.now(),
         updatedBy: userId,
       });
@@ -226,10 +375,15 @@ export default function TeamConfigPage() {
     });
   };
 
+  const FIXED_DEPT_NAMES = ["Localizaciones", "Otros"];
+
   // Department order helpers
   const moveDept = (index: number, dir: -1 | 1) => {
     const next = index + dir;
     if (next < 0 || next >= departments.length) return;
+    // Don't allow moving past fixed departments at the end
+    if (FIXED_DEPT_NAMES.includes(departments[next]) && dir === 1) return;
+    if (FIXED_DEPT_NAMES.includes(departments[index]) && dir === -1) return;
     setDepartments((prev) => {
       const arr = [...prev];
       [arr[index], arr[next]] = [arr[next], arr[index]];
@@ -326,45 +480,186 @@ export default function TeamConfigPage() {
         <div className="px-6 py-4 border-b border-slate-100">
           <p className="text-sm font-semibold text-slate-900">Orden de departamentos</p>
           <p className="text-xs text-slate-500 mt-0.5">
-            Define el orden en que aparecen los departamentos en los listados y exportaciones de crew
+            Define el orden en que aparecen en los listados y exportaciones. Localizaciones y Otros van siempre al final.
           </p>
         </div>
 
         {departments.length === 0 ? (
           <div className="px-6 py-10 text-center">
-            <p className="text-sm text-slate-500">No hay departamentos configurados</p>
-            <p className="text-xs text-slate-400 mt-1">Crea departamentos en la configuración del proyecto</p>
+            <p className="text-sm text-slate-500">No hay crew con departamentos asignados</p>
+            <p className="text-xs text-slate-400 mt-1">Añade miembros al crew y asígnales departamento</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {departments.map((dept, i) => (
-              <div key={dept.id} className="flex items-center gap-3 px-6 py-3">
-                <span className="w-5 text-center text-xs font-mono text-slate-400 flex-shrink-0">{i + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900">{dept.name}</p>
-                  {dept.section && <p className="text-xs text-slate-400 capitalize">{dept.section}</p>}
+            {departments.map((dept, i) => {
+              const isFixed = FIXED_DEPT_NAMES.includes(dept);
+              const isFirst = i === 0 || (i === 1 && FIXED_DEPT_NAMES.includes(departments[0]));
+              const isLast = i === departments.length - 1;
+              const canMoveUp = !isFixed && i > 0 && !FIXED_DEPT_NAMES.includes(departments[i - 1]);
+              const canMoveDown = !isFixed && i < departments.length - 1 && !FIXED_DEPT_NAMES.includes(departments[i + 1]);
+              return (
+                <div key={dept} className={`flex items-center gap-3 px-6 py-3 ${isFixed ? "bg-slate-50" : ""}`}>
+                  <span className="w-5 text-center text-xs font-mono text-slate-400 flex-shrink-0">{i + 1}</span>
+                  <div
+                    className="w-0.5 h-6 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: isFixed ? "#cbd5e1" : TEAM_COLOR }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium ${isFixed ? "text-slate-400" : "text-slate-900"}`}>{dept}</p>
+                    {isFixed && <p className="text-xs text-slate-400">Siempre al final</p>}
+                  </div>
+                  {isFixed ? (
+                    <Lock size={13} className="text-slate-300 flex-shrink-0" />
+                  ) : (
+                    <div className="flex items-center gap-0.5">
+                      <button onClick={() => moveDept(i, -1)} disabled={!canMoveUp}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-20 transition-colors">
+                        <ArrowUp size={13} />
+                      </button>
+                      <button onClick={() => moveDept(i, 1)} disabled={!canMoveDown}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-20 transition-colors">
+                        <ArrowDown size={13} />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-0.5">
-                  <button onClick={() => moveDept(i, -1)} disabled={i === 0}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-20 transition-colors">
-                    <ArrowUp size={13} />
-                  </button>
-                  <button onClick={() => moveDept(i, 1)} disabled={i === departments.length - 1}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-20 transition-colors">
-                    <ArrowDown size={13} />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
       <div className="flex items-start gap-2 text-xs text-slate-500 px-1">
         <Info size={13} className="flex-shrink-0 mt-0.5 text-slate-400" />
-        <span>Este orden se aplica en los listados de crew y en todas las exportaciones. Los departamentos sin asignar aparecen al final.</span>
+        <span>Este orden se aplica automáticamente en los listados de crew y en las exportaciones PDF.</span>
       </div>
     </div>
   );
+
+  const setPayrollRate = (key: keyof PayrollRatesConfig, value: number) =>
+    setPayrollRates(r => ({ ...r, [key]: value }));
+
+  const renderPayrollRates = () => {
+    const rateFields: { key: keyof PayrollRatesConfig; label: string; description: string; icon: React.ReactNode }[] = [
+      { key: "mealRate",            label: "Comidas",                  description: "Por día o comida",               icon: <Utensils size={15} className="text-orange-500" />  },
+      { key: "halfPerDiemRate",     label: "Media dieta nacional",     description: "Nacional — media dieta por día",  icon: <Plane size={15} className="text-sky-300" />       },
+      { key: "perDiemRate",         label: "Dieta nacional",           description: "Nacional — dieta completa/día",   icon: <Plane size={15} className="text-sky-500" />       },
+      { key: "halfIntlPerDiemRate", label: "Media dieta internacional",description: "Internacional — media dieta/día", icon: <Globe size={15} className="text-indigo-300" />    },
+      { key: "intlPerDiemRate",     label: "Dieta internacional",      description: "Internacional — dieta completa",  icon: <Globe size={15} className="text-indigo-500" />    },
+      { key: "accommodationRate",   label: "Alojamiento",              description: "Por noche",                       icon: <Home size={15} className="text-purple-500" />     },
+      { key: "carRate",             label: "Vehículo",                 description: "Por día (o €/km si se prefiere)", icon: <Car size={15} className="text-emerald-500" />     },
+    ];
+    return (
+      <div className="space-y-4">
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <p className="text-sm font-semibold text-slate-900">Tarifas globales</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Importes que se aplican por defecto en la página de Nóminas. Se pueden sobrescribir día a día para cada persona.
+            </p>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {rateFields.map(({ key, label, description, icon }) => (
+              <div key={key} className="flex items-center gap-4 px-6 py-3.5">
+                <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                  {icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900">{label}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{description}</p>
+                </div>
+                <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-slate-300">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={payrollRates[key]}
+                    onChange={e => setPayrollRate(key, parseFloat(e.target.value) || 0)}
+                    className="w-20 text-sm text-right px-3 py-2 focus:outline-none text-slate-900 font-medium"
+                  />
+                  <span className="px-2.5 py-2 text-sm text-slate-400 bg-slate-50 border-l border-slate-200">€</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-start gap-2 text-xs text-slate-500 px-1">
+          <Info size={13} className="flex-shrink-0 mt-0.5 text-slate-400" />
+          <span>
+            Al modificar estas tarifas solo afecta a los nuevos registros. Los días ya guardados con importe personalizado mantienen su valor.
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  const toggleFormField = (key: keyof FormBuilderConfig) =>
+    setFormBuilderConfig((c) => ({ ...c, [key]: !c[key] }));
+
+  const renderFormBuilder = () => {
+    const enabledCount = (Object.values(formBuilderConfig) as boolean[]).filter(Boolean).length;
+    const totalToggleable = Object.keys(FORM_BUILDER_DEFAULTS).length;
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-1">
+          <p className="text-xs text-slate-500">
+            {enabledCount} de {totalToggleable} campos opcionales activos
+          </p>
+          <button
+            onClick={() => setFormBuilderConfig(FORM_BUILDER_DEFAULTS)}
+            className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            Restaurar por defecto
+          </button>
+        </div>
+
+        {FORM_SECTIONS.map((section) => (
+          <div key={section.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="px-6 py-3.5 border-b border-slate-100 bg-slate-50">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{section.label}</p>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {section.fields.map((field, idx) => {
+                const isLocked = field.key === null || field.required;
+                const isOn = field.key ? formBuilderConfig[field.key] : true;
+                return (
+                  <div key={idx} className="flex items-center gap-4 px-6 py-3.5">
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium ${isLocked && !isOn ? "text-slate-400" : "text-slate-900"}`}>
+                        {field.label}
+                      </p>
+                      {field.description && (
+                        <p className="text-xs text-slate-400 mt-0.5">{field.description}</p>
+                      )}
+                    </div>
+                    {isLocked ? (
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <Lock size={11} className="text-slate-300" />
+                        <span className="text-xs text-slate-300">Obligatorio</span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => toggleFormField(field.key!)}
+                        className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors ${isOn ? "" : "bg-slate-200"}`}
+                        style={isOn ? { backgroundColor: TEAM_COLOR } : {}}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isOn ? "translate-x-5" : ""}`} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+        <div className="flex items-start gap-2 text-xs text-slate-500 px-1">
+          <Info size={13} className="flex-shrink-0 mt-0.5 text-slate-400" />
+          <span>Los cambios se aplican a todos los nuevos formularios enviados desde este proyecto. Los formularios ya enviados no se ven afectados.</span>
+        </div>
+      </div>
+    );
+  };
 
   const renderExport = () => {
     const fieldToggles: { key: keyof ExportConfig; label: string; description?: string }[] = [
@@ -511,6 +806,8 @@ export default function TeamConfigPage() {
           <div className="flex-1 min-w-0">
             {activeSection === "approvals"   && renderApprovals()}
             {activeSection === "departments" && renderDepartments()}
+            {activeSection === "payroll"     && renderPayrollRates()}
+            {activeSection === "form"        && renderFormBuilder()}
             {activeSection === "export"      && renderExport()}
           </div>
         </div>

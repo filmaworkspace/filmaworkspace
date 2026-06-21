@@ -430,12 +430,9 @@ export default function CrewPage() {
       });
       setCrew(data);
 
-      // Apply saved department order from teamConfig
+      // Apply saved department order from teamConfig (stored as dept name strings)
       if (deptOrderSnap.exists()) {
         const savedOrder: string[] = deptOrderSnap.data().order || [];
-        // Map saved dept IDs to dept labels used in crew members
-        // (departments collection names vs crew member strings may differ)
-        // We'll use the order to sort the crew dept strings
         const allDepts = Array.from(
           new Set(data.filter((m) => m.status !== "inactive").map((m) => m.department?.trim() || CREW_SECTIONS[m.section].label))
         );

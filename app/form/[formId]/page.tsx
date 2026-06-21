@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { db, storage } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, setDoc, Timestamp } from "firebase/firestore";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import {
   AlertCircle, ArrowLeft, ArrowRight, Check, CheckCircle2,
@@ -23,7 +23,7 @@ function FormLogo() {
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface FormDoc {
-  type: "crew_onboarding" | "box_request";
+  type: "crew_onboarding" | "box_request" | "dietas_request";
   pin: string;
   status: "pending" | "submitted";
   projectId: string;
@@ -38,6 +38,11 @@ interface FormDoc {
     email?: string; phone?: string; role?: string; department?: string; section?: string;
     requesterName?: string;
   };
+  // dietas_request extras
+  dateFrom?: string;
+  dateTo?: string;
+  people?: Array<{ memberId: string; firstName: string; lastName1: string; department: string; section: string }>;
+  allowanceTypes?: string[];
 }
 
 interface UploadedFile { name: string; url: string; size: number; }
@@ -68,12 +73,37 @@ const CREW_EMPTY: CrewFormResponse = {
   docs: {}, photoUrl: "", privacyAccepted: false,
 };
 
+interface FormBuilderConfig {
+  showPhoto: boolean;
+  showLastName2: boolean;
+  showArtisticName: boolean;
+  showDocExpiry: boolean;
+  showBirthPlace: boolean;
+  showNationality: boolean;
+  showProvince: boolean;
+  showCountry: boolean;
+  showIrpfRate: boolean;
+  showContractReason: boolean;
+  showBankName: boolean;
+  showAccountHolder: boolean;
+  showBankCert: boolean;
+  showCv: boolean;
+}
+
+const FORM_BUILDER_DEFAULTS: FormBuilderConfig = {
+  showPhoto: true, showLastName2: true, showArtisticName: false,
+  showDocExpiry: true, showBirthPlace: false, showNationality: true,
+  showProvince: true, showCountry: true,
+  showIrpfRate: true, showContractReason: false, showBankName: false, showAccountHolder: false,
+  showBankCert: false, showCv: false,
+};
+
 const SS_REGIMES = ["Régimen General", "Régimen Especial Artistas", "Autónomo (RETA)", "Trabajador/a Extranjero/a"];
-const DOC_UPLOADS = [
-  { key: "id_front",  label: "DNI / NIE — Anverso",           required: true  },
-  { key: "id_back",   label: "DNI / NIE — Reverso",           required: true  },
-  { key: "bank_cert", label: "Certificado de cuenta bancaria", required: false },
-  { key: "cv",        label: "Curriculum Vitae",               required: false },
+const DOC_UPLOADS_BASE = [
+  { key: "id_front",  label: "DNI / NIE — Anverso",           required: true,  configKey: null          },
+  { key: "id_back",   label: "DNI / NIE — Reverso",           required: true,  configKey: null          },
+  { key: "bank_cert", label: "Certificado de cuenta bancaria", required: false, configKey: "showBankCert" as const },
+  { key: "cv",        label: "Curriculum Vitae",               required: false, configKey: "showCv" as const      },
 ];
 const CREW_STEPS = ["Datos personales", "Contacto", "Fiscal y bancario", "Documentos", "Revisión"];
 
@@ -117,6 +147,8 @@ async function downloadResguardo(formDoc: FormDoc, responseData: any, formId: st
   // Title
   const title = formDoc.type === "crew_onboarding"
     ? "RESGUARDO DE FICHA DE ALTA"
+    : formDoc.type === "dietas_request"
+    ? "RESGUARDO DE INFORME DE DIETAS"
     : "RESGUARDO DE SOLICITUD DE CAJA";
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(18);
@@ -160,7 +192,7 @@ async function downloadResguardo(formDoc: FormDoc, responseData: any, formId: st
         ["Banco", responseData.bankName || "—"],
         ["Titular", responseData.accountHolder || "—"],
       ]],
-      ["Documentos adjuntos", DOC_UPLOADS.map(d => [d.label, responseData.docs?.[d.key] ? "✓ Adjuntado" : "No adjuntado"] as [string, string])],
+      ["Documentos adjuntos", DOC_UPLOADS_BASE.filter(d => responseData.docs?.[d.key]).map(d => [d.label, "✓ Adjuntado"] as [string, string])],
     ];
 
     for (const [sectionTitle, rows] of sections) {
@@ -457,11 +489,23 @@ export default function FormPage() {
   const [step,       setStep]       = useState(0);
   const [crewData,   setCrewData]   = useState<CrewFormResponse>(CREW_EMPTY);
   const [crewErrors, setCrewErrors] = useState<Partial<Record<keyof CrewFormResponse, string>>>({});
+  const [fc,         setFc]         = useState<FormBuilderConfig>(FORM_BUILDER_DEFAULTS);
+
+  const DOC_UPLOADS = DOC_UPLOADS_BASE.filter((d) => !d.configKey || fc[d.configKey]);
 
   // box_request
   const [expenses,     setExpenses]     = useState<ExpenseItem[]>([]);
   const [boxNotes,     setBoxNotes]     = useState("");
   const [boxSubmitting,setBoxSubmitting]= useState(false);
+
+  // dietas_request state
+  // { memberId: { "2025-07-06": { meals: true, ... } } }
+  const [dietasData,   setDietasData]   = useState<Record<string, Record<string, Record<string,boolean>>>>({});
+  const [qfPerson,     setQfPerson]     = useState<string|null>(null);
+  const [qfFrom,       setQfFrom]       = useState("");
+  const [qfTo,         setQfTo]         = useState("");
+  const [qfTypes,      setQfTypes]      = useState<Record<string,boolean>>({});
+  const [dietasSubmitting, setDietasSubmitting] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [openSelectKey, setOpenSelectKey] = useState<string | null>(null);
@@ -485,6 +529,11 @@ export default function FormPage() {
             lastName2: d.prefilled.lastName2 || "", artisticName: d.prefilled.artisticName || "",
             email: d.prefilled.email || "", phone: d.prefilled.phone || "",
           }));
+          // Load form builder config for this project
+          try {
+            const fcSnap = await getDoc(doc(db, `projects/${d.projectId}/teamConfig`, "formConfig"));
+            if (fcSnap.exists()) setFc({ ...FORM_BUILDER_DEFAULTS, ...fcSnap.data() });
+          } catch { /* use defaults */ }
         }
       } catch (e) { console.error(e); setNotFound(true); }
       finally { setLoading(false); }
@@ -625,13 +674,13 @@ export default function FormPage() {
     const { type = "text", placeholder = "", required = false, readonly = false } = opts || {};
     const err = crewErrors[key];
     return (
-      <div className={opts?.half ? "col-span-2 sm:col-span-1" : "col-span-2"}>
+      <div className={`min-w-0 ${opts?.half ? "col-span-2 sm:col-span-1" : "col-span-2"}`}>
         <label className="block text-sm font-medium text-stone-700 mb-1.5">
           {label} {required && <span className="text-red-400">*</span>}
         </label>
         <input type={type} value={crewData[key] as string} readOnly={readonly} placeholder={placeholder}
           onChange={(e) => { if (!readonly) { setCrewData((d) => ({ ...d, [key]: e.target.value })); setCrewErrors((er) => ({ ...er, [key]: undefined })); } }}
-          className={`w-full px-4 py-3 border rounded-xl text-sm focus:outline-none transition-all ${
+          className={`w-full min-w-0 px-4 py-3 border rounded-xl text-sm focus:outline-none transition-all ${
             readonly ? "bg-stone-50 text-stone-400 cursor-not-allowed border-stone-100" :
             err ? "border-red-300 bg-red-50" : "border-stone-200 bg-white text-stone-900"
           }`}
@@ -755,6 +804,242 @@ export default function FormPage() {
           <p className="text-xs text-stone-400 mt-8 text-center max-w-xs">
             Este formulario es personal e intransferible.
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── DIETAS REQUEST form ───────────────────────────────────────────────────
+
+  if (formDoc?.type === "dietas_request") {
+    const people = formDoc.people || [];
+    const allowTypes = formDoc.allowanceTypes || [];
+
+    const getDatesInRange = (from: string, to: string): string[] => {
+      const dates: string[] = [];
+      const start = new Date(from + "T00:00:00");
+      const end   = new Date(to   + "T00:00:00");
+      const cur   = new Date(start);
+      while (cur <= end) {
+        dates.push(cur.toISOString().slice(0, 10));
+        cur.setDate(cur.getDate() + 1);
+      }
+      return dates;
+    };
+
+    const allDates = formDoc.dateFrom && formDoc.dateTo ? getDatesInRange(formDoc.dateFrom, formDoc.dateTo) : [];
+    const DAY_SH = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+    const fmtDate = (d: string) => {
+      const dt = new Date(d + "T00:00:00");
+      return `${DAY_SH[dt.getDay()]} ${dt.getDate()}`;
+    };
+    const isWeekend = (d: string) => { const wd = new Date(d+"T00:00:00").getDay(); return wd===0||wd===6; };
+
+    const DIETA_LABELS: Record<string,string> = {
+      meals:"Comidas", halfPerDiem:"½ dieta nac.", perDiem:"Dieta nac.",
+      halfIntlPerDiem:"½ dieta int.", intlPerDiem:"Dieta int.",
+      accommodation:"Alojamiento", car:"Vehículo",
+    };
+    const DIETA_COLORS: Record<string,string> = {
+      meals:"#f97316", halfPerDiem:"#7dd3fc", perDiem:"#0ea5e9",
+      halfIntlPerDiem:"#a5b4fc", intlPerDiem:"#6366f1",
+      accommodation:"#a855f7", car:"#10b981",
+    };
+
+    const toggleType = (mId: string, date: string, t: string) => {
+      setDietasData(prev => {
+        const pM = prev[mId] || {};
+        const pD = pM[date] || {};
+        return { ...prev, [mId]: { ...pM, [date]: { ...pD, [t]: !pD[t] } } };
+      });
+    };
+
+    const applyQuickFill = (mId: string) => {
+      if (!qfFrom || !qfTo) return;
+      const rangeDates = getDatesInRange(
+        qfFrom < formDoc.dateFrom! ? formDoc.dateFrom! : qfFrom,
+        qfTo   > formDoc.dateTo!   ? formDoc.dateTo!   : qfTo,
+      );
+      setDietasData(prev => {
+        const pM = { ...(prev[mId] || {}) };
+        for (const d of rangeDates) {
+          pM[d] = { ...(pM[d] || {}), ...Object.fromEntries(allowTypes.map(t => [t, !!qfTypes[t]])) };
+        }
+        return { ...prev, [mId]: pM };
+      });
+      setQfPerson(null);
+    };
+
+    const totalFilledDays = people.reduce((sum, p) => {
+      return sum + allDates.filter(d => Object.values(dietasData[p.memberId]?.[d] || {}).some(Boolean)).length;
+    }, 0);
+
+    const handleDietasSubmit = async () => {
+      setDietasSubmitting(true);
+      try {
+        await updateDoc(doc(db, "forms", formId), {
+          status: "submitted",
+          submittedAt: Timestamp.now(),
+          response: { entries: dietasData },
+        });
+        // Update dietasForms status so payroll page can detect it
+        try {
+          await setDoc(doc(db, `projects/${formDoc.projectId}/dietasForms`, formId), {
+            status: "submitted", submittedAt: Timestamp.now(),
+          }, { merge: true });
+        } catch { /* ignore */ }
+        setSubmittedData({ entries: dietasData });
+        setSubmitted(true);
+      } catch (e) { console.error(e); }
+      finally { setDietasSubmitting(false); }
+    };
+
+    return (
+      <div className="min-h-screen" style={{ backgroundColor: "#FAF8F5" }}>
+        {/* Top bar */}
+        <div className="sticky top-0 z-10 bg-white border-b border-stone-100 shadow-sm">
+          <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+            <FormLogo />
+            {formDoc.projectName && (
+              <span className="text-xs font-medium" style={{ color: L }}>{formDoc.projectName}</span>
+            )}
+          </div>
+        </div>
+
+        <div className="max-w-2xl mx-auto px-4 py-8 space-y-5">
+          {/* Header card */}
+          <div className="bg-white border border-stone-100 rounded-2xl p-5 shadow-sm">
+            <p className="text-base font-bold" style={{ color: D }}>Informe de complementos</p>
+            <p className="text-xs text-stone-500 mt-1">
+              {formDoc.dateFrom} → {formDoc.dateTo} · enviado por <strong className="text-stone-700">{formDoc.createdByName}</strong>
+            </p>
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {allowTypes.map(t => (
+                <span key={t} className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full text-white"
+                  style={{ backgroundColor: DIETA_COLORS[t] || "#94a3b8" }}>
+                  {DIETA_LABELS[t] || t}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Per-person sections */}
+          {people.map(person => {
+            const mId = person.memberId;
+            const personEntries = dietasData[mId] || {};
+            const filledCount = allDates.filter(d => Object.values(personEntries[d]||{}).some(Boolean)).length;
+
+            return (
+              <div key={mId} className="bg-white border border-stone-100 rounded-2xl overflow-hidden shadow-sm">
+                {/* Person header */}
+                <div className="px-5 py-4 border-b border-stone-50 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: D }}>{person.firstName} {person.lastName1}</p>
+                    <p className="text-xs text-stone-400 mt-0.5">{person.department}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-stone-400">{filledCount}/{allDates.length} días</span>
+                    <button
+                      onClick={() => {
+                        if (qfPerson === mId) { setQfPerson(null); return; }
+                        setQfPerson(mId);
+                        setQfFrom(formDoc.dateFrom || "");
+                        setQfTo(formDoc.dateTo || "");
+                        setQfTypes(Object.fromEntries(allowTypes.map(t => [t, false])));
+                      }}
+                      className="text-xs px-2.5 py-1 border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
+                      style={{ color: D }}>
+                      {qfPerson === mId ? "Cerrar" : "Relleno rápido"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quick fill widget */}
+                {qfPerson === mId && (
+                  <div className="px-5 py-4 bg-stone-50 border-b border-stone-100 space-y-3">
+                    <p className="text-xs font-semibold text-stone-700">Aplicar patrón a un rango de fechas</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input type="date" value={qfFrom} min={formDoc.dateFrom} max={formDoc.dateTo}
+                        onChange={e => setQfFrom(e.target.value)}
+                        className="border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none" />
+                      <span className="text-xs text-stone-400">→</span>
+                      <input type="date" value={qfTo} min={qfFrom || formDoc.dateFrom} max={formDoc.dateTo}
+                        onChange={e => setQfTo(e.target.value)}
+                        className="border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none" />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {allowTypes.map(t => (
+                        <label key={t} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border cursor-pointer text-xs transition-all ${qfTypes[t] ? "text-white border-transparent" : "border-stone-200 text-stone-600"}`}
+                          style={qfTypes[t] ? { backgroundColor: DIETA_COLORS[t] || "#6366f1" } : {}}>
+                          <input type="checkbox" checked={!!qfTypes[t]} onChange={() => setQfTypes(q => ({ ...q, [t]: !q[t] }))} className="sr-only" />
+                          {DIETA_LABELS[t] || t}
+                        </label>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => applyQuickFill(mId)}
+                        className="flex-1 py-2 text-white text-xs font-semibold rounded-lg transition-opacity hover:opacity-90"
+                        style={{ backgroundColor: D }}>
+                        Aplicar
+                      </button>
+                      <button
+                        onClick={() => {
+                          setDietasData(prev => {
+                            const pM = { ...(prev[mId] || {}) };
+                            for (const d of allDates) pM[d] = {};
+                            return { ...prev, [mId]: pM };
+                          });
+                        }}
+                        className="px-4 py-2 text-stone-500 text-xs rounded-lg border border-stone-200 hover:bg-stone-50 transition-colors">
+                        Limpiar todo
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Day-by-day grid */}
+                <div className="divide-y divide-stone-50">
+                  {allDates.map(date => {
+                    const entry = personEntries[date] || {};
+                    const hasAny = Object.values(entry).some(Boolean);
+                    return (
+                      <div key={date} className={`flex items-center gap-3 px-5 py-2.5 ${isWeekend(date) ? "bg-stone-50" : ""}`}>
+                        <div className={`w-16 flex-shrink-0 text-xs font-medium ${isWeekend(date) ? "text-stone-400" : "text-stone-700"}`}>
+                          {fmtDate(date)}
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 flex-1">
+                          {allowTypes.map(t => (
+                            <button key={t} onClick={() => toggleType(mId, date, t)}
+                              className={`text-[10px] font-medium px-2 py-0.5 rounded-full border transition-all ${entry[t] ? "text-white border-transparent" : "border-stone-200 text-stone-400"}`}
+                              style={entry[t] ? { backgroundColor: DIETA_COLORS[t] || "#6366f1" } : {}}>
+                              {DIETA_LABELS[t] || t}
+                            </button>
+                          ))}
+                        </div>
+                        {hasAny && <div className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Submit */}
+          <div className="bg-white border border-stone-100 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs text-stone-500">
+                {totalFilledDays} día{totalFilledDays!==1?"s":""} con dietas marcadas sobre {people.length * allDates.length} posibles
+              </p>
+            </div>
+            <button onClick={handleDietasSubmit} disabled={dietasSubmitting}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
+              style={{ backgroundColor: D }}>
+              {dietasSubmitting
+                ? <><Loader2 size={15} className="animate-spin" /> Enviando…</>
+                : "Enviar informe de dietas"}
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -934,7 +1219,7 @@ export default function FormPage() {
             {step === 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Photo upload */}
-                <div className="col-span-2">
+                {fc.showPhoto && (<div className="col-span-2">
                   <label className="block text-sm font-medium text-stone-700 mb-2">Foto de perfil <span className="text-xs text-stone-400">(aparecerá en tu ficha)</span></label>
                   <div className="flex items-center gap-4">
                     <div className="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 border border-stone-200 bg-stone-50 flex items-center justify-center">
@@ -968,11 +1253,11 @@ export default function FormPage() {
                       <p className="text-xs text-stone-400 mt-1.5">JPG, PNG o WEBP. Recomendado: fondo neutro.</p>
                     </div>
                   </div>
-                </div>
+                </div>)}
                 {crewField("Nombre", "firstName", { required: true, placeholder: "Tu nombre" })}
-                {crewField("Primer apellido", "lastName1", { required: true, half: true })}
-                {crewField("Segundo apellido", "lastName2", { half: true })}
-                {crewField("Nombre artístico / en créditos", "artisticName", { placeholder: "Como aparecerás en los créditos" })}
+                {crewField("Primer apellido", "lastName1", { required: true, half: fc.showLastName2 })}
+                {fc.showLastName2 && crewField("Segundo apellido", "lastName2", { half: true })}
+                {fc.showArtisticName && crewField("Nombre artístico / en créditos", "artisticName", { placeholder: "Como aparecerás en los créditos" })}
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-stone-700 mb-1.5">Tipo de documento <span className="text-red-400">*</span></label>
                   <div className="grid grid-cols-3 gap-2">
@@ -985,11 +1270,11 @@ export default function FormPage() {
                     ))}
                   </div>
                 </div>
-                {crewField("Número de documento", "docNumber", { required: true, half: true, placeholder: "12345678A" })}
-                {crewField("Caducidad", "docExpiry", { type: "date", half: true })}
-                {crewField("Fecha de nacimiento", "birthDate", { type: "date", required: true, half: true })}
-                {crewField("Lugar de nacimiento", "birthPlace", { half: true, placeholder: "Ciudad" })}
-                {crewField("Nacionalidad", "nationality", { placeholder: "Española" })}
+                {crewField("Número de documento", "docNumber", { required: true, half: fc.showDocExpiry, placeholder: "12345678A" })}
+                {fc.showDocExpiry && crewField("Caducidad", "docExpiry", { type: "date", half: true })}
+                {crewField("Fecha de nacimiento", "birthDate", { type: "date", required: true, half: fc.showBirthPlace })}
+                {fc.showBirthPlace && crewField("Lugar de nacimiento", "birthPlace", { half: true, placeholder: "Ciudad" })}
+                {fc.showNationality && crewField("Nacionalidad", "nationality", { placeholder: "Española" })}
               </div>
             )}
             {step === 1 && (
@@ -999,22 +1284,22 @@ export default function FormPage() {
                 {crewField("Dirección", "address", { required: true, placeholder: "Calle Mayor, 10, 2º A" })}
                 {crewField("Código postal", "postalCode", { required: true, half: true, placeholder: "28001" })}
                 {crewField("Ciudad", "city", { required: true, half: true, placeholder: "Madrid" })}
-                {crewField("Provincia", "province", { half: true, placeholder: "Madrid" })}
-                {crewField("País", "country", { half: true, placeholder: "España" })}
+                {fc.showProvince && crewField("Provincia", "province", { half: fc.showCountry, placeholder: "Madrid" })}
+                {fc.showCountry && crewField("País", "country", { half: fc.showProvince, placeholder: "España" })}
               </div>
             )}
             {step === 2 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {crewField("Nº Seguridad Social", "ssNumber", { required: true, placeholder: "12/1234567/89" })}
                 {crewSelect("Régimen de la SS", "ssRegime", SS_REGIMES, true)}
-                {crewField("% IRPF aplicable", "irpfRate", { half: true, placeholder: "15" })}
-                {crewField("Causa del contrato", "contractReason", { half: true, placeholder: "Obras y servicios" })}
+                {fc.showIrpfRate && crewField("% IRPF aplicable", "irpfRate", { half: fc.showContractReason, placeholder: "15" })}
+                {fc.showContractReason && crewField("Causa del contrato", "contractReason", { half: fc.showIrpfRate, placeholder: "Obras y servicios" })}
                 <div className="col-span-2 pt-3 border-t border-stone-100">
                   <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: L }}>Datos bancarios</p>
                 </div>
                 {crewField("IBAN", "iban", { required: true, placeholder: "ES00 0000 0000 0000 0000 0000" })}
-                {crewField("Nombre del banco", "bankName", { half: true, placeholder: "Banco Santander" })}
-                {crewField("Titular de la cuenta", "accountHolder", { half: true })}
+                {fc.showBankName && crewField("Nombre del banco", "bankName", { half: fc.showAccountHolder, placeholder: "Banco Santander" })}
+                {fc.showAccountHolder && crewField("Titular de la cuenta", "accountHolder", { half: fc.showBankName })}
               </div>
             )}
             {step === 3 && (
@@ -1144,6 +1429,7 @@ function SuccessScreen({ formDoc, responseData, formId }: { formDoc: FormDoc; re
   };
 
   const isBox = formDoc.type === "box_request";
+  const isDietas = formDoc.type === "dietas_request";
   const total = isBox ? (responseData?.expenses || []).reduce((s: number, e: any) => s + (Number(e.amount) || 0), 0) : null;
 
   return (
@@ -1153,27 +1439,31 @@ function SuccessScreen({ formDoc, responseData, formId }: { formDoc: FormDoc; re
           <CheckCircle2 size={38} style={{ color: D }} />
         </div>
         <h1 className="text-2xl font-bold mb-3" style={{ color: D }}>
-          {isBox ? "¡Solicitud enviada!" : "¡Ficha enviada!"}
+          {isBox ? "¡Solicitud enviada!" : isDietas ? "¡Informe enviado!" : "¡Ficha enviada!"}
         </h1>
         <p className="text-stone-500 text-sm leading-relaxed">
           {isBox
             ? <><strong className="text-stone-700">{formDoc.createdByName}</strong> recibirá tu solicitud de <strong className="text-stone-700">{total?.toFixed(2)} €</strong> y te notificará la aprobación y la fecha de pago.</>
+            : isDietas
+            ? <><strong className="text-stone-700">{formDoc.createdByName}</strong> recibirá el informe de dietas y lo importará en el sistema de nóminas.</>
             : <>Tu ficha para <strong className="text-stone-700">{formDoc.projectName}</strong>{formDoc.prefilled.role && <> como <strong className="text-stone-700">{formDoc.prefilled.role}</strong></>} ha sido recibida correctamente.</>
           }
         </p>
 
-        {/* Download resguardo */}
-        <div className="mt-6 bg-white border border-stone-200 rounded-2xl p-5">
-          <p className="text-sm font-semibold mb-1" style={{ color: D }}>Descarga tu resguardo</p>
-          <p className="text-xs text-stone-400 mb-4">Guarda este documento como confirmación del envío</p>
-          <button onClick={handleDownload} disabled={downloading}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
-            style={{ backgroundColor: D }}>
-            {downloading
-              ? <><Loader2 size={15} className="animate-spin" /> Generando PDF…</>
-              : <>⬇ Descargar resguardo PDF</>}
-          </button>
-        </div>
+        {/* Download resguardo (not for dietas) */}
+        {!isDietas && (
+          <div className="mt-6 bg-white border border-stone-200 rounded-2xl p-5">
+            <p className="text-sm font-semibold mb-1" style={{ color: D }}>Descarga tu resguardo</p>
+            <p className="text-xs text-stone-400 mb-4">Guarda este documento como confirmación del envío</p>
+            <button onClick={handleDownload} disabled={downloading}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
+              style={{ backgroundColor: D }}>
+              {downloading
+                ? <><Loader2 size={15} className="animate-spin" /> Generando PDF…</>
+                : <>⬇ Descargar resguardo PDF</>}
+            </button>
+          </div>
+        )}
 
         <div className="mt-6 p-3 bg-white rounded-xl border border-stone-100">
           <p className="text-xs text-stone-400">Puedes cerrar esta ventana con seguridad.</p>

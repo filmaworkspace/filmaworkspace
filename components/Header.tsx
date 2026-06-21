@@ -15,6 +15,7 @@ import { doc, getDoc } from "firebase/firestore";
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
   ArrowLeftRight,
+  Banknote,
   BarChart3,
   Briefcase,
   Building2,
@@ -220,6 +221,7 @@ export default function Header() {
     ? pathname.includes("/crew")      ? "crew"
     : pathname.includes("/calendar")  ? "calendar"
     : pathname.includes("/approvals") ? "approvals"
+    : pathname.includes("/payroll")   ? "payroll"
     : pathname.includes("/config")    ? "config"
     : "panel"
     : null;
@@ -392,6 +394,10 @@ export default function Header() {
               <NavLink href={`/project/${projectId}/team/calendar`} isActive={teamPage === "calendar"}>
                 <Calendar size={14} />
                 <span>Calendario</span>
+              </NavLink>
+              <NavLink href={`/project/${projectId}/team/payroll`} isActive={teamPage === "payroll"}>
+                <Banknote size={14} />
+                <span>Nóminas</span>
               </NavLink>
             </>
           )}
@@ -592,6 +598,14 @@ export default function Header() {
                           : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                       }`}>
                       <Calendar size={14} />Calendario
+                    </Link>
+                    <Link href={`/project/${projectId}/team/payroll`} onClick={() => setMenuOpen(false)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${
+                        teamPage === "payroll"
+                          ? "text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                      }`}>
+                      <Banknote size={14} />Nóminas
                     </Link>
                     <div className="border-t border-slate-100 my-1" />
                     <button onClick={() => { setMenuOpen(false); handleLogout(); }} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-600 hover:text-red-600 hover:bg-red-50 text-left"><LogOut size={14} />Cerrar sesión</button>
