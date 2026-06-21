@@ -187,6 +187,7 @@ export default function PayrollPage() {
   const [rfDay2,        setRfDay2]            = useState(1);
   const [rfMode,        setRfMode]            = useState<"mark"|"clear">("mark");
   const [rfTypes,       setRfTypes]           = useState<Record<string,boolean>>({});
+  const [rfWorked,      setRfWorked]          = useState(false);
 
   // Person detail modal
   const [detailId,      setDetailId]          = useState<string|null>(null);
@@ -313,10 +314,18 @@ export default function PayrollPage() {
     updateEntry(m.id, d, { ...entry, workedOverride: !current });
   };
 
+  // For weekly salary: only weekdays (Mon–Fri) count toward pay
+  const salaryDays = (m: CrewMember): number => {
+    if (m.salaryType === "weekly") {
+      return days.filter(d => isWorked(m, d) && !isWknd(year, month, d)).length;
+    }
+    return days.filter(d => isWorked(m, d)).length;
+  };
+
   const workingDays = (mId: string) => {
     const m = crew.find(x => x.id === mId);
     if (!m) return 0;
-    return days.filter(d => isWorked(m, d)).length;
+    return salaryDays(m);
   };
 
   const dots = (mId: string, d: number): string[] => {
@@ -347,7 +356,7 @@ export default function PayrollPage() {
     return ordered;
   }, [filtered, deptOrder]);
 
-  const grandTotal = filtered.reduce((s, m) => s + memberMonthAllowances(m.id), 0);
+  const grandTotal = filtered.reduce((s, m) => s + memberMonthAllowances(m.id) + dailySalary(m) * salaryDays(m), 0);
 
   // ── Month nav ────────────────────────────────────────────────────────────────
 
@@ -511,6 +520,7 @@ export default function PayrollPage() {
     setRfTarget(memberId);
     setRfDay1(1); setRfDay2(numDays); setRfMode("mark");
     setRfTypes(Object.fromEntries(ALLOWANCES.map(a => [a.key, false])));
+    setRfWorked(false);
   };
 
   const applyRangeFill = () => {
@@ -523,9 +533,12 @@ export default function PayrollPage() {
       if (rfMode === "clear") {
         const cleared = { ...existing };
         Object.keys(rfTypes).forEach(k => { if (rfTypes[k]) (cleared as any)[k] = false; });
+        if (rfWorked) cleared.workedOverride = false;
         next[rfTarget][dk(d)] = cleared;
       } else {
-        next[rfTarget][dk(d)] = { ...existing, ...Object.fromEntries(Object.entries(rfTypes).filter(([,v])=>v)) };
+        const patch: Partial<DayEntry> = Object.fromEntries(Object.entries(rfTypes).filter(([,v])=>v));
+        if (rfWorked) patch.workedOverride = true;
+        next[rfTarget][dk(d)] = { ...existing, ...patch };
       }
     }
     setMonthData(next);
@@ -780,7 +793,7 @@ export default function PayrollPage() {
       {rfTarget && (() => {
         const rfMember = crew.find(m => m.id === rfTarget);
         if (!rfMember) return null;
-        const anyType = Object.values(rfTypes).some(Boolean);
+        const anyType = Object.values(rfTypes).some(Boolean) || rfWorked;
         return (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
@@ -824,6 +837,16 @@ export default function PayrollPage() {
                     </button>
                   ))}
                 </div>
+
+                {/* Worked days toggle */}
+                <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${rfWorked ? "border-slate-300 bg-slate-50" : "border-slate-100"}`}>
+                  <input type="checkbox" checked={rfWorked} onChange={() => setRfWorked(v => !v)} className="sr-only" />
+                  <div className="w-5 h-[5px] rounded-full flex-shrink-0" style={{ backgroundColor: rfWorked ? TEAM_COLOR : "#cbd5e1" }} />
+                  <span className="text-xs font-medium text-slate-700 flex-1">Días trabajados (salario)</span>
+                  <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border flex-shrink-0 transition-all ${rfWorked ? "border-slate-900 bg-slate-900" : "border-slate-300"}`}>
+                    {rfWorked && <Check size={8} className="text-white" />}
+                  </div>
+                </label>
 
                 {/* Types */}
                 <div>
@@ -1490,8 +1513,8 @@ export default function PayrollPage() {
                       </th>
                     );
                   })}
-                  <th className="min-w-[88px] text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider border-l border-slate-200">
-                    Complementos
+                  <th className="min-w-[110px] text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider border-l border-slate-200">
+                    Total
                   </th>
                 </tr>
               </thead>
@@ -1515,6 +1538,8 @@ export default function PayrollPage() {
                       const ds = dailySalary(m);
                       const regime = regimeBadge(m.regime || m.ssRegime);
                       const allowTotal = memberMonthAllowances(m.id);
+                      const salTotal = ds * salaryDays(m);
+                      const grandTotal = salTotal + allowTotal;
                       return (
                         <tr key={m.id} className="border-b border-slate-100 group hover:bg-slate-50/60 transition-colors">
                           {/* Sticky info cell */}
@@ -1588,11 +1613,21 @@ export default function PayrollPage() {
                             );
                           })}
 
-                          {/* Month allowance total */}
-                          <td className="min-w-[88px] text-right px-4 py-2.5 border-l border-slate-100">
-                            <span className={`text-sm font-semibold ${allowTotal > 0 ? "text-slate-900" : "text-slate-200"}`}>
-                              {allowTotal > 0 ? fmt(allowTotal) : "—"}
-                            </span>
+                          {/* Month total */}
+                          <td className="min-w-[110px] text-right px-4 py-2 border-l border-slate-100">
+                            {salTotal > 0 && (
+                              <div className="text-[10px] text-slate-400 leading-tight">
+                                <span>Sal. </span><span className="font-medium text-slate-500">{fmt(salTotal)}</span>
+                              </div>
+                            )}
+                            {allowTotal > 0 && (
+                              <div className="text-[10px] text-slate-400 leading-tight">
+                                <span>Comp. </span><span className="font-medium text-slate-500">{fmt(allowTotal)}</span>
+                              </div>
+                            )}
+                            <div className={`text-sm font-semibold mt-0.5 ${grandTotal > 0 ? "text-slate-900" : "text-slate-200"}`}>
+                              {grandTotal > 0 ? fmt(grandTotal) : "—"}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1617,7 +1652,17 @@ export default function PayrollPage() {
                       </td>
                     );
                   })}
-                  <td className="min-w-[88px] text-right px-4 py-3 border-l border-slate-200">
+                  <td className="min-w-[110px] text-right px-4 py-3 border-l border-slate-200">
+                    <div className="text-[10px] text-slate-400">
+                      Sal. <span className="font-medium text-slate-500">
+                        {fmt(filtered.reduce((s,m) => s + dailySalary(m)*salaryDays(m), 0))}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      Comp. <span className="font-medium text-slate-500">
+                        {fmt(filtered.reduce((s,m) => s + memberMonthAllowances(m.id), 0))}
+                      </span>
+                    </div>
                     <span className="text-sm font-bold text-slate-900">{fmt(grandTotal)}</span>
                   </td>
                 </tr>
