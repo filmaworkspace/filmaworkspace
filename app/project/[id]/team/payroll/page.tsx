@@ -51,6 +51,7 @@ interface DayEntry {
   perDiemRateOverride?: number; halfIntlPerDiemRateOverride?: number;
   intlPerDiemRateOverride?: number; accommodationRateOverride?: number;
   carRateOverride?: number;
+  workedOverride?: boolean; // explicit override of the inRange default
 }
 
 const EMPTY_DAY: DayEntry = {
@@ -175,10 +176,10 @@ export default function PayrollPage() {
   const [copiedKey,     setCopiedKey]         = useState<string|null>(null);
   const [projectName,   setProjectName]       = useState("");
 
-  // Period config
-  const [period,        setPeriod]            = useState<{from:string;to:string}|null>(null);
+  // Period config (per allowance type)
+  const [periods,       setPeriods]           = useState<Record<string,{from:string;to:string}>>({});
   const [showPeriodCfg, setShowPeriodCfg]     = useState(false);
-  const [periodDraft,   setPeriodDraft]       = useState({from:"",to:""});
+  const [periodsDraft,  setPeriodsDraft]      = useState<Record<string,{from:string;to:string}>>({});
 
   // Range fill
   const [rfTarget,      setRfTarget]          = useState<string|null>(null);
@@ -255,10 +256,10 @@ export default function PayrollPage() {
     const snap = await getDoc(doc(db, `projects/${projectId}/payrollMonths`, monthKey));
     if (snap.exists()) {
       setMonthData(snap.data().entries || {});
-      setPeriod(snap.data().period || null);
+      setPeriods(snap.data().periods || {});
     } else {
       setMonthData({});
-      setPeriod(null);
+      setPeriods({});
     }
   };
 
@@ -300,8 +301,23 @@ export default function PayrollPage() {
   const memberMonthAllowances = (mId: string) =>
     days.reduce((s, d) => s + cellTotal(mId, d), 0);
 
-  const workingDays = (mId: string) =>
-    days.filter(d => { const e = getEntry(mId, d); return e.meals||e.halfPerDiem||e.perDiem||e.halfIntlPerDiem||e.intlPerDiem||e.accommodation||e.car||e.other; }).length;
+  const isWorked = (m: CrewMember, d: number): boolean => {
+    const entry = getEntry(m.id, d);
+    if (entry.workedOverride !== undefined) return entry.workedOverride;
+    return inRange(m, year, month, d);
+  };
+
+  const toggleWorked = (m: CrewMember, d: number) => {
+    const current = isWorked(m, d);
+    const entry = getEntry(m.id, d);
+    updateEntry(m.id, d, { ...entry, workedOverride: !current });
+  };
+
+  const workingDays = (mId: string) => {
+    const m = crew.find(x => x.id === mId);
+    if (!m) return 0;
+    return days.filter(d => isWorked(m, d)).length;
+  };
 
   const dots = (mId: string, d: number): string[] => {
     const e = getEntry(mId, d);
@@ -468,29 +484,25 @@ export default function PayrollPage() {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  // ── Period helpers ────────────────────────────────────────────────────────────
+  // ── Period helpers (per allowance type) ─────────────────────────────────────
 
-  const dayOutsidePeriod = (d: number): boolean => {
-    if (!period) return false;
+  const allowanceOutsidePeriod = (d: number, key: string): boolean => {
+    const p = periods[key];
+    if (!p) return false;
     const dt = new Date(year, month, d);
-    if (period.from) {
-      const from = new Date(period.from);
-      from.setHours(0,0,0,0);
-      if (dt < from) return true;
-    }
-    if (period.to) {
-      const to = new Date(period.to);
-      to.setHours(23,59,59,999);
-      if (dt > to) return true;
-    }
+    if (p.from) { const from = new Date(p.from); from.setHours(0,0,0,0); if (dt < from) return true; }
+    if (p.to)   { const to   = new Date(p.to);   to.setHours(23,59,59,999); if (dt > to) return true; }
     return false;
   };
 
-  const savePeriod = async (p: {from:string;to:string}|null) => {
+  const dayOutsidePeriod = (d: number): boolean =>
+    ALLOWANCES.some(a => allowanceOutsidePeriod(d, a.key));
+
+  const savePeriods = async (p: Record<string,{from:string;to:string}>) => {
     await setDoc(doc(db, `projects/${projectId}/payrollMonths`, monthKey), {
-      entries: monthData, period: p || null, updatedAt: Timestamp.now(), updatedBy: user?.uid || "",
+      entries: monthData, periods: p, updatedAt: Timestamp.now(), updatedBy: user?.uid || "",
     });
-    setPeriod(p);
+    setPeriods(p);
   };
 
   // ── Range fill ────────────────────────────────────────────────────────────────
@@ -561,9 +573,6 @@ export default function PayrollPage() {
               <Banknote size={24} style={{ color: TEAM_COLOR }} />
               <div>
                 <h1 className="text-2xl font-semibold text-slate-900">Confección de nóminas</h1>
-                <p className="text-sm text-slate-500 mt-0.5">
-                  {MONTH_NAMES[month]} {year} · {filtered.length} persona{filtered.length !== 1 ? "s" : ""}
-                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -618,10 +627,10 @@ export default function PayrollPage() {
 
         {/* Period config */}
         <button
-          onClick={() => { setPeriodDraft(period || {from:"",to:""}); setShowPeriodCfg(true); }}
-          className={`flex items-center gap-2 px-3 py-2 border rounded-xl text-xs font-medium transition-colors ${period ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+          onClick={() => { setPeriodsDraft({...periods}); setShowPeriodCfg(true); }}
+          className={`flex items-center gap-2 px-3 py-2 border rounded-xl text-xs font-medium transition-colors ${Object.keys(periods).length > 0 ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
           <CalendarRange size={13} />
-          {period ? `${period.from.slice(5).replace("-","/")} → ${period.to.slice(5).replace("-","/")}` : "Período"}
+          {Object.keys(periods).length > 0 ? `${Object.keys(periods).length} período${Object.keys(periods).length !== 1 ? "s" : ""}` : "Períodos"}
         </button>
 
       </div>
@@ -639,8 +648,8 @@ export default function PayrollPage() {
           <span className="text-xs text-slate-500">Otros</span>
         </div>
         <div className="flex items-center gap-1.5 ml-auto">
-          <div className="w-3 h-3 rounded-sm border border-green-200 flex-shrink-0" style={{ backgroundColor: "#6BA31912" }} />
-          <span className="text-xs text-slate-400">Rango de contrato (indicativo)</span>
+          <div className="w-6 h-[5px] rounded-full flex-shrink-0" style={{ backgroundColor: TEAM_COLOR }} />
+          <span className="text-xs text-slate-400">Día trabajado · click para marcar/desmarcar</span>
         </div>
       </div>
 
@@ -695,34 +704,54 @@ export default function PayrollPage() {
       {/* ── Period config modal ──────────────────────────────────────────── */}
       {showPeriodCfg && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CalendarRange size={16} className="text-amber-500" />
-                <p className="text-sm font-semibold text-slate-900">Período de nómina</p>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Períodos de complementos</p>
+                  <p className="text-xs text-slate-400 mt-0.5">El salario siempre cubre el mes completo</p>
+                </div>
               </div>
               <button onClick={() => setShowPeriodCfg(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"><X size={15} /></button>
             </div>
-            <div className="p-6 space-y-4">
-              <p className="text-xs text-slate-500">Define el rango de fechas que cubre esta nómina. Los días fuera del período aparecerán marcados en la tabla.</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1.5">Desde</label>
-                  <input type="date" value={periodDraft.from} onChange={e => setPeriodDraft(p=>({...p,from:e.target.value}))}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1.5">Hasta</label>
-                  <input type="date" value={periodDraft.to} min={periodDraft.from} onChange={e => setPeriodDraft(p=>({...p,to:e.target.value}))}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300" />
-                </div>
-              </div>
-              {period && (
-                <button onClick={() => { savePeriod(null); setShowPeriodCfg(false); }}
-                  className="text-xs text-slate-400 hover:text-red-500 transition-colors underline">
-                  Quitar período
-                </button>
-              )}
+            <div className="p-4 space-y-2 max-h-[60vh] overflow-y-auto">
+              {ALLOWANCES.map(a => {
+                const Icon = a.Icon;
+                const draft = periodsDraft[a.key] || { from: "", to: "" };
+                const hasRange = draft.from || draft.to;
+                return (
+                  <div key={a.key} className={`border rounded-xl p-3 transition-colors ${hasRange ? "border-amber-200 bg-amber-50" : "border-slate-100 bg-slate-50"}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: a.dot + "22" }}>
+                        <Icon size={12} style={{ color: a.dot }} />
+                      </div>
+                      <span className="text-xs font-semibold text-slate-700">{a.label}</span>
+                      {hasRange && (
+                        <button
+                          onClick={() => setPeriodsDraft(p => { const n = {...p}; delete n[a.key]; return n; })}
+                          className="ml-auto text-[10px] text-slate-400 hover:text-red-500 transition-colors underline">
+                          Quitar
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-slate-500 mb-1">Desde</label>
+                        <input type="date" value={draft.from}
+                          onChange={e => setPeriodsDraft(p => ({ ...p, [a.key]: { ...draft, from: e.target.value } }))}
+                          className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-500 mb-1">Hasta</label>
+                        <input type="date" value={draft.to} min={draft.from}
+                          onChange={e => setPeriodsDraft(p => ({ ...p, [a.key]: { ...draft, to: e.target.value } }))}
+                          className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white" />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
               <button onClick={() => setShowPeriodCfg(false)}
@@ -730,11 +759,17 @@ export default function PayrollPage() {
                 Cancelar
               </button>
               <button
-                disabled={!periodDraft.from || !periodDraft.to}
-                onClick={() => { savePeriod(periodDraft); setShowPeriodCfg(false); }}
-                className="flex-1 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+                onClick={() => {
+                  const clean: Record<string,{from:string;to:string}> = {};
+                  for (const [k, v] of Object.entries(periodsDraft)) {
+                    if (v.from || v.to) clean[k] = v;
+                  }
+                  savePeriods(clean);
+                  setShowPeriodCfg(false);
+                }}
+                className="flex-1 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: "#d97706" }}>
-                Guardar período
+                Guardar períodos
               </button>
             </div>
           </div>
@@ -888,11 +923,13 @@ export default function PayrollPage() {
                 </div>
               </div>
 
-              {/* Period */}
-              {period && (
+              {/* Periods */}
+              {Object.keys(periods).length > 0 && (
                 <div className="px-6 py-2.5 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
                   <CalendarRange size={12} className="text-amber-500 flex-shrink-0" />
-                  <p className="text-xs text-amber-700">Período: <strong>{period.from}</strong> → <strong>{period.to}</strong></p>
+                  <p className="text-xs text-amber-700">
+                    {Object.keys(periods).length} complemento{Object.keys(periods).length !== 1 ? "s" : ""} con período definido
+                  </p>
                 </div>
               )}
 
@@ -1510,26 +1547,38 @@ export default function PayrollPage() {
 
                           {/* Day cells */}
                           {days.map(d => {
-                            const w       = isWknd(year, month, d);
-                            const ir      = inRange(m, year, month, d);
-                            const ds2     = dots(m.id, d);
-                            const isM     = dow(year, month, d) === 0;
-                            const hasData = ds2.length > 0;
-                            const outside = dayOutsidePeriod(d);
+                            const w        = isWknd(year, month, d);
+                            const ds2      = dots(m.id, d);
+                            const isM      = dow(year, month, d) === 0;
+                            const hasData  = ds2.length > 0;
+                            const outside  = dayOutsidePeriod(d);
+                            const worked   = isWorked(m, d);
+                            const prevWork = d > 1 && isWorked(m, d - 1);
+                            const nextWork = d < numDays && isWorked(m, d + 1);
                             return (
                               <td key={d}
-                                onClick={() => openEdit(m.id, d)}
-                                title={`${m.firstName} ${m.lastName1} · ${d} ${MONTH_NAMES[month]}${outside ? " (fuera de período)" : ""}`}
-                                className={`w-9 min-w-[36px] cursor-pointer text-center align-middle transition-colors
+                                title={`${m.firstName} ${m.lastName1} · ${d} ${MONTH_NAMES[month]}${worked ? " · día trabajado" : ""}${outside ? " (fuera de período)" : ""}`}
+                                className={`w-9 min-w-[36px] text-center align-top transition-colors
                                   ${isM && d > 1 ? "border-l border-slate-200" : ""}
                                   ${w && !outside ? "bg-slate-50" : ""}
-                                  hover:bg-[#6BA31918]
                                 `}
-                                style={
-                                  outside ? { backgroundColor: "#fef9c320" } :
-                                  !w && ir && !hasData ? { backgroundColor: "#6BA31910" } : {}
-                                }>
-                                <div className="flex flex-wrap justify-center gap-[3px] py-2.5 px-1">
+                                style={outside ? { backgroundColor: "#fef9c320" } : {}}>
+                                {/* Worked-day bar */}
+                                <div
+                                  onClick={() => toggleWorked(m, d)}
+                                  className="h-[5px] cursor-pointer transition-colors"
+                                  style={{
+                                    backgroundColor: worked ? TEAM_COLOR : "transparent",
+                                    marginLeft:  prevWork ? 0 : 2,
+                                    marginRight: nextWork ? 0 : 2,
+                                    borderRadius: `${prevWork ? 0 : 3}px ${nextWork ? 0 : 3}px ${nextWork ? 0 : 3}px ${prevWork ? 0 : 3}px`,
+                                    opacity: outside ? 0.4 : 1,
+                                  }}
+                                />
+                                {/* Complement dots */}
+                                <div
+                                  onClick={() => openEdit(m.id, d)}
+                                  className="flex flex-wrap justify-center gap-[3px] py-2 px-1 cursor-pointer hover:bg-[#6BA31918] transition-colors">
                                   {hasData ? ds2.slice(0, 6).map((c, i) => (
                                     <div key={i} className="w-[7px] h-[7px] rounded-full flex-shrink-0"
                                       style={{ backgroundColor: c, opacity: outside ? 0.5 : 1 }} />
