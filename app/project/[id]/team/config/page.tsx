@@ -272,6 +272,7 @@ export default function TeamConfigPage() {
   const [accessDraftUsePIN,setAccessDraftUsePIN]= useState(false);
   const [accessDraftTypes, setAccessDraftTypes] = useState<Set<AKey>>(new Set(ACCESS_ALLOWANCES.map(a => a.key)));
   const [savingAccess,     setSavingAccess]     = useState(false);
+  const [confirmDialog,    setConfirmDialog]    = useState<{ title: string; message: string; confirmLabel?: string; onConfirm: () => void } | null>(null);
 
   const userId = user?.uid || "";
 
@@ -487,8 +488,7 @@ export default function TeamConfigPage() {
     setAccessDraftPIN("");
     setAccessDraftUsePIN(false);
     setAccessDraftTypes(new Set(ACCESS_ALLOWANCES.map(a => a.key)));
-    setAccessDraftLocked([]);
-    setAccessDraftDate("");
+
     setShowAccessModal(true);
   };
 
@@ -530,10 +530,17 @@ export default function TeamConfigPage() {
     await loadAccesos();
   };
 
-  const deleteAccess = async (id: string) => {
-    if (!confirm("¿Eliminar este acceso? El enlace dejará de funcionar.")) return;
-    await deleteDoc(doc(db, "access", id));
-    await loadAccesos();
+  const deleteAccess = (id: string, name: string) => {
+    setConfirmDialog({
+      title: "Eliminar acceso",
+      message: `¿Eliminar "${name}"? El enlace dejará de funcionar y no se puede deshacer.`,
+      confirmLabel: "Eliminar",
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        await deleteDoc(doc(db, "access", id));
+        await loadAccesos();
+      },
+    });
   };
 
   const copyLink = (entry: AccessEntry) => {
@@ -652,7 +659,7 @@ const renderAccesos = () => (
                     </button>
                     {/* Delete */}
                     <button
-                      onClick={() => deleteAccess(entry.id)}
+                      onClick={() => deleteAccess(entry.id, entry.name)}
                       title="Eliminar"
                       className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors ml-1">
                       <Trash2 size={14} />
@@ -1299,6 +1306,26 @@ const renderAccesos = () => (
                   </button>
                 );
               })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirm dialog ─────────────────────────────────────────────────── */}
+      {confirmDialog && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
+            <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDialog(null)}
+                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">
+                Cancelar
+              </button>
+              <button onClick={confirmDialog.onConfirm}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700">
+                {confirmDialog.confirmLabel || "Confirmar"}
+              </button>
             </div>
           </div>
         </div>
