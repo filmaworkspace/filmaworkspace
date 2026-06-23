@@ -6,12 +6,12 @@ import { inter } from "@/lib/fonts";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
-  collection, doc, getDocs, getDoc, query, orderBy as fbOrderBy, setDoc, Timestamp,
+  collection, doc, getDocs, getDoc, query, orderBy as fbOrderBy, setDoc, deleteDoc, where, Timestamp,
 } from "firebase/firestore";
 import {
   AlertCircle, ArrowDown, ArrowUp, Banknote, Car, Check, CheckCircle2,
-  ClipboardList, FileCheck, FileDown, Globe, GripVertical, Home,
-  Info, Lock, Plane, Plus, Save, Settings, Shield, Trash2, Utensils,
+  ClipboardList, Copy, ExternalLink, FileCheck, FileDown, Globe, GripVertical, Home,
+  Info, Link2, Lock, Plane, Plus, Save, Settings, Shield, Trash2, Utensils,
   User, Users, X,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
@@ -78,6 +78,44 @@ interface FormSection {
   fields: FormField[];
 }
 
+type AKey = "meals"|"halfPerDiem"|"perDiem"|"halfIntlPerDiem"|"intlPerDiem"|"accommodation"|"car";
+
+const ACCESS_ALLOWANCES: { key: AKey; label: string }[] = [
+  { key: "meals",           label: "Comidas"               },
+  { key: "halfPerDiem",     label: "½ Dieta nacional"      },
+  { key: "perDiem",         label: "Dieta nacional"        },
+  { key: "halfIntlPerDiem", label: "½ Dieta internacional" },
+  { key: "intlPerDiem",     label: "Dieta internacional"   },
+  { key: "accommodation",   label: "Alojamiento"           },
+  { key: "car",             label: "Vehículo"              },
+];
+
+interface AccessEntry {
+  id: string;
+  name: string;
+  people: Array<{ memberId: string; firstName: string; lastName1: string; department?: string; section?: string }>;
+  pin: string | null;
+  allowedTypes: AKey[];
+  lockedDays: string[];
+  active: boolean;
+  createdAt?: Date;
+}
+
+interface CrewEntry {
+  id: string;
+  firstName: string;
+  lastName1: string;
+  role: string;
+  department?: string;
+  section: string;
+  status: string;
+}
+
+function genCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const TEAM_COLOR = "#6BA319";
@@ -86,6 +124,7 @@ const CONFIG_SECTIONS = [
   { id: "approvals",    label: "Aprobaciones",  icon: FileCheck,     description: "Flujo de aprobación para altas de crew" },
   { id: "departments",  label: "Departamentos", icon: GripVertical,  description: "Orden de los departamentos en listados" },
   { id: "payroll",      label: "Nóminas",       icon: Banknote,      description: "Tarifas globales de dietas y complementos" },
+  { id: "accesos",      label: "Accesos",       icon: Link2,         description: "Links de coordinación para marcar complementos" },
   { id: "form",         label: "Formulario",    icon: ClipboardList, description: "Preguntas del formulario de alta de crew" },
   { id: "export",       label: "Exportación",   icon: FileDown,      description: "Configuración de exportaciones de crew" },
 ];
@@ -223,6 +262,20 @@ export default function TeamConfigPage() {
   const [payrollRates, setPayrollRates]           = useState<PayrollRatesConfig>(DEFAULT_PAYROLL_RATES);
   const [showMemberPicker, setShowMemberPicker] = useState(false);
 
+  // Accesos
+  const [accesos,          setAccesos]          = useState<AccessEntry[]>([]);
+  const [crew,             setCrew]             = useState<CrewEntry[]>([]);
+  const [projectName,      setProjectName]      = useState("");
+  const [showAccessModal,  setShowAccessModal]  = useState(false);
+  const [accessDraftName,  setAccessDraftName]  = useState("");
+  const [accessDraftPeople,setAccessDraftPeople]= useState<Set<string>>(new Set());
+  const [accessDraftPIN,   setAccessDraftPIN]   = useState("");
+  const [accessDraftUsePIN,setAccessDraftUsePIN]= useState(false);
+  const [accessDraftTypes, setAccessDraftTypes] = useState<Set<AKey>>(new Set(ACCESS_ALLOWANCES.map(a => a.key)));
+  const [accessDraftLocked,setAccessDraftLocked]= useState<string[]>([]);
+  const [accessDraftDate,  setAccessDraftDate]  = useState("");
+  const [savingAccess,     setSavingAccess]     = useState(false);
+
   const userId = user?.uid || "";
 
   useEffect(() => {
@@ -307,6 +360,44 @@ export default function TeamConfigPage() {
       if (payrollSnap.exists()) {
         setPayrollRates({ ...DEFAULT_PAYROLL_RATES, ...payrollSnap.data() });
       }
+
+      // Project name
+      const projSnap = await getDoc(doc(db, "projects", projectId));
+      if (projSnap.exists()) setProjectName(projSnap.data().name || projSnap.data().title || "");
+
+      // Crew list for people picker
+      const crewSnap2 = await getDocs(collection(db, `projects/${projectId}/crew`));
+      setCrew(crewSnap2.docs
+        .filter(d => (d.data().status || "active") !== "inactive")
+        .map(d => ({
+          id: d.id,
+          firstName:  d.data().firstName  || d.data().name || "",
+          lastName1:  d.data().lastName1  || "",
+          role:       d.data().role       || "",
+          department: d.data().department || "",
+          section:    d.data().section    || "technical",
+          status:     d.data().status     || "active",
+        }))
+        .sort((a, b) => `${a.firstName} ${a.lastName1}`.localeCompare(`${b.firstName} ${b.lastName1}`)));
+
+      // Accesos
+      await loadAccesos();
+    } catch (e) { console.error(e); }
+  };
+
+  const loadAccesos = async () => {
+    try {
+      const snap = await getDocs(query(collection(db, "access"), where("projectId", "==", projectId)));
+      setAccesos(snap.docs.map(d => ({
+        id:           d.id,
+        name:         d.data().name         || "",
+        people:       d.data().people       || [],
+        pin:          d.data().pin          || null,
+        allowedTypes: d.data().allowedTypes || [],
+        lockedDays:   d.data().lockedDays   || [],
+        active:       d.data().active       ?? true,
+        createdAt:    d.data().createdAt?.toDate(),
+      })).sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)));
     } catch (e) { console.error(e); }
   };
 
@@ -391,6 +482,213 @@ export default function TeamConfigPage() {
   // Export toggle helper
   const toggleExport = (key: keyof ExportConfig) =>
     setExportConfig((c) => ({ ...c, [key]: !c[key] }));
+
+  // ── Access helpers ─────────────────────────────────────────────────────────
+
+  const openCreateAccess = () => {
+    setAccessDraftName("");
+    setAccessDraftPeople(new Set());
+    setAccessDraftPIN("");
+    setAccessDraftUsePIN(false);
+    setAccessDraftTypes(new Set(ACCESS_ALLOWANCES.map(a => a.key)));
+    setAccessDraftLocked([]);
+    setAccessDraftDate("");
+    setShowAccessModal(true);
+  };
+
+  const saveAccess = async () => {
+    if (!accessDraftName.trim() || accessDraftPeople.size === 0) return;
+    setSavingAccess(true);
+    try {
+      const code = genCode();
+      const people = crew
+        .filter(m => accessDraftPeople.has(m.id))
+        .map(m => ({
+          memberId:   m.id,
+          firstName:  m.firstName,
+          lastName1:  m.lastName1,
+          department: m.department || "",
+          section:    m.section    || "",
+        }));
+      await setDoc(doc(db, "access", code), {
+        code,
+        name:         accessDraftName.trim(),
+        projectId,
+        projectName,
+        color:        TEAM_COLOR,
+        people,
+        pin:          accessDraftUsePIN && accessDraftPIN.trim() ? accessDraftPIN.trim() : null,
+        allowedTypes: Array.from(accessDraftTypes),
+        lockedDays:   accessDraftLocked,
+        active:       true,
+        createdAt:    Timestamp.now(),
+        createdBy:    userId,
+      });
+      setShowAccessModal(false);
+      await loadAccesos();
+    } catch (e) { console.error(e); showError("Error al crear el acceso"); }
+    finally { setSavingAccess(false); }
+  };
+
+  const toggleAccessActive = async (entry: AccessEntry) => {
+    await setDoc(doc(db, "access", entry.id), { active: !entry.active }, { merge: true });
+    await loadAccesos();
+  };
+
+  const deleteAccess = async (id: string) => {
+    if (!confirm("¿Eliminar este acceso? El enlace dejará de funcionar.")) return;
+    await deleteDoc(doc(db, "access", id));
+    await loadAccesos();
+  };
+
+  const copyLink = (code: string) => {
+    const url = `${window.location.origin}/access/${code}`;
+    navigator.clipboard.writeText(url);
+    showSuccess("Enlace copiado");
+  };
+
+  const toggleAccessType = (key: AKey) => {
+    setAccessDraftTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleAccessPerson = (id: string) => {
+    setAccessDraftPeople(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const addLockedDay = () => {
+    if (!accessDraftDate || accessDraftLocked.includes(accessDraftDate)) return;
+    setAccessDraftLocked(prev => [...prev, accessDraftDate].sort());
+    setAccessDraftDate("");
+  };
+
+  const removeLockedDay = (d: string) =>
+    setAccessDraftLocked(prev => prev.filter(x => x !== d));
+
+  const renderAccesos = () => (
+    <div className="space-y-4">
+      {/* Header card */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Accesos de coordinación</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Links para que coordinadores marquen complementos sin acceso a la plataforma
+            </p>
+          </div>
+          <button
+            onClick={openCreateAccess}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg text-white transition-opacity hover:opacity-90"
+            style={{ backgroundColor: TEAM_COLOR }}>
+            <Plus size={13} /> Nuevo acceso
+          </button>
+        </div>
+
+        {accesos.length === 0 ? (
+          <div className="px-6 py-12 text-center">
+            <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <Link2 size={20} className="text-slate-400" />
+            </div>
+            <p className="text-sm text-slate-500">No hay accesos creados</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Crea un acceso y comparte el enlace con tu coordinador
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {accesos.map(entry => (
+              <div key={entry.id} className={`px-6 py-4 ${!entry.active ? "opacity-50" : ""}`}>
+                <div className="flex items-start gap-4">
+                  {/* Color dot + info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-semibold text-slate-900">{entry.name}</p>
+                      {!entry.active && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full uppercase tracking-wide">
+                          Inactivo
+                        </span>
+                      )}
+                      {entry.pin && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full flex items-center gap-1">
+                          <Lock size={9} /> PIN
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {entry.people.length} {entry.people.length === 1 ? "persona" : "personas"} ·{" "}
+                      {entry.allowedTypes.length} complemento{entry.allowedTypes.length !== 1 ? "s" : ""}
+                    </p>
+                    <p className="text-[10px] font-mono text-slate-300 mt-1 truncate">
+                      /access/{entry.id}
+                    </p>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {/* Copy link */}
+                    <button
+                      onClick={() => copyLink(entry.id)}
+                      title="Copiar enlace"
+                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                      <Copy size={14} />
+                    </button>
+                    {/* Open */}
+                    <a
+                      href={`/access/${entry.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Abrir acceso"
+                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                      <ExternalLink size={14} />
+                    </a>
+                    {/* Toggle active */}
+                    <button
+                      onClick={() => toggleAccessActive(entry)}
+                      title={entry.active ? "Desactivar" : "Activar"}
+                      className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ml-1"
+                      style={{ backgroundColor: entry.active ? TEAM_COLOR : "#e2e8f0" }}>
+                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${entry.active ? "left-0.5 translate-x-4" : "left-0.5"}`} />
+                    </button>
+                    {/* Delete */}
+                    <button
+                      onClick={() => deleteAccess(entry.id)}
+                      title="Eliminar"
+                      className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors ml-1">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* People pills */}
+                {entry.people.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {entry.people.slice(0, 8).map(p => (
+                      <span key={p.memberId}
+                        className="text-[11px] font-medium px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">
+                        {p.firstName} {p.lastName1}
+                      </span>
+                    ))}
+                    {entry.people.length > 8 && (
+                      <span className="text-[11px] font-medium px-2 py-0.5 bg-slate-100 text-slate-400 rounded-full">
+                        +{entry.people.length - 8} más
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   // ── Render sections ────────────────────────────────────────────────────────
 
@@ -840,11 +1138,167 @@ export default function TeamConfigPage() {
             {activeSection === "approvals"   && renderApprovals()}
             {activeSection === "departments" && renderDepartments()}
             {activeSection === "payroll"     && renderPayrollRates()}
+            {activeSection === "accesos"     && renderAccesos()}
             {activeSection === "form"        && renderFormBuilder()}
             {activeSection === "export"      && renderExport()}
           </div>
         </div>
       </main>
+
+      {/* ── Create access modal ─────────────────────────────────────────── */}
+      {showAccessModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[92vh] flex flex-col overflow-hidden">
+
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
+              <p className="text-base font-bold text-slate-900">Nuevo acceso</p>
+              <button onClick={() => setShowAccessModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div className="overflow-y-auto flex-1 px-6 py-5 space-y-6">
+
+              {/* Name */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Nombre del acceso</label>
+                <input
+                  type="text"
+                  value={accessDraftName}
+                  onChange={e => setAccessDraftName(e.target.value)}
+                  placeholder="Ej. Coordinadora producción — Semana 3"
+                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                />
+              </div>
+
+              {/* People */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                  Personas ({accessDraftPeople.size} seleccionadas)
+                </label>
+                <div className="border border-slate-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                  {crew.length === 0 ? (
+                    <p className="px-4 py-6 text-center text-sm text-slate-400">No hay crew activo</p>
+                  ) : crew.map(m => {
+                    const sel = accessDraftPeople.has(m.id);
+                    return (
+                      <button key={m.id} onClick={() => toggleAccessPerson(m.id)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-slate-50 last:border-0 ${sel ? "bg-green-50" : "hover:bg-slate-50"}`}>
+                        <div className={`w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-colors ${sel ? "border-transparent" : "border-slate-300"}`}
+                          style={sel ? { backgroundColor: TEAM_COLOR } : {}}>
+                          {sel && <Check size={12} className="text-white" strokeWidth={2.5} />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-900 truncate">{m.firstName} {m.lastName1}</p>
+                          {(m.role || m.department) && (
+                            <p className="text-xs text-slate-400 truncate">{m.role}{m.department ? ` · ${m.department}` : ""}</p>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Complement types */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Complementos visibles</label>
+                <div className="flex flex-wrap gap-2">
+                  {ACCESS_ALLOWANCES.map(a => {
+                    const on = accessDraftTypes.has(a.key);
+                    return (
+                      <button key={a.key} onClick={() => toggleAccessType(a.key)}
+                        className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${on ? "border-transparent text-white" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
+                        style={on ? { backgroundColor: TEAM_COLOR } : {}}>
+                        {a.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* PIN */}
+              <div className="bg-slate-50 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Proteger con PIN</p>
+                    <p className="text-xs text-slate-400 mt-0.5">El coordinador deberá introducir un PIN para acceder</p>
+                  </div>
+                  <button onClick={() => setAccessDraftUsePIN(v => !v)}
+                    className="relative w-10 h-5 rounded-full transition-colors flex-shrink-0"
+                    style={{ backgroundColor: accessDraftUsePIN ? TEAM_COLOR : "#e2e8f0" }}>
+                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${accessDraftUsePIN ? "left-0.5 translate-x-5" : "left-0.5"}`} />
+                  </button>
+                </div>
+                {accessDraftUsePIN && (
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={8}
+                    value={accessDraftPIN}
+                    onChange={e => setAccessDraftPIN(e.target.value.replace(/\D/g, ""))}
+                    placeholder="PIN numérico"
+                    className="w-full text-sm font-mono tracking-widest border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white"
+                  />
+                )}
+              </div>
+
+              {/* Locked days */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Días bloqueados (opcional)</label>
+                <p className="text-xs text-slate-400 mb-2">Los coordinadores no podrán editar estos días</p>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={accessDraftDate}
+                    onChange={e => setAccessDraftDate(e.target.value)}
+                    className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                  />
+                  <button onClick={addLockedDay}
+                    disabled={!accessDraftDate}
+                    className="px-3 py-2 rounded-xl text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+                    <Plus size={16} />
+                  </button>
+                </div>
+                {accessDraftLocked.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {accessDraftLocked.map(d => (
+                      <span key={d} className="flex items-center gap-1 text-xs font-medium px-2 py-1 bg-amber-50 text-amber-700 rounded-lg">
+                        {d}
+                        <button onClick={() => removeLockedDay(d)} className="hover:text-amber-900">
+                          <X size={11} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-3 flex-shrink-0 bg-white">
+              <button onClick={() => setShowAccessModal(false)}
+                className="text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
+                Cancelar
+              </button>
+              <button
+                onClick={saveAccess}
+                disabled={savingAccess || !accessDraftName.trim() || accessDraftPeople.size === 0}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+                style={{ backgroundColor: TEAM_COLOR }}>
+                {savingAccess ? (
+                  <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Creando…</>
+                ) : (
+                  <><Link2 size={14} /> Crear acceso</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Member picker modal */}
       {showMemberPicker && (

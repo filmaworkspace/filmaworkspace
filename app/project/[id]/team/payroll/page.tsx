@@ -368,6 +368,20 @@ export default function PayrollPage() {
     return salaryDays(m);
   };
 
+  // Salary total for the month with the correct formula per type:
+  //   monthly  → salario − díasNoTrabajados × (salario/30)   [always full if no absences]
+  //   weekly   → (salario/5) × díasLaborablesWorked
+  //   session  → tarifaSesión × sesionesWorked
+  const memberSalaryTotal = (m: CrewMember): number => {
+    const ds = dailySalary(m);
+    if (m.salaryType === "monthly") {
+      const monthly   = salaryOverrides[m.id] ?? m.grossSalary ?? 0;
+      const notWorked = days.filter(d => !isWorked(m, d)).length;
+      return monthly - notWorked * (monthly / 30);
+    }
+    return ds * salaryDays(m);
+  };
+
   const dots = (mId: string, d: number): string[] => {
     const e = getEntry(mId, d);
     return [
@@ -396,7 +410,7 @@ export default function PayrollPage() {
     return ordered;
   }, [filtered, deptOrder]);
 
-  const grandTotal = filtered.reduce((s, m) => s + memberMonthAllowances(m.id) + dailySalary(m) * salaryDays(m), 0);
+  const grandTotal = filtered.reduce((s, m) => s + memberMonthAllowances(m.id) + memberSalaryTotal(m), 0);
 
   // ── Month nav ────────────────────────────────────────────────────────────────
 
@@ -412,7 +426,7 @@ export default function PayrollPage() {
       const ds = dailySalary(m);
       const wd = workingDays(m.id);
       const all = memberMonthAllowances(m.id);
-      const sal = ds * wd;
+      const sal = memberSalaryTotal(m);
       return [
         `${m.firstName} ${m.lastName1}`,
         m.department || SECTION_LABELS[m.section] || "—",
@@ -945,7 +959,7 @@ export default function PayrollPage() {
         const activeDays = allDays.filter(x => x.total > 0 || ALLOWANCES.some(a => x.entry[a.key]) || x.entry.other);
         const wd       = workingDays(m.id);
         const allw     = memberMonthAllowances(m.id);
-        const sal      = ds * wd;
+        const sal      = memberSalaryTotal(m);
         const bruto    = allw + sal;
 
         const byType = ALLOWANCES.map(a => ({
@@ -1686,7 +1700,7 @@ export default function PayrollPage() {
                       const ds = dailySalary(m);
                       const regime = regimeBadge(m.regime || m.ssRegime);
                       const allowTotal = memberMonthAllowances(m.id);
-                      const salTotal = ds * salaryDays(m);
+                      const salTotal = memberSalaryTotal(m);
                       const grandTotal = salTotal + allowTotal;
                       return (
                         <tr key={m.id} className="border-b border-slate-100 group hover:bg-slate-50/60 transition-colors">
@@ -1803,7 +1817,7 @@ export default function PayrollPage() {
                   <td className="min-w-[110px] text-right px-4 py-3 border-l border-slate-200">
                     <div className="text-[10px] text-slate-400">
                       Sal. <span className="font-medium text-slate-500">
-                        {fmt(filtered.reduce((s,m) => s + dailySalary(m)*salaryDays(m), 0))}
+                        {fmt(filtered.reduce((s,m) => s + memberSalaryTotal(m), 0))}
                       </span>
                     </div>
                     <div className="text-[10px] text-slate-400">
@@ -1841,7 +1855,7 @@ export default function PayrollPage() {
             const ds      = dailySalary(m);
             const wd      = workingDays(m.id);
             const allw    = memberMonthAllowances(m.id);
-            const sal     = ds * wd;
+            const sal     = memberSalaryTotal(m);
             const bruto   = allw + sal;
             const regime  = regimeBadge(m.regime || m.ssRegime);
 
