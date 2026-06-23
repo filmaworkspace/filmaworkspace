@@ -75,7 +75,6 @@ interface AccessDoc {
   people: PersonData[];
   pin: string | null;
   allowedTypes: AKey[];
-  lockedDays: string[];
   active: boolean;
 }
 
@@ -163,12 +162,7 @@ export default function AccessPage() {
   const getEntry  = (mId: string, d: number, ent: MonthEntries = entries) =>
     ent[mId]?.[dk(d)] || {} as Record<string, boolean>;
 
-  const isLocked = (y: number, m: number, d: number) => {
-    if (!access) return false;
-    return access.lockedDays.includes(`${y}-${padM(m)}-${dk(d)}`);
-  };
-
-  const allowances = access
+const allowances = access
     ? ALL_ALLOWANCES.filter(a => access.allowedTypes.includes(a.key))
     : ALL_ALLOWANCES;
 
@@ -205,7 +199,7 @@ export default function AccessPage() {
 
   // ── Toggle complement ─────────────────────────────────────────────────────
   const toggleComplement = async (memberId: string, d: number, key: AKey) => {
-    if (!access || isLocked(sheetYear, sheetMonth, d)) return;
+    if (!access) return;
     setSaving(true);
     try {
       const monthRef  = doc(db, `projects/${access.projectId}/payrollMonths`, sheetMonthKey);
@@ -402,18 +396,16 @@ export default function AccessPage() {
               </th>
               {days.map(d => {
                 const wknd   = isWknd(year, month, d);
-                const locked = isLocked(year, month, d);
                 const newW   = dow(year,month,d)===0 && d>1;
                 const tod    = isToday(year, month, d);
                 return (
-                  <th key={d} className={`w-[42px] min-w-[42px] text-center py-2.5 ${newW?"border-l border-stone-200":""} ${locked?"bg-amber-50":wknd?"bg-stone-50":""}`}>
+                  <th key={d} className={`w-[42px] min-w-[42px] text-center py-2.5 ${newW?"border-l border-stone-200":""} ${wknd?"bg-stone-50":""}`}>
                     <div className="flex flex-col items-center gap-0.5">
                       <span className="text-[9px] font-medium text-stone-400">{DAY_SHORT[dow(year,month,d)]}</span>
                       <span className="text-xs font-bold leading-none w-6 h-6 flex items-center justify-center rounded-full"
-                        style={tod ? { backgroundColor:color, color:"#fff" } : locked ? { color:"#d97706" } : { color:BD }}>
+                        style={tod ? { backgroundColor:color, color:"#fff" } : { color:BD }}>
                         {d}
                       </span>
-                      {locked && <Lock size={8} className="text-amber-400"/>}
                     </div>
                   </th>
                 );
@@ -450,7 +442,6 @@ export default function AccessPage() {
                 {/* Day cells (read-only indicators) */}
                 {days.map(d => {
                   const wknd   = isWknd(year,month,d);
-                  const locked = isLocked(year,month,d);
                   const newW   = dow(year,month,d)===0 && d>1;
                   const entry  = getEntry(person.memberId, d);
                   const dots   = allowances.filter(a => entry[a.key]);
@@ -459,7 +450,7 @@ export default function AccessPage() {
                       onClick={() => { openSheet(person.memberId); setExpandedDay(d); }}
                       className={`w-[42px] min-w-[42px] text-center align-middle cursor-pointer transition-colors
                         ${newW?"border-l border-stone-200":""}
-                        ${locked?"bg-amber-50/60":wknd?"bg-stone-50 hover:bg-stone-100":"hover:bg-stone-50"}`}>
+                        ${wknd?"bg-stone-50 hover:bg-stone-100":"hover:bg-stone-50"}`}>
                       <div className="flex flex-wrap justify-center gap-[3px] py-3 px-1">
                         {dots.length>0 ? dots.map(a=>(
                           <div key={a.key} className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor:a.dot }}/>
@@ -482,10 +473,6 @@ export default function AccessPage() {
             <span className="text-xs text-stone-500">{a.label}</span>
           </div>
         ))}
-        <div className="flex items-center gap-1.5 ml-auto">
-          <Lock size={9} className="text-amber-400"/>
-          <span className="text-xs text-stone-400">Día bloqueado</span>
-        </div>
       </div>
 
       {/* ── Person sheet ─────────────────────────────────────────────────── */}
@@ -549,7 +536,6 @@ export default function AccessPage() {
             ) : (
               Array.from({length:sheetDays}, (_,i) => i+1).map(d => {
                 const wknd   = isWknd(sheetYear, sheetMonth, d);
-                const locked = isLocked(sheetYear, sheetMonth, d);
                 const tod    = isToday(sheetYear, sheetMonth, d);
                 const entry  = sheetId ? getEntry(sheetId, d, sheetEntries) : {};
                 const active = allowances.filter(a => entry[a.key]);
@@ -559,10 +545,8 @@ export default function AccessPage() {
                   <div key={d} className="mb-1">
                     {/* Day row */}
                     <button
-                      onClick={() => !locked && setExpandedDay(isExp ? null : d)}
-                      disabled={locked}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-left
-                        ${locked?"opacity-40 cursor-not-allowed":"hover:bg-stone-50 cursor-pointer"}
+                      onClick={() => setExpandedDay(isExp ? null : d)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-left hover:bg-stone-50 cursor-pointer
                         ${isExp?"bg-stone-50":""}`}>
 
                       {/* Day number */}
@@ -581,7 +565,6 @@ export default function AccessPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-stone-700">
                           {DAY_FULL[dow(sheetYear,sheetMonth,d)]} {d}
-                          {locked && <span className="ml-2 text-[10px] text-amber-500">bloqueado</span>}
                         </p>
                       </div>
 
@@ -596,10 +579,7 @@ export default function AccessPage() {
                         )}
                       </div>
 
-                      {/* Expand chevron */}
-                      {!locked && (
-                        <ChevronRight size={14} className={`text-stone-300 flex-shrink-0 transition-transform ${isExp?"rotate-90":""}`}/>
-                      )}
+                      <ChevronRight size={14} className={`text-stone-300 flex-shrink-0 transition-transform ${isExp?"rotate-90":""}`}/>
                     </button>
 
                     {/* Expanded complement toggles */}

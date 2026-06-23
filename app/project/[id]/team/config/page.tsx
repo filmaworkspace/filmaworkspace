@@ -96,7 +96,6 @@ interface AccessEntry {
   people: Array<{ memberId: string; firstName: string; lastName1: string; department?: string; section?: string }>;
   pin: string | null;
   allowedTypes: AKey[];
-  lockedDays: string[];
   active: boolean;
   createdAt?: Date;
 }
@@ -272,8 +271,6 @@ export default function TeamConfigPage() {
   const [accessDraftPIN,   setAccessDraftPIN]   = useState("");
   const [accessDraftUsePIN,setAccessDraftUsePIN]= useState(false);
   const [accessDraftTypes, setAccessDraftTypes] = useState<Set<AKey>>(new Set(ACCESS_ALLOWANCES.map(a => a.key)));
-  const [accessDraftLocked,setAccessDraftLocked]= useState<string[]>([]);
-  const [accessDraftDate,  setAccessDraftDate]  = useState("");
   const [savingAccess,     setSavingAccess]     = useState(false);
 
   const userId = user?.uid || "";
@@ -394,7 +391,6 @@ export default function TeamConfigPage() {
         people:       d.data().people       || [],
         pin:          d.data().pin          || null,
         allowedTypes: d.data().allowedTypes || [],
-        lockedDays:   d.data().lockedDays   || [],
         active:       d.data().active       ?? true,
         createdAt:    d.data().createdAt?.toDate(),
       })).sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)));
@@ -519,7 +515,6 @@ export default function TeamConfigPage() {
         people,
         pin:          accessDraftUsePIN && accessDraftPIN.trim() ? accessDraftPIN.trim() : null,
         allowedTypes: Array.from(accessDraftTypes),
-        lockedDays:   accessDraftLocked,
         active:       true,
         createdAt:    Timestamp.now(),
         createdBy:    userId,
@@ -541,10 +536,18 @@ export default function TeamConfigPage() {
     await loadAccesos();
   };
 
-  const copyLink = (code: string) => {
-    const url = `${window.location.origin}/access/${code}`;
-    navigator.clipboard.writeText(url);
-    showSuccess("Enlace copiado");
+  const copyLink = (entry: AccessEntry) => {
+    const url = `${window.location.origin}/access/${entry.id}`;
+    const lines = [
+      `Hola, aquí tienes el enlace para marcar los complementos:`,
+      ``,
+      url,
+    ];
+    if (entry.pin) {
+      lines.push(``, `PIN: ${entry.pin}`);
+    }
+    navigator.clipboard.writeText(lines.join("\n"));
+    showSuccess("Mensaje copiado");
   };
 
   const toggleAccessType = (key: AKey) => {
@@ -563,16 +566,7 @@ export default function TeamConfigPage() {
     });
   };
 
-  const addLockedDay = () => {
-    if (!accessDraftDate || accessDraftLocked.includes(accessDraftDate)) return;
-    setAccessDraftLocked(prev => [...prev, accessDraftDate].sort());
-    setAccessDraftDate("");
-  };
-
-  const removeLockedDay = (d: string) =>
-    setAccessDraftLocked(prev => prev.filter(x => x !== d));
-
-  const renderAccesos = () => (
+const renderAccesos = () => (
     <div className="space-y-4">
       {/* Header card */}
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
@@ -634,8 +628,8 @@ export default function TeamConfigPage() {
                   <div className="flex items-center gap-1 flex-shrink-0">
                     {/* Copy link */}
                     <button
-                      onClick={() => copyLink(entry.id)}
-                      title="Copiar enlace"
+                      onClick={() => copyLink(entry)}
+                      title="Copiar mensaje con enlace"
                       className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
                       <Copy size={14} />
                     </button>
@@ -1227,7 +1221,13 @@ export default function TeamConfigPage() {
                     <p className="text-sm font-semibold text-slate-800">Proteger con PIN</p>
                     <p className="text-xs text-slate-400 mt-0.5">El coordinador deberá introducir un PIN para acceder</p>
                   </div>
-                  <button onClick={() => setAccessDraftUsePIN(v => !v)}
+                  <button onClick={() => {
+                    const next = !accessDraftUsePIN;
+                    setAccessDraftUsePIN(next);
+                    if (next && !accessDraftPIN) {
+                      setAccessDraftPIN(String(Math.floor(1000 + Math.random() * 9000)));
+                    }
+                  }}
                     className="relative w-10 h-5 rounded-full transition-colors flex-shrink-0"
                     style={{ backgroundColor: accessDraftUsePIN ? TEAM_COLOR : "#e2e8f0" }}>
                     <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${accessDraftUsePIN ? "left-0.5 translate-x-5" : "left-0.5"}`} />
@@ -1246,36 +1246,6 @@ export default function TeamConfigPage() {
                 )}
               </div>
 
-              {/* Locked days */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Días bloqueados (opcional)</label>
-                <p className="text-xs text-slate-400 mb-2">Los coordinadores no podrán editar estos días</p>
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    value={accessDraftDate}
-                    onChange={e => setAccessDraftDate(e.target.value)}
-                    className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-300"
-                  />
-                  <button onClick={addLockedDay}
-                    disabled={!accessDraftDate}
-                    className="px-3 py-2 rounded-xl text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition-colors">
-                    <Plus size={16} />
-                  </button>
-                </div>
-                {accessDraftLocked.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {accessDraftLocked.map(d => (
-                      <span key={d} className="flex items-center gap-1 text-xs font-medium px-2 py-1 bg-amber-50 text-amber-700 rounded-lg">
-                        {d}
-                        <button onClick={() => removeLockedDay(d)} className="hover:text-amber-900">
-                          <X size={11} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* Footer */}
