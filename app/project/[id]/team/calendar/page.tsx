@@ -394,12 +394,12 @@ export default function CalendarPage() {
   // ── Calendar grid helpers ─────────────────────────────────────────────────
 
   const getDaysInMonth = (year: number, month: number) => {
-    const firstDay = new Date(year, month, 1);
-    const lastDay  = new Date(year, month + 1, 0);
+    const firstDay = new Date(year, month, 1, 12);
+    const lastDay  = new Date(year, month + 1, 0, 12);
     const startDow = (firstDay.getDay() + 6) % 7; // Mon=0
     const days: (string | null)[] = Array(startDow).fill(null);
     for (let d = 1; d <= lastDay.getDate(); d++) {
-      days.push(toYMD(new Date(year, month, d)));
+      days.push(toYMD(new Date(year, month, d, 12)));
     }
     while (days.length % 7 !== 0) days.push(null);
     return days;

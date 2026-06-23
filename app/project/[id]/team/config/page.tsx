@@ -838,29 +838,29 @@ export default function TeamConfigPage() {
       {
         label: "Media dieta nacional", description: "Nacional — media dieta por día", icon: <Plane size={15} className="text-sky-300" />,
         fields: [
-          { key: "halfPerDiemRate", badge: "R. General", badgeColor: "bg-blue-50 text-blue-600" },
-          { key: "halfPerDiemRateArtistic", badge: "R. Artistas", badgeColor: "bg-violet-50 text-violet-600" },
+          { key: "halfPerDiemRate", badge: "Técnicos", badgeColor: "bg-blue-50 text-blue-600" },
+          { key: "halfPerDiemRateArtistic", badge: "Actores", badgeColor: "bg-violet-50 text-violet-600" },
         ],
       },
       {
         label: "Dieta nacional", description: "Nacional — dieta completa/día", icon: <Plane size={15} className="text-sky-500" />,
         fields: [
-          { key: "perDiemRate", badge: "R. General", badgeColor: "bg-blue-50 text-blue-600" },
-          { key: "perDiemRateArtistic", badge: "R. Artistas", badgeColor: "bg-violet-50 text-violet-600" },
+          { key: "perDiemRate", badge: "Técnicos", badgeColor: "bg-blue-50 text-blue-600" },
+          { key: "perDiemRateArtistic", badge: "Actores", badgeColor: "bg-violet-50 text-violet-600" },
         ],
       },
       {
         label: "Media dieta internacional", description: "Internacional — media dieta/día", icon: <Globe size={15} className="text-indigo-300" />,
         fields: [
-          { key: "halfIntlPerDiemRate", badge: "R. General", badgeColor: "bg-blue-50 text-blue-600" },
-          { key: "halfIntlPerDiemRateArtistic", badge: "R. Artistas", badgeColor: "bg-violet-50 text-violet-600" },
+          { key: "halfIntlPerDiemRate", badge: "Técnicos", badgeColor: "bg-blue-50 text-blue-600" },
+          { key: "halfIntlPerDiemRateArtistic", badge: "Actores", badgeColor: "bg-violet-50 text-violet-600" },
         ],
       },
       {
         label: "Dieta internacional", description: "Internacional — dieta completa", icon: <Globe size={15} className="text-indigo-500" />,
         fields: [
-          { key: "intlPerDiemRate", badge: "R. General", badgeColor: "bg-blue-50 text-blue-600" },
-          { key: "intlPerDiemRateArtistic", badge: "R. Artistas", badgeColor: "bg-violet-50 text-violet-600" },
+          { key: "intlPerDiemRate", badge: "Técnicos", badgeColor: "bg-blue-50 text-blue-600" },
+          { key: "intlPerDiemRateArtistic", badge: "Actores", badgeColor: "bg-violet-50 text-violet-600" },
         ],
       },
       {
@@ -878,7 +878,7 @@ export default function TeamConfigPage() {
           <div className="px-6 py-4 border-b border-slate-100">
             <p className="text-sm font-semibold text-slate-900">Tarifas globales</p>
             <p className="text-xs text-slate-500 mt-0.5">
-              Importes por defecto en Nóminas. Las dietas tienen tarifa separada para Equipo técnico (R. General) y Equipo artístico (R. Artistas).
+              Importes por defecto en Nóminas. Las dietas tienen tarifa separada para Técnicos y Actores.
             </p>
           </div>
           <div className="divide-y divide-slate-100">

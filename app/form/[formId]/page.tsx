@@ -186,7 +186,6 @@ async function downloadResguardo(formDoc: FormDoc, responseData: any, formId: st
       ]],
       ["Fiscal y bancario", [
         ["Nº SS", responseData.ssNumber || "—"],
-        ["Régimen", responseData.ssRegime || "—"],
         ["IRPF", responseData.irpfRate ? `${responseData.irpfRate}%` : "—"],
         ["IBAN", responseData.iban || "—"],
         ["Banco", responseData.bankName || "—"],
@@ -578,7 +577,6 @@ export default function FormPage() {
       if (!crewData.city.trim())       e.city       = "Obligatorio";
     } else if (step === 2) {
       if (!crewData.ssNumber.trim()) e.ssNumber = "Obligatorio";
-      if (!crewData.ssRegime)        e.ssRegime = "Obligatorio";
       if (!crewData.iban.trim())     e.iban     = "Obligatorio";
     } else if (step === 3) {
       const missing = DOC_UPLOADS.filter((d) => d.required && !crewData.docs[d.key]);
@@ -1251,7 +1249,7 @@ export default function FormPage() {
                 {crewField("Nombre", "firstName", { required: true, placeholder: "Tu nombre" })}
                 {crewField("Primer apellido", "lastName1", { required: true, half: fc.showLastName2 })}
                 {fc.showLastName2 && crewField("Segundo apellido", "lastName2", { half: true })}
-                {fc.showArtisticName && crewField("Nombre artístico / en créditos", "artisticName", { placeholder: "Como aparecerás en los créditos" })}
+                {crewField("Nombre en créditos", "artisticName", { placeholder: "Como aparecerás en los créditos" })}
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-stone-700 mb-1.5">Tipo de documento <span className="text-red-400">*</span></label>
                   <div className="grid grid-cols-3 gap-2">
@@ -1285,7 +1283,6 @@ export default function FormPage() {
             {step === 2 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {crewField("Nº Seguridad Social", "ssNumber", { required: true, placeholder: "12/1234567/89" })}
-                {crewSelect("Régimen de la SS", "ssRegime", SS_REGIMES, true)}
                 {fc.showIrpfRate && crewField("% IRPF aplicable", "irpfRate", { half: fc.showContractReason, placeholder: "15" })}
                 {fc.showContractReason && crewField("Causa del contrato", "contractReason", { half: fc.showIrpfRate, placeholder: "Obras y servicios" })}
                 <div className="col-span-2 pt-3 border-t border-stone-100">
@@ -1327,7 +1324,7 @@ export default function FormPage() {
                   ["Dirección", `${crewData.address}, ${crewData.postalCode} ${crewData.city}`],
                 ]} />
                 <ReviewSection title="Fiscal y bancario" items={[
-                  ["Nº SS", crewData.ssNumber], ["Régimen", crewData.ssRegime],
+                  ["Nº SS", crewData.ssNumber],
                   crewData.irpfRate ? ["IRPF", `${crewData.irpfRate}%`] : null,
                   ["IBAN", crewData.iban], crewData.bankName ? ["Banco", crewData.bankName] : null,
                 ]} />
