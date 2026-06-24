@@ -24,6 +24,7 @@ import {
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
+  Activity,
   AlertCircle,
   AlertTriangle,
   ArrowLeft,
@@ -41,6 +42,8 @@ import {
   FolderPlus,
   Info,
   Layers,
+  Link2,
+  Mail,
   MessageSquare,
   Package,
   RefreshCw,
@@ -49,6 +52,7 @@ import {
   Shield,
   ShoppingCart,
   Trash2,
+  UserCheck,
   UserPlus,
   Users,
   X,
@@ -144,7 +148,18 @@ export default function AdminProjectPage() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"general" | "accounting" | "team">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "accounting" | "team" | "logs">("general");
+  const [logs, setLogs] = useState<Array<{
+    id: string;
+    type: string;
+    actorName: string;
+    actorEmail?: string;
+    targetName?: string;
+    targetEmail?: string;
+    meta?: string;
+    createdAt: Timestamp;
+  }>>([]);
+  const [copiedFormId, setCopiedFormId] = useState<string | null>(null);
 
   const [project, setProject] = useState<ProjectData | null>(null);
   const [members, setMembers] = useState<MemberData[]>([]);
@@ -323,14 +338,15 @@ export default function AdminProjectPage() {
           .map((d) => ({ id: d.id, name: d.data().name }))
       );
 
-      // Accounting + team stats (parallel)
-      const [accountsSnap, suppliersSnap, invoicesSnap, posSnap, formsSnap, invitationsSnap] = await Promise.all([
+      // Accounting + team stats + logs (parallel)
+      const [accountsSnap, suppliersSnap, invoicesSnap, posSnap, formsSnap, invitationsSnap, logsSnap] = await Promise.all([
         getDocs(collection(db, `projects/${projectId}/accounts`)),
         getDocs(collection(db, `projects/${projectId}/suppliers`)),
         getDocs(collection(db, `projects/${projectId}/invoices`)),
         getDocs(collection(db, `projects/${projectId}/pos`)),
         getDocs(query(collection(db, "forms"), where("projectId", "==", projectId))),
         getDocs(query(collection(db, "invitations"), where("projectId", "==", projectId))),
+        getDocs(collection(db, `projects/${projectId}/logs`)),
       ]);
       setAccountingStats({
         accountCount: accountsSnap.size,
@@ -363,11 +379,57 @@ export default function AdminProjectPage() {
         invitations: invitationsData,
       });
 
+      const logsData = logsSnap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as any))
+        .sort((a: any, b: any) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+      setLogs(logsData);
+
       setLoading(false);
     } catch (error) {
       console.error("Error loading data:", error);
       showToast("error", "Error al cargar los datos");
       setLoading(false);
+    }
+  };
+
+  const writeLog = async (type: string, data: Record<string, any>) => {
+    try {
+      const logRef = doc(collection(db, `projects/${projectId}/logs`));
+      await setDoc(logRef, {
+        type,
+        ...data,
+        createdAt: serverTimestamp(),
+        createdBy: contextUser?.uid || null,
+      });
+    } catch (_) {}
+  };
+
+  const copyFormLink = async (formId: string) => {
+    const url = `${window.location.origin}/form/${formId}`;
+    await navigator.clipboard.writeText(url);
+    setCopiedFormId(formId);
+    setTimeout(() => setCopiedFormId(null), 2000);
+    showToast("success", "Link copiado");
+  };
+
+  const resendFormEmail = async (form: { id: string; email?: string; firstName?: string; lastName1?: string }) => {
+    if (!form.email) { showToast("error", "Esta ficha no tiene email"); return; }
+    try {
+      const url = `${window.location.origin}/form/${form.id}`;
+      await fetch("/api/send-form-reminder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: form.email,
+          name: `${form.firstName || ""} ${form.lastName1 || ""}`.trim() || form.email,
+          formUrl: url,
+          projectName: project?.name || "",
+        }),
+      });
+      showToast("success", `Email reenviado a ${form.email}`);
+      await writeLog("form_reminder_sent", { targetEmail: form.email, formId: form.id, actorName: contextUser?.name || contextUser?.email || "Admin" });
+    } catch {
+      showToast("error", "Error al reenviar el email");
     }
   };
 
@@ -963,6 +1025,7 @@ export default function AdminProjectPage() {
             { id: "general", label: "General", icon: Settings },
             { id: "accounting", label: "Accounting", icon: BarChart3 },
             { id: "team", label: "Team", icon: Users },
+            { id: "logs", label: "Logs", icon: Activity },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -1317,13 +1380,12 @@ export default function AdminProjectPage() {
         {activeTab === "team" && (
           <div className="space-y-6">
             {/* Stats */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
                 { label: "Fichas creadas", value: teamStats.totalForms, icon: FileText, color: "text-blue-600", bg: "bg-blue-50" },
                 { label: "Pendientes", value: teamStats.pendingForms, icon: Clock, color: "text-amber-600", bg: "bg-amber-50" },
                 { label: "Completadas", value: teamStats.completedForms, icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50" },
                 { label: "Firmadas", value: teamStats.signedForms, icon: Shield, color: "text-violet-600", bg: "bg-violet-50" },
-                { label: "Invitaciones", value: teamStats.totalInvitations, icon: Send, color: "text-rose-600", bg: "bg-rose-50" },
               ].map((stat) => (
                 <div key={stat.label} className="bg-white border border-slate-200 rounded-2xl p-5">
                   <div className={`w-10 h-10 ${stat.bg} rounded-xl flex items-center justify-center mb-3`}>
@@ -1355,8 +1417,9 @@ export default function AdminProjectPage() {
                       completed: { label: "Completada", bg: "bg-emerald-50", text: "text-emerald-700" },
                       signed: { label: "Firmada", bg: "bg-violet-50", text: "text-violet-700" },
                     }[form.status] || { label: form.status, bg: "bg-slate-100", text: "text-slate-600" };
+                    const isCopied = copiedFormId === form.id;
                     return (
-                      <div key={form.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-slate-50">
+                      <div key={form.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-slate-50 group">
                         <div>
                           <p className="text-sm font-medium text-slate-900">
                             {form.firstName || form.lastName1 ? `${form.firstName} ${form.lastName1}`.trim() : "Sin nombre"}
@@ -1372,6 +1435,34 @@ export default function AdminProjectPage() {
                               {form.createdAt.toDate().toLocaleDateString("es-ES")}
                             </span>
                           )}
+                          {/* Copy link */}
+                          <button
+                            onClick={() => copyFormLink(form.id)}
+                            className={`p-1.5 rounded-lg transition-colors ${isCopied ? "bg-emerald-50 text-emerald-600" : "text-slate-400 hover:text-slate-700 hover:bg-slate-100 opacity-0 group-hover:opacity-100"}`}
+                            title="Copiar link de la ficha"
+                          >
+                            {isCopied ? <CheckCircle size={14} /> : <Link2 size={14} />}
+                          </button>
+                          {/* Resend email */}
+                          {form.email && (
+                            <button
+                              onClick={() => resendFormEmail(form)}
+                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                              title={`Reenviar email a ${form.email}`}
+                            >
+                              <Mail size={14} />
+                            </button>
+                          )}
+                          {/* Open form */}
+                          <a
+                            href={`/form/${form.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                            title="Abrir ficha"
+                          >
+                            <ExternalLink size={14} />
+                          </a>
                         </div>
                       </div>
                     );
@@ -1379,35 +1470,77 @@ export default function AdminProjectPage() {
                 </div>
               )}
             </div>
+          </div>
+        )}
 
-            {/* Invitations list */}
-            {teamStats.invitations.length > 0 && (
+        {/* ══════════════════════════════════ LOGS TAB ══════════════════════════════════ */}
+        {activeTab === "logs" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-slate-500">Registro de actividad del proyecto</p>
+              <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{logs.length} eventos</span>
+            </div>
+
+            {logs.length === 0 ? (
+              <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
+                <Activity size={28} className="text-slate-300 mx-auto mb-3" />
+                <p className="text-sm font-medium text-slate-700 mb-1">Sin actividad registrada</p>
+                <p className="text-xs text-slate-400">Los eventos aparecerán aquí a medida que ocurran</p>
+              </div>
+            ) : (
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-                  <Send size={15} className="text-slate-400" />
-                  <h2 className="text-sm font-semibold text-slate-900">Invitaciones al proyecto</h2>
-                  <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{teamStats.totalInvitations}</span>
-                </div>
                 <div className="divide-y divide-slate-100">
-                  {teamStats.invitations.map((inv) => {
-                    const statusConfig = {
-                      pending: { label: "Pendiente", bg: "bg-amber-50", text: "text-amber-700" },
-                      accepted: { label: "Aceptada", bg: "bg-emerald-50", text: "text-emerald-700" },
-                      rejected: { label: "Rechazada", bg: "bg-red-50", text: "text-red-700" },
-                    }[inv.status] || { label: inv.status, bg: "bg-slate-100", text: "text-slate-600" };
+                  {logs.map((log) => {
+                    const logConfig: Record<string, { label: string; icon: any; iconBg: string; iconColor: string }> = {
+                      invitation_sent:      { label: "Invitación enviada",        icon: Send,      iconBg: "bg-blue-50",    iconColor: "text-blue-600" },
+                      invitation_accepted:  { label: "Invitación aceptada",       icon: UserCheck, iconBg: "bg-emerald-50", iconColor: "text-emerald-600" },
+                      invitation_rejected:  { label: "Invitación rechazada",      icon: X,         iconBg: "bg-red-50",     iconColor: "text-red-600" },
+                      user_registered:      { label: "Usuario registrado",        icon: UserPlus,  iconBg: "bg-violet-50",  iconColor: "text-violet-600" },
+                      user_joined:          { label: "Usuario se unió",           icon: UserCheck, iconBg: "bg-emerald-50", iconColor: "text-emerald-600" },
+                      user_removed:         { label: "Usuario eliminado",         icon: Trash2,    iconBg: "bg-slate-100",  iconColor: "text-slate-500" },
+                      member_added:         { label: "Miembro añadido",           icon: UserPlus,  iconBg: "bg-blue-50",    iconColor: "text-blue-600" },
+                      form_created:         { label: "Ficha creada",              icon: FileText,  iconBg: "bg-blue-50",    iconColor: "text-blue-600" },
+                      form_submitted:       { label: "Ficha completada",          icon: CheckCircle, iconBg: "bg-emerald-50", iconColor: "text-emerald-600" },
+                      form_signed:          { label: "Ficha firmada",             icon: Shield,    iconBg: "bg-violet-50",  iconColor: "text-violet-600" },
+                      form_reminder_sent:   { label: "Recordatorio de ficha enviado", icon: Mail, iconBg: "bg-amber-50",   iconColor: "text-amber-600" },
+                      message_sent:         { label: "Mensaje enviado",           icon: MessageSquare, iconBg: "bg-slate-100", iconColor: "text-slate-600" },
+                    };
+                    const cfg = logConfig[log.type] || { label: log.type, icon: Activity, iconBg: "bg-slate-100", iconColor: "text-slate-500" };
+                    const Icon = cfg.icon;
                     return (
-                      <div key={inv.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-slate-50">
-                        <p className="text-sm text-slate-700">{inv.email}</p>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-lg ${statusConfig.bg} ${statusConfig.text}`}>
-                            {statusConfig.label}
-                          </span>
-                          {inv.createdAt && (
-                            <span className="text-xs text-slate-400">
-                              {inv.createdAt.toDate().toLocaleDateString("es-ES")}
-                            </span>
-                          )}
+                      <div key={log.id} className="px-5 py-3.5 flex items-start gap-3 hover:bg-slate-50">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${cfg.iconBg}`}>
+                          <Icon size={14} className={cfg.iconColor} />
                         </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-900">{cfg.label}</p>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+                            {log.actorName && (
+                              <span className="text-xs text-slate-500">
+                                Por: <span className="font-medium text-slate-700">{log.actorName}</span>
+                              </span>
+                            )}
+                            {log.targetEmail && (
+                              <span className="text-xs text-slate-500">
+                                → <span className="font-medium text-slate-700">{log.targetEmail}</span>
+                              </span>
+                            )}
+                            {log.targetName && !log.targetEmail && (
+                              <span className="text-xs text-slate-500">
+                                → <span className="font-medium text-slate-700">{log.targetName}</span>
+                              </span>
+                            )}
+                            {log.meta && (
+                              <span className="text-xs text-slate-400">{log.meta}</span>
+                            )}
+                          </div>
+                        </div>
+                        {log.createdAt && (
+                          <span className="text-xs text-slate-400 flex-shrink-0 mt-0.5">
+                            {log.createdAt.toDate().toLocaleDateString("es-ES", { day: "2-digit", month: "short" })}{" "}
+                            {log.createdAt.toDate().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        )}
                       </div>
                     );
                   })}

@@ -305,6 +305,17 @@ export default function Dashboard() {
     setProcessingInvite(invitation.id);
     try {
       await updateDoc(doc(db, "invitations", invitation.id), { status: "accepted", respondedAt: new Date() });
+      // Log: invitation accepted
+      try {
+        const { addDoc, collection: col, serverTimestamp: sts } = await import("firebase/firestore");
+        const { db: fdb } = await import("@/lib/firebase");
+        await addDoc(col(fdb, `projects/${invitation.projectId}/logs`), {
+          type: "invitation_accepted",
+          actorName: userName,
+          actorEmail: userEmail,
+          createdAt: sts(),
+        });
+      } catch (_) {}
       await setDoc(doc(db, `projects/${invitation.projectId}/members`, userId), {
         userId,
         name: userName,

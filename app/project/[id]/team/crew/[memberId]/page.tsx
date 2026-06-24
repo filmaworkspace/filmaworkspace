@@ -448,6 +448,16 @@ export default function CrewMemberPage() {
       await updateDoc(doc(db, `projects/${projectId}/crew`, memberId), {
         formSentAt: Timestamp.now(), formSentBy: userId, formSentByName: userName,
       });
+      // Log
+      try {
+        await addDoc(collection(db, `projects/${projectId}/logs`), {
+          type: "form_created",
+          actorName: userName || "Equipo",
+          targetName: `${member.firstName || ""} ${member.lastName1 || ""}`.trim() || member.name || "",
+          targetEmail: member.email || "",
+          createdAt: Timestamp.now(),
+        });
+      } catch (_) {}
       setMember({ ...member, formSentAt: new Date(), formSentBy: userId });
       setFormSent(true);
       setTimeout(() => setFormSent(false), 3000);

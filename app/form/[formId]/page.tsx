@@ -619,6 +619,20 @@ export default function FormPage() {
         if (crewData.photoUrl) patch.photoUrl = crewData.photoUrl;
         await updateDoc(doc(db, `projects/${formDoc.projectId}/crew`, formDoc.crewMemberId), patch);
       }
+      // Log form_submitted
+      if (formDoc?.projectId) {
+        try {
+          const { addDoc, collection: col, Timestamp: Ts } = await import("firebase/firestore");
+          const { db: fdb } = await import("@/lib/firebase");
+          await addDoc(col(fdb, `projects/${formDoc.projectId}/logs`), {
+            type: "form_submitted",
+            actorName: `${crewData.firstName || ""} ${crewData.lastName1 || ""}`.trim() || crewData.email || "Crew",
+            targetEmail: crewData.email || "",
+            formId,
+            createdAt: Ts.now(),
+          });
+        } catch (_) {}
+      }
       setSubmittedData(payload);
       setSubmitted(true);
     } catch (e) { console.error(e); }
