@@ -1405,7 +1405,7 @@ export default function EditPOPage() {
               <div className="p-6 space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Condiciones de pago</label>
-                  <input type="text" value={formData.paymentTerms} onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })} disabled={!canEdit()} placeholder="Transferencia 30 días" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm disabled:bg-slate-50 disabled:cursor-not-allowed" />
+                  <input type="text" value={formData.paymentTerms} onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })} disabled={!canEdit()} placeholder="Condiciones de pago" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm disabled:bg-slate-50 disabled:cursor-not-allowed" />
                 </div>
 
                 <div>

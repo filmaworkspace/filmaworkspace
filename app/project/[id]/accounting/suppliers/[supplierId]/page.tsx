@@ -1716,7 +1716,7 @@ export default function SupplierDetailPage() {
                 <textarea
                   value={closeProjectData.notes}
                   onChange={(e) => setCloseProjectData({ ...closeProjectData, notes: e.target.value })}
-                  placeholder="Cierre satisfactorio, proveedor recomendado para futuros proyectos"
+                  placeholder="Valoración del proveedor"
                   rows={3}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />

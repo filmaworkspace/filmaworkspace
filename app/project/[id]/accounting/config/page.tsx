@@ -2300,7 +2300,7 @@ export default function AccountingConfigPage() {
                   type="text"
                   value={bankAccountForm.alias}
                   onChange={(e) => setBankAccountForm({ ...bankAccountForm, alias: e.target.value })}
-                  placeholder="Cuenta principal, Cuenta rodaje"
+                  placeholder="Alias de la cuenta"
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
                 />
               </div>
@@ -2346,7 +2346,7 @@ export default function AccountingConfigPage() {
                   type="text"
                   value={bankAccountForm.bic || ""}
                   onChange={(e) => setBankAccountForm({ ...bankAccountForm, bic: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11) })}
-                  placeholder="CAIXESBBXXX"
+                  placeholder="Código BIC"
                   maxLength={11}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm font-mono uppercase"
                 />

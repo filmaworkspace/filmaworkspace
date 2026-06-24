@@ -8,7 +8,7 @@ import { inter } from "@/lib/fonts";
 
 import { auth, db } from "@/lib/firebase";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { collection, doc, getDocs, query, setDoc, Timestamp, where } from "firebase/firestore";
+import { doc, setDoc, Timestamp } from "firebase/firestore";
 
 import { AlertCircle, ArrowLeft, ArrowRight, ChevronDown, Eye, EyeOff } from "lucide-react";
 
@@ -94,9 +94,14 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      // Check phone uniqueness
-      const phoneSnap = await getDocs(query(collection(db, "users"), where("phone", "==", fullPhone)));
-      if (!phoneSnap.empty) {
+      // Check phone uniqueness via API (user is not authenticated yet)
+      const phoneCheck = await fetch("/api/check-phone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: fullPhone }),
+      });
+      const phoneData = await phoneCheck.json();
+      if (phoneData.exists) {
         setPhoneError("Este número ya está registrado en otra cuenta");
         setLoading(false);
         return;

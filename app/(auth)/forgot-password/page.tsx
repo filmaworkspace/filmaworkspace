@@ -7,8 +7,6 @@ import Image from "next/image";
 import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
-import { auth } from "@/lib/firebase";
-import { fetchSignInMethodsForEmail } from "firebase/auth";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
@@ -34,13 +32,6 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      // Validate email exists in Firebase before calling the API
-      const methods = await fetchSignInMethodsForEmail(auth, email);
-      if (methods.length === 0) {
-        setError("No existe una cuenta con este email");
-        return;
-      }
-
       const res = await fetch("/api/send-reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

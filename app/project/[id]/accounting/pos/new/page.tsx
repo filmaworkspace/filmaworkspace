@@ -1822,7 +1822,7 @@ export default function NewPOPage() {
                     type="text"
                     value={formData.paymentTerms}
                     onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
-                    placeholder="Transferencia 30 días"
+                    placeholder="Condiciones de pago"
                     className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm"
                   />
                 </div>

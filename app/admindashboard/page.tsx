@@ -1665,7 +1665,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={newProject.name}
                     onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                    placeholder="La Casa de Papel T6"
+                    placeholder="Nombre del proyecto"
                     autoFocus
                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
                   />
@@ -1693,7 +1693,7 @@ export default function AdminDashboard() {
                           type="text"
                           value={newProject.customId}
                           onChange={(e) => setNewProject({ ...newProject, customId: e.target.value.replace(/[^a-zA-Z0-9_-]/g, "") })}
-                          placeholder="casa-papel-t6"
+                          placeholder="nombre-del-proyecto"
                           className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm font-mono"
                         />
                         {newProject.customId && (

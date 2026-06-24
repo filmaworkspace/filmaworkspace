@@ -3091,7 +3091,7 @@ export default function BoxesPage() {
                 <label className="block text-sm font-medium text-slate-700 mb-2">Nombre del responsable *</label>
                 <input type="text" value={boxForm.name}
                   onChange={e => { const name = e.target.value; setBoxForm({ ...boxForm, name, code: boxForm.code || generateCode(name) }); }}
-                  placeholder="Lucía García"
+                  placeholder="Nombre del titular"
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
               </div>
               <div>
@@ -4012,7 +4012,7 @@ export default function BoxesPage() {
                     type="text"
                     value={boxFormRequesterName}
                     onChange={e => setBoxFormRequesterName(e.target.value)}
-                    placeholder="Juan García"
+                    placeholder="Nombre del beneficiario"
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                   />
                 </div>

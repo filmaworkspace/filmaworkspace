@@ -781,7 +781,7 @@ export default function JournalPage() {
                               className="w-full text-[10px] font-mono border border-slate-100 rounded px-1.5 py-0.5 focus:border-slate-400 outline-none text-slate-500" />
                           </td>
                           <td className="px-2 py-1.5">
-                            <input value={w.categoria} onChange={e => updateWorker(w.id, "categoria", e.target.value)} placeholder="Productora ejecutiva"
+                            <input value={w.categoria} onChange={e => updateWorker(w.id, "categoria", e.target.value)} placeholder="Categoría"
                               className="w-full text-xs border border-slate-200 rounded px-1.5 py-0.5 focus:border-slate-400 outline-none mb-0.5" />
                             <select value={w.tipoContrato} onChange={e => updateWorker(w.id, "tipoContrato", e.target.value)}
                               className="w-full text-[10px] border border-slate-100 rounded px-1.5 py-0.5 bg-white focus:border-slate-400 outline-none text-slate-500">
