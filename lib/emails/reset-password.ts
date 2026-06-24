@@ -30,7 +30,7 @@ export function resetPasswordHtml({ name, resetUrl }: ResetPasswordProps): strin
           <!-- Logo -->
           <tr>
             <td align="center" style="padding-bottom:28px;">
-              <img src="https://filmaworkspace.com/logodark.svg" alt="Filma Workspace" width="140" height="45" style="display:block;" />
+              <img src="https://filmaworkspace.com/logodark.svg" alt="Filma Workspace" width="140" height="28" style="display:block;" />
             </td>
           </tr>
 

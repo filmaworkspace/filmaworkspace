@@ -11,26 +11,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
   }
 
-  const emails = to.filter((e: string) => typeof e === "string" && e.includes("@"));
+  const emails = (to as string[]).filter((e) => typeof e === "string" && e.includes("@"));
   if (emails.length === 0) {
     return NextResponse.json({ error: "No hay emails válidos" }, { status: 400 });
   }
 
+  const html = broadcastHtml({ title, content, type });
+  const text = broadcastText({ title, content, type });
+  const from = process.env.RESEND_FROM ?? "Filma Workspace <noreply@filmaworkspace.com>";
+
   try {
-    // Send in batches of 50
-    const BATCH_SIZE = 50;
+    // resend.batch.send accepts up to 100 items per call.
+    // Each item has its own `to` so recipients cannot see each other.
+    const BATCH_SIZE = 100;
     let sent = 0;
 
     for (let i = 0; i < emails.length; i += BATCH_SIZE) {
-      const batch = emails.slice(i, i + BATCH_SIZE);
-      await resend.emails.send({
-        from: process.env.RESEND_FROM ?? "Filma Workspace <noreply@filmaworkspace.com>",
-        to: batch,
+      const batch = emails.slice(i, i + BATCH_SIZE).map((email) => ({
+        from,
+        to: [email],
         subject: title,
-        html: broadcastHtml({ title, content, type }),
-        text: broadcastText({ title, content, type }),
+        html,
+        text,
         tags: [{ name: "type", value: "broadcast" }],
-      });
+      }));
+
+      await resend.batch.send(batch);
       sent += batch.length;
     }
 

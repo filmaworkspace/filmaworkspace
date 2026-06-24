@@ -203,6 +203,9 @@ export default function AdminProjectPage() {
   const [cloneIncludeBudget, setCloneIncludeBudget] = useState(true);
   const [cloneIncludeSuppliers, setCloneIncludeSuppliers] = useState(true);
 
+  // Departments
+  const [newDeptName, setNewDeptName] = useState("");
+
   // Copy suppliers
   const [copySupplierTargetId, setCopySupplierTargetId] = useState("");
   const [copySupplierSearch, setCopySupplierSearch] = useState("");
@@ -599,6 +602,48 @@ export default function AdminProjectPage() {
     }
   };
 
+  // ── Departments ──────────────────────────────────────────────────────────────
+
+  const handleAddDepartment = async () => {
+    const name = newDeptName.trim();
+    if (!name) return;
+    if (departments.find((d) => d.name.toLowerCase() === name.toLowerCase())) {
+      showToast("error", "Ya existe ese departamento");
+      return;
+    }
+    setSaving(true);
+    try {
+      const newDepts = [...departments.map((d) => d.name), name];
+      await updateDoc(doc(db, "projects", projectId), { departments: newDepts });
+      setNewDeptName("");
+      showToast("success", "Departamento añadido");
+      await loadData();
+    } catch (error) {
+      showToast("error", "Error al añadir departamento");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveDepartment = async (deptName: string) => {
+    const dept = departments.find((d) => d.name === deptName);
+    if (dept && dept.memberCount > 0) {
+      showToast("error", "El departamento tiene miembros asignados");
+      return;
+    }
+    setSaving(true);
+    try {
+      const newDepts = departments.map((d) => d.name).filter((n) => n !== deptName);
+      await updateDoc(doc(db, "projects", projectId), { departments: newDepts });
+      showToast("success", "Departamento eliminado");
+      await loadData();
+    } catch (error) {
+      showToast("error", "Error al eliminar departamento");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // ── Clone project ─────────────────────────────────────────────────────────────
 
   const handleCloneProject = async () => {
@@ -939,211 +984,236 @@ export default function AdminProjectPage() {
 
         {/* ══════════════════════════════════ GENERAL TAB ══════════════════════════════════ */}
         {activeTab === "general" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Project Info */}
-              <div className="lg:col-span-1 space-y-4">
-                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="space-y-5">
+
+            {/* ── Main grid: users (left 2/3) + info+departments (right 1/3) ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+              {/* Users — prominent left column */}
+              <div className="lg:col-span-2">
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden h-full">
                   <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <h2 className="text-sm font-semibold text-slate-900">Información del proyecto</h2>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-semibold text-slate-900">Usuarios del proyecto</h2>
+                      <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{members.length}</span>
+                    </div>
                     <button
-                      onClick={() => setShowEditModal(true)}
-                      className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
+                      onClick={() => setShowAddMemberModal(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800"
                     >
-                      <Edit2 size={14} />
+                      <UserPlus size={12} />
+                      Añadir usuario
                     </button>
                   </div>
-                  <div className="p-5 space-y-4">
+                  {members.length === 0 ? (
+                    <div className="p-12 text-center">
+                      <Users size={28} className="text-slate-300 mx-auto mb-3" />
+                      <p className="text-sm font-medium text-slate-700 mb-1">Sin usuarios asignados</p>
+                      <p className="text-xs text-slate-400">Añade el primer usuario para que pueda acceder al proyecto</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100">
+                      {members.map((member) => (
+                        <div key={member.id} className="px-5 py-4 flex items-center justify-between hover:bg-slate-50 group">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600 text-sm font-semibold">
+                              {member.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-slate-900">{member.name}</p>
+                              <p className="text-xs text-slate-400">{member.email}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {member.role && (
+                              <span className="text-xs bg-slate-900 text-white px-2 py-0.5 rounded-lg">{member.role}</span>
+                            )}
+                            <div className="flex items-center gap-1">
+                              {member.permissions.config && (
+                                <span className="text-[10px] bg-violet-50 text-violet-700 border border-violet-100 px-1.5 py-0.5 rounded">Config</span>
+                              )}
+                              {member.permissions.accounting && (
+                                <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded">
+                                  {member.accountingAccessLevel === "accounting_extended" ? "Acc+" : member.accountingAccessLevel === "accounting" ? "Acc" : "Acc·U"}
+                                </span>
+                              )}
+                              {member.permissions.team && (
+                                <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-100 px-1.5 py-0.5 rounded">Team</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => {
+                                  setShowEditMemberModal(member);
+                                  setEditMemberForm({
+                                    config: member.permissions.config || false,
+                                    accounting: member.permissions.accounting || false,
+                                    team: member.permissions.team || false,
+                                    accountingAccessLevel: member.accountingAccessLevel || "user",
+                                  });
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
+                                title="Editar permisos"
+                              >
+                                <Shield size={14} />
+                              </button>
+                              <button
+                                onClick={() => handleRemoveMember(member.id, member.name)}
+                                disabled={saving}
+                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                                title="Eliminar del proyecto"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right column: project info + departments */}
+              <div className="lg:col-span-1 space-y-4">
+
+                {/* Project info — compact */}
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                    <h2 className="text-sm font-semibold text-slate-900">Proyecto</h2>
+                    <button
+                      onClick={() => setShowEditModal(true)}
+                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
+                      title="Editar"
+                    >
+                      <Edit2 size={13} />
+                    </button>
+                  </div>
+                  <div className="px-5 py-4 space-y-3">
                     <div>
-                      <p className="text-xs text-slate-500 mb-1">Nombre</p>
+                      <p className="text-xs text-slate-400 mb-0.5">Nombre</p>
                       <p className="text-sm font-medium text-slate-900">{project.name}</p>
                     </div>
-                    <div>
-                      <p className="text-xs text-slate-500 mb-1">Fase</p>
-                      <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-lg ${phase.bg} ${phase.text}`}>
-                        {project.phase}
-                      </span>
-                    </div>
-                    {project.description && (
+                    <div className="flex items-center gap-3">
                       <div>
-                        <p className="text-xs text-slate-500 mb-1">Descripción</p>
-                        <p className="text-sm text-slate-600">{project.description}</p>
+                        <p className="text-xs text-slate-400 mb-0.5">Fase</p>
+                        <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-lg ${phase.bg} ${phase.text}`}>
+                          {project.phase}
+                        </span>
                       </div>
-                    )}
+                      <div>
+                        <p className="text-xs text-slate-400 mb-0.5">ID</p>
+                        <p className="text-xs font-mono text-slate-500">{project.id}</p>
+                      </div>
+                    </div>
                     {project.producerNames && project.producerNames.length > 0 && (
                       <div>
-                        <p className="text-xs text-slate-500 mb-1">Productoras</p>
+                        <p className="text-xs text-slate-400 mb-0.5">Productoras</p>
                         <p className="text-sm text-slate-600">{project.producerNames.join(", ")}</p>
                       </div>
                     )}
-                    <div>
-                      <p className="text-xs text-slate-500 mb-1">ID del proyecto</p>
-                      <p className="text-sm font-mono text-slate-500">{project.id}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right col: Admin actions + Danger zone */}
-              <div className="lg:col-span-2 space-y-4">
-                {/* Clone */}
-                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                  <div className="px-5 py-4 border-b border-slate-100">
-                    <h2 className="text-sm font-semibold text-slate-900">Acciones de administrador</h2>
-                  </div>
-                  <div className="p-5">
-                    <button
-                      onClick={() => {
-                        setCloneName(project.name + " (copia)");
-                        setCloneIncludeBudget(true);
-                        setCloneIncludeSuppliers(true);
-                        setShowCloneModal(true);
-                      }}
-                      className="flex items-center gap-3 w-full p-4 border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 text-left group"
-                    >
-                      <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center group-hover:bg-slate-200">
-                        <FolderPlus size={18} className="text-slate-600" />
-                      </div>
+                    {project.description && (
                       <div>
-                        <p className="text-sm font-medium text-slate-900">Clonar proyecto</p>
-                        <p className="text-xs text-slate-500">Crea una copia de este proyecto (opcional: con presupuesto y proveedores)</p>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Danger zone */}
-                <div className="bg-white border border-red-100 rounded-2xl overflow-hidden">
-                  <div className="px-5 py-4 border-b border-red-100 bg-red-50/50">
-                    <h2 className="text-sm font-semibold text-red-800">Zona de peligro</h2>
-                  </div>
-                  <div className="p-5">
-                    {daysUntilClose === null ? (
-                      <button
-                        onClick={() => setShowCloseModal(true)}
-                        className="flex items-center gap-3 w-full p-4 border border-red-200 rounded-xl hover:bg-red-50 text-left group"
-                      >
-                        <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
-                          <Clock size={18} className="text-red-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-red-800">Programar cierre del proyecto</p>
-                          <p className="text-xs text-red-500">Se notificará a todos los miembros. La acción es reversible hasta la fecha de cierre.</p>
-                        </div>
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
-                        <Clock size={18} className="text-red-600 flex-shrink-0" />
-                        <p className="text-sm text-red-700">Cierre ya programado en {daysUntilClose} días.</p>
+                        <p className="text-xs text-slate-400 mb-0.5">Descripción</p>
+                        <p className="text-xs text-slate-500 leading-relaxed">{project.description}</p>
                       </div>
                     )}
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Usuarios del proyecto */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-semibold text-slate-900">Usuarios del proyecto</h2>
-                  <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{members.length}</span>
-                </div>
-                <button
-                  onClick={() => setShowAddMemberModal(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800"
-                >
-                  <UserPlus size={12} />
-                  Añadir
-                </button>
-              </div>
-              {members.length === 0 ? (
-                <div className="p-10 text-center">
-                  <Users size={24} className="text-slate-300 mx-auto mb-2" />
-                  <p className="text-sm text-slate-500">No hay usuarios asignados</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {members.map((member) => (
-                    <div key={member.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-slate-50">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600 text-sm font-medium">
-                          {member.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">{member.name}</p>
-                          <p className="text-xs text-slate-500">{member.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {member.role && (
-                          <span className="text-xs bg-slate-900 text-white px-2 py-0.5 rounded">{member.role}</span>
-                        )}
-                        <div className="flex items-center gap-1">
-                          {member.permissions.config && (
-                            <span className="text-[10px] bg-violet-50 text-violet-700 px-1.5 py-0.5 rounded">Config</span>
-                          )}
-                          {member.permissions.accounting && (
-                            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">
-                              {member.accountingAccessLevel === "accounting_extended" ? "Acc+" : member.accountingAccessLevel === "accounting" ? "Acc" : "Acc·U"}
-                            </span>
-                          )}
-                          {member.permissions.team && (
-                            <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">Team</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => {
-                              setShowEditMemberModal(member);
-                              setEditMemberForm({
-                                config: member.permissions.config || false,
-                                accounting: member.permissions.accounting || false,
-                                team: member.permissions.team || false,
-                                accountingAccessLevel: member.accountingAccessLevel || "user",
-                              });
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
-                            title="Editar permisos"
+                {/* Departments — editable */}
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2">
+                    <Layers size={14} className="text-slate-400" />
+                    <h2 className="text-sm font-semibold text-slate-900">Departamentos</h2>
+                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{departments.length}</span>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    {departments.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {departments.map((dept) => (
+                          <div
+                            key={dept.id}
+                            className="group flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700"
                           >
-                            <Shield size={13} />
-                          </button>
-                          <button
-                            onClick={() => handleRemoveMember(member.id, member.name)}
-                            disabled={saving}
-                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
+                            <span>{dept.name}</span>
+                            {dept.memberCount > 0 && (
+                              <span className="text-[10px] text-slate-400">{dept.memberCount}</span>
+                            )}
+                            <button
+                              onClick={() => handleRemoveDepartment(dept.name)}
+                              disabled={saving || dept.memberCount > 0}
+                              className="p-0.5 text-slate-300 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed rounded"
+                              title={dept.memberCount > 0 ? "Tiene miembros asignados" : "Eliminar"}
+                            >
+                              <X size={11} />
+                            </button>
+                          </div>
+                        ))}
                       </div>
+                    ) : (
+                      <p className="text-xs text-slate-400">Sin departamentos</p>
+                    )}
+                    {/* Add department */}
+                    <div className="flex gap-2 pt-1">
+                      <input
+                        type="text"
+                        value={newDeptName}
+                        onChange={(e) => setNewDeptName(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleAddDepartment()}
+                        placeholder="Nuevo departamento"
+                        className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-xs"
+                      />
+                      <button
+                        onClick={handleAddDepartment}
+                        disabled={saving || !newDeptName.trim()}
+                        className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 disabled:opacity-40"
+                      >
+                        Añadir
+                      </button>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Departamentos */}
-            {departments.length > 0 && (
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-                  <Layers size={15} className="text-slate-400" />
-                  <h2 className="text-sm font-semibold text-slate-900">Departamentos</h2>
-                  <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{departments.length}</span>
-                </div>
-                <div className="p-5">
-                  <div className="flex flex-wrap gap-2">
-                    {departments.map((dept) => (
-                      <div key={dept.id} className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: dept.color }} />
-                        <span className="text-sm text-slate-700">{dept.name}</span>
-                        <span className="text-xs text-slate-400">{dept.memberCount}</span>
-                      </div>
-                    ))}
                   </div>
                 </div>
               </div>
-            )}
+            </div>
+
+            {/* ── Admin actions strip — compact, secondary ── */}
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <button
+                onClick={() => {
+                  setCloneName(project.name + " (copia)");
+                  setCloneIncludeBudget(true);
+                  setCloneIncludeSuppliers(true);
+                  setShowCloneModal(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300"
+              >
+                <FolderPlus size={14} />
+                Clonar proyecto
+              </button>
+
+              {daysUntilClose === null ? (
+                <button
+                  onClick={() => setShowCloseModal(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white border border-red-200 rounded-xl text-sm text-red-600 hover:bg-red-50"
+                >
+                  <Clock size={14} />
+                  Programar cierre
+                </button>
+              ) : (
+                <div className="flex items-center gap-3 px-4 py-2.5 bg-red-50 border border-red-200 rounded-xl">
+                  <Clock size={14} className="text-red-500 flex-shrink-0" />
+                  <span className="text-sm text-red-700">Cierre en {daysUntilClose} días ({project.closingAt?.toDate().toLocaleDateString("es-ES")})</span>
+                  <button
+                    onClick={handleCancelClose}
+                    disabled={saving}
+                    className="ml-auto text-xs text-red-600 hover:text-red-900 font-medium underline underline-offset-2 disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

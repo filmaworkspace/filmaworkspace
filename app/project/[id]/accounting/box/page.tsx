@@ -1957,8 +1957,6 @@ export default function BoxesPage() {
           <div className="flex items-center justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-400 font-medium">Filma Accounting</span>
-                <ChevronRight size={14} className="text-slate-300" />
                 <span className="text-2xl font-bold bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">BOX</span>
               </div>
               <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl ml-6">
