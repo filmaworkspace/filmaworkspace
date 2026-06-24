@@ -8,7 +8,7 @@ import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db, storage } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
+import { doc, getDoc, addDoc, updateDoc, collection, Timestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -398,6 +398,35 @@ export default function CrewMemberPage() {
     if (!member?.email) return;
     setSendingForm(true);
     try {
+      // Create the form document and generate the real URL + PIN
+      const pin = String(Math.floor(1000 + Math.random() * 9000));
+      const expires = new Date();
+      expires.setDate(expires.getDate() + 14);
+      const formRef = await addDoc(collection(db, "forms"), {
+        type: "crew_onboarding",
+        pin,
+        status: "pending",
+        projectId,
+        projectName: projectName || "",
+        crewMemberId: memberId,
+        createdBy: userId,
+        createdByName: userName,
+        createdAt: Timestamp.now(),
+        expiresAt: Timestamp.fromDate(expires),
+        prefilled: {
+          firstName:    member.firstName  || "",
+          lastName1:    member.lastName1  || "",
+          lastName2:    member.lastName2  || "",
+          artisticName: member.artisticName || "",
+          email:        member.email      || "",
+          phone:        member.phone      || "",
+          role:         member.role       || "",
+          department:   member.department || "",
+          section:      member.section    || "technical",
+        },
+      });
+      const realFormUrl = `${window.location.origin}/form/${formRef.id}`;
+
       const res = await fetch("/api/send-invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -406,7 +435,7 @@ export default function CrewMemberPage() {
           firstName:   member.firstName || member.name || "",
           projectName: projectName || "la producción",
           role:        member.role || "",
-          formUrl,
+          formUrl:     realFormUrl,
           senderName:  userName || "El equipo de producción",
           memberId,
         }),
