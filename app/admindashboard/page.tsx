@@ -124,6 +124,7 @@ interface User {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   role: string;
   projectCount: number;
   projects: UserProject[];
@@ -203,7 +204,9 @@ export default function AdminDashboard() {
     sendToAll: true,
     selectedProjects: [] as string[],
     duration: "indefinite" as "24h" | "7d" | "30d" | "indefinite",
+    sendByEmail: false,
   });
+  const [emailConfirmStep, setEmailConfirmStep] = useState(false);
   const [projectSearchInMessage, setProjectSearchInMessage] = useState("");
 
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -308,6 +311,7 @@ export default function AdminDashboard() {
             id: userDoc.id,
             name: data.name || data.email,
             email: data.email,
+            phone: data.phone || "",
             role: data.role || "user",
             projectCount: userProjectsSnap.size,
             projects: userProjects,
@@ -758,7 +762,18 @@ export default function AdminDashboard() {
         await setDoc(messageRef, messageData);
       }
 
+      // Fire-and-forget email broadcast if requested
+      if (messageForm.sendByEmail) {
+        const emails = targetUserIds.map((id) => users.find((u) => u.id === id)?.email).filter(Boolean) as string[];
+        fetch("/api/send-broadcast", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to: emails, title: messageForm.title.trim(), content: messageForm.content.trim(), type: messageForm.type }),
+        }).catch(console.error);
+      }
+
       // Reset form and close modal
+      setEmailConfirmStep(false);
       setMessageForm({
         title: "",
         content: "",
@@ -766,10 +781,11 @@ export default function AdminDashboard() {
         sendToAll: true,
         selectedProjects: [],
         duration: "indefinite",
+        sendByEmail: false,
       });
       setProjectSearchInMessage("");
       setShowMessageModal(false);
-      showToast("success", `Mensaje enviado a ${targetUserIds.length} usuario${targetUserIds.length !== 1 ? "s" : ""}`);
+      showToast("success", `Mensaje enviado a ${targetUserIds.length} usuario${targetUserIds.length !== 1 ? "s" : ""}${messageForm.sendByEmail ? " (+ email)" : ""}`);
       await loadData();
     } catch (error) {
       console.error(error);
@@ -809,10 +825,11 @@ export default function AdminDashboard() {
 
   // Export users to CSV
   const handleExportUsersCSV = () => {
-    const header = ["Nombre", "Email", "Rol", "Nº proyectos", "Proyectos"];
+    const header = ["Nombre", "Email", "Teléfono", "Rol", "Nº proyectos", "Proyectos"];
     const rows = filteredUsers.map((u) => [
       u.name,
       u.email,
+      u.phone || "",
       u.role === "admin" ? "Administrador" : "Usuario",
       String(u.projectCount),
       u.projects.map((p) => p.name).join(" | "),
@@ -1254,6 +1271,7 @@ export default function AdminDashboard() {
                             )}
                           </div>
                           <p className="text-xs text-slate-500">{user.email}</p>
+                          {user.phone && <p className="text-xs text-slate-400">{user.phone}</p>}
                         </div>
                       </div>
 
@@ -2015,7 +2033,8 @@ export default function AdminDashboard() {
               <button
                 onClick={() => {
                   setShowMessageModal(false);
-                  setMessageForm({ title: "", content: "", type: "info", sendToAll: true, selectedProjects: [], duration: "indefinite" });
+                  setEmailConfirmStep(false);
+                  setMessageForm({ title: "", content: "", type: "info", sendToAll: true, selectedProjects: [], duration: "indefinite", sendByEmail: false });
                   setProjectSearchInMessage("");
                 }}
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
@@ -2256,28 +2275,96 @@ export default function AdminDashboard() {
                     : `El mensaje se eliminará automáticamente después de ${messageForm.duration === "24h" ? "24 horas" : messageForm.duration === "7d" ? "7 días" : "30 días"}`}
                 </p>
               </div>
+
+              {/* Send by email toggle */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between p-4">
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">Enviar también por email</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Además de en la plataforma, recibirán un email</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMessageForm({ ...messageForm, sendByEmail: !messageForm.sendByEmail });
+                      setEmailConfirmStep(false);
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${messageForm.sendByEmail ? "bg-slate-900" : "bg-slate-200"}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${messageForm.sendByEmail ? "translate-x-6" : "translate-x-1"}`} />
+                  </button>
+                </div>
+                {messageForm.sendByEmail && (
+                  <div className="px-4 pb-4">
+                    <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                      <Mail size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-700">
+                        Se enviará un email a los destinatarios. Esta acción no se puede deshacer.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3">
-              <button
-                onClick={() => {
-                  setShowMessageModal(false);
-                  setMessageForm({ title: "", content: "", type: "info", sendToAll: true, selectedProjects: [], duration: "indefinite" });
-                  setProjectSearchInMessage("");
-                }}
-                className="flex-1 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSendMessage}
-                disabled={saving || !messageForm.title.trim() || !messageForm.content.trim() || (!messageForm.sendToAll && messageForm.selectedProjects.length === 0)}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Send size={16} />
-                {saving ? "Enviando..." : "Enviar mensaje"}
-              </button>
-            </div>
+            {/* Footer */}
+            {emailConfirmStep ? (
+              <div className="px-6 py-4 border-t border-slate-100 bg-amber-50 space-y-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-900">¿Enviar también por email?</p>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      Este mensaje llegará a los destinatarios tanto en la plataforma como en su bandeja de entrada de correo. Esta acción no se puede deshacer.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setEmailConfirmStep(false)}
+                    className="flex-1 px-4 py-2.5 border border-amber-300 bg-white text-amber-800 rounded-xl text-sm font-medium hover:bg-amber-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={saving}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-600 text-white rounded-xl text-sm font-medium hover:bg-amber-700 disabled:opacity-50"
+                  >
+                    <Send size={14} />
+                    {saving ? "Enviando..." : "Confirmar y enviar"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowMessageModal(false);
+                    setEmailConfirmStep(false);
+                    setMessageForm({ title: "", content: "", type: "info", sendToAll: true, selectedProjects: [], duration: "indefinite", sendByEmail: false });
+                    setProjectSearchInMessage("");
+                  }}
+                  className="flex-1 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    if (messageForm.sendByEmail) {
+                      setEmailConfirmStep(true);
+                    } else {
+                      handleSendMessage();
+                    }
+                  }}
+                  disabled={saving || !messageForm.title.trim() || !messageForm.content.trim() || (!messageForm.sendToAll && messageForm.selectedProjects.length === 0)}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send size={16} />
+                  {saving ? "Enviando..." : "Enviar mensaje"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

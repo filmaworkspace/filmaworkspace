@@ -250,11 +250,11 @@ export default function ProfilePage() {
     if (!project) return;
 
     try {
-      await updateDoc(doc(db, `userProjects/${user.uid}/projects`, projectId), {
-        archived: !project.archived,
-      });
-      setProjects(projects.map(p => 
-        p.projectId === projectId ? { ...p, archived: !p.archived } : p
+      const newArchived = !project.archived;
+      await updateDoc(doc(db, `userProjects/${user.uid}/projects`, projectId), { archived: newArchived });
+      await updateDoc(doc(db, `projects`, projectId), { archived: newArchived });
+      setProjects(projects.map(p =>
+        p.projectId === projectId ? { ...p, archived: newArchived } : p
       ));
       showToast("success", project.archived ? "Proyecto restaurado" : "Proyecto archivado");
     } catch (error) {
@@ -767,73 +767,6 @@ export default function ProfilePage() {
                       </div>
                     </div>
 
-                    {/* Notifications Panel */}
-                    {expandedProject === project.projectId && (
-                      <div className="px-5 py-4 bg-slate-50 border-t border-slate-100">
-                        <div className="flex items-center justify-between mb-4">
-                          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Notificaciones de este proyecto</p>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => toggleAllNotifications(project.projectId, true)}
-                              className="text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1"
-                            >
-                              <BellRing size={12} />
-                              Activar todas
-                            </button>
-                            <span className="text-slate-300">|</span>
-                            <button
-                              onClick={() => toggleAllNotifications(project.projectId, false)}
-                              className="text-xs text-slate-500 hover:text-slate-700 font-medium flex items-center gap-1"
-                            >
-                              <BellOff size={12} />
-                              Silenciar
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          {NOTIFICATION_TYPES.map((notif) => {
-                            const Icon = notif.icon;
-                            const isEnabled = project.notifications[notif.id as keyof typeof project.notifications];
-                            const isBlue = notif.color === "blue";
-                            return (
-                              <button
-                                key={notif.id}
-                                onClick={() => updateProjectNotification(project.projectId, notif.id, !isEnabled)}
-                                className="flex items-center gap-3 p-3 rounded-xl border transition-all"
-                                style={isEnabled ? {
-                                  backgroundColor: isBlue ? 'rgba(47, 82, 224, 0.08)' : 'rgba(137, 211, 34, 0.12)',
-                                  borderColor: isBlue ? 'rgba(47, 82, 224, 0.25)' : 'rgba(137, 211, 34, 0.35)',
-                                } : {
-                                  backgroundColor: '#f8fafc',
-                                  borderColor: 'transparent',
-                                }}
-                              >
-                                <div 
-                                  className="w-8 h-8 rounded-lg flex items-center justify-center"
-                                  style={isEnabled ? {
-                                    backgroundColor: isBlue ? 'rgba(47, 82, 224, 0.15)' : 'rgba(137, 211, 34, 0.2)',
-                                  } : {
-                                    backgroundColor: '#e2e8f0',
-                                  }}
-                                >
-                                  <Icon size={16} style={{ color: isEnabled ? (isBlue ? '#2F52E0' : '#6BA319') : '#94a3b8' }} />
-                                </div>
-                                <div className="text-left flex-1">
-                                  <p className={`text-sm font-medium ${isEnabled ? "text-slate-900" : "text-slate-500"}`}>
-                                    {notif.label}
-                                  </p>
-                                  <p className="text-xs text-slate-400">{notif.description}</p>
-                                </div>
-                                {isEnabled && (
-                                  <CheckCircle size={16} style={{ color: isBlue ? '#2F52E0' : '#6BA319' }} />
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>

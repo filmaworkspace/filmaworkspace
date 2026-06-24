@@ -25,6 +25,7 @@ export default function RegisterPage() {
 
   // ── Step 1 state ─────────────────────────────────────────────────────────
   const [name,         setName]         = useState("");
+  const [phone,        setPhone]        = useState("");
   const [email,        setEmail]        = useState("");
   const [password,     setPassword]     = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -114,7 +115,7 @@ export default function RegisterPage() {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(cred.user, { displayName: name });
       await setDoc(doc(db, "users", cred.user.uid), {
-        name, email, role: "user",
+        name, email, phone, role: "user",
         createdAt: Timestamp.now(), updatedAt: Timestamp.now(),
       });
 
@@ -164,6 +165,12 @@ export default function RegisterPage() {
               <div>
                 <input type="text" required value={name} onChange={e => setName(e.target.value)}
                   placeholder="Nombre completo" disabled={loading} autoComplete="name"
+                  className="w-full px-3.5 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50"
+                  style={INPUT_STYLE} />
+              </div>
+              <div>
+                <input type="tel" required value={phone} onChange={e => setPhone(e.target.value)}
+                  placeholder="Teléfono" disabled={loading} autoComplete="tel"
                   className="w-full px-3.5 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50"
                   style={INPUT_STYLE} />
               </div>

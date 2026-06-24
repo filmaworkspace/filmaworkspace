@@ -14,10 +14,12 @@ import {
   doc,
   getDocs,
   getDoc,
+  query,
   serverTimestamp,
   setDoc,
   Timestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -122,6 +124,16 @@ interface AccountingStats {
   poCount: number;
 }
 
+interface TeamStats {
+  totalForms: number;
+  pendingForms: number;
+  completedForms: number;
+  signedForms: number;
+  totalInvitations: number;
+  forms: Array<{ id: string; firstName?: string; lastName1?: string; email?: string; status: string; createdAt?: Timestamp }>;
+  invitations: Array<{ id: string; email: string; status: string; createdAt?: Timestamp }>;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function AdminProjectPage() {
@@ -144,6 +156,15 @@ export default function AdminProjectPage() {
     supplierCount: 0,
     invoiceCount: 0,
     poCount: 0,
+  });
+  const [teamStats, setTeamStats] = useState<TeamStats>({
+    totalForms: 0,
+    pendingForms: 0,
+    completedForms: 0,
+    signedForms: 0,
+    totalInvitations: 0,
+    forms: [],
+    invitations: [],
   });
 
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -299,18 +320,44 @@ export default function AdminProjectPage() {
           .map((d) => ({ id: d.id, name: d.data().name }))
       );
 
-      // Accounting stats (parallel)
-      const [accountsSnap, suppliersSnap, invoicesSnap, posSnap] = await Promise.all([
+      // Accounting + team stats (parallel)
+      const [accountsSnap, suppliersSnap, invoicesSnap, posSnap, formsSnap, invitationsSnap] = await Promise.all([
         getDocs(collection(db, `projects/${projectId}/accounts`)),
         getDocs(collection(db, `projects/${projectId}/suppliers`)),
         getDocs(collection(db, `projects/${projectId}/invoices`)),
         getDocs(collection(db, `projects/${projectId}/pos`)),
+        getDocs(query(collection(db, "forms"), where("projectId", "==", projectId))),
+        getDocs(query(collection(db, "invitations"), where("projectId", "==", projectId))),
       ]);
       setAccountingStats({
         accountCount: accountsSnap.size,
         supplierCount: suppliersSnap.size,
         invoiceCount: invoicesSnap.size,
         poCount: posSnap.size,
+      });
+
+      const formsData = formsSnap.docs.map((d) => ({
+        id: d.id,
+        firstName: d.data().prefilled?.firstName || d.data().firstName || "",
+        lastName1: d.data().prefilled?.lastName1 || d.data().lastName1 || "",
+        email: d.data().prefilled?.email || d.data().email || "",
+        status: d.data().status || "pending",
+        createdAt: d.data().createdAt,
+      }));
+      const invitationsData = invitationsSnap.docs.map((d) => ({
+        id: d.id,
+        email: d.data().email || "",
+        status: d.data().status || "pending",
+        createdAt: d.data().createdAt,
+      }));
+      setTeamStats({
+        totalForms: formsData.length,
+        pendingForms: formsData.filter((f) => f.status === "pending").length,
+        completedForms: formsData.filter((f) => f.status === "completed").length,
+        signedForms: formsData.filter((f) => f.status === "signed").length,
+        totalInvitations: invitationsData.length,
+        forms: formsData,
+        invitations: invitationsData,
       });
 
       setLoading(false);
@@ -892,106 +939,211 @@ export default function AdminProjectPage() {
 
         {/* ══════════════════════════════════ GENERAL TAB ══════════════════════════════════ */}
         {activeTab === "general" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Project Info */}
-            <div className="lg:col-span-1 space-y-4">
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-slate-900">Información del proyecto</h2>
-                  <button
-                    onClick={() => setShowEditModal(true)}
-                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
-                  >
-                    <Edit2 size={14} />
-                  </button>
-                </div>
-                <div className="p-5 space-y-4">
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Nombre</p>
-                    <p className="text-sm font-medium text-slate-900">{project.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Fase</p>
-                    <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-lg ${phase.bg} ${phase.text}`}>
-                      {project.phase}
-                    </span>
-                  </div>
-                  {project.description && (
-                    <div>
-                      <p className="text-xs text-slate-500 mb-1">Descripción</p>
-                      <p className="text-sm text-slate-600">{project.description}</p>
-                    </div>
-                  )}
-                  {project.producerNames && project.producerNames.length > 0 && (
-                    <div>
-                      <p className="text-xs text-slate-500 mb-1">Productoras</p>
-                      <p className="text-sm text-slate-600">{project.producerNames.join(", ")}</p>
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">ID del proyecto</p>
-                    <p className="text-sm font-mono text-slate-500">{project.id}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right col: Admin actions + Danger zone */}
-            <div className="lg:col-span-2 space-y-4">
-              {/* Clone */}
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100">
-                  <h2 className="text-sm font-semibold text-slate-900">Acciones de administrador</h2>
-                </div>
-                <div className="p-5">
-                  <button
-                    onClick={() => {
-                      setCloneName(project.name + " (copia)");
-                      setCloneIncludeBudget(true);
-                      setCloneIncludeSuppliers(true);
-                      setShowCloneModal(true);
-                    }}
-                    className="flex items-center gap-3 w-full p-4 border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 text-left group"
-                  >
-                    <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center group-hover:bg-slate-200">
-                      <FolderPlus size={18} className="text-slate-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">Clonar proyecto</p>
-                      <p className="text-xs text-slate-500">Crea una copia de este proyecto (opcional: con presupuesto y proveedores)</p>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* Danger zone */}
-              <div className="bg-white border border-red-100 rounded-2xl overflow-hidden">
-                <div className="px-5 py-4 border-b border-red-100 bg-red-50/50">
-                  <h2 className="text-sm font-semibold text-red-800">Zona de peligro</h2>
-                </div>
-                <div className="p-5">
-                  {daysUntilClose === null ? (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Project Info */}
+              <div className="lg:col-span-1 space-y-4">
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                  <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <h2 className="text-sm font-semibold text-slate-900">Información del proyecto</h2>
                     <button
-                      onClick={() => setShowCloseModal(true)}
-                      className="flex items-center gap-3 w-full p-4 border border-red-200 rounded-xl hover:bg-red-50 text-left group"
+                      onClick={() => setShowEditModal(true)}
+                      className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
                     >
-                      <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
-                        <Clock size={18} className="text-red-600" />
+                      <Edit2 size={14} />
+                    </button>
+                  </div>
+                  <div className="p-5 space-y-4">
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Nombre</p>
+                      <p className="text-sm font-medium text-slate-900">{project.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Fase</p>
+                      <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-lg ${phase.bg} ${phase.text}`}>
+                        {project.phase}
+                      </span>
+                    </div>
+                    {project.description && (
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1">Descripción</p>
+                        <p className="text-sm text-slate-600">{project.description}</p>
+                      </div>
+                    )}
+                    {project.producerNames && project.producerNames.length > 0 && (
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1">Productoras</p>
+                        <p className="text-sm text-slate-600">{project.producerNames.join(", ")}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">ID del proyecto</p>
+                      <p className="text-sm font-mono text-slate-500">{project.id}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right col: Admin actions + Danger zone */}
+              <div className="lg:col-span-2 space-y-4">
+                {/* Clone */}
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                  <div className="px-5 py-4 border-b border-slate-100">
+                    <h2 className="text-sm font-semibold text-slate-900">Acciones de administrador</h2>
+                  </div>
+                  <div className="p-5">
+                    <button
+                      onClick={() => {
+                        setCloneName(project.name + " (copia)");
+                        setCloneIncludeBudget(true);
+                        setCloneIncludeSuppliers(true);
+                        setShowCloneModal(true);
+                      }}
+                      className="flex items-center gap-3 w-full p-4 border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 text-left group"
+                    >
+                      <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center group-hover:bg-slate-200">
+                        <FolderPlus size={18} className="text-slate-600" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-red-800">Programar cierre del proyecto</p>
-                        <p className="text-xs text-red-500">Se notificará a todos los miembros. La acción es reversible hasta la fecha de cierre.</p>
+                        <p className="text-sm font-medium text-slate-900">Clonar proyecto</p>
+                        <p className="text-xs text-slate-500">Crea una copia de este proyecto (opcional: con presupuesto y proveedores)</p>
                       </div>
                     </button>
-                  ) : (
-                    <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
-                      <Clock size={18} className="text-red-600 flex-shrink-0" />
-                      <p className="text-sm text-red-700">Cierre ya programado en {daysUntilClose} días.</p>
-                    </div>
-                  )}
+                  </div>
+                </div>
+
+                {/* Danger zone */}
+                <div className="bg-white border border-red-100 rounded-2xl overflow-hidden">
+                  <div className="px-5 py-4 border-b border-red-100 bg-red-50/50">
+                    <h2 className="text-sm font-semibold text-red-800">Zona de peligro</h2>
+                  </div>
+                  <div className="p-5">
+                    {daysUntilClose === null ? (
+                      <button
+                        onClick={() => setShowCloseModal(true)}
+                        className="flex items-center gap-3 w-full p-4 border border-red-200 rounded-xl hover:bg-red-50 text-left group"
+                      >
+                        <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+                          <Clock size={18} className="text-red-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-red-800">Programar cierre del proyecto</p>
+                          <p className="text-xs text-red-500">Se notificará a todos los miembros. La acción es reversible hasta la fecha de cierre.</p>
+                        </div>
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
+                        <Clock size={18} className="text-red-600 flex-shrink-0" />
+                        <p className="text-sm text-red-700">Cierre ya programado en {daysUntilClose} días.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* Usuarios del proyecto */}
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-slate-900">Usuarios del proyecto</h2>
+                  <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{members.length}</span>
+                </div>
+                <button
+                  onClick={() => setShowAddMemberModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800"
+                >
+                  <UserPlus size={12} />
+                  Añadir
+                </button>
+              </div>
+              {members.length === 0 ? (
+                <div className="p-10 text-center">
+                  <Users size={24} className="text-slate-300 mx-auto mb-2" />
+                  <p className="text-sm text-slate-500">No hay usuarios asignados</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {members.map((member) => (
+                    <div key={member.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-slate-50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600 text-sm font-medium">
+                          {member.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">{member.name}</p>
+                          <p className="text-xs text-slate-500">{member.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {member.role && (
+                          <span className="text-xs bg-slate-900 text-white px-2 py-0.5 rounded">{member.role}</span>
+                        )}
+                        <div className="flex items-center gap-1">
+                          {member.permissions.config && (
+                            <span className="text-[10px] bg-violet-50 text-violet-700 px-1.5 py-0.5 rounded">Config</span>
+                          )}
+                          {member.permissions.accounting && (
+                            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">
+                              {member.accountingAccessLevel === "accounting_extended" ? "Acc+" : member.accountingAccessLevel === "accounting" ? "Acc" : "Acc·U"}
+                            </span>
+                          )}
+                          {member.permissions.team && (
+                            <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">Team</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => {
+                              setShowEditMemberModal(member);
+                              setEditMemberForm({
+                                config: member.permissions.config || false,
+                                accounting: member.permissions.accounting || false,
+                                team: member.permissions.team || false,
+                                accountingAccessLevel: member.accountingAccessLevel || "user",
+                              });
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
+                            title="Editar permisos"
+                          >
+                            <Shield size={13} />
+                          </button>
+                          <button
+                            onClick={() => handleRemoveMember(member.id, member.name)}
+                            disabled={saving}
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Departamentos */}
+            {departments.length > 0 && (
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+                  <Layers size={15} className="text-slate-400" />
+                  <h2 className="text-sm font-semibold text-slate-900">Departamentos</h2>
+                  <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{departments.length}</span>
+                </div>
+                <div className="p-5">
+                  <div className="flex flex-wrap gap-2">
+                    {departments.map((dept) => (
+                      <div key={dept.id} className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: dept.color }} />
+                        <span className="text-sm text-slate-700">{dept.name}</span>
+                        <span className="text-xs text-slate-400">{dept.memberCount}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1094,154 +1246,101 @@ export default function AdminProjectPage() {
         {/* ══════════════════════════════════ TEAM TAB ══════════════════════════════════ */}
         {activeTab === "team" && (
           <div className="space-y-6">
-            {/* Stats row */}
-            <div className="flex items-center gap-6 text-sm">
-              <div className="flex items-center gap-2">
-                <Users size={16} className="text-slate-400" />
-                <span className="text-slate-600">{members.length} miembros</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FolderOpen size={16} className="text-slate-400" />
-                <span className="text-slate-600">{departments.length} departamentos</span>
-              </div>
+            {/* Stats */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              {[
+                { label: "Fichas creadas", value: teamStats.totalForms, icon: FileText, color: "text-blue-600", bg: "bg-blue-50" },
+                { label: "Pendientes", value: teamStats.pendingForms, icon: Clock, color: "text-amber-600", bg: "bg-amber-50" },
+                { label: "Completadas", value: teamStats.completedForms, icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50" },
+                { label: "Firmadas", value: teamStats.signedForms, icon: Shield, color: "text-violet-600", bg: "bg-violet-50" },
+                { label: "Invitaciones", value: teamStats.totalInvitations, icon: Send, color: "text-rose-600", bg: "bg-rose-50" },
+              ].map((stat) => (
+                <div key={stat.label} className="bg-white border border-slate-200 rounded-2xl p-5">
+                  <div className={`w-10 h-10 ${stat.bg} rounded-xl flex items-center justify-center mb-3`}>
+                    <stat.icon size={18} className={stat.color} />
+                  </div>
+                  <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{stat.label}</p>
+                </div>
+              ))}
             </div>
 
-            {/* Members */}
+            {/* Fichas list */}
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-semibold text-slate-900">Miembros</h2>
-                  <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                    {members.length}
-                  </span>
-                </div>
-                <button
-                  onClick={() => setShowAddMemberModal(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800"
-                >
-                  <UserPlus size={12} />
-                  Añadir
-                </button>
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+                <FileText size={15} className="text-slate-400" />
+                <h2 className="text-sm font-semibold text-slate-900">Fichas de crew</h2>
+                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{teamStats.totalForms}</span>
               </div>
-
-              {members.length === 0 ? (
-                <div className="p-12 text-center">
-                  <Users size={24} className="text-slate-300 mx-auto mb-2" />
-                  <p className="text-sm text-slate-500">No hay miembros</p>
+              {teamStats.forms.length === 0 ? (
+                <div className="p-10 text-center">
+                  <FileText size={24} className="text-slate-300 mx-auto mb-2" />
+                  <p className="text-sm text-slate-500">No hay fichas creadas para este proyecto</p>
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100">
-                  {members.map((member) => (
-                    <div key={member.id} className="px-5 py-4 flex items-center justify-between hover:bg-slate-50">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600 text-sm font-medium">
-                          {member.name.charAt(0).toUpperCase()}
-                        </div>
+                  {teamStats.forms.map((form) => {
+                    const statusConfig = {
+                      pending: { label: "Pendiente", bg: "bg-amber-50", text: "text-amber-700" },
+                      completed: { label: "Completada", bg: "bg-emerald-50", text: "text-emerald-700" },
+                      signed: { label: "Firmada", bg: "bg-violet-50", text: "text-violet-700" },
+                    }[form.status] || { label: form.status, bg: "bg-slate-100", text: "text-slate-600" };
+                    return (
+                      <div key={form.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-slate-50">
                         <div>
-                          <p className="text-sm font-medium text-slate-900">{member.name}</p>
-                          <p className="text-xs text-slate-500">{member.email}</p>
+                          <p className="text-sm font-medium text-slate-900">
+                            {form.firstName || form.lastName1 ? `${form.firstName} ${form.lastName1}`.trim() : "Sin nombre"}
+                          </p>
+                          {form.email && <p className="text-xs text-slate-500">{form.email}</p>}
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5">
-                          {member.role && (
-                            <span className="text-xs bg-slate-900 text-white px-2 py-0.5 rounded">
-                              {member.role}
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-lg ${statusConfig.bg} ${statusConfig.text}`}>
+                            {statusConfig.label}
+                          </span>
+                          {form.createdAt && (
+                            <span className="text-xs text-slate-400">
+                              {form.createdAt.toDate().toLocaleDateString("es-ES")}
                             </span>
                           )}
-                          {member.department && (
-                            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
-                              {member.department}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {member.permissions.config && (
-                            <span className="text-[10px] bg-violet-50 text-violet-700 px-1.5 py-0.5 rounded" title="Acceso a Config">
-                              Config
-                            </span>
-                          )}
-                          {member.permissions.accounting && (
-                            <span
-                              className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded"
-                              title={`Nivel: ${
-                                member.accountingAccessLevel === "accounting_extended"
-                                  ? "Avanzado"
-                                  : member.accountingAccessLevel === "accounting"
-                                  ? "Contabilidad"
-                                  : "Usuario"
-                              }`}
-                            >
-                              {member.accountingAccessLevel === "accounting_extended"
-                                ? "Acc+"
-                                : member.accountingAccessLevel === "accounting"
-                                ? "Acc"
-                                : "Acc·U"}
-                            </span>
-                          )}
-                          {member.permissions.team && (
-                            <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded" title="Acceso a Team">
-                              Team
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => {
-                              setShowEditMemberModal(member);
-                              setEditMemberForm({
-                                config: member.permissions.config || false,
-                                accounting: member.permissions.accounting || false,
-                                team: member.permissions.team || false,
-                                accountingAccessLevel: member.accountingAccessLevel || "user",
-                              });
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
-                            title="Editar permisos"
-                          >
-                            <Shield size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleRemoveMember(member.id, member.name)}
-                            disabled={saving}
-                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
-                            title="Eliminar miembro"
-                          >
-                            <Trash2 size={14} />
-                          </button>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
 
-            {/* Departments */}
-            {departments.length > 0 && (
+            {/* Invitations list */}
+            {teamStats.invitations.length > 0 && (
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <Layers size={16} className="text-slate-400" />
-                    <h2 className="text-sm font-semibold text-slate-900">Departamentos</h2>
-                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                      {departments.length}
-                    </span>
-                  </div>
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+                  <Send size={15} className="text-slate-400" />
+                  <h2 className="text-sm font-semibold text-slate-900">Invitaciones al proyecto</h2>
+                  <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{teamStats.totalInvitations}</span>
                 </div>
-                <div className="p-5">
-                  <div className="flex flex-wrap gap-2">
-                    {departments.map((dept) => (
-                      <div
-                        key={dept.id}
-                        className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg"
-                      >
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: dept.color }} />
-                        <span className="text-sm text-slate-700">{dept.name}</span>
-                        <span className="text-xs text-slate-400">{dept.memberCount}</span>
+                <div className="divide-y divide-slate-100">
+                  {teamStats.invitations.map((inv) => {
+                    const statusConfig = {
+                      pending: { label: "Pendiente", bg: "bg-amber-50", text: "text-amber-700" },
+                      accepted: { label: "Aceptada", bg: "bg-emerald-50", text: "text-emerald-700" },
+                      rejected: { label: "Rechazada", bg: "bg-red-50", text: "text-red-700" },
+                    }[inv.status] || { label: inv.status, bg: "bg-slate-100", text: "text-slate-600" };
+                    return (
+                      <div key={inv.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-slate-50">
+                        <p className="text-sm text-slate-700">{inv.email}</p>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-lg ${statusConfig.bg} ${statusConfig.text}`}>
+                            {statusConfig.label}
+                          </span>
+                          {inv.createdAt && (
+                            <span className="text-xs text-slate-400">
+                              {inv.createdAt.toDate().toLocaleDateString("es-ES")}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
