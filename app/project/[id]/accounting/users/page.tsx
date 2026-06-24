@@ -265,6 +265,22 @@ export default function AccountingUsersPage() {
       if (inviteForm.roleType === "project") { inviteData.role = inviteForm.role; inviteData.permissions = { config: false, accounting: true, team: false }; }
       else { inviteData.department = inviteForm.department; inviteData.position = inviteForm.position; inviteData.permissions = { config: false, accounting: true, team: false }; }
       await setDoc(doc(collection(db, "invitations")), inviteData);
+
+      // Send invitation email (fire-and-forget)
+      fetch("/api/send-project-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inviteeName:    inviteData.invitedName,
+          invitedByName:  inviteData.invitedByName,
+          invitedEmail:   email,
+          projectName:    inviteData.projectName,
+          projectId:      id,
+          role:           inviteData.role ?? inviteData.position ?? "",
+          isExistingUser: invitedUserId !== null,
+        }),
+      }).catch(console.error);
+
       setSuccessMessage(`Invitación enviada correctamente a ${inviteForm.name}`); setTimeout(() => setSuccessMessage(""), 3000);
       const invitationsRef = collection(db, "invitations");
       const invQuery = query(invitationsRef, where("projectId", "==", id), where("status", "==", "pending"));

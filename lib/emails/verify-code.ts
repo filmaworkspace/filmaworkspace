@@ -44,13 +44,7 @@ export function verifyCodeHtml({ name, code }: VerifyCodeProps): string {
           <!-- Logo -->
           <tr>
             <td align="center" style="padding-bottom:28px;">
-              <table cellpadding="0" cellspacing="0" role="presentation">
-                <tr>
-                  <td style="background-color:${BD};border-radius:14px;padding:10px 20px;">
-                    <span style="color:#FAF8F5;font-size:15px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;">FILMA</span>
-                  </td>
-                </tr>
-              </table>
+              <img src="https://filmaworkspace.com/logodark.svg" alt="Filma Workspace" width="140" height="45" style="display:block;" />
             </td>
           </tr>
 
