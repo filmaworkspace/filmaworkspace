@@ -18,11 +18,8 @@ export async function POST(req: NextRequest) {
     subject: `Completa tu ficha — ${projectName}`,
     html: fichaInviteHtml({ firstName, projectName, role, formUrl, senderName }),
     text: fichaInviteText({ firstName, projectName, role, formUrl, senderName }),
-    idempotencyKey: `ficha-invite/${memberId}`,
-    tags: [
-      { name: "type",    value: "ficha-invite" },
-      { name: "project", value: projectName.slice(0, 256) },
-    ],
+    idempotencyKey: `ficha-invite/${memberId}/${Date.now()}`,
+    tags: [{ name: "type", value: "ficha-invite" }],
   });
 
   if (error) {
