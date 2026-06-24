@@ -1437,7 +1437,7 @@ export default function NewPOPage() {
                           type="text"
                           value={titleConcept}
                           onChange={(e) => setTitleConcept(e.target.value.toUpperCase())}
-                          placeholder="O escribe el concepto..."
+                          placeholder="O escribe el concepto"
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-400 uppercase placeholder:normal-case"
                         />
                       </div>
@@ -1449,7 +1449,7 @@ export default function NewPOPage() {
                           type="text"
                           value={titleReference}
                           onChange={(e) => setTitleReference(e.target.value.toUpperCase())}
-                          placeholder="CASA AZUL · PERSONAJE · SECUENCIA..."
+                          placeholder="CASA AZUL · PERSONAJE · SECUENCIA"
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-400 uppercase placeholder:normal-case"
                         />
                       </div>
@@ -1822,7 +1822,7 @@ export default function NewPOPage() {
                     type="text"
                     value={formData.paymentTerms}
                     onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
-                    placeholder="Ej: Transferencia 30 días"
+                    placeholder="Transferencia 30 días"
                     className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm"
                   />
                 </div>

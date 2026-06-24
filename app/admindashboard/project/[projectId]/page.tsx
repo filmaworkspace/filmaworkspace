@@ -9,6 +9,7 @@ import { inter } from "@/lib/fonts";
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
 import {
+  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -210,7 +211,7 @@ export default function AdminProjectPage() {
   const [editForm, setEditForm] = useState({ name: "", phase: "", description: "", producers: [] as string[] });
   const [allProducers, setAllProducers] = useState<{ id: string; name: string }[]>([]);
   const [producerSearch, setProducerSearch] = useState("");
-  const [addMemberForm, setAddMemberForm] = useState({ odId: "", role: "", searchQuery: "" });
+  const [addMemberForm, setAddMemberForm] = useState({ odId: "", role: "", searchQuery: "", inviteName: "" });
   const [closeDays, setCloseDays] = useState(30);
 
   // Clone
@@ -589,48 +590,77 @@ export default function AdminProjectPage() {
   };
 
   const handleAddMember = async () => {
-    if (!addMemberForm.odId || !addMemberForm.role) {
-      showToast("error", "Selecciona usuario y rol");
+    if (!addMemberForm.role) {
+      showToast("error", "Selecciona un rol");
       return;
     }
+
+    // Determine whether we're inviting a registered user or a new email
     const selectedUser = allUsers.find((u) => u.id === addMemberForm.odId);
-    if (!selectedUser) return;
-    if (members.find((m) => m.id === addMemberForm.odId)) {
+    const emailRaw = selectedUser ? selectedUser.email : addMemberForm.searchQuery.trim().toLowerCase();
+    const inviteeName = selectedUser ? selectedUser.name : addMemberForm.inviteName.trim();
+
+    if (!emailRaw || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) {
+      showToast("error", "Email no válido");
+      return;
+    }
+    if (!inviteeName) {
+      showToast("error", "Introduce el nombre del invitado");
+      return;
+    }
+    if (members.find((m) => m.email?.toLowerCase() === emailRaw)) {
       showToast("error", "Este usuario ya es miembro");
       return;
     }
+
     setSaving(true);
     try {
       const hasAccounting = ["EP", "PM", "Controller", "PC"].includes(addMemberForm.role);
-      const memberData = {
-        odId: addMemberForm.odId,
-        name: selectedUser.name,
-        email: selectedUser.email,
+      const inviteData: any = {
+        projectId,
+        projectName: project?.name || "",
+        invitedEmail: emailRaw,
+        invitedName: inviteeName,
+        invitedUserId: selectedUser ? selectedUser.id : null,
+        invitedBy: contextUser?.uid || null,
+        invitedByName: "Equipo de Filma Workspace",
+        status: "pending",
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        roleType: "project",
         role: addMemberForm.role,
         permissions: {
           config: ["EP", "PM"].includes(addMemberForm.role),
           accounting: hasAccounting,
           team: ["EP", "PM"].includes(addMemberForm.role),
         },
-        accountingAccessLevel: hasAccounting ? "accounting_extended" : "user",
-        addedAt: serverTimestamp(),
-        addedBy: contextUser?.uid,
+        ...(hasAccounting && { accountingAccessLevel: "accounting_extended" }),
       };
-      await setDoc(doc(db, `projects/${projectId}/members`, addMemberForm.odId), memberData);
-      await setDoc(doc(db, `userProjects/${addMemberForm.odId}/projects`, projectId), {
-        projectId,
-        role: addMemberForm.role,
-        permissions: memberData.permissions,
-        accountingAccessLevel: memberData.accountingAccessLevel,
-        addedAt: serverTimestamp(),
-      });
-      setAddMemberForm({ odId: "", role: "", searchQuery: "" });
+
+      await addDoc(collection(db, "invitations"), inviteData);
+
+      // Send invitation email (fire-and-forget)
+      fetch("/api/send-project-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inviteeName,
+          invitedByName: "Equipo de Filma Workspace",
+          invitedEmail: emailRaw,
+          projectName: project?.name || "",
+          projectId,
+          role: addMemberForm.role,
+          isExistingUser: !!selectedUser,
+        }),
+      }).catch(console.error);
+
+      setAddMemberForm({ odId: "", role: "", searchQuery: "", inviteName: "" });
       setShowAddMemberModal(false);
-      showToast("success", "Miembro añadido");
+      showToast("success", "Invitación enviada");
       await loadData();
     } catch (error) {
       console.error(error);
-      showToast("error", "Error al añadir miembro");
+      showToast("error", "Error al enviar invitación");
     } finally {
       setSaving(false);
     }
@@ -1695,7 +1725,7 @@ export default function AdminProjectPage() {
                   type="text"
                   value={producerSearch}
                   onChange={(e) => setProducerSearch(e.target.value)}
-                  placeholder="Buscar productora..."
+                  placeholder="Buscar productora"
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
                 />
                 {producerSearch.length >= 1 && (
@@ -1811,13 +1841,22 @@ export default function AdminProjectPage() {
       )}
 
       {/* Add Member Modal */}
-      {showAddMemberModal && (
+      {showAddMemberModal && (() => {
+        const selectedUser = allUsers.find((u) => u.id === addMemberForm.odId);
+        const isManualEmail = !selectedUser && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addMemberForm.searchQuery.trim());
+        const canSubmit = !saving && addMemberForm.role && (
+          selectedUser || (isManualEmail && addMemberForm.inviteName.trim())
+        );
+        return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">Añadir miembro</h3>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Invitar miembro</h3>
+                <p className="text-xs text-slate-500 mt-0.5">El usuario recibirá un email y tendrá que aceptar la invitación</p>
+              </div>
               <button
-                onClick={() => { setShowAddMemberModal(false); setAddMemberForm({ odId: "", role: "", searchQuery: "" }); }}
+                onClick={() => { setShowAddMemberModal(false); setAddMemberForm({ odId: "", role: "", searchQuery: "", inviteName: "" }); }}
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
               >
                 <X size={20} />
@@ -1825,33 +1864,67 @@ export default function AdminProjectPage() {
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Usuario</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Usuario o email</label>
                 <input
                   type="text"
                   value={addMemberForm.searchQuery}
-                  onChange={(e) => setAddMemberForm({ ...addMemberForm, searchQuery: e.target.value, odId: "" })}
-                  placeholder="Buscar por nombre o email"
+                  onChange={(e) => setAddMemberForm({ ...addMemberForm, searchQuery: e.target.value, odId: "", inviteName: "" })}
+                  placeholder="Buscar por nombre, email o escribe un email"
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
                 />
-                {addMemberForm.searchQuery && (
+                {addMemberForm.searchQuery && !addMemberForm.odId && (
                   <div className="mt-2 max-h-40 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
-                    {filteredUsersForAdd.length === 0 ? (
-                      <p className="p-3 text-sm text-slate-500 text-center">No se encontraron usuarios</p>
-                    ) : (
+                    {filteredUsersForAdd.length > 0 ? (
                       filteredUsersForAdd.slice(0, 5).map((user) => (
                         <button
                           key={user.id}
-                          onClick={() => setAddMemberForm({ ...addMemberForm, odId: user.id, searchQuery: user.name })}
-                          className={`w-full px-3 py-2 text-left hover:bg-slate-50 ${addMemberForm.odId === user.id ? "bg-slate-50" : ""}`}
+                          onClick={() => setAddMemberForm({ ...addMemberForm, odId: user.id, searchQuery: user.name, inviteName: user.name })}
+                          className="w-full px-3 py-2 text-left hover:bg-slate-50"
                         >
                           <p className="text-sm font-medium text-slate-900">{user.name}</p>
                           <p className="text-xs text-slate-500">{user.email}</p>
                         </button>
                       ))
+                    ) : isManualEmail ? (
+                      <div className="px-3 py-2.5 text-sm text-slate-600 flex items-center gap-2">
+                        <Mail size={14} className="text-slate-400 flex-shrink-0" />
+                        Invitar a <span className="font-medium">{addMemberForm.searchQuery.trim()}</span>
+                      </div>
+                    ) : (
+                      <p className="p-3 text-sm text-slate-500 text-center">Sin resultados — escribe un email para invitar</p>
                     )}
                   </div>
                 )}
+                {selectedUser && (
+                  <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div className="w-7 h-7 bg-slate-200 rounded-full flex items-center justify-center text-xs font-semibold text-slate-600">
+                      {selectedUser.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">{selectedUser.name}</p>
+                      <p className="text-xs text-slate-500 truncate">{selectedUser.email}</p>
+                    </div>
+                    <button onClick={() => setAddMemberForm({ ...addMemberForm, odId: "", searchQuery: "", inviteName: "" })} className="text-slate-400 hover:text-slate-600">
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
+
+              {/* Name field for non-registered users */}
+              {isManualEmail && !selectedUser && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Nombre</label>
+                  <input
+                    type="text"
+                    value={addMemberForm.inviteName}
+                    onChange={(e) => setAddMemberForm({ ...addMemberForm, inviteName: e.target.value })}
+                    placeholder="Nombre completo"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Rol</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -1871,22 +1944,23 @@ export default function AdminProjectPage() {
             </div>
             <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3">
               <button
-                onClick={() => { setShowAddMemberModal(false); setAddMemberForm({ odId: "", role: "", searchQuery: "" }); }}
+                onClick={() => { setShowAddMemberModal(false); setAddMemberForm({ odId: "", role: "", searchQuery: "", inviteName: "" }); }}
                 className="flex-1 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleAddMember}
-                disabled={saving || !addMemberForm.odId || !addMemberForm.role}
-                className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
+                disabled={!canSubmit}
+                className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving ? "Añadiendo..." : "Añadir"}
+                {saving ? "Enviando..." : "Enviar invitación"}
               </button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Edit Member Permissions Modal */}
       {showEditMemberModal && (

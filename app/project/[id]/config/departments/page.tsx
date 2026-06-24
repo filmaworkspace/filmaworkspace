@@ -220,7 +220,7 @@ export default function ConfigDepartments() {
                 value={newDepartment}
                 onChange={(e) => setNewDepartment(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAddDepartment()}
-                placeholder="Nombre del departamento (ej: Producción, Arte, Sonido...)"
+                placeholder="Nombre del departamento"
                 autoFocus
                 className="flex-1 px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
               />

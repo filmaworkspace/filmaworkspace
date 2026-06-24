@@ -1209,7 +1209,7 @@ export default function CalendarPage() {
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData((f) => ({ ...f, description: e.target.value }))}
-                  placeholder="Detalles adicionales, instrucciones, observaciones..."
+                  placeholder="Detalles adicionales, instrucciones, observaciones"
                   rows={3}
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319] resize-none"
                 />

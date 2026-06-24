@@ -1437,7 +1437,7 @@ export default function ReportsPage() {
                           setInvoiceBookFilters({ ...invoiceBookFilters, supplierId: "", supplierName: "" });
                       }}
                       onFocus={() => setShowSupplierDropdown(true)}
-                      placeholder="Buscar proveedor (mín. 2 caracteres)..."
+                      placeholder="Buscar proveedor (mín. 2 caracteres)"
                       className="w-full pl-10 pr-10 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                     />
                     {invoiceBookFilters.supplierId && (

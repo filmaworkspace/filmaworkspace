@@ -1744,7 +1744,7 @@ export default function PODetailPage() {
                 <textarea
                   value={cancellationReason}
                   onChange={(e) => setCancellationReason(e.target.value)}
-                  placeholder="Explica por qué se anula esta PO..."
+                  placeholder="Explica por qué se anula esta PO"
                   rows={3}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none text-sm"
                 />
@@ -1804,7 +1804,7 @@ export default function PODetailPage() {
                 <textarea
                   value={modificationReason}
                   onChange={(e) => setModificationReason(e.target.value)}
-                  placeholder="Explica por qué se modifica..."
+                  placeholder="Explica por qué se modifica"
                   rows={4}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none text-sm"
                 />

@@ -242,7 +242,7 @@ function AccountCombobox({
                 autoFocus
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="Buscar por código o nombre..."
+                placeholder="Buscar por código o nombre"
                 className="flex-1 text-[11px] bg-transparent outline-none text-slate-700 placeholder-slate-400"
               />
               {query && (
@@ -591,7 +591,7 @@ export default function CompanyAccountsPage() {
           <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-3">
             <div className="relative flex-1 max-w-xs">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input type="text" placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+              <input type="text" placeholder="Buscar" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
                 className="w-full pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-400 outline-none" />
             </div>
             <div className="relative" ref={filterRef}>
@@ -848,7 +848,7 @@ export default function CompanyAccountsPage() {
                               <td className="px-3 py-1.5">
                                 {editingLines ? (
                                   <input value={line.name} onChange={e => updateDraftLine(line.id, "name", e.target.value)}
-                                    placeholder="Descripción de la línea..."
+                                    placeholder="Descripción de la línea"
                                     className="text-[11px] border border-slate-200 rounded px-1.5 py-0.5 w-full focus:border-slate-400 outline-none" />
                                 ) : (
                                   <span className="text-[11px] text-slate-600">{line.name}</span>

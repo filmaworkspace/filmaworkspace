@@ -191,7 +191,7 @@ export default function AdminDashboard() {
   const [showAssignCompanyUser, setShowAssignCompanyUser] = useState<string | null>(null);
   const [companyUserSearch, setCompanyUserSearch] = useState("");
 
-  const [newProject, setNewProject] = useState({ name: "", description: "", phase: "Desarrollo", producers: [] as string[], customId: "", useCustomId: false });
+  const [newProject, setNewProject] = useState({ name: "", description: "", phase: "Desarrollo", producers: [] as string[], customId: "", useCustomId: false, language: "es" });
   const [newProducer, setNewProducer] = useState({ name: "" });
   const [assignUserForm, setAssignUserForm] = useState({ odId: "", role: "" });
 
@@ -454,6 +454,7 @@ export default function AdminDashboard() {
         phase: newProject.phase,
         producers: newProject.producers,
         departments: DEFAULT_DEPARTMENTS.map(d => d.name),
+        language: newProject.language,
         createdAt: serverTimestamp(),
       });
 
@@ -467,7 +468,7 @@ export default function AdminDashboard() {
         });
       }
       
-      setNewProject({ name: "", description: "", phase: "Desarrollo", producers: [], customId: "", useCustomId: false });
+      setNewProject({ name: "", description: "", phase: "Desarrollo", producers: [], customId: "", useCustomId: false, language: "es" });
       setShowCreateProject(false);
       showToast("success", "Proyecto creado correctamente");
       await loadData();
@@ -492,6 +493,7 @@ export default function AdminDashboard() {
         description: newProject.description.trim(),
         phase: newProject.phase,
         producers: newProject.producers,
+        language: newProject.language,
       });
 
       // Sincronizar companyProjects
@@ -1131,8 +1133,7 @@ export default function AdminDashboard() {
                 <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <FolderOpen size={28} className="text-slate-400" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">No hay proyectos</h3>
-                <p className="text-slate-500 text-sm mb-6">Crea tu primer proyecto para empezar</p>
+                <h3 className="text-lg font-semibold text-slate-900 mb-6">No hay proyectos</h3>
                 <button
                   onClick={() => setShowCreateProject(true)}
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
@@ -1171,6 +1172,9 @@ export default function AdminDashboard() {
                                     description: project.description || "",
                                     phase: project.phase,
                                     producers: project.producers || [],
+                                    customId: "",
+                                    useCustomId: false,
+                                    language: (project as any).language || "es",
                                   });
                                   setShowEditProject(project.id);
                                   setActiveMenu(null);
@@ -1321,8 +1325,7 @@ export default function AdminDashboard() {
             {filteredUsers.length === 0 ? (
               <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
                 <Users size={28} className="text-slate-300 mx-auto mb-3" />
-                <h3 className="font-semibold text-slate-900 mb-1">No hay usuarios</h3>
-                <p className="text-slate-500 text-sm">No se encontraron usuarios con los filtros actuales</p>
+                <h3 className="font-semibold text-slate-900">No hay usuarios</h3>
               </div>
             ) : (
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
@@ -1414,8 +1417,7 @@ export default function AdminDashboard() {
             {filteredProducers.length === 0 ? (
               <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
                 <Building2 size={28} className="text-slate-300 mx-auto mb-3" />
-                <h3 className="font-semibold text-slate-900 mb-1">No hay productoras</h3>
-                <p className="text-slate-500 text-sm mb-4">Crea tu primera productora</p>
+                <h3 className="font-semibold text-slate-900 mb-4">No hay productoras</h3>
                 <button
                   onClick={() => setShowCreateProducer(true)}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
@@ -1529,8 +1531,7 @@ export default function AdminDashboard() {
             {activeMessages.length === 0 ? (
               <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
                 <Bell size={28} className="text-slate-300 mx-auto mb-3" />
-                <h3 className="font-semibold text-slate-900 mb-1">No hay mensajes activos</h3>
-                <p className="text-slate-500 text-sm mb-4">Envía un mensaje a los usuarios</p>
+                <h3 className="font-semibold text-slate-900 mb-4">No hay mensajes activos</h3>
                 <button
                   onClick={() => setShowMessageModal(true)}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
@@ -1616,198 +1617,293 @@ export default function AdminDashboard() {
       {/* ==================== MODALS ==================== */}
 
       {/* Create/Edit Project Modal */}
-      {(showCreateProject || showEditProject) && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h3 className="text-lg font-semibold text-slate-900">
-                {showEditProject ? "Editar proyecto" : "Nuevo proyecto"}
-              </h3>
-              <button
-                onClick={() => {
-                  setShowCreateProject(false);
-                  setShowEditProject(null);
-                  setNewProject({ name: "", description: "", phase: "Desarrollo", producers: [], customId: "", useCustomId: false });
-                  setProducerModalSearch("");
-                }}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
-              >
-                <X size={20} />
+      {(showCreateProject || showEditProject) && (() => {
+        const isEdit = !!showEditProject;
+        const phase = phaseConfig[newProject.phase] || phaseConfig["Desarrollo"];
+        const LANGUAGES = [
+          { code: "es", flag: "🇪🇸", label: "Español", available: true },
+          { code: "en", flag: "🇬🇧", label: "English",  available: false },
+          { code: "fr", flag: "🇫🇷", label: "Français", available: false },
+          { code: "de", flag: "🇩🇪", label: "Deutsch",  available: false },
+          { code: "pt", flag: "🇵🇹", label: "Português", available: false },
+        ];
+        const closeModal = () => {
+          setShowCreateProject(false);
+          setShowEditProject(null);
+          setNewProject({ name: "", description: "", phase: "Desarrollo", producers: [], customId: "", useCustomId: false, language: "es" });
+          setProducerModalSearch("");
+        };
+        return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col">
+
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center">
+                  <FolderPlus size={16} className="text-slate-700" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">{isEdit ? "Editar proyecto" : "Nuevo proyecto"}</h3>
+                </div>
+              </div>
+              <button onClick={closeModal} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+                <X size={18} />
               </button>
             </div>
 
-            <div className="p-6 space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Nombre *</label>
-                <input
-                  type="text"
-                  value={newProject.name}
-                  onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                  placeholder="Nombre del proyecto"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
-                />
-              </div>
+            {/* Body — two columns */}
+            <div className="flex-1 overflow-hidden flex">
 
-              {/* ID del proyecto — solo en creación */}
-              {!showEditProject && (
+              {/* ── Left: form ── */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-5">
+
+                {/* Name */}
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-slate-700">ID del proyecto</label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">{newProject.useCustomId ? "Personalizado" : "Automático"}</span>
-                      <button
-                        type="button"
-                        onClick={() => setNewProject({ ...newProject, useCustomId: !newProject.useCustomId, customId: "" })}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${newProject.useCustomId ? "bg-slate-900" : "bg-slate-200"}`}
-                      >
-                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${newProject.useCustomId ? "translate-x-[18px]" : "translate-x-[3px]"}`} />
-                      </button>
-                    </div>
-                  </div>
-                  {newProject.useCustomId ? (
-                    <div>
-                      <input
-                        type="text"
-                        value={newProject.customId}
-                        onChange={(e) => setNewProject({ ...newProject, customId: e.target.value.replace(/[^a-zA-Z0-9_-]/g, "") })}
-                        placeholder="ej: mi-proyecto-2025"
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm font-mono"
-                      />
-                      {newProject.customId && (
-                        <p className="mt-1.5 text-xs text-slate-400">
-                          URL: <span className="font-mono text-slate-600">/project/{newProject.customId}</span>
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-400 px-1">Se generará un código aleatorio de 6 caracteres. Puedes activar el toggle para definirlo tú.</p>
-                  )}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Descripción</label>
-                <textarea
-                  value={newProject.description}
-                  onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
-                  placeholder="Descripción del proyecto"
-                  rows={3}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm resize-none transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Fase</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {PHASES.map((phase) => {
-                    const config = phaseConfig[phase];
-                    return (
-                      <button
-                        key={phase}
-                        onClick={() => setNewProject({ ...newProject, phase })}
-                        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                          newProject.phase === phase
-                            ? `${config.bg} ${config.text} ${config.border}`
-                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                        }`}
-                      >
-                        <div className={`w-2 h-2 rounded-full ${config.dot}`} />
-                        {phase}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Productoras */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Productoras</label>
-
-                {newProject.producers.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {newProject.producers.map((prodId) => {
-                      const prod = producers.find((p) => p.id === prodId);
-                      if (!prod) return null;
-                      return (
-                        <span
-                          key={prodId}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-sm"
-                        >
-                          <Building2 size={14} />
-                          {prod.name}
-                          <button
-                            onClick={() =>
-                              setNewProject({
-                                ...newProject,
-                                producers: newProject.producers.filter((id) => id !== prodId),
-                              })
-                            }
-                            className="ml-1 text-amber-500 hover:text-amber-700"
-                          >
-                            <X size={14} />
-                          </button>
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div className="relative">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Nombre del proyecto *</label>
                   <input
                     type="text"
-                    value={producerModalSearch}
-                    onChange={(e) => setProducerModalSearch(e.target.value)}
-                    placeholder="Buscar productora"
-                    className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none text-sm"
+                    value={newProject.name}
+                    onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
+                    placeholder="La Casa de Papel T6"
+                    autoFocus
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
                   />
                 </div>
 
-                {producerModalSearch.length >= 2 && (
-                  <div className="mt-2 border border-slate-200 rounded-xl max-h-40 overflow-y-auto">
-                    {producers
-                      .filter(
-                        (p) =>
-                          p.name.toLowerCase().includes(producerModalSearch.toLowerCase()) &&
-                          !newProject.producers.includes(p.id)
-                      )
-                      .slice(0, 5)
-                      .map((producer) => (
+                {/* Custom ID — creation only */}
+                {!isEdit && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">ID del proyecto</label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-400">{newProject.useCustomId ? "Personalizado" : "Automático"}</span>
                         <button
-                          key={producer.id}
-                          onClick={() => {
-                            setNewProject({ ...newProject, producers: [...newProject.producers, producer.id] });
-                            setProducerModalSearch("");
-                          }}
-                          className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 flex items-center gap-2 border-b border-slate-100 last:border-b-0"
+                          type="button"
+                          onClick={() => setNewProject({ ...newProject, useCustomId: !newProject.useCustomId, customId: "" })}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${newProject.useCustomId ? "bg-slate-900" : "bg-slate-200"}`}
                         >
-                          <Building2 size={14} className="text-amber-600" />
-                          <span className="text-slate-700">{producer.name}</span>
-                          <span className="text-xs text-slate-400 ml-auto">{producer.projectCount} proyectos</span>
+                          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${newProject.useCustomId ? "translate-x-[18px]" : "translate-x-[3px]"}`} />
                         </button>
-                      ))}
-                    {producers.filter(
-                      (p) =>
-                        p.name.toLowerCase().includes(producerModalSearch.toLowerCase()) &&
-                        !newProject.producers.includes(p.id)
-                    ).length === 0 && (
-                      <div className="px-4 py-3 text-sm text-slate-500 text-center">No se encontraron productoras</div>
+                      </div>
+                    </div>
+                    {newProject.useCustomId ? (
+                      <div>
+                        <input
+                          type="text"
+                          value={newProject.customId}
+                          onChange={(e) => setNewProject({ ...newProject, customId: e.target.value.replace(/[^a-zA-Z0-9_-]/g, "") })}
+                          placeholder="casa-papel-t6"
+                          className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm font-mono"
+                        />
+                        {newProject.customId && (
+                          <p className="mt-1.5 text-xs text-slate-400">
+                            URL: <span className="font-mono text-slate-600">/project/{newProject.customId}</span>
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl">
+                        <Hash size={13} className="text-slate-400" />
+                        <p className="text-xs text-slate-500">Se generará un código de 6 caracteres automáticamente</p>
+                      </div>
                     )}
                   </div>
                 )}
+
+                {/* Description */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Descripción</label>
+                  <textarea
+                    value={newProject.description}
+                    onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+                    placeholder="Sinopsis o notas del proyecto"
+                    rows={3}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm resize-none"
+                  />
+                </div>
+
+                {/* Phase */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Fase de producción</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {PHASES.map((p) => {
+                      const cfg = phaseConfig[p];
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => setNewProject({ ...newProject, phase: p })}
+                          className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                            newProject.phase === p ? `${cfg.bg} ${cfg.text} ${cfg.border}` : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
+                          {p}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Language */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Idioma de la plataforma</label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {LANGUAGES.map((lang) => (
+                      <button
+                        key={lang.code}
+                        type="button"
+                        disabled={!lang.available}
+                        onClick={() => lang.available && setNewProject({ ...newProject, language: lang.code })}
+                        className={`relative flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-xl border text-xs font-medium transition-all
+                          ${!lang.available ? "opacity-40 cursor-not-allowed border-slate-100 bg-slate-50" :
+                            newProject.language === lang.code
+                              ? "bg-slate-900 border-slate-900 text-white"
+                              : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                          }`}
+                      >
+                        <span className="text-xl leading-none">{lang.flag}</span>
+                        <span className="text-[10px]">{lang.label}</span>
+                        {!lang.available && (
+                          <span className="absolute -top-1.5 -right-1 text-[8px] bg-slate-300 text-slate-600 px-1 py-0.5 rounded font-semibold leading-none">
+                            Soon
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Producers */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Productoras</label>
+                  {newProject.producers.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {newProject.producers.map((prodId) => {
+                        const prod = producers.find((p) => p.id === prodId);
+                        if (!prod) return null;
+                        return (
+                          <span key={prodId} className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium">
+                            <Building2 size={11} />
+                            {prod.name}
+                            <button onClick={() => setNewProject({ ...newProject, producers: newProject.producers.filter((id) => id !== prodId) })} className="hover:text-slate-300 ml-0.5">
+                              <X size={11} />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={producerModalSearch}
+                      onChange={(e) => setProducerModalSearch(e.target.value)}
+                      placeholder="Buscar y añadir productora"
+                      className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none text-sm"
+                    />
+                  </div>
+                  {producerModalSearch.length >= 1 && (
+                    <div className="mt-2 border border-slate-200 rounded-xl max-h-36 overflow-y-auto">
+                      {producers.filter((p) => p.name.toLowerCase().includes(producerModalSearch.toLowerCase()) && !newProject.producers.includes(p.id)).slice(0, 6).map((producer) => (
+                        <button
+                          key={producer.id}
+                          onClick={() => { setNewProject({ ...newProject, producers: [...newProject.producers, producer.id] }); setProducerModalSearch(""); }}
+                          className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 flex items-center gap-2 border-b border-slate-100 last:border-b-0"
+                        >
+                          <Building2 size={13} className="text-slate-400" />
+                          <span className="text-slate-700 flex-1">{producer.name}</span>
+                          <span className="text-xs text-slate-400">{producer.projectCount} proyectos</span>
+                        </button>
+                      ))}
+                      {producers.filter((p) => p.name.toLowerCase().includes(producerModalSearch.toLowerCase()) && !newProject.producers.includes(p.id)).length === 0 && (
+                        <div className="px-4 py-3 text-xs text-slate-500 text-center">Sin resultados</div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
+              {/* ── Right: summary card ── */}
+              <div className="w-64 flex-shrink-0 bg-slate-50 border-l border-slate-100 p-5 flex flex-col gap-4 overflow-y-auto">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Vista previa</p>
+
+                {/* Project card preview */}
+                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg ${phase.bg} ${phase.text}`}>
+                      {newProject.phase}
+                    </span>
+                    {newProject.language && (
+                      <span className="text-xs">{LANGUAGES.find(l => l.code === newProject.language)?.flag}</span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900 line-clamp-2 leading-snug">
+                      {newProject.name || <span className="text-slate-300 font-normal">Nombre del proyecto</span>}
+                    </p>
+                    {newProject.description && (
+                      <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">{newProject.description}</p>
+                    )}
+                  </div>
+                  {newProject.producers.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {newProject.producers.map((pid) => {
+                        const prod = producers.find(p => p.id === pid);
+                        return prod ? (
+                          <span key={pid} className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">{prod.name}</span>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Config summary */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between py-2 border-b border-slate-200">
+                    <span className="text-xs text-slate-500">ID</span>
+                    <span className="text-xs font-mono text-slate-700">
+                      {newProject.useCustomId && newProject.customId ? newProject.customId : "auto"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-200">
+                    <span className="text-xs text-slate-500">Idioma</span>
+                    <span className="text-xs text-slate-700">
+                      {LANGUAGES.find(l => l.code === newProject.language)?.flag}{" "}
+                      {LANGUAGES.find(l => l.code === newProject.language)?.label}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-200">
+                    <span className="text-xs text-slate-500">Productoras</span>
+                    <span className="text-xs text-slate-700">{newProject.producers.length || "—"}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2">
+                    <span className="text-xs text-slate-500">Departamentos</span>
+                    <span className="text-xs text-slate-700">{DEFAULT_DEPARTMENTS.length} por defecto</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex-shrink-0 flex gap-3">
+              <button onClick={closeModal} className="px-5 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+                Cancelar
+              </button>
               <button
-                onClick={showEditProject ? handleEditProject : handleCreateProject}
+                onClick={isEdit ? handleEditProject : handleCreateProject}
                 disabled={saving || !newProject.name.trim()}
-                className="w-full px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {saving ? "Guardando..." : showEditProject ? "Guardar cambios" : "Crear proyecto"}
+                <FolderPlus size={14} />
+                {saving ? "Guardando..." : isEdit ? "Guardar cambios" : "Crear proyecto"}
               </button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Create/Edit Producer Modal */}
       {(showCreateProducer || showEditProducer) && (
@@ -1840,7 +1936,7 @@ export default function AdminDashboard() {
                   type="text"
                   value={newProducer.name}
                   onChange={(e) => setNewProducer({ ...newProducer, name: e.target.value })}
-                  placeholder="Ej: Productora Films S.L."
+                  placeholder="Productora Films S.L."
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
                 />
               </div>
@@ -2116,7 +2212,6 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-slate-900">Nuevo mensaje</h3>
-                  <p className="text-xs text-slate-500">Notificación a usuarios de la plataforma</p>
                 </div>
               </div>
               <button
@@ -2172,7 +2267,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={messageForm.title}
                     onChange={(e) => setMessageForm({ ...messageForm, title: e.target.value })}
-                    placeholder="Ej: Nueva funcionalidad disponible"
+                    placeholder="Nueva funcionalidad disponible"
                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
                   />
                 </div>
@@ -2183,7 +2278,7 @@ export default function AdminDashboard() {
                   <textarea
                     value={messageForm.content}
                     onChange={(e) => setMessageForm({ ...messageForm, content: e.target.value })}
-                    placeholder="Escribe el contenido del mensaje..."
+                    placeholder="Escribe el contenido del mensaje"
                     rows={4}
                     className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm resize-none"
                   />
@@ -2223,7 +2318,7 @@ export default function AdminDashboard() {
                           type="text"
                           value={projectSearchInMessage}
                           onChange={(e) => setProjectSearchInMessage(e.target.value)}
-                          placeholder="Buscar proyecto..."
+                          placeholder="Buscar proyecto"
                           className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 outline-none text-xs"
                         />
                       </div>
@@ -2268,7 +2363,7 @@ export default function AdminDashboard() {
                           type="text"
                           value={userSearchInMessage}
                           onChange={(e) => setUserSearchInMessage(e.target.value)}
-                          placeholder="Buscar usuario..."
+                          placeholder="Buscar usuario"
                           className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 outline-none text-xs"
                         />
                       </div>
@@ -2339,7 +2434,6 @@ export default function AdminDashboard() {
                     <Mail size={15} className={messageForm.sendByEmail ? "text-amber-600" : "text-slate-400"} />
                     <div>
                       <p className="text-sm font-medium text-slate-900">Enviar por email</p>
-                      <p className="text-xs text-slate-500">Además de la notificación en plataforma</p>
                     </div>
                   </div>
                   <button

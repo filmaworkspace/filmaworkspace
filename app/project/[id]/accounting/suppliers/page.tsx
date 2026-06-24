@@ -813,12 +813,12 @@ export default function SuppliersPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">Nombre fiscal *</label>
-                      <input type="text" value={formData.fiscalName} onChange={(e) => setFormData({ ...formData, fiscalName: e.target.value })} onBlur={handleFiscalNameBlur} placeholder="Ej: Neumáticos García SL" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                      <input type="text" value={formData.fiscalName} onChange={(e) => setFormData({ ...formData, fiscalName: e.target.value })} onBlur={handleFiscalNameBlur} placeholder="Neumáticos García SL" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
                       <p className="text-xs text-slate-500 mt-1">Se formateará automáticamente</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">Nombre comercial</label>
-                      <input type="text" value={formData.commercialName} onChange={(e) => setFormData({ ...formData, commercialName: e.target.value })} onBlur={handleCommercialNameBlur} placeholder="Ej: Neumáticos García" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                      <input type="text" value={formData.commercialName} onChange={(e) => setFormData({ ...formData, commercialName: e.target.value })} onBlur={handleCommercialNameBlur} placeholder="Neumáticos García" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
                     </div>
                     <div ref={countryDropdownRef} className="relative">
                       <label className="block text-sm font-medium text-slate-700 mb-2">País</label>
@@ -960,7 +960,7 @@ export default function SuppliersPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">BIC/SWIFT <span className="text-slate-400 font-normal">(opcional)</span></label>
-                      <input type="text" value={formData.bic} onChange={(e) => setFormData({ ...formData, bic: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11) })} placeholder="Ej: CAIXESBBXXX" maxLength={11} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono uppercase" />
+                      <input type="text" value={formData.bic} onChange={(e) => setFormData({ ...formData, bic: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11) })} placeholder="CAIXESBBXXX" maxLength={11} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono uppercase" />
                       <p className="text-xs text-slate-500 mt-1">Código de 8 u 11 caracteres</p>
                     </div>
                   </div>

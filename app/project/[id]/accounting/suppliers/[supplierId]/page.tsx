@@ -1066,7 +1066,7 @@ export default function SupplierDetailPage() {
                             type="text"
                             value={supplierSearch}
                             onChange={(e) => setSupplierSearch(e.target.value)}
-                            placeholder="Buscar proveedor..."
+                            placeholder="Buscar proveedor"
                             autoFocus
                             className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900"
                           />
@@ -1716,7 +1716,7 @@ export default function SupplierDetailPage() {
                 <textarea
                   value={closeProjectData.notes}
                   onChange={(e) => setCloseProjectData({ ...closeProjectData, notes: e.target.value })}
-                  placeholder="Ej: Cierre satisfactorio, proveedor recomendado para futuros proyectos..."
+                  placeholder="Cierre satisfactorio, proveedor recomendado para futuros proyectos"
                   rows={3}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />

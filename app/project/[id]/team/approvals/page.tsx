@@ -529,7 +529,7 @@ export default function TeamApprovalsPage() {
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">Motivo (opcional)</label>
                 <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}
-                  rows={3} placeholder="Ej: Faltan documentos, datos incorrectos…"
+                  rows={3} placeholder="Faltan documentos, datos incorrectos…"
                   className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-200 resize-none" />
               </div>
               <div className="flex gap-2 pt-1">

@@ -1414,7 +1414,7 @@ export default function AccountingConfigPage() {
                   type="text"
                   value={companyForm.address}
                   onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })}
-                  placeholder="Calle, número, piso..."
+                  placeholder="Calle, número, piso"
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
                 />
               </div>
@@ -2300,7 +2300,7 @@ export default function AccountingConfigPage() {
                   type="text"
                   value={bankAccountForm.alias}
                   onChange={(e) => setBankAccountForm({ ...bankAccountForm, alias: e.target.value })}
-                  placeholder="Ej: Cuenta principal, Cuenta rodaje..."
+                  placeholder="Cuenta principal, Cuenta rodaje"
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
                 />
               </div>
@@ -2346,7 +2346,7 @@ export default function AccountingConfigPage() {
                   type="text"
                   value={bankAccountForm.bic || ""}
                   onChange={(e) => setBankAccountForm({ ...bankAccountForm, bic: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11) })}
-                  placeholder="Ej: CAIXESBBXXX"
+                  placeholder="CAIXESBBXXX"
                   maxLength={11}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm font-mono uppercase"
                 />

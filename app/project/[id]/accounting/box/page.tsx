@@ -3091,7 +3091,7 @@ export default function BoxesPage() {
                 <label className="block text-sm font-medium text-slate-700 mb-2">Nombre del responsable *</label>
                 <input type="text" value={boxForm.name}
                   onChange={e => { const name = e.target.value; setBoxForm({ ...boxForm, name, code: boxForm.code || generateCode(name) }); }}
-                  placeholder="Ej: Lucía García"
+                  placeholder="Lucía García"
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
               </div>
               <div>
@@ -3102,7 +3102,7 @@ export default function BoxesPage() {
                     <>
                       <input type="text" value={boxForm.code}
                         onChange={e => setBoxForm({ ...boxForm, code: e.target.value.toUpperCase().slice(0, 3) })}
-                        placeholder="Ej: LG" maxLength={3}
+                        placeholder="LG" maxLength={3}
                         className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 font-mono uppercase transition-colors ${isDuplicate ? "border-red-400 bg-red-50 focus:ring-red-400" : "border-slate-200 focus:ring-slate-900"}`} />
                       {isDuplicate && (
                         <p className="flex items-center gap-1.5 mt-1.5 text-xs text-red-600 font-medium">
@@ -3895,7 +3895,7 @@ export default function BoxesPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Referencia de la transferencia *</label>
-                <input type="text" value={transferRef} onChange={e => setTransferRef(e.target.value)} placeholder="Ej: 2024-TRF-001"
+                <input type="text" value={transferRef} onChange={e => setTransferRef(e.target.value)} placeholder="2024-TRF-001"
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
               </div>
             </div>
@@ -4012,7 +4012,7 @@ export default function BoxesPage() {
                     type="text"
                     value={boxFormRequesterName}
                     onChange={e => setBoxFormRequesterName(e.target.value)}
-                    placeholder="Ej: Juan García"
+                    placeholder="Juan García"
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                   />
                 </div>
@@ -4220,7 +4220,7 @@ export default function BoxesPage() {
                             value={ed.subAccountCode ? `${ed.subAccountCode} · ${ed.subAccountDescription}` : ed.subAccountSearch}
                             onChange={e => { updateEd(i, { subAccountSearch: e.target.value, subAccountCode: "", subAccountDescription: "" }); }}
                             onFocus={() => updateEd(i, { showSubAccountDropdown: true })}
-                            placeholder="Buscar cuenta..."
+                            placeholder="Buscar cuenta"
                             className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
                           {ed.showSubAccountDropdown && filteredAccounts.length > 0 && (
                             <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">

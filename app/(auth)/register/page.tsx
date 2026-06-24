@@ -8,9 +8,9 @@ import { inter } from "@/lib/fonts";
 
 import { auth, db } from "@/lib/firebase";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { doc, setDoc, Timestamp } from "firebase/firestore";
+import { collection, doc, getDocs, query, setDoc, Timestamp, where } from "firebase/firestore";
 
-import { AlertCircle, ArrowLeft, ArrowRight, Eye, EyeOff } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, ChevronDown, Eye, EyeOff } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -20,15 +20,41 @@ const INPUT_STYLE = {
   borderColor: "rgba(54, 54, 54, 0.2)",
 };
 
+const COUNTRIES = [
+  { code: "ES", dial: "+34", flag: "🇪🇸", name: "España",         digits: 9,  placeholder: "612 345 678" },
+  { code: "US", dial: "+1",  flag: "🇺🇸", name: "Estados Unidos", digits: 10, placeholder: "212 555 0100" },
+  { code: "GB", dial: "+44", flag: "🇬🇧", name: "Reino Unido",    digits: 10, placeholder: "7911 123456" },
+  { code: "FR", dial: "+33", flag: "🇫🇷", name: "Francia",        digits: 9,  placeholder: "6 12 34 56 78" },
+  { code: "DE", dial: "+49", flag: "🇩🇪", name: "Alemania",       digits: 10, placeholder: "1512 3456789" },
+  { code: "IT", dial: "+39", flag: "🇮🇹", name: "Italia",         digits: 10, placeholder: "312 345 6789" },
+  { code: "PT", dial: "+351",flag: "🇵🇹", name: "Portugal",       digits: 9,  placeholder: "912 345 678" },
+  { code: "MX", dial: "+52", flag: "🇲🇽", name: "México",         digits: 10, placeholder: "55 1234 5678" },
+  { code: "AR", dial: "+54", flag: "🇦🇷", name: "Argentina",      digits: 10, placeholder: "11 2345-6789" },
+  { code: "CO", dial: "+57", flag: "🇨🇴", name: "Colombia",       digits: 10, placeholder: "312 345 6789" },
+];
+
+function formatPhoneInput(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)} ${digits.slice(3)}`;
+  return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 9)}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function RegisterPage() {
   const router = useRouter();
 
   // ── Step 1 state ─────────────────────────────────────────────────────────
   const [name,         setName]         = useState("");
-  const [phone,        setPhone]        = useState("");
+  const [phoneRaw,     setPhoneRaw]     = useState("");       // digits only
+  const [phoneDisplay, setPhoneDisplay] = useState("");       // formatted display
+  const [country,      setCountry]      = useState(COUNTRIES[0]);
+  const [showCountry,  setShowCountry]  = useState(false);
   const [email,        setEmail]        = useState("");
   const [password,     setPassword]     = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [phoneError,   setPhoneError]   = useState("");
 
   // ── Step 2 state ─────────────────────────────────────────────────────────
   const [step,        setStep]        = useState<1 | 2>(1);
@@ -44,13 +70,38 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
 
+  // ── Phone input handler ───────────────────────────────────────────────────
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, "").slice(0, country.digits);
+    setPhoneRaw(raw);
+    setPhoneDisplay(formatPhoneInput(raw));
+    setPhoneError("");
+  };
+
+  const fullPhone = `${country.dial} ${phoneDisplay}`.trim();
+
   // ── Step 1: send verification code ───────────────────────────────────────
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setPhoneError("");
+
     if (password.length < 6) { setError("La contraseña debe tener al menos 6 caracteres"); return; }
+    if (phoneRaw.length < country.digits) {
+      setPhoneError(`El número debe tener ${country.digits} dígitos`);
+      return;
+    }
+
     setLoading(true);
     try {
+      // Check phone uniqueness
+      const phoneSnap = await getDocs(query(collection(db, "users"), where("phone", "==", fullPhone)));
+      if (!phoneSnap.empty) {
+        setPhoneError("Este número ya está registrado en otra cuenta");
+        setLoading(false);
+        return;
+      }
+
       const res = await fetch("/api/send-verification", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -97,7 +148,6 @@ export default function RegisterPage() {
     if (code.length < 6) return;
     setLoading(true); setCodeError("");
     try {
-      // 1. Verify code
       const vRes = await fetch("/api/verify-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -111,11 +161,10 @@ export default function RegisterPage() {
         return;
       }
 
-      // 2. Create Firebase account
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(cred.user, { displayName: name });
       await setDoc(doc(db, "users", cred.user.uid), {
-        name, email, phone, role: "user",
+        name, email, phone: fullPhone, role: "user",
         createdAt: Timestamp.now(), updatedAt: Timestamp.now(),
       });
 
@@ -168,18 +217,72 @@ export default function RegisterPage() {
                   className="w-full px-3.5 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50"
                   style={INPUT_STYLE} />
               </div>
+
+              {/* Phone with prefix selector */}
               <div>
-                <input type="tel" required value={phone} onChange={e => setPhone(e.target.value)}
-                  placeholder="Teléfono" disabled={loading} autoComplete="tel"
-                  className="w-full px-3.5 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50"
-                  style={INPUT_STYLE} />
+                <div className={`flex border rounded-xl overflow-hidden transition-all focus-within:ring-2 focus-within:border-transparent ${phoneError ? "border-red-300 bg-red-50" : ""}`}
+                  style={phoneError ? {} : { borderColor: "rgba(54,54,54,0.2)", backgroundColor: "#fff" }}>
+
+                  {/* Country selector */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowCountry(v => !v)}
+                      disabled={loading}
+                      className="flex items-center gap-1.5 px-3 py-2.5 h-full border-r text-sm font-medium disabled:opacity-50 hover:bg-gray-50 transition-colors"
+                      style={{ borderColor: "rgba(54,54,54,0.2)", color: "#363636", minWidth: "80px" }}
+                    >
+                      <span className="text-base leading-none">{country.flag}</span>
+                      <span className="text-xs" style={{ color: "rgba(54,54,54,0.6)" }}>{country.dial}</span>
+                      <ChevronDown size={12} style={{ color: "rgba(54,54,54,0.4)" }} className={`transition-transform ${showCountry ? "rotate-180" : ""}`} />
+                    </button>
+
+                    {showCountry && (
+                      <div className="absolute left-0 top-full mt-1 z-30 bg-white border rounded-xl shadow-lg overflow-hidden"
+                        style={{ borderColor: "rgba(54,54,54,0.15)", minWidth: "200px" }}>
+                        {COUNTRIES.map(c => (
+                          <button
+                            key={c.code}
+                            type="button"
+                            onClick={() => { setCountry(c); setShowCountry(false); setPhoneRaw(""); setPhoneDisplay(""); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors"
+                            style={{ color: c.code === country.code ? "#363636" : "rgba(54,54,54,0.7)", fontWeight: c.code === country.code ? 600 : 400 }}
+                          >
+                            <span className="text-base">{c.flag}</span>
+                            <span className="flex-1 truncate">{c.name}</span>
+                            <span className="text-xs" style={{ color: "rgba(54,54,54,0.4)" }}>{c.dial}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Number input */}
+                  <input
+                    type="tel"
+                    required
+                    value={phoneDisplay}
+                    onChange={handlePhoneChange}
+                    placeholder={country.placeholder}
+                    disabled={loading}
+                    autoComplete="tel"
+                    inputMode="numeric"
+                    className="flex-1 px-3 py-2.5 text-sm focus:outline-none disabled:opacity-50 bg-transparent"
+                    style={{ color: phoneError ? "#dc2626" : "#363636" }}
+                  />
+                </div>
+                {phoneError && (
+                  <p className="text-[11px] text-red-500 mt-1 ml-1">{phoneError}</p>
+                )}
               </div>
+
               <div>
                 <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
                   placeholder="Email" disabled={loading} autoComplete="email"
                   className="w-full px-3.5 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50"
                   style={INPUT_STYLE} />
               </div>
+
               <div>
                 <div className="relative">
                   <input type={showPassword ? "text" : "password"} required value={password}
@@ -297,6 +400,11 @@ export default function RegisterPage() {
 
         </div>
       </div>
+
+      {/* Click-outside to close dropdown */}
+      {showCountry && (
+        <div className="fixed inset-0 z-20" onClick={() => setShowCountry(false)} />
+      )}
     </div>
   );
 }

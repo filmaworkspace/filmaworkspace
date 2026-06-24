@@ -1063,7 +1063,7 @@ export default function EditInvoicePage() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Descripción *</label>
                   <div className="relative">
-                    <textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} onBlur={() => handleBlur("description")} placeholder="Describe el propósito de esta factura..." rows={3} className={cx("w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm pr-10",
+                    <textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} onBlur={() => handleBlur("description")} placeholder="Describe el propósito de esta factura" rows={3} className={cx("w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm pr-10",
                       hasError("description") ? "border-red-300 bg-red-50" : isValid("description") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"
                     )} />
                     {isValid("description") && <CheckCircle2 size={16} className="absolute right-4 top-4 text-emerald-600" />}
@@ -1123,7 +1123,7 @@ export default function EditInvoicePage() {
                       </div>
 
                       <div className="space-y-4">
-                        <input type="text" value={item.description} onChange={e => updateItem(index, "description", e.target.value)} onBlur={() => handleBlur(`item_${index}_description`)} placeholder="Descripción del item..." className={cx("w-full px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white",
+                        <input type="text" value={item.description} onChange={e => updateItem(index, "description", e.target.value)} onBlur={() => handleBlur(`item_${index}_description`)} placeholder="Descripción del item" className={cx("w-full px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white",
                           hasError(`item_${index}_description`) ? "border-red-300 bg-red-50" : item.description.trim() ? "border-emerald-200" : "border-slate-200"
                         )} />
 
@@ -1472,7 +1472,7 @@ export default function EditInvoicePage() {
             <div className="p-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <Search size={20} className="text-slate-400" />
-                <input type="text" value={supplierSearch} onChange={e => setSupplierSearch(e.target.value)} placeholder="Buscar proveedor..." autoFocus className="flex-1 outline-none text-sm" />
+                <input type="text" value={supplierSearch} onChange={e => setSupplierSearch(e.target.value)} placeholder="Buscar proveedor" autoFocus className="flex-1 outline-none text-sm" />
                 <button onClick={() => setShowSupplierModal(false)} className="p-1 hover:bg-slate-100 rounded"><X size={18} /></button>
               </div>
             </div>
@@ -1495,7 +1495,7 @@ export default function EditInvoicePage() {
             <div className="p-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <Search size={20} className="text-slate-400" />
-                <input type="text" value={accountSearch} onChange={e => setAccountSearch(e.target.value)} placeholder="Buscar cuenta..." autoFocus className="flex-1 outline-none text-sm" />
+                <input type="text" value={accountSearch} onChange={e => setAccountSearch(e.target.value)} placeholder="Buscar cuenta" autoFocus className="flex-1 outline-none text-sm" />
                 <button onClick={() => setShowAccountModal(false)} className="p-1 hover:bg-slate-100 rounded"><X size={18} /></button>
               </div>
             </div>
