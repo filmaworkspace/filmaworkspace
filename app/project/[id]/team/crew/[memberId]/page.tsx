@@ -436,6 +436,7 @@ export default function CrewMemberPage() {
           projectName: projectName || "la producción",
           role:        member.role || "",
           formUrl:     realFormUrl,
+          pin,
           senderName:  userName || "El equipo de producción",
           memberId,
         }),

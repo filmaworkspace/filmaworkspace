@@ -5,7 +5,7 @@ import { fichaInviteHtml, fichaInviteText } from "@/lib/emails/ficha-invite";
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
-  const { to, firstName, projectName, role, formUrl, senderName, memberId } =
+  const { to, firstName, projectName, role, formUrl, pin, senderName, memberId } =
     await req.json();
 
   if (!to || !firstName || !projectName || !formUrl || !memberId) {
@@ -16,8 +16,8 @@ export async function POST(req: NextRequest) {
     from: process.env.RESEND_FROM ?? "Filma Workspace <onboarding@resend.dev>",
     to: [to],
     subject: `Completa tu ficha — ${projectName}`,
-    html: fichaInviteHtml({ firstName, projectName, role, formUrl, senderName }),
-    text: fichaInviteText({ firstName, projectName, role, formUrl, senderName }),
+    html: fichaInviteHtml({ firstName, projectName, role, formUrl, pin, senderName }),
+    text: fichaInviteText({ firstName, projectName, role, formUrl, pin, senderName }),
     idempotencyKey: `ficha-invite/${memberId}/${Date.now()}`,
     tags: [{ name: "type", value: "ficha-invite" }],
   });

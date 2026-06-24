@@ -1328,26 +1328,12 @@ export default function CrewPage() {
                   Cancelar
                 </button>
                 <div className="flex-1" />
-                {/* Guardar sin enviar */}
                 <button onClick={handleSave} disabled={saving || !canSave}
-                  className="px-4 py-2.5 border border-slate-300 text-slate-700 bg-white rounded-xl text-sm font-medium hover:bg-slate-50 disabled:opacity-40 transition-colors">
+                  className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
+                  style={{ backgroundColor: "#6BA319" }}>
                   {saving ? "Guardando…" : editingMember ? "Guardar cambios" : "Guardar"}
                 </button>
-                {/* Guardar + enviar ficha */}
-                <button onClick={handleSaveAndSend} disabled={sendingForm || !canSend}
-                  className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
-                  style={{ backgroundColor: "#6BA319" }}
-                  title={!formData.email?.trim() ? "Añade un email para enviar la ficha" : "Guarda y envía la ficha al miembro"}
-                >
-                  <Send size={14} />
-                  {sendingForm ? "Enviando…" : "Guardar y enviar ficha"}
-                </button>
               </div>
-              {!formData.email?.trim() && canSave && (
-                <p className="text-xs text-slate-400 mt-2 text-right">
-                  Añade un email para poder enviar la ficha
-                </p>
-              )}
             </div>
           </div>
         </div>
