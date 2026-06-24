@@ -60,8 +60,8 @@ type CrewSection = keyof typeof CREW_SECTIONS;
 
 const DEPARTMENTS_TECHNICAL = [
   "Producción Ejecutiva", "Legal", "Guion", "Dirección", "Producción",
-  "Transportes", "Fotografía", "Arte", "Vestuario", "Maquillaje & Peluquería",
-  "Sonido", "Eléctricos & Maquinistas", "Transportes Pesados",
+  "Localizaciones", "Fotografía", "Arte", "Vestuario", "Maquillaje & Peluquería",
+  "Sonido", "Eléctricos & Maquinistas", "Transportes", "Transportes Pesados",
   "VFX", "SFX", "Montaje", "Postproducción",
 ];
 

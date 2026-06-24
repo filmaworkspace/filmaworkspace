@@ -241,6 +241,7 @@ export default function CrewMemberPage() {
   const [statusOpen, setStatusOpen]       = useState(false);
   const [submittingApproval, setSubmittingApproval] = useState(false);
   const [exportingPdf, setExportingPdf]   = useState(false);
+  const [projectName, setProjectName]     = useState("");
 
   const photoInputRef = useRef<HTMLInputElement>(null);
   const docInputRef   = useRef<HTMLInputElement>(null);
@@ -267,6 +268,8 @@ export default function CrewMemberPage() {
   const loadMember = async () => {
     try {
       setLoading(true);
+      const projSnap = await getDoc(doc(db, "projects", projectId));
+      if (projSnap.exists()) setProjectName(projSnap.data().name || "");
       const snap = await getDoc(doc(db, `projects/${projectId}/crew`, memberId));
       if (!snap.exists()) { router.push(`/project/${projectId}/team/crew`); return; }
       const d = snap.data();
@@ -395,6 +398,23 @@ export default function CrewMemberPage() {
     if (!member?.email) return;
     setSendingForm(true);
     try {
+      const res = await fetch("/api/send-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to:          member.email,
+          firstName:   member.firstName || member.name || "",
+          projectName: projectName || "la producción",
+          role:        member.role || "",
+          formUrl,
+          senderName:  userName || "El equipo de producción",
+          memberId,
+        }),
+      });
+      if (!res.ok) {
+        const { error } = await res.json();
+        throw new Error(error || "Error al enviar el email");
+      }
       await updateDoc(doc(db, `projects/${projectId}/crew`, memberId), {
         formSentAt: Timestamp.now(), formSentBy: userId, formSentByName: userName,
       });
