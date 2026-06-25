@@ -184,6 +184,25 @@ export default function BudgetPage() {
       const posSnapshot = await getDocs(collection(db, `projects/${id}/pos`));
       posSnapshot.docs.forEach(poDoc => {
         const poData = poDoc.data();
+
+        // Si la PO está siendo modificada (tiene previousCommittedItems y está en draft/pending),
+        // mostrar el comprometido de la versión anterior hasta que la nueva sea aprobada.
+        const isModificationInProgress =
+          poData.previousCommittedItems?.length > 0 &&
+          (poData.status === "draft" || poData.status === "pending");
+
+        if (isModificationInProgress) {
+          poData.previousCommittedItems.forEach((item: any) => {
+            if (item.subAccountCode) {
+              const itemInvoiced = item.invoicedAmount || 0;
+              const itemCommitted = Math.max(0, (item.baseAmount || 0) - itemInvoiced);
+              committedBySubaccount[item.subAccountCode] =
+                (committedBySubaccount[item.subAccountCode] || 0) + itemCommitted;
+            }
+          });
+          return;
+        }
+
         // Usar shouldCommitPO de budgetRules para determinar si cuenta
         if (poData.status && shouldCommitPO(poData.status, loadedCostConfig) && poData.items) {
           poData.items.forEach((item: any) => {
@@ -193,8 +212,8 @@ export default function BudgetPage() {
               // Si está abierto, el comprometido es lo que falta por facturar
               const itemInvoiced = item.invoicedAmount || 0;
               const itemBase = item.baseAmount || 0;
-              const itemCommitted = item.isClosed 
-                ? 0 
+              const itemCommitted = item.isClosed
+                ? 0
                 : Math.max(0, itemBase - itemInvoiced);
               committedBySubaccount[key] = (committedBySubaccount[key] || 0) + itemCommitted;
             }

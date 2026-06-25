@@ -671,12 +671,17 @@ export default function PODetailPage() {
     try {
       const newVersion = (po.version || 1) + 1;
       
-      // Guardar los items comprometidos actuales para calcular la diferencia al aprobar la nueva versión
+      // Guardar los items comprometidos actuales para calcular la diferencia al aprobar la nueva versión.
+      // Se incluyen subAccountCode e invoicedAmount para que:
+      // 1. La página de presupuesto pueda mostrar el committed anterior mientras está en borrador/pendiente.
+      // 2. Al aprobar la nueva versión, se descuente correctamente solo la porción no realizada.
       const committedItems = po.items
         .filter(item => item.subAccountId && item.baseAmount > 0)
         .map(item => ({
           subAccountId: item.subAccountId,
+          subAccountCode: item.subAccountCode || "",
           baseAmount: item.baseAmount,
+          invoicedAmount: item.invoicedAmount || 0,
         }));
       
       await updateDoc(doc(db, `projects/${projectId}/pos`, po.id), {

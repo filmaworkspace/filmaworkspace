@@ -110,6 +110,7 @@ interface POItem {
   totalAmount: number;
   episodeAssignment?: "general" | "specific";
   episodes?: EpisodeDistribution[];
+  invoicedAmount?: number;
 }
 
 interface ApprovalStep {
@@ -340,6 +341,7 @@ export default function EditPOPage() {
         irpfAmount: item.irpfAmount || 0, totalAmount: item.totalAmount || 0,
         episodeAssignment: item.episodeAssignment || "general",
         episodes: item.episodes || undefined,
+        invoicedAmount: item.invoicedAmount || 0,
       }));
 
       if (loadedItems.length === 0) {
@@ -672,21 +674,23 @@ export default function EditPOPage() {
       }
 
       const itemsData = items.map((item) => ({
-        description: item.description?.trim() || "", 
+        description: item.description?.trim() || "",
         subAccountId: item.subAccountId || "",
-        subAccountCode: item.subAccountCode || "", 
+        subAccountCode: item.subAccountCode || "",
         subAccountDescription: item.subAccountDescription || "",
-        date: item.date || new Date().toISOString().split("T")[0], 
-        quantity: item.quantity || 1, 
+        date: item.date || new Date().toISOString().split("T")[0],
+        quantity: item.quantity || 1,
         unitPrice: item.unitPrice || 0,
-        baseAmount: item.baseAmount || 0, 
-        vatRate: item.vatRate ?? 21, 
+        baseAmount: item.baseAmount || 0,
+        vatRate: item.vatRate ?? 21,
         vatAmount: item.vatAmount || 0,
-        irpfRate: item.irpfRate || 0, 
-        irpfAmount: item.irpfAmount || 0, 
+        irpfRate: item.irpfRate || 0,
+        irpfAmount: item.irpfAmount || 0,
         totalAmount: item.totalAmount || 0,
         episodeAssignment: item.episodeAssignment || "general",
         ...(item.episodes && item.episodes.length > 0 ? { episodes: item.episodes } : {}),
+        // Preservar invoicedAmount para que el presupuesto calcule committed neto al aprobar
+        ...(item.invoicedAmount ? { invoicedAmount: item.invoicedAmount } : {}),
       }));
 
       const poData: any = {
