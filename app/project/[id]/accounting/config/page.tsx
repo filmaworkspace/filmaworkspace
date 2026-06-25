@@ -185,7 +185,7 @@ const ACTUAL_TRIGGERS = [
 ];
 
 const BOX_TRIGGERS = [
-  { value: "on_create",  label: "Al enviar sobre" },
+  { value: "on_create",  label: "Al codificar sobre" },
   { value: "on_account", label: "Al contabilizar sobre" },
 ];
 
