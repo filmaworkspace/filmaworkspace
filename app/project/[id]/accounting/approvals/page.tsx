@@ -628,37 +628,26 @@ export default function ApprovalsPage() {
           updates.previousCommittedItems = null;
           
         } else if (approval.type === "invoice") {
-          // Factura
-          updates.status = "pending"; // Pasa a "pendiente de pago" (aprobada)
+          // Factura: la aprobación solo cambia el estado administrativo, no afecta al presupuesto
+          // La realización ocurre exclusivamente al codificar (on_code) o al contabilizar (on_account)
+          updates.status = "pending";
           updates.approvalStatus = "approved";
           updates.approvedAt = Timestamp.now();
           updates.approvedBy = userId;
           updates.approvedByName = userName;
-          
-          // Preparar items para budgetOperations
+
           const budgetItems: Array<{ subAccountId: string; baseAmount: number; poItemIndex?: number }> = [];
           for (const item of (approval.items || [])) {
             const itemBaseAmount = item.baseAmount || (item.quantity && item.unitPrice ? item.quantity * item.unitPrice : item.totalAmount ? item.totalAmount / 1.21 : 0);
             if (item.subAccountId) {
-              budgetItems.push({ 
-                subAccountId: item.subAccountId, 
-                baseAmount: itemBaseAmount,
-                poItemIndex: item.poItemIndex 
-              });
+              budgetItems.push({ subAccountId: item.subAccountId, baseAmount: itemBaseAmount, poItemIndex: item.poItemIndex });
             }
           }
-          
-          // El estado real de la factura será "pending" (aprobada, pendiente de pago)
-          // Usar budgetOperations para manejar el realizado (si corresponde según config)
-          await handleInvoiceStatusChange(approval.projectId, oldStatus, "pending", budgetItems);
 
-          // Actualizar tracking de PO (invoicedAmount) solo si la aprobación ya realiza
-          // según la config. Si es on_account/on_paid, se actualizará en ese momento.
-          if (approval.poId) {
-            const costSettings = await getCostSettings(approval.projectId);
-            if (shouldRealizeInvoice("pending", costSettings)) {
-              await updatePOItemsInvoiced(approval.projectId, approval.poId, budgetItems, "add");
-            }
+          const costSettings = await getCostSettings(approval.projectId);
+          await handleInvoiceStatusChange(approval.projectId, oldStatus, "pending", budgetItems);
+          if (approval.poId && shouldRealizeInvoice("pending", costSettings)) {
+            await updatePOItemsInvoiced(approval.projectId, approval.poId, budgetItems, "add");
           }
         } else if (approval.type === "box") {
           // Sobre BOX (tarjeta o transferencia)

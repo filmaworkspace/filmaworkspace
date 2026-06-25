@@ -548,13 +548,9 @@ export default function InvoiceDetailPage() {
 
       const costSettings = await getCostSettings(projectId);
 
-      // Determinar el nuevo estado
-      // Con on_code: la primera codificación de una factura aprobada la pasa a "coded"
-      const isFirstCoding = costSettings.invoiceActualTrigger === "on_code" &&
-        (invoice.status === "pending" || invoice.status === "approved");
-      const newStatus = invoice.status === "draft" ? "pending_approval"
-        : isFirstCoding ? "coded"
-        : invoice.status;
+      // Con on_code: la codificación es el único trigger de realización, sin importar aprobaciones
+      const isFirstCoding = costSettings.invoiceActualTrigger === "on_code" && !invoice.codedAt;
+      const newStatus = isFirstCoding ? "coded" : invoice.status === "draft" ? "pending_approval" : invoice.status;
 
       // Guardar datos de la factura
       await updateDoc(doc(db, `projects/${projectId}/invoices`, invoice.id), {
@@ -568,28 +564,25 @@ export default function InvoiceDetailPage() {
         codedAt: Timestamp.now(), codedBy: permissions.userId, codedByName: permissions.userName,
       });
 
-      if (invoice.status !== "draft") {
-        const wasRealized = shouldRealizeInvoice(invoice.status, costSettings);
-
-        if (isFirstCoding) {
-          // Primera codificación con on_code: realizar con los ítems FINALES del equipo de contabilidad
-          const newBudgetItems = items.filter(i => i.subAccountId && i.baseAmount > 0)
-            .map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
-          if (newBudgetItems.length > 0) await realizeInvoice(projectId, newBudgetItems);
-          if (invoice.poId) await updatePOItemsInvoiced(projectId, invoice.poId, items, "add");
-        } else if (wasRealized && invoice.poId) {
-          // Re-codificación de factura ya realizada: actualizar ítems de PO con los nuevos valores
+      if (isFirstCoding) {
+        // Primera codificación: realizar presupuesto con los ítems finales del equipo de conta
+        const newBudgetItems = items.filter(i => i.subAccountId && i.baseAmount > 0)
+          .map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
+        if (newBudgetItems.length > 0) await realizeInvoice(projectId, newBudgetItems);
+        if (invoice.poId) await updatePOItemsInvoiced(projectId, invoice.poId, items, "add");
+      } else if (invoice.codedAt) {
+        // Re-codificación: ajustar ítems de presupuesto y PO
+        const oldBudgetItems = (invoice.items || [])
+          .filter((i: any) => i.subAccountId && i.baseAmount > 0)
+          .map((i: any) => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
+        const newBudgetItems = items.filter(i => i.subAccountId && i.baseAmount > 0)
+          .map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
+        if (oldBudgetItems.length > 0) await unrealizeInvoice(projectId, oldBudgetItems);
+        if (newBudgetItems.length > 0) await realizeInvoice(projectId, newBudgetItems);
+        if (invoice.poId) {
           if (invoice.items && invoice.items.length > 0)
             await updatePOItemsInvoiced(projectId, invoice.poId, invoice.items, "subtract");
           await updatePOItemsInvoiced(projectId, invoice.poId, items, "add");
-
-          const oldBudgetItems = (invoice.items || [])
-            .filter((i: any) => i.subAccountId && i.baseAmount > 0)
-            .map((i: any) => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
-          const newBudgetItems = items.filter(i => i.subAccountId && i.baseAmount > 0)
-            .map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
-          if (oldBudgetItems.length > 0) await unrealizeInvoice(projectId, oldBudgetItems);
-          if (newBudgetItems.length > 0) await realizeInvoice(projectId, newBudgetItems);
         }
       }
 
