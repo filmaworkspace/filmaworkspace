@@ -33,7 +33,6 @@ export async function POST(req: NextRequest) {
     subject:        "Restablecer tu contraseña — Filma Workspace",
     html:           resetPasswordHtml({ name, resetUrl }),
     text:           resetPasswordText({ name, resetUrl }),
-    idempotencyKey: `reset-password/${email}/${Date.now()}`,
     tags:           [{ name: "type", value: "reset-password" }],
   });
 

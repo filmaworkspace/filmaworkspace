@@ -33,7 +33,6 @@ export async function POST(req: NextRequest) {
     subject:        `${invitedByName} te ha invitado a "${projectName}" — Filma Workspace`,
     html:           projectInviteHtml({ inviteeName, invitedByName, projectName, role: role ?? "", isExistingUser, loginUrl, registerUrl }),
     text:           projectInviteText({ inviteeName, invitedByName, projectName, role: role ?? "", isExistingUser, loginUrl, registerUrl }),
-    idempotencyKey: `project-invite/${projectId}/${invitedEmail}`,
     tags:           [{ name: "type", value: "project-invite" }],
   });
 

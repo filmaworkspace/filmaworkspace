@@ -22,7 +22,6 @@ export async function POST(req: NextRequest) {
     subject: `Completa tu ficha — ${projectName}`,
     html: fichaInviteHtml({ firstName, projectName, role, formUrl, pin, senderName }),
     text: fichaInviteText({ firstName, projectName, role, formUrl, pin, senderName }),
-    idempotencyKey: `ficha-invite/${memberId}/${Date.now()}`,
     tags: [{ name: "type", value: "ficha-invite" }],
   });
 
