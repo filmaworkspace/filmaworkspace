@@ -299,7 +299,7 @@ export async function GET(request: NextRequest) {
 
     const merged = await mergePdfs(bannerBytes, docPdfBytes);
 
-    return new NextResponse(merged, {
+    return new NextResponse(merged.buffer as ArrayBuffer, {
       status: 200,
       headers: { "Content-Type": "application/pdf", "Cache-Control": "private, max-age=3600" },
     });
