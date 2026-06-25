@@ -299,7 +299,7 @@ export default function SuppliersPage() {
       if (projectDoc.exists()) setProjectName(projectDoc.data().name || "Proyecto");
 
       const suppliersRef = collection(db, `projects/${id}/suppliers`);
-      const suppliersQuery = query(suppliersRef, orderBy("fiscalName", "asc"));
+      const suppliersQuery = query(suppliersRef, orderBy("createdAt", "desc"));
       const suppliersSnapshot = await getDocs(suppliersQuery);
 
       const suppliersData = suppliersSnapshot.docs.map((doc) => {
@@ -341,6 +341,12 @@ export default function SuppliersPage() {
     } else if (filterStatus !== "all") {
       filtered = filtered.filter((s) => !s.closure && getCertificateStatus(s) === filterStatus);
     }
+    // Ordenar: fecha desc (ya viene de Firestore), luego nombre asc como desempate
+    filtered.sort((a, b) => {
+      const dateDiff = (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0);
+      if (dateDiff !== 0) return dateDiff;
+      return a.fiscalName.localeCompare(b.fiscalName);
+    });
     setFilteredSuppliers(filtered);
   };
 

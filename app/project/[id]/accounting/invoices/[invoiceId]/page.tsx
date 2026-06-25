@@ -1348,12 +1348,10 @@ export default function InvoiceDetailPage() {
                 <div className="flex items-center gap-3 flex-wrap">
                   <h1 className="text-2xl font-semibold text-slate-900">{docConfig.label}</h1>
                   <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm font-mono">{invoice.displayNumber}</span>
-                  {/* Estado - no mostrar si es "accounted" para evitar duplicar */}
-                  {invoice.status !== "accounted" && (
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium text-sm ${config.bg} ${config.text}`}><StatusIcon size={14} />{config.label}</span>
-                  )}
-                  {/* Codificada - siempre mostrar si está codificada */}
-                  {invoice.codedAt && (
+                  {/* Estado principal */}
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium text-sm ${config.bg} ${config.text}`}><StatusIcon size={14} />{config.label}</span>
+                  {/* Badge "Codificada" solo cuando el status ya avanzó más allá de coded */}
+                  {invoice.codedAt && invoice.status !== "coded" && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-violet-100 text-violet-700 rounded-lg font-medium text-sm">
                       <FileCheck size={14} />Codificada
                     </span>

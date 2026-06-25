@@ -478,6 +478,9 @@ export default function CompanyAccountsPage() {
   const handleMarkAccounted = async () => {
     if (!selectedInvoice || !entryNumber.trim()) { showToast("error", "Nº de asiento obligatorio"); return; }
     if (!panelOk) { showToast("error", "El asiento no cuadra"); return; }
+    if (!selectedInvoice.codedAt && selectedInvoice.status !== "coded") {
+      showToast("error", "La factura debe ser codificada antes de contabilizarse"); return;
+    }
     setSaving(true);
     try {
       const oldStatus = selectedInvoice.status;
@@ -926,13 +929,16 @@ export default function CompanyAccountsPage() {
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-400 outline-none font-mono" />
                         <p className="text-[10px] text-slate-400 mt-1 font-mono">Formato recomendado: A-YYYY-NNN</p>
                       </div>
-                      <button onClick={handleMarkAccounted} disabled={saving || !entryNumber.trim() || !panelOk}
+                      <button onClick={handleMarkAccounted} disabled={saving || !entryNumber.trim() || !panelOk || (!selectedInvoice?.codedAt && selectedInvoice?.status !== "coded")}
                         className="w-full py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
                         {saving ? <RefreshCw size={13} className="animate-spin" /> : <CheckCircle size={13} />}
                         Contabilizar y siguiente
                       </button>
                       {!panelOk && (
                         <p className="text-xs text-red-600 text-center">Edita las líneas del asiento para cuadrarlo primero</p>
+                      )}
+                      {(!selectedInvoice?.codedAt && selectedInvoice?.status !== "coded") && (
+                        <p className="text-xs text-amber-600 text-center">Pendiente de codificación</p>
                       )}
                     </div>
                   )}
