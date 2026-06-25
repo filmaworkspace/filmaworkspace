@@ -221,7 +221,7 @@ export default function TeamApprovalsPage() {
 
       {/* ── Header (mismo patrón que accounting/approvals) ─────────────────── */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-3">
               <ClipboardCheck size={24} style={{ color: TEAM_COLOR }} />
@@ -234,7 +234,7 @@ export default function TeamApprovalsPage() {
             </div>
 
             {/* Stats */}
-            <div className="hidden md:flex items-center gap-4">
+            <div className="flex items-center gap-4">
               <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-xl border border-slate-200">
                 <div className="text-center">
                   <p className="text-lg font-bold text-slate-900">{approvedToday}</p>
@@ -269,7 +269,7 @@ export default function TeamApprovalsPage() {
       </div>
 
       {/* ── Content ─────────────────────────────────────────────────────────── */}
-      <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+      <div className="px-24 py-6">
         <div className="grid grid-cols-3 gap-6 min-h-[calc(100vh-320px)]">
 
           {/* ── Sidebar ───────────────────────────────────────────────────── */}
@@ -358,7 +358,7 @@ export default function TeamApprovalsPage() {
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col" style={{ minHeight: "calc(100vh - 340px)" }}>
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-flex flex-col" style={{ minHeight: "calc(100vh - 340px)" }}>
 
                 {/* Card header */}
                 <div className="px-6 py-5 border-b border-slate-100">

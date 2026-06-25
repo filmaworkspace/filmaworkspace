@@ -158,7 +158,7 @@ export default function TeamPage() {
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
+        <div className="px-24 pt-10 pb-6">
           <div className="relative flex items-center justify-center">
             <h1 className="text-3xl font-bold text-slate-900 text-center">Panel de coordinación</h1>
 
@@ -182,7 +182,7 @@ export default function TeamPage() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+      <main className="px-24 py-8">
 
         {/* ── Pending approvals banner ──────────────────────────────────────── */}
         {pendingApprovals > 0 && (
@@ -208,7 +208,7 @@ export default function TeamPage() {
         )}
 
         {/* ── Cards ────────────────────────────────────────────────────────── */}
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
+        <div className="flex flex-row gap-6 items-start">
 
           {/* Crew reciente */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1">
@@ -262,7 +262,7 @@ export default function TeamPage() {
                               <div className="flex items-center gap-2 mb-0.5">
                                 <span className="text-sm font-semibold text-slate-900 truncate">{fullName(member)}</span>
                                 {member.artisticName && (
-                                  <span className="text-xs text-slate-400 italic truncate hidden sm:inline">&quot;{member.artisticName}&quot;</span>
+                                  <span className="text-xs text-slate-400 italic truncate inline">&quot;{member.artisticName}&quot;</span>
                                 )}
                               </div>
                               <div className="flex items-center gap-1.5">
@@ -276,7 +276,7 @@ export default function TeamPage() {
 
                           {/* Right */}
                           <div className="flex items-center gap-3 flex-shrink-0">
-                            <div className="text-right hidden sm:block space-y-1">
+                            <div className="text-right block space-y-1">
                               <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium ${sc.bg} ${sc.text}`}>
                                 {sc.label}
                               </span>

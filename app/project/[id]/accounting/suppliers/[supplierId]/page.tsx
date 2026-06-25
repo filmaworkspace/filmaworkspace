@@ -1040,7 +1040,7 @@ export default function SupplierDetailPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           {/* Breadcrumb y acciones */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
@@ -1223,7 +1223,7 @@ export default function SupplierDetailPage() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+      <main className="px-24 py-8">
         {/* Banner de proveedor cerrado */}
         {supplierClosure && (
           <div className="mb-6 bg-slate-900 rounded-2xl p-5 text-white">
@@ -1264,9 +1264,9 @@ export default function SupplierDetailPage() {
             </div>
           </div>
         )}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-3 gap-6">
           {/* Columna izquierda - Datos y documentos */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="col-span-2 space-y-6">
             {/* Datos fiscales y dirección - editable inline */}
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -1300,7 +1300,7 @@ export default function SupplierDetailPage() {
               
               <div className="p-5">
                 {!editingFiscal ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-2 gap-6">
                     {/* Dirección */}
                     <div>
                       <p className="text-xs text-slate-400 uppercase tracking-wide mb-2">Dirección fiscal</p>
@@ -1344,7 +1344,7 @@ export default function SupplierDetailPage() {
                 ) : (
                   <div className="space-y-4">
                     {/* Form de edición */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-3">
                         <p className="text-xs text-slate-400 uppercase tracking-wide">Dirección fiscal</p>
                         <div className="grid grid-cols-3 gap-2">

@@ -1174,7 +1174,7 @@ export default function ReportsPage() {
   return (
     <div className={"min-h-screen bg-white " + inter.className}>
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
               <FileSpreadsheet size={24} style={{ color: "#2F52E0" }} />
@@ -1190,7 +1190,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+      <main className="px-24 py-6">
         <div className="space-y-8">
           {REPORT_SECTIONS.map((section) => (
             <div key={section.id}>

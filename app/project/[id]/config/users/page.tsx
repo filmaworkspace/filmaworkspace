@@ -347,7 +347,7 @@ export default function ConfigUsers() {
 
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
               <UserCog size={24} className="text-slate-900" />
@@ -365,7 +365,7 @@ export default function ConfigUsers() {
         </div>
       </div>
       
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8 space-y-6">
+      <main className="px-24 py-8 space-y-6">
         {/* Pending Invitations */}
         {pendingInvitations.length > 0 && (
           <div className="rounded-2xl p-6" style={{ background: 'linear-gradient(to right, #0f172a, #334155)' }}>
@@ -377,7 +377,7 @@ export default function ConfigUsers() {
                 {pendingInvitations.length} invitación{pendingInvitations.length !== 1 ? "es" : ""} pendiente{pendingInvitations.length !== 1 ? "s" : ""}
               </h2>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 grid-cols-3">
               {pendingInvitations.map((inv) => (
                 <div key={inv.id} className="flex items-center justify-between bg-white rounded-2xl p-4">
                   <div className="flex items-center gap-3">
@@ -412,10 +412,10 @@ export default function ConfigUsers() {
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
+        <div className="flex flex-row gap-6 items-start">
           {/* Project Roles */}
           {projectMembers.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-visible flex-1 lg:max-w-[50%]">
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-visible flex-1 max-w-[50%]">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
                 <Shield size={18} className="text-slate-400" />
                 <h3 className="font-semibold text-slate-900">Roles de proyecto</h3>
@@ -497,7 +497,7 @@ export default function ConfigUsers() {
 
           {/* Department Members */}
           {deptMembers.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-visible flex-1 lg:max-w-[50%]">
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-visible flex-1 max-w-[50%]">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
                 <Briefcase size={18} className="text-slate-400" />
                 <h3 className="font-semibold text-slate-900">Departamentos</h3>

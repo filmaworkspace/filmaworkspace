@@ -193,7 +193,7 @@ export default function ConfigDepartments() {
 
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
               <Briefcase size={24} className="text-slate-900" />
@@ -210,7 +210,7 @@ export default function ConfigDepartments() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8 space-y-6">
+      <main className="px-24 py-8 space-y-6">
         {/* Add Form */}
         {showAddForm && (
           <div className="bg-white rounded-2xl border border-slate-200 p-6">
@@ -289,7 +289,7 @@ export default function ConfigDepartments() {
                   {isExpanded && (
                     <div className="px-6 pb-5 pt-2 border-t border-slate-100 bg-slate-50/30 rounded-b-2xl">
                       {dept.members.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                        <div className="grid grid-cols-4 gap-2">
                           {dept.members.map((m) => (
                             <div key={m.userId} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100">
                               <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-semibold text-sm flex-shrink-0">

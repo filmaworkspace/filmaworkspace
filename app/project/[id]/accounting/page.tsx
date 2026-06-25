@@ -340,7 +340,7 @@ export default function AccountingPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
+        <div className="px-24 pt-10 pb-6">
           <div className="relative flex items-center justify-center">
             <h1 className="text-3xl font-bold text-slate-900 text-center">Panel de contabilidad</h1>
 
@@ -381,7 +381,7 @@ export default function AccountingPage() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+      <main className="px-24 py-8">
         {/* Pending Approvals Alert */}
         {pendingApprovalsCount > 0 && (
           <Link href={`/project/${id}/accounting/approvals`}>
@@ -403,9 +403,9 @@ export default function AccountingPage() {
         )}
 
         {/* Recent Activity */}
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
+        <div className="flex flex-row gap-6 items-start">
           {/* Recent POs */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1 lg:max-w-[50%]">
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1 max-w-[50%]">
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <FileText size={18} style={{ color: '#2F52E0' }} />
@@ -467,7 +467,7 @@ export default function AccountingPage() {
           </div>
 
           {/* Recent Invoices */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1 lg:max-w-[50%]">
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1 max-w-[50%]">
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <Receipt size={18} style={{ color: '#2F52E0' }} />

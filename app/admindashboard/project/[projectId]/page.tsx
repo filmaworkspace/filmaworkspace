@@ -964,7 +964,7 @@ export default function AdminProjectPage() {
 
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
+        <div className="px-24 pt-10 pb-6">
           <div className="mb-6">
             <Link
               href="/admindashboard"
@@ -1020,7 +1020,7 @@ export default function AdminProjectPage() {
 
       {/* Closing warning banner */}
       {daysUntilClose !== null && (
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pb-4">
+        <div className="px-24 pb-4">
           <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -1049,7 +1049,7 @@ export default function AdminProjectPage() {
       )}
 
       {/* Tabs */}
-      <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pb-2">
+      <div className="px-24 pb-2">
         <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl p-1 w-fit">
           {[
             { id: "general", label: "General", icon: Settings },
@@ -1073,17 +1073,17 @@ export default function AdminProjectPage() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+      <main className="px-24 py-6">
 
         {/* ══════════════════════════════════ GENERAL TAB ══════════════════════════════════ */}
         {activeTab === "general" && (
           <div className="space-y-5">
 
             {/* ── Main grid: users (left 2/3) + info+departments (right 1/3) ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-3 gap-5">
 
               {/* Users — prominent left column */}
-              <div className="lg:col-span-2">
+              <div className="col-span-2">
                 <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden h-full">
                   <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -1168,7 +1168,7 @@ export default function AdminProjectPage() {
               </div>
 
               {/* Right column: project info + departments */}
-              <div className="lg:col-span-1 space-y-4">
+              <div className="col-span-1 space-y-4">
 
                 {/* Project info — compact */}
                 <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
@@ -1271,7 +1271,7 @@ export default function AdminProjectPage() {
             </div>
 
             {/* ── Admin actions strip — compact, secondary ── */}
-            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+            <div className="flex flex-row gap-2 pt-1">
               <button
                 onClick={() => {
                   setCloneName(project.name + " (copia)");
@@ -1314,7 +1314,7 @@ export default function AdminProjectPage() {
         {activeTab === "accounting" && (
           <div className="space-y-6">
             {/* Stats */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               {[
                 { label: "Cuentas presup.", value: accountingStats.accountCount, icon: BarChart3, color: "text-blue-600", bg: "bg-blue-50" },
                 { label: "Proveedores", value: accountingStats.supplierCount, icon: Building2, color: "text-emerald-600", bg: "bg-emerald-50" },
@@ -1336,7 +1336,7 @@ export default function AdminProjectPage() {
               <div className="px-5 py-4 border-b border-slate-100">
                 <h2 className="text-sm font-semibold text-slate-900">Acceso rápido</h2>
               </div>
-              <div className="p-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-5 grid grid-cols-4 gap-3">
                 {[
                   { label: "Presupuesto", href: `/project/${projectId}/accounting/budget`, icon: BarChart3 },
                   { label: "Proveedores", href: `/project/${projectId}/accounting/suppliers`, icon: Building2 },
@@ -1357,7 +1357,7 @@ export default function AdminProjectPage() {
             </div>
 
             {/* Copy operations */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               {/* Copy suppliers */}
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100">
@@ -1410,7 +1410,7 @@ export default function AdminProjectPage() {
         {activeTab === "team" && (
           <div className="space-y-6">
             {/* Stats */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               {[
                 { label: "Fichas creadas", value: teamStats.totalForms, icon: FileText, color: "text-blue-600", bg: "bg-blue-50" },
                 { label: "Pendientes", value: teamStats.pendingForms, icon: Clock, color: "text-amber-600", bg: "bg-amber-50" },

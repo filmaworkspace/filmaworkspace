@@ -1356,7 +1356,7 @@ export default function InvoiceDetailPage() {
       {toast && <div className="fixed bottom-4 right-4 z-50"><div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"} text-white text-sm font-medium`}>{toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}{toast.message}</div></div>}
       
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-3">
               <Receipt size={24} className="text-slate-400" />
@@ -1454,7 +1454,7 @@ export default function InvoiceDetailPage() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+      <main className="px-24 py-8">
         {/* Banner de delegación a contabilidad */}
         {invoice.status === "coding" && invoice.delegatedToAccounting && (
           <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
@@ -1523,7 +1523,7 @@ export default function InvoiceDetailPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        <div className="grid grid-cols-2 gap-8">
           {/* Left: Document Preview */}
           <div className="space-y-6">
             {/* Document Preview with actions */}

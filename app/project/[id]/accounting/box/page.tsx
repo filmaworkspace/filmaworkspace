@@ -1953,7 +1953,7 @@ export default function BoxesPage() {
 
       {/* Header */}
       <div className="mt-[53px]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           <div className="flex items-center justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
@@ -2016,7 +2016,7 @@ export default function BoxesPage() {
       </div>
 
       {/* Main Content */}
-      <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pb-8">
+      <div className="px-24 pb-8">
         <div className="flex gap-6">
 
           {/* ── Left Panel ──────────────────────────────────────────────────────── */}

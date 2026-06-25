@@ -634,7 +634,7 @@ export default function PayrollPage() {
 
       {/* ── Page header ──────────────────────────────────────────────────── */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-3">
               <Banknote size={24} style={{ color: TEAM_COLOR }} />
@@ -647,7 +647,7 @@ export default function PayrollPage() {
               <div className="relative">
                 <button onClick={() => setShowExport(v => !v)}
                   className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
-                  <Download size={15} /><span className="hidden sm:inline">Exportar</span>
+                  <Download size={15} /><span className="inline">Exportar</span>
                   <ChevronDown size={13} className="text-slate-400" />
                 </button>
                 {showExport && (
@@ -668,7 +668,7 @@ export default function PayrollPage() {
       </div>
 
       {/* ── Controls bar ─────────────────────────────────────────────────── */}
-      <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pb-4 flex flex-wrap items-center gap-3">
+      <div className="px-24 pb-4 flex flex-wrap items-center gap-3">
         {/* Month nav */}
         <div className="flex items-center border border-slate-200 rounded-xl p-0.5">
           <button onClick={prevM} className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"><ChevronLeft size={15} /></button>
@@ -697,7 +697,7 @@ export default function PayrollPage() {
       </div>
 
       {/* ── Legend ───────────────────────────────────────────────────────── */}
-      <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pb-5 flex flex-wrap items-center gap-4">
+      <div className="px-24 pb-5 flex flex-wrap items-center gap-4">
         {ALLOWANCES.map(a => (
           <div key={a.key} className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: a.dot }} />
@@ -799,7 +799,7 @@ export default function PayrollPage() {
         if (!rfMember) return null;
         const anyType = Object.values(rfTypes).some(Boolean) || rfWorked;
         return (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1210,7 +1210,7 @@ export default function PayrollPage() {
 
       {/* ── (solicitar modal removed) ────────────────────────────────────── */}
       {false && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: "92vh" }}>
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex-shrink-0">
@@ -1426,7 +1426,7 @@ export default function PayrollPage() {
 
       {/* ── Day editor modal ─────────────────────────────────────────────── */}
       {editTarget && editMember && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col" style={{ maxHeight: "92vh" }}>
             {/* Modal header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-start justify-between flex-shrink-0">
@@ -1591,7 +1591,7 @@ export default function PayrollPage() {
   function GridView() {
     if (filtered.length === 0) {
       return (
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-24 text-center">
+        <div className="px-24 py-24 text-center">
           <Users size={40} className="text-slate-200 mx-auto mb-4" />
           <p className="text-slate-500">No hay miembros de crew{filterSection !== "all" ? " en esta sección" : ""}</p>
         </div>
@@ -1599,7 +1599,7 @@ export default function PayrollPage() {
     }
 
     return (
-      <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pb-16">
+      <div className="px-24 pb-16">
         <div className="border border-slate-200 rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="border-collapse" style={{ minWidth: `${224 + numDays * 36 + 100}px`, width: "100%" }}>
@@ -1793,7 +1793,7 @@ export default function PayrollPage() {
   function SummaryView() {
     if (filtered.length === 0) {
       return (
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-24 text-center">
+        <div className="px-24 py-24 text-center">
           <Users size={40} className="text-slate-200 mx-auto mb-4" />
           <p className="text-slate-500">No hay miembros de crew{filterSection !== "all" ? " en esta sección" : ""}</p>
         </div>
@@ -1801,8 +1801,8 @@ export default function PayrollPage() {
     }
 
     return (
-      <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pb-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="px-24 pb-16">
+        <div className="grid grid-cols-3 gap-4">
           {filtered.map(m => {
             const ds      = dailySalary(m);
             const wd      = workingDays(m.id);

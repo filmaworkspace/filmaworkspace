@@ -425,7 +425,7 @@ export default function DocumentCenterPage() {
   return (
     <div className={cx("min-h-screen bg-white", inter.className)}>
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
               <FolderDown size={24} className="text-blue-600" />
@@ -444,11 +444,11 @@ export default function DocumentCenterPage() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8 space-y-6">
+      <main className="px-24 py-8 space-y-6">
 
         {/* Filters */}
         <div className="bg-white border border-slate-200 rounded-2xl p-4">
-          <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex flex-row gap-4">
             <div className="flex-1 relative">
               <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
               <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
@@ -647,7 +647,7 @@ export default function DocumentCenterPage() {
       {previewInvoice && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setPreviewInvoice(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-flex flex-col"
             onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">

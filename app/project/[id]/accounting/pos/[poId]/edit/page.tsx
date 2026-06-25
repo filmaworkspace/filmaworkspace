@@ -917,7 +917,7 @@ export default function EditPOPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-3">
               <FileText size={24} className="text-slate-400" />
@@ -963,7 +963,7 @@ export default function EditPOPage() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+      <main className="px-24 py-8">
         {successMessage && (
           <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3">
             <CheckCircle size={18} className="text-emerald-600" />
@@ -978,9 +978,9 @@ export default function EditPOPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-3 gap-8">
           {/* Main Form */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="col-span-2 space-y-6">
             {/* Basic Info */}
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100">
@@ -1006,7 +1006,7 @@ export default function EditPOPage() {
                   {hasError("supplier") && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{errors.supplier}</p>}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="grid grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
                       Departamento *
@@ -1422,7 +1422,7 @@ export default function EditPOPage() {
 
 
           {/* Sidebar */}
-          <div className="lg:col-span-1">
+          <div className="col-span-1">
             <div className="space-y-4">
               {/* Progress */}
               <div className="bg-white border border-slate-200 rounded-2xl p-5">

@@ -921,7 +921,7 @@ export default function EditInvoicePage() {
     <div className={cx("min-h-screen bg-white", inter.className)}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-3">
               <DocIcon size={24} className={currentDocType.textColor} />
@@ -974,7 +974,7 @@ export default function EditInvoicePage() {
       </div>
 
       {/* Main Content */}
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+      <main className="px-24 py-8">
         {successMessage && (
           <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3">
             <CheckCircle size={18} className="text-emerald-600" />
@@ -999,9 +999,9 @@ export default function EditInvoicePage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-3 gap-8">
           {/* Left Column */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="col-span-2 space-y-6">
             {/* Información básica */}
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100">
@@ -1031,7 +1031,7 @@ export default function EditInvoicePage() {
                 </div>
 
                 {/* Departamento */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="grid grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Departamento</label>
                     <div className="relative" ref={departmentDropdownRef}>
@@ -1298,7 +1298,7 @@ export default function EditInvoicePage() {
           </div>
 
           {/* Right Column - Sidebar */}
-          <div className="lg:col-span-1 space-y-4">
+          <div className="col-span-1 space-y-4">
             {/* Progreso */}
             <div className="bg-white border border-slate-200 rounded-2xl p-5">
               <div className="flex items-center justify-between mb-3">

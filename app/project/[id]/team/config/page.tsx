@@ -1081,7 +1081,7 @@ const renderAccesos = () => (
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-3">
               <Settings size={24} style={{ color: TEAM_COLOR }} />
@@ -1110,13 +1110,13 @@ const renderAccesos = () => (
       )}
 
       {/* ── Main layout ────────────────────────────────────────────────────── */}
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
-        <div className="flex flex-col lg:flex-row gap-6">
+      <main className="px-24 py-8">
+        <div className="flex flex-row gap-6">
 
           {/* Sidebar */}
-          <div className="lg:w-52 flex-shrink-0">
-            <div className="lg:sticky lg:top-20">
-              <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0">
+          <div className="w-52 flex-shrink-0">
+            <div className="sticky top-20">
+              <nav className="flex flex-col gap-1 overflow-x-auto overflow-x-visible pb-2 pb-0">
                 {CONFIG_SECTIONS.map((section) => {
                   const Icon = section.icon;
                   const isActive = activeSection === section.id;
@@ -1148,8 +1148,8 @@ const renderAccesos = () => (
 
       {/* ── Create access modal ─────────────────────────────────────────── */}
       {showAccessModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4">
-          <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[92vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-0 p-4">
+          <div className="bg-white rounded-t-3xl rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden">
 
             {/* Modal header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">

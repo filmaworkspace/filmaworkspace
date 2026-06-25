@@ -705,8 +705,8 @@ export default function JournalPage() {
 
             <div className="px-5 py-4 space-y-5">
               {/* Cabecera nómina */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="col-span-2 sm:col-span-1">
+              <div className="grid grid-cols-4 gap-3">
+                <div className="col-span-2 col-span-1">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Período *</label>
                   <input value={nPeriodo} onChange={e => setNPeriodo(e.target.value)} placeholder="enero 2025"
                     className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-400 outline-none" />

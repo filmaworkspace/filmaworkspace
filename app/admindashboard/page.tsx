@@ -986,12 +986,12 @@ export default function AdminDashboard() {
 
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
+        <div className="px-24 pt-10 pb-6">
           <h1 className="text-3xl font-bold text-slate-900 text-center">Administración</h1>
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+      <main className="px-24 py-6">
         {/* Stats row - minimal */}
         <div className="flex flex-wrap items-center justify-center gap-6 mb-8 text-sm">
           <div className="flex items-center gap-2">
@@ -1014,7 +1014,7 @@ export default function AdminDashboard() {
 
         {/* Toolbar con tabs y acciones */}
         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6">
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+          <div className="flex flex-row gap-4 items-center justify-between">
             {/* Tabs */}
             <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1">
               {[
@@ -1069,9 +1069,9 @@ export default function AdminDashboard() {
         {activeTab === "projects" && (
           <div>
             {/* Toolbar */}
-            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between mb-6">
-              <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full sm:w-auto">
-                <div className="relative flex-1 sm:max-w-xs">
+            <div className="flex flex-row gap-3 items-center justify-between mb-6">
+              <div className="flex flex-row gap-3 flex-1 w-auto">
+                <div className="relative flex-1 max-w-xs">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
@@ -1143,7 +1143,7 @@ export default function AdminDashboard() {
                 </button>
               </div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid gap-4 grid-cols-4">
                 {filteredProjects.map((project) => {
                   const phase = phaseConfig[project.phase] || phaseConfig["Desarrollo"];
                   return (
@@ -1261,8 +1261,8 @@ export default function AdminDashboard() {
         {activeTab === "users" && (
           <div className="space-y-6">
             {/* Toolbar */}
-            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center mb-6">
-              <div className="relative flex-1 sm:max-w-xs">
+            <div className="flex flex-row gap-3 items-center mb-6">
+              <div className="relative flex-1 max-w-xs">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
@@ -1393,8 +1393,8 @@ export default function AdminDashboard() {
         {activeTab === "producers" && (
           <div>
             {/* Toolbar */}
-            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between mb-6">
-              <div className="relative flex-1 sm:max-w-xs">
+            <div className="flex flex-row gap-3 items-center justify-between mb-6">
+              <div className="relative flex-1 max-w-xs">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
@@ -1635,7 +1635,7 @@ export default function AdminDashboard() {
         };
         return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-flex flex-col">
 
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
@@ -1653,7 +1653,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Body — two columns */}
-            <div className="flex-1 overflow-hidden flex">
+            <div className="flex-1 overflow-flex">
 
               {/* ── Left: form ── */}
               <div className="flex-1 overflow-y-auto p-6 space-y-5">
@@ -1726,7 +1726,7 @@ export default function AdminDashboard() {
                 {/* Phase */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Fase de producción</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     {PHASES.map((p) => {
                       const cfg = phaseConfig[p];
                       return (
@@ -2075,7 +2075,7 @@ export default function AdminDashboard() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Rol en el proyecto *</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {PROJECT_ROLES.map((role) => (
                     <button
                       key={role}
@@ -2110,7 +2110,7 @@ export default function AdminDashboard() {
           if (!user) return null;
           return (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-flex flex-col">
                 <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-slate-900">Detalles del usuario</h3>
                   <button
@@ -2202,7 +2202,7 @@ export default function AdminDashboard() {
 
         return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden flex flex-col">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-flex flex-col">
 
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
@@ -2229,7 +2229,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Body — two columns */}
-            <div className="flex-1 overflow-hidden flex">
+            <div className="flex-1 overflow-flex">
 
               {/* ── Left: compose ── */}
               <div className="flex-1 overflow-y-auto p-6 space-y-5 border-r border-slate-100">

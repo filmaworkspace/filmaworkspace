@@ -169,12 +169,12 @@ export default function CompanyDashboardPage() {
     <div className={"min-h-screen bg-white " + inter.className}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
+        <div className="px-24 pt-10 pb-6">
           <h1 className="text-3xl font-bold text-slate-900 text-center">{producer.name}</h1>
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+      <main className="px-24 py-6">
         {/* Stats row - minimal */}
         <div className="flex flex-wrap items-center justify-center gap-6 mb-8 text-sm">
           <div className="flex items-center gap-2">
@@ -218,7 +218,7 @@ export default function CompanyDashboardPage() {
                     <span className="text-xs text-slate-400">({phaseProjects.length})</span>
                   </div>
 
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid gap-4 grid-cols-4">
                     {phaseProjects.map((project) => (
                       <div
                         key={project.id}

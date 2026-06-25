@@ -664,7 +664,7 @@ export default function CrewMemberPage() {
 
       {/* ── Top bar ────────────────────────────────────────────────────────── */}
       <div className="mt-[53px]">
-        <div className="bg-white border-b border-slate-200 px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-4">
+        <div className="bg-white border-b border-slate-200 px-24 py-4">
           <div className="flex items-center justify-between">
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm">
@@ -684,7 +684,7 @@ export default function CrewMemberPage() {
             {/* Right */}
             <div className="flex items-center gap-2">
               {/* Completeness */}
-              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg">
                 <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden">
                   <div className="h-full rounded-full transition-all"
                     style={{ width: `${completeness}%`, backgroundColor: completeness >= 80 ? "#6BA319" : completeness >= 50 ? "#F59E0B" : "#EF4444" }} />
@@ -696,7 +696,7 @@ export default function CrewMemberPage() {
               <button onClick={downloadPdf} disabled={exportingPdf}
                 className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors">
                 {exportingPdf ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
-                <span className="hidden sm:inline">Ficha PDF</span>
+                <span className="inline">Ficha PDF</span>
               </button>
 
               {/* Approval status + send for approval */}
@@ -704,7 +704,7 @@ export default function CrewMemberPage() {
                 const cfg = APPROVAL_CONFIG[member.approvalStatus];
                 return (
                   <div className="flex items-center gap-2">
-                    <span className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium ${cfg.bg} ${cfg.text}`}>
+                    <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium ${cfg.bg} ${cfg.text}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
                       {cfg.label}
                     </span>
@@ -713,7 +713,7 @@ export default function CrewMemberPage() {
                         className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-xl border text-white disabled:opacity-50 transition-colors"
                         style={{ backgroundColor: "#6BA319", borderColor: "#6BA319" }}>
                         {submittingApproval ? <RefreshCw size={13} className="animate-spin" /> : <Send size={13} />}
-                        <span className="hidden sm:inline">Enviar para aprobación</span>
+                        <span className="inline">Enviar para aprobación</span>
                       </button>
                     )}
                   </div>
@@ -725,7 +725,7 @@ export default function CrewMemberPage() {
                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 title={!member.email ? "Añade un email para enviar el formulario" : "Enviar formulario de alta"}>
                 {formSent ? <MailCheck size={14} className="text-[#6BA319]" /> : <Send size={14} />}
-                {formSent ? "Enviado" : <span className="hidden sm:inline">Enviar formulario</span>}
+                {formSent ? "Enviado" : <span className="inline">Enviar formulario</span>}
               </button>
 
               {/* Status dropdown */}
@@ -755,11 +755,11 @@ export default function CrewMemberPage() {
       </div>
 
       {/* ── Content ──────────────────────────────────────────────────────────── */}
-      <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="px-24 py-8">
+        <div className="max-w-5xl mx-auto grid grid-cols-3 gap-6">
 
           {/* ── LEFT ────────────────────────────────────────────────────────── */}
-          <div className="lg:col-span-1 flex flex-col gap-6">
+          <div className="col-span-1 flex flex-col gap-6">
 
             {/* Identity card */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col items-center text-center">
@@ -880,7 +880,7 @@ export default function CrewMemberPage() {
           </div>
 
           {/* ── RIGHT ───────────────────────────────────────────────────────── */}
-          <div className="lg:col-span-2 flex flex-col gap-6">
+          <div className="col-span-2 flex flex-col gap-6">
 
             {/* Contacto */}
             <SectionCard title="Contacto" editing={isEdit("contact")} onEdit={() => startEdit("contact")}>

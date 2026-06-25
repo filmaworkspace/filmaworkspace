@@ -249,7 +249,7 @@ export default function Header() {
   const ProjectBadge = () => {
     if (!isInProjectSection || !projectId || !projectName) return null;
     return (
-      <div className="hidden md:flex items-center gap-2 text-xs">
+      <div className="flex items-center gap-2 text-xs">
         <span className="text-slate-300">·</span>
         <Link
           href={`/project/${projectId}`}
@@ -264,7 +264,7 @@ export default function Header() {
   const AccountsBadge = () => {
     if (!isAccountsSection || !accountsProjectName) return null;
     return (
-      <div className="hidden md:flex items-center gap-2 text-xs">
+      <div className="flex items-center gap-2 text-xs">
         <span className="text-slate-300">·</span>
         <span className="text-slate-600 font-medium uppercase">{accountsProjectName}</span>
         <span className="text-slate-300">·</span>
@@ -286,7 +286,7 @@ export default function Header() {
         </div>
 
         {/* Center: Navigation - Desktop */}
-        <nav className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
+        <nav className="flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
 
           {/* ── ACCOUNTS section nav ── */}
           {isAccountsSection && accountsProjectId && (
@@ -409,7 +409,7 @@ export default function Header() {
           {isAccountingSection && projectId && accountingAccess.box && (
             <Link
               href={`/project/${projectId}/accounting/box`}
-              className="hidden md:flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 shadow-sm hover:shadow-md hover:scale-105 transition-all"
+              className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 shadow-sm hover:shadow-md hover:scale-105 transition-all"
               title="Cajas (BOX)"
             >
               <Package size={14} className="text-white" />
@@ -427,7 +427,7 @@ export default function Header() {
             const otherEnvs = availableEnvs.filter(env => env.key !== currentSection);
             if (otherEnvs.length === 0) return null;
             return (
-              <div className="relative hidden md:block">
+              <div className="relative block">
                 <button onClick={() => setEnvSwitcherOpen(!envSwitcherOpen)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Cambiar entorno">
                   <ArrowLeftRight size={15} />
                 </button>
@@ -475,7 +475,7 @@ export default function Header() {
           )}
 
           {/* Mobile Menu Button */}
-          <button className="md:hidden p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition" onClick={() => setMenuOpen(!menuOpen)}>
+          <button className="hidden p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition" onClick={() => setMenuOpen(!menuOpen)}>
             {menuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
@@ -483,7 +483,7 @@ export default function Header() {
 
       {/* ── Mobile Menu ───────────────────────────────────────────────────── */}
       {menuOpen && (
-        <div className="md:hidden bg-white border-t border-slate-100">
+        <div className="hidden bg-white border-t border-slate-100">
           <nav className="flex flex-col p-2 gap-0.5">
 
             {/* Accounts section — mobile */}

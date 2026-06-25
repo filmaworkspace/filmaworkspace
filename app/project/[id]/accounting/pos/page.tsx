@@ -735,7 +735,7 @@ export default function POsPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
               <FileText size={24} style={{ color: '#2F52E0' }} />
@@ -758,9 +758,9 @@ export default function POsPage() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+      <main className="px-24 py-8">
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+        <div className="grid grid-cols-5 gap-3 mb-8">
           {(["draft", "pending", "approved", "closed", "cancelled"] as POStatus[]).map((status) => {
             const config = STATUS_CONFIG[status];
             const Icon = config.icon;
@@ -787,7 +787,7 @@ export default function POsPage() {
         </div>
 
         {/* Filters & Controls */}
-        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center mb-4">
+        <div className="flex flex-row gap-3 items-center mb-4">
           <div className="flex-1 relative">
             <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
             <input

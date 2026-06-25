@@ -812,7 +812,7 @@ export default function PODetailPage() {
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-3">
               <FileText size={24} className="text-slate-400" />
@@ -971,9 +971,9 @@ export default function PODetailPage() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-6">
+      <main className="px-24 py-8">
+        <div className="grid grid-cols-3 gap-8">
+          <div className="col-span-2 space-y-6">
             {po.generalDescription && (
               <div className="bg-white border border-slate-200 rounded-2xl p-6">
                 <h3 className="font-semibold text-slate-900 mb-3">Descripción</h3>

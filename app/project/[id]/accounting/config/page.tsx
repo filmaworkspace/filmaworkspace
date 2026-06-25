@@ -1130,7 +1130,7 @@ export default function AccountingConfigPage() {
               <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">
                 Tipo de aprobador
               </label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {(["fixed", "role", "hod", "coordinator"] as const).map((t) => {
                   const TIcon = APPROVER_TYPE_ICONS[t];
                   return (
@@ -1166,7 +1166,7 @@ export default function AccountingConfigPage() {
                 <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">
                   Roles que pueden aprobar
                 </label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="grid grid-cols-4 gap-2">
                   {PROJECT_ROLES.map((role) => {
                     const count = getMembersByRole(role).length;
                     return (
@@ -1822,7 +1822,7 @@ export default function AccountingConfigPage() {
               poApprovals.map((step, i) => renderApprovalStep(step, "po", i))
             )}
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => addApprovalStep("po", false)}
                 className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-slate-300 rounded-2xl hover:border-slate-400 hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors text-sm"
@@ -1851,7 +1851,7 @@ export default function AccountingConfigPage() {
               invoiceApprovals.map((step, i) => renderApprovalStep(step, "invoice", i))
             )}
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => addApprovalStep("invoice", false)}
                 className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-slate-300 rounded-2xl hover:border-slate-400 hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors text-sm"
@@ -1880,7 +1880,7 @@ export default function AccountingConfigPage() {
               boxApprovals.map((step, i) => renderApprovalStep(step, "box", i))
             )}
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => addApprovalStep("box", false)}
                 className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-slate-300 rounded-2xl hover:border-slate-400 hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors text-sm"
@@ -2145,7 +2145,7 @@ export default function AccountingConfigPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           {/* Page header */}
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-3">
@@ -2188,13 +2188,13 @@ export default function AccountingConfigPage() {
         </div>
       )}
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+      <main className="px-24 py-8">
         {/* Layout con sidebar de secciones */}
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex flex-row gap-6">
           {/* Sidebar de secciones - sticky que se mueve con el scroll */}
-          <div className="lg:w-52 flex-shrink-0">
-            <div className="lg:sticky lg:top-20">
-              <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 bg-white lg:bg-transparent">
+          <div className="w-52 flex-shrink-0">
+            <div className="sticky top-20">
+              <nav className="flex flex-col gap-1 overflow-x-auto overflow-x-visible pb-2 pb-0 bg-white bg-transparent">
                 {CONFIG_SECTIONS.map((section) => {
                   const Icon = section.icon;
                   const isActive = activeSection === section.id;
@@ -2218,7 +2218,7 @@ export default function AccountingConfigPage() {
               
               {/* Auditoría - Solo visible en desktop */}
               {(auditLog.approvals || auditLog.permissions) && (
-                <div className="hidden lg:block mt-6 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="block mt-6 p-3 bg-slate-50 rounded-lg border border-slate-200">
                   <div className="flex items-center gap-2 mb-2">
                     <Clock size={12} className="text-slate-400" />
                     <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Últimos cambios</p>

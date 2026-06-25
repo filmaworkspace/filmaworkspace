@@ -839,7 +839,7 @@ export default function CrewPage() {
 
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
 
             {/* Left: título solo */}
@@ -851,7 +851,7 @@ export default function CrewPage() {
             {/* Right: stats + botón */}
             <div className="flex items-center gap-4">
               {/* Stats pill */}
-              <div className="hidden md:flex items-center gap-4 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl">
+              <div className="flex items-center gap-4 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl">
                 <div className="text-center">
                   <p className="text-xs text-slate-400 leading-none mb-0.5">Activos</p>
                   <p className="text-base font-bold text-slate-900 leading-none">{stats.active}</p>
@@ -912,10 +912,10 @@ export default function CrewPage() {
       </div>
 
       {/* ── Main ─────────────────────────────────────────────────────────────── */}
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+      <main className="px-24 py-8">
 
         {/* Filters */}
-        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center mb-6">
+        <div className="flex flex-row gap-3 items-center mb-6">
           <div className="flex-1 relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input

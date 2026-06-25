@@ -1566,7 +1566,7 @@ export default function NewInvoicePage() {
     <div className={cx("min-h-screen bg-white", inter.className)}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
               <Link
@@ -1702,7 +1702,7 @@ export default function NewInvoicePage() {
       </div>
 
       {/* Main Content */}
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+      <main className="px-24 py-8">
 
         {/* Replace Mode Banner */}
         {replaceMode && selectedPendingDoc && (
@@ -1721,9 +1721,9 @@ export default function NewInvoicePage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-3 gap-8">
           {/* Left Column */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="col-span-2 space-y-6">
             {/* Document Type Section */}
             {!replaceMode && (
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
@@ -1731,7 +1731,7 @@ export default function NewInvoicePage() {
                   <h2 className="font-semibold text-slate-900">Tipo de documento</h2>
                 </div>
                 <div className="p-6">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-4 gap-3">
                     {(Object.entries(DOCUMENT_TYPES) as [DocumentType, typeof DOCUMENT_TYPES.invoice][]).map(([key, config]) => {
                       const Icon = config.icon;
                       const isSelected = documentType === key;
@@ -1802,7 +1802,7 @@ export default function NewInvoicePage() {
                   <h2 className="font-semibold text-slate-900">Asociación a PO</h2>
                 </div>
                 <div className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <button
                       onClick={() => {
                         setFormData({ ...formData, invoiceType: "with-po", supplier: "", supplierName: "" });
@@ -2620,7 +2620,7 @@ export default function NewInvoicePage() {
           </div>
 
           {/* Right Column - Sidebar */}
-          <div className="lg:col-span-1">
+          <div className="col-span-1">
             <div className="space-y-4">
               {/* Progress Card */}
               <div className="bg-white border border-slate-200 rounded-2xl p-5">

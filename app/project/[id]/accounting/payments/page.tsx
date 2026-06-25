@@ -691,7 +691,7 @@ export default function PaymentsPage() {
       )}
 
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
               <Banknote size={24} style={{ color: "#2F52E0" }} />
@@ -717,7 +717,7 @@ export default function PaymentsPage() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+      <main className="px-24 py-8">
         {invoiceStats.overdue > 0 && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl">
             <div className="flex items-center gap-3">
@@ -731,7 +731,7 @@ export default function PaymentsPage() {
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center mb-6">
+        <div className="flex flex-row gap-3 items-center mb-6">
           <div className="flex-1 relative">
             <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
             <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar previsión o proveedor" className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm" />
@@ -900,7 +900,7 @@ export default function PaymentsPage() {
                 {(searchTerm || statusFilter !== "all" || dateRange !== "all") && <p className="text-slate-500 text-sm">Prueba a ajustar los filtros</p>}
               </div>
             ) : viewMode === "kanban" ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 {filteredForecasts.map((forecast) => {
                   const statusConfig = getStatusConfig(forecast.status);
                   const typeConfig = getTypeConfig(forecast.type);

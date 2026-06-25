@@ -815,7 +815,7 @@ export default function ApprovalsPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           {/* Page header */}
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
@@ -830,7 +830,7 @@ export default function ApprovalsPage() {
             </div>
 
             {/* Stats */}
-            <div className="hidden md:flex items-center gap-4">
+            <div className="flex items-center gap-4">
               <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-xl border border-slate-200">
                 <div className="text-center">
                   <p className="text-lg font-bold text-slate-900">{userStats.approvedToday}</p>
@@ -860,7 +860,7 @@ export default function ApprovalsPage() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+      <main className="px-24 py-8">
 
         {filteredApprovals.length === 0 ? (
           <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
@@ -870,9 +870,9 @@ export default function ApprovalsPage() {
             {userStats.approvedThisWeek > 0 && (<div className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-xl"><Award size={16} className="text-emerald-600" /><span className="text-sm text-emerald-700">Has aprobado {userStats.approvedThisWeek} documentos esta semana</span></div>)}
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-3 gap-6">
             {/* Sidebar */}
-            <div className="lg:col-span-1">
+            <div className="col-span-1">
               <div className="bg-white border border-slate-200 rounded-2xl p-4 sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
                 <p className="text-xs text-slate-500 uppercase tracking-wider mb-3 px-1 font-semibold">Documentos · {filteredApprovals.length}</p>
                 <div className="space-y-2">
@@ -901,7 +901,7 @@ export default function ApprovalsPage() {
             </div>
 
             {/* Main Card */}
-            <div className="lg:col-span-2">
+            <div className="col-span-2">
               {currentApproval && (
                 <div className="space-y-4">
                   <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
@@ -924,7 +924,7 @@ export default function ApprovalsPage() {
                     </div>
 
                     <div className="p-6">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                      <div className="grid grid-cols-4 gap-4 mb-6">
                         <div><p className="text-xs text-slate-500 mb-1">Proveedor</p><div className="flex items-center gap-2"><Building2 size={14} className="text-slate-400" /><p className="text-sm font-medium text-slate-900">{currentApproval.supplier}</p></div></div>
                         <div><p className="text-xs text-slate-500 mb-1">Fecha</p><div className="flex items-center gap-2"><Calendar size={14} className="text-slate-400" /><p className="text-sm text-slate-900">{formatDate(currentApproval.createdAt)}</p></div></div>
                         <div><p className="text-xs text-slate-500 mb-1">Creado por</p><div className="flex items-center gap-2"><User size={14} className="text-slate-400" /><p className="text-sm text-slate-900">{currentApproval.createdByName}</p></div></div>
