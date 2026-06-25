@@ -304,7 +304,11 @@ export default function PaymentsPage() {
       const invoicesData = invoicesSnap.docs
         .filter((docSnap) => {
           const data = docSnap.data();
-          return (data.status === "pending" || data.status === "coded" || data.status === "overdue" || data.status === "pending_approval") && !assignedInvoiceIds.has(docSnap.id);
+          // Pagable: cualquier factura activa sin paidAt, sin importar si está codificada/aprobada/contabilizada.
+          if (assignedInvoiceIds.has(docSnap.id)) return false;
+          if (data.paidAt) return false;
+          if (["cancelled", "rejected", "void", "draft", "paid"].includes(data.status)) return false;
+          return ["submitted", "pending", "pending_approval", "coded", "overdue", "accounted"].includes(data.status);
         })
         .map((docSnap) => ({
           id: docSnap.id,
@@ -893,7 +897,7 @@ export default function PaymentsPage() {
               <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
                 <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><Banknote size={28} className="text-slate-400" /></div>
                 <h3 className="text-lg font-semibold text-slate-900 mb-2">{searchTerm || statusFilter !== "all" || dateRange !== "all" ? "No se encontraron resultados" : "Sin previsiones de pago"}</h3>
-                <p className="text-slate-500 text-sm">{searchTerm || statusFilter !== "all" || dateRange !== "all" ? "Prueba a ajustar los filtros" : "Crea tu primera previsión para organizar los pagos"}</p>
+                {(searchTerm || statusFilter !== "all" || dateRange !== "all") && <p className="text-slate-500 text-sm">Prueba a ajustar los filtros</p>}
               </div>
             ) : viewMode === "kanban" ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">

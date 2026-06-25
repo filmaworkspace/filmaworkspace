@@ -105,17 +105,26 @@ export function shouldCommitOnStatusChange(
  * - paid: pagada (siempre realiza)
  * - cancelled/rejected/void: anulada/rechazada (nunca realiza)
  */
+export interface InvoiceTracks {
+  codedAt?: any;
+  accountedAt?: any;
+  paidAt?: any;
+  approvedAt?: any;
+}
+
 export function shouldRealizeInvoice(
   invoiceStatus: string,
-  costSettings: CostSettings
+  costSettings: CostSettings,
+  tracks?: InvoiceTracks
 ): boolean {
   // Nunca realizar en estos estados
-  if (invoiceStatus === "draft" || invoiceStatus === "pending_approval" || 
+  if (invoiceStatus === "draft" || invoiceStatus === "pending_approval" ||
       invoiceStatus === "rejected" || invoiceStatus === "void" || invoiceStatus === "cancelled") {
     return false;
   }
-  
+
   if (costSettings.invoiceActualTrigger === "on_create") {
+    // submitted o cualquier estado activo (excepto los anulados ya filtrados arriba)
     return invoiceStatus !== "draft" &&
            invoiceStatus !== "rejected" &&
            invoiceStatus !== "void" &&
@@ -123,21 +132,28 @@ export function shouldRealizeInvoice(
   }
 
   if (costSettings.invoiceActualTrigger === "on_code") {
-    // Realizar cuando el equipo de contabilidad codifica la factura (coded) o estados posteriores
+    // Nuevo modelo: realizar cuando existe codedAt. La página de presupuesto y los
+    // flujos de cancelación comprueban codedAt directamente; aquí mantenemos compat
+    // con valores de status antiguos.
+    if (tracks?.codedAt || tracks?.accountedAt || tracks?.paidAt) return true;
     return invoiceStatus === "coded" || invoiceStatus === "accounted" || invoiceStatus === "paid";
   }
 
   if (costSettings.invoiceActualTrigger === "on_approve") {
     // Legado → migrado a on_code, mismo comportamiento
+    if (tracks?.codedAt || tracks?.accountedAt || tracks?.paidAt || tracks?.approvedAt) return true;
     return invoiceStatus === "coded" || invoiceStatus === "pending" || invoiceStatus === "approved" ||
            invoiceStatus === "accounted" || invoiceStatus === "paid";
   }
 
   if (costSettings.invoiceActualTrigger === "on_account") {
+    // Nuevo modelo: realizar cuando existe accountedAt; compat con status antiguos.
+    if (tracks?.accountedAt || tracks?.paidAt) return true;
     return invoiceStatus === "accounted" || invoiceStatus === "paid";
   }
 
   // on_paid: legado
+  if (tracks?.paidAt) return true;
   return invoiceStatus === "paid";
 }
 

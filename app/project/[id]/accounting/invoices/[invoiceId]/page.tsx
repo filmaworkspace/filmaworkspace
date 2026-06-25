@@ -75,13 +75,16 @@ import {
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
 import { unrealizeInvoice, updatePOItemsInvoiced, realizeInvoice } from "@/lib/budgetOperations";
+import { getInvoiceDisplayState, type InvoiceDisplayState } from "@/lib/invoiceHelpers";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type InvoiceStatus = "draft" | "pending" | "pending_approval" | "approved" | "rejected" | "paid" | "cancelled" | "coding" | "coded" | "accounted" | "returned" | "partial_return";
+// Lifecycle values written to Firestore: "draft" | "submitted" | "cancelled" | "rejected" | "void".
+// Legacy values kept for backwards compat with existing docs.
+type InvoiceStatus = "draft" | "submitted" | "void" | "pending" | "pending_approval" | "approved" | "rejected" | "paid" | "cancelled" | "coding" | "coded" | "accounted" | "returned" | "partial_return";
 type DocumentType = "invoice" | "proforma" | "autonomo" | "ticket" | "budget" | "guarantee";
 
 interface EpisodeDistribution {
@@ -174,6 +177,8 @@ interface Invoice {
   approvedBy?: string;
   approvedByName?: string;
   paidAt?: Date;
+  paidBy?: string;
+  paidByName?: string;
   paidAmount?: number;
   paymentMethod?: string;
   paymentReference?: string;
@@ -262,17 +267,18 @@ interface GuaranteeReturn {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const STATUS_CONFIG: Record<InvoiceStatus, { bg: string; text: string; label: string; icon: typeof Clock }> = {
+// Keyed by display state (see getInvoiceDisplayState).
+const STATUS_CONFIG: Record<InvoiceDisplayState, { bg: string; text: string; label: string; icon: typeof Clock }> = {
   draft: { bg: "bg-slate-100", text: "text-slate-700", label: "Borrador", icon: Edit },
-  coding: { bg: "bg-violet-50", text: "text-violet-700", label: "Codificando", icon: Code },
-  pending: { bg: "bg-amber-50", text: "text-amber-700", label: "Pendiente pago", icon: Clock },
-  pending_approval: { bg: "bg-amber-50", text: "text-amber-700", label: "Pend. aprobación", icon: Clock },
+  submitted: { bg: "bg-amber-50", text: "text-amber-700", label: "En sistema", icon: Clock },
   approved: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Aprobada", icon: CheckCircle },
   coded: { bg: "bg-violet-50", text: "text-violet-700", label: "Codificada", icon: Code },
   accounted: { bg: "bg-teal-50", text: "text-teal-700", label: "Contabilizada", icon: Lock },
-  rejected: { bg: "bg-red-50", text: "text-red-700", label: "Rechazada", icon: XCircle },
   paid: { bg: "bg-blue-50", text: "text-blue-700", label: "Pagada", icon: CreditCard },
+  overdue: { bg: "bg-red-50", text: "text-red-700", label: "Vencida", icon: AlertTriangle },
+  rejected: { bg: "bg-red-50", text: "text-red-700", label: "Rechazada", icon: XCircle },
   cancelled: { bg: "bg-red-50", text: "text-red-700", label: "Anulada", icon: Ban },
+  void: { bg: "bg-red-50", text: "text-red-700", label: "Anulada", icon: Ban },
   returned: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Devuelta", icon: CheckCircle },
   partial_return: { bg: "bg-amber-50", text: "text-amber-700", label: "Devolución parcial", icon: Clock },
 };
@@ -378,7 +384,7 @@ export default function InvoiceDetailPage() {
         createdAt: data.createdAt?.toDate() || new Date(), createdBy: data.createdBy || "", createdByName: data.createdByName || "",
         codedAt: data.codedAt?.toDate(), codedBy: data.codedBy, codedByName: data.codedByName,
         approvedAt: data.approvedAt?.toDate(), approvedBy: data.approvedBy, approvedByName: data.approvedByName,
-        paidAt: data.paidAt?.toDate(), paidAmount: data.paidAmount, paymentMethod: data.paymentMethod, paymentReference: data.paymentReference,
+        paidAt: data.paidAt?.toDate(), paidBy: data.paidBy, paidByName: data.paidByName, paidAmount: data.paidAmount, paymentMethod: data.paymentMethod, paymentReference: data.paymentReference,
         cancelledAt: data.cancelledAt?.toDate(), cancelledByName: data.cancelledByName, cancellationReason: data.cancellationReason,
         poId: data.poId, poNumber: data.poNumber, requiresReplacement: data.requiresReplacement,
         replacedByInvoiceId: data.replacedByInvoiceId, isReplacement: data.isReplacement,
@@ -548,9 +554,12 @@ export default function InvoiceDetailPage() {
 
       const costSettings = await getCostSettings(projectId);
 
-      // Con on_code: la codificación es el único trigger de realización, sin importar aprobaciones
+      // Con on_code: la codificación realiza el presupuesto independientemente de las aprobaciones.
+      // El status de aprobación sigue su propio flujo (pending_approval → pending al aprobar).
       const isFirstCoding = costSettings.invoiceActualTrigger === "on_code" && !invoice.codedAt;
-      const newStatus = isFirstCoding ? "coded" : invoice.status === "draft" ? "pending_approval" : invoice.status;
+      // El lifecycle nunca codifica directamente: un draft pasa a "submitted",
+      // el resto conserva su status. El track codedAt registra la codificación.
+      const newStatus = invoice.status === "draft" ? "submitted" : invoice.status;
 
       // Guardar datos de la factura
       await updateDoc(doc(db, `projects/${projectId}/invoices`, invoice.id), {
@@ -609,7 +618,15 @@ export default function InvoiceDetailPage() {
     try {
       // Verificar si la factura estaba realizada según la configuración
       const costSettings = await getCostSettings(projectId);
-      const wasRealized = shouldRealizeInvoice(invoice.status, costSettings);
+      // La realización depende de los tracks, no del status. Pasamos los tracks a
+      // shouldRealizeInvoice para que evalúe correctamente con el nuevo modelo.
+      const wasRealized = costSettings.invoiceActualTrigger === "on_code"
+        ? !!(invoice.codedAt)
+        : costSettings.invoiceActualTrigger === "on_account"
+          ? !!(invoice.accountedAt || invoice.accounted)
+          : shouldRealizeInvoice(invoice.status, costSettings, {
+              codedAt: invoice.codedAt, accountedAt: invoice.accountedAt || invoice.accounted, paidAt: invoice.paidAt, approvedAt: invoice.approvedAt,
+            });
       
       // Si estaba realizada, revertir el presupuesto
       if (wasRealized) {
@@ -662,12 +679,13 @@ export default function InvoiceDetailPage() {
   };
   const canCancel = () => {
     if (invoice?.accounted) return false; // Bloqueada si está contabilizada
-    return invoice && !["cancelled", "paid"].includes(invoice.status) && permissions.isProjectRole;
+    return invoice && !["cancelled", "rejected", "void", "paid"].includes(invoice.status) && !invoice.paidAt && permissions.isProjectRole;
   };
   // Solo contabilidad ampliada puede modificar (genera nueva versión y reinicia aprobaciones)
   const canModify = () => {
-    if (invoice?.accounted) return false;
-    if (invoice?.status === "cancelled" || invoice?.status === "paid") return false;
+    if (invoice?.accounted || invoice?.accountedAt) return false;
+    if (invoice?.paidAt) return false;
+    if (["cancelled", "rejected", "void", "paid"].includes(invoice?.status || "")) return false;
     return permissions.accountingAccessLevel === "accounting_extended";
   };
   // Solo contabilidad ampliada puede hacer corrección administrativa (sin nueva versión)
@@ -690,7 +708,7 @@ export default function InvoiceDetailPage() {
   const canRegisterReturn = () => {
     if (!invoice) return false;
     if (invoice.documentType !== "guarantee") return false;
-    if (invoice.status !== "paid" && invoice.status !== "partial_return") return false;
+    if (!invoice.paidAt && invoice.status !== "paid" && invoice.status !== "partial_return") return false;
     return permissions.accountingAccessLevel === "accounting_extended";
   };
   
@@ -876,7 +894,8 @@ export default function InvoiceDetailPage() {
 
   if (!invoice) return null;
 
-  const config = STATUS_CONFIG[invoice.status];
+  const displayState = getInvoiceDisplayState(invoice);
+  const config = STATUS_CONFIG[displayState] || STATUS_CONFIG.submitted;
   const docConfig = DOC_TYPE_CONFIG[invoice.documentType];
   const StatusIcon = config.icon;
   const totals = calculateTotals();
@@ -1343,16 +1362,26 @@ export default function InvoiceDetailPage() {
                   <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm font-mono">{invoice.displayNumber}</span>
                   {/* Estado principal */}
                   <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium text-sm ${config.bg} ${config.text}`}><StatusIcon size={14} />{config.label}</span>
-                  {/* Badge "Codificada" solo cuando el status ya avanzó más allá de coded */}
-                  {invoice.codedAt && invoice.status !== "coded" && (
+                  {/* Badges independientes por track (se muestran si el track está completo
+                      y no es ya el estado principal mostrado) */}
+                  {invoice.approvedAt && displayState !== "approved" && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg font-medium text-sm">
+                      <CheckCircle size={14} />Aprobada
+                    </span>
+                  )}
+                  {invoice.codedAt && displayState !== "coded" && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-violet-100 text-violet-700 rounded-lg font-medium text-sm">
                       <FileCheck size={14} />Codificada
                     </span>
                   )}
-                  {/* Contabilizada */}
-                  {invoice.accounted && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg font-medium text-sm">
+                  {(invoice.accountedAt || invoice.accounted) && displayState !== "accounted" && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-teal-100 text-teal-700 rounded-lg font-medium text-sm">
                       <Lock size={14} />Contabilizada
+                    </span>
+                  )}
+                  {invoice.paidAt && displayState !== "paid" && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-700 rounded-lg font-medium text-sm">
+                      <CreditCard size={14} />Pagada
                     </span>
                   )}
                   {invoice.poNumber && <Link href={`/project/${projectId}/accounting/pos/${invoice.poId}`} className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-100"><LinkIcon size={12} />PO-{invoice.poNumber}</Link>}
@@ -1380,7 +1409,7 @@ export default function InvoiceDetailPage() {
                   <Edit size={16} />Modificar
                 </Link>
               )}
-              {invoice.status === "pending" && canPay() && <Link href={`/project/${projectId}/accounting/payments?invoice=${invoice.id}`} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium"><CreditCard size={16} />Ir a pagar</Link>}
+              {invoice.approvedAt && !invoice.paidAt && displayState !== "cancelled" && canPay() && <Link href={`/project/${projectId}/accounting/payments?invoice=${invoice.id}`} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium"><CreditCard size={16} />Ir a pagar</Link>}
               
               {/* Botón de devolución para fianzas */}
               {canRegisterReturn() && (
@@ -1659,7 +1688,7 @@ export default function InvoiceDetailPage() {
             )}
 
             {/* Payments Section */}
-            {(invoice.status === "paid" || payments.length > 0) && (
+            {(invoice.paidAt || invoice.status === "paid" || payments.length > 0) && (
               <div className={`border rounded-2xl p-5 ${payments.reduce((sum, p) => sum + p.amount, 0) >= invoice.totalAmount * 0.99 ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
@@ -1764,7 +1793,7 @@ export default function InvoiceDetailPage() {
                   <div className="flex-1">
                     <p className="font-semibold text-amber-900">Pendiente de factura definitiva</p>
                     <p className="text-sm text-amber-700 mt-1">
-                      {invoice.status === "paid" 
+                      {(invoice.paidAt || invoice.status === "paid")
                         ? "Este documento ha sido pagado. Recuerda subir la factura definitiva del proveedor."
                         : "Este documento provisional deberá ser sustituido por la factura definitiva del proveedor."}
                     </p>
@@ -1868,7 +1897,7 @@ export default function InvoiceDetailPage() {
                     <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg font-medium">Devuelta completamente</span>
                   ) : invoice.status === "partial_return" ? (
                     <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-lg font-medium">Devolución parcial</span>
-                  ) : invoice.status === "paid" ? (
+                  ) : (invoice.paidAt || invoice.status === "paid") ? (
                     <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-lg font-medium">Depositada</span>
                   ) : (
                     <span className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-lg font-medium">Pendiente</span>
@@ -1924,7 +1953,7 @@ export default function InvoiceDetailPage() {
                 )}
                 
                 {/* Mensaje si no hay devoluciones */}
-                {(!invoice.guaranteeReturns || invoice.guaranteeReturns.length === 0) && invoice.status === "paid" && (
+                {(!invoice.guaranteeReturns || invoice.guaranteeReturns.length === 0) && (invoice.paidAt || invoice.status === "paid") && (
                   <p className="text-sm text-emerald-700 text-center py-2">
                     La fianza está depositada. Registra las devoluciones cuando se produzcan.
                   </p>
@@ -1939,12 +1968,17 @@ export default function InvoiceDetailPage() {
           <div className="mt-8 bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="px-6 py-3 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-semibold text-slate-900">Firmas</h3>
-              {invoice.status === "approved" || invoice.status === "pending" || invoice.status === "paid" ? (
+              {invoice.approvedAt ? (
                 <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
                   <CheckCircle size={12} />
                   Completado
                 </span>
-              ) : invoice.status === "pending_approval" ? (
+              ) : invoice.status === "rejected" ? (
+                <span className="text-xs text-red-600 font-medium flex items-center gap-1">
+                  <XCircle size={12} />
+                  Rechazado
+                </span>
+              ) : (invoice.status === "submitted" || invoice.status === "pending_approval") ? (
                 <span className="text-xs text-amber-600 font-medium flex items-center gap-1">
                   <Clock size={12} />
                   {invoice.approvalSteps.filter(s => s.status === "approved").length}/{invoice.approvalSteps.length}

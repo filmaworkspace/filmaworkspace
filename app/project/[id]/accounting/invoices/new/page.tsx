@@ -650,13 +650,13 @@ export default function NewInvoicePage() {
         const pendingSnap = await getDocs(
           query(
             collection(db, "projects/" + id + "/invoices"),
-            where("status", "==", "paid"),
             where("requiresReplacement", "==", true)
           )
         );
 
         const pendingDocs = pendingSnap.docs
-          .filter((d) => !d.data().replacedByInvoiceId)
+          // Pagados: nuevo modelo usa paidAt; compat con status "paid".
+          .filter((d) => (d.data().paidAt || d.data().status === "paid") && !d.data().replacedByInvoiceId)
           .map((d) => {
             const data = d.data();
             return {
@@ -1417,20 +1417,27 @@ export default function NewInvoicePage() {
       // Estado de aprobación
       const steps = generateApprovalSteps();
       
-      // Si se delega a contabilidad, va directamente a estado "coding"
+      // Lifecycle nuevo: "submitted" para todo lo que entra al sistema. Los detalles
+      // (delegada/aprobada/pendiente) se reflejan en flags y tracks.
       if (delegateToAccounting) {
-        invoiceData.status = "coding";
+        // Delegada a contabilidad: en el sistema, pendiente de codificar.
+        invoiceData.status = "submitted";
         invoiceData.approvalStatus = "pending";
         invoiceData.delegatedToAccounting = true;
         invoiceData.delegatedAt = Timestamp.now();
         invoiceData.delegatedBy = permissions.userId || "";
         invoiceData.delegatedByName = permissions.userName || "";
       } else if (shouldAutoApprove(steps)) {
-        invoiceData.status = "pending";
+        // Auto-aprobada: track de aprobación completado.
+        invoiceData.status = "submitted";
         invoiceData.approvalStatus = "approved";
         invoiceData.autoApproved = true;
+        invoiceData.approvedAt = Timestamp.now();
+        invoiceData.approvedBy = permissions.userId || "";
+        invoiceData.approvedByName = permissions.userName || "";
       } else {
-        invoiceData.status = "pending_approval";
+        // Pendiente de aprobación.
+        invoiceData.status = "submitted";
         invoiceData.approvalStatus = "pending";
         invoiceData.approvalSteps = steps;
         invoiceData.currentApprovalStep = 0;
@@ -1446,7 +1453,7 @@ export default function NewInvoicePage() {
       // Actualizar presupuesto y tracking de PO solo si la factura ya debe realizarse
       // según la configuración (on_create). Si es on_approve/on_account/on_paid,
       // estas actualizaciones ocurren en el momento de aprobación/contabilización/pago.
-      if (shouldRealizeInvoice(finalStatus, costSettings)) {
+      if (shouldRealizeInvoice(finalStatus, costSettings, { approvedAt: invoiceData.approvedAt })) {
         await updateSubAccountsBudget(items, !!selectedPO);
         if (selectedPO) {
           await updatePOInvoicedAmount(selectedPO.id, items);

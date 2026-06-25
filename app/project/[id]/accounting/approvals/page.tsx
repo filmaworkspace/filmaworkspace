@@ -63,7 +63,7 @@ import {
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
-import { handlePOStatusChange, handleInvoiceStatusChange, updatePOItemsInvoiced } from "@/lib/budgetOperations";
+import { handlePOStatusChange, handleInvoiceStatusChange, updatePOItemsInvoiced, realizeInvoice } from "@/lib/budgetOperations";
 import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -288,9 +288,11 @@ export default function ApprovalsPage() {
 
       // Load Invoices
       try {
-        const invoicesSnap = await getDocs(query(collection(db, `projects/${id}/invoices`), where("status", "==", "pending_approval")));
+        const invoicesSnap = await getDocs(query(collection(db, `projects/${id}/invoices`), where("status", "in", ["submitted", "pending_approval"])));
         for (const invDoc of invoicesSnap.docs) {
           const d = invDoc.data();
+          // Solo facturas pendientes de aprobar (sin track de aprobación completado)
+          if (d.approvedAt) continue;
           if (canUserApprove(d, userId!, localUserRole, localUserDepartment, localUserPosition)) {
             const createdAt = d.createdAt?.toDate() || new Date();
             const daysWaiting = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
@@ -628,11 +630,14 @@ export default function ApprovalsPage() {
           updates.previousCommittedItems = null;
           
         } else if (approval.type === "invoice") {
-          // Factura: la aprobación solo cambia el estado administrativo, no afecta al presupuesto
-          // La realización ocurre exclusivamente al codificar (on_code) o al contabilizar (on_account)
-          updates.status = "pending";
+          // Factura: la aprobación completa el track de aprobación. El lifecycle
+          // pasa a "submitted" (estado activo). La realización del presupuesto solo
+          // ocurre aquí si el trigger es on_approve; para on_code/on_account ocurre
+          // al codificar/contabilizar.
+          const approvedAt = Timestamp.now();
+          updates.status = "submitted";
           updates.approvalStatus = "approved";
-          updates.approvedAt = Timestamp.now();
+          updates.approvedAt = approvedAt;
           updates.approvedBy = userId;
           updates.approvedByName = userName;
 
@@ -645,9 +650,15 @@ export default function ApprovalsPage() {
           }
 
           const costSettings = await getCostSettings(approval.projectId);
-          await handleInvoiceStatusChange(approval.projectId, oldStatus, "pending", budgetItems);
-          if (approval.poId && shouldRealizeInvoice("pending", costSettings)) {
-            await updatePOItemsInvoiced(approval.projectId, approval.poId, budgetItems, "add");
+          // Realizar solo si el trigger es on_approve. shouldRealizeInvoice con el
+          // track approvedAt devuelve true para on_approve y false para on_code/on_account.
+          const realizeNow = shouldRealizeInvoice("submitted", costSettings, { approvedAt });
+          if (realizeNow) {
+            const wasRealized = shouldRealizeInvoice(oldStatus, costSettings);
+            if (!wasRealized && budgetItems.length > 0) {
+              await realizeInvoice(approval.projectId, budgetItems.map(b => ({ subAccountId: b.subAccountId, baseAmount: b.baseAmount })));
+              if (approval.poId) await updatePOItemsInvoiced(approval.projectId, approval.poId, budgetItems, "add");
+            }
           }
         } else if (approval.type === "box") {
           // Sobre BOX (tarjeta o transferencia)

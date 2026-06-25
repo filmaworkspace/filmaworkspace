@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+import { getInvoiceDisplayState } from "@/lib/invoiceHelpers";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
@@ -298,6 +299,9 @@ export default function SupplierDetailPage() {
           issueDate: invData.issueDate?.toDate() || invData.createdAt?.toDate() || new Date(),
           dueDate: invData.dueDate?.toDate(),
           paidAt: invData.paidAt?.toDate(),
+          codedAt: invData.codedAt?.toDate(),
+          approvedAt: invData.approvedAt?.toDate(),
+          accountedAt: invData.accountedAt?.toDate(),
           department: invData.department || "",
           createdBy: invData.createdBy || "",
         };
@@ -565,16 +569,20 @@ export default function SupplierDetailPage() {
   const getStatusBadge = (status: string) => {
     const config: Record<string, { bg: string; text: string; label: string }> = {
       draft: { bg: "bg-slate-100", text: "text-slate-600", label: "Borrador" },
+      submitted: { bg: "bg-purple-50", text: "text-purple-700", label: "En sistema" },
       pending: { bg: "bg-amber-50", text: "text-amber-700", label: "Pendiente" },
       pending_approval: { bg: "bg-purple-50", text: "text-purple-700", label: "Pend. aprob." },
       approved: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Aprobada" },
-      paid: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Pagada" },
+      coded: { bg: "bg-violet-50", text: "text-violet-700", label: "Codificada" },
+      accounted: { bg: "bg-teal-50", text: "text-teal-700", label: "Contabilizada" },
+      paid: { bg: "bg-blue-50", text: "text-blue-700", label: "Pagada" },
       rejected: { bg: "bg-red-50", text: "text-red-700", label: "Rechazada" },
       closed: { bg: "bg-blue-50", text: "text-blue-700", label: "Cerrada" },
       cancelled: { bg: "bg-red-100", text: "text-red-800", label: "Anulada" },
+      void: { bg: "bg-red-100", text: "text-red-800", label: "Anulada" },
       overdue: { bg: "bg-red-50", text: "text-red-700", label: "Vencida" },
     };
-    const c = config[status] || config.pending;
+    const c = config[status] || config.submitted;
     return (
       <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-xs font-medium ${c.bg} ${c.text} ${status === "cancelled" ? "line-through" : ""}`}>
         {status === "cancelled" && <span className="font-bold">✕</span>}
@@ -585,7 +593,7 @@ export default function SupplierDetailPage() {
 
   // Generar PDF de listado de facturas
   const generateInvoiceListPdf = async () => {
-    const activeInvoices = invoices.filter(inv => inv.status !== "cancelled");
+    const activeInvoices = invoices.filter(inv => !["cancelled","void"].includes(inv.status));
     if (!supplier || activeInvoices.length === 0) return;
     setGeneratingPdf("invoices");
 
@@ -593,8 +601,8 @@ export default function SupplierDetailPage() {
       const { jsPDF } = await import('jspdf');
       const today = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
 
-      const paidInvoices = activeInvoices.filter(inv => inv.status === "paid");
-      const pendingInvoices = activeInvoices.filter(inv => inv.status !== "paid");
+      const paidInvoices = activeInvoices.filter(inv => (inv.paidAt || inv.status === "paid"));
+      const pendingInvoices = activeInvoices.filter(inv => (!inv.paidAt && inv.status !== "paid"));
       const totalBase = activeInvoices.reduce((s, inv) => s + inv.baseAmount, 0);
       const totalAmount = activeInvoices.reduce((s, inv) => s + inv.totalAmount, 0);
       const totalPaid = paidInvoices.reduce((s, inv) => s + inv.totalAmount, 0);
@@ -751,7 +759,7 @@ export default function SupplierDetailPage() {
     try {
       const { jsPDF } = await import('jspdf');
 
-      const paidInvoices = invoices.filter(inv => inv.status === "paid")
+      const paidInvoices = invoices.filter(inv => (inv.paidAt || inv.status === "paid"))
         .sort((a, b) => b.issueDate.getTime() - a.issueDate.getTime());
       const totalPaid = paidInvoices.reduce((s, inv) => s + inv.totalAmount, 0);
       const today = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -1005,8 +1013,8 @@ export default function SupplierDetailPage() {
     </div>
   );
 
-  const pendingInvoices = invoices.filter(inv => inv.status !== "paid" && inv.status !== "cancelled");
-  const paidInvoices = invoices.filter(inv => inv.status === "paid");
+  const pendingInvoices = invoices.filter(inv => (!inv.paidAt && inv.status !== "paid") && !["cancelled","void"].includes(inv.status));
+  const paidInvoices = invoices.filter(inv => (inv.paidAt || inv.status === "paid"));
   const hasPendingInvoices = pendingInvoices.length > 0;
 
   // Determinar estado general del proveedor
@@ -1432,8 +1440,8 @@ export default function SupplierDetailPage() {
 
             {/* Facturas */}
             {(() => {
-              const activeInvoices = invoices.filter(inv => inv.status !== "cancelled");
-              const paidCount = activeInvoices.filter(inv => inv.status === "paid").length;
+              const activeInvoices = invoices.filter(inv => !["cancelled","void"].includes(inv.status));
+              const paidCount = activeInvoices.filter(inv => (inv.paidAt || inv.status === "paid")).length;
               const totalBase = activeInvoices.reduce((s, inv) => s + inv.baseAmount, 0);
               return (
                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -1482,7 +1490,7 @@ export default function SupplierDetailPage() {
                           </div>
                           <div className="flex items-center gap-3 flex-shrink-0">
                             <span className="font-mono text-sm font-semibold text-slate-900">{formatCurrency(inv.totalAmount)} €</span>
-                            {getStatusBadge(inv.status)}
+                            {getStatusBadge(getInvoiceDisplayState(inv))}
                             <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-500" />
                           </div>
                         </Link>

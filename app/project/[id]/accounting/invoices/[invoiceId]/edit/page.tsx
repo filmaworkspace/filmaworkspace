@@ -333,8 +333,8 @@ export default function EditInvoicePage() {
       setExistingFileUrl(data.attachmentUrl || "");
       setExistingFileName(data.attachmentFileName || "");
       
-      // Verificar si estaba aprobada/realizada
-      const wasRealizedBefore = ["pending", "approved", "paid"].includes(data.status);
+      // Verificar si estaba aprobada (track approvedAt) o, por compat, por status antiguo
+      const wasRealizedBefore = !!data.approvedAt || ["pending", "approved", "paid"].includes(data.status);
       setWasApproved(wasRealizedBefore);
 
       setFormData({
@@ -489,7 +489,7 @@ export default function EditInvoicePage() {
       const invoicesSnap = await getDocs(query(
         collection(db, `projects/${id}/invoices`),
         where("poId", "==", linkedPO.id),
-        where("status", "in", ["pending", "pending_approval", "approved", "paid", "overdue"])
+        where("status", "in", ["submitted", "pending", "pending_approval", "approved", "paid", "overdue", "coded", "accounted"])
       ));
       
       // Calcular cuánto está facturado por item
@@ -796,7 +796,8 @@ export default function EditInvoicePage() {
 
         const steps = generateApprovalSteps();
         if (shouldAutoApprove(steps)) {
-          updateData.status = "pending";
+          // Auto-aprobada: lifecycle "submitted" + track de aprobación.
+          updateData.status = "submitted";
           updateData.approvalStatus = "approved";
           updateData.autoApproved = true;
           updateData.approvedAt = Timestamp.now();
@@ -805,7 +806,8 @@ export default function EditInvoicePage() {
           updateData.approvalSteps = deleteField();
           updateData.currentApprovalStep = deleteField();
         } else {
-          updateData.status = "pending_approval";
+          // Pendiente de aprobar: lifecycle "submitted", sin track de aprobación.
+          updateData.status = "submitted";
           updateData.approvalStatus = "pending";
           updateData.approvalSteps = steps;
           updateData.currentApprovalStep = 0;
@@ -828,22 +830,23 @@ export default function EditInvoicePage() {
 
       // Manejar presupuesto
       if (!isAdminCorrection && sendForApproval) {
-        const finalStatus = updateData.status;
-        
-        if (finalStatus === "pending" && wasApproved && originalItems.length > 0) {
+        // Realización para el trigger on_approve: ocurre cuando la factura queda
+        // aprobada (track approvedAt presente en este guardado).
+        const isApprovedNow = updateData.autoApproved === true;
+        const realizeNow = isApprovedNow && shouldRealizeInvoice("submitted", costSettings, { approvedAt: Timestamp.now() });
+
+        if (isApprovedNow && wasApproved && originalItems.length > 0) {
           // Desrealizar items anteriores
           const itemsToUnrealize = originalItems.filter(i => i.subAccountId && i.baseAmount > 0).map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
           if (itemsToUnrealize.length > 0) await unrealizeInvoice(id, itemsToUnrealize);
-          // Realizar nuevos items
-          if (shouldRealizeInvoice(finalStatus, costSettings)) {
+          // Realizar nuevos items si corresponde
+          if (realizeNow) {
             const itemsToRealize = items.filter(i => i.subAccountId && i.baseAmount > 0).map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
             if (itemsToRealize.length > 0) await realizeInvoice(id, itemsToRealize);
           }
-        } else if (finalStatus === "pending" && !wasApproved) {
-          if (shouldRealizeInvoice(finalStatus, costSettings)) {
-            const itemsToRealize = items.filter(i => i.subAccountId && i.baseAmount > 0).map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
-            if (itemsToRealize.length > 0) await realizeInvoice(id, itemsToRealize);
-          }
+        } else if (isApprovedNow && !wasApproved && realizeNow) {
+          const itemsToRealize = items.filter(i => i.subAccountId && i.baseAmount > 0).map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
+          if (itemsToRealize.length > 0) await realizeInvoice(id, itemsToRealize);
         }
       }
 

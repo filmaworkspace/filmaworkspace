@@ -44,7 +44,9 @@ import {
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
-import { handleInvoiceStatusChange } from "@/lib/budgetOperations";
+import { realizeInvoice, unrealizeInvoice } from "@/lib/budgetOperations";
+import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
+import { getInvoiceDisplayState } from "@/lib/invoiceHelpers";
 import { useUser } from "@/contexts/UserContext";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -87,6 +89,10 @@ interface Invoice {
   accountingAccount?: string;
   paidAt?: Date;
   paidAmount?: number;
+  codedAt?: Date;
+  codedBy?: string;
+  codedByName?: string;
+  approvedAt?: Date;
 }
 
 interface ChartAccount {
@@ -101,14 +107,15 @@ interface ChartAccount {
 
 const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string }> = {
   draft:            { bg: "bg-slate-100",  text: "text-slate-600",  label: "Borrador"      },
-  coding:           { bg: "bg-violet-50",  text: "text-violet-700", label: "Codificando"   },
-  pending_approval: { bg: "bg-amber-50",   text: "text-amber-700",  label: "Pte. aprob."   },
-  pending:          { bg: "bg-blue-50",    text: "text-blue-700",   label: "Pte. pago"     },
+  submitted:        { bg: "bg-amber-50",   text: "text-amber-700",  label: "En sistema"    },
   approved:         { bg: "bg-emerald-50", text: "text-emerald-700",label: "Aprobada"      },
+  coded:            { bg: "bg-violet-50",  text: "text-violet-700", label: "Codificada"    },
   accounted:        { bg: "bg-teal-50",    text: "text-teal-700",   label: "Contabilizada" },
-  paid:             { bg: "bg-emerald-50", text: "text-emerald-700",label: "Pagada"        },
+  paid:             { bg: "bg-blue-50",    text: "text-blue-700",   label: "Pagada"        },
+  overdue:          { bg: "bg-red-50",     text: "text-red-700",    label: "Vencida"       },
   rejected:         { bg: "bg-red-50",     text: "text-red-700",    label: "Rechazada"     },
   cancelled:        { bg: "bg-red-50",     text: "text-red-700",    label: "Anulada"       },
+  void:             { bg: "bg-red-50",     text: "text-red-700",    label: "Anulada"       },
 };
 
 const FILTER_OPTIONS = [
@@ -431,6 +438,8 @@ export default function CompanyAccountsPage() {
           accountedBy: r.accountedBy, accountedByName: r.accountedByName,
           accountingEntryNumber: r.accountingEntryNumber, accountingAccount: r.accountingAccount,
           paidAt: r.paidAt?.toDate?.(), paidAmount: r.paidAmount,
+          codedAt: r.codedAt?.toDate?.(), codedBy: r.codedBy, codedByName: r.codedByName,
+          approvedAt: r.approvedAt?.toDate?.(),
         };
       }));
     } catch (err) { console.error(err); showToast("error", "Error al cargar datos"); }
@@ -483,15 +492,28 @@ export default function CompanyAccountsPage() {
     }
     setSaving(true);
     try {
-      const oldStatus = selectedInvoice.status;
       const lines = selectedInvoice.journalLines?.length ? selectedInvoice.journalLines : buildDefaultLines(selectedInvoice, planCuentas);
+      const accountedAt = new Date();
+      // Track de contabilización; el lifecycle se mantiene en "submitted". Conservamos
+      // accounted:true por compatibilidad con código antiguo.
       await updateDoc(doc(db, `projects/${projectId}/invoices`, selectedInvoice.id), {
-        accounted: true, accountedAt: new Date(), accountedBy: contextUser?.uid,
+        accounted: true, accountedAt, accountedBy: contextUser?.uid,
         accountedByName: contextUser?.name, accountingEntryNumber: entryNumber.trim(),
-        status: "accounted", journalLines: lines,
+        status: "submitted", journalLines: lines,
       });
+      // Realizar presupuesto si el trigger es on_account y no estaba ya realizado.
+      const costSettings = await getCostSettings(projectId);
       const items = selectedInvoice.items.map((i: any) => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount || 0 }));
-      await handleInvoiceStatusChange(projectId, oldStatus, "accounted", items);
+      const wasRealized = shouldRealizeInvoice(selectedInvoice.status, costSettings, {
+        codedAt: selectedInvoice.codedAt, accountedAt: selectedInvoice.accountedAt, paidAt: selectedInvoice.paidAt,
+      });
+      const nowRealized = shouldRealizeInvoice("submitted", costSettings, {
+        codedAt: selectedInvoice.codedAt, accountedAt, paidAt: selectedInvoice.paidAt,
+      });
+      if (!wasRealized && nowRealized) {
+        const budgetItems = items.filter((i: any) => i.subAccountId && i.baseAmount > 0);
+        if (budgetItems.length > 0) await realizeInvoice(projectId, budgetItems);
+      }
       showToast("success", `Contabilizada — ${entryNumber}`);
       setEntryNumber(""); setEditingLines(false);
       await loadData(); goToNext();
@@ -503,9 +525,22 @@ export default function CompanyAccountsPage() {
     if (!selectedInvoice || !confirm("¿Desmarcar como contabilizada?")) return;
     setSaving(true);
     try {
-      await updateDoc(doc(db, `projects/${projectId}/invoices`, selectedInvoice.id), { accounted: false, status: "approved" });
+      // Limpiar track de contabilización; el lifecycle permanece "submitted".
+      await updateDoc(doc(db, `projects/${projectId}/invoices`, selectedInvoice.id), { accounted: false, accountedAt: null, accountedBy: null, accountedByName: null, status: "submitted" });
+      // Si la realización dependía de la contabilización (on_account) y ya no hay
+      // otro track que la mantenga, revertir el presupuesto.
+      const costSettings = await getCostSettings(projectId);
       const items = selectedInvoice.items.map((i: any) => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount || 0 }));
-      await handleInvoiceStatusChange(projectId, selectedInvoice.status, "approved", items);
+      const wasRealized = shouldRealizeInvoice(selectedInvoice.status, costSettings, {
+        codedAt: selectedInvoice.codedAt, accountedAt: selectedInvoice.accountedAt, paidAt: selectedInvoice.paidAt,
+      });
+      const stillRealized = shouldRealizeInvoice("submitted", costSettings, {
+        codedAt: selectedInvoice.codedAt, accountedAt: undefined, paidAt: selectedInvoice.paidAt,
+      });
+      if (wasRealized && !stillRealized) {
+        const budgetItems = items.filter((i: any) => i.subAccountId && i.baseAmount > 0);
+        if (budgetItems.length > 0) await unrealizeInvoice(projectId, budgetItems);
+      }
       showToast("success", "Factura desbloqueada"); setEditingLines(false); await loadData();
     } catch (err) { console.error(err); showToast("error", "Error"); }
     finally { setSaving(false); }
@@ -518,10 +553,11 @@ export default function CompanyAccountsPage() {
       || inv.description.toLowerCase().includes(term) || (inv.accountingEntryNumber || "").toLowerCase().includes(term);
     const coded = isInvoiceCoded(inv);
     let st = true;
-    if      (statusFilter === "pending_accounting") st = coded && !inv.accounted && ["approved","pending","paid"].includes(inv.status);
-    else if (statusFilter === "accounted")           st = inv.accounted === true;
+    const accounted = inv.accounted === true || !!inv.accountedAt;
+    if      (statusFilter === "pending_accounting") st = coded && !accounted && ["submitted","approved","pending","paid","coded"].includes(inv.status);
+    else if (statusFilter === "accounted")           st = accounted;
     else if (statusFilter === "not_coded")           st = !coded;
-    else if (statusFilter !== "all")                 st = inv.status === statusFilter;
+    else if (statusFilter !== "all")                 st = getInvoiceDisplayState(inv) === statusFilter;
     return match && st;
   }), [invoices, searchTerm, statusFilter]);
 
@@ -538,8 +574,8 @@ export default function CompanyAccountsPage() {
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   const coded        = invoices.filter(i => isInvoiceCoded(i));
-  const pendingCount = coded.filter(i => !i.accounted && ["approved","pending","paid"].includes(i.status)).length;
-  const accountedCnt = invoices.filter(i => i.accounted).length;
+  const pendingCount = coded.filter(i => !i.accounted && !i.accountedAt && ["submitted","approved","pending","paid","coded"].includes(i.status)).length;
+  const accountedCnt = invoices.filter(i => i.accounted || i.accountedAt).length;
   const notCodedCnt  = invoices.filter(i => !isInvoiceCoded(i)).length;
   const totalBase    = coded.reduce((s, i) => s + i.baseAmount, 0);
 
@@ -635,7 +671,7 @@ export default function CompanyAccountsPage() {
                   <tbody className="divide-y divide-slate-100">
                     {filtered.map(inv => {
                       const isCoded = isInvoiceCoded(inv);
-                      const st      = STATUS_CONFIG[inv.status] || STATUS_CONFIG.pending;
+                      const st      = STATUS_CONFIG[getInvoiceDisplayState(inv)] || STATUS_CONFIG.submitted;
                       const warns   = validateInvoice(inv);
                       const hasErr  = warns.some(w => w.level === "error");
                       const hasWarn = warns.some(w => w.level === "warn");

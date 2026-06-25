@@ -53,7 +53,7 @@ import {
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
-import { getCostSettings, shouldRealizeInvoice, shouldRealizeOnStatusChange } from "@/lib/budgetRules";
+import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
 import { realizeInvoice, unrealizeInvoice, updatePOItemsInvoiced } from "@/lib/budgetOperations";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
@@ -273,24 +273,35 @@ export default function PaymentPayPage() {
         
         // Update invoice status and handle budget realization
         if (item.invoiceId) {
-          const newStatus = isPartialPayment ? "partial_paid" : "paid";
-          
           // Obtener estado anterior de la factura
           const invoiceRef = doc(db, `projects/${id}/invoices`, item.invoiceId);
           const invoiceSnap = await getDoc(invoiceRef);
-          const oldStatus = invoiceSnap.exists() ? invoiceSnap.data().status : "pending";
-          
-          // Actualizar estado de la factura
-          await updateDoc(invoiceRef, { 
-            status: newStatus, 
-            paidAmount: payingAmount, 
-            paidAt: Timestamp.now(), 
-            paymentForecastId: forecastId 
+          const invoiceData = invoiceSnap.exists() ? invoiceSnap.data() : null;
+          const oldStatus = invoiceData?.status || "submitted";
+
+          // Track de pago. El lifecycle permanece "submitted"; el pago total se
+          // refleja con paidAt. Para pagos parciales no fijamos paidAt todavía.
+          const invoiceUpdate: Record<string, any> = {
+            paidAmount: payingAmount,
+            paymentForecastId: forecastId,
+            status: "submitted",
+          };
+          if (!isPartialPayment) {
+            invoiceUpdate.paidAt = Timestamp.now();
+            invoiceUpdate.paidBy = permissions.userId || "";
+            invoiceUpdate.paidByName = permissions.userName || "";
+          }
+          await updateDoc(invoiceRef, invoiceUpdate);
+
+          // Si corresponde realizar según configuración (p.ej. on_paid), mover de
+          // committed a actual. Evaluamos con los tracks resultantes.
+          const wasRealized = shouldRealizeInvoice(oldStatus, costSettings, {
+            codedAt: invoiceData?.codedAt, accountedAt: invoiceData?.accountedAt, paidAt: invoiceData?.paidAt,
           });
-          
-          // Si corresponde realizar según configuración, mover de committed a actual
-          if (!isPartialPayment && shouldRealizeOnStatusChange(oldStatus, newStatus, costSettings)) {
-            const invoiceData = invoiceSnap.data();
+          const nowRealized = shouldRealizeInvoice("submitted", costSettings, {
+            codedAt: invoiceData?.codedAt, accountedAt: invoiceData?.accountedAt, paidAt: invoiceUpdate.paidAt,
+          });
+          if (!isPartialPayment && !wasRealized && nowRealized) {
             if (invoiceData?.items) {
               const budgetItems = invoiceData.items
                 .filter((i: any) => i.subAccountId && i.baseAmount > 0)
@@ -410,29 +421,34 @@ export default function PaymentPayPage() {
               (i) => i.invoiceId === item.invoiceId && i.status === "completed" && i.id !== itemId
             );
             
-            let newStatus: string;
+            let stillPaid: boolean;
             if (otherPaymentsForInvoice.length > 0) {
-              // There are still other payments, calculate total paid
+              // There are still other payments, calculate total paid (pago parcial)
               const totalPaid = otherPaymentsForInvoice.reduce((sum, i) => sum + (i.partialAmount || i.amount), 0);
-              newStatus = "partial_paid";
-              await updateDoc(invoiceRef, { 
-                status: newStatus, 
-                paidAmount: totalPaid
+              stillPaid = false; // queda como pago parcial, sin track paidAt completo
+              await updateDoc(invoiceRef, {
+                status: "submitted",
+                paidAmount: totalPaid,
+                paidAt: null, paidBy: null, paidByName: null,
               });
             } else {
-              // No other payments, reset to pending
-              newStatus = "pending";
-              await updateDoc(invoiceRef, { 
-                status: newStatus, 
-                paidAmount: 0, 
-                paidAt: null, 
-                paymentForecastId: null 
+              // No other payments, limpiar track de pago. El lifecycle vuelve a "submitted".
+              stillPaid = false;
+              await updateDoc(invoiceRef, {
+                status: "submitted",
+                paidAmount: 0,
+                paidAt: null, paidBy: null, paidByName: null,
+                paymentForecastId: null
               });
             }
-            
-            // Si la factura estaba realizada (paid) y ahora no lo está, revertir presupuesto
-            const wasRealized = shouldRealizeInvoice(oldStatus, costSettings);
-            const isStillRealized = shouldRealizeInvoice(newStatus, costSettings);
+
+            // Si la factura estaba realizada por el pago (on_paid) y ahora no lo está, revertir.
+            const wasRealized = shouldRealizeInvoice(oldStatus, costSettings, {
+              codedAt: invoiceData.codedAt, accountedAt: invoiceData.accountedAt, paidAt: invoiceData.paidAt,
+            });
+            const isStillRealized = shouldRealizeInvoice("submitted", costSettings, {
+              codedAt: invoiceData.codedAt, accountedAt: invoiceData.accountedAt, paidAt: stillPaid ? invoiceData.paidAt : undefined,
+            });
             
             if (wasRealized && !isStillRealized && invoiceData.items) {
               const budgetItems = invoiceData.items

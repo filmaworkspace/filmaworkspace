@@ -207,8 +207,19 @@ export default function BudgetPage() {
       const invoicesSnapshot = await getDocs(collection(db, `projects/${id}/invoices`));
       invoicesSnapshot.docs.forEach(invDoc => {
         const invData = invDoc.data();
-        // Usar shouldRealizeInvoice de budgetRules para determinar si cuenta
-        if (invData.status && shouldRealizeInvoice(invData.status, loadedCostConfig) && invData.items) {
+        // La realización depende de los tracks, no del lifecycle (la factura puede
+        // estar en "submitted" y ya codificada/contabilizada). Pasamos los tracks.
+        const terminal = ["cancelled", "rejected", "void"].includes(invData.status);
+        const isRealized = terminal
+          ? false
+          : loadedCostConfig.invoiceActualTrigger === "on_code"
+            ? !!invData.codedAt
+            : loadedCostConfig.invoiceActualTrigger === "on_account"
+              ? !!(invData.accountedAt || invData.accounted)
+              : shouldRealizeInvoice(invData.status, loadedCostConfig, {
+                  codedAt: invData.codedAt, accountedAt: invData.accountedAt || invData.accounted, paidAt: invData.paidAt, approvedAt: invData.approvedAt,
+                });
+        if (invData.status && isRealized && invData.items) {
           invData.items.forEach((item: any) => {
             if (item.subAccountCode) {
               const key = item.subAccountCode;

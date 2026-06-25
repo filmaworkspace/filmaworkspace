@@ -825,7 +825,9 @@ export default function ReportsPage() {
       const invoicedByPOItem: Record<string, Record<number, number>> = {};
       invoicesSnapshot.docs.forEach(invDoc => {
         const invData = invDoc.data();
-        if (invData.poId && shouldRealizeInvoice(invData.status || "", costConfig)) {
+        if (invData.poId && shouldRealizeInvoice(invData.status || "", costConfig, {
+          codedAt: invData.codedAt, accountedAt: invData.accountedAt || invData.accounted, paidAt: invData.paidAt, approvedAt: invData.approvedAt,
+        })) {
           if (!invoicedByPOItem[invData.poId]) invoicedByPOItem[invData.poId] = {};
           (invData.items || []).forEach((invItem: any) => {
             const itemIndex = invItem.poItemIndex ?? -1;
@@ -1009,7 +1011,7 @@ export default function ReportsPage() {
       const invoicesSnapshot = await getDocs(query(collection(db, `projects/${id}/invoices`), orderBy("dueDate", "asc")));
       const dataRows: (string | number)[][] = [];
       invoicesSnapshot.docs
-        .filter(doc => doc.data().status !== "cancelled")
+        .filter(doc => !["cancelled", "void", "rejected"].includes(doc.data().status))
         .forEach(docSnap => {
           const data = docSnap.data();
           dataRows.push(toXlsxRow(columns, {
@@ -1021,7 +1023,7 @@ export default function ReportsPage() {
             paymentMethod: data.paymentMethod || "",
             dueDate: formatDate(data.dueDate),
             paidAt: formatDate(data.paidAt),
-            status: data.status === "paid" ? "Pagada" : "Pendiente",
+            status: (data.paidAt || data.status === "paid") ? "Pagada" : "Pendiente",
             paidBy: data.paidByName || "", accountingEntryNumber: data.accountingEntryNumber || "",
           }));
         });

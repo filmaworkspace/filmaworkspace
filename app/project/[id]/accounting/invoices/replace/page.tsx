@@ -311,8 +311,9 @@ export default function ReplaceDocumentPage() {
         // Nuevo archivo de factura definitiva
         attachmentUrl,
         attachmentFileName: uploadedFile.name,
-        // Descodificar para que se vuelva a codificar
-        status: "approved",
+        // Descodificar para que se vuelva a codificar. El lifecycle permanece
+        // "submitted"; el track de aprobación (approvedAt) se conserva.
+        status: "submitted",
         codedAt: null,
         codedBy: null,
         codedByName: null,
