@@ -168,9 +168,22 @@ export default function RegisterPage() {
 
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(cred.user, { displayName: name });
-      await setDoc(doc(db, "users", cred.user.uid), {
-        name, email, phone: fullPhone, role: "user",
-        createdAt: Timestamp.now(), updatedAt: Timestamp.now(),
+
+      try {
+        await setDoc(doc(db, "users", cred.user.uid), {
+          name, email, phone: fullPhone, role: "user",
+          createdAt: Timestamp.now(), updatedAt: Timestamp.now(),
+        });
+      } catch (firestoreErr) {
+        await cred.user.delete();
+        throw firestoreErr;
+      }
+
+      const idToken = await cred.user.getIdToken();
+      await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
       });
 
       router.push("/dashboard");

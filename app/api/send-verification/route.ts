@@ -13,6 +13,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
   }
 
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return NextResponse.json({ error: "Email no válido" }, { status: 400 });
+  }
+
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const expiresAt = Timestamp.fromMillis(Date.now() + 10 * 60 * 1000); // 10 min
 
@@ -29,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     console.error("[send-verification]", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Error al enviar el email" }, { status: 500 });
   }
 
   return NextResponse.json({ id: data?.id });

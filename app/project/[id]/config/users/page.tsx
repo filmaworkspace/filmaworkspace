@@ -233,19 +233,21 @@ export default function ConfigUsers() {
       await setDoc(doc(collection(db, "invitations")), inviteData);
 
       // Send invitation email (fire-and-forget)
-      fetch("/api/send-project-invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          inviteeName:   inviteData.invitedName,
-          invitedByName: inviteData.invitedByName,
-          invitedEmail:  email,
-          projectName:   inviteData.projectName,
-          projectId:     id,
-          role:          inviteData.role ?? inviteData.position ?? "",
-          isExistingUser: inviteData.invitedUserId !== null,
-        }),
-      }).catch(console.error);
+      auth.currentUser?.getIdToken().then((token) => {
+        fetch("/api/send-project-invite", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            inviteeName:   inviteData.invitedName,
+            invitedByName: inviteData.invitedByName,
+            invitedEmail:  email,
+            projectName:   inviteData.projectName,
+            projectId:     id,
+            role:          inviteData.role ?? inviteData.position ?? "",
+            isExistingUser: inviteData.invitedUserId !== null,
+          }),
+        }).catch(console.error);
+      });
 
       showToast("success", "Invitación enviada");
 

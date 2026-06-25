@@ -7,7 +7,7 @@ import Link from "next/link";
 import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import {
   addDoc,
   collection,
@@ -417,9 +417,10 @@ export default function AdminProjectPage() {
     if (!form.email) { showToast("error", "Esta ficha no tiene email"); return; }
     try {
       const url = `${window.location.origin}/form/${form.id}`;
+      const token = await auth.currentUser?.getIdToken();
       await fetch("/api/send-form-reminder", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(token && { Authorization: `Bearer ${token}` }) },
         body: JSON.stringify({
           to: form.email,
           name: `${form.firstName || ""} ${form.lastName1 || ""}`.trim() || form.email,
@@ -640,19 +641,21 @@ export default function AdminProjectPage() {
       await addDoc(collection(db, "invitations"), inviteData);
 
       // Send invitation email (fire-and-forget)
-      fetch("/api/send-project-invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          inviteeName,
-          invitedByName: "Equipo de Filma Workspace",
-          invitedEmail: emailRaw,
-          projectName: project?.name || "",
-          projectId,
-          role: addMemberForm.role,
-          isExistingUser: !!selectedUser,
-        }),
-      }).catch(console.error);
+      auth.currentUser?.getIdToken().then((token) => {
+        fetch("/api/send-project-invite", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            inviteeName,
+            invitedByName: "Equipo de Filma Workspace",
+            invitedEmail: emailRaw,
+            projectName: project?.name || "",
+            projectId,
+            role: addMemberForm.role,
+            isExistingUser: !!selectedUser,
+          }),
+        }).catch(console.error);
+      });
 
       setAddMemberForm({ odId: "", role: "", searchQuery: "", inviteName: "" });
       setShowAddMemberModal(false);

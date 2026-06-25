@@ -813,11 +813,13 @@ export default function AdminDashboard() {
       // Fire-and-forget email broadcast if requested
       if (messageForm.sendByEmail) {
         const emails = targetUserIds.map((id) => users.find((u) => u.id === id)?.email).filter(Boolean) as string[];
-        fetch("/api/send-broadcast", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ to: emails, title: messageForm.title.trim(), content: messageForm.content.trim(), type: messageForm.type }),
-        }).catch(console.error);
+        auth.currentUser?.getIdToken().then((token) => {
+          fetch("/api/send-broadcast", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ to: emails, title: messageForm.title.trim(), content: messageForm.content.trim(), type: messageForm.type }),
+          }).catch(console.error);
+        });
       }
 
       // Reset form and close modal

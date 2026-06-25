@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { projectInviteHtml, projectInviteText } from "@/lib/emails/project-invite";
+import { verifyRequestAuth } from "@/lib/serverAuth";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
+  const auth = await verifyRequestAuth(req);
+  if (auth instanceof NextResponse) return auth;
+
   const {
     inviteeName,
     invitedByName,
@@ -35,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     console.error("[send-project-invite]", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Error al enviar el email" }, { status: 500 });
   }
 
   return NextResponse.json({ id: data?.id });

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 // ─── Libraries ───────────────────────────────────────────────────────────────
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { verifyRequestAuth } from "@/lib/serverAuth";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -238,20 +239,30 @@ async function mergePdfs(bannerBytes: Uint8Array, docBytes: Uint8Array): Promise
   const invoicePages = await mergedDoc.copyPages(srcDoc, srcDoc.getPageIndices());
   invoicePages.forEach((p) => mergedDoc.addPage(p));
 
-  console.log(
-    `[Proxy] merged: 1 banner + ${srcDoc.getPageCount()} invoice pages = ${mergedDoc.getPageCount()} total`
-  );
-
   return mergedDoc.save();
 }
 
 export async function GET(request: NextRequest) {
+  const authResult = await verifyRequestAuth(request);
+  if (authResult instanceof NextResponse) return authResult;
+
   const { searchParams } = new URL(request.url);
   const url = searchParams.get("url");
   const expenseRaw = searchParams.get("expense");
 
   if (!url) return NextResponse.json({ error: "Missing url" }, { status: 400 });
-  if (!url.includes("firebasestorage.googleapis.com") && !url.includes("firebasestorage.app"))
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    return NextResponse.json({ error: "Invalid storage URL" }, { status: 403 });
+  }
+  const allowedHosts = ["firebasestorage.googleapis.com", "storage.googleapis.com"];
+  const hostAllowed = allowedHosts.some(
+    (h) => parsedUrl.hostname === h || parsedUrl.hostname.endsWith(`.${h}`)
+  );
+  if (!hostAllowed || (parsedUrl.protocol !== "https:"))
     return NextResponse.json({ error: "Invalid storage URL" }, { status: 403 });
 
   try {
@@ -272,8 +283,6 @@ export async function GET(request: NextRequest) {
     const fileBytes = new Uint8Array(await response.arrayBuffer());
     const contentType = response.headers.get("content-type") || "application/octet-stream";
 
-    console.log("[Proxy] file fetched, contentType:", contentType, "bytes:", fileBytes.length);
-
     if (!expenseRaw) {
       return new NextResponse(fileBytes, {
         status: 200,
@@ -283,12 +292,10 @@ export async function GET(request: NextRequest) {
 
     const expense: ExpenseData = JSON.parse(expenseRaw);
     const bannerBytes = await generateBannerPdf(expense);
-    console.log("[Proxy] banner generated:", bannerBytes.length, "bytes");
 
     const docPdfBytes = contentType.includes("pdf")
       ? fileBytes
       : await convertImageToPdf(fileBytes, contentType);
-    console.log("[Proxy] docPdfBytes:", docPdfBytes.length);
 
     const merged = await mergePdfs(bannerBytes, docPdfBytes);
 

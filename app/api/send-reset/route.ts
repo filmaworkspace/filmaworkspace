@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     console.error("[send-reset]", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Error al enviar el email" }, { status: 500 });
   }
 
   return NextResponse.json({ id: data?.id });

@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { broadcastHtml, broadcastText } from "@/lib/emails/broadcast";
+import { verifyRequestAuth } from "@/lib/serverAuth";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
+  const auth = await verifyRequestAuth(req);
+  if (auth instanceof NextResponse) return auth;
+
   const { to, title, content, type = "info" } = await req.json();
 
   if (!to || !Array.isArray(to) || to.length === 0 || !title || !content) {
@@ -14,6 +18,10 @@ export async function POST(req: NextRequest) {
   const emails = (to as string[]).filter((e) => typeof e === "string" && e.includes("@"));
   if (emails.length === 0) {
     return NextResponse.json({ error: "No hay emails válidos" }, { status: 400 });
+  }
+
+  if (emails.length > 500) {
+    return NextResponse.json({ error: "Demasiados destinatarios (máximo 500)" }, { status: 400 });
   }
 
   const html = broadcastHtml({ title, content, type });

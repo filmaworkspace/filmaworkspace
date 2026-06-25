@@ -7,7 +7,7 @@ import Link from "next/link";
 import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
-import { db, storage } from "@/lib/firebase";
+import { auth, db, storage } from "@/lib/firebase";
 import { doc, getDoc, addDoc, updateDoc, collection, Timestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -427,9 +427,10 @@ export default function CrewMemberPage() {
       });
       const realFormUrl = `${window.location.origin}/form/${formRef.id}`;
 
+      const idToken = await auth.currentUser?.getIdToken() ?? "";
       const res = await fetch("/api/send-invite", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           to:          member.email,
           firstName:   member.firstName || member.name || "",

@@ -1360,7 +1360,10 @@ export default function BoxesPage() {
               totalAmount: e.totalAmount,
             };
             const proxyUrl = `/api/storage-proxy?url=${encodeURIComponent(e.documentUrl!)}&expense=${encodeURIComponent(JSON.stringify(expenseData))}`;
-            const resp = await fetch(proxyUrl);
+            const idToken = await auth.currentUser?.getIdToken() ?? "";
+            const resp = await fetch(proxyUrl, {
+              headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
+            });
 
             if (!resp.ok) {
               console.warn(`[Export] Proxy failed for ${e.displayNumber}: ${resp.status}`);
@@ -1369,17 +1372,14 @@ export default function BoxesPage() {
 
             const buf = await resp.arrayBuffer();
             if (buf.byteLength > 0) {
-              // Proxy always returns PDF (images get converted too)
               zipEntries[`${folderName}/documents/${e.displayNumber}.pdf`] = new Uint8Array(buf);
               docsIncluded++;
-              console.log(`[Export] ✓ ${e.displayNumber}.pdf (${buf.byteLength} bytes)`);
             }
           } catch (err) {
             console.warn(`[Export] Error en ${e.displayNumber}:`, err);
           }
         });
       await Promise.all(fetchPromises);
-      console.log(`[Export] ZIP entries:`, Object.keys(zipEntries));
 
       const outerZip = zipSync(zipEntries);
       const blob = new Blob([outerZip], { type: "application/zip" });

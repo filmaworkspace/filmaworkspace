@@ -322,6 +322,7 @@ export default function ProfilePage() {
 
   const handleLogout = async () => {
     try {
+      await fetch("/api/session", { method: "DELETE" });
       await signOut(auth);
       router.push("/");
     } catch (err) {

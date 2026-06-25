@@ -7,7 +7,7 @@ import Link from "next/link";
 import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -278,21 +278,20 @@ export default function DocumentCenterPage() {
 
     // Use server-side merge via proxy (uses pdf-merger-js which handles complex PDFs better)
     if (invoice.attachmentUrl) {
+      const idToken = await auth.currentUser?.getIdToken() ?? "";
+      const authHeader = idToken ? { Authorization: `Bearer ${idToken}` } : {};
       const proxyUrl = `/api/storage-proxy?url=${encodeURIComponent(invoice.attachmentUrl)}&expense=${encodeURIComponent(JSON.stringify(expenseData))}`;
-      console.log("[DocCenter] fetching merged PDF from proxy...");
-      const resp = await fetch(proxyUrl);
+      const resp = await fetch(proxyUrl, { headers: authHeader });
       if (!resp.ok) {
-        console.error("[DocCenter] proxy failed:", resp.status);
         return null;
       }
-      
+
       let result = new Uint8Array(await resp.arrayBuffer());
-      console.log("[DocCenter] got merged PDF:", result.length, "bytes");
 
       // If there's also a receipt, append it client-side
       if (invoice.receiptUrl) {
         try {
-          const rResp = await fetch(`/api/storage-proxy?url=${encodeURIComponent(invoice.receiptUrl)}`);
+          const rResp = await fetch(`/api/storage-proxy?url=${encodeURIComponent(invoice.receiptUrl)}`, { headers: authHeader });
           if (rResp.ok) {
             const rContentType = rResp.headers.get("content-type") || "";
             const rBytes = new Uint8Array(await rResp.arrayBuffer());
