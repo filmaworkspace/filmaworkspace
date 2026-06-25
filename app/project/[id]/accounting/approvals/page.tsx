@@ -1211,7 +1211,7 @@ export default function ApprovalsPage() {
                 </div>
                 <div>
                   <p className="font-medium text-slate-900">¿Aprobar este documento?</p>
-                  <p className="text-sm text-slate-600">{selectedApproval.supplier} · {formatCurrency(selectedApproval.totalAmount)}</p>
+                  <p className="text-sm text-slate-600">{selectedApproval.supplier} · {formatCurrency(selectedApproval.amount)}</p>
                 </div>
               </div>
               <div className="flex gap-3">
