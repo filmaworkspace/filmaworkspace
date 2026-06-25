@@ -850,10 +850,12 @@ export default function ReportsPage() {
           const baseInvoiced = poInvoiced[index] || 0;
           const taxRate = item.vatRate || item.taxRate || 21;
           const irpfRate = item.irpfRate || 0;
-          const baseCommitted = itemIsClosed ? 0 : Math.max(0, rawBaseAmount - baseInvoiced);
-          const taxAmount = baseCommitted * (taxRate / 100);
-          const irpfAmount = baseCommitted * (irpfRate / 100);
-          const totalCommitted = baseCommitted + taxAmount - irpfAmount;
+          // Comprometido = importe real de la PO (sin restar realizado)
+          const baseCommitted = itemIsClosed ? 0 : rawBaseAmount;
+          const totalCommitted = baseCommitted + baseCommitted * (taxRate / 100) - baseCommitted * (irpfRate / 100);
+          // Disponible = PO menos lo ya realizado, nunca negativo
+          const baseAvailable = itemIsClosed ? 0 : Math.max(0, rawBaseAmount - baseInvoiced);
+          const totalAvailable = baseAvailable + baseAvailable * (taxRate / 100) - baseAvailable * (irpfRate / 100);
           const episodes = item.episodes || [];
           const episodeAssignment = item.episodeAssignment || "general";
 
@@ -862,9 +864,10 @@ export default function ReportsPage() {
               const rawEpBaseAmount = ep.amount || 0;
               const epPercentage = rawBaseAmount > 0 ? rawEpBaseAmount / rawBaseAmount : 0;
               const epBaseInvoiced = baseInvoiced * epPercentage;
-              const epBaseCommitted = itemIsClosed ? 0 : Math.max(0, rawEpBaseAmount - epBaseInvoiced);
-              const epTaxAmount = epBaseCommitted * (taxRate / 100);
-              const epTotalCommitted = epBaseCommitted + epTaxAmount - epBaseCommitted * (irpfRate / 100);
+              const epBaseCommitted = itemIsClosed ? 0 : rawEpBaseAmount;
+              const epTotalCommitted = epBaseCommitted + epBaseCommitted * (taxRate / 100) - epBaseCommitted * (irpfRate / 100);
+              const epBaseAvailable = itemIsClosed ? 0 : Math.max(0, rawEpBaseAmount - epBaseInvoiced);
+              const epTotalAvailable = epBaseAvailable + epBaseAvailable * (taxRate / 100) - epBaseAvailable * (irpfRate / 100);
               dataRows.push(toXlsxRow(columns, {
                 poNumber: poData.number || poData.displayNumber || "", poDescription: poData.generalDescription || poData.description || "",
                 supplier: poData.supplier || "", itemNumber: index + 1, itemDescription: item.description || "",
@@ -872,7 +875,7 @@ export default function ReportsPage() {
                 accountDescription: item.accountDescription || "", subaccountCode: item.subAccountCode || item.subaccountCode || "",
                 subaccountDescription: item.subAccountDescription || item.subaccountDescription || "",
                 baseCommitted: epBaseCommitted, totalCommitted: epTotalCommitted, baseInvoiced: epBaseInvoiced,
-                baseAvailable: epBaseCommitted, totalAvailable: epTotalCommitted,
+                baseAvailable: epBaseAvailable, totalAvailable: epTotalAvailable,
                 poStatus: poData.status || "", isOpen: poData.isOpen !== false ? "Abierta" : "Cerrada",
                 itemClosed: itemIsClosed ? "Sí" : "No", taxRate: `${taxRate}%`, irpfRate: `${irpfRate}%`,
               }));
@@ -888,7 +891,7 @@ export default function ReportsPage() {
               episode: episodeLabel, accountCode: item.accountCode || item.subAccountCode?.split(".")[0] || "",
               accountDescription: item.accountDescription || "", subaccountCode: item.subAccountCode || item.subaccountCode || "",
               subaccountDescription: item.subAccountDescription || item.subaccountDescription || "",
-              baseCommitted, totalCommitted, baseInvoiced, baseAvailable: baseCommitted, totalAvailable: totalCommitted,
+              baseCommitted, totalCommitted, baseInvoiced, baseAvailable, totalAvailable,
               poStatus: poData.status || "", isOpen: poData.isOpen !== false ? "Abierta" : "Cerrada",
               itemClosed: itemIsClosed ? "Sí" : "No", taxRate: `${taxRate}%`, irpfRate: `${irpfRate}%`,
             }));

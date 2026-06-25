@@ -175,22 +175,18 @@ const CONFIG_SECTIONS = [
 
 // Opciones de comportamiento del presupuesto
 const COMMITMENT_TRIGGERS = [
-  { value: "on_create", label: "Al enviar a aprobación", description: "Se compromete cuando la PO se envía a aprobación (pendiente)" },
-  { value: "on_approve", label: "Al aprobar", description: "Se compromete cuando la PO es aprobada" },
+  { value: "on_create", label: "Al enviar PO" },
+  { value: "on_approve", label: "Al aprobar PO" },
 ];
 
-// "Al pagar" se elimina: la realización debe ocurrir antes del pago.
-// "on_create" es la opción para cuando no hay aprobaciones configuradas.
 const ACTUAL_TRIGGERS = [
-  { value: "on_create",  label: "Al enviar (inmediato)",  description: "Pasa a realizado en cuanto se crea la factura — úsalo cuando no hay flujo de aprobación", requiresNoApprovals: true },
-  { value: "on_approve", label: "Al aprobar factura",     description: "Pasa a realizado cuando la factura es aprobada — requiere pasos de aprobación configurados", requiresApprovals: true },
-  { value: "on_account", label: "Al contabilizar",        description: "Pasa a realizado cuando se marca como contabilizada (recomendado)" },
+  { value: "on_approve", label: "Al aprobar factura" },
+  { value: "on_account", label: "Al contabilizar factura" },
 ];
 
 const BOX_TRIGGERS = [
-  { value: "on_create",  label: "Al enviar (inmediato)",  description: "Pasa a realizado en cuanto se abre el sobre — úsalo cuando no hay flujo de aprobación", requiresNoApprovals: true },
-  { value: "on_approve", label: "Al aprobar sobre",       description: "Pasa a realizado cuando el sobre es aprobado — requiere pasos de aprobación configurados", requiresApprovals: true },
-  { value: "on_account", label: "Al contabilizar",        description: "Pasa a realizado cuando se marca como contabilizado (recomendado)" },
+  { value: "on_create",  label: "Al enviar sobre" },
+  { value: "on_account", label: "Al contabilizar sobre" },
 ];
 
 interface CostSettings {
@@ -1571,7 +1567,6 @@ export default function AccountingConfigPage() {
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
           <h2 className="font-semibold text-slate-900">Comprometido (POs)</h2>
-          <p className="text-sm text-slate-500 mt-1">Define cuándo se suma el importe al presupuesto comprometido</p>
         </div>
 
         <div className="p-6">
@@ -1608,7 +1603,6 @@ export default function AccountingConfigPage() {
                         <span className="text-[10px] font-medium px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">Sin aprobaciones configuradas</span>
                       )}
                     </div>
-                    <p className="text-sm text-slate-500 mt-0.5">{trigger.description}</p>
                   </div>
                 </label>
               );
@@ -1627,16 +1621,11 @@ export default function AccountingConfigPage() {
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
           <h2 className="font-semibold text-slate-900">Realizado (Facturas)</h2>
-          <p className="text-sm text-slate-500 mt-1">Define cuándo el importe pasa de comprometido a realizado</p>
         </div>
 
         <div className="p-6">
           <div className="space-y-3">
-            {ACTUAL_TRIGGERS.filter((trigger) => {
-              if ((trigger as any).requiresNoApprovals) return invoiceApprovals.length === 0;
-              if ((trigger as any).requiresApprovals)   return invoiceApprovals.length > 0;
-              return true;
-            }).map((trigger) => {
+            {ACTUAL_TRIGGERS.map((trigger) => {
               const isDisabled = trigger.value === "on_approve" && invoiceApprovals.length === 0;
               const isSelected = costSettings.invoiceActualTrigger === trigger.value;
               return (
@@ -1661,7 +1650,6 @@ export default function AccountingConfigPage() {
                   />
                   <div className="flex-1">
                     <p className={`font-medium ${isDisabled ? "text-slate-400" : "text-slate-900"}`}>{trigger.label}</p>
-                    <p className="text-sm text-slate-500 mt-0.5">{trigger.description}</p>
                   </div>
                 </label>
               );
@@ -1674,17 +1662,12 @@ export default function AccountingConfigPage() {
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
           <h2 className="font-semibold text-slate-900">Realizado (BOX)</h2>
-          <p className="text-sm text-slate-500 mt-1">Define cuándo los gastos de tarjeta y transferencia pasan a realizado</p>
         </div>
 
         <div className="p-6">
           <div className="space-y-3">
-            {BOX_TRIGGERS.filter((trigger) => {
-              if ((trigger as any).requiresNoApprovals) return boxApprovals.length === 0;
-              if ((trigger as any).requiresApprovals)   return boxApprovals.length > 0;
-              return true;
-            }).map((trigger) => {
-              const isDisabled = trigger.value === "on_approve" && boxApprovals.length === 0;
+            {BOX_TRIGGERS.map((trigger) => {
+              const isDisabled = false;
               const isSelected = costSettings.boxActualTrigger === trigger.value;
               return (
                 <label
@@ -1708,7 +1691,6 @@ export default function AccountingConfigPage() {
                   />
                   <div className="flex-1">
                     <p className={`font-medium ${isDisabled ? "text-slate-400" : "text-slate-900"}`}>{trigger.label}</p>
-                    <p className="text-sm text-slate-500 mt-0.5">{trigger.description}</p>
                   </div>
                 </label>
               );

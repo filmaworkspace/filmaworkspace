@@ -1502,15 +1502,9 @@ export default function EditInvoicePage() {
             <div className="max-h-96 overflow-y-auto">
               {filteredSubAccounts.map(s => (
                 <button key={s.id} onClick={() => selectAccount(s)} className="w-full px-4 py-3 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-slate-900 font-mono">{s.code}</p>
-                      <p className="text-sm text-slate-500">{s.description}</p>
-                    </div>
-                    <div className="text-right text-xs">
-                      <p className={cx("font-medium", s.available >= 0 ? "text-emerald-600" : "text-red-600")}>Disp: {formatCurrency(s.available)} €</p>
-                    </div>
-                  </div>
+                  <p className="font-medium text-slate-900 font-mono">{s.code}</p>
+                  <p className="text-sm text-slate-500">{s.description}</p>
+                  {s.accountDescription && <p className="text-xs text-slate-400 mt-0.5">{s.accountCode} · {s.accountDescription}</p>}
                 </button>
               ))}
             </div>

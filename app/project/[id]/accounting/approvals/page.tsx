@@ -64,6 +64,7 @@ import {
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { handlePOStatusChange, handleInvoiceStatusChange, updatePOItemsInvoiced } from "@/lib/budgetOperations";
+import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -650,10 +651,14 @@ export default function ApprovalsPage() {
           // El estado real de la factura será "pending" (aprobada, pendiente de pago)
           // Usar budgetOperations para manejar el realizado (si corresponde según config)
           await handleInvoiceStatusChange(approval.projectId, oldStatus, "pending", budgetItems);
-          
-          // Si tiene PO vinculada, actualizar los invoicedAmount de cada item de la PO
+
+          // Actualizar tracking de PO (invoicedAmount) solo si la aprobación ya realiza
+          // según la config. Si es on_account/on_paid, se actualizará en ese momento.
           if (approval.poId) {
-            await updatePOItemsInvoiced(approval.projectId, approval.poId, budgetItems, "add");
+            const costSettings = await getCostSettings(approval.projectId);
+            if (shouldRealizeInvoice("pending", costSettings)) {
+              await updatePOItemsInvoiced(approval.projectId, approval.poId, budgetItems, "add");
+            }
           }
         } else if (approval.type === "box") {
           // Sobre BOX (tarjeta o transferencia)

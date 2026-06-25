@@ -1443,15 +1443,14 @@ export default function NewInvoicePage() {
       const costSettings = await getCostSettings(id);
       const finalStatus = invoiceData.status;
       
-      // Actualizar presupuesto solo si corresponde según configuración
+      // Actualizar presupuesto y tracking de PO solo si la factura ya debe realizarse
+      // según la configuración (on_create). Si es on_approve/on_account/on_paid,
+      // estas actualizaciones ocurren en el momento de aprobación/contabilización/pago.
       if (shouldRealizeInvoice(finalStatus, costSettings)) {
         await updateSubAccountsBudget(items, !!selectedPO);
-      }
-
-      // Actualizar tracking de PO siempre que haya PO vinculada,
-      // independientemente de cuándo se realice el presupuesto
-      if (selectedPO) {
-        await updatePOInvoicedAmount(selectedPO.id, items);
+        if (selectedPO) {
+          await updatePOInvoicedAmount(selectedPO.id, items);
+        }
       }
 
       // Actualizar documento reemplazado
