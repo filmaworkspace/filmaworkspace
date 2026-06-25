@@ -191,8 +191,8 @@ const BOX_TRIGGERS = [
 
 interface CostSettings {
   poCommitmentTrigger: "on_create" | "on_approve";
-  invoiceActualTrigger: "on_create" | "on_approve" | "on_account";
-  boxActualTrigger: "on_create" | "on_approve" | "on_account";
+  invoiceActualTrigger: "on_code" | "on_account" | "on_create" | "on_approve";
+  boxActualTrigger: "on_create" | "on_account" | "on_approve";
 }
 
 // Configuración específica del proyecto para contabilidad
