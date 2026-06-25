@@ -1,19 +1,19 @@
 interface FichaInviteProps {
   firstName: string;
   projectName: string;
-  role: string;
   formUrl: string;
-  pin: string;
-  senderName: string;
+  role?: string;
+  pin?: string;
+  senderName?: string;
 }
 
 export function fichaInviteHtml({
   firstName,
   projectName,
-  role,
+  role = "",
   formUrl,
-  pin,
-  senderName,
+  pin = "",
+  senderName = "Filma Workspace",
 }: FichaInviteProps): string {
   const BD     = "#342A21";
   const CREAM  = "#FAF8F5";
@@ -172,10 +172,10 @@ export function fichaInviteHtml({
 export function fichaInviteText({
   firstName,
   projectName,
-  role,
+  role = "",
   formUrl,
-  pin,
-  senderName,
+  pin = "",
+  senderName = "Filma Workspace",
 }: FichaInviteProps): string {
   return `
 Hola ${firstName},
