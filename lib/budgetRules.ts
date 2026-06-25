@@ -3,9 +3,7 @@ import { db } from "@/lib/firebase";
 
 export interface CostSettings {
   poCommitmentTrigger: "on_create" | "on_approve";
-  // "on_create" = realiza en cuanto se crea (sin aprobaciones)
-  // "on_paid"   = compatibilidad con datos antiguos; el UI ya no lo ofrece
-  invoiceActualTrigger: "on_create" | "on_approve" | "on_account" | "on_paid";
+  invoiceActualTrigger: "on_code" | "on_account" | "on_create" | "on_approve" | "on_paid";
 }
 
 const DEFAULT_SETTINGS: CostSettings = {
@@ -23,9 +21,10 @@ export async function getCostSettings(projectId: string): Promise<CostSettings> 
     
     if (costConfigSnap.exists()) {
       const data = costConfigSnap.data();
-      // Migrar "on_paid" (opción eliminada) → "on_account"
       const rawInvoice = data.invoiceActualTrigger || DEFAULT_SETTINGS.invoiceActualTrigger;
-      const migratedInvoice = rawInvoice === "on_paid" ? "on_account" : rawInvoice;
+      const migratedInvoice = rawInvoice === "on_paid" ? "on_account"
+        : rawInvoice === "on_approve" ? "on_code"
+        : rawInvoice;
       return {
         poCommitmentTrigger: data.poCommitmentTrigger || DEFAULT_SETTINGS.poCommitmentTrigger,
         invoiceActualTrigger: migratedInvoice as CostSettings["invoiceActualTrigger"],
@@ -117,25 +116,28 @@ export function shouldRealizeInvoice(
   }
   
   if (costSettings.invoiceActualTrigger === "on_create") {
-    // Realizar en cuanto se crea (sale del estado draft), sin esperar aprobación
     return invoiceStatus !== "draft" &&
            invoiceStatus !== "rejected" &&
            invoiceStatus !== "void" &&
            invoiceStatus !== "cancelled";
   }
 
+  if (costSettings.invoiceActualTrigger === "on_code") {
+    // Realizar cuando el equipo de contabilidad codifica la factura (coded) o estados posteriores
+    return invoiceStatus === "coded" || invoiceStatus === "accounted" || invoiceStatus === "paid";
+  }
+
   if (costSettings.invoiceActualTrigger === "on_approve") {
-    // Realizar cuando se aprueba (pending = aprobada pendiente de pago), contabiliza o paga
-    return invoiceStatus === "pending" || invoiceStatus === "approved" ||
+    // Legado → migrado a on_code, mismo comportamiento
+    return invoiceStatus === "coded" || invoiceStatus === "pending" || invoiceStatus === "approved" ||
            invoiceStatus === "accounted" || invoiceStatus === "paid";
   }
-  
+
   if (costSettings.invoiceActualTrigger === "on_account") {
-    // Realizar cuando se contabiliza o paga
     return invoiceStatus === "accounted" || invoiceStatus === "paid";
   }
-  
-  // on_paid: solo realizar cuando está pagada
+
+  // on_paid: legado
   return invoiceStatus === "paid";
 }
 

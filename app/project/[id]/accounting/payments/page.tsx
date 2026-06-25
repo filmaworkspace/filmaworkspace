@@ -304,7 +304,7 @@ export default function PaymentsPage() {
       const invoicesData = invoicesSnap.docs
         .filter((docSnap) => {
           const data = docSnap.data();
-          return (data.status === "pending" || data.status === "overdue" || data.status === "pending_approval") && !assignedInvoiceIds.has(docSnap.id);
+          return (data.status === "pending" || data.status === "coded" || data.status === "overdue" || data.status === "pending_approval") && !assignedInvoiceIds.has(docSnap.id);
         })
         .map((docSnap) => ({
           id: docSnap.id,

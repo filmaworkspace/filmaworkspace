@@ -81,7 +81,7 @@ import { unrealizeInvoice, updatePOItemsInvoiced, realizeInvoice } from "@/lib/b
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type InvoiceStatus = "draft" | "pending" | "pending_approval" | "approved" | "rejected" | "paid" | "cancelled" | "coding" | "accounted" | "returned" | "partial_return";
+type InvoiceStatus = "draft" | "pending" | "pending_approval" | "approved" | "rejected" | "paid" | "cancelled" | "coding" | "coded" | "accounted" | "returned" | "partial_return";
 type DocumentType = "invoice" | "proforma" | "autonomo" | "ticket" | "budget" | "guarantee";
 
 interface EpisodeDistribution {
@@ -268,6 +268,7 @@ const STATUS_CONFIG: Record<InvoiceStatus, { bg: string; text: string; label: st
   pending: { bg: "bg-amber-50", text: "text-amber-700", label: "Pendiente pago", icon: Clock },
   pending_approval: { bg: "bg-amber-50", text: "text-amber-700", label: "Pend. aprobación", icon: Clock },
   approved: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Aprobada", icon: CheckCircle },
+  coded: { bg: "bg-violet-50", text: "text-violet-700", label: "Codificada", icon: Code },
   accounted: { bg: "bg-teal-50", text: "text-teal-700", label: "Contabilizada", icon: Lock },
   rejected: { bg: "bg-red-50", text: "text-red-700", label: "Rechazada", icon: XCircle },
   paid: { bg: "bg-blue-50", text: "text-blue-700", label: "Pagada", icon: CreditCard },
@@ -545,9 +546,16 @@ export default function InvoiceDetailPage() {
         return { ...item, baseAmount: t.base, vatAmount: t.vat, irpfAmount: t.irpf, totalAmount: t.total };
       });
 
+      const costSettings = await getCostSettings(projectId);
+
       // Determinar el nuevo estado
-      const newStatus = invoice.status === "draft" ? "pending_approval" : invoice.status;
-      
+      // Con on_code: la primera codificación de una factura aprobada la pasa a "coded"
+      const isFirstCoding = costSettings.invoiceActualTrigger === "on_code" &&
+        (invoice.status === "pending" || invoice.status === "approved");
+      const newStatus = invoice.status === "draft" ? "pending_approval"
+        : isFirstCoding ? "coded"
+        : invoice.status;
+
       // Guardar datos de la factura
       await updateDoc(doc(db, `projects/${projectId}/invoices`, invoice.id), {
         supplierNumber: codingForm.supplierNumber, invoiceDate: codingForm.invoiceDate ? Timestamp.fromDate(new Date(codingForm.invoiceDate)) : null,
@@ -560,36 +568,28 @@ export default function InvoiceDetailPage() {
         codedAt: Timestamp.now(), codedBy: permissions.userId, codedByName: permissions.userName,
       });
 
-      // Solo actualizar presupuesto y PO si la factura YA ESTABA realizada (re-codificación)
-      // NO tocar nada si es la primera codificación (draft → pending_approval)
-      if (invoice.poId && invoice.status !== "draft") {
-        const costSettings = await getCostSettings(projectId);
+      if (invoice.status !== "draft") {
         const wasRealized = shouldRealizeInvoice(invoice.status, costSettings);
-        
-        if (wasRealized) {
-          // Re-codificación de factura ya realizada: actualizar items de PO
-          // Primero restar los valores antiguos
-          if (invoice.items && invoice.items.length > 0) {
+
+        if (isFirstCoding) {
+          // Primera codificación con on_code: realizar con los ítems FINALES del equipo de contabilidad
+          const newBudgetItems = items.filter(i => i.subAccountId && i.baseAmount > 0)
+            .map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
+          if (newBudgetItems.length > 0) await realizeInvoice(projectId, newBudgetItems);
+          if (invoice.poId) await updatePOItemsInvoiced(projectId, invoice.poId, items, "add");
+        } else if (wasRealized && invoice.poId) {
+          // Re-codificación de factura ya realizada: actualizar ítems de PO con los nuevos valores
+          if (invoice.items && invoice.items.length > 0)
             await updatePOItemsInvoiced(projectId, invoice.poId, invoice.items, "subtract");
-          }
-          // Luego sumar los nuevos valores
           await updatePOItemsInvoiced(projectId, invoice.poId, items, "add");
-          
-          // También actualizar el presupuesto (committed/actual) si los items cambiaron
-          const oldBudgetItems = invoice.items
+
+          const oldBudgetItems = (invoice.items || [])
             .filter((i: any) => i.subAccountId && i.baseAmount > 0)
             .map((i: any) => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
-          const newBudgetItems = items
-            .filter(i => i.subAccountId && i.baseAmount > 0)
+          const newBudgetItems = items.filter(i => i.subAccountId && i.baseAmount > 0)
             .map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
-          
-          // Revertir el realizado antiguo y aplicar el nuevo
-          if (oldBudgetItems.length > 0) {
-            await unrealizeInvoice(projectId, oldBudgetItems);
-          }
-          if (newBudgetItems.length > 0) {
-            await realizeInvoice(projectId, newBudgetItems);
-          }
+          if (oldBudgetItems.length > 0) await unrealizeInvoice(projectId, oldBudgetItems);
+          if (newBudgetItems.length > 0) await realizeInvoice(projectId, newBudgetItems);
         }
       }
 
@@ -1244,8 +1244,13 @@ export default function InvoiceDetailPage() {
                         </div>
                       </div>
 
+                      <div className="col-span-2">
+                        <label className="text-xs text-slate-500 block mb-1">Cantidad</label>
+                        <input type="number" step="0.01" min="0" value={item.quantity || ""} onChange={(e) => updateCodingItem(idx, "quantity", parseFloat(e.target.value) || 0)} placeholder="1" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none text-right font-mono" />
+                      </div>
+
                       <div className="col-span-3">
-                        <label className="text-xs text-slate-500 block mb-1">Base imponible</label>
+                        <label className="text-xs text-slate-500 block mb-1">Precio unit.</label>
                         <div className="relative">
                           <input type="number" step="0.01" value={item.unitPrice || ""} onChange={(e) => updateCodingItem(idx, "unitPrice", parseFloat(e.target.value) || 0)} placeholder="0.00" className="w-full px-3 py-2 pr-8 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none text-right font-mono" />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">€</span>

@@ -507,6 +507,7 @@ export default function InvoicesPage() {
   const getStatusBadge = (status: string) => {
     const config: Record<string, { bg: string; text: string; label: string }> = {
       pending_approval: { bg: "bg-purple-50", text: "text-purple-700", label: "Pte. aprobación" },
+      coded: { bg: "bg-violet-50", text: "text-violet-700", label: "Codificada" },
       pending: { bg: "bg-amber-50", text: "text-amber-700", label: "Pte. pago" },
       paid: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Pagada" },
       overdue: { bg: "bg-red-50", text: "text-red-700", label: "Vencida" },

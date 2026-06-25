@@ -180,7 +180,7 @@ const COMMITMENT_TRIGGERS = [
 ];
 
 const ACTUAL_TRIGGERS = [
-  { value: "on_approve", label: "Al aprobar factura" },
+  { value: "on_code", label: "Al codificar factura" },
   { value: "on_account", label: "Al contabilizar factura" },
 ];
 
@@ -519,13 +519,11 @@ export default function AccountingConfigPage() {
         let rawInvoice = data.invoiceActualTrigger || "on_account";
         let rawBox     = data.boxActualTrigger     || "on_account";
         let rawPO      = data.poCommitmentTrigger  || "on_approve";
-        // "on_paid" eliminado → "on_account"
-        if (rawInvoice === "on_paid") rawInvoice = "on_account";
-        if (rawBox     === "on_paid") rawBox     = "on_account";
-        // "on_approve" sin aprobaciones → "on_create"
-        if (rawInvoice === "on_approve" && localInvoiceApprovals.length === 0) rawInvoice = "on_create";
-        if (rawBox     === "on_approve" && localBoxApprovals.length     === 0) rawBox     = "on_create";
-        if (rawPO      === "on_approve" && localPoApprovals.length      === 0) rawPO      = "on_create";
+        // Migraciones de valores eliminados
+        if (rawInvoice === "on_paid")    rawInvoice = "on_account";
+        if (rawBox     === "on_paid")    rawBox     = "on_account";
+        if (rawInvoice === "on_approve") rawInvoice = "on_code";
+        if (rawBox     === "on_approve") rawBox     = "on_create";
         setCostSettings({
           poCommitmentTrigger: rawPO as any,
           invoiceActualTrigger: rawInvoice as any,
