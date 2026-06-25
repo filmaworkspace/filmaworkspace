@@ -626,7 +626,7 @@ export default function ReplaceDocumentPage() {
                 <div className="flex items-start gap-2">
                   <AlertTriangle size={14} className="text-amber-600 mt-0.5" />
                   <p className="text-xs text-amber-800">
-                    Al sustituir, el documento pasará a estado "Aprobado" y deberá ser codificado de nuevo.
+                    Al sustituir, el documento pasará a estado &ldquo;Aprobado&rdquo; y deberá ser codificado de nuevo.
                   </p>
                 </div>
               </div>

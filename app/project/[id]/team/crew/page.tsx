@@ -997,7 +997,7 @@ export default function CrewPage() {
                             </div>
                             <div>
                               <p className="text-sm font-semibold text-slate-900">{fullName(member)}</p>
-                              {member.artisticName && <p className="text-xs text-slate-400 italic mt-0.5">"{member.artisticName}"</p>}
+                              {member.artisticName && <p className="text-xs text-slate-400 italic mt-0.5">&ldquo;{member.artisticName}&rdquo;</p>}
                               {member.section === "cast" && member.character && <p className="text-xs text-violet-500 mt-0.5">{member.character}</p>}
                             </div>
                           </div>

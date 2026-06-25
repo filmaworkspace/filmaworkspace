@@ -1678,7 +1678,7 @@ export default function PODetailPage() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">Reabrir PO-{po.number}</h3>
-                <p className="text-xs text-slate-500">Volverá al estado "Aprobada"</p>
+                <p className="text-xs text-slate-500">Volverá al estado &ldquo;Aprobada&rdquo;</p>
               </div>
             </div>
             <div className="p-6">
@@ -1897,7 +1897,7 @@ export default function PODetailPage() {
                 showApprovalNoteModal.type === "rejection" ? "bg-red-50 border-red-200" :
                 "bg-slate-50 border-slate-200"
               }`}>
-                <p className="text-sm text-slate-700 italic">"{showApprovalNoteModal.text}"</p>
+                <p className="text-sm text-slate-700 italic">&ldquo;{showApprovalNoteModal.text}&rdquo;</p>
               </div>
               
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">

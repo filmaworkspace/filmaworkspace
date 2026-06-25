@@ -2118,7 +2118,7 @@ export default function InvoiceDetailPage() {
                 showApprovalNoteModal.type === "rejection" ? "bg-red-50 border-red-200" :
                 "bg-slate-50 border-slate-200"
               }`}>
-                <p className="text-sm text-slate-700 italic">"{showApprovalNoteModal.text}"</p>
+                <p className="text-sm text-slate-700 italic">&ldquo;{showApprovalNoteModal.text}&rdquo;</p>
               </div>
               
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">

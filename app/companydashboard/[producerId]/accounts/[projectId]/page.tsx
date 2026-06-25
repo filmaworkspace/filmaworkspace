@@ -263,7 +263,7 @@ function AccountCombobox({
           {/* Results */}
           <div className="max-h-56 overflow-y-auto py-1">
             {matches.length === 0 ? (
-              <p className="px-3 py-3 text-[11px] text-slate-400 text-center">Sin resultados para "{query}"</p>
+              <p className="px-3 py-3 text-[11px] text-slate-400 text-center">Sin resultados para &ldquo;{query}&rdquo;</p>
             ) : matches.map(a => {
               const isSelected = a.code === value;
               const typeColor  = TYPE_COLORS[a.type] || "bg-slate-100 text-slate-500";

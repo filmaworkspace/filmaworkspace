@@ -579,7 +579,7 @@ export default function PaymentPayPage() {
           </div>
           <h1 className="text-2xl font-semibold text-slate-900 mb-2">Acceso restringido</h1>
           <p className="text-slate-500 mb-6">
-            No tienes permisos para acceder a la gestión de pagos. Esta sección está disponible únicamente para usuarios con nivel de acceso "Contabilidad ampliada".
+            No tienes permisos para acceder a la gestión de pagos. Esta sección está disponible únicamente para usuarios con nivel de acceso &ldquo;Contabilidad ampliada&rdquo;.
           </p>
           <Link 
             href={`/project/${id}/accounting`} 

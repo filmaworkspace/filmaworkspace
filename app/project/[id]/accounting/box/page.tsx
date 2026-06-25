@@ -2684,7 +2684,7 @@ export default function BoxesPage() {
                             <p className="text-xs text-amber-500 mt-1 italic">Esta incidencia se anota para cuadre posterior — no se cierra.</p>
                           )}
                           {drawerExpense.conflictNote && (
-                            <p className="text-xs text-amber-700 mt-1 italic">"{drawerExpense.conflictNote}"</p>
+                            <p className="text-xs text-amber-700 mt-1 italic">&ldquo;{drawerExpense.conflictNote}&rdquo;</p>
                           )}
                           {drawerExpense.conflictAnnotatedAt && (
                             <p className="text-xs text-amber-500 mt-1">

@@ -177,7 +177,7 @@ export default function ConfigDepartments() {
               </button>
             </div>
             <div className="p-6">
-              <p className="text-sm text-slate-500 mb-6">Se eliminará "<span className="font-medium text-slate-700">{confirmDelete}</span>" del proyecto.</p>
+              <p className="text-sm text-slate-500 mb-6">Se eliminará &ldquo;<span className="font-medium text-slate-700">{confirmDelete}</span>&rdquo; del proyecto.</p>
               <div className="flex gap-3">
                 <button onClick={() => setConfirmDelete(null)} className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">
                   Cancelar

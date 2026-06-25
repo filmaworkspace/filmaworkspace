@@ -1239,7 +1239,7 @@ export default function SupplierDetailPage() {
                   </p>
                   {supplierClosure.notes && (
                     <p className="text-white/80 text-sm mt-2 bg-white/10 rounded-lg px-3 py-2">
-                      "{supplierClosure.notes}"
+                      &ldquo;{supplierClosure.notes}&rdquo;
                     </p>
                   )}
                   {supplierClosure.signedLetterName && (

@@ -1179,7 +1179,7 @@ export default function POsPage() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">Reabrir PO-{selectedPO.number}</h3>
-                <p className="text-xs text-slate-500">Volverá al estado "Aprobada"</p>
+                <p className="text-xs text-slate-500">Volverá al estado &ldquo;Aprobada&rdquo;</p>
               </div>
             </div>
             <div className="p-6">

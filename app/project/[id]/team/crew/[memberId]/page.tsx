@@ -781,7 +781,7 @@ export default function CrewMemberPage() {
               </div>
 
               <h1 className="text-lg font-bold text-slate-900 leading-tight">{member.name}</h1>
-              {member.artisticName && <p className="text-sm text-slate-400 italic mt-0.5">"{member.artisticName}"</p>}
+              {member.artisticName && <p className="text-sm text-slate-400 italic mt-0.5">&ldquo;{member.artisticName}&rdquo;</p>}
               <div className="mt-2">
                 <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${sc.bgColor} ${sc.textColor}`}>
                   {sc.label}
