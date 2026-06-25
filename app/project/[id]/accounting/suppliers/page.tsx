@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+import { IBANField } from "@/components/IBANField";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
@@ -960,14 +961,17 @@ export default function SuppliersPage() {
                       )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Cuenta bancaria (IBAN)</label>
-                      <input type="text" value={formData.bankAccount} onChange={(e) => handleBankAccountChange(e.target.value)} placeholder={formData.country === "ES" ? "Pega los 20 dígitos o IBAN completo" : `${getCountryInfo(formData.country).ibanPrefix}XX XXXX XXXX XXXX XXXX XXXX`} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
-                      <p className="text-xs text-slate-500 mt-1">{formData.country === "ES" ? "Pega 20 dígitos y se calcula ESXX automáticamente" : `Prefijo ${getCountryInfo(formData.country).ibanPrefix} automático`}</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">BIC/SWIFT <span className="text-slate-400 font-normal">(opcional)</span></label>
-                      <input type="text" value={formData.bic} onChange={(e) => setFormData({ ...formData, bic: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11) })} placeholder="Código BIC" maxLength={11} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono uppercase" />
-                      <p className="text-xs text-slate-500 mt-1">Código de 8 u 11 caracteres</p>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Cuenta bancaria (IBAN) / BIC</label>
+                      <IBANField
+                        iban={formData.bankAccount}
+                        bic={formData.bic}
+                        onIBANChange={(v) => setFormData({ ...formData, bankAccount: v })}
+                        onBICChange={(v) => setFormData({ ...formData, bic: v })}
+                        ibanClassName="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        bicClassName="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        ibanPlaceholder="Pega 20 dígitos o IBAN completo"
+                        bicPlaceholder="BIC/SWIFT (opcional)"
+                      />
                     </div>
                   </div>
                 </div>

@@ -280,7 +280,7 @@ export default function ApprovalsPage() {
             attachmentUrl: d.attachmentUrl, attachmentFileName: d.attachmentFileName,
             items: d.items || [], department: d.department, poType: d.poType, currency: d.currency || "EUR",
             timeline: buildTimeline(d, membersMap), autoChecks: buildAutoChecks(d, "po", subAccountsMap),
-            budgetImpact: calculateBudgetImpact(d.items || [], subAccountsMap, false),
+            budgetImpact: calculateBudgetImpact(d.items || [], subAccountsMap, "po", false),
             supplierStats: await loadSupplierStats(d.supplierId), daysWaiting, isUrgent: daysWaiting >= 3,
           });
         }
@@ -308,7 +308,7 @@ export default function ApprovalsPage() {
               attachmentUrl: d.attachmentUrl, attachmentFileName: d.attachmentFileName,
               items: d.items || [], poId: d.poId, poNumber: d.poNumber,
               timeline: buildTimeline(d, membersMap), autoChecks: buildAutoChecks(d, "invoice", subAccountsMap),
-              budgetImpact: calculateBudgetImpact(d.items || [], subAccountsMap, !!d.poId),
+              budgetImpact: calculateBudgetImpact(d.items || [], subAccountsMap, "invoice", !!d.poId),
               supplierStats: await loadSupplierStats(d.supplierId), poComparison, daysWaiting, isUrgent: daysWaiting >= 3,
             });
           }
@@ -506,31 +506,39 @@ export default function ApprovalsPage() {
     return checks;
   };
 
-  const calculateBudgetImpact = (items: any[], subAccountsMap: Record<string, any>, hasPO: boolean): PendingApproval["budgetImpact"] => {
+  // docType: "po" = la aprobación compromete presupuesto; "invoice" = puede realizar según config
+  const calculateBudgetImpact = (items: any[], subAccountsMap: Record<string, any>, docType: "po" | "invoice", hasPO: boolean): PendingApproval["budgetImpact"] => {
     const impact: PendingApproval["budgetImpact"] = [];
     const accountImpacts: Record<string, number> = {};
     for (const item of items) { if (item.subAccountId && subAccountsMap[item.subAccountId]) accountImpacts[item.subAccountId] = (accountImpacts[item.subAccountId] || 0) + (item.baseAmount || 0); }
-    for (const [subAccountId, amount] of Object.entries(accountImpacts)) { 
-      const sub = subAccountsMap[subAccountId]; 
-      if (sub) {
-        // Si tiene PO: el realizado aumenta y el comprometido disminuye (el available no cambia)
-        // Si no tiene PO: el realizado aumenta y el available disminuye
-        const newCommitted = hasPO ? Math.max(0, sub.committed - amount) : sub.committed;
-        const newActual = sub.actual + amount;
-        const newAvailable = hasPO ? sub.available : sub.available - amount;
-        impact.push({ 
-          accountCode: sub.code, 
-          accountName: sub.description, 
-          budgeted: sub.budgeted, 
-          committed: sub.committed, 
-          actual: sub.actual, 
-          available: sub.available, 
-          afterApproval: newAvailable,
-          // Campos adicionales para mostrar el cambio
-          committedAfter: newCommitted,
-          actualAfter: newActual,
-        }); 
+    for (const [subAccountId, amount] of Object.entries(accountImpacts)) {
+      const sub = subAccountsMap[subAccountId];
+      if (!sub) continue;
+      let newCommitted = sub.committed;
+      let newActual = sub.actual;
+      if (docType === "po") {
+        // Aprobar una PO compromete presupuesto
+        newCommitted = sub.committed + amount;
+      } else if (docType === "invoice" && hasPO) {
+        // Factura con PO: comprometido baja, realizado sube (neto = 0 en disponible)
+        newCommitted = Math.max(0, sub.committed - amount);
+        newActual = sub.actual + amount;
+      } else {
+        // Factura sin PO: realizado sube, disponible baja
+        newActual = sub.actual + amount;
       }
+      const newAvailable = sub.budgeted - newCommitted - newActual;
+      impact.push({
+        accountCode: sub.code,
+        accountName: sub.description,
+        budgeted: sub.budgeted,
+        committed: sub.committed,
+        actual: sub.actual,
+        available: sub.available,
+        afterApproval: newAvailable,
+        committedAfter: newCommitted,
+        actualAfter: newActual,
+      });
     }
     return impact;
   };
@@ -1078,8 +1086,85 @@ export default function ApprovalsPage() {
                   {/* Budget Impact */}
                   {currentApproval.budgetImpact && currentApproval.budgetImpact.length > 0 && (
                     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                      <button onClick={() => toggleSection("budget")} className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"><div className="flex items-center gap-3"><PieChart size={18} className="text-slate-500" /><span className="font-semibold text-slate-900">Impacto en presupuesto</span></div>{expandedSections.has("budget") ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}</button>
-                      {expandedSections.has("budget") && (<div className="px-6 pb-6 space-y-3">{currentApproval.budgetImpact.map((impact, idx) => { const isOverBudget = impact.afterApproval < 0; const isLow = impact.afterApproval < impact.budgeted * 0.1 && impact.afterApproval >= 0; return (<div key={idx} className={`p-4 rounded-xl border ${isOverBudget ? "border-red-200 bg-red-50" : isLow ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50"}`}><div className="flex items-center justify-between mb-2"><p className="text-sm font-medium text-slate-900">{impact.accountCode}</p>{isOverBudget && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg">Sin presupuesto</span>}{isLow && !isOverBudget && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg">Bajo</span>}</div><p className="text-xs text-slate-500 mb-3">{impact.accountName}</p><div className="grid grid-cols-4 gap-2 text-xs"><div><p className="text-slate-500">Presupuestado</p><p className="font-semibold text-slate-900">{formatCurrency(impact.budgeted)}</p></div><div><p className="text-slate-500">Disponible</p><p className="font-semibold text-slate-900">{formatCurrency(impact.available)}</p></div><div><p className="text-slate-500">Este doc.</p><p className="font-semibold text-amber-600">-{formatCurrency(impact.available - impact.afterApproval)}</p></div><div><p className="text-slate-500">Tras aprobar</p><p className={`font-semibold ${isOverBudget ? "text-red-600" : isLow ? "text-amber-600" : "text-emerald-600"}`}>{formatCurrency(impact.afterApproval)}</p></div></div></div>); })}</div>)}
+                      <button onClick={() => toggleSection("budget")} className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <PieChart size={18} className="text-slate-500" />
+                          <span className="font-semibold text-slate-900">Impacto en presupuesto</span>
+                          {currentApproval.budgetImpact.some(i => i.afterApproval < 0) && (
+                            <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg">Sin presupuesto</span>
+                          )}
+                        </div>
+                        {expandedSections.has("budget") ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
+                      </button>
+                      {expandedSections.has("budget") && (
+                        <div className="px-6 pb-6 space-y-4">
+                          {currentApproval.budgetImpact.map((impact, idx) => {
+                            const isOverBudget = impact.afterApproval < 0;
+                            const isLow = impact.afterApproval >= 0 && impact.afterApproval < impact.budgeted * 0.1;
+                            const execBefore = impact.budgeted > 0 ? ((impact.committed + impact.actual) / impact.budgeted) * 100 : 0;
+                            const execAfter = impact.budgeted > 0 ? (((impact.committedAfter ?? impact.committed) + (impact.actualAfter ?? impact.actual)) / impact.budgeted) * 100 : 0;
+                            const thisDoc = impact.available - impact.afterApproval;
+                            return (
+                              <div key={idx} className={`rounded-xl border ${isOverBudget ? "border-red-200 bg-red-50/40" : isLow ? "border-amber-200 bg-amber-50/40" : "border-slate-200 bg-slate-50/60"}`}>
+                                {/* Header subcuenta */}
+                                <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-200/60">
+                                  <div>
+                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">{impact.accountCode}</span>
+                                    <p className="text-sm font-semibold text-slate-900 mt-0.5">{impact.accountName}</p>
+                                  </div>
+                                  {isOverBudget && <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-lg font-medium">Sin presupuesto</span>}
+                                  {isLow && !isOverBudget && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-lg font-medium">Presupuesto bajo</span>}
+                                </div>
+                                {/* Stats */}
+                                <div className="grid grid-cols-4 gap-0 px-4 py-4">
+                                  <div className="pr-4 border-r border-slate-200">
+                                    <p className="text-xs text-slate-500 mb-1">Presupuestado</p>
+                                    <p className="text-sm font-bold text-slate-900 tabular-nums">{formatCurrency(impact.budgeted)}</p>
+                                  </div>
+                                  <div className="px-4 border-r border-slate-200">
+                                    <p className="text-xs text-slate-500 mb-1">Comprometido</p>
+                                    <p className="text-sm font-semibold text-slate-700 tabular-nums">{formatCurrency(impact.committed)}</p>
+                                    {impact.committedAfter !== undefined && impact.committedAfter !== impact.committed && (
+                                      <p className={`text-xs font-semibold tabular-nums mt-0.5 ${impact.committedAfter > impact.committed ? "text-amber-600" : "text-emerald-600"}`}>
+                                        → {formatCurrency(impact.committedAfter)}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="px-4 border-r border-slate-200">
+                                    <p className="text-xs text-slate-500 mb-1">Realizado</p>
+                                    <p className="text-sm font-semibold text-slate-700 tabular-nums">{formatCurrency(impact.actual)}</p>
+                                    {impact.actualAfter !== undefined && impact.actualAfter !== impact.actual && (
+                                      <p className="text-xs font-semibold text-amber-600 tabular-nums mt-0.5">
+                                        → {formatCurrency(impact.actualAfter)}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="pl-4">
+                                    <p className="text-xs text-slate-500 mb-1">Disponible</p>
+                                    <p className="text-sm font-semibold text-slate-700 tabular-nums">{formatCurrency(impact.available)}</p>
+                                    <p className={`text-xs font-bold tabular-nums mt-0.5 ${isOverBudget ? "text-red-600" : thisDoc === 0 ? "text-slate-500" : "text-amber-600"}`}>
+                                      → {formatCurrency(impact.afterApproval)}
+                                    </p>
+                                  </div>
+                                </div>
+                                {/* Barra de ejecución */}
+                                {impact.budgeted > 0 && (
+                                  <div className="px-4 pb-4">
+                                    <div className="flex items-center justify-between text-xs text-slate-500 mb-1.5">
+                                      <span>Ejecución tras aprobar</span>
+                                      <span className={`font-semibold ${execAfter > 100 ? "text-red-600" : execAfter > 90 ? "text-amber-600" : "text-slate-700"}`}>{execAfter.toFixed(1)}%</span>
+                                    </div>
+                                    <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden relative">
+                                      <div className="h-full bg-slate-300 rounded-full" style={{ width: `${Math.min(execBefore, 100)}%` }} />
+                                      <div className={`absolute top-0 left-0 h-full rounded-full opacity-70 ${isOverBudget ? "bg-red-500" : execAfter > 90 ? "bg-amber-500" : "bg-[#2F52E0]"}`} style={{ width: `${Math.min(execAfter, 100)}%` }} />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
 

@@ -76,6 +76,7 @@ import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
 import { unrealizeInvoice, updatePOItemsInvoiced, realizeInvoice } from "@/lib/budgetOperations";
 import { getInvoiceDisplayState, type InvoiceDisplayState } from "@/lib/invoiceHelpers";
+import { IBANField } from "@/components/IBANField";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1008,13 +1009,16 @@ export default function InvoiceDetailPage() {
                   <label className="text-xs text-slate-500 block mb-1">CIF/NIF</label>
                   <input value={codingForm.supplierTaxId} onChange={(e) => setCodingForm({ ...codingForm, supplierTaxId: e.target.value })} placeholder="B12345678" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none font-mono" />
                 </div>
-                <div>
-                  <label className="text-xs text-slate-500 block mb-1">IBAN</label>
-                  <input value={codingForm.supplierIban} onChange={(e) => setCodingForm({ ...codingForm, supplierIban: e.target.value })} placeholder="ES12 3456 7890 1234 5678 90" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none font-mono" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-500 block mb-1">BIC</label>
-                  <input value={codingForm.supplierBic} onChange={(e) => setCodingForm({ ...codingForm, supplierBic: e.target.value })} placeholder="BBVAESMMXXX" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none font-mono" />
+                <div className="col-span-2">
+                  <label className="text-xs text-slate-500 block mb-1">IBAN / BIC</label>
+                  <IBANField
+                    iban={codingForm.supplierIban}
+                    bic={codingForm.supplierBic}
+                    onIBANChange={(v) => setCodingForm({ ...codingForm, supplierIban: v })}
+                    onBICChange={(v) => setCodingForm({ ...codingForm, supplierBic: v })}
+                    ibanClassName="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none"
+                    bicClassName="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none"
+                  />
                 </div>
               </div>
             </div>

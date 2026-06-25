@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
 import { getInvoiceDisplayState } from "@/lib/invoiceHelpers";
+import { IBANField } from "@/components/IBANField";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
@@ -1389,23 +1390,15 @@ export default function SupplierDetailPage() {
                       
                       <div className="space-y-3">
                         <p className="text-xs text-slate-400 uppercase tracking-wide">Datos bancarios</p>
-                        <div>
-                          <input
-                            type="text"
-                            value={editForm.bankAccount}
-                            onChange={(e) => handleBankAccountChange(e.target.value)}
-                            placeholder="Pega 20 dígitos o IBAN completo"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900"
-                          />
-                          <p className="text-xs text-slate-400 mt-1">Pega 20 dígitos y se calcula ESXX automáticamente</p>
-                        </div>
-                        <input
-                          type="text"
-                          value={editForm.bic}
-                          onChange={(e) => setEditForm({ ...editForm, bic: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11) })}
-                          placeholder="BIC/SWIFT (opcional)"
-                          maxLength={11}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        <IBANField
+                          iban={editForm.bankAccount}
+                          bic={editForm.bic}
+                          onIBANChange={(v) => setEditForm({ ...editForm, bankAccount: v })}
+                          onBICChange={(v) => setEditForm({ ...editForm, bic: v })}
+                          ibanClassName="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                          bicClassName="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                          ibanPlaceholder="Pega 20 dígitos o IBAN completo"
+                          bicPlaceholder="BIC/SWIFT"
                         />
                         <div className="relative custom-dropdown">
                           <button
