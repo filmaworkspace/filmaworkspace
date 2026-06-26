@@ -259,13 +259,6 @@ export default function EditPOPage() {
   // Items originales con todas sus propiedades (para detectar cambios de cuenta)
   const [originalItems, setOriginalItems] = useState<{subAccountId: string; subAccountCode: string; subAccountDescription: string}[]>([]);
 
-  useEffect(() => {
-    if (!permissionsLoading && permissions.userId && id && poId) loadData();
-  }, [permissionsLoading, permissions.userId, id, poId, loadData]);
-
-  useEffect(() => { calculateTotals(); }, [items, calculateTotals]);
-  useEffect(() => { if (Object.keys(touched).length > 0) validateForm(true); }, [formData, items, touched, validateForm]);
-
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   useEffect(() => {
@@ -443,6 +436,9 @@ export default function EditPOPage() {
     }
   }, [id, poId, canEditPO]);
 
+  useEffect(() => {
+    if (!permissionsLoading && permissions.userId && id && poId) loadData();
+  }, [permissionsLoading, permissions.userId, id, poId, loadData]);
 
   const resolveApprovers = (step: ApprovalStep, dept?: string): { ids: string[]; names: string[] } => {
     let approverIds: string[] = [];
@@ -624,6 +620,9 @@ export default function EditPOPage() {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }, [formData, items]);
+
+  useEffect(() => { calculateTotals(); }, [items, calculateTotals]);
+  useEffect(() => { if (Object.keys(touched).length > 0) validateForm(true); }, [formData, items, touched, validateForm]);
 
   const handleBlur = (field: string) => setTouched((prev) => ({ ...prev, [field]: true }));
 

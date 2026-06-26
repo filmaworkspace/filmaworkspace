@@ -290,13 +290,6 @@ export default function EditInvoicePage() {
   const [originalItems, setOriginalItems] = useState<InvoiceItem[]>([]);
   const [wasApproved, setWasApproved] = useState(false);
 
-  useEffect(() => {
-    if (id && invoiceId && !permissionsLoading) loadData();
-  }, [id, invoiceId, permissionsLoading, loadData]);
-
-  useEffect(() => { calculateTotals(); }, [items, calculateTotals]);
-  useEffect(() => { if (Object.keys(touched).length > 0) validateForm(true); }, [formData, items, touched, validateForm]);
-
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   useEffect(() => {
@@ -437,6 +430,10 @@ export default function EditInvoicePage() {
       setLoading(false);
     }
   }, [id, invoiceId, permissions.accountingAccessLevel, permissions.canViewDepartmentPOs, permissions.canViewOwnPOs, permissions.department, permissions.userId]);
+
+  useEffect(() => {
+    if (id && invoiceId && !permissionsLoading) loadData();
+  }, [id, invoiceId, permissionsLoading, loadData]);
 
   // Cálculos
   const calculateItemTotal = (item: InvoiceItem) => {
@@ -698,6 +695,9 @@ export default function EditInvoicePage() {
     if (!silent) setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }, [formData, items, multipleDueDates]);
+
+  useEffect(() => { calculateTotals(); }, [items, calculateTotals]);
+  useEffect(() => { if (Object.keys(touched).length > 0) validateForm(true); }, [formData, items, touched, validateForm]);
 
   const handleBlur = (field: string) => setTouched(p => ({ ...p, [field]: true }));
 

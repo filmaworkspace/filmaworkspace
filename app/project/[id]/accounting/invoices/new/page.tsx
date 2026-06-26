@@ -405,41 +405,11 @@ export default function NewInvoicePage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Effects
-  useEffect(() => {
-    if (!permissionsLoading && permissions.userId && id) {
-      loadData();
-    }
-  }, [permissionsLoading, permissions.userId, id, loadData]);
-
-  useEffect(() => {
-    calculateTotals();
-  }, [items, calculateTotals]);
-
-  useEffect(() => {
-    if (selectedPO) {
-      calculatePOStats();
-      loadPOItemsInvoiced();
-    }
-  }, [selectedPO, calculatePOStats, loadPOItemsInvoiced]);
-
-  useEffect(() => {
-    if (selectedPO && poItemsWithInvoiced.length > 0) {
-      updateAvailableWithCurrentItems();
-    }
-  }, [items, poItemsWithInvoiced.length, selectedPO, updateAvailableWithCurrentItems]);
-
   useEffect(() => {
     if (id) {
       setNextNumber("NUEVO");
     }
   }, [id]);
-
-  useEffect(() => {
-    if (Object.keys(touched).length > 0) {
-      validateForm();
-    }
-  }, [formData, items, uploadedFile, selectedPO, touched, validateForm]);
 
   useEffect(() => {
     if (replaceMode && selectedPendingDoc) {
@@ -1287,6 +1257,36 @@ export default function NewInvoicePage() {
     setErrors(e);
     return Object.keys(e).length === 0;
   }, [uploadedFile, formData, selectedPO, replaceMode, linkedDocumentId, multipleDueDates, dueDates, items, sameAmount, differenceReason]);
+
+  // Effects
+  useEffect(() => {
+    if (!permissionsLoading && permissions.userId && id) {
+      loadData();
+    }
+  }, [permissionsLoading, permissions.userId, id, loadData]);
+
+  useEffect(() => {
+    calculateTotals();
+  }, [items, calculateTotals]);
+
+  useEffect(() => {
+    if (selectedPO) {
+      calculatePOStats();
+      loadPOItemsInvoiced();
+    }
+  }, [selectedPO, calculatePOStats, loadPOItemsInvoiced]);
+
+  useEffect(() => {
+    if (selectedPO && poItemsWithInvoiced.length > 0) {
+      updateAvailableWithCurrentItems();
+    }
+  }, [items, poItemsWithInvoiced.length, selectedPO, updateAvailableWithCurrentItems]);
+
+  useEffect(() => {
+    if (Object.keys(touched).length > 0) {
+      validateForm();
+    }
+  }, [formData, items, uploadedFile, selectedPO, touched, validateForm]);
 
   // Funciones de actualización de presupuesto
   const updateSubAccountsBudget = async (invoiceItems: InvoiceItem[], hasPO: boolean) => {

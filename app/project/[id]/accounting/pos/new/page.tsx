@@ -343,13 +343,6 @@ export default function NewPOPage() {
     }
   }, [permissionsLoading, permissions.fixedDepartment]);
 
-  useEffect(() => {
-    if (!permissionsLoading && permissions.userId && id) loadData();
-  }, [permissionsLoading, permissions.userId, id, loadData]);
-
-  useEffect(() => {
-    calculateTotals();
-  }, [items, calculateTotals]);
 
   // Cargar borradores desde localStorage
   useEffect(() => {
@@ -402,12 +395,6 @@ export default function NewPOPage() {
     setDrafts(updatedDrafts);
     localStorage.setItem(`po_drafts_${id}`, JSON.stringify(updatedDrafts));
   };
-
-  useEffect(() => {
-    if (Object.keys(touched).length > 0) {
-      validateForm(true);
-    }
-  }, [formData, items, uploadedFile, touched, validateForm]);
 
   const loadData = useCallback(async () => {
     try {
@@ -860,6 +847,20 @@ export default function NewPOPage() {
     else setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }, [formData, items]);
+
+  useEffect(() => {
+    if (!permissionsLoading && permissions.userId && id) loadData();
+  }, [permissionsLoading, permissions.userId, id, loadData]);
+
+  useEffect(() => {
+    calculateTotals();
+  }, [items, calculateTotals]);
+
+  useEffect(() => {
+    if (Object.keys(touched).length > 0) {
+      validateForm(true);
+    }
+  }, [formData, items, uploadedFile, touched, validateForm]);
 
   const handleBlur = (field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));

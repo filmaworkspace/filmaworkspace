@@ -157,13 +157,6 @@ export default function POsPage() {
   const menuRef = useRef<HTMLDivElement>(null);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!permissionsLoading && permissions.userId && id) loadData();
-  }, [permissionsLoading, permissions.userId, id, loadData]);
-
-  useEffect(() => {
-    filterAndSortPOs();
-  }, [filterAndSortPOs]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -250,6 +243,14 @@ export default function POsPage() {
     });
     setFilteredPOs(filtered);
   }, [pos, searchTerm, statusFilter, sortOrder]);
+
+  useEffect(() => {
+    if (!permissionsLoading && permissions.userId && id) loadData();
+  }, [permissionsLoading, permissions.userId, id, loadData]);
+
+  useEffect(() => {
+    filterAndSortPOs();
+  }, [filterAndSortPOs]);
 
   const getSortLabel = () => SORT_OPTIONS.find(o => o.value === sortOrder)?.label || "Ordenar";
 

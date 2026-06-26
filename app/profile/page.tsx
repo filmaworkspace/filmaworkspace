@@ -136,13 +136,6 @@ export default function ProfilePage() {
   };
 
   useEffect(() => {
-    if (user) {
-      setFormData({ name: user.name || "", email: user.email || "" });
-      loadProjects();
-    }
-  }, [user, loadProjects]);
-
-  useEffect(() => {
     if (!isLoading && !user) router.push("/");
   }, [isLoading, user, router]);
 
@@ -202,6 +195,13 @@ export default function ProfilePage() {
       setLoadingProjects(false);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      setFormData({ name: user.name || "", email: user.email || "" });
+      loadProjects();
+    }
+  }, [user, loadProjects]);
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

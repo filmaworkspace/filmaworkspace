@@ -367,8 +367,6 @@ export default function InvoiceDetailPage() {
   const formatDateTime = (d: Date) => d ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(d) : "-";
   const formatDateInput = (d: Date) => d ? d.toISOString().split("T")[0] : "";
 
-  useEffect(() => { if (projectId && invoiceId && !permissionsLoading) loadData(); }, [projectId, invoiceId, permissionsLoading, loadData]);
-
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
@@ -494,6 +492,8 @@ export default function InvoiceDetailPage() {
       setLoading(false);
     } catch (error) { console.error("Error:", error); setLoading(false); }
   }, [projectId, invoiceId, permissionsLoading, permissions.isProjectRole, permissions.canViewDepartmentPOs, permissions.canViewOwnPOs, permissions.department, permissions.userId]);
+
+  useEffect(() => { if (projectId && invoiceId && !permissionsLoading) loadData(); }, [projectId, invoiceId, permissionsLoading, loadData]);
 
   const loadSupplierData = async () => {
     if (!invoice?.supplierId) return;

@@ -235,10 +235,6 @@ export default function PODetailPage() {
   const [replacingDocument, setReplacingDocument] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (projectId && poId && !permissionsLoading) loadData();
-  }, [projectId, poId, permissionsLoading, loadData]);
-
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
@@ -306,6 +302,10 @@ export default function PODetailPage() {
       setLoading(false);
     }
   }, [projectId, poId, canViewPO]);
+
+  useEffect(() => {
+    if (projectId && poId && !permissionsLoading) loadData();
+  }, [projectId, poId, permissionsLoading, loadData]);
 
   const verifyPassword = async (): Promise<boolean> => {
     if (!passwordInput.trim()) {

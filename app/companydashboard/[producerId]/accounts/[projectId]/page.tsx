@@ -402,13 +402,6 @@ export default function CompanyAccountsPage() {
   const isInvoiceCoded = (inv: Invoice) =>
     inv.items?.length > 0 && inv.items.every(i => i.subAccountId);
 
-  useEffect(() => { if (!userLoading && !hasAccess) router.push("/dashboard"); }, [userLoading, hasAccess, router]);
-  useEffect(() => { if (producerId && projectId && hasAccess) loadData(); }, [producerId, projectId, hasAccess, loadData]);
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (filterRef.current && !filterRef.current.contains(e.target as Node)) setShowFilter(false); };
-    document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
-  }, []);
-
   // ── Load ───────────────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
     try {
@@ -445,6 +438,13 @@ export default function CompanyAccountsPage() {
     } catch (err) { console.error(err); showToast("error", "Error al cargar datos"); }
     finally { setLoading(false); }
   }, [producerId, projectId, router, isAdmin]);
+
+  useEffect(() => { if (!userLoading && !hasAccess) router.push("/dashboard"); }, [userLoading, hasAccess, router]);
+  useEffect(() => { if (producerId && projectId && hasAccess) loadData(); }, [producerId, projectId, hasAccess, loadData]);
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (filterRef.current && !filterRef.current.contains(e.target as Node)) setShowFilter(false); };
+    document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
+  }, []);
 
   // ── Journal editor ─────────────────────────────────────────────────────────
   const startEditLines = (inv: Invoice) => {

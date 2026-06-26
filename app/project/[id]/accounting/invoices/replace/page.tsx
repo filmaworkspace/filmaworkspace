@@ -153,10 +153,6 @@ export default function ReplaceDocumentPage() {
     return () => unsubscribe();
   }, [router]);
 
-  useEffect(() => {
-    if (userId && projectId && !permissionsLoading) loadData();
-  }, [userId, projectId, permissionsLoading, loadData]);
-
   // Abrir modal automáticamente si viene con docId preseleccionado
   useEffect(() => {
     if (preselectedDocId && documents.length > 0 && !showReplaceModal) {
@@ -227,6 +223,10 @@ export default function ReplaceDocumentPage() {
       setLoading(false);
     }
   }, [projectId]);
+
+  useEffect(() => {
+    if (userId && projectId && !permissionsLoading) loadData();
+  }, [userId, projectId, permissionsLoading, loadData]);
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);

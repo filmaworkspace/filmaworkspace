@@ -175,16 +175,6 @@ export default function CalendarPage() {
 
   // ── Auth + load ───────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) { router.push("/"); return; }
-      setUserId(user.uid);
-      setUserName(user.displayName || user.email?.split("@")[0] || "Usuario");
-      await Promise.all([loadEvents(), loadCrew()]);
-      setLoading(false);
-    });
-    return () => unsub();
-  }, [id, router, loadEvents, loadCrew]);
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
@@ -249,6 +239,17 @@ export default function CalendarPage() {
       setCrew(data);
     } catch (e) { console.error(e); }
   }, [id]);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) { router.push("/"); return; }
+      setUserId(user.uid);
+      setUserName(user.displayName || user.email?.split("@")[0] || "Usuario");
+      await Promise.all([loadEvents(), loadCrew()]);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [id, router, loadEvents, loadCrew]);
 
   // Synthesise crew join/leave events from crew startDate/endDate
   const crewAutoEvents = useCallback((): CalendarEvent[] => {

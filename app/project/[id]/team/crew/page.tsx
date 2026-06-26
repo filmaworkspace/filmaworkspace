@@ -357,18 +357,6 @@ export default function CrewPage() {
   const userId   = user?.uid  || "";
   const userName = user?.name || "Usuario";
 
-  useEffect(() => { if (userId && id) loadData(); }, [userId, id, loadData]);
-  useEffect(() => { filterCrew(); }, [searchTerm, statusFilter, sectionFilter, crew, filterCrew]);
-  useEffect(() => {
-    const h = (e: MouseEvent) => {
-      const t = e.target as HTMLElement;
-      if (!t.closest(".menu-container")) { setOpenMenuId(null); setMenuPosition(null); }
-      if (statusDropdownRef.current && !statusDropdownRef.current.contains(t)) setShowStatusDropdown(false);
-    };
-    document.addEventListener("click", h);
-    return () => document.removeEventListener("click", h);
-  }, []);
-
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
   const fullName = (m: CrewMember) =>
@@ -462,6 +450,18 @@ export default function CrewPage() {
     }
     setFilteredCrew(f);
   }, [crew, sectionFilter, statusFilter, searchTerm]);
+
+  useEffect(() => { if (userId && id) loadData(); }, [userId, id, loadData]);
+  useEffect(() => { filterCrew(); }, [searchTerm, statusFilter, sectionFilter, crew, filterCrew]);
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (!t.closest(".menu-container")) { setOpenMenuId(null); setMenuPosition(null); }
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(t)) setShowStatusDropdown(false);
+    };
+    document.addEventListener("click", h);
+    return () => document.removeEventListener("click", h);
+  }, []);
 
   const closeMenu = () => { setOpenMenuId(null); setMenuPosition(null); };
 
