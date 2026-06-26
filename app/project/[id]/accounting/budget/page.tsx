@@ -1025,7 +1025,7 @@ export default function BudgetPage() {
               <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Disponible</p>
               <p className={`text-base font-bold tabular-nums ${summary.totalAvailable < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{formatCurrency(summary.totalAvailable)} €</p>
             </div>
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 col-span-2 col-span-1">
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
               <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">% Ejecución</p>
               <div className="flex items-center gap-2">
                 <p className={`text-base font-bold tabular-nums ${totalExecutionPercent > 100 ? 'text-red-600' : totalExecutionPercent > 90 ? 'text-amber-600' : 'text-slate-900'}`}>{totalExecutionPercent.toFixed(1)}%</p>
