@@ -237,22 +237,6 @@ export default function AdminProjectPage() {
     if (!userLoading && !isAdmin) router.push("/dashboard");
   }, [contextUser, userLoading, router, isAdmin]);
 
-  useEffect(() => {
-    if (projectId && isAdmin) loadData();
-  }, [projectId, isAdmin, loadData]);
-
-  const showToast = (type: "success" | "error", message: string) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const generateShortId = () => {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    let result = "";
-    for (let i = 0; i < 6; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
-    return result;
-  };
-
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
@@ -392,6 +376,22 @@ export default function AdminProjectPage() {
       setLoading(false);
     }
   }, [projectId, isAdmin, router]);
+
+  useEffect(() => {
+    if (projectId && isAdmin) loadData();
+  }, [projectId, isAdmin, loadData]);
+
+  const showToast = (type: "success" | "error", message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const generateShortId = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let result = "";
+    for (let i = 0; i < 6; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+    return result;
+  };
 
   const writeLog = async (type: string, data: Record<string, any>) => {
     try {
