@@ -1,7 +1,7 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { inter } from "@/lib/fonts";
 
@@ -373,10 +373,7 @@ export default function JournalPage() {
   const hasAccess     = isAdmin || isCompanyUser;
   const showToast     = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500); };
 
-  useEffect(() => { if (!userLoading && !hasAccess) router.push("/dashboard"); }, [contextUser, userLoading]);
-  useEffect(() => { if (producerId && projectId && hasAccess) loadData(); }, [producerId, projectId, hasAccess]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [pd, prj] = await Promise.all([getDoc(doc(db, "producers", producerId)), getDoc(doc(db, "projects", projectId))]);
@@ -397,7 +394,10 @@ export default function JournalPage() {
       setManuals((manSnap as any).docs.map((d: any) => { const r = d.data(); return { id: d.id, numero: r.numero, date: r.date, concepto: r.concepto, lines: r.lines || [], tipo: r.tipo || "manual", recurrente: r.recurrente || false, frecuencia: r.frecuencia, createdAt: r.createdAt?.toDate?.() || new Date() }; }));
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
-  };
+  }, [producerId, projectId, router, isAdmin]);
+
+  useEffect(() => { if (!userLoading && !hasAccess) router.push("/dashboard"); }, [userLoading, hasAccess, router]);
+  useEffect(() => { if (producerId && projectId && hasAccess) loadData(); }, [producerId, projectId, hasAccess, loadData]);
 
   // ── All entries ───────────────────────────────────────────────────────────────
   const allEntries = useMemo(() => {
@@ -510,7 +510,7 @@ export default function JournalPage() {
   }, [nWorkers]);
 
   // Build the three payroll journal entries
-  const buildNominaEntries = () => {
+  const buildNominaEntries = useCallback(() => {
     const { valid } = nTot;
     // ── Asiento 1: Nómina (devengo) ──
     // Si desglose por trabajador: una línea 640.xx por persona + una 465 global
@@ -551,7 +551,7 @@ export default function JournalPage() {
     pagoLines.push({ id: uid(), code: nCtaBancaria, name: "Bancos c/c — pago neto trabajadores", debe: 0, haber: nTot.neto });
 
     return { nominaLines, ssLines, pagoLines };
-  };
+  }, [nTot, nDesglose, nPeriodo, nCtaBancaria]);
 
   const saveNomina = async () => {
     if (!nEntryNomina.trim() || !nEntrySS.trim() || !nEntryPago.trim()) { showToast("Rellena los tres números de asiento"); return; }
@@ -595,7 +595,7 @@ export default function JournalPage() {
   const totalHaber = filtered.reduce((s, e) => s + e.lines.reduce((ss, l) => ss + l.haber, 0), 0);
 
   // Preview: cuadre de los tres asientos
-  const { nominaLines, ssLines, pagoLines } = useMemo(() => nTot.valid.length > 0 ? buildNominaEntries() : { nominaLines: [], ssLines: [], pagoLines: [] }, [nWorkers, nCtaBancaria, nDesglose, nPeriodo]);
+  const { nominaLines, ssLines, pagoLines } = useMemo(() => nTot.valid.length > 0 ? buildNominaEntries() : { nominaLines: [], ssLines: [], pagoLines: [] }, [nTot.valid.length, buildNominaEntries]);
 
   if (loading || userLoading) return (
     <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
