@@ -420,7 +420,7 @@ export default function AdminProjectPage() {
       const token = await auth.currentUser?.getIdToken();
       await fetch("/api/send-form-reminder", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(token && { Authorization: `Bearer ${token}` }) },
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) } as Record<string, string>,
         body: JSON.stringify({
           to: form.email,
           name: `${form.firstName || ""} ${form.lastName1 || ""}`.trim() || form.email,

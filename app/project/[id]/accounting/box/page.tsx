@@ -1362,7 +1362,7 @@ export default function BoxesPage() {
             const proxyUrl = `/api/storage-proxy?url=${encodeURIComponent(e.documentUrl!)}&expense=${encodeURIComponent(JSON.stringify(expenseData))}`;
             const idToken = await auth.currentUser?.getIdToken() ?? "";
             const resp = await fetch(proxyUrl, {
-              headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
+              headers: (idToken ? { Authorization: `Bearer ${idToken}` } : {}) as Record<string, string>,
             });
 
             if (!resp.ok) {
@@ -1382,7 +1382,7 @@ export default function BoxesPage() {
       await Promise.all(fetchPromises);
 
       const outerZip = zipSync(zipEntries);
-      const blob = new Blob([outerZip], { type: "application/zip" });
+      const blob = new Blob([outerZip.buffer as ArrayBuffer], { type: "application/zip" });
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement("a");
       a.href = url;

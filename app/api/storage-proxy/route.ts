@@ -202,7 +202,7 @@ async function generateBannerPdf(expense: ExpenseData): Promise<Uint8Array> {
     color: rgb(0.75, 0.78, 0.82),
   });
 
-  return pdfDoc.save();
+  return new Uint8Array((await pdfDoc.save()).buffer as ArrayBuffer);
 }
 
 async function convertImageToPdf(imageBytes: Uint8Array, contentType: string): Promise<Uint8Array> {
@@ -221,12 +221,12 @@ async function convertImageToPdf(imageBytes: Uint8Array, contentType: string): P
     width: width * scale,
     height: height * scale,
   });
-  return pdfDoc.save();
+  return new Uint8Array((await pdfDoc.save()).buffer as ArrayBuffer);
 }
 
 async function mergePdfs(bannerBytes: Uint8Array, docBytes: Uint8Array): Promise<Uint8Array> {
   const srcRaw = await PDFDocument.load(docBytes, { ignoreEncryption: true });
-  const normalized = await srcRaw.save({ useObjectStreams: false });
+  const normalized = new Uint8Array((await srcRaw.save({ useObjectStreams: false })).buffer as ArrayBuffer);
   const srcDoc = await PDFDocument.load(normalized, { ignoreEncryption: true });
 
   const bannerDoc = await PDFDocument.load(bannerBytes, { ignoreEncryption: true });
@@ -239,7 +239,7 @@ async function mergePdfs(bannerBytes: Uint8Array, docBytes: Uint8Array): Promise
   const invoicePages = await mergedDoc.copyPages(srcDoc, srcDoc.getPageIndices());
   invoicePages.forEach((p) => mergedDoc.addPage(p));
 
-  return mergedDoc.save();
+  return new Uint8Array((await mergedDoc.save()).buffer as ArrayBuffer);
 }
 
 export async function GET(request: NextRequest) {

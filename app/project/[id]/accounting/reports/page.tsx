@@ -448,7 +448,7 @@ function downloadXLSX(
   const headers = columns.map(c => (c.isBlank ? "" : c.label));
   const numericCols = detectNumericCols(dataRows);
   const xlsxBytes = buildXlsx(headers, dataRows, titleText, numericCols);
-  const blob = new Blob([xlsxBytes], {
+  const blob = new Blob([xlsxBytes.buffer as ArrayBuffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
   const url = URL.createObjectURL(blob);

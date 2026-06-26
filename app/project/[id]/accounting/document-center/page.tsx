@@ -315,7 +315,7 @@ export default function DocumentCenterPage() {
               const page = final.addPage([595.28, 841.89]);
               page.drawImage(img, { x: 20, y: 841.89 - 20 - height * scale, width: width * scale, height: height * scale });
             }
-            result = await final.save();
+            result = new Uint8Array((await final.save()).buffer as ArrayBuffer);
           }
         } catch (e) { console.warn("[DocCenter] receipt failed:", e); }
       }
@@ -334,7 +334,7 @@ export default function DocumentCenterPage() {
   };
 
   const triggerDownload = (bytes: Uint8Array, fileName: string) => {
-    const blob = new Blob([bytes], { type: "application/pdf" });
+    const blob = new Blob([bytes.buffer as ArrayBuffer], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = fileName; a.click();
     URL.revokeObjectURL(url);
