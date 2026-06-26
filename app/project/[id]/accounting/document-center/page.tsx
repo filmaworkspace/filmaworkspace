@@ -279,7 +279,7 @@ export default function DocumentCenterPage() {
     // Use server-side merge via proxy (uses pdf-merger-js which handles complex PDFs better)
     if (invoice.attachmentUrl) {
       const idToken = await auth.currentUser?.getIdToken() ?? "";
-      const authHeader = idToken ? { Authorization: `Bearer ${idToken}` } : {};
+      const authHeader: Record<string, string> = idToken ? { Authorization: `Bearer ${idToken}` } : {};
       const proxyUrl = `/api/storage-proxy?url=${encodeURIComponent(invoice.attachmentUrl)}&expense=${encodeURIComponent(JSON.stringify(expenseData))}`;
       const resp = await fetch(proxyUrl, { headers: authHeader });
       if (!resp.ok) {
