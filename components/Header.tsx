@@ -17,6 +17,7 @@ import {
   ArrowLeftRight,
   Banknote,
   BarChart3,
+  Clock,
   Briefcase,
   Building2,
   Calendar,
@@ -222,6 +223,7 @@ export default function Header() {
     : pathname.includes("/calendar")  ? "calendar"
     : pathname.includes("/approvals") ? "approvals"
     : pathname.includes("/payroll")   ? "payroll"
+    : pathname.includes("/timesheet") ? "timesheet"
     : pathname.includes("/config")    ? "config"
     : "panel"
     : null;
@@ -398,6 +400,10 @@ export default function Header() {
               <NavLink href={`/project/${projectId}/team/payroll`} isActive={teamPage === "payroll"}>
                 <Banknote size={14} />
                 <span>Nóminas</span>
+              </NavLink>
+              <NavLink href={`/project/${projectId}/team/timesheet`} isActive={teamPage === "timesheet"}>
+                <Clock size={14} />
+                <span>Control horario</span>
               </NavLink>
             </>
           )}
