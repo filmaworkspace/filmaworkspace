@@ -38,6 +38,7 @@ import {
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { PROJECT_ROLES } from "@/hooks/useAccountingPermissions";
+import { getInvoiceDisplayState } from "@/lib/invoiceHelpers";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -64,11 +65,15 @@ interface Invoice {
   supplier: string;
   description: string;
   baseAmount: number;
-  status: "pending_approval" | "pending" | "paid" | "overdue" | "rejected" | "cancelled";
+  status: string;
   dueDate: Date | null;
   createdAt: Date | null;
   department?: string;
   createdBy: string;
+  codedAt?: Date | null;
+  approvedAt?: Date | null;
+  accountedAt?: Date | null;
+  paidAt?: Date | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -202,10 +207,14 @@ export default function AccountingPage() {
             description: data.description || "", 
             baseAmount: data.baseAmount || 0, 
             status: data.status || "pending", 
-            createdAt: data.createdAt?.toDate() || null, 
+            createdAt: data.createdAt?.toDate() || null,
             dueDate: data.dueDate?.toDate() || null,
             department: data.department || "",
             createdBy: data.createdBy || "",
+            codedAt: data.codedAt?.toDate() || null,
+            approvedAt: data.approvedAt?.toDate() || null,
+            accountedAt: data.accountedAt?.toDate() || null,
+            paidAt: data.paidAt?.toDate() || null,
           };
         });
         
@@ -248,11 +257,13 @@ export default function AccountingPage() {
     );
 
     const invUnsub = onSnapshot(
-      query(collection(db, `projects/${id}/invoices`), where("status", "==", "pending_approval")),
+      query(collection(db, `projects/${id}/invoices`), where("status", "in", ["submitted", "pending_approval"])),
       (snap) => {
         invCount = 0;
         snap.forEach((d) => {
           const data = d.data();
+          // Solo pendientes de aprobar (sin track de aprobación).
+          if (data.approvedAt) return;
           if (data.approvalSteps && data.currentApprovalStep !== undefined) {
             const step = data.approvalSteps[data.currentApprovalStep];
             if (step?.approvers?.includes(userId)) invCount++;
@@ -277,15 +288,38 @@ export default function AccountingPage() {
       closed: { bg: "bg-blue-50", text: "text-blue-700", label: "Cerrada" },
       cancelled: { bg: "bg-red-100", text: "text-red-800", label: "Anulada" },
       pending_approval: { bg: "bg-purple-50", text: "text-purple-700", label: "Pend. aprob." },
-      paid: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Pagada" },
-      overdue: { bg: "bg-red-50", text: "text-red-700", label: "Vencida" },
-      returned: { bg: "bg-teal-50", text: "text-teal-700", label: "Devuelta" },
-      partial_return: { bg: "bg-cyan-50", text: "text-cyan-700", label: "Dev. parcial" },
     };
     const c = config[status] || config.pending;
     return (
       <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${c.bg} ${c.text} ${status === "cancelled" ? "line-through" : ""}`}>
         {status === "cancelled" && <span className="font-bold not-italic">✕</span>}
+        {c.label}
+      </span>
+    );
+  };
+
+  const getInvoiceBadge = (invoice: any) => {
+    const state = getInvoiceDisplayState(invoice);
+    const config: Record<string, { bg: string; text: string; label: string; icon?: string }> = {
+      draft:           { bg: "bg-slate-100",   text: "text-slate-600",  label: "Borrador" },
+      submitted:       { bg: "bg-purple-50",   text: "text-purple-700", label: "En sistema" },
+      approved:        { bg: "bg-emerald-50",  text: "text-emerald-700",label: "Aprobada" },
+      coded:           { bg: "bg-violet-50",   text: "text-violet-700", label: "Codificada" },
+      accounted:       { bg: "bg-teal-50",     text: "text-teal-700",   label: "Contabilizada" },
+      paid:            { bg: "bg-blue-50",     text: "text-blue-700",   label: "Pagada", icon: "💲" },
+      overdue:         { bg: "bg-red-50",      text: "text-red-700",    label: "Vencida" },
+      cancelled:       { bg: "bg-red-100",     text: "text-red-800",    label: "Anulada" },
+      void:            { bg: "bg-red-100",     text: "text-red-800",    label: "Anulada" },
+      rejected:        { bg: "bg-red-50",      text: "text-red-700",    label: "Rechazada" },
+      returned:        { bg: "bg-teal-50",     text: "text-teal-700",   label: "Devuelta" },
+      partial_return:  { bg: "bg-cyan-50",     text: "text-cyan-700",   label: "Dev. parcial" },
+    };
+    const c = config[state] || config.submitted;
+    const struck = state === "cancelled" || state === "void";
+    return (
+      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${c.bg} ${c.text} ${struck ? "line-through" : ""}`}>
+        {c.icon && <span className="text-[10px]">{c.icon}</span>}
+        {struck && <span className="font-bold not-italic">✕</span>}
         {c.label}
       </span>
     );
@@ -306,7 +340,7 @@ export default function AccountingPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
+        <div className="px-24 pt-10 pb-6">
           <div className="relative flex items-center justify-center">
             <h1 className="text-3xl font-bold text-slate-900 text-center">Panel de contabilidad</h1>
 
@@ -347,7 +381,7 @@ export default function AccountingPage() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+      <main className="px-24 py-8">
         {/* Pending Approvals Alert */}
         {pendingApprovalsCount > 0 && (
           <Link href={`/project/${id}/accounting/approvals`}>
@@ -369,9 +403,9 @@ export default function AccountingPage() {
         )}
 
         {/* Recent Activity */}
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
+        <div className="flex flex-row gap-6 items-start">
           {/* Recent POs */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1 lg:max-w-[50%]">
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1 max-w-[50%]">
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <FileText size={18} style={{ color: '#2F52E0' }} />
@@ -433,7 +467,7 @@ export default function AccountingPage() {
           </div>
 
           {/* Recent Invoices */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1 lg:max-w-[50%]">
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1 max-w-[50%]">
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <Receipt size={18} style={{ color: '#2F52E0' }} />
@@ -476,13 +510,13 @@ export default function AccountingPage() {
               ) : (
                 <div className="space-y-2">
                   {recentInvoices.map((invoice) => {
-                    const isOverdue = invoice.status === "overdue" || (invoice.dueDate && invoice.dueDate < new Date() && invoice.status === "pending");
+                    const isOverdue = getInvoiceDisplayState(invoice) === "overdue";
                     return (
                       <Link key={invoice.id} href={`/project/${id}/accounting/invoices/${invoice.id}`} className="block">
-                        <div className={`flex items-center justify-between px-3 py-3 rounded-xl transition-colors cursor-pointer group border ${invoice.status === "cancelled" ? "bg-red-50/40 border-red-100 opacity-60 hover:opacity-80" : "bg-slate-50 hover:bg-slate-100 border-transparent hover:border-slate-200"}`}>
+                        <div className={`flex items-center justify-between px-3 py-3 rounded-xl transition-colors cursor-pointer group border ${["cancelled","void","rejected"].includes(invoice.status) ? "bg-red-50/40 border-red-100 opacity-60 hover:opacity-80" : "bg-slate-50 hover:bg-slate-100 border-transparent hover:border-slate-200"}`}>
                           <div className="flex-1 min-w-0 mr-3">
                             <div className="flex items-center gap-2 mb-0.5">
-                              <span className={`text-sm font-semibold font-mono ${invoice.status === "cancelled" ? "line-through text-slate-400" : "text-slate-900"}`}>{invoice.displayNumber}</span>
+                              <span className={`text-sm font-semibold font-mono ${["cancelled","void"].includes(invoice.status) ? "line-through text-slate-400" : "text-slate-900"}`}>{invoice.displayNumber}</span>
                               {isOverdue && <AlertCircle size={12} className="text-red-500" />}
                               <span className="text-slate-300">/</span>
                               <span className="text-sm font-medium text-slate-700 truncate">{invoice.supplier || "Sin proveedor"}</span>
@@ -494,7 +528,7 @@ export default function AccountingPage() {
                           <div className="flex items-center gap-3 flex-shrink-0">
                             <div className="text-right">
                               <p className="text-sm font-semibold text-slate-900">{formatCurrency(invoice.baseAmount)} €</p>
-                              {getStatusBadge(invoice.status)}
+                              {getInvoiceBadge(invoice)}
                             </div>
                             <ChevronRight size={16} className="text-slate-300 group-hover:text-[#2F52E0] transition-colors" />
                           </div>

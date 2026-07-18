@@ -394,12 +394,12 @@ export default function CalendarPage() {
   // ── Calendar grid helpers ─────────────────────────────────────────────────
 
   const getDaysInMonth = (year: number, month: number) => {
-    const firstDay = new Date(year, month, 1);
-    const lastDay  = new Date(year, month + 1, 0);
+    const firstDay = new Date(year, month, 1, 12);
+    const lastDay  = new Date(year, month + 1, 0, 12);
     const startDow = (firstDay.getDay() + 6) % 7; // Mon=0
     const days: (string | null)[] = Array(startDow).fill(null);
     for (let d = 1; d <= lastDay.getDate(); d++) {
-      days.push(toYMD(new Date(year, month, d)));
+      days.push(toYMD(new Date(year, month, d, 12)));
     }
     while (days.length % 7 !== 0) days.push(null);
     return days;
@@ -485,8 +485,8 @@ export default function CalendarPage() {
 
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-6">
+        <div className="px-24 py-6">
+          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
 
             <div className="flex items-center gap-3">
               <Calendar size={24} style={{ color: "#6BA319" }} />
@@ -572,7 +572,7 @@ export default function CalendarPage() {
       </div>
 
       {/* ── Content ──────────────────────────────────────────────────────── */}
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pb-16">
+      <main className="px-24 pb-16">
 
         {/* ─ Nav row ─ */}
         <div className="flex items-center justify-between mb-6">
@@ -603,7 +603,7 @@ export default function CalendarPage() {
           </div>
 
           {/* Crew stats strip */}
-          <div className="hidden lg:flex items-center gap-3">
+          <div className="flex items-center gap-3">
             {(["technical","cast","specialists"] as CrewSection[]).map((sec) => {
               const count = crew.filter((m) => m.section === sec && m.status === "active").length;
               const colors: Record<CrewSection,string> = { technical: "text-sky-600 bg-sky-50", cast: "text-violet-600 bg-violet-50", specialists: "text-amber-600 bg-amber-50" };
@@ -1209,7 +1209,7 @@ export default function CalendarPage() {
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData((f) => ({ ...f, description: e.target.value }))}
-                  placeholder="Detalles adicionales, instrucciones, observaciones..."
+                  placeholder="Detalles adicionales, instrucciones, observaciones"
                   rows={3}
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319] resize-none"
                 />

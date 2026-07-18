@@ -265,6 +265,22 @@ export default function AccountingUsersPage() {
       if (inviteForm.roleType === "project") { inviteData.role = inviteForm.role; inviteData.permissions = { config: false, accounting: true, team: false }; }
       else { inviteData.department = inviteForm.department; inviteData.position = inviteForm.position; inviteData.permissions = { config: false, accounting: true, team: false }; }
       await setDoc(doc(collection(db, "invitations")), inviteData);
+
+      // Send invitation email (fire-and-forget)
+      fetch("/api/send-project-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inviteeName:    inviteData.invitedName,
+          invitedByName:  inviteData.invitedByName,
+          invitedEmail:   email,
+          projectName:    inviteData.projectName,
+          projectId:      id,
+          role:           inviteData.role ?? inviteData.position ?? "",
+          isExistingUser: invitedUserId !== null,
+        }),
+      }).catch(console.error);
+
       setSuccessMessage(`Invitación enviada correctamente a ${inviteForm.name}`); setTimeout(() => setSuccessMessage(""), 3000);
       const invitationsRef = collection(db, "invitations");
       const invQuery = query(invitationsRef, where("projectId", "==", id), where("status", "==", "pending"));
@@ -375,7 +391,7 @@ export default function AccountingUsersPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
               <Users size={24} style={{ color: '#2F52E0' }} />
@@ -388,7 +404,7 @@ export default function AccountingUsersPage() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+      <main className="px-24 py-6">
         {/* Pending Invitations */}
         {pendingInvitations.length > 0 && (
           <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
@@ -409,7 +425,7 @@ export default function AccountingUsersPage() {
         )}
 
         {/* Search */}
-        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center mb-4">
+        <div className="flex flex-row gap-3 items-center mb-4">
           <div className="flex-1 relative">
             <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
             <input type="text" placeholder="Buscar usuarios" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm" />
@@ -438,7 +454,7 @@ export default function AccountingUsersPage() {
                   <h2 className="text-sm font-semibold text-slate-900">Equipo de proyecto</h2>
                   <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{projectRoleMembers.length}</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                <div className="grid grid-cols-4 gap-3">
                   {projectRoleMembers.map((member) => (
                     <div key={member.userId} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-slate-300 transition-all group">
                       <div className="flex items-start gap-3">
@@ -484,7 +500,7 @@ export default function AccountingUsersPage() {
                   <h2 className="text-sm font-semibold text-slate-900">{deptName}</h2>
                   <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{deptMembers.length}</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                <div className="grid grid-cols-4 gap-3">
                   {deptMembers.map((member) => (
                     <div key={member.userId} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-slate-300 transition-all group">
                       <div className="flex items-start gap-3">
@@ -528,7 +544,7 @@ export default function AccountingUsersPage() {
                   <h2 className="text-sm font-semibold text-slate-900">Sin asignar</h2>
                   <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{unassignedMembers.length}</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                <div className="grid grid-cols-4 gap-3">
                   {unassignedMembers.map((member) => (
                     <div key={member.userId} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-slate-300 transition-all group">
                       <div className="flex items-start gap-3">

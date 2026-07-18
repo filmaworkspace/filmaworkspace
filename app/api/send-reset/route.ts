@@ -13,20 +13,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Email requerido" }, { status: 400 });
     }
 
-    // Lookup user name from Firebase Admin
+    // Lookup user — only swallow "user not found" to avoid leaking existence
     let name = "";
     try {
       const user = await adminAuth.getUserByEmail(email);
       name = user.displayName ?? "";
-    } catch {
-      // User not found — return 200 to avoid leaking existence
-      return NextResponse.json({ ok: true });
+    } catch (err: any) {
+      if (err?.code === "auth/user-not-found") {
+        return NextResponse.json({ ok: true });
+      }
+      // Any other error (bad credentials, SDK init failure, network) → surface it
+      console.error("[send-reset] adminAuth.getUserByEmail failed:", err?.code, err?.message);
+      throw err;
     }
 
     // Generate branded reset link via Firebase Admin
-    const resetUrl = await adminAuth.generatePasswordResetLink(email, {
-      url: `${process.env.NEXT_PUBLIC_BASE_URL ?? "https://filmaworkspace.com"}/login`,
-    });
+    let resetUrl: string;
+    try {
+      resetUrl = await adminAuth.generatePasswordResetLink(email, {
+        url: `${process.env.NEXT_PUBLIC_BASE_URL ?? "https://filmaworkspace.com"}/login`,
+      });
+    } catch (err: any) {
+      console.error("[send-reset] generatePasswordResetLink failed:", err?.code, err?.message);
+      throw err;
+    }
 
     const { data, error } = await resend.emails.send({
       from:           process.env.RESEND_FROM ?? "Filma Workspace <onboarding@resend.dev>",

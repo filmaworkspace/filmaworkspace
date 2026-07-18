@@ -175,28 +175,24 @@ const CONFIG_SECTIONS = [
 
 // Opciones de comportamiento del presupuesto
 const COMMITMENT_TRIGGERS = [
-  { value: "on_create", label: "Al enviar a aprobación", description: "Se compromete cuando la PO se envía a aprobación (pendiente)" },
-  { value: "on_approve", label: "Al aprobar", description: "Se compromete cuando la PO es aprobada" },
+  { value: "on_create", label: "Al enviar PO" },
+  { value: "on_approve", label: "Al aprobar PO" },
 ];
 
-// "Al pagar" se elimina: la realización debe ocurrir antes del pago.
-// "on_create" es la opción para cuando no hay aprobaciones configuradas.
 const ACTUAL_TRIGGERS = [
-  { value: "on_create",  label: "Al enviar (inmediato)",  description: "Pasa a realizado en cuanto se crea la factura — úsalo cuando no hay flujo de aprobación", requiresNoApprovals: true },
-  { value: "on_approve", label: "Al aprobar factura",     description: "Pasa a realizado cuando la factura es aprobada — requiere pasos de aprobación configurados", requiresApprovals: true },
-  { value: "on_account", label: "Al contabilizar",        description: "Pasa a realizado cuando se marca como contabilizada (recomendado)" },
+  { value: "on_code", label: "Al codificar factura" },
+  { value: "on_account", label: "Al contabilizar factura" },
 ];
 
 const BOX_TRIGGERS = [
-  { value: "on_create",  label: "Al enviar (inmediato)",  description: "Pasa a realizado en cuanto se abre el sobre — úsalo cuando no hay flujo de aprobación", requiresNoApprovals: true },
-  { value: "on_approve", label: "Al aprobar sobre",       description: "Pasa a realizado cuando el sobre es aprobado — requiere pasos de aprobación configurados", requiresApprovals: true },
-  { value: "on_account", label: "Al contabilizar",        description: "Pasa a realizado cuando se marca como contabilizado (recomendado)" },
+  { value: "on_create",  label: "Al codificar sobre" },
+  { value: "on_account", label: "Al contabilizar sobre" },
 ];
 
 interface CostSettings {
   poCommitmentTrigger: "on_create" | "on_approve";
-  invoiceActualTrigger: "on_create" | "on_approve" | "on_account";
-  boxActualTrigger: "on_create" | "on_approve" | "on_account";
+  invoiceActualTrigger: "on_code" | "on_account" | "on_create" | "on_approve";
+  boxActualTrigger: "on_create" | "on_account" | "on_approve";
 }
 
 // Configuración específica del proyecto para contabilidad
@@ -523,13 +519,11 @@ export default function AccountingConfigPage() {
         let rawInvoice = data.invoiceActualTrigger || "on_account";
         let rawBox     = data.boxActualTrigger     || "on_account";
         let rawPO      = data.poCommitmentTrigger  || "on_approve";
-        // "on_paid" eliminado → "on_account"
-        if (rawInvoice === "on_paid") rawInvoice = "on_account";
-        if (rawBox     === "on_paid") rawBox     = "on_account";
-        // "on_approve" sin aprobaciones → "on_create"
-        if (rawInvoice === "on_approve" && localInvoiceApprovals.length === 0) rawInvoice = "on_create";
-        if (rawBox     === "on_approve" && localBoxApprovals.length     === 0) rawBox     = "on_create";
-        if (rawPO      === "on_approve" && localPoApprovals.length      === 0) rawPO      = "on_create";
+        // Migraciones de valores eliminados
+        if (rawInvoice === "on_paid")    rawInvoice = "on_account";
+        if (rawBox     === "on_paid")    rawBox     = "on_account";
+        if (rawInvoice === "on_approve") rawInvoice = "on_code";
+        if (rawBox     === "on_approve") rawBox     = "on_create";
         setCostSettings({
           poCommitmentTrigger: rawPO as any,
           invoiceActualTrigger: rawInvoice as any,
@@ -1136,7 +1130,7 @@ export default function AccountingConfigPage() {
               <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">
                 Tipo de aprobador
               </label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {(["fixed", "role", "hod", "coordinator"] as const).map((t) => {
                   const TIcon = APPROVER_TYPE_ICONS[t];
                   return (
@@ -1172,7 +1166,7 @@ export default function AccountingConfigPage() {
                 <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">
                   Roles que pueden aprobar
                 </label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="grid grid-cols-4 gap-2">
                   {PROJECT_ROLES.map((role) => {
                     const count = getMembersByRole(role).length;
                     return (
@@ -1414,7 +1408,7 @@ export default function AccountingConfigPage() {
                   type="text"
                   value={companyForm.address}
                   onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })}
-                  placeholder="Calle, número, piso..."
+                  placeholder="Calle, número, piso"
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
                 />
               </div>
@@ -1571,7 +1565,6 @@ export default function AccountingConfigPage() {
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
           <h2 className="font-semibold text-slate-900">Comprometido (POs)</h2>
-          <p className="text-sm text-slate-500 mt-1">Define cuándo se suma el importe al presupuesto comprometido</p>
         </div>
 
         <div className="p-6">
@@ -1608,7 +1601,6 @@ export default function AccountingConfigPage() {
                         <span className="text-[10px] font-medium px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">Sin aprobaciones configuradas</span>
                       )}
                     </div>
-                    <p className="text-sm text-slate-500 mt-0.5">{trigger.description}</p>
                   </div>
                 </label>
               );
@@ -1627,16 +1619,11 @@ export default function AccountingConfigPage() {
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
           <h2 className="font-semibold text-slate-900">Realizado (Facturas)</h2>
-          <p className="text-sm text-slate-500 mt-1">Define cuándo el importe pasa de comprometido a realizado</p>
         </div>
 
         <div className="p-6">
           <div className="space-y-3">
-            {ACTUAL_TRIGGERS.filter((trigger) => {
-              if ((trigger as any).requiresNoApprovals) return invoiceApprovals.length === 0;
-              if ((trigger as any).requiresApprovals)   return invoiceApprovals.length > 0;
-              return true;
-            }).map((trigger) => {
+            {ACTUAL_TRIGGERS.map((trigger) => {
               const isDisabled = trigger.value === "on_approve" && invoiceApprovals.length === 0;
               const isSelected = costSettings.invoiceActualTrigger === trigger.value;
               return (
@@ -1661,7 +1648,6 @@ export default function AccountingConfigPage() {
                   />
                   <div className="flex-1">
                     <p className={`font-medium ${isDisabled ? "text-slate-400" : "text-slate-900"}`}>{trigger.label}</p>
-                    <p className="text-sm text-slate-500 mt-0.5">{trigger.description}</p>
                   </div>
                 </label>
               );
@@ -1674,17 +1660,12 @@ export default function AccountingConfigPage() {
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
           <h2 className="font-semibold text-slate-900">Realizado (BOX)</h2>
-          <p className="text-sm text-slate-500 mt-1">Define cuándo los gastos de tarjeta y transferencia pasan a realizado</p>
         </div>
 
         <div className="p-6">
           <div className="space-y-3">
-            {BOX_TRIGGERS.filter((trigger) => {
-              if ((trigger as any).requiresNoApprovals) return boxApprovals.length === 0;
-              if ((trigger as any).requiresApprovals)   return boxApprovals.length > 0;
-              return true;
-            }).map((trigger) => {
-              const isDisabled = trigger.value === "on_approve" && boxApprovals.length === 0;
+            {BOX_TRIGGERS.map((trigger) => {
+              const isDisabled = false;
               const isSelected = costSettings.boxActualTrigger === trigger.value;
               return (
                 <label
@@ -1708,7 +1689,6 @@ export default function AccountingConfigPage() {
                   />
                   <div className="flex-1">
                     <p className={`font-medium ${isDisabled ? "text-slate-400" : "text-slate-900"}`}>{trigger.label}</p>
-                    <p className="text-sm text-slate-500 mt-0.5">{trigger.description}</p>
                   </div>
                 </label>
               );
@@ -1842,7 +1822,7 @@ export default function AccountingConfigPage() {
               poApprovals.map((step, i) => renderApprovalStep(step, "po", i))
             )}
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => addApprovalStep("po", false)}
                 className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-slate-300 rounded-2xl hover:border-slate-400 hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors text-sm"
@@ -1871,7 +1851,7 @@ export default function AccountingConfigPage() {
               invoiceApprovals.map((step, i) => renderApprovalStep(step, "invoice", i))
             )}
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => addApprovalStep("invoice", false)}
                 className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-slate-300 rounded-2xl hover:border-slate-400 hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors text-sm"
@@ -1900,7 +1880,7 @@ export default function AccountingConfigPage() {
               boxApprovals.map((step, i) => renderApprovalStep(step, "box", i))
             )}
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => addApprovalStep("box", false)}
                 className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-slate-300 rounded-2xl hover:border-slate-400 hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors text-sm"
@@ -2165,7 +2145,7 @@ export default function AccountingConfigPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           {/* Page header */}
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-3">
@@ -2208,13 +2188,13 @@ export default function AccountingConfigPage() {
         </div>
       )}
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+      <main className="px-24 py-8">
         {/* Layout con sidebar de secciones */}
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex flex-row gap-6">
           {/* Sidebar de secciones - sticky que se mueve con el scroll */}
-          <div className="lg:w-52 flex-shrink-0">
-            <div className="lg:sticky lg:top-20">
-              <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 bg-white lg:bg-transparent">
+          <div className="w-52 flex-shrink-0">
+            <div className="sticky top-20">
+              <nav className="flex flex-col gap-1 overflow-x-auto overflow-x-visible pb-2 pb-0 bg-white bg-transparent">
                 {CONFIG_SECTIONS.map((section) => {
                   const Icon = section.icon;
                   const isActive = activeSection === section.id;
@@ -2238,7 +2218,7 @@ export default function AccountingConfigPage() {
               
               {/* Auditoría - Solo visible en desktop */}
               {(auditLog.approvals || auditLog.permissions) && (
-                <div className="hidden lg:block mt-6 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="block mt-6 p-3 bg-slate-50 rounded-lg border border-slate-200">
                   <div className="flex items-center gap-2 mb-2">
                     <Clock size={12} className="text-slate-400" />
                     <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Últimos cambios</p>
@@ -2300,7 +2280,7 @@ export default function AccountingConfigPage() {
                   type="text"
                   value={bankAccountForm.alias}
                   onChange={(e) => setBankAccountForm({ ...bankAccountForm, alias: e.target.value })}
-                  placeholder="Ej: Cuenta principal, Cuenta rodaje..."
+                  placeholder="Alias de la cuenta"
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
                 />
               </div>
@@ -2346,7 +2326,7 @@ export default function AccountingConfigPage() {
                   type="text"
                   value={bankAccountForm.bic || ""}
                   onChange={(e) => setBankAccountForm({ ...bankAccountForm, bic: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11) })}
-                  placeholder="Ej: CAIXESBBXXX"
+                  placeholder="Código BIC"
                   maxLength={11}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm font-mono uppercase"
                 />

@@ -7,8 +7,6 @@ import Image from "next/image";
 import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
-import { auth } from "@/lib/firebase";
-import { sendPasswordResetEmail } from "firebase/auth";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
@@ -34,15 +32,22 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      await sendPasswordResetEmail(auth, email);
+      const res = await fetch("/api/send-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Error al enviar el email");
+      }
       setSuccess(true);
     } catch (err: any) {
       const errorMessages: Record<string, string> = {
-        "auth/user-not-found": "No existe una cuenta con este email",
-        "auth/invalid-email": "Email no válido",
-        "auth/too-many-requests": "Demasiados intentos. Inténtalo más tarde",
+        "auth/invalid-email":      "Email no válido",
+        "auth/too-many-requests":  "Demasiados intentos. Inténtalo más tarde",
       };
-      setError(errorMessages[err.code] || "Error al enviar el email");
+      setError(errorMessages[err.code] || err.message || "Error al enviar el email");
     } finally {
       setLoading(false);
     }

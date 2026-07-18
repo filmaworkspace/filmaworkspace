@@ -184,6 +184,25 @@ export default function BudgetPage() {
       const posSnapshot = await getDocs(collection(db, `projects/${id}/pos`));
       posSnapshot.docs.forEach(poDoc => {
         const poData = poDoc.data();
+
+        // Si la PO está siendo modificada (tiene previousCommittedItems y está en draft/pending),
+        // mostrar el comprometido de la versión anterior hasta que la nueva sea aprobada.
+        const isModificationInProgress =
+          poData.previousCommittedItems?.length > 0 &&
+          (poData.status === "draft" || poData.status === "pending");
+
+        if (isModificationInProgress) {
+          poData.previousCommittedItems.forEach((item: any) => {
+            if (item.subAccountCode) {
+              const itemInvoiced = item.invoicedAmount || 0;
+              const itemCommitted = Math.max(0, (item.baseAmount || 0) - itemInvoiced);
+              committedBySubaccount[item.subAccountCode] =
+                (committedBySubaccount[item.subAccountCode] || 0) + itemCommitted;
+            }
+          });
+          return;
+        }
+
         // Usar shouldCommitPO de budgetRules para determinar si cuenta
         if (poData.status && shouldCommitPO(poData.status, loadedCostConfig) && poData.items) {
           poData.items.forEach((item: any) => {
@@ -193,8 +212,8 @@ export default function BudgetPage() {
               // Si está abierto, el comprometido es lo que falta por facturar
               const itemInvoiced = item.invoicedAmount || 0;
               const itemBase = item.baseAmount || 0;
-              const itemCommitted = item.isClosed 
-                ? 0 
+              const itemCommitted = item.isClosed
+                ? 0
                 : Math.max(0, itemBase - itemInvoiced);
               committedBySubaccount[key] = (committedBySubaccount[key] || 0) + itemCommitted;
             }
@@ -207,8 +226,19 @@ export default function BudgetPage() {
       const invoicesSnapshot = await getDocs(collection(db, `projects/${id}/invoices`));
       invoicesSnapshot.docs.forEach(invDoc => {
         const invData = invDoc.data();
-        // Usar shouldRealizeInvoice de budgetRules para determinar si cuenta
-        if (invData.status && shouldRealizeInvoice(invData.status, loadedCostConfig) && invData.items) {
+        // La realización depende de los tracks, no del lifecycle (la factura puede
+        // estar en "submitted" y ya codificada/contabilizada). Pasamos los tracks.
+        const terminal = ["cancelled", "rejected", "void"].includes(invData.status);
+        const isRealized = terminal
+          ? false
+          : loadedCostConfig.invoiceActualTrigger === "on_code"
+            ? !!invData.codedAt
+            : loadedCostConfig.invoiceActualTrigger === "on_account"
+              ? !!(invData.accountedAt || invData.accounted)
+              : shouldRealizeInvoice(invData.status, loadedCostConfig, {
+                  codedAt: invData.codedAt, accountedAt: invData.accountedAt || invData.accounted, paidAt: invData.paidAt, approvedAt: invData.approvedAt,
+                });
+        if (invData.status && isRealized && invData.items) {
           invData.items.forEach((item: any) => {
             if (item.subAccountCode) {
               const key = item.subAccountCode;
@@ -959,7 +989,7 @@ export default function BudgetPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           {/* Page header */}
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
@@ -978,7 +1008,7 @@ export default function BudgetPage() {
           </div>
 
           {/* Summary Stats - Compacto */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-6">
+          <div className="grid grid-cols-5 gap-3 mt-6">
             <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
               <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Presupuestado</p>
               <p className="text-base font-bold text-slate-900 tabular-nums">{formatCurrency(summary.totalBudgeted)} €</p>
@@ -995,7 +1025,7 @@ export default function BudgetPage() {
               <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Disponible</p>
               <p className={`text-base font-bold tabular-nums ${summary.totalAvailable < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{formatCurrency(summary.totalAvailable)} €</p>
             </div>
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 col-span-2 md:col-span-1">
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
               <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">% Ejecución</p>
               <div className="flex items-center gap-2">
                 <p className={`text-base font-bold tabular-nums ${totalExecutionPercent > 100 ? 'text-red-600' : totalExecutionPercent > 90 ? 'text-amber-600' : 'text-slate-900'}`}>{totalExecutionPercent.toFixed(1)}%</p>
@@ -1008,9 +1038,9 @@ export default function BudgetPage() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+      <main className="px-24 py-6">
         {/* Filters */}
-        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center mb-4">
+        <div className="flex flex-row gap-3 items-center mb-4">
           <div className="flex-1 relative">
             <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
             <input type="text" placeholder="Buscar cuentas" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm" />
@@ -1207,7 +1237,7 @@ export default function BudgetPage() {
       {/* Import Modal - Super Guay */}
       {showImportModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeImportModal}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3">

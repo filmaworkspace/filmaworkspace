@@ -311,8 +311,9 @@ export default function ReplaceDocumentPage() {
         // Nuevo archivo de factura definitiva
         attachmentUrl,
         attachmentFileName: uploadedFile.name,
-        // Descodificar para que se vuelva a codificar
-        status: "approved",
+        // Descodificar para que se vuelva a codificar. El lifecycle permanece
+        // "submitted"; el track de aprobación (approvedAt) se conserva.
+        status: "submitted",
         codedAt: null,
         codedBy: null,
         codedByName: null,
@@ -354,7 +355,7 @@ export default function ReplaceDocumentPage() {
     <div className={`${inter.className} min-h-screen bg-white`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+        <div className="px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
               <Link
@@ -375,10 +376,10 @@ export default function ReplaceDocumentPage() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+      <main className="px-24 py-6">
         {/* Filtros */}
         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6">
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-row gap-3">
             {/* Buscador */}
             <div className="relative flex-1">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -395,7 +396,7 @@ export default function ReplaceDocumentPage() {
             <div className="relative" ref={typeDropdownRef}>
               <button
                 onClick={() => { setShowTypeDropdown(!showTypeDropdown); setShowStatusDropdown(false); }}
-                className="w-full sm:w-44 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white flex items-center justify-between hover:border-slate-300 transition-colors"
+                className="w-full w-44 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white flex items-center justify-between hover:border-slate-300 transition-colors"
               >
                 <span className={filterType === "all" ? "text-slate-500" : "text-slate-900"}>
                   {TYPE_OPTIONS.find(o => o.value === filterType)?.label}
@@ -421,7 +422,7 @@ export default function ReplaceDocumentPage() {
             <div className="relative" ref={statusDropdownRef}>
               <button
                 onClick={() => { setShowStatusDropdown(!showStatusDropdown); setShowTypeDropdown(false); }}
-                className="w-full sm:w-44 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white flex items-center justify-between hover:border-slate-300 transition-colors"
+                className="w-full w-44 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white flex items-center justify-between hover:border-slate-300 transition-colors"
               >
                 <span className={filterStatus === "all" ? "text-slate-500" : "text-slate-900"}>
                   {STATUS_OPTIONS.find(o => o.value === filterStatus)?.label}

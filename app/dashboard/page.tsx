@@ -27,6 +27,7 @@ import {
 import {
   AlertTriangle,
   Archive,
+  ArrowRight,
   ArrowUpDown,
   BarChart3,
   Bell,
@@ -35,15 +36,14 @@ import {
   CheckCircle,
   ChevronDown,
   Clock,
+  ClipboardCheck,
   Filter,
   Folder,
   FolderOpen,
   Info,
   Mail,
-  MessageSquare,
   Search,
   Settings,
-  Sparkles,
   Users,
   X as XIcon,
 } from "lucide-react";
@@ -122,6 +122,14 @@ interface AdminMessage {
   read: boolean;
 }
 
+interface PendingAction {
+  projectId: string;
+  projectName: string;
+  type: "accounting" | "team";
+  count: number;
+  href: string;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -140,6 +148,7 @@ export default function Dashboard() {
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [expandedMessage, setExpandedMessage] = useState<string | null>(null);
   const [reloadTrigger, setReloadTrigger] = useState(0);
+  const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
   const phaseDropdownRef = useRef<HTMLDivElement>(null);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -223,6 +232,9 @@ export default function Dashboard() {
         setProjects(projectsData);
         setFilteredProjects(projectsData.filter((p) => !p.archived));
 
+        // Load pending actions in background (non-blocking)
+        loadPendingActions(projectsData, userId);
+
         const invitationsRef = collection(db, "invitations");
         const q = query(invitationsRef, where("invitedEmail", "==", userEmail), where("status", "==", "pending"));
         const invitationsSnapshot = await getDocs(q);
@@ -300,11 +312,60 @@ export default function Dashboard() {
   const archivedProjects = projects.filter((p) => p.archived);
   const activeProjectsCount = projects.filter((p) => !p.archived).length;
 
+  const loadPendingActions = async (projectsList: Project[], uid: string) => {
+    const actions: PendingAction[] = [];
+    await Promise.all(
+      projectsList
+        .filter((p) => !p.archived && (p.permissions.accounting || p.permissions.team))
+        .map(async (project) => {
+          if (project.permissions.accounting) {
+            const [posSnap, invSnap] = await Promise.all([
+              getDocs(query(collection(db, `projects/${project.id}/pos`), where("status", "==", "pending"))),
+              getDocs(query(collection(db, `projects/${project.id}/invoices`), where("status", "in", ["submitted", "pending_approval"]))),
+            ]);
+            let count = 0;
+            posSnap.forEach((d) => {
+              const data = d.data();
+              const step = data.approvalSteps?.[data.currentApprovalStep];
+              if (step?.approvers?.includes(uid)) count++;
+            });
+            invSnap.forEach((d) => {
+              const data = d.data();
+              if (data.approvedAt) return;
+              const step = data.approvalSteps?.[data.currentApprovalStep];
+              if (step?.approvers?.includes(uid)) count++;
+            });
+            if (count > 0) {
+              actions.push({ projectId: project.id, projectName: project.name, type: "accounting", count, href: `/project/${project.id}/accounting/approvals` });
+            }
+          }
+          if (project.permissions.team) {
+            const crewSnap = await getDocs(query(collection(db, `projects/${project.id}/crew`), where("approvalStatus", "==", "pending_approval")));
+            if (crewSnap.size > 0) {
+              actions.push({ projectId: project.id, projectName: project.name, type: "team", count: crewSnap.size, href: `/project/${project.id}/team/approvals` });
+            }
+          }
+        })
+    );
+    setPendingActions(actions);
+  };
+
   const handleAcceptInvitation = async (invitation: Invitation) => {
     if (!userId) return;
     setProcessingInvite(invitation.id);
     try {
       await updateDoc(doc(db, "invitations", invitation.id), { status: "accepted", respondedAt: new Date() });
+      // Log: invitation accepted
+      try {
+        const { addDoc, collection: col, serverTimestamp: sts } = await import("firebase/firestore");
+        const { db: fdb } = await import("@/lib/firebase");
+        await addDoc(col(fdb, `projects/${invitation.projectId}/logs`), {
+          type: "invitation_accepted",
+          actorName: userName,
+          actorEmail: userEmail,
+          createdAt: sts(),
+        });
+      } catch (_) {}
       await setDoc(doc(db, `projects/${invitation.projectId}/members`, userId), {
         userId,
         name: userName,
@@ -376,6 +437,8 @@ export default function Dashboard() {
   };
 
   const unreadMessagesCount = messages.filter((m) => !m.read).length;
+  const totalPendingCount = pendingActions.reduce((s, a) => s + a.count, 0);
+  const bellBadgeCount = unreadMessagesCount + (totalPendingCount > 0 ? 1 : 0);
 
   const getMessageConfig = (type: AdminMessage["type"]) => {
     switch (type) {
@@ -595,7 +658,7 @@ export default function Dashboard() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header con título y notificaciones */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
+        <div className="px-24 pt-10 pb-6">
           <div className="flex items-center justify-center relative">
             <h1 className="text-3xl font-bold text-slate-900">Panel de proyectos</h1>
             
@@ -606,9 +669,9 @@ export default function Dashboard() {
                 className="relative p-2 hover:bg-slate-100 rounded-xl transition-colors"
               >
                 <Bell size={20} className="text-slate-500" />
-                {unreadMessagesCount > 0 && (
+                {bellBadgeCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                    {unreadMessagesCount > 9 ? "9+" : unreadMessagesCount}
+                    {bellBadgeCount > 9 ? "9+" : bellBadgeCount}
                   </span>
                 )}
               </button>
@@ -624,79 +687,108 @@ export default function Dashboard() {
             className="fixed inset-0 z-[100]" 
             onClick={() => setExpandedMessage(null)}
           />
-          <div className="fixed top-40 right-6 md:right-8 lg:right-12 xl:right-16 2xl:right-24 w-80 bg-white border border-slate-200 rounded-2xl shadow-lg z-[101] overflow-hidden">
+          <div className="fixed top-40 right-24 w-80 bg-white border border-slate-200 rounded-2xl shadow-lg z-[101] overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
               <span className="text-sm font-semibold text-slate-900">Notificaciones</span>
               {unreadMessagesCount > 0 && (
                 <span className="text-xs text-slate-500">{unreadMessagesCount} sin leer</span>
               )}
             </div>
-                      {messages.length === 0 ? (
-                        <div className="px-4 py-8 text-center">
-                          <Bell size={24} className="text-slate-300 mx-auto mb-2" />
-                          <p className="text-sm text-slate-500">No hay notificaciones</p>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="max-h-80 overflow-y-auto">
-                            {messages.map((message) => {
-                              const config = getMessageConfig(message.type);
-                              const Icon = config.icon;
 
-                              return (
-                                <div
-                                  key={message.id}
-                                  className={`px-4 py-3 border-b border-slate-50 last:border-0 ${!message.read ? "bg-blue-50/50" : ""}`}
-                                >
-                                  <div className="flex items-start gap-3">
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${config.bg}`}>
-                                      <Icon size={14} className={config.text} />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2">
-                                        <p className="text-sm font-medium text-slate-900 truncate">{message.title}</p>
-                                        {!message.read && (
-                                          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />
-                                        )}
-                                      </div>
-                                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{message.content}</p>
-                                      <div className="flex items-center justify-between mt-2">
-                                        <span className="text-[10px] text-slate-400">{message.sentByName}</span>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDismissMessage(message.id);
-                                          }}
-                                          className="text-[10px] text-slate-400 hover:text-red-500"
-                                        >
-                                          Descartar
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
+            <div className="max-h-[28rem] overflow-y-auto">
+              {/* ── Acciones pendientes ── */}
+              {pendingActions.length > 0 && (
+                <div className="border-b border-slate-100">
+                  <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Pendientes de acción</p>
+                  {pendingActions.map((action) => (
+                    <Link
+                      key={`${action.projectId}-${action.type}`}
+                      href={action.href}
+                      onClick={() => setExpandedMessage(null)}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"
+                    >
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                        action.type === "accounting" ? "bg-blue-50" : "bg-green-50"
+                      }`}>
+                        {action.type === "accounting"
+                          ? <BarChart3 size={14} className="text-blue-600" />
+                          : <Users size={14} className="text-green-600" />
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-slate-800 truncate">{action.projectName}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {action.count} {action.count === 1 ? "aprobación pendiente" : "aprobaciones pendientes"} en {action.type === "accounting" ? "Contabilidad" : "Coordinación"}
+                        </p>
+                      </div>
+                      <ArrowRight size={13} className="text-slate-300 flex-shrink-0" />
+                    </Link>
+                  ))}
+                </div>
+              )}
+
+              {/* ── Mensajes admin ── */}
+              {messages.length === 0 && pendingActions.length === 0 ? (
+                <div className="px-4 py-8 text-center">
+                  <Bell size={24} className="text-slate-300 mx-auto mb-2" />
+                  <p className="text-sm text-slate-500">No hay notificaciones</p>
+                </div>
+              ) : messages.length > 0 && (
+                <>
+                  {pendingActions.length > 0 && (
+                    <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Mensajes</p>
+                  )}
+                  {messages.map((message) => {
+                    const config = getMessageConfig(message.type);
+                    const Icon = config.icon;
+                    return (
+                      <div
+                        key={message.id}
+                        className={`px-4 py-3 border-b border-slate-50 last:border-0 ${!message.read ? "bg-blue-50/50" : ""}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${config.bg}`}>
+                            <Icon size={14} className={config.text} />
                           </div>
-                          <div className="px-4 py-2 border-t border-slate-100 bg-slate-50">
-                            <button
-                              onClick={() => {
-                                messages.forEach((m) => {
-                                  if (!m.read) handleMarkMessageAsRead(m.id);
-                                });
-                              }}
-                              className="text-xs text-slate-500 hover:text-slate-700 w-full text-center"
-                            >
-                              Marcar todas como leídas
-                            </button>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-medium text-slate-900 truncate">{message.title}</p>
+                              {!message.read && <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />}
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{message.content}</p>
+                            <div className="flex items-center justify-between mt-2">
+                              <span className="text-[10px] text-slate-400">{message.sentByName}</span>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDismissMessage(message.id); }}
+                                className="text-[10px] text-slate-400 hover:text-red-500"
+                              >
+                                Descartar
+                              </button>
+                            </div>
                           </div>
-                        </>
-                      )}
-                    </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+
+            {messages.some((m) => !m.read) && (
+              <div className="px-4 py-2 border-t border-slate-100 bg-slate-50">
+                <button
+                  onClick={() => messages.forEach((m) => { if (!m.read) handleMarkMessageAsRead(m.id); })}
+                  className="text-xs text-slate-500 hover:text-slate-700 w-full text-center"
+                >
+                  Marcar todas como leídas
+                </button>
+              </div>
+            )}
+          </div>
                 </>
               )}
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+      <main className="px-24 py-6">
         {/* Invitaciones */}
         {invitations.length > 0 && (
           <div className="mb-6">
@@ -711,7 +803,7 @@ export default function Dashboard() {
                   </h2>
                 </div>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 grid-cols-3">
                 {invitations.map((invitation) => (
                   <div key={invitation.id} className="bg-white rounded-2xl p-4 shadow-sm">
                     <div className="flex items-start gap-3 mb-3">
@@ -776,7 +868,7 @@ export default function Dashboard() {
             {/* Barra de filtros */}
             {activeProjectsCount > 0 && (
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6 relative z-30">
-                <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
+                <div className="flex flex-row gap-3 items-center">
                   {/* Buscador */}
                   <div className="relative flex-1">
                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -790,7 +882,7 @@ export default function Dashboard() {
                   </div>
 
                   {/* Filtros */}
-                  <div className="flex flex-wrap gap-2 lg:flex-shrink-0">
+                  <div className="flex flex-wrap gap-2 flex-shrink-0">
                     {/* Phase Dropdown */}
                     <div className="relative" ref={phaseDropdownRef}>
                       <button
@@ -910,7 +1002,7 @@ export default function Dashboard() {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-start">
+                  <div className="grid gap-4 grid-cols-3 items-start">
                     {filteredProjects.map((project) => renderProjectCard(project))}
                   </div>
                 )}
@@ -938,7 +1030,7 @@ export default function Dashboard() {
                 </button>
                 
                 {showArchived && (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-start">
+                  <div className="grid gap-4 grid-cols-3 items-start">
                     {archivedProjects.map((project) => renderArchivedCard(project))}
                   </div>
                 )}
