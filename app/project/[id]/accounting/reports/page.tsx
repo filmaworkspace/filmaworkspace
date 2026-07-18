@@ -56,7 +56,7 @@ import { CostSettings, getCostSettings, shouldCommitPO, shouldRealizeInvoice } f
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type ReportType = "budget" | "pos_list" | "pos_items" | "invoices" | "invoices_items" | "suppliers" | "payments" | "box_cards" | "box_transfers";
+type ReportType = "budget" | "pos_list" | "pos_items" | "invoices" | "invoices_accounting" | "suppliers" | "payments" | "cost_report" | "box_cards" | "box_transfers";
 
 interface ReportColumn {
   id: string;
@@ -168,27 +168,27 @@ const REPORT_COLUMNS: Record<ReportType, ReportColumn[]> = {
     { id: "createdAt", label: "Fecha registro", enabled: false },
     { id: "paidAt", label: "Fecha pago", enabled: false },
   ],
-  invoices_items: [
-    { id: "number", label: "Nº Factura", enabled: true, locked: true },
-    { id: "supplier", label: "Proveedor", enabled: true },
-    { id: "supplierTaxId", label: "NIF Proveedor", enabled: false },
-    { id: "description", label: "Descripción factura", enabled: true },
-    { id: "itemDescription", label: "Descripción ítem", enabled: true },
-    { id: "itemNumber", label: "Nº Ítem", enabled: true },
-    { id: "poNumber", label: "Nº PO asociada", enabled: true },
-    { id: "episode", label: "Capítulo", enabled: true },
-    { id: "accountCode", label: "Cuenta contable", enabled: true },
-    { id: "subaccountCode", label: "Subcuenta", enabled: false },
-    { id: "baseAmount", label: "Base imponible", enabled: true },
-    { id: "taxRate", label: "% IVA", enabled: false },
-    { id: "taxAmount", label: "IVA", enabled: true },
-    { id: "irpfRate", label: "% IRPF", enabled: false },
-    { id: "irpfAmount", label: "IRPF", enabled: false },
-    { id: "totalAmount", label: "Total", enabled: true },
-    { id: "status", label: "Estado", enabled: true },
+  invoices_accounting: [
+    { id: "accountingEntryNumber", label: "Nº Asiento", enabled: true, locked: true },
+    { id: "number", label: "Nº Factura", enabled: true },
+    { id: "supplierNumber", label: "Nº Factura proveedor", enabled: true },
     { id: "invoiceDate", label: "Fecha factura", enabled: true },
+    { id: "supplier", label: "Proveedor", enabled: true },
+    { id: "supplierTaxId", label: "NIF Proveedor", enabled: true },
+    { id: "supplierIban", label: "IBAN", enabled: false },
+    { id: "description", label: "Concepto", enabled: true },
+    { id: "accountCode", label: "Cuenta contable", enabled: true },
+    { id: "baseAmount", label: "Base imponible", enabled: true },
+    { id: "taxRate", label: "% IVA", enabled: true },
+    { id: "taxAmount", label: "Cuota IVA", enabled: true },
+    { id: "irpfRate", label: "% IRPF", enabled: false },
+    { id: "irpfAmount", label: "Retención IRPF", enabled: false },
+    { id: "totalAmount", label: "Total factura", enabled: true },
     { id: "dueDate", label: "Vencimiento", enabled: true },
+    { id: "status", label: "Estado pago", enabled: true },
     { id: "paidAt", label: "Fecha pago", enabled: false },
+    { id: "accountedAt", label: "Fecha contabilización", enabled: true },
+    { id: "accountedBy", label: "Contabilizado por", enabled: false },
   ],
   suppliers: [
     { id: "fiscalName", label: "Nombre fiscal", enabled: true, locked: true },
@@ -207,20 +207,31 @@ const REPORT_COLUMNS: Record<ReportType, ReportColumn[]> = {
     { id: "totalInvoiced", label: "Total facturado", enabled: false },
   ],
   payments: [
-    { id: "invoiceNumber", label: "Nº Factura", enabled: true, locked: true },
+    { id: "paymentNumber", label: "Nº Pago", enabled: true, locked: true },
+    { id: "invoiceNumber", label: "Nº Factura", enabled: true },
     { id: "supplierNumber", label: "Nº Factura proveedor", enabled: true },
     { id: "supplier", label: "Proveedor", enabled: true },
-    { id: "supplierTaxId", label: "NIF Proveedor", enabled: false },
+    { id: "supplierTaxId", label: "NIF Proveedor", enabled: true },
     { id: "supplierIban", label: "IBAN", enabled: true },
     { id: "description", label: "Concepto", enabled: true },
     { id: "baseAmount", label: "Base imponible", enabled: true },
-    { id: "totalAmount", label: "Total factura", enabled: true },
+    { id: "totalAmount", label: "Total pagado", enabled: true },
     { id: "paymentMethod", label: "Método pago", enabled: true },
-    { id: "dueDate", label: "Fecha pago estimada", enabled: true },
-    { id: "paidAt", label: "Fecha pago real", enabled: true },
-    { id: "status", label: "Estado", enabled: true },
+    { id: "paidAt", label: "Fecha pago", enabled: true },
     { id: "paidBy", label: "Pagado por", enabled: false },
-    { id: "accountingEntryNumber", label: "Nº Asiento", enabled: false },
+    { id: "accountingEntryNumber", label: "Nº Asiento", enabled: true },
+  ],
+  cost_report: [
+    { id: "accountCode", label: "Cuenta", enabled: true, locked: true },
+    { id: "accountDescription", label: "Descripción cuenta", enabled: true },
+    { id: "budgeted", label: "Presupuestado", enabled: true },
+    { id: "committed", label: "Comprometido", enabled: true },
+    { id: "invoiced", label: "Facturado", enabled: true },
+    { id: "paid", label: "Pagado", enabled: true },
+    { id: "pendingPayment", label: "Pendiente pago", enabled: true },
+    { id: "available", label: "Disponible", enabled: true },
+    { id: "percentExecuted", label: "% Ejecutado", enabled: true },
+    { id: "deviation", label: "Desviación", enabled: false },
   ],
   box_cards: [
     { id: "envelopeNumber", label: "Nº Sobre", enabled: true, locked: true },
@@ -266,20 +277,21 @@ const REPORT_COLUMNS: Record<ReportType, ReportColumn[]> = {
 
 const REPORT_INFO: Record<ReportType, { title: string; icon: any; section: string }> = {
   budget: { title: "Presupuesto", icon: Wallet, section: "presupuesto" },
+  cost_report: { title: "Informe de costes", icon: FileSpreadsheet, section: "presupuesto" },
   pos_list: { title: "Listado de POs", icon: FileText, section: "pos" },
   pos_items: { title: "POs desglosado por ítems", icon: Layers, section: "pos" },
   invoices: { title: "Listado de facturas", icon: Receipt, section: "facturas" },
-  invoices_items: { title: "Facturas desglosado por ítems", icon: Layers, section: "facturas" },
-  payments: { title: "Informe de pagos", icon: Wallet, section: "facturas" },
+  invoices_accounting: { title: "Libro de facturas", icon: BookMarked, section: "facturas" },
+  payments: { title: "Registro de pagos", icon: Wallet, section: "facturas" },
   box_cards: { title: "Gastos de tarjeta", icon: CreditCard, section: "box" },
   box_transfers: { title: "Transferencias de caja", icon: Banknote, section: "box" },
   suppliers: { title: "Proveedores", icon: Building2, section: "otros" },
 };
 
 const REPORT_SECTIONS = [
-  { id: "presupuesto", title: "Presupuesto", reports: ["budget"] as ReportType[] },
+  { id: "presupuesto", title: "Presupuesto", reports: ["budget", "cost_report"] as ReportType[] },
   { id: "pos", title: "Órdenes de compra", reports: ["pos_list", "pos_items"] as ReportType[] },
-  { id: "facturas", title: "Facturas y pagos", reports: ["invoices", "invoices_items", "payments"] as ReportType[] },
+  { id: "facturas", title: "Facturas y pagos", reports: ["invoices", "invoices_accounting", "payments"] as ReportType[] },
   { id: "box", title: "BOX", reports: ["box_cards", "box_transfers"] as ReportType[] },
   { id: "otros", title: "Otros", reports: ["suppliers"] as ReportType[] },
 ];
@@ -825,9 +837,7 @@ export default function ReportsPage() {
       const invoicedByPOItem: Record<string, Record<number, number>> = {};
       invoicesSnapshot.docs.forEach(invDoc => {
         const invData = invDoc.data();
-        if (invData.poId && shouldRealizeInvoice(invData.status || "", costConfig, {
-          codedAt: invData.codedAt, accountedAt: invData.accountedAt || invData.accounted, paidAt: invData.paidAt, approvedAt: invData.approvedAt,
-        })) {
+        if (invData.poId && shouldRealizeInvoice(invData.status || "", costConfig)) {
           if (!invoicedByPOItem[invData.poId]) invoicedByPOItem[invData.poId] = {};
           (invData.items || []).forEach((invItem: any) => {
             const itemIndex = invItem.poItemIndex ?? -1;
@@ -852,12 +862,10 @@ export default function ReportsPage() {
           const baseInvoiced = poInvoiced[index] || 0;
           const taxRate = item.vatRate || item.taxRate || 21;
           const irpfRate = item.irpfRate || 0;
-          // Comprometido = importe real de la PO (sin restar realizado)
-          const baseCommitted = itemIsClosed ? 0 : rawBaseAmount;
-          const totalCommitted = baseCommitted + baseCommitted * (taxRate / 100) - baseCommitted * (irpfRate / 100);
-          // Disponible = PO menos lo ya realizado, nunca negativo
-          const baseAvailable = itemIsClosed ? 0 : Math.max(0, rawBaseAmount - baseInvoiced);
-          const totalAvailable = baseAvailable + baseAvailable * (taxRate / 100) - baseAvailable * (irpfRate / 100);
+          const baseCommitted = itemIsClosed ? 0 : Math.max(0, rawBaseAmount - baseInvoiced);
+          const taxAmount = baseCommitted * (taxRate / 100);
+          const irpfAmount = baseCommitted * (irpfRate / 100);
+          const totalCommitted = baseCommitted + taxAmount - irpfAmount;
           const episodes = item.episodes || [];
           const episodeAssignment = item.episodeAssignment || "general";
 
@@ -866,10 +874,9 @@ export default function ReportsPage() {
               const rawEpBaseAmount = ep.amount || 0;
               const epPercentage = rawBaseAmount > 0 ? rawEpBaseAmount / rawBaseAmount : 0;
               const epBaseInvoiced = baseInvoiced * epPercentage;
-              const epBaseCommitted = itemIsClosed ? 0 : rawEpBaseAmount;
-              const epTotalCommitted = epBaseCommitted + epBaseCommitted * (taxRate / 100) - epBaseCommitted * (irpfRate / 100);
-              const epBaseAvailable = itemIsClosed ? 0 : Math.max(0, rawEpBaseAmount - epBaseInvoiced);
-              const epTotalAvailable = epBaseAvailable + epBaseAvailable * (taxRate / 100) - epBaseAvailable * (irpfRate / 100);
+              const epBaseCommitted = itemIsClosed ? 0 : Math.max(0, rawEpBaseAmount - epBaseInvoiced);
+              const epTaxAmount = epBaseCommitted * (taxRate / 100);
+              const epTotalCommitted = epBaseCommitted + epTaxAmount - epBaseCommitted * (irpfRate / 100);
               dataRows.push(toXlsxRow(columns, {
                 poNumber: poData.number || poData.displayNumber || "", poDescription: poData.generalDescription || poData.description || "",
                 supplier: poData.supplier || "", itemNumber: index + 1, itemDescription: item.description || "",
@@ -877,7 +884,7 @@ export default function ReportsPage() {
                 accountDescription: item.accountDescription || "", subaccountCode: item.subAccountCode || item.subaccountCode || "",
                 subaccountDescription: item.subAccountDescription || item.subaccountDescription || "",
                 baseCommitted: epBaseCommitted, totalCommitted: epTotalCommitted, baseInvoiced: epBaseInvoiced,
-                baseAvailable: epBaseAvailable, totalAvailable: epTotalAvailable,
+                baseAvailable: epBaseCommitted, totalAvailable: epTotalCommitted,
                 poStatus: poData.status || "", isOpen: poData.isOpen !== false ? "Abierta" : "Cerrada",
                 itemClosed: itemIsClosed ? "Sí" : "No", taxRate: `${taxRate}%`, irpfRate: `${irpfRate}%`,
               }));
@@ -893,7 +900,7 @@ export default function ReportsPage() {
               episode: episodeLabel, accountCode: item.accountCode || item.subAccountCode?.split(".")[0] || "",
               accountDescription: item.accountDescription || "", subaccountCode: item.subAccountCode || item.subaccountCode || "",
               subaccountDescription: item.subAccountDescription || item.subaccountDescription || "",
-              baseCommitted, totalCommitted, baseInvoiced, baseAvailable, totalAvailable,
+              baseCommitted, totalCommitted, baseInvoiced, baseAvailable: baseCommitted, totalAvailable: totalCommitted,
               poStatus: poData.status || "", isOpen: poData.isOpen !== false ? "Abierta" : "Cerrada",
               itemClosed: itemIsClosed ? "Sí" : "No", taxRate: `${taxRate}%`, irpfRate: `${irpfRate}%`,
             }));
@@ -955,79 +962,130 @@ export default function ReportsPage() {
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
-  const generateInvoicesItemsReport = async (columns: SelectedColumn[]) => {
-    setGenerating("invoices_items");
+  const generateInvoicesAccountingReport = async (columns: SelectedColumn[], filters?: InvoiceBookFilters) => {
+    setGenerating("invoices_accounting");
     try {
-      const invoicesSnapshot = await getDocs(query(collection(db, `projects/${id}/invoices`), orderBy("createdAt", "desc")));
+      const invoicesSnapshot = await getDocs(query(collection(db, `projects/${id}/invoices`), orderBy("invoiceDate", "desc")));
+      let filteredInvoices = invoicesSnapshot.docs;
+      
+      if (filters) {
+        filteredInvoices = filteredInvoices.filter(docSnap => {
+          const data = docSnap.data();
+          // Excluir anuladas salvo que se soliciten explícitamente
+          if (!filters.includeCancelled && data.status === "cancelled") return false;
+          if (filters.supplierId && data.supplierId !== filters.supplierId) return false;
+          if (filters.dateFrom || filters.dateTo) {
+            const invoiceDate = data.invoiceDate?.toDate ? data.invoiceDate.toDate() : null;
+            if (!invoiceDate) return false;
+            if (filters.dateFrom) {
+              const fromDate = new Date(filters.dateFrom); fromDate.setHours(0, 0, 0, 0);
+              if (invoiceDate < fromDate) return false;
+            }
+            if (filters.dateTo) {
+              const toDate = new Date(filters.dateTo); toDate.setHours(23, 59, 59, 999);
+              if (invoiceDate > toDate) return false;
+            }
+          }
+          if (filters.paymentStatus === "paid" && data.status !== "paid") return false;
+          if (filters.paymentStatus === "pending" && data.status === "paid") return false;
+          return true;
+        });
+      } else {
+        // Sin filtros explícitos: excluir anuladas por defecto
+        filteredInvoices = filteredInvoices.filter(d => d.data().status !== "cancelled");
+        filteredInvoices = filteredInvoices.filter(doc => doc.data().accounted === true);
+      }
+      
       const dataRows: (string | number)[][] = [];
-      invoicesSnapshot.docs.forEach(docSnap => {
+      filteredInvoices.forEach(docSnap => {
         const data = docSnap.data();
         const items = data.items || [];
-        if (items.length === 0) {
-          dataRows.push(toXlsxRow(columns, {
-            number: data.number || data.displayNumber || "", supplier: data.supplier || "",
-            supplierTaxId: data.supplierTaxId || "", description: data.description || "",
-            itemDescription: "", itemNumber: "", poNumber: data.poNumber || "", episode: "",
-            accountCode: "", subaccountCode: "",
-            baseAmount: data.baseAmount || 0, taxRate: "", taxAmount: data.vatAmount || 0,
-            irpfRate: "", irpfAmount: data.irpfAmount || 0, totalAmount: data.totalAmount || 0,
-            status: data.status || "", invoiceDate: formatDate(data.invoiceDate),
-            dueDate: formatDate(data.dueDate), paidAt: formatDate(data.paidAt),
-          }));
-        } else {
-          items.forEach((item: any, idx: number) => {
-            const episodes = item.episodes || [];
-            const episodeLabel = item.episodeAssignment === "general" ? "0"
-              : episodes.length === 1 ? episodes[0].episode.toString()
-              : episodes.map((e: any) => e.episode).join(", ") || "0";
-            const taxRate = item.vatRate || item.taxRate || 0;
-            const irpfRate = item.irpfRate || 0;
-            const base = item.baseAmount || 0;
-            dataRows.push(toXlsxRow(columns, {
-              number: data.number || data.displayNumber || "", supplier: data.supplier || "",
-              supplierTaxId: data.supplierTaxId || "", description: data.description || "",
-              itemDescription: item.description || "", itemNumber: idx + 1,
-              poNumber: data.poNumber || "", episode: episodeLabel,
-              accountCode: item.subAccountCode?.split(".")[0] || item.accountCode || "",
-              subaccountCode: item.subAccountCode || item.subaccountCode || "",
-              baseAmount: base, taxRate: taxRate ? `${taxRate}%` : "",
-              taxAmount: base * (taxRate / 100),
-              irpfRate: irpfRate ? `${irpfRate}%` : "",
-              irpfAmount: base * (irpfRate / 100),
-              totalAmount: base + base * (taxRate / 100) - base * (irpfRate / 100),
-              status: data.status || "", invoiceDate: formatDate(data.invoiceDate),
-              dueDate: formatDate(data.dueDate), paidAt: formatDate(data.paidAt),
-            }));
-          });
-        }
+        const accountCode = items.length > 0 ? (items[0].subAccountCode || "") : "";
+        const taxRate = data.baseAmount > 0 ? Math.round((data.vatAmount / data.baseAmount) * 100) : 21;
+        const irpfRate = data.baseAmount > 0 ? Math.round((data.irpfAmount / data.baseAmount) * 100) : 0;
+        dataRows.push(toXlsxRow(columns, {
+          accountingEntryNumber: data.accountingEntryNumber || "", number: data.number || data.displayNumber || "",
+          supplierNumber: data.supplierNumber || "", invoiceDate: formatDate(data.invoiceDate),
+          supplier: data.supplier || "", supplierTaxId: data.supplierTaxId || "", supplierIban: data.supplierIban || "",
+          description: data.description || "", accountCode,
+          baseAmount: data.baseAmount || 0, taxRate: `${taxRate}%`, taxAmount: data.vatAmount || 0,
+          irpfRate: `${irpfRate}%`, irpfAmount: data.irpfAmount || 0, totalAmount: data.totalAmount || 0,
+          dueDate: formatDate(data.dueDate),
+          status: data.status === "paid" ? "Pagada" : "Pendiente",
+          paidAt: formatDate(data.paidAt), accountedAt: formatDate(data.accountedAt),
+          accountedBy: data.accountedByName || "",
+        }));
       });
-      downloadXLSX(columns, dataRows, makeTitle("invoices_items"), `Facturas_Items_${projectName}_${getCurrentDate()}`);
+
+      let filename = "Libro_Facturas";
+      if (filters?.supplierName) filename += `_${filters.supplierName.replace(/[^a-zA-Z0-9]/g, "_")}`;
+      if (filters?.dateFrom) filename += `_desde_${filters.dateFrom}`;
+      if (filters?.dateTo) filename += `_hasta_${filters.dateTo}`;
+      filename += `_${getCurrentDate()}`;
+
+      downloadXLSX(columns, dataRows, makeTitle("invoices_accounting"), filename);
+      setShowInvoiceBookModal(false);
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
   const generatePaymentsReport = async (columns: SelectedColumn[]) => {
     setGenerating("payments");
     try {
-      const invoicesSnapshot = await getDocs(query(collection(db, `projects/${id}/invoices`), orderBy("dueDate", "asc")));
+      const invoicesSnapshot = await getDocs(query(collection(db, `projects/${id}/invoices`), orderBy("paidAt", "desc")));
       const dataRows: (string | number)[][] = [];
-      invoicesSnapshot.docs
-        .filter(doc => !["cancelled", "void", "rejected"].includes(doc.data().status))
-        .forEach(docSnap => {
-          const data = docSnap.data();
-          dataRows.push(toXlsxRow(columns, {
-            invoiceNumber: data.number || data.displayNumber || "",
-            supplierNumber: data.supplierNumber || "",
-            supplier: data.supplier || "", supplierTaxId: data.supplierTaxId || "",
-            supplierIban: data.supplierIban || "", description: data.description || "",
-            baseAmount: data.baseAmount || 0, totalAmount: data.totalAmount || 0,
-            paymentMethod: data.paymentMethod || "",
-            dueDate: formatDate(data.dueDate),
-            paidAt: formatDate(data.paidAt),
-            status: (data.paidAt || data.status === "paid") ? "Pagada" : "Pendiente",
-            paidBy: data.paidByName || "", accountingEntryNumber: data.accountingEntryNumber || "",
-          }));
+      const paidInvoices = invoicesSnapshot.docs.filter(doc => doc.data().status === "paid" && doc.data().paidAt);
+      paidInvoices.forEach((docSnap, idx) => {
+        const data = docSnap.data();
+        dataRows.push(toXlsxRow(columns, {
+          paymentNumber: `PAG-${String(idx + 1).padStart(4, "0")}`,
+          invoiceNumber: data.number || data.displayNumber || "", supplierNumber: data.supplierNumber || "",
+          supplier: data.supplier || "", supplierTaxId: data.supplierTaxId || "", supplierIban: data.supplierIban || "",
+          description: data.description || "", baseAmount: data.baseAmount || 0, totalAmount: data.totalAmount || 0,
+          paymentMethod: data.paymentMethod || "Transferencia", paidAt: formatDate(data.paidAt),
+          paidBy: data.paidByName || "", accountingEntryNumber: data.accountingEntryNumber || "",
+        }));
+      });
+      downloadXLSX(columns, dataRows, makeTitle("payments"), `Pagos_${projectName}_${getCurrentDate()}`);
+    } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
+  };
+
+  const generateCostReport = async (columns: SelectedColumn[]) => {
+    setGenerating("cost_report");
+    try {
+      const accountsSnapshot = await getDocs(query(collection(db, `projects/${id}/accounts`), orderBy("code", "asc")));
+      const invoicesSnapshot = await getDocs(collection(db, `projects/${id}/invoices`));
+      const dataRows: (string | number)[][] = [];
+
+      for (const accountDoc of accountsSnapshot.docs) {
+        const accountData = accountDoc.data();
+        const subAccountsSnapshot = await getDocs(query(collection(db, `projects/${id}/accounts/${accountDoc.id}/subaccounts`), orderBy("code", "asc")));
+        let totalBudgeted = 0, totalCommitted = 0, totalActual = 0;
+        subAccountsSnapshot.docs.forEach(subDoc => {
+          const subData = subDoc.data();
+          totalBudgeted += subData.budgeted || 0;
+          totalCommitted += subData.committed || 0;
+          totalActual += subData.actual || 0;
         });
-      downloadXLSX(columns, dataRows, makeTitle("payments"), `Informe_Pagos_${projectName}_${getCurrentDate()}`);
+        let totalPaid = 0, totalPending = 0;
+        invoicesSnapshot.docs.forEach(invDoc => {
+          const invData = invDoc.data();
+          (invData.items || []).forEach((item: any) => {
+            if (item.subAccountCode?.startsWith(accountData.code)) {
+              if (invData.status === "paid") totalPaid += item.baseAmount || 0;
+              else if (["approved", "pending", "accounted"].includes(invData.status)) totalPending += item.baseAmount || 0;
+            }
+          });
+        });
+        const available = totalBudgeted - totalCommitted;
+        const percentExecuted = totalBudgeted > 0 ? Math.round((totalActual / totalBudgeted) * 100) : 0;
+        dataRows.push(toXlsxRow(columns, {
+          accountCode: accountData.code || "", accountDescription: accountData.description || "",
+          budgeted: totalBudgeted, committed: totalCommitted, invoiced: totalActual,
+          paid: totalPaid, pendingPayment: totalPending, available,
+          percentExecuted: `${percentExecuted}%`, deviation: totalActual - totalBudgeted,
+        }));
+      }
+      downloadXLSX(columns, dataRows, makeTitle("cost_report"), `Informe_Costes_${projectName}_${getCurrentDate()}`);
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
@@ -1112,15 +1170,16 @@ export default function ReportsPage() {
   const generateReport = (reportType: ReportType, columns?: SelectedColumn[]) => {
     const cols = columns || getDefaultColumns(reportType);
     switch (reportType) {
-      case "budget":         return generateBudgetReport(cols);
-      case "pos_list":       return generatePOsListReport(cols);
-      case "pos_items":      return generatePOsItemsReport(cols);
-      case "invoices":       return generateInvoicesReport(cols);
-      case "invoices_items": return generateInvoicesItemsReport(cols);
-      case "suppliers":      return generateSuppliersReport(cols);
-      case "payments":       return generatePaymentsReport(cols);
-      case "box_cards":      return generateBoxCardsReport(cols);
-      case "box_transfers":  return generateBoxTransfersReport(cols);
+      case "budget":               return generateBudgetReport(cols);
+      case "pos_list":             return generatePOsListReport(cols);
+      case "pos_items":            return generatePOsItemsReport(cols);
+      case "invoices":             return generateInvoicesReport(cols);
+      case "invoices_accounting":  return generateInvoicesAccountingReport(cols);
+      case "suppliers":            return generateSuppliersReport(cols);
+      case "payments":             return generatePaymentsReport(cols);
+      case "cost_report":          return generateCostReport(cols);
+      case "box_cards":            return generateBoxCardsReport(cols);
+      case "box_transfers":        return generateBoxTransfersReport(cols);
     }
   };
 
@@ -1135,9 +1194,9 @@ export default function ReportsPage() {
 
   const getReportCount = (reportType: ReportType) => {
     switch (reportType) {
-      case "budget": return counts.accounts;
+      case "budget": case "cost_report": return counts.accounts;
       case "pos_list": case "pos_items": return counts.pos;
-      case "invoices": case "invoices_items": case "payments": return counts.invoices;
+      case "invoices": case "invoices_accounting": case "payments": return counts.invoices;
       case "suppliers": return counts.suppliers;
       case "box_cards": return counts.cardExpenses || 0;
       case "box_transfers": return counts.transferExpenses || 0;
@@ -1174,7 +1233,7 @@ export default function ReportsPage() {
   return (
     <div className={"min-h-screen bg-white " + inter.className}>
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
               <FileSpreadsheet size={24} style={{ color: "#2F52E0" }} />
@@ -1190,7 +1249,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <main className="px-24 py-6">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
         <div className="space-y-8">
           {REPORT_SECTIONS.map((section) => (
             <div key={section.id}>
@@ -1219,9 +1278,9 @@ export default function ReportsPage() {
                           <button onClick={() => openConfig(reportType)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Configurar columnas">
                             <Settings2 size={16} />
                           </button>
-                          <button
-                            onClick={() => generateReport(reportType)}
-                            disabled={generating !== null}
+                          <button 
+                            onClick={() => reportType === "invoices_accounting" ? openInvoiceBookModal() : generateReport(reportType)} 
+                            disabled={generating !== null} 
                             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
                           >
                             {generating === reportType
@@ -1345,7 +1404,8 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {false && (
+      {/* Invoice Book Modal — unchanged */}
+      {showInvoiceBookModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowInvoiceBookModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
@@ -1377,7 +1437,7 @@ export default function ReportsPage() {
                           setInvoiceBookFilters({ ...invoiceBookFilters, supplierId: "", supplierName: "" });
                       }}
                       onFocus={() => setShowSupplierDropdown(true)}
-                      placeholder="Buscar proveedor (mín. 2 caracteres)"
+                      placeholder="Buscar proveedor (mín. 2 caracteres)..."
                       className="w-full pl-10 pr-10 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                     />
                     {invoiceBookFilters.supplierId && (

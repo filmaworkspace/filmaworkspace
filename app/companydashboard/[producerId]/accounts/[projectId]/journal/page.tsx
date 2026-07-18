@@ -288,7 +288,7 @@ function AccountSelect({ value, plan, onChange }: { value: string; plan: ChartAc
       {open && (
         <div className="absolute top-full left-0 mt-0.5 z-[60] bg-white border border-slate-200 rounded-lg shadow-xl w-64">
           <div className="p-1.5 border-b border-slate-100">
-            <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Código o nombre"
+            <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Código o nombre..."
               className="w-full text-xs px-2 py-1 border border-slate-200 rounded outline-none font-mono" />
           </div>
           <div className="max-h-48 overflow-y-auto py-0.5">
@@ -705,8 +705,8 @@ export default function JournalPage() {
 
             <div className="px-5 py-4 space-y-5">
               {/* Cabecera nómina */}
-              <div className="grid grid-cols-4 gap-3">
-                <div className="col-span-2 col-span-1">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="col-span-2 sm:col-span-1">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Período *</label>
                   <input value={nPeriodo} onChange={e => setNPeriodo(e.target.value)} placeholder="enero 2025"
                     className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-400 outline-none" />
@@ -781,7 +781,7 @@ export default function JournalPage() {
                               className="w-full text-[10px] font-mono border border-slate-100 rounded px-1.5 py-0.5 focus:border-slate-400 outline-none text-slate-500" />
                           </td>
                           <td className="px-2 py-1.5">
-                            <input value={w.categoria} onChange={e => updateWorker(w.id, "categoria", e.target.value)} placeholder="Categoría"
+                            <input value={w.categoria} onChange={e => updateWorker(w.id, "categoria", e.target.value)} placeholder="ej: Productora ejecutiva"
                               className="w-full text-xs border border-slate-200 rounded px-1.5 py-0.5 focus:border-slate-400 outline-none mb-0.5" />
                             <select value={w.tipoContrato} onChange={e => updateWorker(w.id, "tipoContrato", e.target.value)}
                               className="w-full text-[10px] border border-slate-100 rounded px-1.5 py-0.5 bg-white focus:border-slate-400 outline-none text-slate-500">
@@ -902,7 +902,7 @@ export default function JournalPage() {
             {/* Search */}
             <div className="relative">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input placeholder="Buscar asiento" value={search} onChange={e => setSearch(e.target.value)}
+              <input placeholder="Buscar asiento..." value={search} onChange={e => setSearch(e.target.value)}
                 className="pl-8 pr-3 py-1.5 text-sm border border-slate-200 bg-white rounded-lg focus:ring-1 focus:ring-slate-400 outline-none w-48" />
             </div>
 

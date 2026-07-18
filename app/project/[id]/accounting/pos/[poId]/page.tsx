@@ -671,17 +671,12 @@ export default function PODetailPage() {
     try {
       const newVersion = (po.version || 1) + 1;
       
-      // Guardar los items comprometidos actuales para calcular la diferencia al aprobar la nueva versión.
-      // Se incluyen subAccountCode e invoicedAmount para que:
-      // 1. La página de presupuesto pueda mostrar el committed anterior mientras está en borrador/pendiente.
-      // 2. Al aprobar la nueva versión, se descuente correctamente solo la porción no realizada.
+      // Guardar los items comprometidos actuales para calcular la diferencia al aprobar la nueva versión
       const committedItems = po.items
         .filter(item => item.subAccountId && item.baseAmount > 0)
         .map(item => ({
           subAccountId: item.subAccountId,
-          subAccountCode: item.subAccountCode || "",
           baseAmount: item.baseAmount,
-          invoicedAmount: item.invoicedAmount || 0,
         }));
       
       await updateDoc(doc(db, `projects/${projectId}/pos`, po.id), {
@@ -812,7 +807,7 @@ export default function PODetailPage() {
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-3">
               <FileText size={24} className="text-slate-400" />
@@ -971,9 +966,9 @@ export default function PODetailPage() {
         </div>
       </div>
 
-      <main className="px-24 py-8">
-        <div className="grid grid-cols-3 gap-8">
-          <div className="col-span-2 space-y-6">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-6">
             {po.generalDescription && (
               <div className="bg-white border border-slate-200 rounded-2xl p-6">
                 <h3 className="font-semibold text-slate-900 mb-3">Descripción</h3>
@@ -1749,7 +1744,7 @@ export default function PODetailPage() {
                 <textarea
                   value={cancellationReason}
                   onChange={(e) => setCancellationReason(e.target.value)}
-                  placeholder="Explica por qué se anula esta PO"
+                  placeholder="Explica por qué se anula esta PO..."
                   rows={3}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none text-sm"
                 />
@@ -1809,7 +1804,7 @@ export default function PODetailPage() {
                 <textarea
                   value={modificationReason}
                   onChange={(e) => setModificationReason(e.target.value)}
-                  placeholder="Explica por qué se modifica"
+                  placeholder="Explica por qué se modifica..."
                   rows={4}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none text-sm"
                 />

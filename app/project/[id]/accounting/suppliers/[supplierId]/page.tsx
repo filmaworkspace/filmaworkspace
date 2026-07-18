@@ -5,8 +5,6 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
-import { getInvoiceDisplayState } from "@/lib/invoiceHelpers";
-import { IBANField } from "@/components/IBANField";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
@@ -300,23 +298,18 @@ export default function SupplierDetailPage() {
           issueDate: invData.issueDate?.toDate() || invData.createdAt?.toDate() || new Date(),
           dueDate: invData.dueDate?.toDate(),
           paidAt: invData.paidAt?.toDate(),
-          codedAt: invData.codedAt?.toDate(),
-          approvedAt: invData.approvedAt?.toDate(),
-          accountedAt: invData.accountedAt?.toDate(),
           department: invData.department || "",
           createdBy: invData.createdBy || "",
         };
       });
       
-      // Filtrar facturas según permisos y ordenar por fecha desc, descripción asc
-      const filteredInvoices = allInvoices
-        .filter((inv) => {
-          if (canViewAllPOs) return true;
-          if (canViewDepartmentPOs && inv.department === userDepartment) return true;
-          if (canViewOwnPOs && inv.createdBy === userId) return true;
-          return false;
-        })
-        .sort((a, b) => b.issueDate.getTime() - a.issueDate.getTime() || (a.description || "").localeCompare(b.description || ""));
+      // Filtrar facturas según permisos
+      const filteredInvoices = allInvoices.filter((inv) => {
+        if (canViewAllPOs) return true;
+        if (canViewDepartmentPOs && inv.department === userDepartment) return true;
+        if (canViewOwnPOs && inv.createdBy === userId) return true;
+        return false;
+      });
       setInvoices(filteredInvoices);
 
       // Cargar POs
@@ -570,20 +563,16 @@ export default function SupplierDetailPage() {
   const getStatusBadge = (status: string) => {
     const config: Record<string, { bg: string; text: string; label: string }> = {
       draft: { bg: "bg-slate-100", text: "text-slate-600", label: "Borrador" },
-      submitted: { bg: "bg-purple-50", text: "text-purple-700", label: "En sistema" },
       pending: { bg: "bg-amber-50", text: "text-amber-700", label: "Pendiente" },
       pending_approval: { bg: "bg-purple-50", text: "text-purple-700", label: "Pend. aprob." },
       approved: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Aprobada" },
-      coded: { bg: "bg-violet-50", text: "text-violet-700", label: "Codificada" },
-      accounted: { bg: "bg-teal-50", text: "text-teal-700", label: "Contabilizada" },
-      paid: { bg: "bg-blue-50", text: "text-blue-700", label: "Pagada" },
+      paid: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Pagada" },
       rejected: { bg: "bg-red-50", text: "text-red-700", label: "Rechazada" },
       closed: { bg: "bg-blue-50", text: "text-blue-700", label: "Cerrada" },
       cancelled: { bg: "bg-red-100", text: "text-red-800", label: "Anulada" },
-      void: { bg: "bg-red-100", text: "text-red-800", label: "Anulada" },
       overdue: { bg: "bg-red-50", text: "text-red-700", label: "Vencida" },
     };
-    const c = config[status] || config.submitted;
+    const c = config[status] || config.pending;
     return (
       <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-xs font-medium ${c.bg} ${c.text} ${status === "cancelled" ? "line-through" : ""}`}>
         {status === "cancelled" && <span className="font-bold">✕</span>}
@@ -594,154 +583,161 @@ export default function SupplierDetailPage() {
 
   // Generar PDF de listado de facturas
   const generateInvoiceListPdf = async () => {
-    const activeInvoices = invoices.filter(inv => !["cancelled","void"].includes(inv.status));
-    if (!supplier || activeInvoices.length === 0) return;
+    if (!supplier || invoices.length === 0) return;
     setGeneratingPdf("invoices");
-
+    
     try {
       const { jsPDF } = await import('jspdf');
-      const today = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
-
-      const paidInvoices = activeInvoices.filter(inv => (inv.paidAt || inv.status === "paid"));
-      const pendingInvoices = activeInvoices.filter(inv => (!inv.paidAt && inv.status !== "paid"));
-      const totalBase = activeInvoices.reduce((s, inv) => s + inv.baseAmount, 0);
-      const totalAmount = activeInvoices.reduce((s, inv) => s + inv.totalAmount, 0);
-      const totalPaid = paidInvoices.reduce((s, inv) => s + inv.totalAmount, 0);
-
+      
+      const totalBase = invoices.reduce((sum, inv) => sum + inv.baseAmount, 0);
+      const totalAmount = invoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
+      const paidInvoices = invoices.filter(inv => inv.status === "paid");
+      const pendingInvoices = invoices.filter(inv => inv.status !== "paid" && inv.status !== "cancelled");
+      
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 20;
-      const cw = pageWidth - margin * 2;
+      const contentWidth = pageWidth - (margin * 2);
       let y = margin;
 
-      // ── CABECERA ──────────────────────────────────────────────
-      doc.setFillColor(15, 23, 42);
-      doc.rect(0, 0, pageWidth, 38, 'F');
-      doc.setTextColor(255, 255, 255);
+      // --- TÍTULO ---
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(16);
-      doc.text('Listado de Facturas', margin, 17);
+      doc.setFontSize(18);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Listado de Facturas', margin, y);
+      y += 8;
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      doc.text(`${supplier.fiscalName} · ${supplier.taxId}`, margin, y);
+      y += 15;
+
+      // --- INFO BOXES ---
+      // Box 1: Proyecto
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(margin, y, contentWidth / 2 - 5, 25, 2, 2, 'F');
+      doc.setFontSize(8);
+      doc.setTextColor(100);
+      doc.text('PROYECTO', margin + 5, y + 8);
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42);
+      doc.setFont('helvetica', 'bold');
+      doc.text(projectName, margin + 5, y + 17);
+      
+      // Box 2: Resumen
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(margin + contentWidth / 2 + 5, y, contentWidth / 2 - 5, 25, 2, 2, 'F');
+      doc.setFontSize(8);
+      doc.setTextColor(100);
+      doc.setFont('helvetica', 'normal');
+      doc.text('RESUMEN', margin + contentWidth / 2 + 10, y + 8);
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${invoices.length} facturas`, margin + contentWidth / 2 + 10, y + 17);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
-      doc.setTextColor(148, 163, 184);
-      doc.text(`${projectName}  ·  ${supplier.fiscalName}  ·  ${supplier.taxId}`, margin, 27);
-      doc.setTextColor(148, 163, 184);
-      doc.text(today, pageWidth - margin, 27, { align: 'right' });
-      y = 50;
+      doc.setTextColor(100);
+      doc.text(`${paidInvoices.length} pagadas · ${pendingInvoices.length} pendientes`, margin + contentWidth / 2 + 10, y + 23);
+      
+      y += 35;
 
-      // ── RESUMEN 3 CAJAS ───────────────────────────────────────
-      const boxW = (cw - 8) / 3;
-      const boxes = [
-        { label: 'TOTAL FACTURAS', value: `${activeInvoices.length}`, sub: `${paidInvoices.length} pagadas · ${pendingInvoices.length} pendientes` },
-        { label: 'IMPORTE TOTAL', value: `${formatCurrency(totalAmount)} €`, sub: `Base: ${formatCurrency(totalBase)} €` },
-        { label: 'TOTAL PAGADO', value: `${formatCurrency(totalPaid)} €`, sub: `${paidInvoices.length} de ${activeInvoices.length} facturas` },
-      ];
-      boxes.forEach((b, i) => {
-        const bx = margin + i * (boxW + 4);
-        doc.setFillColor(248, 250, 252);
-        doc.setDrawColor(226, 232, 240);
-        doc.roundedRect(bx, y, boxW, 26, 2, 2, 'FD');
-        doc.setFontSize(7);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(100, 116, 139);
-        doc.text(b.label, bx + 6, y + 8);
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(15, 23, 42);
-        doc.text(b.value, bx + 6, y + 17);
-        doc.setFontSize(7);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(148, 163, 184);
-        doc.text(b.sub, bx + 6, y + 23);
-      });
-      y += 36;
-
-      // ── TABLA ─────────────────────────────────────────────────
-      // Columnas: Nº(28) Fecha(22) Descripción(60) Base(28) Total(28) Estado(22)
-      const cols = { num: margin, date: margin+28, desc: margin+50, base: margin+115, total: margin+138, status: margin+161 };
-
-      // Cabecera tabla
-      doc.setFillColor(30, 41, 59);
-      doc.rect(margin, y, cw, 9, 'F');
-      doc.setFontSize(7.5);
+      // --- TABLA ---
+      // Header
+      doc.setFillColor(241, 245, 249);
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(margin, y, contentWidth, 10, 'FD');
+      
+      doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(255, 255, 255);
-      doc.text('Nº FACTURA', cols.num + 2, y + 6);
-      doc.text('FECHA', cols.date, y + 6);
-      doc.text('DESCRIPCIÓN', cols.desc, y + 6);
-      doc.text('BASE', cols.base, y + 6, { align: 'right' });
-      doc.text('TOTAL', cols.total, y + 6, { align: 'right' });
-      doc.text('ESTADO', cols.status, y + 6);
-      y += 9;
+      doc.setTextColor(100);
+      doc.text('Nº FACTURA', margin + 3, y + 7);
+      doc.text('FECHA', margin + 35, y + 7);
+      doc.text('DESCRIPCIÓN', margin + 60, y + 7);
+      doc.text('BASE', margin + 115, y + 7);
+      doc.text('TOTAL', margin + 140, y + 7);
+      doc.text('ESTADO', margin + 165, y + 7);
+      y += 10;
 
       // Filas
-      activeInvoices.forEach((inv, idx) => {
-        if (y > pageHeight - 35) { doc.addPage(); y = margin; }
-
-        doc.setFillColor(idx % 2 === 0 ? 255 : 249, idx % 2 === 0 ? 255 : 250, idx % 2 === 0 ? 255 : 252);
-        doc.rect(margin, y, cw, 8, 'F');
-        doc.setDrawColor(226, 232, 240);
-        doc.line(margin, y + 8, margin + cw, y + 8);
-
-        doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      invoices.forEach((inv) => {
+        if (y > 270) {
+          doc.addPage();
+          y = margin;
+        }
+        
+        doc.setDrawColor(241, 245, 249);
+        doc.line(margin, y + 8, pageWidth - margin, y + 8);
+        
+        doc.setFontSize(9);
         doc.setTextColor(15, 23, 42);
         doc.setFont('helvetica', 'bold');
-        doc.text(inv.number || '-', cols.num + 2, y + 5.5);
+        doc.text(inv.number, margin + 3, y + 6);
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(71, 85, 105);
-        doc.text(formatDate(inv.issueDate), cols.date, y + 5.5);
-        doc.text((inv.description || '-').substring(0, 26), cols.desc, y + 5.5);
+        doc.text(formatDate(inv.issueDate), margin + 35, y + 6);
+        doc.text((inv.description || '-').substring(0, 22), margin + 60, y + 6);
+        doc.text(formatCurrency(inv.baseAmount), margin + 115, y + 6);
+        doc.text(formatCurrency(inv.totalAmount), margin + 140, y + 6);
+        
+        // Estado con color
+        const statusText = inv.status === 'paid' ? 'Pagada' : 'Pendiente';
+        if (inv.status === 'paid') {
+          doc.setTextColor(22, 101, 52);
+        } else {
+          doc.setTextColor(146, 64, 14);
+        }
+        doc.text(statusText, margin + 165, y + 6);
         doc.setTextColor(15, 23, 42);
-        doc.text(formatCurrency(inv.baseAmount), cols.base, y + 5.5, { align: 'right' });
-        doc.setFont('helvetica', 'bold');
-        doc.text(formatCurrency(inv.totalAmount), cols.total, y + 5.5, { align: 'right' });
-
-        const isPaid = inv.status === 'paid';
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(isPaid ? 22 : 146, isPaid ? 101 : 64, isPaid ? 52 : 14);
-        doc.text(isPaid ? 'Pagada' : 'Pendiente', cols.status, y + 5.5);
-        doc.setTextColor(15, 23, 42);
-        y += 8;
+        
+        y += 9;
       });
 
-      // ── TOTALES ────────────────────────────────────────────────
-      y += 4;
-      doc.setFillColor(15, 23, 42);
-      doc.roundedRect(margin, y, cw, 18, 2, 2, 'F');
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(148, 163, 184);
-      doc.text('Base imponible total', margin + 6, y + 7);
+      // --- TOTALES ---
+      y += 5;
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(margin, y, contentWidth, 30, 2, 2, 'F');
+      
+      doc.setFontSize(9);
+      doc.setTextColor(100);
+      doc.text('Total Base Imponible', margin + 5, y + 10);
+      doc.setTextColor(15, 23, 42);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(255, 255, 255);
-      doc.text(`${formatCurrency(totalBase)} €`, margin + 6, y + 14);
+      doc.text(formatCurrency(totalBase), margin + 60, y + 10);
+      
+      doc.setDrawColor(226, 232, 240);
+      doc.line(margin + 5, y + 15, margin + contentWidth - 10, y + 15);
+      
+      doc.setFontSize(11);
+      doc.setTextColor(100);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(148, 163, 184);
-      doc.text('TOTAL FACTURAS', margin + cw / 2, y + 7, { align: 'center' });
-      doc.setFontSize(12);
+      doc.text('TOTAL', margin + 5, y + 24);
+      doc.setTextColor(15, 23, 42);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(255, 255, 255);
-      doc.text(`${formatCurrency(totalAmount)} €`, margin + cw / 2, y + 14, { align: 'center' });
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(148, 163, 184);
-      doc.text('Total pagado', margin + cw - 6, y + 7, { align: 'right' });
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(134, 239, 172);
-      doc.text(`${formatCurrency(totalPaid)} €`, margin + cw - 6, y + 14, { align: 'right' });
+      doc.setFontSize(14);
+      doc.text(formatCurrency(totalAmount), margin + 60, y + 24);
 
-      // ── FOOTER ─────────────────────────────────────────────────
+      // --- FOOTER ---
+      const today = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
       const pageCount = doc.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
-        doc.setFontSize(7.5);
-        doc.setTextColor(148, 163, 184);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
         doc.setFont('helvetica', 'normal');
-        doc.text(`Generado el ${today} · Filma Workspace · Pág. ${i}/${pageCount}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
+        doc.text(
+          `Generado el ${today} · Filma Workspace`,
+          pageWidth / 2,
+          doc.internal.pageSize.getHeight() - 10,
+          { align: 'center' }
+        );
       }
 
-      doc.save(`facturas_${supplier.fiscalName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+      // Guardar
+      const fileName = `facturas_${supplier.fiscalName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(fileName);
+      
       setSuccessMessage("Listado de facturas generado");
     } catch (error) {
       console.error(error);
@@ -756,205 +752,202 @@ export default function SupplierDetailPage() {
   const generateEndOfProjectLetter = async () => {
     if (!supplier) return;
     setGeneratingPdf("letter");
-
+    
     try {
+      // Importar jsPDF dinámicamente
       const { jsPDF } = await import('jspdf');
-
-      const paidInvoices = invoices.filter(inv => (inv.paidAt || inv.status === "paid"))
-        .sort((a, b) => b.issueDate.getTime() - a.issueDate.getTime());
-      const totalPaid = paidInvoices.reduce((s, inv) => s + inv.totalAmount, 0);
+      
+      const paidInvoices = invoices.filter(inv => inv.status === "paid");
+      const totalPaid = paidInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
       const today = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
-
+      
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 25;
-      const cw = pageWidth - margin * 2;
+      const contentWidth = pageWidth - (margin * 2);
       let y = margin;
 
-      // ── MEMBRETE ──────────────────────────────────────────────
-      // Banda superior sutil
-      doc.setFillColor(248, 250, 252);
-      doc.rect(0, 0, pageWidth, 42, 'F');
-      doc.setDrawColor(226, 232, 240);
-      doc.line(0, 42, pageWidth, 42);
+      // Configuración de fuentes
+      doc.setFont('helvetica');
 
+      // --- MEMBRETE ---
+      doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(15);
-      doc.setTextColor(15, 23, 42);
-      doc.text(projectConfig?.fiscalName || projectName, margin, y + 10);
+      doc.text(projectConfig?.fiscalName || projectName, pageWidth / 2, y, { align: 'center' });
+      y += 6;
+      
+      if (projectConfig?.taxId) {
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100);
+        doc.text(`CIF: ${projectConfig.taxId}`, pageWidth / 2, y, { align: 'center' });
+        y += 5;
+      }
+      
+      if (projectConfig?.address) {
+        doc.setFontSize(9);
+        doc.text(`${projectConfig.address}, ${projectConfig.postalCode} ${projectConfig.city}`, pageWidth / 2, y, { align: 'center' });
+        y += 5;
+      }
+      
+      // Línea separadora
+      y += 5;
+      doc.setDrawColor(200);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 15;
 
+      // --- FECHA ---
+      doc.setTextColor(100);
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
-      doc.setTextColor(100, 116, 139);
-      const memberInfo = [
-        projectConfig?.taxId ? `CIF: ${projectConfig.taxId}` : null,
-        projectConfig?.address ? `${projectConfig.address}${projectConfig.city ? `, ${projectConfig.city}` : ''}` : null,
-      ].filter(Boolean).join('  ·  ');
-      if (memberInfo) doc.text(memberInfo, margin, y + 18);
+      doc.text(today, pageWidth - margin, y, { align: 'right' });
+      y += 20;
 
-      // Fecha a la derecha
-      doc.setTextColor(100, 116, 139);
-      doc.text(today, pageWidth - margin, y + 10, { align: 'right' });
-
-      y = 56;
-
-      // ── DESTINATARIO ──────────────────────────────────────────
-      doc.setFont('helvetica', 'bold');
+      // --- DESTINATARIO ---
+      doc.setTextColor(0);
       doc.setFontSize(11);
-      doc.setTextColor(15, 23, 42);
+      doc.setFont('helvetica', 'bold');
       doc.text(supplier.fiscalName, margin, y);
       y += 6;
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9.5);
-      doc.setTextColor(71, 85, 105);
+      doc.setFontSize(10);
       doc.text(supplier.taxId, margin, y);
       y += 5;
       if (supplier.address?.street) {
-        doc.text(`${supplier.address.street}${supplier.address.number ? ` ${supplier.address.number}` : ''}`, margin, y);
+        doc.text(`${supplier.address.street} ${supplier.address.number}`, margin, y);
         y += 5;
       }
       if (supplier.address?.city) {
-        doc.text(`${supplier.address.postalCode || ''} ${supplier.address.city}`.trim(), margin, y);
+        doc.text(`${supplier.address.postalCode} ${supplier.address.city}`, margin, y);
         y += 5;
       }
-      y += 14;
+      y += 15;
 
-      // ── ASUNTO ────────────────────────────────────────────────
-      doc.setDrawColor(47, 82, 224);
-      doc.setLineWidth(0.8);
-      doc.line(margin, y, margin + 3, y);
-      doc.setLineWidth(0.2);
-      doc.setFont('helvetica', 'bold');
+      // --- ASUNTO ---
       doc.setFontSize(10);
-      doc.setTextColor(15, 23, 42);
-      const asuntoText = `Asunto: Certificado de cierre de relación comercial — "${projectName}"`;
-      doc.text(asuntoText, margin + 6, y + 0.5, { maxWidth: cw - 6 });
-      y += doc.splitTextToSize(asuntoText, cw - 6).length * 5.5 + 10;
+      doc.setFont('helvetica', 'bold');
+      const asunto = `Asunto: Certificado de cierre de relación comercial - Proyecto "${projectName}"`;
+      doc.text(asunto, margin, y, { maxWidth: contentWidth });
+      y += 15;
 
-      // ── CUERPO ────────────────────────────────────────────────
+      // --- CUERPO ---
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
-      doc.setTextColor(30, 41, 59);
-      const productorText = producerNames.length > 0 ? `, producido por ${producerNames.join(" y ")}` : "";
-      const p1 = `Por medio de la presente, ${projectConfig?.fiscalName || "la productora"} certifica que, con fecha de hoy, no existen facturas pendientes de pago correspondientes a los servicios prestados por ${supplier.fiscalName} en el marco del proyecto audiovisual "${projectName}"${productorText}.`;
-      const lines1 = doc.splitTextToSize(p1, cw);
+      
+      const parrafo1 = `Por medio de la presente, ${projectConfig?.fiscalName || "la productora"} certifica que, con fecha de hoy, no existen facturas pendientes de pago correspondientes a los servicios prestados por ${supplier.fiscalName} en el marco del proyecto audiovisual "${projectName}"${producerNames.length > 0 ? `, producido por ${producerNames.join(" y ")}` : ""}.`;
+      
+      const lines1 = doc.splitTextToSize(parrafo1, contentWidth);
       doc.text(lines1, margin, y);
-      y += lines1.length * 5.5 + 12;
+      y += lines1.length * 5 + 10;
 
-      // ── CAJA VERIFICACIÓN ─────────────────────────────────────
-      doc.setFillColor(240, 253, 244);
-      doc.setDrawColor(34, 197, 94);
-      doc.setLineWidth(0.4);
-      doc.roundedRect(margin, y, cw, 22, 3, 3, 'FD');
-      doc.setLineWidth(0.2);
+      // --- CAJA DESTACADA ---
+      const boxHeight = 20;
+      doc.setFillColor(240, 253, 244); // emerald-50
+      doc.setDrawColor(34, 197, 94); // emerald-500
+      doc.roundedRect(margin, y, contentWidth, boxHeight, 3, 3, 'FD');
+      
+      doc.setTextColor(22, 101, 52); // emerald-800
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
-      doc.setTextColor(22, 101, 52);
-      doc.text('✓  Todas las facturas han sido íntegramente abonadas', margin + 7, y + 9);
+      doc.text('✓ Todas las facturas han sido abonadas', margin + 5, y + 8);
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
-      doc.setTextColor(21, 128, 61);
-      doc.text(`La relación comercial con ${supplier.commercialName || supplier.fiscalName} queda debidamente liquidada.`, margin + 7, y + 16);
-      y += 32;
+      doc.setFontSize(9);
+      doc.text(`La relación comercial con ${supplier.commercialName || supplier.fiscalName} ha quedado debidamente liquidada.`, margin + 5, y + 14);
+      y += boxHeight + 15;
 
-      // ── TABLA DE FACTURAS PAGADAS ─────────────────────────────
+      // --- TABLA DE FACTURAS ---
+      doc.setTextColor(0);
       if (paidInvoices.length > 0) {
+        doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9.5);
-        doc.setTextColor(30, 41, 59);
-        doc.text('A continuación se detalla el histórico de facturas abonadas:', margin, y);
-        y += 8;
+        doc.text('A continuación se detalla el histórico de facturas correspondientes a este proyecto:', margin, y);
+        y += 10;
 
-        // Cabecera tabla
-        doc.setFillColor(30, 41, 59);
-        doc.rect(margin, y, cw, 8, 'F');
-        doc.setFontSize(7.5);
+        // Header de tabla
+        doc.setFillColor(248, 250, 252); // slate-50
+        doc.setDrawColor(226, 232, 240); // slate-200
+        doc.rect(margin, y, contentWidth, 8, 'FD');
+        
+        doc.setFontSize(8);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(255, 255, 255);
+        doc.setTextColor(100);
         doc.text('Nº FACTURA', margin + 3, y + 5.5);
-        doc.text('FECHA EMISIÓN', margin + 35, y + 5.5);
-        doc.text('CONCEPTO', margin + 68, y + 5.5);
-        doc.text('IMPORTE', margin + 128, y + 5.5, { align: 'right' });
-        doc.text('FECHA PAGO', margin + cw - 3, y + 5.5, { align: 'right' });
+        doc.text('FECHA', margin + 35, y + 5.5);
+        doc.text('CONCEPTO', margin + 60, y + 5.5);
+        doc.text('IMPORTE', margin + 120, y + 5.5);
+        doc.text('FECHA PAGO', margin + 145, y + 5.5);
         y += 8;
 
+        // Filas de tabla
         doc.setFont('helvetica', 'normal');
-        paidInvoices.forEach((inv, idx) => {
-          if (y > pageHeight - 45) { doc.addPage(); y = margin; }
-
-          doc.setFillColor(idx % 2 === 0 ? 255 : 249, idx % 2 === 0 ? 255 : 250, idx % 2 === 0 ? 255 : 252);
-          doc.rect(margin, y, cw, 8, 'F');
-          doc.setDrawColor(226, 232, 240);
-          doc.line(margin, y + 8, margin + cw, y + 8);
-
+        doc.setTextColor(0);
+        paidInvoices.forEach((inv, index) => {
+          if (y > 260) {
+            doc.addPage();
+            y = margin;
+          }
+          
+          doc.setDrawColor(241, 245, 249);
+          doc.line(margin, y + 7, pageWidth - margin, y + 7);
+          
           doc.setFontSize(8);
-          doc.setTextColor(15, 23, 42);
-          doc.setFont('helvetica', 'bold');
-          doc.text(inv.number || '-', margin + 3, y + 5.5);
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(71, 85, 105);
-          doc.text(formatDate(inv.issueDate), margin + 35, y + 5.5);
-          doc.text((inv.description || '-').substring(0, 28), margin + 68, y + 5.5);
-          doc.setTextColor(15, 23, 42);
-          doc.setFont('helvetica', 'bold');
-          doc.text(`${formatCurrency(inv.totalAmount)} €`, margin + 128, y + 5.5, { align: 'right' });
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(22, 101, 52);
-          doc.text(inv.paidAt ? formatDate(inv.paidAt) : '-', margin + cw - 3, y + 5.5, { align: 'right' });
+          doc.text(inv.number, margin + 3, y + 5);
+          doc.text(formatDate(inv.issueDate), margin + 35, y + 5);
+          doc.text((inv.description || '-').substring(0, 25), margin + 60, y + 5);
+          doc.text(formatCurrency(inv.totalAmount), margin + 120, y + 5);
+          doc.text(inv.paidAt ? formatDate(inv.paidAt) : '-', margin + 145, y + 5);
           y += 8;
         });
 
-        // Total
-        doc.setFillColor(15, 23, 42);
-        doc.rect(margin, y, cw, 9, 'F');
-        doc.setFontSize(8.5);
+        // Fila de total
+        doc.setFillColor(248, 250, 252);
+        doc.rect(margin, y, contentWidth, 8, 'FD');
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(255, 255, 255);
-        doc.text('TOTAL ABONADO', margin + 3, y + 6);
-        doc.setTextColor(134, 239, 172);
-        doc.text(`${formatCurrency(totalPaid)} €`, margin + 128, y + 6, { align: 'right' });
+        doc.text('TOTAL ABONADO', margin + 3, y + 5.5);
+        doc.text(formatCurrency(totalPaid), margin + 120, y + 5.5);
         y += 20;
       }
 
-      // ── PÁRRAFO FINAL ─────────────────────────────────────────
-      if (y > pageHeight - 55) { doc.addPage(); y = margin; }
+      // --- PÁRRAFO FINAL ---
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9.5);
-      doc.setTextColor(30, 41, 59);
-      const pFinal = 'Se expide el presente certificado a petición del interesado y para los efectos que estime oportunos.';
-      doc.text(pFinal, margin, y, { maxWidth: cw });
-      y += 18;
+      doc.setFontSize(10);
+      const parrafoFinal = 'Se expide el presente certificado a petición del interesado y para los efectos que estime oportunos.';
+      doc.text(parrafoFinal, margin, y);
+      y += 25;
 
-      // ── FIRMA ─────────────────────────────────────────────────
+      // --- FIRMA ---
       doc.text('Atentamente,', margin, y);
-      y += 28;
-      doc.setDrawColor(15, 23, 42);
-      doc.setLineWidth(0.5);
-      doc.line(margin, y, margin + 65, y);
-      doc.setLineWidth(0.2);
+      y += 35;
+      
+      doc.setDrawColor(0);
+      doc.line(margin, y, margin + 70, y);
       y += 5;
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(15, 23, 42);
       doc.text(projectConfig?.fiscalName || projectName, margin, y);
       y += 5;
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
-      doc.setTextColor(100, 116, 139);
+      doc.setTextColor(100);
+      doc.setFontSize(9);
       doc.text('Departamento de Producción', margin, y);
 
-      // ── FOOTER ────────────────────────────────────────────────
+      // --- FOOTER ---
       const pageCount = doc.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
-        doc.setFontSize(7.5);
-        doc.setTextColor(148, 163, 184);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Documento generado automáticamente · Filma Workspace · ${today}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(
+          `Documento generado automáticamente · Filma Workspace · ${today}`,
+          pageWidth / 2,
+          doc.internal.pageSize.getHeight() - 10,
+          { align: 'center' }
+        );
       }
 
-      doc.save(`carta_fin_proyecto_${supplier.fiscalName.replace(/\s+/g, '_')}_${projectName.replace(/\s+/g, '_')}.pdf`);
+      // Guardar PDF
+      const fileName = `carta_fin_proyecto_${supplier.fiscalName.replace(/\s+/g, '_')}_${projectName.replace(/\s+/g, '_')}.pdf`;
+      doc.save(fileName);
+      
       setSuccessMessage("Carta de fin de proyecto generada");
     } catch (error) {
       console.error(error);
@@ -1014,8 +1007,8 @@ export default function SupplierDetailPage() {
     </div>
   );
 
-  const pendingInvoices = invoices.filter(inv => (!inv.paidAt && inv.status !== "paid") && !["cancelled","void"].includes(inv.status));
-  const paidInvoices = invoices.filter(inv => (inv.paidAt || inv.status === "paid"));
+  const pendingInvoices = invoices.filter(inv => inv.status !== "paid" && inv.status !== "cancelled");
+  const paidInvoices = invoices.filter(inv => inv.status === "paid");
   const hasPendingInvoices = pendingInvoices.length > 0;
 
   // Determinar estado general del proveedor
@@ -1040,7 +1033,7 @@ export default function SupplierDetailPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           {/* Breadcrumb y acciones */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
@@ -1073,7 +1066,7 @@ export default function SupplierDetailPage() {
                             type="text"
                             value={supplierSearch}
                             onChange={(e) => setSupplierSearch(e.target.value)}
-                            placeholder="Buscar proveedor"
+                            placeholder="Buscar proveedor..."
                             autoFocus
                             className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900"
                           />
@@ -1223,7 +1216,7 @@ export default function SupplierDetailPage() {
         </div>
       </div>
 
-      <main className="px-24 py-8">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
         {/* Banner de proveedor cerrado */}
         {supplierClosure && (
           <div className="mb-6 bg-slate-900 rounded-2xl p-5 text-white">
@@ -1264,9 +1257,9 @@ export default function SupplierDetailPage() {
             </div>
           </div>
         )}
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Columna izquierda - Datos y documentos */}
-          <div className="col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6">
             {/* Datos fiscales y dirección - editable inline */}
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -1300,7 +1293,7 @@ export default function SupplierDetailPage() {
               
               <div className="p-5">
                 {!editingFiscal ? (
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Dirección */}
                     <div>
                       <p className="text-xs text-slate-400 uppercase tracking-wide mb-2">Dirección fiscal</p>
@@ -1344,7 +1337,7 @@ export default function SupplierDetailPage() {
                 ) : (
                   <div className="space-y-4">
                     {/* Form de edición */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-3">
                         <p className="text-xs text-slate-400 uppercase tracking-wide">Dirección fiscal</p>
                         <div className="grid grid-cols-3 gap-2">
@@ -1390,15 +1383,23 @@ export default function SupplierDetailPage() {
                       
                       <div className="space-y-3">
                         <p className="text-xs text-slate-400 uppercase tracking-wide">Datos bancarios</p>
-                        <IBANField
-                          iban={editForm.bankAccount}
-                          bic={editForm.bic}
-                          onIBANChange={(v) => setEditForm({ ...editForm, bankAccount: v })}
-                          onBICChange={(v) => setEditForm({ ...editForm, bic: v })}
-                          ibanClassName="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                          bicClassName="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                          ibanPlaceholder="Pega 20 dígitos o IBAN completo"
-                          bicPlaceholder="BIC/SWIFT"
+                        <div>
+                          <input
+                            type="text"
+                            value={editForm.bankAccount}
+                            onChange={(e) => handleBankAccountChange(e.target.value)}
+                            placeholder="Pega 20 dígitos o IBAN completo"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900"
+                          />
+                          <p className="text-xs text-slate-400 mt-1">Pega 20 dígitos y se calcula ESXX automáticamente</p>
+                        </div>
+                        <input
+                          type="text"
+                          value={editForm.bic}
+                          onChange={(e) => setEditForm({ ...editForm, bic: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11) })}
+                          placeholder="BIC/SWIFT (opcional)"
+                          maxLength={11}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-slate-900"
                         />
                         <div className="relative custom-dropdown">
                           <button
@@ -1432,67 +1433,52 @@ export default function SupplierDetailPage() {
             </div>
 
             {/* Facturas */}
-            {(() => {
-              const activeInvoices = invoices.filter(inv => !["cancelled","void"].includes(inv.status));
-              const paidCount = activeInvoices.filter(inv => (inv.paidAt || inv.status === "paid")).length;
-              const totalBase = activeInvoices.reduce((s, inv) => s + inv.baseAmount, 0);
-              return (
-                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                  <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <h2 className="font-semibold text-slate-900">Facturas</h2>
-                      <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">{activeInvoices.length}</span>
-                      {paidCount > 0 && (
-                        <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg">{paidCount} pagadas</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {activeInvoices.length > 0 && (
-                        <span className="text-xs text-slate-500 font-mono">{formatCurrency(totalBase)} €</span>
-                      )}
-                      {invoices.length > 0 && (
-                        <Link
-                          href={`/project/${projectId}/accounting/invoices?supplier=${supplierId}`}
-                          className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1"
-                        >
-                          Ver todas <ExternalLink size={12} />
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-
-                  {activeInvoices.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <Receipt size={24} className="text-slate-300 mx-auto mb-2" />
-                      <p className="text-sm text-slate-400">Sin facturas registradas</p>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-slate-100">
-                      {activeInvoices.slice(0, 5).map(inv => (
-                        <Link
-                          key={inv.id}
-                          href={`/project/${projectId}/accounting/invoices/${inv.id}`}
-                          className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors group"
-                        >
-                          <div className="flex-1 min-w-0 mr-3">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <span className="font-mono text-sm font-semibold text-slate-900">{inv.number}</span>
-                              <span className="text-xs text-slate-400">{formatDate(inv.issueDate)}</span>
-                            </div>
-                            {inv.description && <p className="text-xs text-slate-500 truncate">{inv.description}</p>}
-                          </div>
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            <span className="font-mono text-sm font-semibold text-slate-900">{formatCurrency(inv.totalAmount)} €</span>
-                            {getStatusBadge(getInvoiceDisplayState(inv))}
-                            <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-500" />
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-semibold text-slate-900">Facturas</h2>
+                  <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">{invoices.length}</span>
                 </div>
-              );
-            })()}
+                {invoices.length > 0 && (
+                  <Link 
+                    href={`/project/${projectId}/accounting/invoices?supplier=${supplierId}`}
+                    className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1"
+                  >
+                    Ver todas <ExternalLink size={12} />
+                  </Link>
+                )}
+              </div>
+              
+              {invoices.length === 0 ? (
+                <div className="p-8 text-center">
+                  <Receipt size={24} className="text-slate-300 mx-auto mb-2" />
+                  <p className="text-sm text-slate-400">Sin facturas registradas</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {invoices.slice(0, 5).map(inv => {
+                    const isCancelled = inv.status === "cancelled";
+                    return (
+                      <Link
+                        key={inv.id}
+                        href={`/project/${projectId}/accounting/invoices/${inv.id}`}
+                        className={`flex items-center justify-between px-5 py-3.5 transition-colors group ${isCancelled ? "bg-red-50/40 opacity-60 hover:opacity-80" : "hover:bg-slate-50"}`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className={`font-mono text-sm font-semibold ${isCancelled ? "line-through text-slate-400" : "text-slate-900"}`}>{inv.number}</span>
+                          <span className="text-sm text-slate-500 truncate">{inv.description || formatDate(inv.issueDate)}</span>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <span className={`font-mono text-sm font-semibold ${isCancelled ? "line-through text-slate-400" : "text-slate-900"}`}>{formatCurrency(inv.totalAmount)}</span>
+                          {getStatusBadge(inv.status)}
+                          <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-500" />
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             {/* POs */}
             {pos.length > 0 && (
@@ -1730,7 +1716,7 @@ export default function SupplierDetailPage() {
                 <textarea
                   value={closeProjectData.notes}
                   onChange={(e) => setCloseProjectData({ ...closeProjectData, notes: e.target.value })}
-                  placeholder="Valoración del proveedor"
+                  placeholder="Ej: Cierre satisfactorio, proveedor recomendado para futuros proyectos..."
                   rows={3}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />

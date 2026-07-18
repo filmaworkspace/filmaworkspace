@@ -255,7 +255,7 @@ export default function ProjectOverviewPage() {
 
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
-      <div className="px-24 pt-24 pb-12">
+      <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-24 pb-12">
         
         {/* Header del proyecto */}
         <div className="mb-10">
@@ -365,10 +365,10 @@ export default function ProjectOverviewPage() {
             )}
           </div>
 
-          <div className="flex flex-row gap-4 items-start">
+          <div className="flex flex-col lg:flex-row gap-4 items-start">
             {/* Roles de proyecto */}
             {projectRoleMembers.length > 0 && (
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-flex-1 max-w-[50%] w-full">
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex-1 lg:max-w-[50%] w-full">
                 <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
                   <Shield size={16} className="text-slate-400" />
                   <h3 className="font-semibold text-slate-900 text-sm">Roles de proyecto</h3>
@@ -411,7 +411,7 @@ export default function ProjectOverviewPage() {
 
             {/* Departamentos */}
             {departmentMembers.length > 0 && (
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-flex-1 max-w-[50%] w-full">
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex-1 lg:max-w-[50%] w-full">
                 <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
                   <Briefcase size={16} className="text-slate-400" />
                   <h3 className="font-semibold text-slate-900 text-sm">Departamentos</h3>

@@ -53,7 +53,6 @@ import {
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
-import { getInvoiceDisplayState } from "@/lib/invoiceHelpers";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -67,13 +66,10 @@ const DOCUMENT_TYPES = {
   guarantee: { code: "FNZ", label: "Fianza", icon: Shield, bgColor: "bg-slate-100", textColor: "text-slate-700", borderColor: "border-slate-300" },
 };
 
-// Filter values are display states (see getInvoiceDisplayState).
 const STATUS_OPTIONS = [
   { value: "all", label: "Todos los estados" },
-  { value: "submitted", label: "En sistema" },
-  { value: "approved", label: "Aprobadas" },
-  { value: "coded", label: "Codificadas" },
-  { value: "accounted", label: "Contabilizadas" },
+  { value: "pending_approval", label: "Pte. aprobación" },
+  { value: "pending", label: "Pte. pago" },
   { value: "paid", label: "Pagadas" },
   { value: "overdue", label: "Vencidas" },
   { value: "rejected", label: "Rechazadas" },
@@ -116,8 +112,7 @@ interface Invoice {
   vatAmount: number;
   irpfAmount: number;
   totalAmount: number;
-  // Lifecycle only. Legacy values kept for backwards compat with existing docs.
-  status: "draft" | "submitted" | "void" | "pending_approval" | "pending" | "paid" | "overdue" | "cancelled" | "rejected" | "coded" | "accounted" | "returned" | "partial_return";
+  status: "pending_approval" | "pending" | "paid" | "overdue" | "cancelled" | "rejected";
   approvalSteps?: any[];
   currentApprovalStep?: number;
   dueDate: Date;
@@ -136,12 +131,8 @@ interface Invoice {
   linkedDocumentId?: string;
   codedAt?: Date;
   codedByName?: string;
-  approvedAt?: Date;
-  accountedAt?: Date;
-  paidAt?: Date;
   accounted?: boolean;
   accountingEntryNumber?: string;
-  replacedBy?: string;
 }
 
 interface CompanyData {
@@ -240,9 +231,6 @@ export default function InvoicesPage() {
           rejectedAt: data.rejectedAt?.toDate(),
           codedAt: data.codedAt?.toDate(),
           codedByName: data.codedByName,
-          approvedAt: data.approvedAt?.toDate(),
-          accountedAt: data.accountedAt?.toDate(),
-          paidAt: data.paidAt?.toDate(),
           accounted: data.accounted || false,
           accountingEntryNumber: data.accountingEntryNumber,
         };
@@ -255,10 +243,13 @@ export default function InvoicesPage() {
         return false;
       });
 
+      const now = new Date();
       let pendingCount = 0;
       for (const invoice of invoicesData) {
-        // "Vencida" ahora es un estado calculado (ver getInvoiceDisplayState); no se
-        // persiste en Firestore.
+        if (invoice.status === "pending" && invoice.dueDate < now) {
+          await updateDoc(doc(db, `projects/${id}/invoices`, invoice.id), { status: "overdue" });
+          invoice.status = "overdue";
+        }
         // Contar proformas y presupuestos que no han sido reemplazados
         if (invoice.requiresReplacement && !invoice.replacedByInvoiceId && !invoice.replacedBy) pendingCount++;
       }
@@ -284,7 +275,7 @@ export default function InvoicesPage() {
           (inv.poNumber && inv.poNumber.toLowerCase().includes(s))
       );
     }
-    if (statusFilter !== "all") filtered = filtered.filter((inv) => getInvoiceDisplayState(inv) === statusFilter);
+    if (statusFilter !== "all") filtered = filtered.filter((inv) => inv.status === statusFilter);
     if (typeFilter !== "all") filtered = filtered.filter((inv) => inv.documentType === typeFilter);
     if (showUncodedOnly) filtered = filtered.filter((inv) => !inv.codedAt);
     setFilteredInvoices(filtered);
@@ -296,9 +287,8 @@ export default function InvoicesPage() {
   };
 
   const canEditInvoice = (invoice: Invoice): boolean => {
-    if (invoice.accounted || invoice.accountedAt) return false; // Bloqueada si está contabilizada
-    if (invoice.paidAt) return false;
-    if (["paid", "cancelled", "rejected", "void"].includes(invoice.status)) return false;
+    if (invoice.accounted) return false; // Bloqueada si está contabilizada
+    if (invoice.status === "paid" || invoice.status === "cancelled") return false;
     if (permissions.canEditAllPOs) return true;
     if (permissions.canEditDepartmentPOs && invoice.department === permissions.department) return true;
     if (permissions.canEditOwnPOs && invoice.createdBy === permissions.userId) return true;
@@ -306,17 +296,13 @@ export default function InvoicesPage() {
   };
 
   const canDeleteInvoice = (invoice: Invoice): boolean => {
-    if (invoice.accounted || invoice.accountedAt) return false; // Bloqueada si está contabilizada
-    // Solo se puede borrar antes de aprobar, o si está rechazada.
-    if (invoice.approvedAt) return false;
-    if (!["submitted", "pending_approval", "rejected"].includes(invoice.status)) return false;
+    if (invoice.accounted) return false; // Bloqueada si está contabilizada
+    if (invoice.status !== "pending_approval" && invoice.status !== "rejected") return false;
     return canEditInvoice(invoice);
   };
 
   const canMarkAsPaid = (invoice: Invoice): boolean => {
-    // Pagable cuando está aprobada y aún no pagada.
-    if (!invoice.approvedAt || invoice.paidAt) return false;
-    if (["cancelled", "rejected", "void"].includes(invoice.status)) return false;
+    if (invoice.status !== "pending" && invoice.status !== "overdue") return false;
     if (permissions.isProjectRole) return true;
     if (permissions.canEditAllPOs) return true;
     return false;
@@ -368,7 +354,7 @@ export default function InvoicesPage() {
   const doMarkAsPaid = async (invoice: Invoice) => {
     try {
       await updateDoc(doc(db, `projects/${id}/invoices`, invoice.id), {
-        status: "submitted",
+        status: "paid",
         paidAt: Timestamp.now(),
         paidBy: permissions.userId,
         paidByName: permissions.userName,
@@ -427,7 +413,7 @@ export default function InvoicesPage() {
     if (!reason) return;
 
     try {
-      if ((invoice.paidAt || invoice.accountedAt || invoice.codedAt || invoice.status === "paid") && invoice.items?.length > 0) {
+      if (invoice.status === "paid" && invoice.items?.length > 0) {
         const accountsSnapshot = await getDocs(collection(db, `projects/${id}/accounts`));
         const hasPO = !!invoice.poId;
 
@@ -518,27 +504,21 @@ export default function InvoicesPage() {
     );
   };
 
-  const getStatusBadge = (invoice: Invoice) => {
-    const state = getInvoiceDisplayState(invoice);
+  const getStatusBadge = (status: string) => {
     const config: Record<string, { bg: string; text: string; label: string }> = {
-      draft: { bg: "bg-slate-100", text: "text-slate-700", label: "Borrador" },
-      submitted: { bg: "bg-purple-50", text: "text-purple-700", label: "En sistema" },
-      approved: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Aprobada" },
-      coded: { bg: "bg-violet-50", text: "text-violet-700", label: "Codificada" },
-      accounted: { bg: "bg-teal-50", text: "text-teal-700", label: "Contabilizada" },
-      paid: { bg: "bg-blue-50", text: "text-blue-700", label: "Pagada" },
+      pending_approval: { bg: "bg-purple-50", text: "text-purple-700", label: "Pte. aprobación" },
+      pending: { bg: "bg-amber-50", text: "text-amber-700", label: "Pte. pago" },
+      paid: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Pagada" },
       overdue: { bg: "bg-red-50", text: "text-red-700", label: "Vencida" },
       cancelled: { bg: "bg-red-100", text: "text-red-700", label: "Anulada" },
-      void: { bg: "bg-red-100", text: "text-red-700", label: "Anulada" },
       rejected: { bg: "bg-red-50", text: "text-red-700", label: "Rechazada" },
       returned: { bg: "bg-teal-50", text: "text-teal-700", label: "Devuelta" },
       partial_return: { bg: "bg-cyan-50", text: "text-cyan-700", label: "Dev. parcial" },
     };
-    const c = config[state] || config.submitted;
-    const struck = state === "cancelled" || state === "void";
+    const c = config[status] || config.pending;
     return (
-      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${c.bg} ${c.text} ${struck ? "line-through" : ""}`}>
-        {struck && <span className="font-bold">✕</span>}
+      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${c.bg} ${c.text} ${status === "cancelled" ? "line-through" : ""}`}>
+        {status === "cancelled" && <span className="font-bold">✕</span>}
         {c.label}
       </span>
     );
@@ -626,7 +606,7 @@ export default function InvoicesPage() {
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           {/* Page header */}
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
@@ -720,7 +700,7 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      <main className="px-24 py-8">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
         {pendingReplacementCount > 0 && (
           <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
             <div className="flex items-start gap-3">
@@ -744,7 +724,7 @@ export default function InvoicesPage() {
         )}
 
         {/* Filters */}
-        <div className="flex flex-row gap-3 items-center mb-4">
+        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center mb-4">
           <div className="flex-1 relative">
             <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
             <input
@@ -828,14 +808,13 @@ export default function InvoicesPage() {
                 <tbody className="divide-y divide-slate-100">
                   {filteredInvoices.map((invoice) => {
                     const daysUntilDue = getDaysUntilDue(invoice.dueDate);
-                    const dispState = getInvoiceDisplayState(invoice);
-                    const isDueSoon = daysUntilDue <= 7 && daysUntilDue > 0 && !invoice.paidAt && invoice.approvedAt;
-                    const needsReplacement = invoice.requiresReplacement && (invoice.paidAt || invoice.status === "paid") && !invoice.replacedByInvoiceId;
+                    const isDueSoon = daysUntilDue <= 7 && daysUntilDue > 0 && invoice.status === "pending";
+                    const needsReplacement = invoice.requiresReplacement && invoice.status === "paid" && !invoice.replacedByInvoiceId;
                     return (
                       <tr
                         key={invoice.id}
                         className={`transition-colors cursor-pointer ${
-                          (dispState === "cancelled" || dispState === "void")
+                          invoice.status === "cancelled"
                             ? "bg-red-50/40 opacity-60 hover:opacity-80"
                             : needsReplacement
                             ? "bg-amber-50/50 hover:bg-amber-50"
@@ -847,13 +826,13 @@ export default function InvoicesPage() {
                           <div className="text-left group/inv">
                             <div className="flex items-center gap-2">
                               {getDocumentTypeBadge(invoice.documentType)}
-                              <p className={`font-semibold font-mono transition-colors ${(dispState === "cancelled" || dispState === "void") ? "line-through text-slate-400" : "text-slate-900 group-hover/inv:text-[#2F52E0]"}`}>{invoice.displayNumber}</p>
-                              {(invoice.accounted || invoice.accountedAt) && (
+                              <p className={`font-semibold font-mono transition-colors ${invoice.status === "cancelled" ? "line-through text-slate-400" : "text-slate-900 group-hover/inv:text-[#2F52E0]"}`}>{invoice.displayNumber}</p>
+                              {invoice.accounted && (
                                 <span className="flex items-center gap-1 text-xs text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded" title={`Contabilizada - Asiento: ${invoice.accountingEntryNumber}`}>
                                   <Lock size={10} />
                                 </span>
                               )}
-                              {invoice.codedAt && !invoice.accounted && !invoice.accountedAt && (
+                              {invoice.codedAt && !invoice.accounted && (
                                 <span className="flex items-center gap-1 text-xs text-violet-600 bg-violet-100 px-1.5 py-0.5 rounded" title={`Codificada por ${invoice.codedByName}`}>
                                   <FileCheck size={10} />
                                 </span>
@@ -877,14 +856,14 @@ export default function InvoicesPage() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex flex-col">
-                            {getStatusBadge(invoice)}
-                            {!invoice.approvedAt && (invoice.status === "submitted" || invoice.status === "pending_approval") && getApprovalProgress(invoice)}
+                            {getStatusBadge(invoice.status)}
+                            {invoice.status === "pending_approval" && getApprovalProgress(invoice)}
                           </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-1.5">
                             <Calendar size={12} className="text-slate-400" />
-                            <span className={`text-xs ${dispState === "overdue" ? "text-red-600 font-semibold" : isDueSoon ? "text-amber-600 font-semibold" : "text-slate-600"}`}>
+                            <span className={`text-xs ${invoice.status === "overdue" ? "text-red-600 font-semibold" : isDueSoon ? "text-amber-600 font-semibold" : "text-slate-600"}`}>
                               {formatDate(invoice.dueDate)}
                             </span>
                             {isDueSoon && <span className="text-xs text-amber-600">({daysUntilDue}d)</span>}
@@ -925,7 +904,7 @@ export default function InvoicesPage() {
             {(() => {
               const invoice = filteredInvoices.find((i) => i.id === openMenuId);
               if (!invoice) return null;
-              const needsReplacement = invoice.requiresReplacement && (invoice.paidAt || invoice.status === "paid") && !invoice.replacedByInvoiceId;
+              const needsReplacement = invoice.requiresReplacement && invoice.status === "paid" && !invoice.replacedByInvoiceId;
               return (
                 <>
                   <Link
@@ -951,7 +930,7 @@ export default function InvoicesPage() {
                       </Link>
                     </>
                   )}
-                  {canEditInvoice(invoice) && !invoice.paidAt && !["cancelled", "rejected", "void"].includes(invoice.status) && (
+                  {canEditInvoice(invoice) && (invoice.status === "pending" || invoice.status === "overdue") && (
                     <>
                       <div className="border-t border-slate-100 my-1" />
                       <button onClick={() => handleCancelInvoice(invoice.id)} className="w-full px-4 py-2.5 text-left text-sm text-amber-600 hover:bg-amber-50 flex items-center gap-3">
@@ -993,7 +972,7 @@ export default function InvoicesPage() {
               </button>
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-              {selectedInvoice.requiresReplacement && (selectedInvoice.paidAt || selectedInvoice.status === "paid") && !selectedInvoice.replacedByInvoiceId && (
+              {selectedInvoice.requiresReplacement && selectedInvoice.status === "paid" && !selectedInvoice.replacedByInvoiceId && (
                 <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
                   <div className="flex items-start gap-3">
                     <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
@@ -1032,7 +1011,7 @@ export default function InvoicesPage() {
                 </div>
                 <div className="bg-slate-50 rounded-xl p-4">
                   <p className="text-xs text-slate-500 mb-1">Estado</p>
-                  <div className="mt-1">{getStatusBadge(selectedInvoice)}</div>
+                  <div className="mt-1">{getStatusBadge(selectedInvoice.status)}</div>
                 </div>
               </div>
               {selectedInvoice.status === "rejected" && selectedInvoice.rejectionReason && (

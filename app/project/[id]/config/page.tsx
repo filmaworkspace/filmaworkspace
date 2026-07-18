@@ -359,7 +359,7 @@ export default function ConfigGeneral() {
 
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
               <Settings size={24} className="text-slate-900" />
@@ -411,7 +411,7 @@ export default function ConfigGeneral() {
       </div>
 
       {/* Content */}
-      <main className="px-24 py-8">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
         {!editingProject && !editingProduction ? (
           /* VIEW MODE */
           <div className="space-y-8">
@@ -608,7 +608,7 @@ export default function ConfigGeneral() {
             {/* Project Info */}
             <section className="space-y-5">
               <h3 className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Información básica</h3>
-              <div className="grid grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Nombre del proyecto</label>
                   <input
@@ -695,7 +695,7 @@ export default function ConfigGeneral() {
               </div>
 
               {/* Stats grid */}
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {productionForm.projectType === "serie" && (
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Capítulos</label>
@@ -767,7 +767,7 @@ export default function ConfigGeneral() {
               </div>
 
               {/* Titles */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Título original</label>
                   <input
@@ -791,7 +791,7 @@ export default function ConfigGeneral() {
               </div>
 
               {/* Dates */}
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Inicio preproducción</label>
                   <input

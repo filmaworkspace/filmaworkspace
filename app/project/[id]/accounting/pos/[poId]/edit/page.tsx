@@ -110,7 +110,6 @@ interface POItem {
   totalAmount: number;
   episodeAssignment?: "general" | "specific";
   episodes?: EpisodeDistribution[];
-  invoicedAmount?: number;
 }
 
 interface ApprovalStep {
@@ -341,7 +340,6 @@ export default function EditPOPage() {
         irpfAmount: item.irpfAmount || 0, totalAmount: item.totalAmount || 0,
         episodeAssignment: item.episodeAssignment || "general",
         episodes: item.episodes || undefined,
-        invoicedAmount: item.invoicedAmount || 0,
       }));
 
       if (loadedItems.length === 0) {
@@ -674,23 +672,21 @@ export default function EditPOPage() {
       }
 
       const itemsData = items.map((item) => ({
-        description: item.description?.trim() || "",
+        description: item.description?.trim() || "", 
         subAccountId: item.subAccountId || "",
-        subAccountCode: item.subAccountCode || "",
+        subAccountCode: item.subAccountCode || "", 
         subAccountDescription: item.subAccountDescription || "",
-        date: item.date || new Date().toISOString().split("T")[0],
-        quantity: item.quantity || 1,
+        date: item.date || new Date().toISOString().split("T")[0], 
+        quantity: item.quantity || 1, 
         unitPrice: item.unitPrice || 0,
-        baseAmount: item.baseAmount || 0,
-        vatRate: item.vatRate ?? 21,
+        baseAmount: item.baseAmount || 0, 
+        vatRate: item.vatRate ?? 21, 
         vatAmount: item.vatAmount || 0,
-        irpfRate: item.irpfRate || 0,
-        irpfAmount: item.irpfAmount || 0,
+        irpfRate: item.irpfRate || 0, 
+        irpfAmount: item.irpfAmount || 0, 
         totalAmount: item.totalAmount || 0,
         episodeAssignment: item.episodeAssignment || "general",
         ...(item.episodes && item.episodes.length > 0 ? { episodes: item.episodes } : {}),
-        // Preservar invoicedAmount para que el presupuesto calcule committed neto al aprobar
-        ...(item.invoicedAmount ? { invoicedAmount: item.invoicedAmount } : {}),
       }));
 
       const poData: any = {
@@ -917,7 +913,7 @@ export default function EditPOPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-3">
               <FileText size={24} className="text-slate-400" />
@@ -963,7 +959,7 @@ export default function EditPOPage() {
         </div>
       </div>
 
-      <main className="px-24 py-8">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
         {successMessage && (
           <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3">
             <CheckCircle size={18} className="text-emerald-600" />
@@ -978,9 +974,9 @@ export default function EditPOPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Form */}
-          <div className="col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6">
             {/* Basic Info */}
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100">
@@ -1006,7 +1002,7 @@ export default function EditPOPage() {
                   {hasError("supplier") && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{errors.supplier}</p>}
                 </div>
 
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
                       Departamento *
@@ -1080,7 +1076,7 @@ export default function EditPOPage() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Descripción general *</label>
                   <div className="relative">
-                    <textarea value={formData.generalDescription} onChange={(e) => setFormData({ ...formData, generalDescription: e.target.value })} onBlur={() => handleBlur("generalDescription")} disabled={!canEdit()} placeholder="Describe el propósito de esta orden de compra" rows={3} className={`w-full px-4 py-3 border ${hasError("generalDescription") ? "border-red-300 bg-red-50" : isValid("generalDescription") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"} rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm pr-10 disabled:bg-slate-50 disabled:cursor-not-allowed`} />
+                    <textarea value={formData.generalDescription} onChange={(e) => setFormData({ ...formData, generalDescription: e.target.value })} onBlur={() => handleBlur("generalDescription")} disabled={!canEdit()} placeholder="Describe el propósito de esta orden de compra..." rows={3} className={`w-full px-4 py-3 border ${hasError("generalDescription") ? "border-red-300 bg-red-50" : isValid("generalDescription") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"} rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm pr-10 disabled:bg-slate-50 disabled:cursor-not-allowed`} />
                     {isValid("generalDescription") && <CheckCircle2 size={16} className="absolute right-4 top-4 text-emerald-600" />}
                   </div>
                   {hasError("generalDescription") && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{errors.generalDescription}</p>}
@@ -1127,7 +1123,7 @@ export default function EditPOPage() {
                       </div>
 
                       <div className="space-y-4">
-                        <input type="text" value={item.description} onChange={(e) => updateItem(index, "description", e.target.value)} onBlur={() => handleBlur(`item_${index}_description`)} disabled={!canEdit()} placeholder="Descripción del item" className={`w-full px-4 py-3 border ${hasError(`item_${index}_description`) ? "border-red-300 bg-red-50" : item.description.trim() ? "border-emerald-200" : "border-slate-200"} rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white disabled:bg-slate-50 disabled:cursor-not-allowed`} />
+                        <input type="text" value={item.description} onChange={(e) => updateItem(index, "description", e.target.value)} onBlur={() => handleBlur(`item_${index}_description`)} disabled={!canEdit()} placeholder="Descripción del item..." className={`w-full px-4 py-3 border ${hasError(`item_${index}_description`) ? "border-red-300 bg-red-50" : item.description.trim() ? "border-emerald-200" : "border-slate-200"} rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white disabled:bg-slate-50 disabled:cursor-not-allowed`} />
 
                         <div>
                           {/* Aviso si tiene facturas contabilizadas */}
@@ -1409,12 +1405,12 @@ export default function EditPOPage() {
               <div className="p-6 space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Condiciones de pago</label>
-                  <input type="text" value={formData.paymentTerms} onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })} disabled={!canEdit()} placeholder="Condiciones de pago" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm disabled:bg-slate-50 disabled:cursor-not-allowed" />
+                  <input type="text" value={formData.paymentTerms} onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })} disabled={!canEdit()} placeholder="Ej: Transferencia 30 días..." className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm disabled:bg-slate-50 disabled:cursor-not-allowed" />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Notas internas</label>
-                  <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} disabled={!canEdit()} placeholder="Notas adicionales" rows={2} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm disabled:bg-slate-50 disabled:cursor-not-allowed" />
+                  <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} disabled={!canEdit()} placeholder="Notas adicionales..." rows={2} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm disabled:bg-slate-50 disabled:cursor-not-allowed" />
                 </div>
               </div>
             </div>
@@ -1422,7 +1418,7 @@ export default function EditPOPage() {
 
 
           {/* Sidebar */}
-          <div className="col-span-1">
+          <div className="lg:col-span-1">
             <div className="space-y-4">
               {/* Progress */}
               <div className="bg-white border border-slate-200 rounded-2xl p-5">
@@ -1574,7 +1570,7 @@ export default function EditPOPage() {
             <div className="p-6">
               <div className="relative mb-4">
                 <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="text" value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)} placeholder="Buscar por nombre o NIF" className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm" autoFocus />
+                <input type="text" value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)} placeholder="Buscar por nombre o NIF..." className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm" autoFocus />
               </div>
               <div className="max-h-80 overflow-y-auto space-y-2">
                 {filteredSuppliers.length === 0 ? (
@@ -1618,7 +1614,7 @@ export default function EditPOPage() {
             <div className="p-6">
               <div className="relative mb-4">
                 <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="text" value={accountSearch} onChange={(e) => setAccountSearch(e.target.value)} placeholder="Buscar por código o descripción" className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm" autoFocus />
+                <input type="text" value={accountSearch} onChange={(e) => setAccountSearch(e.target.value)} placeholder="Buscar por código o descripción..." className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm" autoFocus />
               </div>
               <div className="max-h-80 overflow-y-auto space-y-2">
                 {filteredSubAccounts.length === 0 ? (
@@ -1627,13 +1623,33 @@ export default function EditPOPage() {
                     <p className="text-sm text-slate-500">No se encontraron cuentas</p>
                   </div>
                 ) : (
-                  filteredSubAccounts.map((subAccount) => (
-                    <button key={subAccount.id} onClick={() => selectAccount(subAccount)} className="w-full text-left p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">
-                      <p className="font-mono font-semibold text-slate-900">{subAccount.code}</p>
-                      <p className="text-sm text-slate-700">{subAccount.description}</p>
-                      <p className="text-xs text-slate-500 mt-1">{subAccount.accountCode} · {subAccount.accountDescription}</p>
-                    </button>
-                  ))
+                  filteredSubAccounts.map((subAccount) => {
+                    const isLowBudget = subAccount.available < subAccount.budgeted * 0.1;
+                    const isOverBudget = subAccount.available < 0;
+                    return (
+                      <button key={subAccount.id} onClick={() => selectAccount(subAccount)} className={`w-full text-left p-4 border rounded-xl hover:bg-slate-50 transition-all ${isOverBudget ? "border-red-200 bg-red-50/50" : isLowBudget ? "border-amber-200 bg-amber-50/50" : "border-slate-200"}`}>
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-mono font-semibold text-slate-900">{subAccount.code}</p>
+                              {isOverBudget && <span className="flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg"><AlertTriangle size={10} />Sin presupuesto</span>}
+                              {!isOverBudget && isLowBudget && <span className="flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg"><AlertTriangle size={10} />Bajo</span>}
+                            </div>
+                            <p className="text-sm text-slate-700">{subAccount.description}</p>
+                            <p className="text-xs text-slate-500 mt-1">{subAccount.accountCode} - {subAccount.accountDescription}</p>
+                          </div>
+                        </div>
+                        {permissions.isProjectRole && (
+                          <div className="grid grid-cols-4 gap-3 text-xs">
+                            <div className="bg-slate-50 rounded-lg p-2"><p className="text-slate-500">Presupuestado</p><p className="font-semibold text-slate-900">{formatCurrency(subAccount.budgeted)} €</p></div>
+                            <div className="bg-amber-50 rounded-lg p-2"><p className="text-amber-600">Comprometido</p><p className="font-semibold text-amber-700">{formatCurrency(subAccount.committed)} €</p></div>
+                            <div className="bg-emerald-50 rounded-lg p-2"><p className="text-emerald-600">Realizado</p><p className="font-semibold text-emerald-700">{formatCurrency(subAccount.actual)} €</p></div>
+                            <div className={`rounded-lg p-2 ${isOverBudget ? "bg-red-50" : isLowBudget ? "bg-amber-50" : "bg-emerald-50"}`}><p className={isOverBudget ? "text-red-600" : isLowBudget ? "text-amber-600" : "text-emerald-600"}>Disponible</p><p className={`font-semibold ${isOverBudget ? "text-red-700" : isLowBudget ? "text-amber-700" : "text-emerald-700"}`}>{formatCurrency(subAccount.available)} €</p></div>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })
                 )}
               </div>
             </div>

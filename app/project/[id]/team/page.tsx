@@ -1,17 +1,33 @@
 "use client";
 
+// ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+
+// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import {
-  collection, doc, getDocs, getDoc, limit, orderBy, query,
+  collection,
+  getDocs,
+  limit,
+  orderBy,
+  query,
 } from "firebase/firestore";
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  ArrowRight, ChevronRight, Clapperboard,
-  ClipboardCheck, Clock, MailPlus, Plus, Settings, Shield, Users,
+  ChevronRight,
+  Clapperboard,
+  MailPlus,
+  Plus,
+  Shield,
+  Users,
 } from "lucide-react";
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -28,20 +44,16 @@ interface CrewMember {
   role: string;
   department?: string;
   status: "active" | "inactive" | "pending";
-  approvalStatus?: string;
   email?: string;
   character?: string;
-  photoUrl?: string;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const TEAM_COLOR = "#6BA319";
-
 const SECTION_CONFIG: Record<CrewSection, { label: string; bg: string; text: string; icon: typeof Users }> = {
-  technical:   { label: "Técnico",       bg: "bg-sky-50",    text: "text-sky-700",    icon: Users       },
+  technical:   { label: "Equipo técnico", bg: "bg-sky-50",    text: "text-sky-700",    icon: Users      },
   cast:        { label: "Cast",           bg: "bg-violet-50", text: "text-violet-700", icon: Clapperboard },
-  specialists: { label: "Especialistas",  bg: "bg-amber-50",  text: "text-amber-700",  icon: Shield      },
+  specialists: { label: "Especialistas",  bg: "bg-amber-50",  text: "text-amber-700",  icon: Shield     },
 };
 
 const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string }> = {
@@ -50,36 +62,30 @@ const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string }>
   pending:  { bg: "bg-amber-50",   text: "text-amber-700",   label: "Pendiente" },
 };
 
-const APPROVAL_CONFIG: Record<string, { bg: string; text: string; label: string }> = {
-  draft:            { bg: "bg-slate-100",  text: "text-slate-500",   label: "Borrador"   },
-  pending_approval: { bg: "bg-amber-50",   text: "text-amber-700",   label: "Pend. aprob." },
-  approved:         { bg: "bg-emerald-50", text: "text-emerald-700", label: "Aprobada"   },
-  rejected:         { bg: "bg-red-50",     text: "text-red-700",     label: "Rechazada"  },
-};
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function TeamPage() {
   const { id } = useParams();
+  const router = useRouter();
 
-  const [loading, setLoading]                   = useState(true);
-  const [recentCrew, setRecentCrew]             = useState<CrewMember[]>([]);
-  const [stats, setStats]                       = useState({ total: 0, active: 0, technical: 0, cast: 0, specialists: 0 });
-  const [pendingApprovals, setPendingApprovals] = useState(0);
+  const [loading, setLoading]           = useState(true);
+  const [recentCrew, setRecentCrew]     = useState<CrewMember[]>([]);
+  const [stats, setStats]               = useState({ total: 0, active: 0, technical: 0, cast: 0, specialists: 0 });
 
   useEffect(() => {
-    const unsub = auth.onAuthStateChanged(async (user) => {
-      if (!user) return;
-      await loadData();
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) { router.push("/"); return; }
+      await loadCrewData();
       setLoading(false);
     });
     return () => unsub();
-  }, [id]);
+  }, [id, router]);
 
-  const loadData = async () => {
+  const loadCrewData = async () => {
     try {
+      // Full list for stats
       const allSnap = await getDocs(collection(db, `projects/${id}/crew`));
-      const all: CrewMember[] = allSnap.docs.map((d) => {
+      const allCrew = allSnap.docs.map((d) => {
         const v = d.data();
         return {
           id: d.id,
@@ -92,26 +98,24 @@ export default function TeamPage() {
           role:         v.role         || "",
           department:   v.department   || "",
           status:       v.status       || "active",
-          approvalStatus: v.approvalStatus || undefined,
           email:        v.email        || "",
           character:    v.character    || "",
-          photoUrl:     v.photoUrl     || "",
-        };
+        } as CrewMember;
       });
 
       setStats({
-        total:       all.length,
-        active:      all.filter((m) => m.status === "active").length,
-        technical:   all.filter((m) => m.section === "technical").length,
-        cast:        all.filter((m) => m.section === "cast").length,
-        specialists: all.filter((m) => m.section === "specialists").length,
+        total:       allCrew.length,
+        active:      allCrew.filter((m) => m.status === "active").length,
+        technical:   allCrew.filter((m) => m.section === "technical").length,
+        cast:        allCrew.filter((m) => m.section === "cast").length,
+        specialists: allCrew.filter((m) => m.section === "specialists").length,
       });
-      setPendingApprovals(all.filter((m) => m.approvalStatus === "pending_approval").length);
 
+      // Recent 5 for the summary list
       const recentSnap = await getDocs(
-        query(collection(db, `projects/${id}/crew`), orderBy("createdAt", "desc"), limit(6))
+        query(collection(db, `projects/${id}/crew`), orderBy("createdAt", "desc"), limit(5))
       );
-      setRecentCrew(recentSnap.docs.map((d) => {
+      const recent: CrewMember[] = recentSnap.docs.map((d) => {
         const v = d.data();
         return {
           id: d.id,
@@ -124,25 +128,26 @@ export default function TeamPage() {
           role:         v.role         || "",
           department:   v.department   || "",
           status:       v.status       || "active",
-          approvalStatus: v.approvalStatus || undefined,
           email:        v.email        || "",
           character:    v.character    || "",
-          photoUrl:     v.photoUrl     || "",
         };
-      }));
-    } catch (e) { console.error(e); }
+      });
+      setRecentCrew(recent);
+    } catch (e) {
+      console.error("Error cargando crew:", e);
+    }
   };
 
   const fullName = (m: CrewMember) =>
     [m.firstName, m.lastName1, m.lastName2].filter(Boolean).join(" ");
 
-  const getStatusBadge = (m: CrewMember) => {
-    if (m.approvalStatus && m.approvalStatus !== "approved") {
-      const c = APPROVAL_CONFIG[m.approvalStatus] || APPROVAL_CONFIG.draft;
-      return <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium ${c.bg} ${c.text}`}>{c.label}</span>;
-    }
-    const c = STATUS_CONFIG[m.status] || STATUS_CONFIG.active;
-    return <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium ${c.bg} ${c.text}`}>{c.label}</span>;
+  const getStatusBadge = (status: string) => {
+    const c = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
+    return (
+      <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${c.bg} ${c.text}`}>
+        {c.label}
+      </span>
+    );
   };
 
   if (loading) {
@@ -156,82 +161,68 @@ export default function TeamPage() {
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
 
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 pt-10 pb-6">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
           <div className="relative flex items-center justify-center">
             <h1 className="text-3xl font-bold text-slate-900 text-center">Panel de coordinación</h1>
-
-            {/* Icons top-right */}
-            <div className="absolute right-0 flex items-center gap-1">
-              <Link href={`/project/${id}/team/approvals`}
-                className="relative p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
-                title="Aprobaciones">
-                <ClipboardCheck size={18} />
-                {pendingApprovals > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ backgroundColor: TEAM_COLOR }} />
-                )}
-              </Link>
-              <Link href={`/project/${id}/team/config`}
-                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
-                title="Configuración">
-                <Settings size={18} />
-              </Link>
-            </div>
           </div>
         </div>
       </div>
 
-      <main className="px-24 py-8">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
 
-        {/* ── Pending approvals banner ──────────────────────────────────────── */}
-        {pendingApprovals > 0 && (
-          <Link href={`/project/${id}/team/approvals`}>
-            <div className="mb-8 rounded-2xl p-5 cursor-pointer hover:shadow-lg transition-shadow"
-              style={{ background: `linear-gradient(to right, ${TEAM_COLOR}, #4a7a10)` }}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
-                    <Clock size={24} className="text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">
-                      {pendingApprovals} alta{pendingApprovals !== 1 ? "s" : ""} pendiente{pendingApprovals !== 1 ? "s" : ""} de aprobación
-                    </h3>
-                    <p className="text-white/80 text-sm">Revisa y aprueba para activar los miembros</p>
-                  </div>
-                </div>
-                <ArrowRight size={24} className="text-white/80" />
-              </div>
-            </div>
-          </Link>
-        )}
+        {/* Crew summary card — mirrors the POs/Invoices cards in AccountingPage */}
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1 lg:max-w-[50%]">
 
-        {/* ── Cards ────────────────────────────────────────────────────────── */}
-        <div className="flex flex-row gap-6 items-start">
-
-          {/* Crew reciente */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1">
+            {/* Card header */}
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <Users size={18} style={{ color: TEAM_COLOR }} />
+                <Users size={18} style={{ color: "#6BA319" }} />
                 <h3 className="font-semibold text-slate-900">Crew</h3>
                 <span className="text-xs text-slate-400">reciente</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Link href={`/project/${id}/team/crew/new`}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors" title="Añadir miembro">
+                <Link
+                  href={`/project/${id}/team/crew/new`}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                  title="Añadir miembro"
+                >
                   <Plus size={16} />
                 </Link>
-                <Link href={`/project/${id}/team/crew`}
-                  className="text-xs font-medium flex items-center gap-0.5 px-2 py-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors">
+                <Link
+                  href={`/project/${id}/team/crew`}
+                  className="text-xs font-medium flex items-center gap-0.5 px-2 py-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+                >
                   Ver todos <ChevronRight size={12} />
                 </Link>
               </div>
             </div>
 
+            {/* Section stats strip */}
+            <div className="px-5 pt-4 pb-2 grid grid-cols-3 gap-3">
+              {(["technical", "cast", "specialists"] as CrewSection[]).map((section) => {
+                const cfg   = SECTION_CONFIG[section];
+                const Icon  = cfg.icon;
+                const count = stats[section];
+                return (
+                  <Link
+                    key={section}
+                    href={`/project/${id}/team/crew`}
+                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border border-transparent hover:border-slate-200 transition-all ${cfg.bg}`}
+                  >
+                    <Icon size={14} className={cfg.text} />
+                    <div>
+                      <p className={`text-sm font-bold leading-none ${cfg.text}`}>{count}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5 leading-none">{cfg.label}</p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
 
-            {/* List */}
+            {/* Recent members list */}
             <div className="p-5">
               {recentCrew.length === 0 ? (
                 <div className="text-center py-12">
@@ -243,54 +234,70 @@ export default function TeamPage() {
               ) : (
                 <div className="space-y-2">
                   {recentCrew.map((member) => {
-                    const sc  = SECTION_CONFIG[member.section];
-                    const dim = member.status === "inactive";
+                    const sectionCfg = SECTION_CONFIG[member.section];
+                    const dim        = member.status === "inactive";
                     return (
-                      <Link key={member.id} href={`/project/${id}/team/crew/${member.id}`} className="block">
-                        <div className={`flex items-center justify-between px-3 py-3 rounded-xl transition-colors cursor-pointer group border ${
-                          dim ? "bg-slate-50/60 border-slate-100 opacity-60 hover:opacity-80"
-                              : "bg-slate-50 hover:bg-slate-100 border-transparent hover:border-slate-200"}`}>
+                      <Link
+                        key={member.id}
+                        href={`/project/${id}/team/crew/${member.id}`}
+                        className="block"
+                      >
+                        <div
+                          className={`flex items-center justify-between px-3 py-3 rounded-xl transition-colors cursor-pointer group border ${
+                            dim
+                              ? "bg-slate-50/60 border-slate-100 opacity-60 hover:opacity-80"
+                              : "bg-slate-50 hover:bg-slate-100 border-transparent hover:border-slate-200"
+                          }`}
+                        >
                           {/* Avatar + name */}
                           <div className="flex items-center gap-3 flex-1 min-w-0 mr-3">
-                            <div className="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center flex-shrink-0 overflow-hidden text-xs font-semibold text-slate-600">
-                              {member.photoUrl
-                                ? <img src={member.photoUrl} alt={fullName(member)} className="w-full h-full object-cover" />
-                                : member.firstName.charAt(0).toUpperCase()
-                              }
+                            <div className="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-slate-600">
+                              {member.firstName.charAt(0).toUpperCase()}
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 mb-0.5">
-                                <span className="text-sm font-semibold text-slate-900 truncate">{fullName(member)}</span>
+                                <span className="text-sm font-semibold text-slate-900 truncate">
+                                  {fullName(member)}
+                                </span>
                                 {member.artisticName && (
-                                  <span className="text-xs text-slate-400 italic truncate inline">&quot;{member.artisticName}&quot;</span>
+                                  <span className="text-xs text-slate-400 italic truncate hidden sm:inline">
+                                    "{member.artisticName}"
+                                  </span>
                                 )}
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <p className="text-xs text-slate-500 truncate">{member.role}</p>
                                 {member.section === "cast" && member.character && (
-                                  <><span className="text-slate-300">·</span><p className="text-xs text-violet-500 truncate">{member.character}</p></>
+                                  <>
+                                    <span className="text-slate-300">·</span>
+                                    <p className="text-xs text-violet-500 truncate">{member.character}</p>
+                                  </>
                                 )}
                               </div>
                             </div>
                           </div>
 
-                          {/* Right */}
+                          {/* Right: section badge + status + arrow */}
                           <div className="flex items-center gap-3 flex-shrink-0">
-                            <div className="text-right block space-y-1">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium ${sc.bg} ${sc.text}`}>
-                                {sc.label}
+                            <div className="text-right hidden sm:block">
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium ${sectionCfg.bg} ${sectionCfg.text} mb-1`}
+                              >
+                                {sectionCfg.label}
                               </span>
-                              <div>{getStatusBadge(member)}</div>
+                              <div>{getStatusBadge(member.status)}</div>
                             </div>
                             {member.email && (
-                              <a href={`mailto:${member.email}`} onClick={(e) => e.preventDefault()}
-                                className="p-1.5 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-200 transition-colors" title={member.email}>
+                              <a
+                                href={`mailto:${member.email}`}
+                                onClick={(e) => e.preventDefault()}
+                                className="p-1.5 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-200 transition-colors"
+                                title={member.email}
+                              >
                                 <MailPlus size={13} />
                               </a>
                             )}
-                            <ChevronRight size={16} className="text-slate-300 transition-colors" style={{ color: undefined }}
-                              // eslint-disable-next-line react/no-unknown-property
-                            />
+                            <ChevronRight size={16} className="text-slate-300 group-hover:text-[#6BA319] transition-colors" />
                           </div>
                         </div>
                       </Link>
@@ -300,20 +307,25 @@ export default function TeamPage() {
               )}
             </div>
 
+            {/* Footer summary */}
             {stats.total > 0 && (
               <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
                 <span className="text-xs text-slate-500">
-                  <span className="font-semibold text-slate-900">{stats.active}</span> activos de <span className="font-semibold text-slate-900">{stats.total}</span> totales
+                  <span className="font-semibold text-slate-900">{stats.active}</span> activos
+                  {" "}de{" "}
+                  <span className="font-semibold text-slate-900">{stats.total}</span> miembros totales
                 </span>
-                <Link href={`/project/${id}/team/crew`}
-                  className="text-xs font-medium text-slate-500 hover:text-slate-900 transition-colors flex items-center gap-0.5">
+                <Link
+                  href={`/project/${id}/team/crew`}
+                  className="text-xs font-medium text-slate-500 hover:text-slate-900 transition-colors flex items-center gap-0.5"
+                >
                   Ver crew completo <ChevronRight size={11} />
                 </Link>
               </div>
             )}
           </div>
-
         </div>
+
       </main>
     </div>
   );

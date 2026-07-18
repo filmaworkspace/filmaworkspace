@@ -44,9 +44,7 @@ import {
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
-import { realizeInvoice, unrealizeInvoice } from "@/lib/budgetOperations";
-import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
-import { getInvoiceDisplayState } from "@/lib/invoiceHelpers";
+import { handleInvoiceStatusChange } from "@/lib/budgetOperations";
 import { useUser } from "@/contexts/UserContext";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,10 +87,6 @@ interface Invoice {
   accountingAccount?: string;
   paidAt?: Date;
   paidAmount?: number;
-  codedAt?: Date;
-  codedBy?: string;
-  codedByName?: string;
-  approvedAt?: Date;
 }
 
 interface ChartAccount {
@@ -107,15 +101,14 @@ interface ChartAccount {
 
 const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string }> = {
   draft:            { bg: "bg-slate-100",  text: "text-slate-600",  label: "Borrador"      },
-  submitted:        { bg: "bg-amber-50",   text: "text-amber-700",  label: "En sistema"    },
+  coding:           { bg: "bg-violet-50",  text: "text-violet-700", label: "Codificando"   },
+  pending_approval: { bg: "bg-amber-50",   text: "text-amber-700",  label: "Pte. aprob."   },
+  pending:          { bg: "bg-blue-50",    text: "text-blue-700",   label: "Pte. pago"     },
   approved:         { bg: "bg-emerald-50", text: "text-emerald-700",label: "Aprobada"      },
-  coded:            { bg: "bg-violet-50",  text: "text-violet-700", label: "Codificada"    },
   accounted:        { bg: "bg-teal-50",    text: "text-teal-700",   label: "Contabilizada" },
-  paid:             { bg: "bg-blue-50",    text: "text-blue-700",   label: "Pagada"        },
-  overdue:          { bg: "bg-red-50",     text: "text-red-700",    label: "Vencida"       },
+  paid:             { bg: "bg-emerald-50", text: "text-emerald-700",label: "Pagada"        },
   rejected:         { bg: "bg-red-50",     text: "text-red-700",    label: "Rechazada"     },
   cancelled:        { bg: "bg-red-50",     text: "text-red-700",    label: "Anulada"       },
-  void:             { bg: "bg-red-50",     text: "text-red-700",    label: "Anulada"       },
 };
 
 const FILTER_OPTIONS = [
@@ -249,7 +242,7 @@ function AccountCombobox({
                 autoFocus
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="Buscar por código o nombre"
+                placeholder="Buscar por código o nombre..."
                 className="flex-1 text-[11px] bg-transparent outline-none text-slate-700 placeholder-slate-400"
               />
               {query && (
@@ -438,8 +431,6 @@ export default function CompanyAccountsPage() {
           accountedBy: r.accountedBy, accountedByName: r.accountedByName,
           accountingEntryNumber: r.accountingEntryNumber, accountingAccount: r.accountingAccount,
           paidAt: r.paidAt?.toDate?.(), paidAmount: r.paidAmount,
-          codedAt: r.codedAt?.toDate?.(), codedBy: r.codedBy, codedByName: r.codedByName,
-          approvedAt: r.approvedAt?.toDate?.(),
         };
       }));
     } catch (err) { console.error(err); showToast("error", "Error al cargar datos"); }
@@ -487,33 +478,17 @@ export default function CompanyAccountsPage() {
   const handleMarkAccounted = async () => {
     if (!selectedInvoice || !entryNumber.trim()) { showToast("error", "Nº de asiento obligatorio"); return; }
     if (!panelOk) { showToast("error", "El asiento no cuadra"); return; }
-    if (!selectedInvoice.codedAt && selectedInvoice.status !== "coded") {
-      showToast("error", "La factura debe ser codificada antes de contabilizarse"); return;
-    }
     setSaving(true);
     try {
+      const oldStatus = selectedInvoice.status;
       const lines = selectedInvoice.journalLines?.length ? selectedInvoice.journalLines : buildDefaultLines(selectedInvoice, planCuentas);
-      const accountedAt = new Date();
-      // Track de contabilización; el lifecycle se mantiene en "submitted". Conservamos
-      // accounted:true por compatibilidad con código antiguo.
       await updateDoc(doc(db, `projects/${projectId}/invoices`, selectedInvoice.id), {
-        accounted: true, accountedAt, accountedBy: contextUser?.uid,
+        accounted: true, accountedAt: new Date(), accountedBy: contextUser?.uid,
         accountedByName: contextUser?.name, accountingEntryNumber: entryNumber.trim(),
-        status: "submitted", journalLines: lines,
+        status: "accounted", journalLines: lines,
       });
-      // Realizar presupuesto si el trigger es on_account y no estaba ya realizado.
-      const costSettings = await getCostSettings(projectId);
       const items = selectedInvoice.items.map((i: any) => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount || 0 }));
-      const wasRealized = shouldRealizeInvoice(selectedInvoice.status, costSettings, {
-        codedAt: selectedInvoice.codedAt, accountedAt: selectedInvoice.accountedAt, paidAt: selectedInvoice.paidAt,
-      });
-      const nowRealized = shouldRealizeInvoice("submitted", costSettings, {
-        codedAt: selectedInvoice.codedAt, accountedAt, paidAt: selectedInvoice.paidAt,
-      });
-      if (!wasRealized && nowRealized) {
-        const budgetItems = items.filter((i: any) => i.subAccountId && i.baseAmount > 0);
-        if (budgetItems.length > 0) await realizeInvoice(projectId, budgetItems);
-      }
+      await handleInvoiceStatusChange(projectId, oldStatus, "accounted", items);
       showToast("success", `Contabilizada — ${entryNumber}`);
       setEntryNumber(""); setEditingLines(false);
       await loadData(); goToNext();
@@ -525,22 +500,9 @@ export default function CompanyAccountsPage() {
     if (!selectedInvoice || !confirm("¿Desmarcar como contabilizada?")) return;
     setSaving(true);
     try {
-      // Limpiar track de contabilización; el lifecycle permanece "submitted".
-      await updateDoc(doc(db, `projects/${projectId}/invoices`, selectedInvoice.id), { accounted: false, accountedAt: null, accountedBy: null, accountedByName: null, status: "submitted" });
-      // Si la realización dependía de la contabilización (on_account) y ya no hay
-      // otro track que la mantenga, revertir el presupuesto.
-      const costSettings = await getCostSettings(projectId);
+      await updateDoc(doc(db, `projects/${projectId}/invoices`, selectedInvoice.id), { accounted: false, status: "approved" });
       const items = selectedInvoice.items.map((i: any) => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount || 0 }));
-      const wasRealized = shouldRealizeInvoice(selectedInvoice.status, costSettings, {
-        codedAt: selectedInvoice.codedAt, accountedAt: selectedInvoice.accountedAt, paidAt: selectedInvoice.paidAt,
-      });
-      const stillRealized = shouldRealizeInvoice("submitted", costSettings, {
-        codedAt: selectedInvoice.codedAt, accountedAt: undefined, paidAt: selectedInvoice.paidAt,
-      });
-      if (wasRealized && !stillRealized) {
-        const budgetItems = items.filter((i: any) => i.subAccountId && i.baseAmount > 0);
-        if (budgetItems.length > 0) await unrealizeInvoice(projectId, budgetItems);
-      }
+      await handleInvoiceStatusChange(projectId, selectedInvoice.status, "approved", items);
       showToast("success", "Factura desbloqueada"); setEditingLines(false); await loadData();
     } catch (err) { console.error(err); showToast("error", "Error"); }
     finally { setSaving(false); }
@@ -553,11 +515,10 @@ export default function CompanyAccountsPage() {
       || inv.description.toLowerCase().includes(term) || (inv.accountingEntryNumber || "").toLowerCase().includes(term);
     const coded = isInvoiceCoded(inv);
     let st = true;
-    const accounted = inv.accounted === true || !!inv.accountedAt;
-    if      (statusFilter === "pending_accounting") st = coded && !accounted && ["submitted","approved","pending","paid","coded"].includes(inv.status);
-    else if (statusFilter === "accounted")           st = accounted;
+    if      (statusFilter === "pending_accounting") st = coded && !inv.accounted && ["approved","pending","paid"].includes(inv.status);
+    else if (statusFilter === "accounted")           st = inv.accounted === true;
     else if (statusFilter === "not_coded")           st = !coded;
-    else if (statusFilter !== "all")                 st = getInvoiceDisplayState(inv) === statusFilter;
+    else if (statusFilter !== "all")                 st = inv.status === statusFilter;
     return match && st;
   }), [invoices, searchTerm, statusFilter]);
 
@@ -574,8 +535,8 @@ export default function CompanyAccountsPage() {
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   const coded        = invoices.filter(i => isInvoiceCoded(i));
-  const pendingCount = coded.filter(i => !i.accounted && !i.accountedAt && ["submitted","approved","pending","paid","coded"].includes(i.status)).length;
-  const accountedCnt = invoices.filter(i => i.accounted || i.accountedAt).length;
+  const pendingCount = coded.filter(i => !i.accounted && ["approved","pending","paid"].includes(i.status)).length;
+  const accountedCnt = invoices.filter(i => i.accounted).length;
   const notCodedCnt  = invoices.filter(i => !isInvoiceCoded(i)).length;
   const totalBase    = coded.reduce((s, i) => s + i.baseAmount, 0);
 
@@ -630,7 +591,7 @@ export default function CompanyAccountsPage() {
           <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-3">
             <div className="relative flex-1 max-w-xs">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input type="text" placeholder="Buscar" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+              <input type="text" placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
                 className="w-full pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-400 outline-none" />
             </div>
             <div className="relative" ref={filterRef}>
@@ -671,7 +632,7 @@ export default function CompanyAccountsPage() {
                   <tbody className="divide-y divide-slate-100">
                     {filtered.map(inv => {
                       const isCoded = isInvoiceCoded(inv);
-                      const st      = STATUS_CONFIG[getInvoiceDisplayState(inv)] || STATUS_CONFIG.submitted;
+                      const st      = STATUS_CONFIG[inv.status] || STATUS_CONFIG.pending;
                       const warns   = validateInvoice(inv);
                       const hasErr  = warns.some(w => w.level === "error");
                       const hasWarn = warns.some(w => w.level === "warn");
@@ -887,7 +848,7 @@ export default function CompanyAccountsPage() {
                               <td className="px-3 py-1.5">
                                 {editingLines ? (
                                   <input value={line.name} onChange={e => updateDraftLine(line.id, "name", e.target.value)}
-                                    placeholder="Descripción de la línea"
+                                    placeholder="Descripción de la línea..."
                                     className="text-[11px] border border-slate-200 rounded px-1.5 py-0.5 w-full focus:border-slate-400 outline-none" />
                                 ) : (
                                   <span className="text-[11px] text-slate-600">{line.name}</span>
@@ -965,16 +926,13 @@ export default function CompanyAccountsPage() {
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-400 outline-none font-mono" />
                         <p className="text-[10px] text-slate-400 mt-1 font-mono">Formato recomendado: A-YYYY-NNN</p>
                       </div>
-                      <button onClick={handleMarkAccounted} disabled={saving || !entryNumber.trim() || !panelOk || (!selectedInvoice?.codedAt && selectedInvoice?.status !== "coded")}
+                      <button onClick={handleMarkAccounted} disabled={saving || !entryNumber.trim() || !panelOk}
                         className="w-full py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
                         {saving ? <RefreshCw size={13} className="animate-spin" /> : <CheckCircle size={13} />}
                         Contabilizar y siguiente
                       </button>
                       {!panelOk && (
                         <p className="text-xs text-red-600 text-center">Edita las líneas del asiento para cuadrarlo primero</p>
-                      )}
-                      {(!selectedInvoice?.codedAt && selectedInvoice?.status !== "coded") && (
-                        <p className="text-xs text-amber-600 text-center">Pendiente de codificación</p>
                       )}
                     </div>
                   )}

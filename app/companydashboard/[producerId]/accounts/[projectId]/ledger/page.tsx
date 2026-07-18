@@ -563,7 +563,7 @@ export default function LedgerPage() {
               {/* Search */}
               <div className="relative">
                 <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input placeholder="Código o nombre" value={search} onChange={e => setSearch(e.target.value)}
+                <input placeholder="Código o nombre..." value={search} onChange={e => setSearch(e.target.value)}
                   className="pl-8 pr-3 py-1.5 text-sm border border-slate-200 bg-white rounded-lg focus:ring-1 focus:ring-slate-400 outline-none w-52" />
               </div>
 

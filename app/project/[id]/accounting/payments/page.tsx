@@ -304,11 +304,7 @@ export default function PaymentsPage() {
       const invoicesData = invoicesSnap.docs
         .filter((docSnap) => {
           const data = docSnap.data();
-          // Pagable: cualquier factura activa sin paidAt, sin importar si está codificada/aprobada/contabilizada.
-          if (assignedInvoiceIds.has(docSnap.id)) return false;
-          if (data.paidAt) return false;
-          if (["cancelled", "rejected", "void", "draft", "paid"].includes(data.status)) return false;
-          return ["submitted", "pending", "pending_approval", "coded", "overdue", "accounted"].includes(data.status);
+          return (data.status === "pending" || data.status === "overdue" || data.status === "pending_approval") && !assignedInvoiceIds.has(docSnap.id);
         })
         .map((docSnap) => ({
           id: docSnap.id,
@@ -691,7 +687,7 @@ export default function PaymentsPage() {
       )}
 
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
               <Banknote size={24} style={{ color: "#2F52E0" }} />
@@ -717,7 +713,7 @@ export default function PaymentsPage() {
         </div>
       </div>
 
-      <main className="px-24 py-8">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
         {invoiceStats.overdue > 0 && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl">
             <div className="flex items-center gap-3">
@@ -731,7 +727,7 @@ export default function PaymentsPage() {
           </div>
         )}
 
-        <div className="flex flex-row gap-3 items-center mb-6">
+        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center mb-6">
           <div className="flex-1 relative">
             <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
             <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar previsión o proveedor" className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm" />
@@ -808,7 +804,7 @@ export default function PaymentsPage() {
                   <div className="p-3 border-b border-slate-100">
                     <div className="relative mb-2">
                       <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input type="text" value={invoiceSearch} onChange={(e) => setInvoiceSearch(e.target.value)} placeholder="Buscar factura" className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
+                      <input type="text" value={invoiceSearch} onChange={(e) => setInvoiceSearch(e.target.value)} placeholder="Buscar factura..." className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
                       {invoiceSearch && (<button onClick={() => setInvoiceSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600"><X size={12} /></button>)}
                     </div>
                     <div className="flex gap-2">
@@ -897,10 +893,10 @@ export default function PaymentsPage() {
               <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
                 <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><Banknote size={28} className="text-slate-400" /></div>
                 <h3 className="text-lg font-semibold text-slate-900 mb-2">{searchTerm || statusFilter !== "all" || dateRange !== "all" ? "No se encontraron resultados" : "Sin previsiones de pago"}</h3>
-                {(searchTerm || statusFilter !== "all" || dateRange !== "all") && <p className="text-slate-500 text-sm">Prueba a ajustar los filtros</p>}
+                <p className="text-slate-500 text-sm">{searchTerm || statusFilter !== "all" || dateRange !== "all" ? "Prueba a ajustar los filtros" : "Crea tu primera previsión para organizar los pagos"}</p>
               </div>
             ) : viewMode === "kanban" ? (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                 {filteredForecasts.map((forecast) => {
                   const statusConfig = getStatusConfig(forecast.status);
                   const typeConfig = getTypeConfig(forecast.type);
@@ -1083,7 +1079,7 @@ export default function PaymentsPage() {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Nombre de la previsión</label>
-                <input type="text" value={newForecast.name} onChange={(e) => setNewForecast({ ...newForecast, name: e.target.value })} placeholder="Nombre de la remesa" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                <input type="text" value={newForecast.name} onChange={(e) => setNewForecast({ ...newForecast, name: e.target.value })} placeholder="Ej: Remesa Semana 23" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Fecha de pago</label>

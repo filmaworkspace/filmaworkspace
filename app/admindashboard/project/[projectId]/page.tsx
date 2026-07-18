@@ -9,23 +9,19 @@ import { inter } from "@/lib/fonts";
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
   getDocs,
   getDoc,
-  query,
   serverTimestamp,
   setDoc,
   Timestamp,
   updateDoc,
-  where,
 } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  Activity,
   AlertCircle,
   AlertTriangle,
   ArrowLeft,
@@ -43,8 +39,6 @@ import {
   FolderPlus,
   Info,
   Layers,
-  Link2,
-  Mail,
   MessageSquare,
   Package,
   RefreshCw,
@@ -53,7 +47,6 @@ import {
   Shield,
   ShoppingCart,
   Trash2,
-  UserCheck,
   UserPlus,
   Users,
   X,
@@ -129,16 +122,6 @@ interface AccountingStats {
   poCount: number;
 }
 
-interface TeamStats {
-  totalForms: number;
-  pendingForms: number;
-  completedForms: number;
-  signedForms: number;
-  totalInvitations: number;
-  forms: Array<{ id: string; firstName?: string; lastName1?: string; email?: string; status: string; createdAt?: Timestamp }>;
-  invitations: Array<{ id: string; email: string; status: string; createdAt?: Timestamp }>;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function AdminProjectPage() {
@@ -149,18 +132,7 @@ export default function AdminProjectPage() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"general" | "accounting" | "team" | "logs">("general");
-  const [logs, setLogs] = useState<Array<{
-    id: string;
-    type: string;
-    actorName: string;
-    actorEmail?: string;
-    targetName?: string;
-    targetEmail?: string;
-    meta?: string;
-    createdAt: Timestamp;
-  }>>([]);
-  const [copiedFormId, setCopiedFormId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"general" | "accounting" | "team">("general");
 
   const [project, setProject] = useState<ProjectData | null>(null);
   const [members, setMembers] = useState<MemberData[]>([]);
@@ -172,15 +144,6 @@ export default function AdminProjectPage() {
     supplierCount: 0,
     invoiceCount: 0,
     poCount: 0,
-  });
-  const [teamStats, setTeamStats] = useState<TeamStats>({
-    totalForms: 0,
-    pendingForms: 0,
-    completedForms: 0,
-    signedForms: 0,
-    totalInvitations: 0,
-    forms: [],
-    invitations: [],
   });
 
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -211,16 +174,13 @@ export default function AdminProjectPage() {
   const [editForm, setEditForm] = useState({ name: "", phase: "", description: "", producers: [] as string[] });
   const [allProducers, setAllProducers] = useState<{ id: string; name: string }[]>([]);
   const [producerSearch, setProducerSearch] = useState("");
-  const [addMemberForm, setAddMemberForm] = useState({ odId: "", role: "", searchQuery: "", inviteName: "" });
+  const [addMemberForm, setAddMemberForm] = useState({ odId: "", role: "", searchQuery: "" });
   const [closeDays, setCloseDays] = useState(30);
 
   // Clone
   const [cloneName, setCloneName] = useState("");
   const [cloneIncludeBudget, setCloneIncludeBudget] = useState(true);
   const [cloneIncludeSuppliers, setCloneIncludeSuppliers] = useState(true);
-
-  // Departments
-  const [newDeptName, setNewDeptName] = useState("");
 
   // Copy suppliers
   const [copySupplierTargetId, setCopySupplierTargetId] = useState("");
@@ -339,15 +299,12 @@ export default function AdminProjectPage() {
           .map((d) => ({ id: d.id, name: d.data().name }))
       );
 
-      // Accounting + team stats + logs (parallel)
-      const [accountsSnap, suppliersSnap, invoicesSnap, posSnap, formsSnap, invitationsSnap, logsSnap] = await Promise.all([
+      // Accounting stats (parallel)
+      const [accountsSnap, suppliersSnap, invoicesSnap, posSnap] = await Promise.all([
         getDocs(collection(db, `projects/${projectId}/accounts`)),
         getDocs(collection(db, `projects/${projectId}/suppliers`)),
         getDocs(collection(db, `projects/${projectId}/invoices`)),
         getDocs(collection(db, `projects/${projectId}/pos`)),
-        getDocs(query(collection(db, "forms"), where("projectId", "==", projectId))),
-        getDocs(query(collection(db, "invitations"), where("projectId", "==", projectId))),
-        getDocs(collection(db, `projects/${projectId}/logs`)),
       ]);
       setAccountingStats({
         accountCount: accountsSnap.size,
@@ -356,81 +313,11 @@ export default function AdminProjectPage() {
         poCount: posSnap.size,
       });
 
-      const formsData = formsSnap.docs.map((d) => ({
-        id: d.id,
-        firstName: d.data().prefilled?.firstName || d.data().firstName || "",
-        lastName1: d.data().prefilled?.lastName1 || d.data().lastName1 || "",
-        email: d.data().prefilled?.email || d.data().email || "",
-        status: d.data().status || "pending",
-        createdAt: d.data().createdAt,
-      }));
-      const invitationsData = invitationsSnap.docs.map((d) => ({
-        id: d.id,
-        email: d.data().email || "",
-        status: d.data().status || "pending",
-        createdAt: d.data().createdAt,
-      }));
-      setTeamStats({
-        totalForms: formsData.length,
-        pendingForms: formsData.filter((f) => f.status === "pending").length,
-        completedForms: formsData.filter((f) => f.status === "completed").length,
-        signedForms: formsData.filter((f) => f.status === "signed").length,
-        totalInvitations: invitationsData.length,
-        forms: formsData,
-        invitations: invitationsData,
-      });
-
-      const logsData = logsSnap.docs
-        .map((d) => ({ id: d.id, ...d.data() } as any))
-        .sort((a: any, b: any) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
-      setLogs(logsData);
-
       setLoading(false);
     } catch (error) {
       console.error("Error loading data:", error);
       showToast("error", "Error al cargar los datos");
       setLoading(false);
-    }
-  };
-
-  const writeLog = async (type: string, data: Record<string, any>) => {
-    try {
-      const logRef = doc(collection(db, `projects/${projectId}/logs`));
-      await setDoc(logRef, {
-        type,
-        ...data,
-        createdAt: serverTimestamp(),
-        createdBy: contextUser?.uid || null,
-      });
-    } catch (_) {}
-  };
-
-  const copyFormLink = async (formId: string) => {
-    const url = `${window.location.origin}/form/${formId}`;
-    await navigator.clipboard.writeText(url);
-    setCopiedFormId(formId);
-    setTimeout(() => setCopiedFormId(null), 2000);
-    showToast("success", "Link copiado");
-  };
-
-  const resendFormEmail = async (form: { id: string; email?: string; firstName?: string; lastName1?: string }) => {
-    if (!form.email) { showToast("error", "Esta ficha no tiene email"); return; }
-    try {
-      const url = `${window.location.origin}/form/${form.id}`;
-      await fetch("/api/send-form-reminder", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: form.email,
-          name: `${form.firstName || ""} ${form.lastName1 || ""}`.trim() || form.email,
-          formUrl: url,
-          projectName: project?.name || "",
-        }),
-      });
-      showToast("success", `Email reenviado a ${form.email}`);
-      await writeLog("form_reminder_sent", { targetEmail: form.email, formId: form.id, actorName: contextUser?.name || contextUser?.email || "Admin" });
-    } catch {
-      showToast("error", "Error al reenviar el email");
     }
   };
 
@@ -590,77 +477,48 @@ export default function AdminProjectPage() {
   };
 
   const handleAddMember = async () => {
-    if (!addMemberForm.role) {
-      showToast("error", "Selecciona un rol");
+    if (!addMemberForm.odId || !addMemberForm.role) {
+      showToast("error", "Selecciona usuario y rol");
       return;
     }
-
-    // Determine whether we're inviting a registered user or a new email
     const selectedUser = allUsers.find((u) => u.id === addMemberForm.odId);
-    const emailRaw = selectedUser ? selectedUser.email : addMemberForm.searchQuery.trim().toLowerCase();
-    const inviteeName = selectedUser ? selectedUser.name : addMemberForm.inviteName.trim();
-
-    if (!emailRaw || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) {
-      showToast("error", "Email no válido");
-      return;
-    }
-    if (!inviteeName) {
-      showToast("error", "Introduce el nombre del invitado");
-      return;
-    }
-    if (members.find((m) => m.email?.toLowerCase() === emailRaw)) {
+    if (!selectedUser) return;
+    if (members.find((m) => m.id === addMemberForm.odId)) {
       showToast("error", "Este usuario ya es miembro");
       return;
     }
-
     setSaving(true);
     try {
       const hasAccounting = ["EP", "PM", "Controller", "PC"].includes(addMemberForm.role);
-      const inviteData: any = {
-        projectId,
-        projectName: project?.name || "",
-        invitedEmail: emailRaw,
-        invitedName: inviteeName,
-        invitedUserId: selectedUser ? selectedUser.id : null,
-        invitedBy: contextUser?.uid || null,
-        invitedByName: "Equipo de Filma Workspace",
-        status: "pending",
-        createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        roleType: "project",
+      const memberData = {
+        odId: addMemberForm.odId,
+        name: selectedUser.name,
+        email: selectedUser.email,
         role: addMemberForm.role,
         permissions: {
           config: ["EP", "PM"].includes(addMemberForm.role),
           accounting: hasAccounting,
           team: ["EP", "PM"].includes(addMemberForm.role),
         },
-        ...(hasAccounting && { accountingAccessLevel: "accounting_extended" }),
+        accountingAccessLevel: hasAccounting ? "accounting_extended" : "user",
+        addedAt: serverTimestamp(),
+        addedBy: contextUser?.uid,
       };
-
-      await addDoc(collection(db, "invitations"), inviteData);
-
-      // Send invitation email (fire-and-forget)
-      fetch("/api/send-project-invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          inviteeName,
-          invitedByName: "Equipo de Filma Workspace",
-          invitedEmail: emailRaw,
-          projectName: project?.name || "",
-          projectId,
-          role: addMemberForm.role,
-          isExistingUser: !!selectedUser,
-        }),
-      }).catch(console.error);
-
-      setAddMemberForm({ odId: "", role: "", searchQuery: "", inviteName: "" });
+      await setDoc(doc(db, `projects/${projectId}/members`, addMemberForm.odId), memberData);
+      await setDoc(doc(db, `userProjects/${addMemberForm.odId}/projects`, projectId), {
+        projectId,
+        role: addMemberForm.role,
+        permissions: memberData.permissions,
+        accountingAccessLevel: memberData.accountingAccessLevel,
+        addedAt: serverTimestamp(),
+      });
+      setAddMemberForm({ odId: "", role: "", searchQuery: "" });
       setShowAddMemberModal(false);
-      showToast("success", "Invitación enviada");
+      showToast("success", "Miembro añadido");
       await loadData();
     } catch (error) {
       console.error(error);
-      showToast("error", "Error al enviar invitación");
+      showToast("error", "Error al añadir miembro");
     } finally {
       setSaving(false);
     }
@@ -689,48 +547,6 @@ export default function AdminProjectPage() {
     } catch (error) {
       console.error(error);
       showToast("error", "Error al actualizar permisos");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // ── Departments ──────────────────────────────────────────────────────────────
-
-  const handleAddDepartment = async () => {
-    const name = newDeptName.trim();
-    if (!name) return;
-    if (departments.find((d) => d.name.toLowerCase() === name.toLowerCase())) {
-      showToast("error", "Ya existe ese departamento");
-      return;
-    }
-    setSaving(true);
-    try {
-      const newDepts = [...departments.map((d) => d.name), name];
-      await updateDoc(doc(db, "projects", projectId), { departments: newDepts });
-      setNewDeptName("");
-      showToast("success", "Departamento añadido");
-      await loadData();
-    } catch (error) {
-      showToast("error", "Error al añadir departamento");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleRemoveDepartment = async (deptName: string) => {
-    const dept = departments.find((d) => d.name === deptName);
-    if (dept && dept.memberCount > 0) {
-      showToast("error", "El departamento tiene miembros asignados");
-      return;
-    }
-    setSaving(true);
-    try {
-      const newDepts = departments.map((d) => d.name).filter((n) => n !== deptName);
-      await updateDoc(doc(db, "projects", projectId), { departments: newDepts });
-      showToast("success", "Departamento eliminado");
-      await loadData();
-    } catch (error) {
-      showToast("error", "Error al eliminar departamento");
     } finally {
       setSaving(false);
     }
@@ -964,7 +780,7 @@ export default function AdminProjectPage() {
 
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 pt-10 pb-6">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
           <div className="mb-6">
             <Link
               href="/admindashboard"
@@ -1020,7 +836,7 @@ export default function AdminProjectPage() {
 
       {/* Closing warning banner */}
       {daysUntilClose !== null && (
-        <div className="px-24 pb-4">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pb-4">
           <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -1049,13 +865,12 @@ export default function AdminProjectPage() {
       )}
 
       {/* Tabs */}
-      <div className="px-24 pb-2">
+      <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pb-2">
         <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl p-1 w-fit">
           {[
             { id: "general", label: "General", icon: Settings },
             { id: "accounting", label: "Accounting", icon: BarChart3 },
             { id: "team", label: "Team", icon: Users },
-            { id: "logs", label: "Logs", icon: Activity },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -1073,239 +888,109 @@ export default function AdminProjectPage() {
         </div>
       </div>
 
-      <main className="px-24 py-6">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
 
         {/* ══════════════════════════════════ GENERAL TAB ══════════════════════════════════ */}
         {activeTab === "general" && (
-          <div className="space-y-5">
-
-            {/* ── Main grid: users (left 2/3) + info+departments (right 1/3) ── */}
-            <div className="grid grid-cols-3 gap-5">
-
-              {/* Users — prominent left column */}
-              <div className="col-span-2">
-                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden h-full">
-                  <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-sm font-semibold text-slate-900">Usuarios del proyecto</h2>
-                      <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{members.length}</span>
-                    </div>
-                    <button
-                      onClick={() => setShowAddMemberModal(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800"
-                    >
-                      <UserPlus size={12} />
-                      Añadir usuario
-                    </button>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Project Info */}
+            <div className="lg:col-span-1 space-y-4">
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-slate-900">Información del proyecto</h2>
+                  <button
+                    onClick={() => setShowEditModal(true)}
+                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                </div>
+                <div className="p-5 space-y-4">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Nombre</p>
+                    <p className="text-sm font-medium text-slate-900">{project.name}</p>
                   </div>
-                  {members.length === 0 ? (
-                    <div className="p-12 text-center">
-                      <Users size={28} className="text-slate-300 mx-auto mb-3" />
-                      <p className="text-sm font-medium text-slate-700 mb-1">Sin usuarios asignados</p>
-                      <p className="text-xs text-slate-400">Añade el primer usuario para que pueda acceder al proyecto</p>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-slate-100">
-                      {members.map((member) => (
-                        <div key={member.id} className="px-5 py-4 flex items-center justify-between hover:bg-slate-50 group">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600 text-sm font-semibold">
-                              {member.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-slate-900">{member.name}</p>
-                              <p className="text-xs text-slate-400">{member.email}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {member.role && (
-                              <span className="text-xs bg-slate-900 text-white px-2 py-0.5 rounded-lg">{member.role}</span>
-                            )}
-                            <div className="flex items-center gap-1">
-                              {member.permissions.config && (
-                                <span className="text-[10px] bg-violet-50 text-violet-700 border border-violet-100 px-1.5 py-0.5 rounded">Config</span>
-                              )}
-                              {member.permissions.accounting && (
-                                <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded">
-                                  {member.accountingAccessLevel === "accounting_extended" ? "Acc+" : member.accountingAccessLevel === "accounting" ? "Acc" : "Acc·U"}
-                                </span>
-                              )}
-                              {member.permissions.team && (
-                                <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-100 px-1.5 py-0.5 rounded">Team</span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button
-                                onClick={() => {
-                                  setShowEditMemberModal(member);
-                                  setEditMemberForm({
-                                    config: member.permissions.config || false,
-                                    accounting: member.permissions.accounting || false,
-                                    team: member.permissions.team || false,
-                                    accountingAccessLevel: member.accountingAccessLevel || "user",
-                                  });
-                                }}
-                                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
-                                title="Editar permisos"
-                              >
-                                <Shield size={14} />
-                              </button>
-                              <button
-                                onClick={() => handleRemoveMember(member.id, member.name)}
-                                disabled={saving}
-                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
-                                title="Eliminar del proyecto"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Fase</p>
+                    <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-lg ${phase.bg} ${phase.text}`}>
+                      {project.phase}
+                    </span>
+                  </div>
+                  {project.description && (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Descripción</p>
+                      <p className="text-sm text-slate-600">{project.description}</p>
                     </div>
                   )}
-                </div>
-              </div>
-
-              {/* Right column: project info + departments */}
-              <div className="col-span-1 space-y-4">
-
-                {/* Project info — compact */}
-                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                  <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-                    <h2 className="text-sm font-semibold text-slate-900">Proyecto</h2>
-                    <button
-                      onClick={() => setShowEditModal(true)}
-                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
-                      title="Editar"
-                    >
-                      <Edit2 size={13} />
-                    </button>
-                  </div>
-                  <div className="px-5 py-4 space-y-3">
+                  {project.producerNames && project.producerNames.length > 0 && (
                     <div>
-                      <p className="text-xs text-slate-400 mb-0.5">Nombre</p>
-                      <p className="text-sm font-medium text-slate-900">{project.name}</p>
+                      <p className="text-xs text-slate-500 mb-1">Productoras</p>
+                      <p className="text-sm text-slate-600">{project.producerNames.join(", ")}</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <p className="text-xs text-slate-400 mb-0.5">Fase</p>
-                        <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-lg ${phase.bg} ${phase.text}`}>
-                          {project.phase}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-400 mb-0.5">ID</p>
-                        <p className="text-xs font-mono text-slate-500">{project.id}</p>
-                      </div>
-                    </div>
-                    {project.producerNames && project.producerNames.length > 0 && (
-                      <div>
-                        <p className="text-xs text-slate-400 mb-0.5">Productoras</p>
-                        <p className="text-sm text-slate-600">{project.producerNames.join(", ")}</p>
-                      </div>
-                    )}
-                    {project.description && (
-                      <div>
-                        <p className="text-xs text-slate-400 mb-0.5">Descripción</p>
-                        <p className="text-xs text-slate-500 leading-relaxed">{project.description}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Departments — editable */}
-                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                  <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2">
-                    <Layers size={14} className="text-slate-400" />
-                    <h2 className="text-sm font-semibold text-slate-900">Departamentos</h2>
-                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{departments.length}</span>
-                  </div>
-                  <div className="p-4 space-y-3">
-                    {departments.length > 0 ? (
-                      <div className="flex flex-wrap gap-1.5">
-                        {departments.map((dept) => (
-                          <div
-                            key={dept.id}
-                            className="group flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700"
-                          >
-                            <span>{dept.name}</span>
-                            {dept.memberCount > 0 && (
-                              <span className="text-[10px] text-slate-400">{dept.memberCount}</span>
-                            )}
-                            <button
-                              onClick={() => handleRemoveDepartment(dept.name)}
-                              disabled={saving || dept.memberCount > 0}
-                              className="p-0.5 text-slate-300 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed rounded"
-                              title={dept.memberCount > 0 ? "Tiene miembros asignados" : "Eliminar"}
-                            >
-                              <X size={11} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-400">Sin departamentos</p>
-                    )}
-                    {/* Add department */}
-                    <div className="flex gap-2 pt-1">
-                      <input
-                        type="text"
-                        value={newDeptName}
-                        onChange={(e) => setNewDeptName(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleAddDepartment()}
-                        placeholder="Nuevo departamento"
-                        className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-xs"
-                      />
-                      <button
-                        onClick={handleAddDepartment}
-                        disabled={saving || !newDeptName.trim()}
-                        className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 disabled:opacity-40"
-                      >
-                        Añadir
-                      </button>
-                    </div>
+                  )}
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">ID del proyecto</p>
+                    <p className="text-sm font-mono text-slate-500">{project.id}</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* ── Admin actions strip — compact, secondary ── */}
-            <div className="flex flex-row gap-2 pt-1">
-              <button
-                onClick={() => {
-                  setCloneName(project.name + " (copia)");
-                  setCloneIncludeBudget(true);
-                  setCloneIncludeSuppliers(true);
-                  setShowCloneModal(true);
-                }}
-                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300"
-              >
-                <FolderPlus size={14} />
-                Clonar proyecto
-              </button>
-
-              {daysUntilClose === null ? (
-                <button
-                  onClick={() => setShowCloseModal(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-white border border-red-200 rounded-xl text-sm text-red-600 hover:bg-red-50"
-                >
-                  <Clock size={14} />
-                  Programar cierre
-                </button>
-              ) : (
-                <div className="flex items-center gap-3 px-4 py-2.5 bg-red-50 border border-red-200 rounded-xl">
-                  <Clock size={14} className="text-red-500 flex-shrink-0" />
-                  <span className="text-sm text-red-700">Cierre en {daysUntilClose} días ({project.closingAt?.toDate().toLocaleDateString("es-ES")})</span>
+            {/* Right col: Admin actions + Danger zone */}
+            <div className="lg:col-span-2 space-y-4">
+              {/* Clone */}
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100">
+                  <h2 className="text-sm font-semibold text-slate-900">Acciones de administrador</h2>
+                </div>
+                <div className="p-5">
                   <button
-                    onClick={handleCancelClose}
-                    disabled={saving}
-                    className="ml-auto text-xs text-red-600 hover:text-red-900 font-medium underline underline-offset-2 disabled:opacity-50"
+                    onClick={() => {
+                      setCloneName(project.name + " (copia)");
+                      setCloneIncludeBudget(true);
+                      setCloneIncludeSuppliers(true);
+                      setShowCloneModal(true);
+                    }}
+                    className="flex items-center gap-3 w-full p-4 border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 text-left group"
                   >
-                    Cancelar
+                    <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center group-hover:bg-slate-200">
+                      <FolderPlus size={18} className="text-slate-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">Clonar proyecto</p>
+                      <p className="text-xs text-slate-500">Crea una copia de este proyecto (opcional: con presupuesto y proveedores)</p>
+                    </div>
                   </button>
                 </div>
-              )}
+              </div>
+
+              {/* Danger zone */}
+              <div className="bg-white border border-red-100 rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-red-100 bg-red-50/50">
+                  <h2 className="text-sm font-semibold text-red-800">Zona de peligro</h2>
+                </div>
+                <div className="p-5">
+                  {daysUntilClose === null ? (
+                    <button
+                      onClick={() => setShowCloseModal(true)}
+                      className="flex items-center gap-3 w-full p-4 border border-red-200 rounded-xl hover:bg-red-50 text-left group"
+                    >
+                      <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+                        <Clock size={18} className="text-red-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-red-800">Programar cierre del proyecto</p>
+                        <p className="text-xs text-red-500">Se notificará a todos los miembros. La acción es reversible hasta la fecha de cierre.</p>
+                      </div>
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
+                      <Clock size={18} className="text-red-600 flex-shrink-0" />
+                      <p className="text-sm text-red-700">Cierre ya programado en {daysUntilClose} días.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1314,7 +999,7 @@ export default function AdminProjectPage() {
         {activeTab === "accounting" && (
           <div className="space-y-6">
             {/* Stats */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
                 { label: "Cuentas presup.", value: accountingStats.accountCount, icon: BarChart3, color: "text-blue-600", bg: "bg-blue-50" },
                 { label: "Proveedores", value: accountingStats.supplierCount, icon: Building2, color: "text-emerald-600", bg: "bg-emerald-50" },
@@ -1336,7 +1021,7 @@ export default function AdminProjectPage() {
               <div className="px-5 py-4 border-b border-slate-100">
                 <h2 className="text-sm font-semibold text-slate-900">Acceso rápido</h2>
               </div>
-              <div className="p-5 grid grid-cols-4 gap-3">
+              <div className="p-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
                   { label: "Presupuesto", href: `/project/${projectId}/accounting/budget`, icon: BarChart3 },
                   { label: "Proveedores", href: `/project/${projectId}/accounting/suppliers`, icon: Building2 },
@@ -1357,7 +1042,7 @@ export default function AdminProjectPage() {
             </div>
 
             {/* Copy operations */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Copy suppliers */}
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100">
@@ -1409,171 +1094,154 @@ export default function AdminProjectPage() {
         {/* ══════════════════════════════════ TEAM TAB ══════════════════════════════════ */}
         {activeTab === "team" && (
           <div className="space-y-6">
-            {/* Stats */}
-            <div className="grid grid-cols-4 gap-4">
-              {[
-                { label: "Fichas creadas", value: teamStats.totalForms, icon: FileText, color: "text-blue-600", bg: "bg-blue-50" },
-                { label: "Pendientes", value: teamStats.pendingForms, icon: Clock, color: "text-amber-600", bg: "bg-amber-50" },
-                { label: "Completadas", value: teamStats.completedForms, icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50" },
-                { label: "Firmadas", value: teamStats.signedForms, icon: Shield, color: "text-violet-600", bg: "bg-violet-50" },
-              ].map((stat) => (
-                <div key={stat.label} className="bg-white border border-slate-200 rounded-2xl p-5">
-                  <div className={`w-10 h-10 ${stat.bg} rounded-xl flex items-center justify-center mb-3`}>
-                    <stat.icon size={18} className={stat.color} />
-                  </div>
-                  <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">{stat.label}</p>
-                </div>
-              ))}
+            {/* Stats row */}
+            <div className="flex items-center gap-6 text-sm">
+              <div className="flex items-center gap-2">
+                <Users size={16} className="text-slate-400" />
+                <span className="text-slate-600">{members.length} miembros</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <FolderOpen size={16} className="text-slate-400" />
+                <span className="text-slate-600">{departments.length} departamentos</span>
+              </div>
             </div>
 
-            {/* Fichas list */}
+            {/* Members */}
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-                <FileText size={15} className="text-slate-400" />
-                <h2 className="text-sm font-semibold text-slate-900">Fichas de crew</h2>
-                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{teamStats.totalForms}</span>
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-slate-900">Miembros</h2>
+                  <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                    {members.length}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowAddMemberModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800"
+                >
+                  <UserPlus size={12} />
+                  Añadir
+                </button>
               </div>
-              {teamStats.forms.length === 0 ? (
-                <div className="p-10 text-center">
-                  <FileText size={24} className="text-slate-300 mx-auto mb-2" />
-                  <p className="text-sm text-slate-500">No hay fichas creadas para este proyecto</p>
+
+              {members.length === 0 ? (
+                <div className="p-12 text-center">
+                  <Users size={24} className="text-slate-300 mx-auto mb-2" />
+                  <p className="text-sm text-slate-500">No hay miembros</p>
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100">
-                  {teamStats.forms.map((form) => {
-                    const statusConfig = {
-                      pending: { label: "Pendiente", bg: "bg-amber-50", text: "text-amber-700" },
-                      completed: { label: "Completada", bg: "bg-emerald-50", text: "text-emerald-700" },
-                      signed: { label: "Firmada", bg: "bg-violet-50", text: "text-violet-700" },
-                    }[form.status] || { label: form.status, bg: "bg-slate-100", text: "text-slate-600" };
-                    const isCopied = copiedFormId === form.id;
-                    return (
-                      <div key={form.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-slate-50 group">
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">
-                            {form.firstName || form.lastName1 ? `${form.firstName} ${form.lastName1}`.trim() : "Sin nombre"}
-                          </p>
-                          {form.email && <p className="text-xs text-slate-500">{form.email}</p>}
+                  {members.map((member) => (
+                    <div key={member.id} className="px-5 py-4 flex items-center justify-between hover:bg-slate-50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600 text-sm font-medium">
+                          {member.name.charAt(0).toUpperCase()}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-lg ${statusConfig.bg} ${statusConfig.text}`}>
-                            {statusConfig.label}
-                          </span>
-                          {form.createdAt && (
-                            <span className="text-xs text-slate-400">
-                              {form.createdAt.toDate().toLocaleDateString("es-ES")}
-                            </span>
-                          )}
-                          {/* Copy link */}
-                          <button
-                            onClick={() => copyFormLink(form.id)}
-                            className={`p-1.5 rounded-lg transition-colors ${isCopied ? "bg-emerald-50 text-emerald-600" : "text-slate-400 hover:text-slate-700 hover:bg-slate-100 opacity-0 group-hover:opacity-100"}`}
-                            title="Copiar link de la ficha"
-                          >
-                            {isCopied ? <CheckCircle size={14} /> : <Link2 size={14} />}
-                          </button>
-                          {/* Resend email */}
-                          {form.email && (
-                            <button
-                              onClick={() => resendFormEmail(form)}
-                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                              title={`Reenviar email a ${form.email}`}
-                            >
-                              <Mail size={14} />
-                            </button>
-                          )}
-                          {/* Open form */}
-                          <a
-                            href={`/form/${form.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                            title="Abrir ficha"
-                          >
-                            <ExternalLink size={14} />
-                          </a>
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">{member.name}</p>
+                          <p className="text-xs text-slate-500">{member.email}</p>
                         </div>
                       </div>
-                    );
-                  })}
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5">
+                          {member.role && (
+                            <span className="text-xs bg-slate-900 text-white px-2 py-0.5 rounded">
+                              {member.role}
+                            </span>
+                          )}
+                          {member.department && (
+                            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                              {member.department}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {member.permissions.config && (
+                            <span className="text-[10px] bg-violet-50 text-violet-700 px-1.5 py-0.5 rounded" title="Acceso a Config">
+                              Config
+                            </span>
+                          )}
+                          {member.permissions.accounting && (
+                            <span
+                              className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded"
+                              title={`Nivel: ${
+                                member.accountingAccessLevel === "accounting_extended"
+                                  ? "Avanzado"
+                                  : member.accountingAccessLevel === "accounting"
+                                  ? "Contabilidad"
+                                  : "Usuario"
+                              }`}
+                            >
+                              {member.accountingAccessLevel === "accounting_extended"
+                                ? "Acc+"
+                                : member.accountingAccessLevel === "accounting"
+                                ? "Acc"
+                                : "Acc·U"}
+                            </span>
+                          )}
+                          {member.permissions.team && (
+                            <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded" title="Acceso a Team">
+                              Team
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => {
+                              setShowEditMemberModal(member);
+                              setEditMemberForm({
+                                config: member.permissions.config || false,
+                                accounting: member.permissions.accounting || false,
+                                team: member.permissions.team || false,
+                                accountingAccessLevel: member.accountingAccessLevel || "user",
+                              });
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
+                            title="Editar permisos"
+                          >
+                            <Shield size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleRemoveMember(member.id, member.name)}
+                            disabled={saving}
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                            title="Eliminar miembro"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-          </div>
-        )}
 
-        {/* ══════════════════════════════════ LOGS TAB ══════════════════════════════════ */}
-        {activeTab === "logs" && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-slate-500">Registro de actividad del proyecto</p>
-              <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{logs.length} eventos</span>
-            </div>
-
-            {logs.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
-                <Activity size={28} className="text-slate-300 mx-auto mb-3" />
-                <p className="text-sm font-medium text-slate-700 mb-1">Sin actividad registrada</p>
-                <p className="text-xs text-slate-400">Los eventos aparecerán aquí a medida que ocurran</p>
-              </div>
-            ) : (
+            {/* Departments */}
+            {departments.length > 0 && (
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="divide-y divide-slate-100">
-                  {logs.map((log) => {
-                    const logConfig: Record<string, { label: string; icon: any; iconBg: string; iconColor: string }> = {
-                      invitation_sent:      { label: "Invitación enviada",        icon: Send,      iconBg: "bg-blue-50",    iconColor: "text-blue-600" },
-                      invitation_accepted:  { label: "Invitación aceptada",       icon: UserCheck, iconBg: "bg-emerald-50", iconColor: "text-emerald-600" },
-                      invitation_rejected:  { label: "Invitación rechazada",      icon: X,         iconBg: "bg-red-50",     iconColor: "text-red-600" },
-                      user_registered:      { label: "Usuario registrado",        icon: UserPlus,  iconBg: "bg-violet-50",  iconColor: "text-violet-600" },
-                      user_joined:          { label: "Usuario se unió",           icon: UserCheck, iconBg: "bg-emerald-50", iconColor: "text-emerald-600" },
-                      user_removed:         { label: "Usuario eliminado",         icon: Trash2,    iconBg: "bg-slate-100",  iconColor: "text-slate-500" },
-                      member_added:         { label: "Miembro añadido",           icon: UserPlus,  iconBg: "bg-blue-50",    iconColor: "text-blue-600" },
-                      form_created:         { label: "Ficha creada",              icon: FileText,  iconBg: "bg-blue-50",    iconColor: "text-blue-600" },
-                      form_submitted:       { label: "Ficha completada",          icon: CheckCircle, iconBg: "bg-emerald-50", iconColor: "text-emerald-600" },
-                      form_signed:          { label: "Ficha firmada",             icon: Shield,    iconBg: "bg-violet-50",  iconColor: "text-violet-600" },
-                      form_reminder_sent:   { label: "Recordatorio de ficha enviado", icon: Mail, iconBg: "bg-amber-50",   iconColor: "text-amber-600" },
-                      message_sent:         { label: "Mensaje enviado",           icon: MessageSquare, iconBg: "bg-slate-100", iconColor: "text-slate-600" },
-                    };
-                    const cfg = logConfig[log.type] || { label: log.type, icon: Activity, iconBg: "bg-slate-100", iconColor: "text-slate-500" };
-                    const Icon = cfg.icon;
-                    return (
-                      <div key={log.id} className="px-5 py-3.5 flex items-start gap-3 hover:bg-slate-50">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${cfg.iconBg}`}>
-                          <Icon size={14} className={cfg.iconColor} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-900">{cfg.label}</p>
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
-                            {log.actorName && (
-                              <span className="text-xs text-slate-500">
-                                Por: <span className="font-medium text-slate-700">{log.actorName}</span>
-                              </span>
-                            )}
-                            {log.targetEmail && (
-                              <span className="text-xs text-slate-500">
-                                → <span className="font-medium text-slate-700">{log.targetEmail}</span>
-                              </span>
-                            )}
-                            {log.targetName && !log.targetEmail && (
-                              <span className="text-xs text-slate-500">
-                                → <span className="font-medium text-slate-700">{log.targetName}</span>
-                              </span>
-                            )}
-                            {log.meta && (
-                              <span className="text-xs text-slate-400">{log.meta}</span>
-                            )}
-                          </div>
-                        </div>
-                        {log.createdAt && (
-                          <span className="text-xs text-slate-400 flex-shrink-0 mt-0.5">
-                            {log.createdAt.toDate().toLocaleDateString("es-ES", { day: "2-digit", month: "short" })}{" "}
-                            {log.createdAt.toDate().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
-                          </span>
-                        )}
+                <div className="px-5 py-4 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Layers size={16} className="text-slate-400" />
+                    <h2 className="text-sm font-semibold text-slate-900">Departamentos</h2>
+                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                      {departments.length}
+                    </span>
+                  </div>
+                </div>
+                <div className="p-5">
+                  <div className="flex flex-wrap gap-2">
+                    {departments.map((dept) => (
+                      <div
+                        key={dept.id}
+                        className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg"
+                      >
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: dept.color }} />
+                        <span className="text-sm text-slate-700">{dept.name}</span>
+                        <span className="text-xs text-slate-400">{dept.memberCount}</span>
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -1725,7 +1393,7 @@ export default function AdminProjectPage() {
                   type="text"
                   value={producerSearch}
                   onChange={(e) => setProducerSearch(e.target.value)}
-                  placeholder="Buscar productora"
+                  placeholder="Buscar productora..."
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
                 />
                 {producerSearch.length >= 1 && (
@@ -1841,22 +1509,13 @@ export default function AdminProjectPage() {
       )}
 
       {/* Add Member Modal */}
-      {showAddMemberModal && (() => {
-        const selectedUser = allUsers.find((u) => u.id === addMemberForm.odId);
-        const isManualEmail = !selectedUser && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addMemberForm.searchQuery.trim());
-        const canSubmit = !saving && addMemberForm.role && (
-          selectedUser || (isManualEmail && addMemberForm.inviteName.trim())
-        );
-        return (
+      {showAddMemberModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">Invitar miembro</h3>
-                <p className="text-xs text-slate-500 mt-0.5">El usuario recibirá un email y tendrá que aceptar la invitación</p>
-              </div>
+              <h3 className="text-lg font-semibold text-slate-900">Añadir miembro</h3>
               <button
-                onClick={() => { setShowAddMemberModal(false); setAddMemberForm({ odId: "", role: "", searchQuery: "", inviteName: "" }); }}
+                onClick={() => { setShowAddMemberModal(false); setAddMemberForm({ odId: "", role: "", searchQuery: "" }); }}
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
               >
                 <X size={20} />
@@ -1864,67 +1523,33 @@ export default function AdminProjectPage() {
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Usuario o email</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Usuario</label>
                 <input
                   type="text"
                   value={addMemberForm.searchQuery}
-                  onChange={(e) => setAddMemberForm({ ...addMemberForm, searchQuery: e.target.value, odId: "", inviteName: "" })}
-                  placeholder="Buscar por nombre, email o escribe un email"
+                  onChange={(e) => setAddMemberForm({ ...addMemberForm, searchQuery: e.target.value, odId: "" })}
+                  placeholder="Buscar por nombre o email"
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
                 />
-                {addMemberForm.searchQuery && !addMemberForm.odId && (
+                {addMemberForm.searchQuery && (
                   <div className="mt-2 max-h-40 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
-                    {filteredUsersForAdd.length > 0 ? (
+                    {filteredUsersForAdd.length === 0 ? (
+                      <p className="p-3 text-sm text-slate-500 text-center">No se encontraron usuarios</p>
+                    ) : (
                       filteredUsersForAdd.slice(0, 5).map((user) => (
                         <button
                           key={user.id}
-                          onClick={() => setAddMemberForm({ ...addMemberForm, odId: user.id, searchQuery: user.name, inviteName: user.name })}
-                          className="w-full px-3 py-2 text-left hover:bg-slate-50"
+                          onClick={() => setAddMemberForm({ ...addMemberForm, odId: user.id, searchQuery: user.name })}
+                          className={`w-full px-3 py-2 text-left hover:bg-slate-50 ${addMemberForm.odId === user.id ? "bg-slate-50" : ""}`}
                         >
                           <p className="text-sm font-medium text-slate-900">{user.name}</p>
                           <p className="text-xs text-slate-500">{user.email}</p>
                         </button>
                       ))
-                    ) : isManualEmail ? (
-                      <div className="px-3 py-2.5 text-sm text-slate-600 flex items-center gap-2">
-                        <Mail size={14} className="text-slate-400 flex-shrink-0" />
-                        Invitar a <span className="font-medium">{addMemberForm.searchQuery.trim()}</span>
-                      </div>
-                    ) : (
-                      <p className="p-3 text-sm text-slate-500 text-center">Sin resultados — escribe un email para invitar</p>
                     )}
                   </div>
                 )}
-                {selectedUser && (
-                  <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl">
-                    <div className="w-7 h-7 bg-slate-200 rounded-full flex items-center justify-center text-xs font-semibold text-slate-600">
-                      {selectedUser.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">{selectedUser.name}</p>
-                      <p className="text-xs text-slate-500 truncate">{selectedUser.email}</p>
-                    </div>
-                    <button onClick={() => setAddMemberForm({ ...addMemberForm, odId: "", searchQuery: "", inviteName: "" })} className="text-slate-400 hover:text-slate-600">
-                      <X size={14} />
-                    </button>
-                  </div>
-                )}
               </div>
-
-              {/* Name field for non-registered users */}
-              {isManualEmail && !selectedUser && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Nombre</label>
-                  <input
-                    type="text"
-                    value={addMemberForm.inviteName}
-                    onChange={(e) => setAddMemberForm({ ...addMemberForm, inviteName: e.target.value })}
-                    placeholder="Nombre completo"
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
-                  />
-                </div>
-              )}
-
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Rol</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -1944,23 +1569,22 @@ export default function AdminProjectPage() {
             </div>
             <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3">
               <button
-                onClick={() => { setShowAddMemberModal(false); setAddMemberForm({ odId: "", role: "", searchQuery: "", inviteName: "" }); }}
+                onClick={() => { setShowAddMemberModal(false); setAddMemberForm({ odId: "", role: "", searchQuery: "" }); }}
                 className="flex-1 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleAddMember}
-                disabled={!canSubmit}
-                className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={saving || !addMemberForm.odId || !addMemberForm.role}
+                className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
               >
-                {saving ? "Enviando..." : "Enviar invitación"}
+                {saving ? "Añadiendo..." : "Añadir"}
               </button>
             </div>
           </div>
         </div>
-        );
-      })()}
+      )}
 
       {/* Edit Member Permissions Modal */}
       {showEditMemberModal && (

@@ -8,7 +8,6 @@ import { inter } from "@/lib/fonts";
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -26,11 +25,8 @@ import {
 import {
   Check,
   ChevronDown,
-  ClipboardCopy,
-  ExternalLink,
+  ChevronUp,
   FileDown,
-  Filter,
-  Link2,
   MailPlus,
   MoreHorizontal,
   Pencil,
@@ -60,8 +56,8 @@ type CrewSection = keyof typeof CREW_SECTIONS;
 
 const DEPARTMENTS_TECHNICAL = [
   "Producción Ejecutiva", "Legal", "Guion", "Dirección", "Producción",
-  "Localizaciones", "Fotografía", "Arte", "Vestuario", "Maquillaje & Peluquería",
-  "Sonido", "Eléctricos & Maquinistas", "Transportes", "Transportes Pesados",
+  "Transportes", "Fotografía", "Arte", "Vestuario", "Maquillaje & Peluquería",
+  "Sonido", "Eléctricos & Maquinistas", "Transportes Pesados",
   "VFX", "SFX", "Montaje", "Postproducción",
 ];
 
@@ -345,14 +341,6 @@ export default function CrewPage() {
   const [deptOrder, setDeptOrder]           = useState<string[]>([]);
   const [exportingPdf, setExportingPdf]     = useState(false);
 
-  // Send form modal
-  const [formTarget, setFormTarget]         = useState<CrewMember | null>(null);
-  const [formMessage, setFormMessage]       = useState("");
-  const [generatingForm, setGeneratingForm] = useState(false);
-  const [generatedResult, setGeneratedResult] = useState<{ url: string; pin: string } | null>(null);
-  const [copiedUrl, setCopiedUrl]           = useState(false);
-  const [copiedPin, setCopiedPin]           = useState(false);
-
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const userId   = user?.uid  || "";
   const userName = user?.name || "Usuario";
@@ -389,10 +377,9 @@ export default function CrewPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [projectSnap, snap, deptOrderSnap] = await Promise.all([
+      const [projectSnap, snap] = await Promise.all([
         getDoc(doc(db, `projects/${id}`)),
         getDocs(query(collection(db, `projects/${id}/crew`), orderBy("createdAt", "desc"))),
-        getDoc(doc(db, `projects/${id}/teamConfig`, "departmentOrder")),
       ]);
       if (projectSnap.exists()) setProjectName(projectSnap.data().name || "");
       const data: CrewMember[] = snap.docs.map((d) => {
@@ -429,19 +416,6 @@ export default function CrewPage() {
         };
       });
       setCrew(data);
-
-      // Apply saved department order from teamConfig (stored as dept name strings)
-      if (deptOrderSnap.exists()) {
-        const savedOrder: string[] = deptOrderSnap.data().order || [];
-        const allDepts = Array.from(
-          new Set(data.filter((m) => m.status !== "inactive").map((m) => m.department?.trim() || CREW_SECTIONS[m.section].label))
-        );
-        const ordered = [
-          ...savedOrder.filter((id) => allDepts.includes(id)),
-          ...allDepts.filter((d) => !savedOrder.includes(d)),
-        ];
-        setDeptOrder(ordered);
-      }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
@@ -513,7 +487,7 @@ export default function CrewPage() {
       } else {
         const crewNumber = await getNextCrewNumber();
         await setDoc(doc(collection(db, `projects/${id}/crew`)),
-          sanitize({ ...formData, crewNumber, approvalStatus: "draft", createdAt: Timestamp.now(), createdBy: userId, createdByName: userName })
+          sanitize({ ...formData, crewNumber, createdAt: Timestamp.now(), createdBy: userId, createdByName: userName })
         );
       }
       await loadData();
@@ -534,7 +508,7 @@ export default function CrewPage() {
         : doc(collection(db, `projects/${id}/crew`));
       await setDoc(ref, sanitize({
         ...formData, crewNumber,
-        ...(editingMember ? {} : { approvalStatus: "draft", createdAt: Timestamp.now(), createdBy: userId, createdByName: userName }),
+        ...(editingMember ? {} : { createdAt: Timestamp.now(), createdBy: userId, createdByName: userName }),
         updatedAt: Timestamp.now(), updatedBy: userId,
         formSentAt: Timestamp.now(), formSentBy: userId, formSentByName: userName,
       }), { merge: true });
@@ -571,86 +545,24 @@ export default function CrewPage() {
 
   const creditName = (m: CrewMember) => m.artisticName?.trim() || fullName(m);
 
-  const openSendForm = (member: CrewMember) => {
-    setFormTarget(member);
-    setFormMessage("");
-    setGeneratedResult(null);
-    closeMenu();
-  };
-
-  const closeSendForm = () => {
-    setFormTarget(null);
-    setGeneratedResult(null);
-    setFormMessage("");
-  };
-
-  const handleGenerateForm = async () => {
-    if (!formTarget) return;
-    setGeneratingForm(true);
-    try {
-      const pin = String(Math.floor(1000 + Math.random() * 9000));
-      const expires = new Date();
-      expires.setDate(expires.getDate() + 14);
-      const docRef = await addDoc(collection(db, "forms"), {
-        type: "crew_onboarding",
-        pin,
-        status: "pending",
-        projectId: id,
-        projectName,
-        crewMemberId: formTarget.id,
-        createdBy: userId,
-        createdByName: userName,
-        coordinatorMessage: formMessage.trim() || null,
-        createdAt: Timestamp.now(),
-        expiresAt: Timestamp.fromDate(expires),
-        prefilled: {
-          firstName:    formTarget.firstName,
-          lastName1:    formTarget.lastName1,
-          lastName2:    formTarget.lastName2    || "",
-          artisticName: formTarget.artisticName || "",
-          email:        formTarget.email        || "",
-          phone:        formTarget.phone        || "",
-          role:         formTarget.role,
-          department:   formTarget.department,
-          section:      formTarget.section,
-        },
-      });
-      const url = `${window.location.origin}/form/${docRef.id}`;
-      setGeneratedResult({ url, pin });
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setGeneratingForm(false);
-    }
-  };
-
-  const copyToClipboard = async (text: string, type: "url" | "pin") => {
-    await navigator.clipboard.writeText(text);
-    if (type === "url") { setCopiedUrl(true); setTimeout(() => setCopiedUrl(false), 2000); }
-    else                { setCopiedPin(true); setTimeout(() => setCopiedPin(false), 2000); }
-  };
-
-  const copyFormMessage = async (url: string, pin: string) => {
-    const msg = `Este es el enlace al formulario:\n${url}\n\nPara acceder a él, tendrás que usar esta clave: ${pin}`;
-    await navigator.clipboard.writeText(msg);
-    setCopiedUrl(true); setTimeout(() => setCopiedUrl(false), 2000);
-  };
-
   const openCrewListModal = () => {
-    // Use pre-loaded saved order; add any crew depts not in saved order at the end
-    const activeDepts = Array.from(
+    const depts = Array.from(
       new Set(
         crew
           .filter((m) => m.status !== "inactive")
           .map((m) => m.department?.trim() || CREW_SECTIONS[m.section].label)
       )
     );
-    const merged = [
-      ...deptOrder.filter((d) => activeDepts.includes(d)),
-      ...activeDepts.filter((d) => !deptOrder.includes(d)),
-    ];
-    setDeptOrder(merged);
+    setDeptOrder(depts);
     setShowCrewListModal(true);
+  };
+
+  const moveDept = (idx: number, dir: -1 | 1) => {
+    const next = [...deptOrder];
+    const swap = idx + dir;
+    if (swap < 0 || swap >= next.length) return;
+    [next[idx], next[swap]] = [next[swap], next[idx]];
+    setDeptOrder(next);
   };
 
   const handleExportPdf = async () => {
@@ -839,8 +751,8 @@ export default function CrewPage() {
 
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-6">
 
             {/* Left: título solo */}
             <div className="flex items-center gap-3">
@@ -851,7 +763,7 @@ export default function CrewPage() {
             {/* Right: stats + botón */}
             <div className="flex items-center gap-4">
               {/* Stats pill */}
-              <div className="flex items-center gap-4 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl">
+              <div className="hidden md:flex items-center gap-4 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl">
                 <div className="text-center">
                   <p className="text-xs text-slate-400 leading-none mb-0.5">Activos</p>
                   <p className="text-base font-bold text-slate-900 leading-none">{stats.active}</p>
@@ -912,10 +824,10 @@ export default function CrewPage() {
       </div>
 
       {/* ── Main ─────────────────────────────────────────────────────────────── */}
-      <main className="px-24 py-8">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
 
         {/* Filters */}
-        <div className="flex flex-row gap-3 items-center mb-6">
+        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center mb-6">
           <div className="flex-1 relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -1080,9 +992,6 @@ export default function CrewPage() {
                 <>
                   <button onClick={() => openEdit(member)} className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3">
                     <Pencil size={14} className="text-slate-400" />Editar datos
-                  </button>
-                  <button onClick={() => openSendForm(member)} className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3">
-                    <Link2 size={14} className="text-slate-400" />Enviar ficha
                   </button>
                   <button onClick={() => handleToggleStatus(member)} className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3">
                     {member.status === "active"
@@ -1328,162 +1237,27 @@ export default function CrewPage() {
                   Cancelar
                 </button>
                 <div className="flex-1" />
+                {/* Guardar sin enviar */}
                 <button onClick={handleSave} disabled={saving || !canSave}
-                  className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
-                  style={{ backgroundColor: "#6BA319" }}>
+                  className="px-4 py-2.5 border border-slate-300 text-slate-700 bg-white rounded-xl text-sm font-medium hover:bg-slate-50 disabled:opacity-40 transition-colors">
                   {saving ? "Guardando…" : editingMember ? "Guardar cambios" : "Guardar"}
                 </button>
+                {/* Guardar + enviar ficha */}
+                <button onClick={handleSaveAndSend} disabled={sendingForm || !canSend}
+                  className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
+                  style={{ backgroundColor: "#6BA319" }}
+                  title={!formData.email?.trim() ? "Añade un email para enviar la ficha" : "Guarda y envía la ficha al miembro"}
+                >
+                  <Send size={14} />
+                  {sendingForm ? "Enviando…" : "Guardar y enviar ficha"}
+                </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Send Form Modal ──────────────────────────────────────────────────── */}
-      {formTarget && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={closeSendForm}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col" onClick={(e) => e.stopPropagation()}>
-
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(107,163,25,0.1)" }}>
-                  <Link2 size={16} style={{ color: "#6BA319" }} />
-                </div>
-                <div>
-                  <h2 className="text-base font-semibold text-slate-900">Enviar ficha de alta</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {formTarget.firstName} {formTarget.lastName1} · {formTarget.role}
-                  </p>
-                </div>
-              </div>
-              <button onClick={closeSendForm} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-5">
-              {!generatedResult ? (
-                <>
-                  {/* Pre-filled preview */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl divide-y divide-slate-100 text-sm">
-                    {[
-                      ["Nombre", `${formTarget.firstName} ${formTarget.lastName1}${formTarget.lastName2 ? " " + formTarget.lastName2 : ""}`],
-                      formTarget.email ? ["Email", formTarget.email] : null,
-                      formTarget.phone ? ["Teléfono", formTarget.phone] : null,
-                      ["Cargo", formTarget.role],
-                      formTarget.department ? ["Departamento", formTarget.department] : null,
-                    ].filter(Boolean).map(([label, value]) => (
-                      <div key={label} className="flex items-center justify-between px-4 py-2.5 gap-3">
-                        <span className="text-xs text-slate-400 flex-shrink-0">{label}</span>
-                        <span className="text-sm text-slate-700 text-right truncate">{value}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Optional message */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                      Mensaje para {formTarget.firstName} <span className="font-normal text-slate-400">(opcional)</span>
-                    </label>
-                    <textarea
-                      value={formMessage}
-                      onChange={(e) => setFormMessage(e.target.value)}
-                      placeholder={`Hola ${formTarget.firstName}, adjunto la ficha de alta para ${projectName || "la producción"}. Rellena todos los campos y adjunta los documentos indicados. ¡Gracias!`}
-                      rows={3}
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319] resize-none"
-                    />
-                  </div>
-
-                  <p className="text-xs text-slate-400 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
-                    Se generará un enlace único y un código de 4 dígitos válido durante 14 días.
-                  </p>
-                </>
-              ) : (
-                /* Result */
-                <div className="space-y-4">
-                  <div className="text-center py-2">
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: "rgba(107,163,25,0.1)" }}>
-                      <Check size={22} style={{ color: "#6BA319" }} />
-                    </div>
-                    <h3 className="text-base font-semibold text-slate-900">¡Ficha generada!</h3>
-                    <p className="text-xs text-slate-500 mt-1">Comparte el enlace y el código con {formTarget.firstName}</p>
-                  </div>
-
-                  {/* PIN */}
-                  <div className="bg-slate-900 rounded-2xl p-5 text-center">
-                    <p className="text-xs text-slate-400 mb-2 uppercase tracking-wider font-medium">Código de acceso</p>
-                    <div className="flex items-center justify-center gap-2 mb-3">
-                      {generatedResult.pin.split("").map((d, i) => (
-                        <div key={i} className="w-12 h-14 bg-white/10 rounded-xl flex items-center justify-center">
-                          <span className="text-2xl font-bold text-white">{d}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => copyToClipboard(generatedResult.pin, "pin")}
-                      className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors mx-auto"
-                    >
-                      {copiedPin ? <Check size={11} className="text-emerald-400" /> : <ClipboardCopy size={11} />}
-                      {copiedPin ? "Copiado" : "Copiar código"}
-                    </button>
-                  </div>
-
-                  {/* URL */}
-                  <div className="border border-slate-200 rounded-xl p-4 space-y-2">
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Enlace del formulario</p>
-                    <p className="text-xs text-slate-600 break-all font-mono bg-slate-50 rounded-lg px-2 py-1.5">{generatedResult.url}</p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => copyFormMessage(generatedResult.url, generatedResult.pin)}
-                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-slate-200 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-50 transition-colors"
-                      >
-                        {copiedUrl ? <Check size={12} className="text-emerald-500" /> : <ClipboardCopy size={12} />}
-                        {copiedUrl ? "Copiado" : "Copiar mensaje"}
-                      </button>
-                      <a
-                        href={generatedResult.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-50 transition-colors"
-                      >
-                        <ExternalLink size={12} /> Abrir
-                      </a>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-slate-400 text-center">
-                    Válido durante 14 días · El código solo sirve para este formulario
-                  </p>
-                </div>
+              {!formData.email?.trim() && canSave && (
+                <p className="text-xs text-slate-400 mt-2 text-right">
+                  Añade un email para poder enviar la ficha
+                </p>
               )}
             </div>
-
-            {/* Footer */}
-            {!generatedResult && (
-              <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex gap-3">
-                <button onClick={closeSendForm} className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-white text-sm font-medium transition-colors">
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleGenerateForm}
-                  disabled={generatingForm}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
-                  style={{ backgroundColor: "#6BA319" }}
-                >
-                  {generatingForm
-                    ? <><Send size={14} className="animate-pulse" /> Generando…</>
-                    : <><Link2 size={14} /> Generar enlace y código</>}
-                </button>
-              </div>
-            )}
-            {generatedResult && (
-              <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl">
-                <button onClick={closeSendForm} className="w-full py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-white text-sm font-medium transition-colors">
-                  Cerrar
-                </button>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -1507,7 +1281,7 @@ export default function CrewPage() {
                 </div>
                 <div>
                   <h2 className="text-base font-semibold text-slate-900">Exportar Crew List</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">Orden según configuración de team</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Ordena los departamentos antes de exportar</p>
                 </div>
               </div>
               <button onClick={() => setShowCrewListModal(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
@@ -1529,9 +1303,24 @@ export default function CrewPage() {
                   return (
                     <div
                       key={dept}
-                      className="flex items-center gap-3 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl"
+                      className="flex items-center gap-3 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl group"
                     >
-                      <span className="text-xs font-mono text-slate-300 w-5 text-right flex-shrink-0">{idx + 1}</span>
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          onClick={() => moveDept(idx, -1)}
+                          disabled={idx === 0}
+                          className="p-0.5 text-slate-300 hover:text-slate-600 disabled:opacity-20 transition-colors rounded"
+                        >
+                          <ChevronUp size={13} />
+                        </button>
+                        <button
+                          onClick={() => moveDept(idx, 1)}
+                          disabled={idx === deptOrder.length - 1}
+                          className="p-0.5 text-slate-300 hover:text-slate-600 disabled:opacity-20 transition-colors rounded"
+                        >
+                          <ChevronDown size={13} />
+                        </button>
+                      </div>
 
                       <div
                         className="w-0.5 h-8 rounded-full flex-shrink-0"
@@ -1542,6 +1331,8 @@ export default function CrewPage() {
                         <p className="text-sm font-medium text-slate-900 truncate">{dept}</p>
                         <p className="text-xs text-slate-400">{count} miembro{count !== 1 ? "s" : ""}</p>
                       </div>
+
+                      <span className="text-xs font-mono text-slate-300 w-5 text-right">{idx + 1}</span>
                     </div>
                   );
                 })

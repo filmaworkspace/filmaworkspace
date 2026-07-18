@@ -8,7 +8,7 @@ import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db, storage } from "@/lib/firebase";
-import { doc, getDoc, addDoc, updateDoc, collection, Timestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -16,10 +16,8 @@ import {
   ArrowLeft,
   Camera,
   Check,
-  CheckCircle,
   ChevronDown,
   ClipboardCopy,
-  Download,
   FileText,
   Link as LinkIcon,
   Mail,
@@ -31,7 +29,6 @@ import {
   Send,
   Upload,
   X,
-  XCircle,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
@@ -67,15 +64,6 @@ type DocKey = typeof REQUIRED_DOCS[number]["key"];
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type ApprovalStatus = "draft" | "pending_approval" | "approved" | "rejected";
-
-const APPROVAL_CONFIG: Record<ApprovalStatus, { label: string; bg: string; text: string; dot: string }> = {
-  draft:            { label: "Borrador",           bg: "bg-slate-100",   text: "text-slate-600",   dot: "bg-slate-400"   },
-  pending_approval: { label: "Pendiente aprobación", bg: "bg-amber-50", text: "text-amber-700",   dot: "bg-amber-500"   },
-  approved:         { label: "Aprobada",            bg: "bg-emerald-50",  text: "text-emerald-700", dot: "bg-emerald-500" },
-  rejected:         { label: "Rechazada",           bg: "bg-red-50",      text: "text-red-700",     dot: "bg-red-500"     },
-};
-
 interface CrewMember {
   id: string;
   crewNumber?: string;
@@ -89,7 +77,6 @@ interface CrewMember {
   department: string;
   company?: string;
   status: "active" | "inactive" | "pending";
-  approvalStatus?: ApprovalStatus;
   photoUrl?: string;
   // Contacto
   phone?: string;
@@ -125,9 +112,6 @@ interface CrewMember {
   notes?: string;
   formSentAt?: Date;
   formSentBy?: string;
-  submittedForApprovalAt?: Date;
-  approvedAt?: Date;
-  rejectedReason?: string;
   createdAt: Date;
   createdBy: string;
   createdByName: string;
@@ -239,9 +223,6 @@ export default function CrewMemberPage() {
   const [formSent, setFormSent]           = useState(false);
   const [linkCopied, setLinkCopied]       = useState(false);
   const [statusOpen, setStatusOpen]       = useState(false);
-  const [submittingApproval, setSubmittingApproval] = useState(false);
-  const [exportingPdf, setExportingPdf]   = useState(false);
-  const [projectName, setProjectName]     = useState("");
 
   const photoInputRef = useRef<HTMLInputElement>(null);
   const docInputRef   = useRef<HTMLInputElement>(null);
@@ -268,8 +249,6 @@ export default function CrewMemberPage() {
   const loadMember = async () => {
     try {
       setLoading(true);
-      const projSnap = await getDoc(doc(db, "projects", projectId));
-      if (projSnap.exists()) setProjectName(projSnap.data().name || "");
       const snap = await getDoc(doc(db, `projects/${projectId}/crew`, memberId));
       if (!snap.exists()) { router.push(`/project/${projectId}/team/crew`); return; }
       const d = snap.data();
@@ -313,17 +292,13 @@ export default function CrewMemberPage() {
         irpfRate:             d.irpfRate,
         regime:               d.regime               || "",
         bankAccount:          d.bankAccount          || "",
-        documents:                  d.documents                        || {},
-        notes:                      d.notes                            || "",
-        formSentAt:                 d.formSentAt?.toDate(),
-        formSentBy:                 d.formSentBy                       || "",
-        approvalStatus:             d.approvalStatus                   || undefined,
-        submittedForApprovalAt:     d.submittedForApprovalAt?.toDate(),
-        approvedAt:                 d.approvedAt?.toDate(),
-        rejectedReason:             d.rejectedReason                   || "",
-        createdAt:                  d.createdAt?.toDate()              || new Date(),
-        createdBy:                  d.createdBy                        || "",
-        createdByName:              d.createdByName                    || "",
+        documents:            d.documents            || {},
+        notes:                d.notes                || "",
+        formSentAt:           d.formSentAt?.toDate(),
+        formSentBy:           d.formSentBy           || "",
+        createdAt:            d.createdAt?.toDate()  || new Date(),
+        createdBy:            d.createdBy            || "",
+        createdByName:        d.createdByName        || "",
       });
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
@@ -398,218 +373,15 @@ export default function CrewMemberPage() {
     if (!member?.email) return;
     setSendingForm(true);
     try {
-      // Create the form document and generate the real URL + PIN
-      const pin = String(Math.floor(1000 + Math.random() * 9000));
-      const expires = new Date();
-      expires.setDate(expires.getDate() + 14);
-      const formRef = await addDoc(collection(db, "forms"), {
-        type: "crew_onboarding",
-        pin,
-        status: "pending",
-        projectId,
-        projectName: projectName || "",
-        crewMemberId: memberId,
-        createdBy: userId,
-        createdByName: userName,
-        createdAt: Timestamp.now(),
-        expiresAt: Timestamp.fromDate(expires),
-        prefilled: {
-          firstName:    member.firstName  || "",
-          lastName1:    member.lastName1  || "",
-          lastName2:    member.lastName2  || "",
-          artisticName: member.artisticName || "",
-          email:        member.email      || "",
-          phone:        member.phone      || "",
-          role:         member.role       || "",
-          department:   member.department || "",
-          section:      member.section    || "technical",
-        },
-      });
-      const realFormUrl = `${window.location.origin}/form/${formRef.id}`;
-
-      const res = await fetch("/api/send-invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to:          member.email,
-          firstName:   member.firstName || member.name || "",
-          projectName: projectName || "la producción",
-          role:        member.role || "",
-          formUrl:     realFormUrl,
-          pin,
-          senderName:  userName || "El equipo de producción",
-          memberId,
-        }),
-      });
-      if (!res.ok) {
-        const { error } = await res.json();
-        throw new Error(error || "Error al enviar el email");
-      }
       await updateDoc(doc(db, `projects/${projectId}/crew`, memberId), {
         formSentAt: Timestamp.now(), formSentBy: userId, formSentByName: userName,
       });
-      // Log
-      try {
-        await addDoc(collection(db, `projects/${projectId}/logs`), {
-          type: "form_created",
-          actorName: userName || "Equipo",
-          targetName: `${member.firstName || ""} ${member.lastName1 || ""}`.trim() || member.name || "",
-          targetEmail: member.email || "",
-          createdAt: Timestamp.now(),
-        });
-      } catch (_) {}
       setMember({ ...member, formSentAt: new Date(), formSentBy: userId });
       setFormSent(true);
       setTimeout(() => setFormSent(false), 3000);
       setShowFormModal(false);
     } catch (e) { console.error(e); }
     finally { setSendingForm(false); }
-  };
-
-  // ── Submit for approval ───────────────────────────────────────────────────────
-  const submitForApproval = async () => {
-    if (!member) return;
-    setSubmittingApproval(true);
-    try {
-      await updateDoc(doc(db, `projects/${projectId}/crew`, memberId), {
-        approvalStatus: "pending_approval",
-        submittedForApprovalAt: Timestamp.now(),
-        submittedForApprovalBy: userId,
-        submittedForApprovalByName: userName,
-      });
-      setMember({ ...member, approvalStatus: "pending_approval" });
-    } catch (e) { console.error(e); }
-    finally { setSubmittingApproval(false); }
-  };
-
-  // ── Download PDF ficha ────────────────────────────────────────────────────────
-  const downloadPdf = async () => {
-    if (!member) return;
-    setExportingPdf(true);
-    try {
-      const { jsPDF } = await import("jspdf");
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const W = 210; const mL = 14; const mR = W - 14;
-
-      // Header bar
-      pdf.setFillColor(15, 23, 42);
-      pdf.rect(0, 0, W, 28, "F");
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(11);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("FICHA DE CREW", mL, 12);
-      pdf.setFontSize(8);
-      pdf.setFont("helvetica", "normal");
-      pdf.text(`Generado: ${new Date().toLocaleDateString("es-ES")}`, mL, 19);
-      pdf.setFontSize(9);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("FILMA WORKSPACE", mR, 12, { align: "right" });
-
-      // Name + role block
-      let y = 40;
-      pdf.setTextColor(15, 23, 42);
-      pdf.setFontSize(18);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(member.name, mL, y);
-      y += 7;
-      if (member.artisticName) {
-        pdf.setFontSize(10);
-        pdf.setFont("helvetica", "italic");
-        pdf.setTextColor(100, 116, 139);
-        pdf.text(`"${member.artisticName}"`, mL, y);
-        y += 6;
-      }
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(71, 85, 105);
-      pdf.text(`${member.role}${member.department ? ` · ${member.department}` : ""}`, mL, y);
-      y += 4;
-      if (member.crewNumber) {
-        pdf.setFontSize(9);
-        pdf.setTextColor(148, 163, 184);
-        pdf.text(`#${member.crewNumber}`, mL, y);
-      }
-
-      // Accent line
-      y += 8;
-      pdf.setDrawColor(107, 163, 25);
-      pdf.setLineWidth(0.8);
-      pdf.line(mL, y, mR, y);
-      y += 8;
-
-      const section = (title: string) => {
-        pdf.setFillColor(248, 250, 252);
-        pdf.rect(mL, y - 4, mR - mL, 7, "F");
-        pdf.setFontSize(8);
-        pdf.setFont("helvetica", "bold");
-        pdf.setTextColor(107, 163, 25);
-        pdf.text(title.toUpperCase(), mL + 2, y);
-        y += 6;
-      };
-
-      const row = (label: string, value: string, col2?: { label: string; value: string }) => {
-        const colW = col2 ? (mR - mL) / 2 - 2 : mR - mL;
-        pdf.setFontSize(7.5);
-        pdf.setFont("helvetica", "normal");
-        pdf.setTextColor(148, 163, 184);
-        pdf.text(label, mL, y);
-        if (col2) pdf.text(col2.label, mL + colW + 4, y);
-        y += 4;
-        pdf.setFontSize(9);
-        pdf.setFont("helvetica", "bold");
-        pdf.setTextColor(15, 23, 42);
-        pdf.text(value || "—", mL, y);
-        if (col2) pdf.text(col2.value || "—", mL + colW + 4, y);
-        y += 6;
-      };
-
-      // Contacto
-      section("Contacto");
-      row("Email", member.email || "—", { label: "Teléfono", value: member.phone || "—" });
-      if (member.address) row("Domicilio", member.address);
-      row("Municipio", member.municipality || "—", { label: "Código postal", value: member.postalCode || "—" });
-      y += 2;
-
-      // Personales
-      section("Datos personales");
-      row("DNI / NIE", member.dni ? "••••••••" : "—", { label: "Nº Seg. Social", value: member.socialSecurityNumber ? "••••••••" : "—" });
-      row("Fecha nacimiento", member.birthDate || "—", { label: "Nacionalidad", value: member.nationality || "—" });
-      if (member.birthPlace) row("Lugar nacimiento", member.birthPlace);
-      y += 2;
-
-      // Contrato
-      section("Contrato & Remuneración");
-      row("Fecha alta", member.startDate || "—", { label: "Baja aprox.", value: member.endDateApprox || "—" });
-      if (member.contractReason) row("Motivo contratación", member.contractReason);
-      if (member.salaryAmount) row("Salario bruto", `${new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(member.salaryAmount)} € / ${member.salaryType === "weekly" ? "semana" : "mes"}`);
-      if (member.salaryPerSession) row("Salario por sesión", `${new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(member.salaryPerSession)} €`, { label: "Sesiones", value: String(member.sessions || "—") });
-      row("Retención IRPF", member.irpfRate ? `${member.irpfRate}%` : "—", { label: "Régimen", value: member.regime || "—" });
-      y += 2;
-
-      // Notas
-      if (member.notes) {
-        section("Notas");
-        pdf.setFontSize(9);
-        pdf.setFont("helvetica", "normal");
-        pdf.setTextColor(71, 85, 105);
-        const lines = pdf.splitTextToSize(member.notes, mR - mL - 4);
-        pdf.text(lines, mL + 2, y);
-        y += lines.length * 5 + 4;
-      }
-
-      // Footer
-      const pageH = 297;
-      pdf.setFillColor(248, 250, 252);
-      pdf.rect(0, pageH - 14, W, 14, "F");
-      pdf.setFontSize(7.5);
-      pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(148, 163, 184);
-      pdf.text("Filma Workspace · Documento confidencial", mL, pageH - 5);
-      pdf.text(`Pág. 1`, mR, pageH - 5, { align: "right" });
-
-      pdf.save(`ficha_${member.name.replace(/\s+/g, "_").toLowerCase()}.pdf`);
-    } catch (e) { console.error(e); }
-    finally { setExportingPdf(false); }
   };
 
   const handleCopyLink = async () => {
@@ -664,7 +436,7 @@ export default function CrewMemberPage() {
 
       {/* ── Top bar ────────────────────────────────────────────────────────── */}
       <div className="mt-[53px]">
-        <div className="bg-white border-b border-slate-200 px-24 py-4">
+        <div className="bg-white border-b border-slate-200 px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-4">
           <div className="flex items-center justify-between">
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm">
@@ -684,7 +456,7 @@ export default function CrewMemberPage() {
             {/* Right */}
             <div className="flex items-center gap-2">
               {/* Completeness */}
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg">
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg">
                 <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden">
                   <div className="h-full rounded-full transition-all"
                     style={{ width: `${completeness}%`, backgroundColor: completeness >= 80 ? "#6BA319" : completeness >= 50 ? "#F59E0B" : "#EF4444" }} />
@@ -692,40 +464,12 @@ export default function CrewMemberPage() {
                 <span className="text-xs text-slate-500 font-medium">{completeness}% completado</span>
               </div>
 
-              {/* PDF download */}
-              <button onClick={downloadPdf} disabled={exportingPdf}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors">
-                {exportingPdf ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
-                <span className="inline">Ficha PDF</span>
-              </button>
-
-              {/* Approval status + send for approval */}
-              {member.approvalStatus && (() => {
-                const cfg = APPROVAL_CONFIG[member.approvalStatus];
-                return (
-                  <div className="flex items-center gap-2">
-                    <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium ${cfg.bg} ${cfg.text}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-                      {cfg.label}
-                    </span>
-                    {(member.approvalStatus === "draft" || member.approvalStatus === "rejected") && (
-                      <button onClick={submitForApproval} disabled={submittingApproval}
-                        className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-xl border text-white disabled:opacity-50 transition-colors"
-                        style={{ backgroundColor: "#6BA319", borderColor: "#6BA319" }}>
-                        {submittingApproval ? <RefreshCw size={13} className="animate-spin" /> : <Send size={13} />}
-                        <span className="inline">Enviar para aprobación</span>
-                      </button>
-                    )}
-                  </div>
-                );
-              })()}
-
               {/* Send form */}
               <button onClick={() => setShowFormModal(true)} disabled={!member.email}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 title={!member.email ? "Añade un email para enviar el formulario" : "Enviar formulario de alta"}>
                 {formSent ? <MailCheck size={14} className="text-[#6BA319]" /> : <Send size={14} />}
-                {formSent ? "Enviado" : <span className="inline">Enviar formulario</span>}
+                {formSent ? "Enviado" : "Enviar formulario"}
               </button>
 
               {/* Status dropdown */}
@@ -755,11 +499,11 @@ export default function CrewMemberPage() {
       </div>
 
       {/* ── Content ──────────────────────────────────────────────────────────── */}
-      <div className="px-24 py-8">
-        <div className="max-w-5xl mx-auto grid grid-cols-3 gap-6">
+      <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           {/* ── LEFT ────────────────────────────────────────────────────────── */}
-          <div className="col-span-1 flex flex-col gap-6">
+          <div className="lg:col-span-1 flex flex-col gap-6">
 
             {/* Identity card */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col items-center text-center">
@@ -880,7 +624,7 @@ export default function CrewMemberPage() {
           </div>
 
           {/* ── RIGHT ───────────────────────────────────────────────────────── */}
-          <div className="col-span-2 flex flex-col gap-6">
+          <div className="lg:col-span-2 flex flex-col gap-6">
 
             {/* Contacto */}
             <SectionCard title="Contacto" editing={isEdit("contact")} onEdit={() => startEdit("contact")}>

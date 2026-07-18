@@ -124,7 +124,6 @@ interface User {
   id: string;
   name: string;
   email: string;
-  phone?: string;
   role: string;
   projectCount: number;
   projects: UserProject[];
@@ -191,7 +190,7 @@ export default function AdminDashboard() {
   const [showAssignCompanyUser, setShowAssignCompanyUser] = useState<string | null>(null);
   const [companyUserSearch, setCompanyUserSearch] = useState("");
 
-  const [newProject, setNewProject] = useState({ name: "", description: "", phase: "Desarrollo", producers: [] as string[], customId: "", useCustomId: false, language: "es" });
+  const [newProject, setNewProject] = useState({ name: "", description: "", phase: "Desarrollo", producers: [] as string[], customId: "", useCustomId: false });
   const [newProducer, setNewProducer] = useState({ name: "" });
   const [assignUserForm, setAssignUserForm] = useState({ odId: "", role: "" });
 
@@ -201,29 +200,11 @@ export default function AdminDashboard() {
     title: "",
     content: "",
     type: "info" as "info" | "warning" | "success",
-    recipientMode: "all" as "all" | "projects" | "users",
+    sendToAll: true,
     selectedProjects: [] as string[],
-    selectedUsers: [] as string[],
     duration: "indefinite" as "24h" | "7d" | "30d" | "indefinite",
-    sendByEmail: false,
   });
-  const [emailConfirmStep, setEmailConfirmStep] = useState(false);
   const [projectSearchInMessage, setProjectSearchInMessage] = useState("");
-  const [userSearchInMessage, setUserSearchInMessage] = useState("");
-  const [messageTab, setMessageTab] = useState<"compose" | "history">("compose");
-
-  // Custom confirm dialog
-  const [confirmDialog, setConfirmDialog] = useState<{
-    title: string;
-    message: string;
-    confirmLabel?: string;
-    danger?: boolean;
-    onConfirm: () => void;
-  } | null>(null);
-
-  const showConfirmDialog = (title: string, message: string, onConfirm: () => void, options?: { confirmLabel?: string; danger?: boolean }) => {
-    setConfirmDialog({ title, message, onConfirm, danger: options?.danger ?? true, confirmLabel: options?.confirmLabel });
-  };
 
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -327,7 +308,6 @@ export default function AdminDashboard() {
             id: userDoc.id,
             name: data.name || data.email,
             email: data.email,
-            phone: data.phone || "",
             role: data.role || "user",
             projectCount: userProjectsSnap.size,
             projects: userProjects,
@@ -454,7 +434,6 @@ export default function AdminDashboard() {
         phase: newProject.phase,
         producers: newProject.producers,
         departments: DEFAULT_DEPARTMENTS.map(d => d.name),
-        language: newProject.language,
         createdAt: serverTimestamp(),
       });
 
@@ -468,7 +447,7 @@ export default function AdminDashboard() {
         });
       }
       
-      setNewProject({ name: "", description: "", phase: "Desarrollo", producers: [], customId: "", useCustomId: false, language: "es" });
+      setNewProject({ name: "", description: "", phase: "Desarrollo", producers: [], customId: "", useCustomId: false });
       setShowCreateProject(false);
       showToast("success", "Proyecto creado correctamente");
       await loadData();
@@ -493,7 +472,6 @@ export default function AdminDashboard() {
         description: newProject.description.trim(),
         phase: newProject.phase,
         producers: newProject.producers,
-        language: newProject.language,
       });
 
       // Sincronizar companyProjects
@@ -528,11 +506,7 @@ export default function AdminDashboard() {
   const handleDeleteProject = async (projectId: string) => {
     const project = projects.find((p) => p.id === projectId);
     if (!project) return;
-    showConfirmDialog(`Eliminar "${project.name}"`, "Esta acción eliminará el proyecto y todos sus miembros. No se puede deshacer.", () => _doDeleteProject(projectId));
-  };
-  const _doDeleteProject = async (projectId: string) => {
-    const project = projects.find((p) => p.id === projectId);
-    if (!project) return;
+    if (!confirm(`¿Eliminar "${project.name}"? Esta acción no se puede deshacer.`)) return;
     setSaving(true);
     try {
       // Eliminar miembros del proyecto y sus referencias en userProjects
@@ -551,7 +525,6 @@ export default function AdminDashboard() {
       await deleteDoc(doc(db, "projects", projectId));
       showToast("success", "Proyecto eliminado");
       setActiveMenu(null);
-      setConfirmDialog(null);
       await loadData();
     } catch (error) {
       console.error(error);
@@ -606,16 +579,11 @@ export default function AdminDashboard() {
       showToast("error", `"${producer.name}" tiene proyectos asignados`);
       return;
     }
-    showConfirmDialog(`Eliminar "${producer.name}"`, "Se eliminará la productora permanentemente.", () => _doDeleteProducer(producerId));
-  };
-  const _doDeleteProducer = async (producerId: string) => {
-    const producer = producers.find((p) => p.id === producerId);
-    if (!producer) return;
+    if (!confirm(`¿Eliminar "${producer.name}"?`)) return;
     setSaving(true);
     try {
       await deleteDoc(doc(db, "producers", producerId));
       showToast("success", "Productora eliminada");
-      setConfirmDialog(null);
       await loadData();
     } catch (error) {
       console.error(error);
@@ -669,15 +637,12 @@ export default function AdminDashboard() {
   };
 
   const handleRemoveUserFromProject = async (projectId: string, odId: string) => {
-    showConfirmDialog("Eliminar usuario del proyecto", "El usuario perderá acceso a este proyecto.", () => _doRemoveUserFromProject(projectId, odId));
-  };
-  const _doRemoveUserFromProject = async (projectId: string, odId: string) => {
+    if (!confirm("¿Eliminar este usuario del proyecto?")) return;
     setSaving(true);
     try {
       await deleteDoc(doc(db, `projects/${projectId}/members`, odId));
       await deleteDoc(doc(db, `userProjects/${odId}/projects/${projectId}`));
       showToast("success", "Usuario eliminado del proyecto");
-      setConfirmDialog(null);
       await loadData();
     } catch (error) {
       console.error(error);
@@ -689,22 +654,11 @@ export default function AdminDashboard() {
 
   const handleToggleUserRole = async (odId: string, currentRole: string) => {
     const newRole = currentRole === "admin" ? "user" : "admin";
-    const user = users.find(u => u.id === odId);
-    showConfirmDialog(
-      newRole === "admin" ? "Hacer administrador" : "Quitar administrador",
-      newRole === "admin"
-        ? `${user?.name} tendrá acceso completo al panel de administración.`
-        : `${user?.name} dejará de ser administrador.`,
-      () => _doToggleUserRole(odId, newRole),
-      { danger: newRole !== "admin", confirmLabel: newRole === "admin" ? "Hacer admin" : "Quitar admin" }
-    );
-  };
-  const _doToggleUserRole = async (odId: string, newRole: string) => {
+    if (!confirm(`¿Cambiar rol a ${newRole === "admin" ? "Administrador" : "Usuario"}?`)) return;
     setSaving(true);
     try {
       await updateDoc(doc(db, "users", odId), { role: newRole });
       showToast("success", "Rol actualizado");
-      setConfirmDialog(null);
       await loadData();
     } catch (error) {
       console.error(error);
@@ -731,15 +685,11 @@ export default function AdminDashboard() {
   };
 
   const handleRemoveCompanyUser = async (odId: string) => {
-    const user = users.find(u => u.id === odId);
-    showConfirmDialog("Quitar de productora", `${user?.name} dejará de tener acceso al panel de la productora.`, () => _doRemoveCompanyUser(odId));
-  };
-  const _doRemoveCompanyUser = async (odId: string) => {
+    if (!confirm("¿Quitar este usuario de la productora?")) return;
     setSaving(true);
     try {
       await updateDoc(doc(db, "users", odId), { companyId: null });
       showToast("success", "Usuario eliminado de productora");
-      setConfirmDialog(null);
       await loadData();
     } catch (error) {
       console.error(error);
@@ -755,12 +705,8 @@ export default function AdminDashboard() {
       showToast("error", "Título y mensaje son obligatorios");
       return;
     }
-    if (messageForm.recipientMode === "projects" && messageForm.selectedProjects.length === 0) {
+    if (!messageForm.sendToAll && messageForm.selectedProjects.length === 0) {
       showToast("error", "Selecciona al menos un proyecto");
-      return;
-    }
-    if (messageForm.recipientMode === "users" && messageForm.selectedUsers.length === 0) {
-      showToast("error", "Selecciona al menos un usuario");
       return;
     }
 
@@ -769,17 +715,19 @@ export default function AdminDashboard() {
       // Determine which users to send to
       let targetUserIds: string[] = [];
 
-      if (messageForm.recipientMode === "all") {
+      if (messageForm.sendToAll) {
+        // All users
         targetUserIds = users.map((u) => u.id);
-      } else if (messageForm.recipientMode === "projects") {
+      } else {
+        // Users from selected projects
         const selectedProjectsData = projects.filter((p) => messageForm.selectedProjects.includes(p.id));
         const userIdSet = new Set<string>();
         selectedProjectsData.forEach((project) => {
-          project.members?.forEach((member) => { userIdSet.add(member.odId); });
+          project.members?.forEach((member) => {
+            userIdSet.add(member.odId);
+          });
         });
         targetUserIds = Array.from(userIdSet);
-      } else {
-        targetUserIds = messageForm.selectedUsers;
       }
 
       // Calculate expiration
@@ -800,7 +748,7 @@ export default function AdminDashboard() {
         sentBy: contextUser?.uid,
         sentByName: contextUser?.name || contextUser?.email || "Admin",
         read: false,
-        targetProjects: messageForm.recipientMode === "projects" ? messageForm.selectedProjects : null,
+        targetProjects: messageForm.sendToAll ? null : messageForm.selectedProjects,
         expiresAt: expiresAt ? Timestamp.fromDate(expiresAt) : null,
       };
 
@@ -810,32 +758,18 @@ export default function AdminDashboard() {
         await setDoc(messageRef, messageData);
       }
 
-      // Fire-and-forget email broadcast if requested
-      if (messageForm.sendByEmail) {
-        const emails = targetUserIds.map((id) => users.find((u) => u.id === id)?.email).filter(Boolean) as string[];
-        fetch("/api/send-broadcast", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ to: emails, title: messageForm.title.trim(), content: messageForm.content.trim(), type: messageForm.type }),
-        }).catch(console.error);
-      }
-
       // Reset form and close modal
-      setEmailConfirmStep(false);
       setMessageForm({
         title: "",
         content: "",
         type: "info",
-        recipientMode: "all",
+        sendToAll: true,
         selectedProjects: [],
-        selectedUsers: [],
         duration: "indefinite",
-        sendByEmail: false,
       });
       setProjectSearchInMessage("");
-      setUserSearchInMessage("");
       setShowMessageModal(false);
-      showToast("success", `Mensaje enviado a ${targetUserIds.length} usuario${targetUserIds.length !== 1 ? "s" : ""}${messageForm.sendByEmail ? " (+ email)" : ""}`);
+      showToast("success", `Mensaje enviado a ${targetUserIds.length} usuario${targetUserIds.length !== 1 ? "s" : ""}`);
       await loadData();
     } catch (error) {
       console.error(error);
@@ -847,9 +781,7 @@ export default function AdminDashboard() {
 
   // Delete message from all users
   const handleDeleteMessage = async (messageTitle: string, messageSentAt: Timestamp) => {
-    showConfirmDialog("Eliminar mensaje", "Se eliminará de todos los usuarios que lo hayan recibido.", () => _doDeleteMessage(messageTitle, messageSentAt));
-  };
-  const _doDeleteMessage = async (messageTitle: string, messageSentAt: Timestamp) => {
+    if (!confirm("¿Eliminar este mensaje de todos los usuarios?")) return;
     
     setSaving(true);
     try {
@@ -865,7 +797,6 @@ export default function AdminDashboard() {
         }
       }
       showToast("success", `Mensaje eliminado de ${deletedCount} usuario${deletedCount !== 1 ? "s" : ""}`);
-      setConfirmDialog(null);
       await loadData();
     } catch (error) {
       console.error(error);
@@ -878,11 +809,10 @@ export default function AdminDashboard() {
 
   // Export users to CSV
   const handleExportUsersCSV = () => {
-    const header = ["Nombre", "Email", "Teléfono", "Rol", "Nº proyectos", "Proyectos"];
+    const header = ["Nombre", "Email", "Rol", "Nº proyectos", "Proyectos"];
     const rows = filteredUsers.map((u) => [
       u.name,
       u.email,
-      u.phone || "",
       u.role === "admin" ? "Administrador" : "Usuario",
       String(u.projectCount),
       u.projects.map((p) => p.name).join(" | "),
@@ -911,33 +841,9 @@ export default function AdminDashboard() {
     }));
   };
 
-  const toggleUserInMessage = (userId: string) => {
-    setMessageForm((prev) => ({
-      ...prev,
-      selectedUsers: prev.selectedUsers.includes(userId)
-        ? prev.selectedUsers.filter((id) => id !== userId)
-        : [...prev.selectedUsers, userId],
-    }));
-  };
-
   const filteredProjectsForMessage = projects.filter((p) =>
     p.name.toLowerCase().includes(projectSearchInMessage.toLowerCase())
   );
-
-  const filteredUsersForMessage = users.filter((u) =>
-    u.name.toLowerCase().includes(userSearchInMessage.toLowerCase()) ||
-    u.email.toLowerCase().includes(userSearchInMessage.toLowerCase())
-  );
-
-  const recipientCount = (() => {
-    if (messageForm.recipientMode === "all") return users.length;
-    if (messageForm.recipientMode === "users") return messageForm.selectedUsers.length;
-    const userIdSet = new Set<string>();
-    projects.filter((p) => messageForm.selectedProjects.includes(p.id)).forEach((project) => {
-      project.members?.forEach((member) => userIdSet.add(member.odId));
-    });
-    return userIdSet.size;
-  })();
 
   const filteredProjects = projects.filter((p) => {
     const matchesSearch = p.name.toLowerCase().includes(projectSearch.toLowerCase());
@@ -986,12 +892,12 @@ export default function AdminDashboard() {
 
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 pt-10 pb-6">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
           <h1 className="text-3xl font-bold text-slate-900 text-center">Administración</h1>
         </div>
       </div>
 
-      <main className="px-24 py-6">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
         {/* Stats row - minimal */}
         <div className="flex flex-wrap items-center justify-center gap-6 mb-8 text-sm">
           <div className="flex items-center gap-2">
@@ -1014,7 +920,7 @@ export default function AdminDashboard() {
 
         {/* Toolbar con tabs y acciones */}
         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6">
-          <div className="flex flex-row gap-4 items-center justify-between">
+          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
             {/* Tabs */}
             <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1">
               {[
@@ -1069,9 +975,9 @@ export default function AdminDashboard() {
         {activeTab === "projects" && (
           <div>
             {/* Toolbar */}
-            <div className="flex flex-row gap-3 items-center justify-between mb-6">
-              <div className="flex flex-row gap-3 flex-1 w-auto">
-                <div className="relative flex-1 max-w-xs">
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between mb-6">
+              <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full sm:w-auto">
+                <div className="relative flex-1 sm:max-w-xs">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
@@ -1133,7 +1039,8 @@ export default function AdminDashboard() {
                 <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <FolderOpen size={28} className="text-slate-400" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-6">No hay proyectos</h3>
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">No hay proyectos</h3>
+                <p className="text-slate-500 text-sm mb-6">Crea tu primer proyecto para empezar</p>
                 <button
                   onClick={() => setShowCreateProject(true)}
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
@@ -1143,7 +1050,7 @@ export default function AdminDashboard() {
                 </button>
               </div>
             ) : (
-              <div className="grid gap-4 grid-cols-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {filteredProjects.map((project) => {
                   const phase = phaseConfig[project.phase] || phaseConfig["Desarrollo"];
                   return (
@@ -1172,9 +1079,6 @@ export default function AdminDashboard() {
                                     description: project.description || "",
                                     phase: project.phase,
                                     producers: project.producers || [],
-                                    customId: "",
-                                    useCustomId: false,
-                                    language: (project as any).language || "es",
                                   });
                                   setShowEditProject(project.id);
                                   setActiveMenu(null);
@@ -1261,8 +1165,8 @@ export default function AdminDashboard() {
         {activeTab === "users" && (
           <div className="space-y-6">
             {/* Toolbar */}
-            <div className="flex flex-row gap-3 items-center mb-6">
-              <div className="relative flex-1 max-w-xs">
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center mb-6">
+              <div className="relative flex-1 sm:max-w-xs">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
@@ -1325,7 +1229,8 @@ export default function AdminDashboard() {
             {filteredUsers.length === 0 ? (
               <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
                 <Users size={28} className="text-slate-300 mx-auto mb-3" />
-                <h3 className="font-semibold text-slate-900">No hay usuarios</h3>
+                <h3 className="font-semibold text-slate-900 mb-1">No hay usuarios</h3>
+                <p className="text-slate-500 text-sm">No se encontraron usuarios con los filtros actuales</p>
               </div>
             ) : (
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
@@ -1349,7 +1254,6 @@ export default function AdminDashboard() {
                             )}
                           </div>
                           <p className="text-xs text-slate-500">{user.email}</p>
-                          {user.phone && <p className="text-xs text-slate-400">{user.phone}</p>}
                         </div>
                       </div>
 
@@ -1393,8 +1297,8 @@ export default function AdminDashboard() {
         {activeTab === "producers" && (
           <div>
             {/* Toolbar */}
-            <div className="flex flex-row gap-3 items-center justify-between mb-6">
-              <div className="relative flex-1 max-w-xs">
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between mb-6">
+              <div className="relative flex-1 sm:max-w-xs">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
@@ -1417,7 +1321,8 @@ export default function AdminDashboard() {
             {filteredProducers.length === 0 ? (
               <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
                 <Building2 size={28} className="text-slate-300 mx-auto mb-3" />
-                <h3 className="font-semibold text-slate-900 mb-4">No hay productoras</h3>
+                <h3 className="font-semibold text-slate-900 mb-1">No hay productoras</h3>
+                <p className="text-slate-500 text-sm mb-4">Crea tu primera productora</p>
                 <button
                   onClick={() => setShowCreateProducer(true)}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
@@ -1531,7 +1436,8 @@ export default function AdminDashboard() {
             {activeMessages.length === 0 ? (
               <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
                 <Bell size={28} className="text-slate-300 mx-auto mb-3" />
-                <h3 className="font-semibold text-slate-900 mb-4">No hay mensajes activos</h3>
+                <h3 className="font-semibold text-slate-900 mb-1">No hay mensajes activos</h3>
+                <p className="text-slate-500 text-sm mb-4">Envía un mensaje a los usuarios</p>
                 <button
                   onClick={() => setShowMessageModal(true)}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
@@ -1617,293 +1523,198 @@ export default function AdminDashboard() {
       {/* ==================== MODALS ==================== */}
 
       {/* Create/Edit Project Modal */}
-      {(showCreateProject || showEditProject) && (() => {
-        const isEdit = !!showEditProject;
-        const phase = phaseConfig[newProject.phase] || phaseConfig["Desarrollo"];
-        const LANGUAGES = [
-          { code: "es", flag: "🇪🇸", label: "Español", available: true },
-          { code: "en", flag: "🇬🇧", label: "English",  available: false },
-          { code: "fr", flag: "🇫🇷", label: "Français", available: false },
-          { code: "de", flag: "🇩🇪", label: "Deutsch",  available: false },
-          { code: "pt", flag: "🇵🇹", label: "Português", available: false },
-        ];
-        const closeModal = () => {
-          setShowCreateProject(false);
-          setShowEditProject(null);
-          setNewProject({ name: "", description: "", phase: "Desarrollo", producers: [], customId: "", useCustomId: false, language: "es" });
-          setProducerModalSearch("");
-        };
-        return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-flex flex-col">
-
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center">
-                  <FolderPlus size={16} className="text-slate-700" />
-                </div>
-                <div>
-                  <h3 className="text-base font-semibold text-slate-900">{isEdit ? "Editar proyecto" : "Nuevo proyecto"}</h3>
-                </div>
-              </div>
-              <button onClick={closeModal} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
-                <X size={18} />
+      {(showCreateProject || showEditProject) && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+              <h3 className="text-lg font-semibold text-slate-900">
+                {showEditProject ? "Editar proyecto" : "Nuevo proyecto"}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowCreateProject(false);
+                  setShowEditProject(null);
+                  setNewProject({ name: "", description: "", phase: "Desarrollo", producers: [], customId: "", useCustomId: false });
+                  setProducerModalSearch("");
+                }}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
+              >
+                <X size={20} />
               </button>
             </div>
 
-            {/* Body — two columns */}
-            <div className="flex-1 overflow-flex">
+            <div className="p-6 space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Nombre *</label>
+                <input
+                  type="text"
+                  value={newProject.name}
+                  onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
+                  placeholder="Nombre del proyecto"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
+                />
+              </div>
 
-              {/* ── Left: form ── */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-5">
-
-                {/* Name */}
+              {/* ID del proyecto — solo en creación */}
+              {!showEditProject && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Nombre del proyecto *</label>
-                  <input
-                    type="text"
-                    value={newProject.name}
-                    onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                    placeholder="Nombre del proyecto"
-                    autoFocus
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
-                  />
-                </div>
-
-                {/* Custom ID — creation only */}
-                {!isEdit && (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">ID del proyecto</label>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-400">{newProject.useCustomId ? "Personalizado" : "Automático"}</span>
-                        <button
-                          type="button"
-                          onClick={() => setNewProject({ ...newProject, useCustomId: !newProject.useCustomId, customId: "" })}
-                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${newProject.useCustomId ? "bg-slate-900" : "bg-slate-200"}`}
-                        >
-                          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${newProject.useCustomId ? "translate-x-[18px]" : "translate-x-[3px]"}`} />
-                        </button>
-                      </div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-slate-700">ID del proyecto</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500">{newProject.useCustomId ? "Personalizado" : "Automático"}</span>
+                      <button
+                        type="button"
+                        onClick={() => setNewProject({ ...newProject, useCustomId: !newProject.useCustomId, customId: "" })}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${newProject.useCustomId ? "bg-slate-900" : "bg-slate-200"}`}
+                      >
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${newProject.useCustomId ? "translate-x-[18px]" : "translate-x-[3px]"}`} />
+                      </button>
                     </div>
-                    {newProject.useCustomId ? (
-                      <div>
-                        <input
-                          type="text"
-                          value={newProject.customId}
-                          onChange={(e) => setNewProject({ ...newProject, customId: e.target.value.replace(/[^a-zA-Z0-9_-]/g, "") })}
-                          placeholder="nombre-del-proyecto"
-                          className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm font-mono"
-                        />
-                        {newProject.customId && (
-                          <p className="mt-1.5 text-xs text-slate-400">
-                            URL: <span className="font-mono text-slate-600">/project/{newProject.customId}</span>
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl">
-                        <Hash size={13} className="text-slate-400" />
-                        <p className="text-xs text-slate-500">Se generará un código de 6 caracteres automáticamente</p>
-                      </div>
-                    )}
                   </div>
-                )}
-
-                {/* Description */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Descripción</label>
-                  <textarea
-                    value={newProject.description}
-                    onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
-                    placeholder="Sinopsis o notas del proyecto"
-                    rows={3}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm resize-none"
-                  />
+                  {newProject.useCustomId ? (
+                    <div>
+                      <input
+                        type="text"
+                        value={newProject.customId}
+                        onChange={(e) => setNewProject({ ...newProject, customId: e.target.value.replace(/[^a-zA-Z0-9_-]/g, "") })}
+                        placeholder="ej: mi-proyecto-2025"
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm font-mono"
+                      />
+                      {newProject.customId && (
+                        <p className="mt-1.5 text-xs text-slate-400">
+                          URL: <span className="font-mono text-slate-600">/project/{newProject.customId}</span>
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 px-1">Se generará un código aleatorio de 6 caracteres. Puedes activar el toggle para definirlo tú.</p>
+                  )}
                 </div>
+              )}
 
-                {/* Phase */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Fase de producción</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {PHASES.map((p) => {
-                      const cfg = phaseConfig[p];
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Descripción</label>
+                <textarea
+                  value={newProject.description}
+                  onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+                  placeholder="Descripción del proyecto"
+                  rows={3}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm resize-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Fase</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {PHASES.map((phase) => {
+                    const config = phaseConfig[phase];
+                    return (
+                      <button
+                        key={phase}
+                        onClick={() => setNewProject({ ...newProject, phase })}
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                          newProject.phase === phase
+                            ? `${config.bg} ${config.text} ${config.border}`
+                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className={`w-2 h-2 rounded-full ${config.dot}`} />
+                        {phase}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Productoras */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Productoras</label>
+
+                {newProject.producers.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {newProject.producers.map((prodId) => {
+                      const prod = producers.find((p) => p.id === prodId);
+                      if (!prod) return null;
                       return (
-                        <button
-                          key={p}
-                          onClick={() => setNewProject({ ...newProject, phase: p })}
-                          className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                            newProject.phase === p ? `${cfg.bg} ${cfg.text} ${cfg.border}` : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                          }`}
+                        <span
+                          key={prodId}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-sm"
                         >
-                          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
-                          {p}
-                        </button>
+                          <Building2 size={14} />
+                          {prod.name}
+                          <button
+                            onClick={() =>
+                              setNewProject({
+                                ...newProject,
+                                producers: newProject.producers.filter((id) => id !== prodId),
+                              })
+                            }
+                            className="ml-1 text-amber-500 hover:text-amber-700"
+                          >
+                            <X size={14} />
+                          </button>
+                        </span>
                       );
                     })}
                   </div>
+                )}
+
+                <div className="relative">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={producerModalSearch}
+                    onChange={(e) => setProducerModalSearch(e.target.value)}
+                    placeholder="Buscar productora"
+                    className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none text-sm"
+                  />
                 </div>
 
-                {/* Language */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Idioma de la plataforma</label>
-                  <div className="grid grid-cols-5 gap-2">
-                    {LANGUAGES.map((lang) => (
-                      <button
-                        key={lang.code}
-                        type="button"
-                        disabled={!lang.available}
-                        onClick={() => lang.available && setNewProject({ ...newProject, language: lang.code })}
-                        className={`relative flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-xl border text-xs font-medium transition-all
-                          ${!lang.available ? "opacity-40 cursor-not-allowed border-slate-100 bg-slate-50" :
-                            newProject.language === lang.code
-                              ? "bg-slate-900 border-slate-900 text-white"
-                              : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                          }`}
-                      >
-                        <span className="text-xl leading-none">{lang.flag}</span>
-                        <span className="text-[10px]">{lang.label}</span>
-                        {!lang.available && (
-                          <span className="absolute -top-1.5 -right-1 text-[8px] bg-slate-300 text-slate-600 px-1 py-0.5 rounded font-semibold leading-none">
-                            Soon
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Producers */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Productoras</label>
-                  {newProject.producers.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {newProject.producers.map((prodId) => {
-                        const prod = producers.find((p) => p.id === prodId);
-                        if (!prod) return null;
-                        return (
-                          <span key={prodId} className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium">
-                            <Building2 size={11} />
-                            {prod.name}
-                            <button onClick={() => setNewProject({ ...newProject, producers: newProject.producers.filter((id) => id !== prodId) })} className="hover:text-slate-300 ml-0.5">
-                              <X size={11} />
-                            </button>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                  <div className="relative">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      value={producerModalSearch}
-                      onChange={(e) => setProducerModalSearch(e.target.value)}
-                      placeholder="Buscar y añadir productora"
-                      className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none text-sm"
-                    />
-                  </div>
-                  {producerModalSearch.length >= 1 && (
-                    <div className="mt-2 border border-slate-200 rounded-xl max-h-36 overflow-y-auto">
-                      {producers.filter((p) => p.name.toLowerCase().includes(producerModalSearch.toLowerCase()) && !newProject.producers.includes(p.id)).slice(0, 6).map((producer) => (
+                {producerModalSearch.length >= 2 && (
+                  <div className="mt-2 border border-slate-200 rounded-xl max-h-40 overflow-y-auto">
+                    {producers
+                      .filter(
+                        (p) =>
+                          p.name.toLowerCase().includes(producerModalSearch.toLowerCase()) &&
+                          !newProject.producers.includes(p.id)
+                      )
+                      .slice(0, 5)
+                      .map((producer) => (
                         <button
                           key={producer.id}
-                          onClick={() => { setNewProject({ ...newProject, producers: [...newProject.producers, producer.id] }); setProducerModalSearch(""); }}
+                          onClick={() => {
+                            setNewProject({ ...newProject, producers: [...newProject.producers, producer.id] });
+                            setProducerModalSearch("");
+                          }}
                           className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 flex items-center gap-2 border-b border-slate-100 last:border-b-0"
                         >
-                          <Building2 size={13} className="text-slate-400" />
-                          <span className="text-slate-700 flex-1">{producer.name}</span>
-                          <span className="text-xs text-slate-400">{producer.projectCount} proyectos</span>
+                          <Building2 size={14} className="text-amber-600" />
+                          <span className="text-slate-700">{producer.name}</span>
+                          <span className="text-xs text-slate-400 ml-auto">{producer.projectCount} proyectos</span>
                         </button>
                       ))}
-                      {producers.filter((p) => p.name.toLowerCase().includes(producerModalSearch.toLowerCase()) && !newProject.producers.includes(p.id)).length === 0 && (
-                        <div className="px-4 py-3 text-xs text-slate-500 text-center">Sin resultados</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* ── Right: summary card ── */}
-              <div className="w-64 flex-shrink-0 bg-slate-50 border-l border-slate-100 p-5 flex flex-col gap-4 overflow-y-auto">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Vista previa</p>
-
-                {/* Project card preview */}
-                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg ${phase.bg} ${phase.text}`}>
-                      {newProject.phase}
-                    </span>
-                    {newProject.language && (
-                      <span className="text-xs">{LANGUAGES.find(l => l.code === newProject.language)?.flag}</span>
+                    {producers.filter(
+                      (p) =>
+                        p.name.toLowerCase().includes(producerModalSearch.toLowerCase()) &&
+                        !newProject.producers.includes(p.id)
+                    ).length === 0 && (
+                      <div className="px-4 py-3 text-sm text-slate-500 text-center">No se encontraron productoras</div>
                     )}
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900 line-clamp-2 leading-snug">
-                      {newProject.name || <span className="text-slate-300 font-normal">Nombre del proyecto</span>}
-                    </p>
-                    {newProject.description && (
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">{newProject.description}</p>
-                    )}
-                  </div>
-                  {newProject.producers.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {newProject.producers.map((pid) => {
-                        const prod = producers.find(p => p.id === pid);
-                        return prod ? (
-                          <span key={pid} className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">{prod.name}</span>
-                        ) : null;
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* Config summary */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between py-2 border-b border-slate-200">
-                    <span className="text-xs text-slate-500">ID</span>
-                    <span className="text-xs font-mono text-slate-700">
-                      {newProject.useCustomId && newProject.customId ? newProject.customId : "auto"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between py-2 border-b border-slate-200">
-                    <span className="text-xs text-slate-500">Idioma</span>
-                    <span className="text-xs text-slate-700">
-                      {LANGUAGES.find(l => l.code === newProject.language)?.flag}{" "}
-                      {LANGUAGES.find(l => l.code === newProject.language)?.label}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between py-2 border-b border-slate-200">
-                    <span className="text-xs text-slate-500">Productoras</span>
-                    <span className="text-xs text-slate-700">{newProject.producers.length || "—"}</span>
-                  </div>
-                  <div className="flex items-center justify-between py-2">
-                    <span className="text-xs text-slate-500">Departamentos</span>
-                    <span className="text-xs text-slate-700">{DEFAULT_DEPARTMENTS.length} por defecto</span>
-                  </div>
-                </div>
+                )}
               </div>
-            </div>
 
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex-shrink-0 flex gap-3">
-              <button onClick={closeModal} className="px-5 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
-                Cancelar
-              </button>
               <button
-                onClick={isEdit ? handleEditProject : handleCreateProject}
+                onClick={showEditProject ? handleEditProject : handleCreateProject}
                 disabled={saving || !newProject.name.trim()}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <FolderPlus size={14} />
-                {saving ? "Guardando..." : isEdit ? "Guardar cambios" : "Crear proyecto"}
+                {saving ? "Guardando..." : showEditProject ? "Guardar cambios" : "Crear proyecto"}
               </button>
             </div>
           </div>
         </div>
-        );
-      })()}
+      )}
 
       {/* Create/Edit Producer Modal */}
       {(showCreateProducer || showEditProducer) && (
@@ -1936,7 +1747,7 @@ export default function AdminDashboard() {
                   type="text"
                   value={newProducer.name}
                   onChange={(e) => setNewProducer({ ...newProducer, name: e.target.value })}
-                  placeholder="Productora Films S.L."
+                  placeholder="Ej: Productora Films S.L."
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
                 />
               </div>
@@ -2075,7 +1886,7 @@ export default function AdminDashboard() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Rol en el proyecto *</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {PROJECT_ROLES.map((role) => (
                     <button
                       key={role}
@@ -2110,7 +1921,7 @@ export default function AdminDashboard() {
           if (!user) return null;
           return (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-flex flex-col">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col">
                 <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-slate-900">Detalles del usuario</h3>
                   <button
@@ -2188,397 +1999,283 @@ export default function AdminDashboard() {
         })()}
 
       {/* Send Message Modal */}
-      {showMessageModal && (() => {
-        const typeConfig = {
-          info: { icon: Info, accent: "#2F52E0", accentBg: "#EFF2FF", label: "Información", badgeBg: "bg-blue-50", badgeText: "text-blue-700", badgeBorder: "border-blue-200" },
-          warning: { icon: AlertTriangle, accent: "#D97706", accentBg: "#FEF3C7", label: "Aviso", badgeBg: "bg-amber-50", badgeText: "text-amber-700", badgeBorder: "border-amber-200" },
-          success: { icon: CheckCircle, accent: "#059669", accentBg: "#D1FAE5", label: "Actualización", badgeBg: "bg-emerald-50", badgeText: "text-emerald-700", badgeBorder: "border-emerald-200" },
-        }[messageForm.type];
-        const TypeIcon = typeConfig.icon;
-        const canSend = messageForm.title.trim() && messageForm.content.trim() &&
-          (messageForm.recipientMode === "all" ||
-          (messageForm.recipientMode === "projects" && messageForm.selectedProjects.length > 0) ||
-          (messageForm.recipientMode === "users" && messageForm.selectedUsers.length > 0));
-
-        return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-flex flex-col">
-
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+      {showMessageModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center">
-                  <MessageSquare size={16} className="text-slate-700" />
+                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <MessageSquare size={20} className="text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="text-base font-semibold text-slate-900">Nuevo mensaje</h3>
+                  <h3 className="text-lg font-semibold text-slate-900">Enviar mensaje</h3>
+                  <p className="text-xs text-slate-500">Notifica a los usuarios de la plataforma</p>
                 </div>
               </div>
               <button
                 onClick={() => {
                   setShowMessageModal(false);
-                  setEmailConfirmStep(false);
-                  setMessageForm({ title: "", content: "", type: "info", recipientMode: "all", selectedProjects: [], selectedUsers: [], duration: "indefinite", sendByEmail: false });
+                  setMessageForm({ title: "", content: "", type: "info", sendToAll: true, selectedProjects: [], duration: "indefinite" });
                   setProjectSearchInMessage("");
-                  setUserSearchInMessage("");
                 }}
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
               >
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
 
-            {/* Body — two columns */}
-            <div className="flex-1 overflow-flex">
-
-              {/* ── Left: compose ── */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-5 border-r border-slate-100">
-
-                {/* Type */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Tipo</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { value: "info", label: "Informativo", icon: Info, bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
-                      { value: "warning", label: "Aviso", icon: AlertTriangle, bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
-                      { value: "success", label: "Logro", icon: CheckCircle, bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
-                    ].map((t) => {
-                      const Icon = t.icon;
-                      return (
-                        <button
-                          key={t.value}
-                          onClick={() => setMessageForm({ ...messageForm, type: t.value as typeof messageForm.type })}
-                          className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                            messageForm.type === t.value ? `${t.bg} ${t.text} ${t.border}` : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                          }`}
-                        >
-                          <Icon size={14} />
-                          {t.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Title */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Título *</label>
-                  <input
-                    type="text"
-                    value={messageForm.title}
-                    onChange={(e) => setMessageForm({ ...messageForm, title: e.target.value })}
-                    placeholder="Nueva funcionalidad disponible"
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
-                  />
-                </div>
-
-                {/* Content */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Mensaje *</label>
-                  <textarea
-                    value={messageForm.content}
-                    onChange={(e) => setMessageForm({ ...messageForm, content: e.target.value })}
-                    placeholder="Escribe el contenido del mensaje"
-                    rows={4}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm resize-none"
-                  />
-                </div>
-
-                {/* Recipients */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Destinatarios</label>
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                    {[
-                      { mode: "all", label: "Todos", sublabel: `${users.length} usuarios`, icon: Users },
-                      { mode: "projects", label: "Por proyecto", sublabel: "Uno o varios", icon: Briefcase },
-                      { mode: "users", label: "Usuarios", sublabel: "Específicos", icon: UserPlus },
-                    ].map((opt) => {
-                      const Icon = opt.icon;
-                      const active = messageForm.recipientMode === opt.mode;
-                      return (
-                        <button
-                          key={opt.mode}
-                          onClick={() => setMessageForm({ ...messageForm, recipientMode: opt.mode as typeof messageForm.recipientMode, selectedProjects: [], selectedUsers: [] })}
-                          className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all ${active ? "bg-slate-900 border-slate-900 text-white" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
-                        >
-                          <Icon size={16} className={active ? "text-white" : "text-slate-400"} />
-                          <span className="text-xs font-semibold">{opt.label}</span>
-                          <span className={`text-[10px] ${active ? "text-slate-300" : "text-slate-400"}`}>{opt.sublabel}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Project picker */}
-                  {messageForm.recipientMode === "projects" && (
-                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                      <div className="relative">
-                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type="text"
-                          value={projectSearchInMessage}
-                          onChange={(e) => setProjectSearchInMessage(e.target.value)}
-                          placeholder="Buscar proyecto"
-                          className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 outline-none text-xs"
-                        />
-                      </div>
-                      {messageForm.selectedProjects.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {messageForm.selectedProjects.map((pid) => {
-                            const p = projects.find((x) => x.id === pid);
-                            return p ? (
-                              <span key={pid} className="inline-flex items-center gap-1 px-2 py-1 bg-slate-900 text-white rounded-lg text-xs">
-                                {p.name}
-                                <button onClick={() => toggleProjectInMessage(pid)} className="hover:text-slate-300"><X size={10} /></button>
-                              </span>
-                            ) : null;
-                          })}
-                        </div>
-                      )}
-                      <div className="max-h-36 overflow-y-auto space-y-0.5">
-                        {filteredProjectsForMessage.map((p) => {
-                          const sel = messageForm.selectedProjects.includes(p.id);
-                          return (
-                            <button
-                              key={p.id}
-                              onClick={() => toggleProjectInMessage(p.id)}
-                              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-xs transition-colors ${sel ? "bg-slate-900 text-white" : "hover:bg-slate-100 text-slate-700"}`}
-                            >
-                              {sel ? <CheckSquare size={12} /> : <Square size={12} className="text-slate-400" />}
-                              <span className="flex-1 truncate font-medium">{p.name}</span>
-                              <span className={sel ? "text-slate-300" : "text-slate-400"}>{p.memberCount}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* User picker */}
-                  {messageForm.recipientMode === "users" && (
-                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                      <div className="relative">
-                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type="text"
-                          value={userSearchInMessage}
-                          onChange={(e) => setUserSearchInMessage(e.target.value)}
-                          placeholder="Buscar usuario"
-                          className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 outline-none text-xs"
-                        />
-                      </div>
-                      {messageForm.selectedUsers.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {messageForm.selectedUsers.map((uid) => {
-                            const u = users.find((x) => x.id === uid);
-                            return u ? (
-                              <span key={uid} className="inline-flex items-center gap-1 px-2 py-1 bg-slate-900 text-white rounded-lg text-xs">
-                                {u.name}
-                                <button onClick={() => toggleUserInMessage(uid)} className="hover:text-slate-300"><X size={10} /></button>
-                              </span>
-                            ) : null;
-                          })}
-                        </div>
-                      )}
-                      <div className="max-h-36 overflow-y-auto space-y-0.5">
-                        {filteredUsersForMessage.map((u) => {
-                          const sel = messageForm.selectedUsers.includes(u.id);
-                          return (
-                            <button
-                              key={u.id}
-                              onClick={() => toggleUserInMessage(u.id)}
-                              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-xs transition-colors ${sel ? "bg-slate-900 text-white" : "hover:bg-slate-100 text-slate-700"}`}
-                            >
-                              {sel ? <CheckSquare size={12} /> : <Square size={12} className="text-slate-400" />}
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium truncate">{u.name}</p>
-                                <p className={`truncate ${sel ? "text-slate-300" : "text-slate-400"}`}>{u.email}</p>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Duration */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Visibilidad</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[
-                      { value: "24h", label: "24h" },
-                      { value: "7d", label: "7 días" },
-                      { value: "30d", label: "30 días" },
-                      { value: "indefinite", label: "Siempre" },
-                    ].map((opt) => (
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {/* Message Type */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de mensaje</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: "info", label: "Informativo", icon: Info, bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
+                    { value: "warning", label: "Aviso", icon: AlertTriangle, bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
+                    { value: "success", label: "Éxito", icon: CheckCircle, bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
+                  ].map((type) => {
+                    const Icon = type.icon;
+                    return (
                       <button
-                        key={opt.value}
-                        onClick={() => setMessageForm({ ...messageForm, duration: opt.value as typeof messageForm.duration })}
-                        className={`py-2 rounded-xl border text-xs font-medium transition-all ${
-                          messageForm.duration === opt.value ? "bg-slate-900 text-white border-slate-900" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                        key={type.value}
+                        onClick={() => setMessageForm({ ...messageForm, type: type.value as typeof messageForm.type })}
+                        className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium ${
+                          messageForm.type === type.value
+                            ? `${type.bg} ${type.text} ${type.border}`
+                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                         }`}
                       >
-                        {opt.label}
+                        <Icon size={14} />
+                        {type.label}
                       </button>
-                    ))}
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1.5">
-                    {messageForm.duration === "indefinite" ? "El mensaje no expira automáticamente" : `Se elimina automáticamente tras ${messageForm.duration === "24h" ? "24 horas" : messageForm.duration === "7d" ? "7 días" : "30 días"}`}
-                  </p>
-                </div>
-
-                {/* Email toggle */}
-                <div className={`flex items-center justify-between p-4 rounded-xl border transition-colors ${messageForm.sendByEmail ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-white"}`}>
-                  <div className="flex items-center gap-3">
-                    <Mail size={15} className={messageForm.sendByEmail ? "text-amber-600" : "text-slate-400"} />
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">Enviar por email</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => { setMessageForm({ ...messageForm, sendByEmail: !messageForm.sendByEmail }); setEmailConfirmStep(false); }}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${messageForm.sendByEmail ? "bg-amber-500" : "bg-slate-200"}`}
-                  >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${messageForm.sendByEmail ? "translate-x-6" : "translate-x-1"}`} />
-                  </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* ── Right: preview ── */}
-              <div className="w-72 flex-shrink-0 bg-slate-50 p-5 flex flex-col gap-4 overflow-y-auto">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Vista previa</p>
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Título *</label>
+                <input
+                  type="text"
+                  value={messageForm.title}
+                  onChange={(e) => setMessageForm({ ...messageForm, title: e.target.value })}
+                  placeholder="Ej: Actualización importante"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
+                />
+              </div>
 
-                {/* Notification bell preview */}
-                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                  <div className="px-3 py-2 border-b border-slate-100 flex items-center gap-2">
-                    <Bell size={12} className="text-slate-400" />
-                    <span className="text-[10px] text-slate-400 font-medium">Notificación en plataforma</span>
+              {/* Content */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Mensaje *</label>
+                <textarea
+                  value={messageForm.content}
+                  onChange={(e) => setMessageForm({ ...messageForm, content: e.target.value })}
+                  placeholder="Escribe el contenido del mensaje"
+                  rows={4}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm resize-none"
+                />
+              </div>
+
+              {/* Recipients */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-3">Destinatarios</label>
+                
+                {/* Send to all toggle */}
+                <div className="space-y-3">
+                  <button
+                    onClick={() => setMessageForm({ ...messageForm, sendToAll: true, selectedProjects: [] })}
+                    className={`w-full flex items-center gap-3 p-4 rounded-xl border text-left ${
+                      messageForm.sendToAll
+                        ? "bg-slate-900 border-slate-900 text-white"
+                        : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                      messageForm.sendToAll ? "border-white" : "border-slate-300"
+                    }`}>
+                      {messageForm.sendToAll && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">Todos los usuarios</p>
+                      <p className={`text-xs ${messageForm.sendToAll ? "text-slate-300" : "text-slate-500"}`}>
+                        Enviar a los {users.length} usuarios registrados
+                      </p>
+                    </div>
+                    <Users size={18} className={messageForm.sendToAll ? "text-white" : "text-slate-400"} />
+                  </button>
+
+                  <button
+                    onClick={() => setMessageForm({ ...messageForm, sendToAll: false })}
+                    className={`w-full flex items-center gap-3 p-4 rounded-xl border text-left ${
+                      !messageForm.sendToAll
+                        ? "bg-slate-900 border-slate-900 text-white"
+                        : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                      !messageForm.sendToAll ? "border-white" : "border-slate-300"
+                    }`}>
+                      {!messageForm.sendToAll && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">Usuarios de proyectos específicos</p>
+                      <p className={`text-xs ${!messageForm.sendToAll ? "text-slate-300" : "text-slate-500"}`}>
+                        Selecciona uno o más proyectos
+                      </p>
+                    </div>
+                    <Briefcase size={18} className={!messageForm.sendToAll ? "text-white" : "text-slate-400"} />
+                  </button>
+                </div>
+
+                {/* Project selection */}
+                {!messageForm.sendToAll && (
+                  <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <div className="relative mb-3">
+                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={projectSearchInMessage}
+                        onChange={(e) => setProjectSearchInMessage(e.target.value)}
+                        placeholder="Buscar proyectos"
+                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none text-sm"
+                      />
+                    </div>
+
+                    {/* Selected projects */}
+                    {messageForm.selectedProjects.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {messageForm.selectedProjects.map((projectId) => {
+                          const project = projects.find((p) => p.id === projectId);
+                          if (!project) return null;
+                          return (
+                            <span
+                              key={projectId}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-sm"
+                            >
+                              <Briefcase size={12} />
+                              {project.name}
+                              <button
+                                onClick={() => toggleProjectInMessage(projectId)}
+                                className="ml-1 text-blue-500 hover:text-blue-700"
+                              >
+                                <X size={14} />
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Project list */}
+                    <div className="max-h-48 overflow-y-auto space-y-1">
+                      {filteredProjectsForMessage.map((project) => {
+                        const isSelected = messageForm.selectedProjects.includes(project.id);
+                        return (
+                          <button
+                            key={project.id}
+                            onClick={() => toggleProjectInMessage(project.id)}
+                            className={`w-full flex items-center gap-3 p-3 rounded-xl text-left text-sm ${
+                              isSelected
+                                ? "bg-blue-50 border border-blue-200"
+                                : "bg-white border border-slate-200 hover:bg-slate-50"
+                            }`}
+                          >
+                            {isSelected ? (
+                              <CheckSquare size={16} className="text-blue-600" />
+                            ) : (
+                              <Square size={16} className="text-slate-400" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className={`font-medium truncate ${isSelected ? "text-blue-900" : "text-slate-900"}`}>
+                                {project.name}
+                              </p>
+                              <p className={`text-xs ${isSelected ? "text-blue-600" : "text-slate-500"}`}>
+                                {project.memberCount} miembro{project.memberCount !== 1 ? "s" : ""}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                      {filteredProjectsForMessage.length === 0 && (
+                        <p className="text-sm text-slate-500 text-center py-4">No se encontraron proyectos</p>
+                      )}
+                    </div>
+
+                    {/* Summary */}
+                    {messageForm.selectedProjects.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-slate-200">
+                        <p className="text-xs text-slate-600">
+                          Se enviará a{" "}
+                          <span className="font-semibold">
+                            {(() => {
+                              const userIdSet = new Set<string>();
+                              projects
+                                .filter((p) => messageForm.selectedProjects.includes(p.id))
+                                .forEach((project) => {
+                                  project.members?.forEach((member) => userIdSet.add(member.odId));
+                                });
+                              return userIdSet.size;
+                            })()}{" "}
+                            usuario(s)
+                          </span>{" "}
+                          de {messageForm.selectedProjects.length} proyecto(s)
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  <div className="p-3 flex gap-2.5">
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
-                      style={{ backgroundColor: typeConfig.accentBg }}
+                )}
+              </div>
+
+              {/* Duration */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Duración</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { value: "24h", label: "24 horas" },
+                    { value: "7d", label: "7 días" },
+                    { value: "30d", label: "30 días" },
+                    { value: "indefinite", label: "Indefinido" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setMessageForm({ ...messageForm, duration: option.value as typeof messageForm.duration })}
+                      className={`px-3 py-2 rounded-xl border text-sm font-medium ${
+                        messageForm.duration === option.value
+                          ? "bg-slate-900 text-white border-slate-900"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
                     >
-                      <TypeIcon size={14} style={{ color: typeConfig.accent }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-slate-900 leading-snug line-clamp-1">
-                        {messageForm.title || "Título del mensaje"}
-                      </p>
-                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-3 leading-relaxed">
-                        {messageForm.content || "El contenido del mensaje aparecerá aquí..."}
-                      </p>
-                    </div>
-                  </div>
+                      {option.label}
+                    </button>
+                  ))}
                 </div>
-
-                {/* Recipient summary */}
-                <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Alcance</p>
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
-                      <Users size={14} className="text-white" />
-                    </div>
-                    <div>
-                      <p className="text-lg font-bold text-slate-900 leading-none">{recipientCount}</p>
-                      <p className="text-[11px] text-slate-500">destinatario{recipientCount !== 1 ? "s" : ""}</p>
-                    </div>
-                  </div>
-                  {messageForm.recipientMode === "projects" && messageForm.selectedProjects.length > 0 && (
-                    <p className="text-[11px] text-slate-400">De {messageForm.selectedProjects.length} proyecto{messageForm.selectedProjects.length !== 1 ? "s" : ""}</p>
-                  )}
-                  {messageForm.sendByEmail && (
-                    <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100">
-                      <Mail size={11} className="text-amber-500" />
-                      <p className="text-[11px] text-amber-600 font-medium">+ email a cada destinatario</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Duration badge */}
-                <div className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl">
-                  <Clock size={12} className="text-slate-400" />
-                  <span className="text-xs text-slate-600">
-                    {messageForm.duration === "indefinite" ? "Sin expiración" : `Expira en ${messageForm.duration === "24h" ? "24 h" : messageForm.duration === "7d" ? "7 días" : "30 días"}`}
-                  </span>
-                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  {messageForm.duration === "indefinite"
+                    ? "El mensaje permanecerá hasta que el usuario lo descarte o lo elimines"
+                    : `El mensaje se eliminará automáticamente después de ${messageForm.duration === "24h" ? "24 horas" : messageForm.duration === "7d" ? "7 días" : "30 días"}`}
+                </p>
               </div>
             </div>
 
-            {/* Footer */}
-            {emailConfirmStep ? (
-              <div className="px-6 py-4 border-t border-amber-200 bg-amber-50 flex-shrink-0 space-y-3">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle size={15} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-semibold text-amber-900">¿Confirmas el envío por email?</p>
-                    <p className="text-xs text-amber-700 mt-0.5">
-                      Se enviarán {recipientCount} email{recipientCount !== 1 ? "s" : ""} individuales. Esta acción no se puede deshacer.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setEmailConfirmStep(false)} className="flex-1 px-4 py-2.5 border border-amber-300 bg-white text-amber-800 rounded-xl text-sm font-medium hover:bg-amber-50">
-                    Volver
-                  </button>
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={saving}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-600 text-white rounded-xl text-sm font-medium hover:bg-amber-700 disabled:opacity-50"
-                  >
-                    <Send size={14} />
-                    {saving ? "Enviando..." : "Confirmar y enviar"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex-shrink-0 flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowMessageModal(false);
-                    setEmailConfirmStep(false);
-                    setMessageForm({ title: "", content: "", type: "info", recipientMode: "all", selectedProjects: [], selectedUsers: [], duration: "indefinite", sendByEmail: false });
-                    setProjectSearchInMessage("");
-                    setUserSearchInMessage("");
-                  }}
-                  className="px-5 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => messageForm.sendByEmail ? setEmailConfirmStep(true) : handleSendMessage()}
-                  disabled={saving || !canSend}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <Send size={14} />
-                  {saving ? "Enviando..." : `Enviar a ${recipientCount} usuario${recipientCount !== 1 ? "s" : ""}${messageForm.sendByEmail ? " + email" : ""}`}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-        );
-      })()}
-      {/* Confirm Dialog */}
-      {confirmDialog && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
-            <p className="text-sm text-slate-500 mb-6">{confirmDialog.message}</p>
-            <div className="flex gap-3">
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3">
               <button
-                onClick={() => setConfirmDialog(null)}
-                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm"
+                onClick={() => {
+                  setShowMessageModal(false);
+                  setMessageForm({ title: "", content: "", type: "info", sendToAll: true, selectedProjects: [], duration: "indefinite" });
+                  setProjectSearchInMessage("");
+                }}
+                className="flex-1 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"
               >
                 Cancelar
               </button>
               <button
-                onClick={confirmDialog.onConfirm}
-                className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-sm text-white transition-colors ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
+                onClick={handleSendMessage}
+                disabled={saving || !messageForm.title.trim() || !messageForm.content.trim() || (!messageForm.sendToAll && messageForm.selectedProjects.length === 0)}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {confirmDialog.confirmLabel || "Confirmar"}
+                <Send size={16} />
+                {saving ? "Enviando..." : "Enviar mensaje"}
               </button>
             </div>
           </div>

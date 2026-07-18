@@ -5,7 +5,6 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
-import { IBANField } from "@/components/IBANField";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
@@ -300,7 +299,7 @@ export default function SuppliersPage() {
       if (projectDoc.exists()) setProjectName(projectDoc.data().name || "Proyecto");
 
       const suppliersRef = collection(db, `projects/${id}/suppliers`);
-      const suppliersQuery = query(suppliersRef, orderBy("createdAt", "desc"));
+      const suppliersQuery = query(suppliersRef, orderBy("fiscalName", "asc"));
       const suppliersSnapshot = await getDocs(suppliersQuery);
 
       const suppliersData = suppliersSnapshot.docs.map((doc) => {
@@ -342,12 +341,6 @@ export default function SuppliersPage() {
     } else if (filterStatus !== "all") {
       filtered = filtered.filter((s) => !s.closure && getCertificateStatus(s) === filterStatus);
     }
-    // Ordenar: fecha desc (ya viene de Firestore), luego nombre asc como desempate
-    filtered.sort((a, b) => {
-      const dateDiff = (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0);
-      if (dateDiff !== 0) return dateDiff;
-      return a.fiscalName.localeCompare(b.fiscalName);
-    });
     setFilteredSuppliers(filtered);
   };
 
@@ -659,7 +652,7 @@ export default function SuppliersPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
               <Building2 size={24} style={{ color: '#2F52E0' }} />
@@ -675,9 +668,9 @@ export default function SuppliersPage() {
         </div>
       </div>
 
-      <main className="px-24 py-8">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
         {/* Filters */}
-        <div className="flex flex-row gap-3 items-center mb-4">
+        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center mb-4">
           <div className="flex-1 relative">
             <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
             <input type="text" placeholder="Buscar proveedores" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm" />
@@ -817,15 +810,15 @@ export default function SuppliersPage() {
                 {/* Información básica */}
                 <div>
                   <h3 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-wider flex items-center gap-2"><Building2 size={14} />Información básica</h3>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">Nombre fiscal *</label>
-                      <input type="text" value={formData.fiscalName} onChange={(e) => setFormData({ ...formData, fiscalName: e.target.value })} onBlur={handleFiscalNameBlur} placeholder="Razón social" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                      <input type="text" value={formData.fiscalName} onChange={(e) => setFormData({ ...formData, fiscalName: e.target.value })} onBlur={handleFiscalNameBlur} placeholder="Ej: Neumáticos García SL" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
                       <p className="text-xs text-slate-500 mt-1">Se formateará automáticamente</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">Nombre comercial</label>
-                      <input type="text" value={formData.commercialName} onChange={(e) => setFormData({ ...formData, commercialName: e.target.value })} onBlur={handleCommercialNameBlur} placeholder="Nombre comercial" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                      <input type="text" value={formData.commercialName} onChange={(e) => setFormData({ ...formData, commercialName: e.target.value })} onBlur={handleCommercialNameBlur} placeholder="Ej: Neumáticos García" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
                     </div>
                     <div ref={countryDropdownRef} className="relative">
                       <label className="block text-sm font-medium text-slate-700 mb-2">País</label>
@@ -879,7 +872,7 @@ export default function SuppliersPage() {
                 {/* Persona de contacto */}
                 <div>
                   <h3 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-wider flex items-center gap-2"><User size={14} />Persona de contacto</h3>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">Nombre</label>
                       <div className="relative">
@@ -907,8 +900,8 @@ export default function SuppliersPage() {
                 {/* Dirección */}
                 <div>
                   <h3 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-wider flex items-center gap-2"><MapPin size={14} />Dirección</h3>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="col-span-2">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-slate-700 mb-2">Calle</label>
                       <input type="text" value={formData.address.street} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, street: e.target.value } })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
                     </div>
@@ -934,7 +927,7 @@ export default function SuppliersPage() {
                 {/* Información de pago */}
                 <div>
                   <h3 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-wider flex items-center gap-2"><CreditCard size={14} />Información de pago</h3>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div ref={paymentMethodDropdownRef} className="relative">
                       <label className="block text-sm font-medium text-slate-700 mb-2">Método de pago</label>
                       <button
@@ -961,17 +954,14 @@ export default function SuppliersPage() {
                       )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Cuenta bancaria (IBAN) / BIC</label>
-                      <IBANField
-                        iban={formData.bankAccount}
-                        bic={formData.bic}
-                        onIBANChange={(v) => setFormData({ ...formData, bankAccount: v })}
-                        onBICChange={(v) => setFormData({ ...formData, bic: v })}
-                        ibanClassName="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900"
-                        bicClassName="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900"
-                        ibanPlaceholder="Pega 20 dígitos o IBAN completo"
-                        bicPlaceholder="BIC/SWIFT (opcional)"
-                      />
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Cuenta bancaria (IBAN)</label>
+                      <input type="text" value={formData.bankAccount} onChange={(e) => handleBankAccountChange(e.target.value)} placeholder={formData.country === "ES" ? "Pega los 20 dígitos o IBAN completo" : `${getCountryInfo(formData.country).ibanPrefix}XX XXXX XXXX XXXX XXXX XXXX`} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
+                      <p className="text-xs text-slate-500 mt-1">{formData.country === "ES" ? "Pega 20 dígitos y se calcula ESXX automáticamente" : `Prefijo ${getCountryInfo(formData.country).ibanPrefix} automático`}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">BIC/SWIFT <span className="text-slate-400 font-normal">(opcional)</span></label>
+                      <input type="text" value={formData.bic} onChange={(e) => setFormData({ ...formData, bic: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11) })} placeholder="Ej: CAIXESBBXXX" maxLength={11} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono uppercase" />
+                      <p className="text-xs text-slate-500 mt-1">Código de 8 u 11 caracteres</p>
                     </div>
                   </div>
                 </div>

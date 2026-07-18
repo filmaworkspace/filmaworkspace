@@ -1113,7 +1113,7 @@ export default function NewPOPage() {
     <div className={cx("min-h-screen bg-white", inter.className)}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
               <Link
@@ -1229,10 +1229,10 @@ export default function NewPOPage() {
         </div>
       </div>
 
-      <main className="px-24 py-8">
-        <div className="grid grid-cols-3 gap-8">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Form */}
-          <div className="col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6">
             {/* Basic Info */}
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100">
@@ -1271,7 +1271,7 @@ export default function NewPOPage() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {/* Departamento - Custom Dropdown */}
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -1437,7 +1437,7 @@ export default function NewPOPage() {
                           type="text"
                           value={titleConcept}
                           onChange={(e) => setTitleConcept(e.target.value.toUpperCase())}
-                          placeholder="O escribe el concepto"
+                          placeholder="O escribe el concepto..."
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-400 uppercase placeholder:normal-case"
                         />
                       </div>
@@ -1449,7 +1449,7 @@ export default function NewPOPage() {
                           type="text"
                           value={titleReference}
                           onChange={(e) => setTitleReference(e.target.value.toUpperCase())}
-                          placeholder="CASA AZUL · PERSONAJE · SECUENCIA"
+                          placeholder="CASA AZUL · PERSONAJE · SECUENCIA..."
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-400 uppercase placeholder:normal-case"
                         />
                       </div>
@@ -1584,6 +1584,17 @@ export default function NewPOPage() {
                             )}
                             <Search size={14} className="text-slate-400" />
                           </button>
+                          {permissions.isProjectRole && selectedAccount && (
+                            <div className="mt-2 p-2 bg-slate-50 rounded-lg flex items-center justify-between text-xs">
+                              <span className="text-slate-500">Disponible:</span>
+                              <span className={cx(
+                                "font-medium",
+                                selectedAccount.available < item.baseAmount ? "text-red-600" : selectedAccount.available < selectedAccount.budgeted * 0.2 ? "text-amber-600" : "text-emerald-600"
+                              )}>
+                                {formatCurrency(selectedAccount.available)} €
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Asignación de capítulos */}
@@ -1811,7 +1822,7 @@ export default function NewPOPage() {
                     type="text"
                     value={formData.paymentTerms}
                     onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
-                    placeholder="Condiciones de pago"
+                    placeholder="Ej: Transferencia 30 días"
                     className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm"
                   />
                 </div>
@@ -1831,7 +1842,7 @@ export default function NewPOPage() {
           </div>
 
           {/* Sidebar */}
-          <div className="col-span-1">
+          <div className="lg:col-span-1">
             <div className="space-y-4">
               {/* Progress */}
               <div className="bg-white border border-slate-200 rounded-2xl p-5">
@@ -2170,17 +2181,61 @@ export default function NewPOPage() {
                     <p className="text-sm text-slate-500">No se encontraron cuentas</p>
                   </div>
                 ) : (
-                  filteredSubAccounts.map((subAccount) => (
-                    <button
-                      key={subAccount.id}
-                      onClick={() => selectAccount(subAccount)}
-                      className="w-full text-left p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all"
-                    >
-                      <p className="font-mono font-semibold text-slate-900">{subAccount.code}</p>
-                      <p className="text-sm text-slate-700">{subAccount.description}</p>
-                      <p className="text-xs text-slate-500 mt-1">{subAccount.accountCode} · {subAccount.accountDescription}</p>
-                    </button>
-                  ))
+                  filteredSubAccounts.map((subAccount) => {
+                    const isLowBudget = subAccount.available < subAccount.budgeted * 0.1;
+                    const isOverBudget = subAccount.available < 0;
+                    
+                    return (
+                      <button
+                        key={subAccount.id}
+                        onClick={() => selectAccount(subAccount)}
+                        className={cx(
+                          "w-full text-left p-4 border rounded-xl hover:bg-slate-50 transition-all",
+                          isOverBudget ? "border-red-200 bg-red-50/50" : isLowBudget ? "border-amber-200 bg-amber-50/50" : "border-slate-200"
+                        )}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-mono font-semibold text-slate-900">{subAccount.code}</p>
+                              {isOverBudget && (
+                                <span className="flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg">
+                                  <AlertTriangle size={10} />
+                                  Sin presupuesto
+                                </span>
+                              )}
+                              {!isOverBudget && isLowBudget && (
+                                <span className="flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg">
+                                  <AlertTriangle size={10} />
+                                  Bajo
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-slate-700">{subAccount.description}</p>
+                            <p className="text-xs text-slate-500 mt-1">{subAccount.accountCode} - {subAccount.accountDescription}</p>
+                          </div>
+                        </div>
+                        {permissions.isProjectRole && (
+                          <div className="grid grid-cols-3 gap-3 text-xs">
+                            <div className="bg-amber-50 rounded-lg p-2">
+                              <p className="text-amber-600">Comprometido</p>
+                              <p className="font-semibold text-amber-700">{formatCurrency(subAccount.committed)} €</p>
+                            </div>
+                            <div className="bg-emerald-50 rounded-lg p-2">
+                              <p className="text-emerald-600">Realizado</p>
+                              <p className="font-semibold text-emerald-700">{formatCurrency(subAccount.actual)} €</p>
+                            </div>
+                            <div className={cx("rounded-lg p-2", isOverBudget ? "bg-red-50" : isLowBudget ? "bg-amber-50" : "bg-emerald-50")}>
+                              <p className={isOverBudget ? "text-red-600" : isLowBudget ? "text-amber-600" : "text-emerald-600"}>Disponible</p>
+                              <p className={cx("font-semibold", isOverBudget ? "text-red-700" : isLowBudget ? "text-amber-700" : "text-emerald-700")}>
+                                {formatCurrency(subAccount.available)} €
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })
                 )}
               </div>
             </div>

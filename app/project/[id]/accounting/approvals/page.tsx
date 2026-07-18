@@ -63,8 +63,7 @@ import {
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
-import { handlePOStatusChange, handleInvoiceStatusChange, updatePOItemsInvoiced, realizeInvoice } from "@/lib/budgetOperations";
-import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
+import { handlePOStatusChange, handleInvoiceStatusChange, updatePOItemsInvoiced } from "@/lib/budgetOperations";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -280,7 +279,7 @@ export default function ApprovalsPage() {
             attachmentUrl: d.attachmentUrl, attachmentFileName: d.attachmentFileName,
             items: d.items || [], department: d.department, poType: d.poType, currency: d.currency || "EUR",
             timeline: buildTimeline(d, membersMap), autoChecks: buildAutoChecks(d, "po", subAccountsMap),
-            budgetImpact: calculateBudgetImpact(d.items || [], subAccountsMap, "po", false),
+            budgetImpact: calculateBudgetImpact(d.items || [], subAccountsMap, false),
             supplierStats: await loadSupplierStats(d.supplierId), daysWaiting, isUrgent: daysWaiting >= 3,
           });
         }
@@ -288,11 +287,9 @@ export default function ApprovalsPage() {
 
       // Load Invoices
       try {
-        const invoicesSnap = await getDocs(query(collection(db, `projects/${id}/invoices`), where("status", "in", ["submitted", "pending_approval"])));
+        const invoicesSnap = await getDocs(query(collection(db, `projects/${id}/invoices`), where("status", "==", "pending_approval")));
         for (const invDoc of invoicesSnap.docs) {
           const d = invDoc.data();
-          // Solo facturas pendientes de aprobar (sin track de aprobación completado)
-          if (d.approvedAt) continue;
           if (canUserApprove(d, userId!, localUserRole, localUserDepartment, localUserPosition)) {
             const createdAt = d.createdAt?.toDate() || new Date();
             const daysWaiting = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
@@ -308,7 +305,7 @@ export default function ApprovalsPage() {
               attachmentUrl: d.attachmentUrl, attachmentFileName: d.attachmentFileName,
               items: d.items || [], poId: d.poId, poNumber: d.poNumber,
               timeline: buildTimeline(d, membersMap), autoChecks: buildAutoChecks(d, "invoice", subAccountsMap),
-              budgetImpact: calculateBudgetImpact(d.items || [], subAccountsMap, "invoice", !!d.poId),
+              budgetImpact: calculateBudgetImpact(d.items || [], subAccountsMap, !!d.poId),
               supplierStats: await loadSupplierStats(d.supplierId), poComparison, daysWaiting, isUrgent: daysWaiting >= 3,
             });
           }
@@ -506,39 +503,31 @@ export default function ApprovalsPage() {
     return checks;
   };
 
-  // docType: "po" = la aprobación compromete presupuesto; "invoice" = puede realizar según config
-  const calculateBudgetImpact = (items: any[], subAccountsMap: Record<string, any>, docType: "po" | "invoice", hasPO: boolean): PendingApproval["budgetImpact"] => {
+  const calculateBudgetImpact = (items: any[], subAccountsMap: Record<string, any>, hasPO: boolean): PendingApproval["budgetImpact"] => {
     const impact: PendingApproval["budgetImpact"] = [];
     const accountImpacts: Record<string, number> = {};
     for (const item of items) { if (item.subAccountId && subAccountsMap[item.subAccountId]) accountImpacts[item.subAccountId] = (accountImpacts[item.subAccountId] || 0) + (item.baseAmount || 0); }
-    for (const [subAccountId, amount] of Object.entries(accountImpacts)) {
-      const sub = subAccountsMap[subAccountId];
-      if (!sub) continue;
-      let newCommitted = sub.committed;
-      let newActual = sub.actual;
-      if (docType === "po") {
-        // Aprobar una PO compromete presupuesto
-        newCommitted = sub.committed + amount;
-      } else if (docType === "invoice" && hasPO) {
-        // Factura con PO: comprometido baja, realizado sube (neto = 0 en disponible)
-        newCommitted = Math.max(0, sub.committed - amount);
-        newActual = sub.actual + amount;
-      } else {
-        // Factura sin PO: realizado sube, disponible baja
-        newActual = sub.actual + amount;
+    for (const [subAccountId, amount] of Object.entries(accountImpacts)) { 
+      const sub = subAccountsMap[subAccountId]; 
+      if (sub) {
+        // Si tiene PO: el realizado aumenta y el comprometido disminuye (el available no cambia)
+        // Si no tiene PO: el realizado aumenta y el available disminuye
+        const newCommitted = hasPO ? Math.max(0, sub.committed - amount) : sub.committed;
+        const newActual = sub.actual + amount;
+        const newAvailable = hasPO ? sub.available : sub.available - amount;
+        impact.push({ 
+          accountCode: sub.code, 
+          accountName: sub.description, 
+          budgeted: sub.budgeted, 
+          committed: sub.committed, 
+          actual: sub.actual, 
+          available: sub.available, 
+          afterApproval: newAvailable,
+          // Campos adicionales para mostrar el cambio
+          committedAfter: newCommitted,
+          actualAfter: newActual,
+        }); 
       }
-      const newAvailable = sub.budgeted - newCommitted - newActual;
-      impact.push({
-        accountCode: sub.code,
-        accountName: sub.description,
-        budgeted: sub.budgeted,
-        committed: sub.committed,
-        actual: sub.actual,
-        available: sub.available,
-        afterApproval: newAvailable,
-        committedAfter: newCommitted,
-        actualAfter: newActual,
-      });
     }
     return impact;
   };
@@ -638,35 +627,33 @@ export default function ApprovalsPage() {
           updates.previousCommittedItems = null;
           
         } else if (approval.type === "invoice") {
-          // Factura: la aprobación completa el track de aprobación. El lifecycle
-          // pasa a "submitted" (estado activo). La realización del presupuesto solo
-          // ocurre aquí si el trigger es on_approve; para on_code/on_account ocurre
-          // al codificar/contabilizar.
-          const approvedAt = Timestamp.now();
-          updates.status = "submitted";
+          // Factura
+          updates.status = "pending"; // Pasa a "pendiente de pago" (aprobada)
           updates.approvalStatus = "approved";
-          updates.approvedAt = approvedAt;
+          updates.approvedAt = Timestamp.now();
           updates.approvedBy = userId;
           updates.approvedByName = userName;
-
+          
+          // Preparar items para budgetOperations
           const budgetItems: Array<{ subAccountId: string; baseAmount: number; poItemIndex?: number }> = [];
           for (const item of (approval.items || [])) {
             const itemBaseAmount = item.baseAmount || (item.quantity && item.unitPrice ? item.quantity * item.unitPrice : item.totalAmount ? item.totalAmount / 1.21 : 0);
             if (item.subAccountId) {
-              budgetItems.push({ subAccountId: item.subAccountId, baseAmount: itemBaseAmount, poItemIndex: item.poItemIndex });
+              budgetItems.push({ 
+                subAccountId: item.subAccountId, 
+                baseAmount: itemBaseAmount,
+                poItemIndex: item.poItemIndex 
+              });
             }
           }
-
-          const costSettings = await getCostSettings(approval.projectId);
-          // Realizar solo si el trigger es on_approve. shouldRealizeInvoice con el
-          // track approvedAt devuelve true para on_approve y false para on_code/on_account.
-          const realizeNow = shouldRealizeInvoice("submitted", costSettings, { approvedAt });
-          if (realizeNow) {
-            const wasRealized = shouldRealizeInvoice(oldStatus, costSettings);
-            if (!wasRealized && budgetItems.length > 0) {
-              await realizeInvoice(approval.projectId, budgetItems.map(b => ({ subAccountId: b.subAccountId, baseAmount: b.baseAmount })));
-              if (approval.poId) await updatePOItemsInvoiced(approval.projectId, approval.poId, budgetItems, "add");
-            }
+          
+          // El estado real de la factura será "pending" (aprobada, pendiente de pago)
+          // Usar budgetOperations para manejar el realizado (si corresponde según config)
+          await handleInvoiceStatusChange(approval.projectId, oldStatus, "pending", budgetItems);
+          
+          // Si tiene PO vinculada, actualizar los invoicedAmount de cada item de la PO
+          if (approval.poId) {
+            await updatePOItemsInvoiced(approval.projectId, approval.poId, budgetItems, "add");
           }
         } else if (approval.type === "box") {
           // Sobre BOX (tarjeta o transferencia)
@@ -815,7 +802,7 @@ export default function ApprovalsPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           {/* Page header */}
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-4">
@@ -830,7 +817,7 @@ export default function ApprovalsPage() {
             </div>
 
             {/* Stats */}
-            <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-4">
               <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-xl border border-slate-200">
                 <div className="text-center">
                   <p className="text-lg font-bold text-slate-900">{userStats.approvedToday}</p>
@@ -860,7 +847,7 @@ export default function ApprovalsPage() {
         </div>
       </div>
 
-      <main className="px-24 py-8">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
 
         {filteredApprovals.length === 0 ? (
           <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
@@ -870,9 +857,9 @@ export default function ApprovalsPage() {
             {userStats.approvedThisWeek > 0 && (<div className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-xl"><Award size={16} className="text-emerald-600" /><span className="text-sm text-emerald-700">Has aprobado {userStats.approvedThisWeek} documentos esta semana</span></div>)}
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Sidebar */}
-            <div className="col-span-1">
+            <div className="lg:col-span-1">
               <div className="bg-white border border-slate-200 rounded-2xl p-4 sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
                 <p className="text-xs text-slate-500 uppercase tracking-wider mb-3 px-1 font-semibold">Documentos · {filteredApprovals.length}</p>
                 <div className="space-y-2">
@@ -901,7 +888,7 @@ export default function ApprovalsPage() {
             </div>
 
             {/* Main Card */}
-            <div className="col-span-2">
+            <div className="lg:col-span-2">
               {currentApproval && (
                 <div className="space-y-4">
                   <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
@@ -924,7 +911,7 @@ export default function ApprovalsPage() {
                     </div>
 
                     <div className="p-6">
-                      <div className="grid grid-cols-4 gap-4 mb-6">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                         <div><p className="text-xs text-slate-500 mb-1">Proveedor</p><div className="flex items-center gap-2"><Building2 size={14} className="text-slate-400" /><p className="text-sm font-medium text-slate-900">{currentApproval.supplier}</p></div></div>
                         <div><p className="text-xs text-slate-500 mb-1">Fecha</p><div className="flex items-center gap-2"><Calendar size={14} className="text-slate-400" /><p className="text-sm text-slate-900">{formatDate(currentApproval.createdAt)}</p></div></div>
                         <div><p className="text-xs text-slate-500 mb-1">Creado por</p><div className="flex items-center gap-2"><User size={14} className="text-slate-400" /><p className="text-sm text-slate-900">{currentApproval.createdByName}</p></div></div>
@@ -1066,7 +1053,7 @@ export default function ApprovalsPage() {
 
                       <div className="pt-6 border-t border-slate-200">
                         {showCommentInput ? (
-                          <div className="space-y-3"><textarea value={approvalComment} onChange={(e) => setApprovalComment(e.target.value)} placeholder="Añade un comentario (opcional)" rows={2} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none text-sm" /><div className="flex gap-3"><button onClick={() => { setShowCommentInput(false); setApprovalComment(""); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">Cancelar</button><button onClick={() => handleApprove(currentApproval, true)} disabled={processing} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">{processing ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send size={16} />}Aprobar con comentario</button></div></div>
+                          <div className="space-y-3"><textarea value={approvalComment} onChange={(e) => setApprovalComment(e.target.value)} placeholder="Añade un comentario (opcional)..." rows={2} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none text-sm" /><div className="flex gap-3"><button onClick={() => { setShowCommentInput(false); setApprovalComment(""); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">Cancelar</button><button onClick={() => handleApprove(currentApproval, true)} disabled={processing} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">{processing ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send size={16} />}Aprobar con comentario</button></div></div>
                         ) : (
                           <div className="space-y-3"><div className="flex gap-3"><button onClick={() => { setSelectedApproval(currentApproval); setShowApprovalModal(true); }} disabled={processing} className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">{processing ? (<><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Procesando...</>) : (<><CheckCircle size={18} />Aprobar</>)}</button><button onClick={() => { setSelectedApproval(currentApproval); setShowRejectionModal(true); }} disabled={processing} className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"><XCircle size={18} />Rechazar</button></div><div className="flex gap-3"><button onClick={() => setShowCommentInput(true)} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"><MessageSquare size={16} />Aprobar con comentario</button><button onClick={() => { setSelectedApproval(currentApproval); setShowInfoRequestModal(true); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"><HelpCircle size={16} />Solicitar información</button></div></div>
                         )}
@@ -1086,85 +1073,8 @@ export default function ApprovalsPage() {
                   {/* Budget Impact */}
                   {currentApproval.budgetImpact && currentApproval.budgetImpact.length > 0 && (
                     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                      <button onClick={() => toggleSection("budget")} className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <PieChart size={18} className="text-slate-500" />
-                          <span className="font-semibold text-slate-900">Impacto en presupuesto</span>
-                          {currentApproval.budgetImpact.some(i => i.afterApproval < 0) && (
-                            <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg">Sin presupuesto</span>
-                          )}
-                        </div>
-                        {expandedSections.has("budget") ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
-                      </button>
-                      {expandedSections.has("budget") && (
-                        <div className="px-6 pb-6 space-y-4">
-                          {currentApproval.budgetImpact.map((impact, idx) => {
-                            const isOverBudget = impact.afterApproval < 0;
-                            const isLow = impact.afterApproval >= 0 && impact.afterApproval < impact.budgeted * 0.1;
-                            const execBefore = impact.budgeted > 0 ? ((impact.committed + impact.actual) / impact.budgeted) * 100 : 0;
-                            const execAfter = impact.budgeted > 0 ? (((impact.committedAfter ?? impact.committed) + (impact.actualAfter ?? impact.actual)) / impact.budgeted) * 100 : 0;
-                            const thisDoc = impact.available - impact.afterApproval;
-                            return (
-                              <div key={idx} className={`rounded-xl border ${isOverBudget ? "border-red-200 bg-red-50/40" : isLow ? "border-amber-200 bg-amber-50/40" : "border-slate-200 bg-slate-50/60"}`}>
-                                {/* Header subcuenta */}
-                                <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-200/60">
-                                  <div>
-                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">{impact.accountCode}</span>
-                                    <p className="text-sm font-semibold text-slate-900 mt-0.5">{impact.accountName}</p>
-                                  </div>
-                                  {isOverBudget && <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-lg font-medium">Sin presupuesto</span>}
-                                  {isLow && !isOverBudget && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-lg font-medium">Presupuesto bajo</span>}
-                                </div>
-                                {/* Stats */}
-                                <div className="grid grid-cols-4 gap-0 px-4 py-4">
-                                  <div className="pr-4 border-r border-slate-200">
-                                    <p className="text-xs text-slate-500 mb-1">Presupuestado</p>
-                                    <p className="text-sm font-bold text-slate-900 tabular-nums">{formatCurrency(impact.budgeted)}</p>
-                                  </div>
-                                  <div className="px-4 border-r border-slate-200">
-                                    <p className="text-xs text-slate-500 mb-1">Comprometido</p>
-                                    <p className="text-sm font-semibold text-slate-700 tabular-nums">{formatCurrency(impact.committed)}</p>
-                                    {impact.committedAfter !== undefined && impact.committedAfter !== impact.committed && (
-                                      <p className={`text-xs font-semibold tabular-nums mt-0.5 ${impact.committedAfter > impact.committed ? "text-amber-600" : "text-emerald-600"}`}>
-                                        → {formatCurrency(impact.committedAfter)}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <div className="px-4 border-r border-slate-200">
-                                    <p className="text-xs text-slate-500 mb-1">Realizado</p>
-                                    <p className="text-sm font-semibold text-slate-700 tabular-nums">{formatCurrency(impact.actual)}</p>
-                                    {impact.actualAfter !== undefined && impact.actualAfter !== impact.actual && (
-                                      <p className="text-xs font-semibold text-amber-600 tabular-nums mt-0.5">
-                                        → {formatCurrency(impact.actualAfter)}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <div className="pl-4">
-                                    <p className="text-xs text-slate-500 mb-1">Disponible</p>
-                                    <p className="text-sm font-semibold text-slate-700 tabular-nums">{formatCurrency(impact.available)}</p>
-                                    <p className={`text-xs font-bold tabular-nums mt-0.5 ${isOverBudget ? "text-red-600" : thisDoc === 0 ? "text-slate-500" : "text-amber-600"}`}>
-                                      → {formatCurrency(impact.afterApproval)}
-                                    </p>
-                                  </div>
-                                </div>
-                                {/* Barra de ejecución */}
-                                {impact.budgeted > 0 && (
-                                  <div className="px-4 pb-4">
-                                    <div className="flex items-center justify-between text-xs text-slate-500 mb-1.5">
-                                      <span>Ejecución tras aprobar</span>
-                                      <span className={`font-semibold ${execAfter > 100 ? "text-red-600" : execAfter > 90 ? "text-amber-600" : "text-slate-700"}`}>{execAfter.toFixed(1)}%</span>
-                                    </div>
-                                    <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden relative">
-                                      <div className="h-full bg-slate-300 rounded-full" style={{ width: `${Math.min(execBefore, 100)}%` }} />
-                                      <div className={`absolute top-0 left-0 h-full rounded-full opacity-70 ${isOverBudget ? "bg-red-500" : execAfter > 90 ? "bg-amber-500" : "bg-[#2F52E0]"}`} style={{ width: `${Math.min(execAfter, 100)}%` }} />
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                      <button onClick={() => toggleSection("budget")} className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"><div className="flex items-center gap-3"><PieChart size={18} className="text-slate-500" /><span className="font-semibold text-slate-900">Impacto en presupuesto</span></div>{expandedSections.has("budget") ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}</button>
+                      {expandedSections.has("budget") && (<div className="px-6 pb-6 space-y-3">{currentApproval.budgetImpact.map((impact, idx) => { const isOverBudget = impact.afterApproval < 0; const isLow = impact.afterApproval < impact.budgeted * 0.1 && impact.afterApproval >= 0; return (<div key={idx} className={`p-4 rounded-xl border ${isOverBudget ? "border-red-200 bg-red-50" : isLow ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50"}`}><div className="flex items-center justify-between mb-2"><p className="text-sm font-medium text-slate-900">{impact.accountCode}</p>{isOverBudget && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg">Sin presupuesto</span>}{isLow && !isOverBudget && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg">Bajo</span>}</div><p className="text-xs text-slate-500 mb-3">{impact.accountName}</p><div className="grid grid-cols-4 gap-2 text-xs"><div><p className="text-slate-500">Presupuestado</p><p className="font-semibold text-slate-900">{formatCurrency(impact.budgeted)}</p></div><div><p className="text-slate-500">Disponible</p><p className="font-semibold text-slate-900">{formatCurrency(impact.available)}</p></div><div><p className="text-slate-500">Este doc.</p><p className="font-semibold text-amber-600">-{formatCurrency(impact.available - impact.afterApproval)}</p></div><div><p className="text-slate-500">Tras aprobar</p><p className={`font-semibold ${isOverBudget ? "text-red-600" : isLow ? "text-amber-600" : "text-emerald-600"}`}>{formatCurrency(impact.afterApproval)}</p></div></div></div>); })}</div>)}
                     </div>
                   )}
 
@@ -1242,7 +1152,7 @@ export default function ApprovalsPage() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-200"><h3 className="text-lg font-semibold text-slate-900">Rechazar documento</h3><p className="text-sm text-slate-500">{selectedApproval.displayNumber}</p></div>
-            <div className="p-6"><label className="block text-sm font-medium text-slate-700 mb-2">Motivo del rechazo *</label><textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Explica el motivo del rechazo" rows={4} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none text-sm" /><div className="flex gap-3 mt-6"><button onClick={() => { setShowRejectionModal(false); setRejectionReason(""); setSelectedApproval(null); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">Cancelar</button><button onClick={handleReject} disabled={processing || !rejectionReason.trim()} className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">{processing ? "Rechazando..." : "Confirmar rechazo"}</button></div></div>
+            <div className="p-6"><label className="block text-sm font-medium text-slate-700 mb-2">Motivo del rechazo *</label><textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Explica el motivo del rechazo..." rows={4} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none text-sm" /><div className="flex gap-3 mt-6"><button onClick={() => { setShowRejectionModal(false); setRejectionReason(""); setSelectedApproval(null); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">Cancelar</button><button onClick={handleReject} disabled={processing || !rejectionReason.trim()} className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">{processing ? "Rechazando..." : "Confirmar rechazo"}</button></div></div>
           </div>
         </div>
       )}
@@ -1251,7 +1161,7 @@ export default function ApprovalsPage() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-200"><h3 className="text-lg font-semibold text-slate-900">Solicitar información</h3><p className="text-sm text-slate-500">{selectedApproval.displayNumber}</p></div>
-            <div className="p-6"><label className="block text-sm font-medium text-slate-700 mb-2">¿Qué información necesitas?</label><textarea value={infoRequestMessage} onChange={(e) => setInfoRequestMessage(e.target.value)} placeholder="Describe qué información adicional necesitas" rows={4} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none text-sm" /><div className="flex gap-3 mt-6"><button onClick={() => { setShowInfoRequestModal(false); setInfoRequestMessage(""); setSelectedApproval(null); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">Cancelar</button><button onClick={handleRequestInfo} disabled={processing || !infoRequestMessage.trim()} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-medium disabled:opacity-50"><Send size={16} />{processing ? "Enviando..." : "Enviar solicitud"}</button></div></div>
+            <div className="p-6"><label className="block text-sm font-medium text-slate-700 mb-2">¿Qué información necesitas?</label><textarea value={infoRequestMessage} onChange={(e) => setInfoRequestMessage(e.target.value)} placeholder="Describe qué información adicional necesitas..." rows={4} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none text-sm" /><div className="flex gap-3 mt-6"><button onClick={() => { setShowInfoRequestModal(false); setInfoRequestMessage(""); setSelectedApproval(null); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">Cancelar</button><button onClick={handleRequestInfo} disabled={processing || !infoRequestMessage.trim()} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-medium disabled:opacity-50"><Send size={16} />{processing ? "Enviando..." : "Enviar solicitud"}</button></div></div>
           </div>
         </div>
       )}

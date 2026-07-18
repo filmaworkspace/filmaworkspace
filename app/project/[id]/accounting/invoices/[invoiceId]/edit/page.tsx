@@ -333,8 +333,8 @@ export default function EditInvoicePage() {
       setExistingFileUrl(data.attachmentUrl || "");
       setExistingFileName(data.attachmentFileName || "");
       
-      // Verificar si estaba aprobada (track approvedAt) o, por compat, por status antiguo
-      const wasRealizedBefore = !!data.approvedAt || ["pending", "approved", "paid"].includes(data.status);
+      // Verificar si estaba aprobada/realizada
+      const wasRealizedBefore = ["pending", "approved", "paid"].includes(data.status);
       setWasApproved(wasRealizedBefore);
 
       setFormData({
@@ -489,7 +489,7 @@ export default function EditInvoicePage() {
       const invoicesSnap = await getDocs(query(
         collection(db, `projects/${id}/invoices`),
         where("poId", "==", linkedPO.id),
-        where("status", "in", ["submitted", "pending", "pending_approval", "approved", "paid", "overdue", "coded", "accounted"])
+        where("status", "in", ["pending", "pending_approval", "approved", "paid", "overdue"])
       ));
       
       // Calcular cuánto está facturado por item
@@ -796,8 +796,7 @@ export default function EditInvoicePage() {
 
         const steps = generateApprovalSteps();
         if (shouldAutoApprove(steps)) {
-          // Auto-aprobada: lifecycle "submitted" + track de aprobación.
-          updateData.status = "submitted";
+          updateData.status = "pending";
           updateData.approvalStatus = "approved";
           updateData.autoApproved = true;
           updateData.approvedAt = Timestamp.now();
@@ -806,8 +805,7 @@ export default function EditInvoicePage() {
           updateData.approvalSteps = deleteField();
           updateData.currentApprovalStep = deleteField();
         } else {
-          // Pendiente de aprobar: lifecycle "submitted", sin track de aprobación.
-          updateData.status = "submitted";
+          updateData.status = "pending_approval";
           updateData.approvalStatus = "pending";
           updateData.approvalSteps = steps;
           updateData.currentApprovalStep = 0;
@@ -830,23 +828,22 @@ export default function EditInvoicePage() {
 
       // Manejar presupuesto
       if (!isAdminCorrection && sendForApproval) {
-        // Realización para el trigger on_approve: ocurre cuando la factura queda
-        // aprobada (track approvedAt presente en este guardado).
-        const isApprovedNow = updateData.autoApproved === true;
-        const realizeNow = isApprovedNow && shouldRealizeInvoice("submitted", costSettings, { approvedAt: Timestamp.now() });
-
-        if (isApprovedNow && wasApproved && originalItems.length > 0) {
+        const finalStatus = updateData.status;
+        
+        if (finalStatus === "pending" && wasApproved && originalItems.length > 0) {
           // Desrealizar items anteriores
           const itemsToUnrealize = originalItems.filter(i => i.subAccountId && i.baseAmount > 0).map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
           if (itemsToUnrealize.length > 0) await unrealizeInvoice(id, itemsToUnrealize);
-          // Realizar nuevos items si corresponde
-          if (realizeNow) {
+          // Realizar nuevos items
+          if (shouldRealizeInvoice(finalStatus, costSettings)) {
             const itemsToRealize = items.filter(i => i.subAccountId && i.baseAmount > 0).map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
             if (itemsToRealize.length > 0) await realizeInvoice(id, itemsToRealize);
           }
-        } else if (isApprovedNow && !wasApproved && realizeNow) {
-          const itemsToRealize = items.filter(i => i.subAccountId && i.baseAmount > 0).map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
-          if (itemsToRealize.length > 0) await realizeInvoice(id, itemsToRealize);
+        } else if (finalStatus === "pending" && !wasApproved) {
+          if (shouldRealizeInvoice(finalStatus, costSettings)) {
+            const itemsToRealize = items.filter(i => i.subAccountId && i.baseAmount > 0).map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
+            if (itemsToRealize.length > 0) await realizeInvoice(id, itemsToRealize);
+          }
         }
       }
 
@@ -921,7 +918,7 @@ export default function EditInvoicePage() {
     <div className={cx("min-h-screen bg-white", inter.className)}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-3">
               <DocIcon size={24} className={currentDocType.textColor} />
@@ -974,7 +971,7 @@ export default function EditInvoicePage() {
       </div>
 
       {/* Main Content */}
-      <main className="px-24 py-8">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
         {successMessage && (
           <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3">
             <CheckCircle size={18} className="text-emerald-600" />
@@ -999,9 +996,9 @@ export default function EditInvoicePage() {
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column */}
-          <div className="col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6">
             {/* Información básica */}
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100">
@@ -1031,7 +1028,7 @@ export default function EditInvoicePage() {
                 </div>
 
                 {/* Departamento */}
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Departamento</label>
                     <div className="relative" ref={departmentDropdownRef}>
@@ -1066,7 +1063,7 @@ export default function EditInvoicePage() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Descripción *</label>
                   <div className="relative">
-                    <textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} onBlur={() => handleBlur("description")} placeholder="Describe el propósito de esta factura" rows={3} className={cx("w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm pr-10",
+                    <textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} onBlur={() => handleBlur("description")} placeholder="Describe el propósito de esta factura..." rows={3} className={cx("w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm pr-10",
                       hasError("description") ? "border-red-300 bg-red-50" : isValid("description") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"
                     )} />
                     {isValid("description") && <CheckCircle2 size={16} className="absolute right-4 top-4 text-emerald-600" />}
@@ -1126,7 +1123,7 @@ export default function EditInvoicePage() {
                       </div>
 
                       <div className="space-y-4">
-                        <input type="text" value={item.description} onChange={e => updateItem(index, "description", e.target.value)} onBlur={() => handleBlur(`item_${index}_description`)} placeholder="Descripción del item" className={cx("w-full px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white",
+                        <input type="text" value={item.description} onChange={e => updateItem(index, "description", e.target.value)} onBlur={() => handleBlur(`item_${index}_description`)} placeholder="Descripción del item..." className={cx("w-full px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white",
                           hasError(`item_${index}_description`) ? "border-red-300 bg-red-50" : item.description.trim() ? "border-emerald-200" : "border-slate-200"
                         )} />
 
@@ -1298,7 +1295,7 @@ export default function EditInvoicePage() {
           </div>
 
           {/* Right Column - Sidebar */}
-          <div className="col-span-1 space-y-4">
+          <div className="lg:col-span-1 space-y-4">
             {/* Progreso */}
             <div className="bg-white border border-slate-200 rounded-2xl p-5">
               <div className="flex items-center justify-between mb-3">
@@ -1475,7 +1472,7 @@ export default function EditInvoicePage() {
             <div className="p-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <Search size={20} className="text-slate-400" />
-                <input type="text" value={supplierSearch} onChange={e => setSupplierSearch(e.target.value)} placeholder="Buscar proveedor" autoFocus className="flex-1 outline-none text-sm" />
+                <input type="text" value={supplierSearch} onChange={e => setSupplierSearch(e.target.value)} placeholder="Buscar proveedor..." autoFocus className="flex-1 outline-none text-sm" />
                 <button onClick={() => setShowSupplierModal(false)} className="p-1 hover:bg-slate-100 rounded"><X size={18} /></button>
               </div>
             </div>
@@ -1498,16 +1495,22 @@ export default function EditInvoicePage() {
             <div className="p-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <Search size={20} className="text-slate-400" />
-                <input type="text" value={accountSearch} onChange={e => setAccountSearch(e.target.value)} placeholder="Buscar cuenta" autoFocus className="flex-1 outline-none text-sm" />
+                <input type="text" value={accountSearch} onChange={e => setAccountSearch(e.target.value)} placeholder="Buscar cuenta..." autoFocus className="flex-1 outline-none text-sm" />
                 <button onClick={() => setShowAccountModal(false)} className="p-1 hover:bg-slate-100 rounded"><X size={18} /></button>
               </div>
             </div>
             <div className="max-h-96 overflow-y-auto">
               {filteredSubAccounts.map(s => (
                 <button key={s.id} onClick={() => selectAccount(s)} className="w-full px-4 py-3 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0">
-                  <p className="font-medium text-slate-900 font-mono">{s.code}</p>
-                  <p className="text-sm text-slate-500">{s.description}</p>
-                  {s.accountDescription && <p className="text-xs text-slate-400 mt-0.5">{s.accountCode} · {s.accountDescription}</p>}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-slate-900 font-mono">{s.code}</p>
+                      <p className="text-sm text-slate-500">{s.description}</p>
+                    </div>
+                    <div className="text-right text-xs">
+                      <p className={cx("font-medium", s.available >= 0 ? "text-emerald-600" : "text-red-600")}>Disp: {formatCurrency(s.available)} €</p>
+                    </div>
+                  </div>
                 </button>
               ))}
             </div>

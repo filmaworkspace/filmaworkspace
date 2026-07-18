@@ -75,17 +75,13 @@ import {
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
 import { unrealizeInvoice, updatePOItemsInvoiced, realizeInvoice } from "@/lib/budgetOperations";
-import { getInvoiceDisplayState, type InvoiceDisplayState } from "@/lib/invoiceHelpers";
-import { IBANField } from "@/components/IBANField";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-// Lifecycle values written to Firestore: "draft" | "submitted" | "cancelled" | "rejected" | "void".
-// Legacy values kept for backwards compat with existing docs.
-type InvoiceStatus = "draft" | "submitted" | "void" | "pending" | "pending_approval" | "approved" | "rejected" | "paid" | "cancelled" | "coding" | "coded" | "accounted" | "returned" | "partial_return";
+type InvoiceStatus = "draft" | "pending" | "pending_approval" | "approved" | "rejected" | "paid" | "cancelled" | "coding" | "accounted" | "returned" | "partial_return";
 type DocumentType = "invoice" | "proforma" | "autonomo" | "ticket" | "budget" | "guarantee";
 
 interface EpisodeDistribution {
@@ -178,8 +174,6 @@ interface Invoice {
   approvedBy?: string;
   approvedByName?: string;
   paidAt?: Date;
-  paidBy?: string;
-  paidByName?: string;
   paidAmount?: number;
   paymentMethod?: string;
   paymentReference?: string;
@@ -268,18 +262,16 @@ interface GuaranteeReturn {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-// Keyed by display state (see getInvoiceDisplayState).
-const STATUS_CONFIG: Record<InvoiceDisplayState, { bg: string; text: string; label: string; icon: typeof Clock }> = {
+const STATUS_CONFIG: Record<InvoiceStatus, { bg: string; text: string; label: string; icon: typeof Clock }> = {
   draft: { bg: "bg-slate-100", text: "text-slate-700", label: "Borrador", icon: Edit },
-  submitted: { bg: "bg-amber-50", text: "text-amber-700", label: "En sistema", icon: Clock },
+  coding: { bg: "bg-violet-50", text: "text-violet-700", label: "Codificando", icon: Code },
+  pending: { bg: "bg-amber-50", text: "text-amber-700", label: "Pendiente pago", icon: Clock },
+  pending_approval: { bg: "bg-amber-50", text: "text-amber-700", label: "Pend. aprobación", icon: Clock },
   approved: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Aprobada", icon: CheckCircle },
-  coded: { bg: "bg-violet-50", text: "text-violet-700", label: "Codificada", icon: Code },
   accounted: { bg: "bg-teal-50", text: "text-teal-700", label: "Contabilizada", icon: Lock },
-  paid: { bg: "bg-blue-50", text: "text-blue-700", label: "Pagada", icon: CreditCard },
-  overdue: { bg: "bg-red-50", text: "text-red-700", label: "Vencida", icon: AlertTriangle },
   rejected: { bg: "bg-red-50", text: "text-red-700", label: "Rechazada", icon: XCircle },
+  paid: { bg: "bg-blue-50", text: "text-blue-700", label: "Pagada", icon: CreditCard },
   cancelled: { bg: "bg-red-50", text: "text-red-700", label: "Anulada", icon: Ban },
-  void: { bg: "bg-red-50", text: "text-red-700", label: "Anulada", icon: Ban },
   returned: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Devuelta", icon: CheckCircle },
   partial_return: { bg: "bg-amber-50", text: "text-amber-700", label: "Devolución parcial", icon: Clock },
 };
@@ -385,7 +377,7 @@ export default function InvoiceDetailPage() {
         createdAt: data.createdAt?.toDate() || new Date(), createdBy: data.createdBy || "", createdByName: data.createdByName || "",
         codedAt: data.codedAt?.toDate(), codedBy: data.codedBy, codedByName: data.codedByName,
         approvedAt: data.approvedAt?.toDate(), approvedBy: data.approvedBy, approvedByName: data.approvedByName,
-        paidAt: data.paidAt?.toDate(), paidBy: data.paidBy, paidByName: data.paidByName, paidAmount: data.paidAmount, paymentMethod: data.paymentMethod, paymentReference: data.paymentReference,
+        paidAt: data.paidAt?.toDate(), paidAmount: data.paidAmount, paymentMethod: data.paymentMethod, paymentReference: data.paymentReference,
         cancelledAt: data.cancelledAt?.toDate(), cancelledByName: data.cancelledByName, cancellationReason: data.cancellationReason,
         poId: data.poId, poNumber: data.poNumber, requiresReplacement: data.requiresReplacement,
         replacedByInvoiceId: data.replacedByInvoiceId, isReplacement: data.isReplacement,
@@ -553,15 +545,9 @@ export default function InvoiceDetailPage() {
         return { ...item, baseAmount: t.base, vatAmount: t.vat, irpfAmount: t.irpf, totalAmount: t.total };
       });
 
-      const costSettings = await getCostSettings(projectId);
-
-      // Con on_code: la codificación realiza el presupuesto independientemente de las aprobaciones.
-      // El status de aprobación sigue su propio flujo (pending_approval → pending al aprobar).
-      const isFirstCoding = costSettings.invoiceActualTrigger === "on_code" && !invoice.codedAt;
-      // El lifecycle nunca codifica directamente: un draft pasa a "submitted",
-      // el resto conserva su status. El track codedAt registra la codificación.
-      const newStatus = invoice.status === "draft" ? "submitted" : invoice.status;
-
+      // Determinar el nuevo estado
+      const newStatus = invoice.status === "draft" ? "pending_approval" : invoice.status;
+      
       // Guardar datos de la factura
       await updateDoc(doc(db, `projects/${projectId}/invoices`, invoice.id), {
         supplierNumber: codingForm.supplierNumber, invoiceDate: codingForm.invoiceDate ? Timestamp.fromDate(new Date(codingForm.invoiceDate)) : null,
@@ -574,25 +560,36 @@ export default function InvoiceDetailPage() {
         codedAt: Timestamp.now(), codedBy: permissions.userId, codedByName: permissions.userName,
       });
 
-      if (isFirstCoding) {
-        // Primera codificación: realizar presupuesto con los ítems finales del equipo de conta
-        const newBudgetItems = items.filter(i => i.subAccountId && i.baseAmount > 0)
-          .map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
-        if (newBudgetItems.length > 0) await realizeInvoice(projectId, newBudgetItems);
-        if (invoice.poId) await updatePOItemsInvoiced(projectId, invoice.poId, items, "add");
-      } else if (invoice.codedAt) {
-        // Re-codificación: ajustar ítems de presupuesto y PO
-        const oldBudgetItems = (invoice.items || [])
-          .filter((i: any) => i.subAccountId && i.baseAmount > 0)
-          .map((i: any) => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
-        const newBudgetItems = items.filter(i => i.subAccountId && i.baseAmount > 0)
-          .map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
-        if (oldBudgetItems.length > 0) await unrealizeInvoice(projectId, oldBudgetItems);
-        if (newBudgetItems.length > 0) await realizeInvoice(projectId, newBudgetItems);
-        if (invoice.poId) {
-          if (invoice.items && invoice.items.length > 0)
+      // Solo actualizar presupuesto y PO si la factura YA ESTABA realizada (re-codificación)
+      // NO tocar nada si es la primera codificación (draft → pending_approval)
+      if (invoice.poId && invoice.status !== "draft") {
+        const costSettings = await getCostSettings(projectId);
+        const wasRealized = shouldRealizeInvoice(invoice.status, costSettings);
+        
+        if (wasRealized) {
+          // Re-codificación de factura ya realizada: actualizar items de PO
+          // Primero restar los valores antiguos
+          if (invoice.items && invoice.items.length > 0) {
             await updatePOItemsInvoiced(projectId, invoice.poId, invoice.items, "subtract");
+          }
+          // Luego sumar los nuevos valores
           await updatePOItemsInvoiced(projectId, invoice.poId, items, "add");
+          
+          // También actualizar el presupuesto (committed/actual) si los items cambiaron
+          const oldBudgetItems = invoice.items
+            .filter((i: any) => i.subAccountId && i.baseAmount > 0)
+            .map((i: any) => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
+          const newBudgetItems = items
+            .filter(i => i.subAccountId && i.baseAmount > 0)
+            .map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
+          
+          // Revertir el realizado antiguo y aplicar el nuevo
+          if (oldBudgetItems.length > 0) {
+            await unrealizeInvoice(projectId, oldBudgetItems);
+          }
+          if (newBudgetItems.length > 0) {
+            await realizeInvoice(projectId, newBudgetItems);
+          }
         }
       }
 
@@ -619,15 +616,7 @@ export default function InvoiceDetailPage() {
     try {
       // Verificar si la factura estaba realizada según la configuración
       const costSettings = await getCostSettings(projectId);
-      // La realización depende de los tracks, no del status. Pasamos los tracks a
-      // shouldRealizeInvoice para que evalúe correctamente con el nuevo modelo.
-      const wasRealized = costSettings.invoiceActualTrigger === "on_code"
-        ? !!(invoice.codedAt)
-        : costSettings.invoiceActualTrigger === "on_account"
-          ? !!(invoice.accountedAt || invoice.accounted)
-          : shouldRealizeInvoice(invoice.status, costSettings, {
-              codedAt: invoice.codedAt, accountedAt: invoice.accountedAt || invoice.accounted, paidAt: invoice.paidAt, approvedAt: invoice.approvedAt,
-            });
+      const wasRealized = shouldRealizeInvoice(invoice.status, costSettings);
       
       // Si estaba realizada, revertir el presupuesto
       if (wasRealized) {
@@ -680,13 +669,12 @@ export default function InvoiceDetailPage() {
   };
   const canCancel = () => {
     if (invoice?.accounted) return false; // Bloqueada si está contabilizada
-    return invoice && !["cancelled", "rejected", "void", "paid"].includes(invoice.status) && !invoice.paidAt && permissions.isProjectRole;
+    return invoice && !["cancelled", "paid"].includes(invoice.status) && permissions.isProjectRole;
   };
   // Solo contabilidad ampliada puede modificar (genera nueva versión y reinicia aprobaciones)
   const canModify = () => {
-    if (invoice?.accounted || invoice?.accountedAt) return false;
-    if (invoice?.paidAt) return false;
-    if (["cancelled", "rejected", "void", "paid"].includes(invoice?.status || "")) return false;
+    if (invoice?.accounted) return false;
+    if (invoice?.status === "cancelled" || invoice?.status === "paid") return false;
     return permissions.accountingAccessLevel === "accounting_extended";
   };
   // Solo contabilidad ampliada puede hacer corrección administrativa (sin nueva versión)
@@ -709,7 +697,7 @@ export default function InvoiceDetailPage() {
   const canRegisterReturn = () => {
     if (!invoice) return false;
     if (invoice.documentType !== "guarantee") return false;
-    if (!invoice.paidAt && invoice.status !== "paid" && invoice.status !== "partial_return") return false;
+    if (invoice.status !== "paid" && invoice.status !== "partial_return") return false;
     return permissions.accountingAccessLevel === "accounting_extended";
   };
   
@@ -895,8 +883,7 @@ export default function InvoiceDetailPage() {
 
   if (!invoice) return null;
 
-  const displayState = getInvoiceDisplayState(invoice);
-  const config = STATUS_CONFIG[displayState] || STATUS_CONFIG.submitted;
+  const config = STATUS_CONFIG[invoice.status];
   const docConfig = DOC_TYPE_CONFIG[invoice.documentType];
   const StatusIcon = config.icon;
   const totals = calculateTotals();
@@ -981,7 +968,7 @@ export default function InvoiceDetailPage() {
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs text-slate-500 block mb-1">Nº Factura proveedor</label>
-                  <input value={codingForm.supplierNumber} onChange={(e) => setCodingForm({ ...codingForm, supplierNumber: e.target.value })} placeholder="Número de proveedor" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none" />
+                  <input value={codingForm.supplierNumber} onChange={(e) => setCodingForm({ ...codingForm, supplierNumber: e.target.value })} placeholder="Ej: G 07668" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none" />
                 </div>
                 <div>
                   <label className="text-xs text-slate-500 block mb-1">Fecha factura</label>
@@ -1009,16 +996,13 @@ export default function InvoiceDetailPage() {
                   <label className="text-xs text-slate-500 block mb-1">CIF/NIF</label>
                   <input value={codingForm.supplierTaxId} onChange={(e) => setCodingForm({ ...codingForm, supplierTaxId: e.target.value })} placeholder="B12345678" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none font-mono" />
                 </div>
-                <div className="col-span-2">
-                  <label className="text-xs text-slate-500 block mb-1">IBAN / BIC</label>
-                  <IBANField
-                    iban={codingForm.supplierIban}
-                    bic={codingForm.supplierBic}
-                    onIBANChange={(v) => setCodingForm({ ...codingForm, supplierIban: v })}
-                    onBICChange={(v) => setCodingForm({ ...codingForm, supplierBic: v })}
-                    ibanClassName="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none"
-                    bicClassName="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none"
-                  />
+                <div>
+                  <label className="text-xs text-slate-500 block mb-1">IBAN</label>
+                  <input value={codingForm.supplierIban} onChange={(e) => setCodingForm({ ...codingForm, supplierIban: e.target.value })} placeholder="ES12 3456 7890 1234 5678 90" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none font-mono" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 block mb-1">BIC</label>
+                  <input value={codingForm.supplierBic} onChange={(e) => setCodingForm({ ...codingForm, supplierBic: e.target.value })} placeholder="BBVAESMMXXX" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none font-mono" />
                 </div>
               </div>
             </div>
@@ -1122,7 +1106,7 @@ export default function InvoiceDetailPage() {
                           ) : (
                             <div className="relative">
                               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                              <input placeholder="Buscar cuenta" value={searchSubAccount} onChange={(e) => setSearchSubAccount(e.target.value)} onFocus={() => setSearchSubAccount("")} className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none" />
+                              <input placeholder="Buscar cuenta..." value={searchSubAccount} onChange={(e) => setSearchSubAccount(e.target.value)} onFocus={() => setSearchSubAccount("")} className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none" />
                               {searchSubAccount && (
                                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-10 max-h-48 overflow-y-auto">
                                   {subAccounts.filter((s) => s.code.toLowerCase().includes(searchSubAccount.toLowerCase()) || s.description.toLowerCase().includes(searchSubAccount.toLowerCase())).slice(0, 10).map((s) => (
@@ -1260,13 +1244,8 @@ export default function InvoiceDetailPage() {
                         </div>
                       </div>
 
-                      <div className="col-span-2">
-                        <label className="text-xs text-slate-500 block mb-1">Cantidad</label>
-                        <input type="number" step="0.01" min="0" value={item.quantity || ""} onChange={(e) => updateCodingItem(idx, "quantity", parseFloat(e.target.value) || 0)} placeholder="1" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none text-right font-mono" />
-                      </div>
-
                       <div className="col-span-3">
-                        <label className="text-xs text-slate-500 block mb-1">Precio unit.</label>
+                        <label className="text-xs text-slate-500 block mb-1">Base imponible</label>
                         <div className="relative">
                           <input type="number" step="0.01" value={item.unitPrice || ""} onChange={(e) => updateCodingItem(idx, "unitPrice", parseFloat(e.target.value) || 0)} placeholder="0.00" className="w-full px-3 py-2 pr-8 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none text-right font-mono" />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">€</span>
@@ -1335,12 +1314,12 @@ export default function InvoiceDetailPage() {
                 {codingForm.isAsset && (
                   <div className="col-span-2">
                     <label className="text-xs text-slate-500 block mb-1">Categoría de activo</label>
-                    <input value={codingForm.assetCategory} onChange={(e) => setCodingForm({ ...codingForm, assetCategory: e.target.value })} placeholder="Categoría del activo" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none" />
+                    <input value={codingForm.assetCategory} onChange={(e) => setCodingForm({ ...codingForm, assetCategory: e.target.value })} placeholder="Ej: Equipo de cámara" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none" />
                   </div>
                 )}
                 <div className="col-span-2">
                   <label className="text-xs text-slate-500 block mb-1">Notas internas</label>
-                  <textarea value={codingForm.notes} onChange={(e) => setCodingForm({ ...codingForm, notes: e.target.value })} rows={2} placeholder="Notas para el equipo de contabilidad" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none resize-none" />
+                  <textarea value={codingForm.notes} onChange={(e) => setCodingForm({ ...codingForm, notes: e.target.value })} rows={2} placeholder="Notas para el equipo de contabilidad..." className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none resize-none" />
                 </div>
               </div>
             </div>
@@ -1356,7 +1335,7 @@ export default function InvoiceDetailPage() {
       {toast && <div className="fixed bottom-4 right-4 z-50"><div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"} text-white text-sm font-medium`}>{toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}{toast.message}</div></div>}
       
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
             <div className="flex items-center gap-3">
               <Receipt size={24} className="text-slate-400" />
@@ -1364,28 +1343,20 @@ export default function InvoiceDetailPage() {
                 <div className="flex items-center gap-3 flex-wrap">
                   <h1 className="text-2xl font-semibold text-slate-900">{docConfig.label}</h1>
                   <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm font-mono">{invoice.displayNumber}</span>
-                  {/* Estado principal */}
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium text-sm ${config.bg} ${config.text}`}><StatusIcon size={14} />{config.label}</span>
-                  {/* Badges independientes por track (se muestran si el track está completo
-                      y no es ya el estado principal mostrado) */}
-                  {invoice.approvedAt && displayState !== "approved" && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg font-medium text-sm">
-                      <CheckCircle size={14} />Aprobada
-                    </span>
+                  {/* Estado - no mostrar si es "accounted" para evitar duplicar */}
+                  {invoice.status !== "accounted" && (
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium text-sm ${config.bg} ${config.text}`}><StatusIcon size={14} />{config.label}</span>
                   )}
-                  {invoice.codedAt && displayState !== "coded" && (
+                  {/* Codificada - siempre mostrar si está codificada */}
+                  {invoice.codedAt && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-violet-100 text-violet-700 rounded-lg font-medium text-sm">
                       <FileCheck size={14} />Codificada
                     </span>
                   )}
-                  {(invoice.accountedAt || invoice.accounted) && displayState !== "accounted" && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-teal-100 text-teal-700 rounded-lg font-medium text-sm">
+                  {/* Contabilizada */}
+                  {invoice.accounted && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg font-medium text-sm">
                       <Lock size={14} />Contabilizada
-                    </span>
-                  )}
-                  {invoice.paidAt && displayState !== "paid" && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-700 rounded-lg font-medium text-sm">
-                      <CreditCard size={14} />Pagada
                     </span>
                   )}
                   {invoice.poNumber && <Link href={`/project/${projectId}/accounting/pos/${invoice.poId}`} className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-100"><LinkIcon size={12} />PO-{invoice.poNumber}</Link>}
@@ -1413,7 +1384,7 @@ export default function InvoiceDetailPage() {
                   <Edit size={16} />Modificar
                 </Link>
               )}
-              {invoice.approvedAt && !invoice.paidAt && displayState !== "cancelled" && canPay() && <Link href={`/project/${projectId}/accounting/payments?invoice=${invoice.id}`} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium"><CreditCard size={16} />Ir a pagar</Link>}
+              {invoice.status === "pending" && canPay() && <Link href={`/project/${projectId}/accounting/payments?invoice=${invoice.id}`} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium"><CreditCard size={16} />Ir a pagar</Link>}
               
               {/* Botón de devolución para fianzas */}
               {canRegisterReturn() && (
@@ -1454,7 +1425,7 @@ export default function InvoiceDetailPage() {
         </div>
       </div>
 
-      <main className="px-24 py-8">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
         {/* Banner de delegación a contabilidad */}
         {invoice.status === "coding" && invoice.delegatedToAccounting && (
           <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
@@ -1523,7 +1494,7 @@ export default function InvoiceDetailPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           {/* Left: Document Preview */}
           <div className="space-y-6">
             {/* Document Preview with actions */}
@@ -1692,7 +1663,7 @@ export default function InvoiceDetailPage() {
             )}
 
             {/* Payments Section */}
-            {(invoice.paidAt || invoice.status === "paid" || payments.length > 0) && (
+            {(invoice.status === "paid" || payments.length > 0) && (
               <div className={`border rounded-2xl p-5 ${payments.reduce((sum, p) => sum + p.amount, 0) >= invoice.totalAmount * 0.99 ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
@@ -1797,7 +1768,7 @@ export default function InvoiceDetailPage() {
                   <div className="flex-1">
                     <p className="font-semibold text-amber-900">Pendiente de factura definitiva</p>
                     <p className="text-sm text-amber-700 mt-1">
-                      {(invoice.paidAt || invoice.status === "paid")
+                      {invoice.status === "paid" 
                         ? "Este documento ha sido pagado. Recuerda subir la factura definitiva del proveedor."
                         : "Este documento provisional deberá ser sustituido por la factura definitiva del proveedor."}
                     </p>
@@ -1901,7 +1872,7 @@ export default function InvoiceDetailPage() {
                     <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg font-medium">Devuelta completamente</span>
                   ) : invoice.status === "partial_return" ? (
                     <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-lg font-medium">Devolución parcial</span>
-                  ) : (invoice.paidAt || invoice.status === "paid") ? (
+                  ) : invoice.status === "paid" ? (
                     <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-lg font-medium">Depositada</span>
                   ) : (
                     <span className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-lg font-medium">Pendiente</span>
@@ -1957,7 +1928,7 @@ export default function InvoiceDetailPage() {
                 )}
                 
                 {/* Mensaje si no hay devoluciones */}
-                {(!invoice.guaranteeReturns || invoice.guaranteeReturns.length === 0) && (invoice.paidAt || invoice.status === "paid") && (
+                {(!invoice.guaranteeReturns || invoice.guaranteeReturns.length === 0) && invoice.status === "paid" && (
                   <p className="text-sm text-emerald-700 text-center py-2">
                     La fianza está depositada. Registra las devoluciones cuando se produzcan.
                   </p>
@@ -1972,17 +1943,12 @@ export default function InvoiceDetailPage() {
           <div className="mt-8 bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="px-6 py-3 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-semibold text-slate-900">Firmas</h3>
-              {invoice.approvedAt ? (
+              {invoice.status === "approved" || invoice.status === "pending" || invoice.status === "paid" ? (
                 <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
                   <CheckCircle size={12} />
                   Completado
                 </span>
-              ) : invoice.status === "rejected" ? (
-                <span className="text-xs text-red-600 font-medium flex items-center gap-1">
-                  <XCircle size={12} />
-                  Rechazado
-                </span>
-              ) : (invoice.status === "submitted" || invoice.status === "pending_approval") ? (
+              ) : invoice.status === "pending_approval" ? (
                 <span className="text-xs text-amber-600 font-medium flex items-center gap-1">
                   <Clock size={12} />
                   {invoice.approvalSteps.filter(s => s.status === "approved").length}/{invoice.approvalSteps.length}
@@ -2278,7 +2244,7 @@ export default function InvoiceDetailPage() {
                   value={returnForm.notes} 
                   onChange={(e) => setReturnForm({ ...returnForm, notes: e.target.value })}
                   rows={2}
-                  placeholder="Notas adicionales sobre la devolución"
+                  placeholder="Notas adicionales sobre la devolución..."
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-emerald-500 outline-none"
                 />
               </div>

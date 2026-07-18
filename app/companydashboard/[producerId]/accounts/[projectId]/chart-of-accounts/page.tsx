@@ -326,7 +326,7 @@ export default function ChartOfAccountsPage() {
             <button onClick={loadData} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white border border-slate-200 rounded-lg"><RefreshCw size={13} className={loading ? "animate-spin" : ""} /></button>
             <div className="relative">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input placeholder="Filtrar código o nombre" value={search} onChange={e => setSearch(e.target.value)}
+              <input placeholder="Filtrar código o nombre..." value={search} onChange={e => setSearch(e.target.value)}
                 className="pl-8 pr-3 py-1.5 text-sm border border-slate-200 bg-white rounded-lg focus:ring-1 focus:ring-slate-400 outline-none w-60" />
             </div>
             <button onClick={openCreate} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-lg hover:bg-slate-700">

@@ -305,17 +305,6 @@ export default function Dashboard() {
     setProcessingInvite(invitation.id);
     try {
       await updateDoc(doc(db, "invitations", invitation.id), { status: "accepted", respondedAt: new Date() });
-      // Log: invitation accepted
-      try {
-        const { addDoc, collection: col, serverTimestamp: sts } = await import("firebase/firestore");
-        const { db: fdb } = await import("@/lib/firebase");
-        await addDoc(col(fdb, `projects/${invitation.projectId}/logs`), {
-          type: "invitation_accepted",
-          actorName: userName,
-          actorEmail: userEmail,
-          createdAt: sts(),
-        });
-      } catch (_) {}
       await setDoc(doc(db, `projects/${invitation.projectId}/members`, userId), {
         userId,
         name: userName,
@@ -606,7 +595,7 @@ export default function Dashboard() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header con título y notificaciones */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 pt-10 pb-6">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
           <div className="flex items-center justify-center relative">
             <h1 className="text-3xl font-bold text-slate-900">Panel de proyectos</h1>
             
@@ -635,7 +624,7 @@ export default function Dashboard() {
             className="fixed inset-0 z-[100]" 
             onClick={() => setExpandedMessage(null)}
           />
-          <div className="fixed top-40 right-24 w-80 bg-white border border-slate-200 rounded-2xl shadow-lg z-[101] overflow-hidden">
+          <div className="fixed top-40 right-6 md:right-8 lg:right-12 xl:right-16 2xl:right-24 w-80 bg-white border border-slate-200 rounded-2xl shadow-lg z-[101] overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
               <span className="text-sm font-semibold text-slate-900">Notificaciones</span>
               {unreadMessagesCount > 0 && (
@@ -707,7 +696,7 @@ export default function Dashboard() {
                 </>
               )}
 
-      <main className="px-24 py-6">
+      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
         {/* Invitaciones */}
         {invitations.length > 0 && (
           <div className="mb-6">
@@ -722,7 +711,7 @@ export default function Dashboard() {
                   </h2>
                 </div>
               </div>
-              <div className="grid gap-3 grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {invitations.map((invitation) => (
                   <div key={invitation.id} className="bg-white rounded-2xl p-4 shadow-sm">
                     <div className="flex items-start gap-3 mb-3">
@@ -787,7 +776,7 @@ export default function Dashboard() {
             {/* Barra de filtros */}
             {activeProjectsCount > 0 && (
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6 relative z-30">
-                <div className="flex flex-row gap-3 items-center">
+                <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
                   {/* Buscador */}
                   <div className="relative flex-1">
                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -801,7 +790,7 @@ export default function Dashboard() {
                   </div>
 
                   {/* Filtros */}
-                  <div className="flex flex-wrap gap-2 flex-shrink-0">
+                  <div className="flex flex-wrap gap-2 lg:flex-shrink-0">
                     {/* Phase Dropdown */}
                     <div className="relative" ref={phaseDropdownRef}>
                       <button
@@ -921,7 +910,7 @@ export default function Dashboard() {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid gap-4 grid-cols-3 items-start">
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-start">
                     {filteredProjects.map((project) => renderProjectCard(project))}
                   </div>
                 )}
@@ -949,7 +938,7 @@ export default function Dashboard() {
                 </button>
                 
                 {showArchived && (
-                  <div className="grid gap-4 grid-cols-3 items-start">
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-start">
                     {archivedProjects.map((project) => renderArchivedCard(project))}
                   </div>
                 )}
