@@ -14,10 +14,14 @@ import {
   doc,
   getDocs,
   getDoc,
+  onSnapshot,
+  orderBy,
+  query,
   serverTimestamp,
   setDoc,
   Timestamp,
   updateDoc,
+  addDoc,
 } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -64,6 +68,10 @@ import {
   UserPlus,
   Users,
   X,
+  HeadphonesIcon,
+  CheckCheck,
+  Circle,
+  Loader2,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
@@ -146,6 +154,25 @@ interface Producer {
   users?: { id: string; name: string; email: string }[];
 }
 
+interface SupportChat {
+  id:            string;
+  userId:        string;
+  userName:      string;
+  userEmail:     string;
+  status:        "open" | "resolved";
+  lastMessage:   string;
+  lastMessageAt: Timestamp | null;
+  unreadAdmin:   number;
+}
+
+interface SupportMessage {
+  id:         string;
+  text:       string;
+  sender:     "user" | "admin";
+  senderName: string;
+  createdAt:  Timestamp | null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
@@ -154,7 +181,16 @@ export default function AdminDashboard() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"projects" | "users" | "producers" | "messages">("projects");
+  const [activeTab, setActiveTab] = useState<"projects" | "users" | "producers" | "messages" | "support">("projects");
+
+  // Support
+  const [supportChats,      setSupportChats]      = useState<SupportChat[]>([]);
+  const [activeChatId,      setActiveChatId]      = useState<string | null>(null);
+  const [chatMessages,      setChatMessages]       = useState<SupportMessage[]>([]);
+  const [supportInput,      setSupportInput]       = useState("");
+  const [supportSending,    setSupportSending]     = useState(false);
+  const [totalUnreadSupport, setTotalUnreadSupport] = useState(0);
+  const supportMsgsRef = useRef<HTMLDivElement>(null);
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -422,6 +458,60 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (contextUser?.uid && isAdmin) loadData();
   }, [contextUser?.uid, isAdmin]);
+
+  // Real-time support chats listener
+  useEffect(() => {
+    if (!isAdmin) return;
+    const unsub = onSnapshot(collection(db, "supportChats"), (snap) => {
+      const chats = snap.docs.map((d) => ({ id: d.id, ...d.data() } as SupportChat));
+      chats.sort((a, b) => (b.lastMessageAt?.seconds ?? 0) - (a.lastMessageAt?.seconds ?? 0));
+      setSupportChats(chats);
+      setTotalUnreadSupport(chats.reduce((sum, c) => sum + (c.unreadAdmin > 0 ? 1 : 0), 0));
+    });
+    return () => unsub();
+  }, [isAdmin]);
+
+  // Load messages when active chat changes
+  useEffect(() => {
+    if (!activeChatId) { setChatMessages([]); return; }
+    const q = query(
+      collection(db, `supportChats/${activeChatId}/messages`),
+      orderBy("createdAt", "asc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setChatMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() } as SupportMessage)));
+      setTimeout(() => supportMsgsRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
+    });
+    // Mark as read
+    updateDoc(doc(db, "supportChats", activeChatId), { unreadAdmin: 0 }).catch(() => {});
+    return () => unsub();
+  }, [activeChatId]);
+
+  const handleSupportReply = async () => {
+    const text = supportInput.trim();
+    if (!text || !activeChatId || supportSending) return;
+    setSupportSending(true);
+    setSupportInput("");
+    try {
+      await addDoc(collection(db, `supportChats/${activeChatId}/messages`), {
+        text, sender: "admin", senderName: "Soporte Filma", createdAt: serverTimestamp(),
+      });
+      await updateDoc(doc(db, "supportChats", activeChatId), {
+        lastMessage: text, lastMessageAt: serverTimestamp(), unreadUser: 1,
+      });
+    } finally {
+      setSupportSending(false);
+    }
+  };
+
+  const handleResolveChat = async (chatId: string) => {
+    await updateDoc(doc(db, "supportChats", chatId), { status: "resolved", unreadAdmin: 0 });
+    if (activeChatId === chatId) setActiveChatId(null);
+  };
+
+  const handleReopenChat = async (chatId: string) => {
+    await updateDoc(doc(db, "supportChats", chatId), { status: "open" });
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -1080,10 +1170,11 @@ export default function AdminDashboard() {
             {/* Tabs */}
             <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1">
               {[
-                { id: "projects", label: "Proyectos", icon: Briefcase, count: projects.length },
-                { id: "users", label: "Usuarios", icon: Users, count: users.length },
-                { id: "producers", label: "Productoras", icon: Building2, count: producers.length },
-                { id: "messages", label: "Mensajes", icon: Bell, count: activeMessages.length },
+                { id: "projects",  label: "Proyectos",   icon: Briefcase,       count: projects.length },
+                { id: "users",     label: "Usuarios",    icon: Users,           count: users.length },
+                { id: "producers", label: "Productoras", icon: Building2,       count: producers.length },
+                { id: "messages",  label: "Mensajes",    icon: Bell,            count: activeMessages.length },
+                { id: "support",   label: "Soporte",     icon: HeadphonesIcon,  count: totalUnreadSupport },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -1690,6 +1781,164 @@ export default function AdminDashboard() {
                     );
                   })}
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==================== SUPPORT TAB ==================== */}
+        {activeTab === "support" && (
+          <div className="flex gap-4 h-[620px]">
+
+            {/* Chat list */}
+            <div className="w-72 flex-shrink-0 bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden">
+              <div className="px-4 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-900">Conversaciones</p>
+                <span className="text-xs text-slate-400">{supportChats.length}</span>
+              </div>
+              <div className="flex-1 overflow-y-auto divide-y divide-slate-50">
+                {supportChats.length === 0 && (
+                  <div className="flex flex-col items-center justify-center h-full gap-3 p-6 text-center">
+                    <HeadphonesIcon size={24} className="text-slate-300" />
+                    <p className="text-xs text-slate-400">Sin conversaciones todavía</p>
+                  </div>
+                )}
+                {supportChats.map((chat) => (
+                  <button
+                    key={chat.id}
+                    onClick={() => setActiveChatId(chat.id)}
+                    className={`w-full text-left px-4 py-3.5 transition-colors hover:bg-slate-50 ${
+                      activeChatId === chat.id ? "bg-slate-50 border-l-2 border-slate-800" : ""
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-slate-900 truncate">{chat.userName}</p>
+                          {chat.status === "resolved" && (
+                            <span className="text-[9px] bg-emerald-50 text-emerald-600 border border-emerald-100 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">
+                              Cerrado
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400 truncate mt-0.5">{chat.lastMessage || "Sin mensajes"}</p>
+                      </div>
+                      {chat.unreadAdmin > 0 && (
+                        <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />
+                      )}
+                    </div>
+                    {chat.lastMessageAt && (
+                      <p className="text-[10px] text-slate-300 mt-1">
+                        {chat.lastMessageAt.toDate().toLocaleDateString("es-ES", { day: "2-digit", month: "short" })}
+                        {" · "}
+                        {chat.lastMessageAt.toDate().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Conversation */}
+            {activeChatId ? (() => {
+              const activeChat = supportChats.find((c) => c.id === activeChatId);
+              return (
+                <div className="flex-1 bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden">
+                  {/* Conv header */}
+                  <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{activeChat?.userName}</p>
+                      <p className="text-xs text-slate-400">{activeChat?.userEmail}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {activeChat?.status === "open" ? (
+                        <button
+                          onClick={() => handleResolveChat(activeChatId)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium transition-colors"
+                        >
+                          <CheckCheck size={13} />
+                          Cerrar conversación
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleReopenChat(activeChatId)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors"
+                        >
+                          <Circle size={11} />
+                          Reabrir
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Messages */}
+                  <div className="flex-1 overflow-y-auto px-5 py-5 space-y-3 bg-slate-50">
+                    {chatMessages.map((msg) => {
+                      const isAdmin = msg.sender === "admin";
+                      return (
+                        <div key={msg.id} className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}>
+                          <div className={`max-w-[70%] ${!isAdmin ? "flex items-end gap-2" : ""}`}>
+                            {!isAdmin && (
+                              <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0 mb-0.5">
+                                <span className="text-[10px] font-semibold text-slate-600">
+                                  {msg.senderName?.[0]?.toUpperCase() ?? "U"}
+                                </span>
+                              </div>
+                            )}
+                            <div>
+                              <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                                isAdmin
+                                  ? "bg-slate-800 text-white rounded-br-sm"
+                                  : "bg-white text-slate-800 border border-slate-200 rounded-bl-sm shadow-sm"
+                              }`}>
+                                {msg.text}
+                              </div>
+                              <p className={`text-[10px] text-slate-400 mt-1 ${isAdmin ? "text-right" : "text-left"}`}>
+                                {msg.createdAt
+                                  ? msg.createdAt.toDate().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
+                                  : ""}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div ref={supportMsgsRef} />
+                  </div>
+
+                  {/* Reply input */}
+                  {activeChat?.status === "open" ? (
+                    <div className="px-4 py-3.5 border-t border-slate-100 bg-white flex items-end gap-3">
+                      <textarea
+                        rows={1}
+                        value={supportInput}
+                        onChange={(e) => setSupportInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSupportReply(); } }}
+                        placeholder="Escribe una respuesta..."
+                        className="flex-1 resize-none text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-transparent leading-relaxed"
+                        style={{ maxHeight: 100 }}
+                      />
+                      <button
+                        onClick={handleSupportReply}
+                        disabled={!supportInput.trim() || supportSending}
+                        className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium flex items-center gap-2 transition-colors"
+                      >
+                        {supportSending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                        Enviar
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="px-4 py-3 border-t border-slate-100 bg-white">
+                      <p className="text-xs text-center text-slate-400">Conversación cerrada</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })() : (
+              <div className="flex-1 bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center gap-3 text-center">
+                <HeadphonesIcon size={32} className="text-slate-300" />
+                <p className="text-sm font-medium text-slate-500">Selecciona una conversación</p>
+                <p className="text-xs text-slate-400">Las respuestas llegan al usuario en tiempo real</p>
               </div>
             )}
           </div>
