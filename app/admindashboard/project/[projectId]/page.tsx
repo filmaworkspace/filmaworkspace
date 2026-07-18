@@ -163,6 +163,7 @@ export default function AdminProjectPage() {
   const [copiedFormId, setCopiedFormId] = useState<string | null>(null);
 
   const [project, setProject] = useState<ProjectData | null>(null);
+  const [workingTitle, setWorkingTitle] = useState("");
   const [members, setMembers] = useState<MemberData[]>([]);
   const [departments, setDepartments] = useState<DepartmentData[]>([]);
   const [allUsers, setAllUsers] = useState<{ id: string; name: string; email: string }[]>([]);
@@ -271,6 +272,9 @@ export default function AdminProjectPage() {
           if (producerDoc.exists()) producerNames.push(producerDoc.data().name);
         }
       }
+
+      const prodSnap = await getDoc(doc(db, `projects/${projectId}/config`, "production"));
+      if (prodSnap.exists()) setWorkingTitle(prodSnap.data().workingTitle || "");
 
       setProject({
         id: projectDoc.id,
@@ -425,6 +429,7 @@ export default function AdminProjectPage() {
           name: `${form.firstName || ""} ${form.lastName1 || ""}`.trim() || form.email,
           formUrl: url,
           projectName: project?.name || "",
+          workingTitle,
         }),
       });
       showToast("success", `Email reenviado a ${form.email}`);
@@ -648,6 +653,7 @@ export default function AdminProjectPage() {
           invitedByName: "Equipo de Filma Workspace",
           invitedEmail: emailRaw,
           projectName: project?.name || "",
+          workingTitle,
           projectId,
           role: addMemberForm.role,
           isExistingUser: !!selectedUser,

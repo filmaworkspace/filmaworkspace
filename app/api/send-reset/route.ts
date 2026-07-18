@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await resend.emails.send({
       from:           process.env.RESEND_FROM ?? "Filma Workspace <onboarding@resend.dev>",
       to:             [email],
-      subject:        "Restablecer tu contraseña — Filma Workspace",
+      subject:        "Filma Workspace | Restablecer tu contraseña",
       html:           resetPasswordHtml({ name, resetUrl }),
       text:           resetPasswordText({ name, resetUrl }),
       idempotencyKey: `reset-password/${email}/${Date.now()}`,

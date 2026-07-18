@@ -5,7 +5,9 @@ import { fichaInviteHtml, fichaInviteText } from "@/lib/emails/ficha-invite";
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
-  const { to, name, formUrl, projectName } = await req.json();
+  const { to, name, formUrl, projectName, workingTitle } = await req.json();
+
+  const projectLabel = workingTitle || projectName;
 
   if (!to || !formUrl || !projectName) {
     return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
@@ -14,7 +16,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await resend.emails.send({
     from: process.env.RESEND_FROM ?? "Filma Workspace <noreply@filmaworkspace.com>",
     to: [to],
-    subject: `Recordatorio: completa tu ficha — ${projectName}`,
+    subject: `${projectLabel} | Recordatorio: completa tu ficha`,
     html: fichaInviteHtml({ firstName: name || to, projectName, formUrl }),
     text: fichaInviteText({ firstName: name || to, projectName, formUrl }),
     tags: [{ name: "type", value: "form-reminder" }],

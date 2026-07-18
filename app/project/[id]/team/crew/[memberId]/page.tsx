@@ -242,6 +242,7 @@ export default function CrewMemberPage() {
   const [submittingApproval, setSubmittingApproval] = useState(false);
   const [exportingPdf, setExportingPdf]   = useState(false);
   const [projectName, setProjectName]     = useState("");
+  const [workingTitle, setWorkingTitle]   = useState("");
 
   const photoInputRef = useRef<HTMLInputElement>(null);
   const docInputRef   = useRef<HTMLInputElement>(null);
@@ -270,6 +271,8 @@ export default function CrewMemberPage() {
       setLoading(true);
       const projSnap = await getDoc(doc(db, "projects", projectId));
       if (projSnap.exists()) setProjectName(projSnap.data().name || "");
+      const prodSnap = await getDoc(doc(db, `projects/${projectId}/config`, "production"));
+      if (prodSnap.exists()) setWorkingTitle(prodSnap.data().workingTitle || "");
       const snap = await getDoc(doc(db, `projects/${projectId}/crew`, memberId));
       if (!snap.exists()) { router.push(`/project/${projectId}/team/crew`); return; }
       const d = snap.data();
@@ -434,6 +437,7 @@ export default function CrewMemberPage() {
           to:          member.email,
           firstName:   member.firstName || member.name || "",
           projectName: projectName || "la producción",
+          workingTitle,
           role:        member.role || "",
           formUrl:     realFormUrl,
           pin,

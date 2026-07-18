@@ -109,6 +109,7 @@ export default function AccountingUsersPage() {
   const [isAccountingExtended, setIsAccountingExtended] = useState(false);
   const [currentUserAccessLevel, setCurrentUserAccessLevel] = useState<string>("user");
   const [projectName, setProjectName] = useState("");
+  const [workingTitle, setWorkingTitle] = useState("");
   const [members, setMembers] = useState<Member[]>([]);
   const [accountingMembers, setAccountingMembers] = useState<Member[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([]);
@@ -196,6 +197,8 @@ export default function AccountingUsersPage() {
         const projectRef = doc(db, "projects", id as string);
         const projectSnap = await getDoc(projectRef);
         if (projectSnap.exists()) { const projectData = projectSnap.data(); setProjectName(projectData.name); const depts = projectData.departments || []; setDepartments(depts.map((d: string) => ({ name: d }))); }
+        const prodSnap = await getDoc(doc(db, `projects/${id}/config`, "production"));
+        if (prodSnap.exists()) setWorkingTitle(prodSnap.data().workingTitle || "");
 
         const membersRef = collection(db, `projects/${id}/members`);
         const membersSnap = await getDocs(membersRef);
@@ -275,6 +278,7 @@ export default function AccountingUsersPage() {
           invitedByName:  inviteData.invitedByName,
           invitedEmail:   email,
           projectName:    inviteData.projectName,
+          workingTitle,
           projectId:      id,
           role:           inviteData.role ?? inviteData.position ?? "",
           isExistingUser: invitedUserId !== null,

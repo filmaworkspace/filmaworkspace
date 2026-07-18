@@ -126,6 +126,7 @@ interface User {
   email: string;
   phone?: string;
   role: string;
+  isDemo?: boolean;
   projectCount: number;
   projects: UserProject[];
 }
@@ -194,6 +195,13 @@ export default function AdminDashboard() {
   const [newProject, setNewProject] = useState({ name: "", description: "", phase: "Desarrollo", producers: [] as string[], customId: "", useCustomId: false, language: "es" });
   const [newProducer, setNewProducer] = useState({ name: "" });
   const [assignUserForm, setAssignUserForm] = useState({ odId: "", role: "" });
+
+  // Demo user modal
+  const [showDemoModal, setShowDemoModal] = useState(false);
+  const [demoForm, setDemoForm] = useState({ name: "", email: "", password: "" });
+  const [demoCreated, setDemoCreated] = useState<{ email: string; password: string } | null>(null);
+  const [demoSaving, setDemoSaving] = useState(false);
+  const [demoError, setDemoError] = useState("");
 
   // Message modal states
   const [showMessageModal, setShowMessageModal] = useState(false);
@@ -329,6 +337,7 @@ export default function AdminDashboard() {
             email: data.email,
             phone: data.phone || "",
             role: data.role || "user",
+            isDemo: data.isDemo || false,
             projectCount: userProjectsSnap.size,
             projects: userProjects,
           };
@@ -531,31 +540,22 @@ export default function AdminDashboard() {
     showConfirmDialog(`Eliminar "${project.name}"`, "Esta acción eliminará el proyecto y todos sus miembros. No se puede deshacer.", () => _doDeleteProject(projectId));
   };
   const _doDeleteProject = async (projectId: string) => {
-    const project = projects.find((p) => p.id === projectId);
-    if (!project) return;
     setSaving(true);
     try {
-      // Eliminar miembros del proyecto y sus referencias en userProjects
-      const membersSnap = await getDocs(collection(db, `projects/${projectId}/members`));
-      for (const memberDoc of membersSnap.docs) {
-        await deleteDoc(doc(db, `userProjects/${memberDoc.id}/projects/${projectId}`));
-        await deleteDoc(memberDoc.ref);
-      }
-      
-      // Eliminar de companyProjects de cada productora
-      for (const producerId of project.producers || []) {
-        await deleteDoc(doc(db, `companyProjects/${producerId}/projects`, projectId));
-      }
-      
-      // Eliminar el proyecto
-      await deleteDoc(doc(db, "projects", projectId));
-      showToast("success", "Proyecto eliminado");
+      const res = await fetch("/api/delete-project", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Error al eliminar");
+      showToast("success", "Proyecto eliminado completamente");
       setActiveMenu(null);
       setConfirmDialog(null);
       await loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      showToast("error", "Error al eliminar");
+      showToast("error", error.message || "Error al eliminar");
     } finally {
       setSaving(false);
     }
@@ -709,6 +709,38 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error(error);
       showToast("error", "Error al actualizar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    const user = users.find((u) => u.id === userId);
+    if (!user) return;
+    showConfirmDialog(
+      `Eliminar "${user.name}"`,
+      `Se eliminará el usuario de Firebase Auth y Firestore. Sus proyectos quedarán intactos pero sin este miembro. Esta acción no se puede deshacer.`,
+      () => _doDeleteUser(userId),
+      { danger: true, confirmLabel: "Eliminar usuario" }
+    );
+  };
+  const _doDeleteUser = async (userId: string) => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/delete-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: userId }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Error al eliminar");
+      showToast("success", "Usuario eliminado completamente");
+      setConfirmDialog(null);
+      setShowUserDetails(null);
+      await loadData();
+    } catch (error: any) {
+      console.error(error);
+      showToast("error", error.message || "Error al eliminar");
     } finally {
       setSaving(false);
     }
@@ -900,6 +932,36 @@ export default function AdminDashboard() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     showToast("success", "CSV exportado");
+  };
+
+  const openDemoModal = () => {
+    const rand = Math.random().toString(36).slice(2, 7);
+    const pw = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 5).toUpperCase() + "!1";
+    setDemoForm({ name: "", email: `demo.${rand}@filmaworkspace.demo`, password: pw });
+    setDemoCreated(null);
+    setDemoError("");
+    setShowDemoModal(true);
+  };
+
+  const handleCreateDemoUser = async () => {
+    if (!demoForm.name.trim()) { setDemoError("El nombre es obligatorio"); return; }
+    setDemoSaving(true);
+    setDemoError("");
+    try {
+      const res = await fetch("/api/create-demo-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: demoForm.name.trim(), email: demoForm.email, password: demoForm.password }),
+      });
+      const body = await res.json();
+      if (!res.ok) { setDemoError(body.error || "Error al crear el usuario"); return; }
+      setDemoCreated({ email: demoForm.email, password: demoForm.password });
+      await loadData();
+    } catch {
+      setDemoError("Error de red");
+    } finally {
+      setDemoSaving(false);
+    }
   };
 
   const toggleProjectInMessage = (projectId: string) => {
@@ -1313,8 +1375,15 @@ export default function AdminDashboard() {
                 )}
               </div>
               <button
+                onClick={openDemoModal}
+                className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-700 ml-auto"
+              >
+                <UserPlus size={14} />
+                Usuario demo
+              </button>
+              <button
                 onClick={handleExportUsersCSV}
-                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 ml-auto"
+                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 <Download size={14} />
                 Exportar CSV
@@ -1345,6 +1414,11 @@ export default function AdminDashboard() {
                             {user.role === "admin" && (
                               <span className="px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded text-[10px] font-medium">
                                 Admin
+                              </span>
+                            )}
+                            {user.isDemo && (
+                              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-medium">
+                                Demo
                               </span>
                             )}
                           </div>
@@ -1378,6 +1452,14 @@ export default function AdminDashboard() {
                             title={user.role === "admin" ? "Quitar admin" : "Hacer admin"}
                           >
                             <Shield size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(user.id)}
+                            disabled={saving}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                            title="Eliminar usuario"
+                          >
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </div>
@@ -2174,12 +2256,20 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="px-6 py-4 border-t border-slate-100 bg-slate-50">
+                <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3">
                   <button
                     onClick={() => setShowUserDetails(null)}
-                    className="w-full px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"
+                    className="flex-1 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"
                   >
                     Cerrar
+                  </button>
+                  <button
+                    onClick={() => { setShowUserDetails(null); handleDeleteUser(user.id); }}
+                    disabled={saving}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                  >
+                    <Trash2 size={14} />
+                    Eliminar usuario
                   </button>
                 </div>
               </div>
@@ -2580,6 +2670,111 @@ export default function AdminDashboard() {
               >
                 {confirmDialog.confirmLabel || "Confirmar"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Demo User Modal */}
+      {showDemoModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100">
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">Crear usuario demo</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Sin email real ni teléfono. Solo para pruebas.</p>
+              </div>
+              <button onClick={() => setShowDemoModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {!demoCreated ? (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1.5">Nombre</label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Usuario Demo 1"
+                      value={demoForm.name}
+                      onChange={(e) => setDemoForm({ ...demoForm, name: e.target.value })}
+                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1.5">Email (auto-generado)</label>
+                    <input
+                      type="text"
+                      value={demoForm.email}
+                      onChange={(e) => setDemoForm({ ...demoForm, email: e.target.value })}
+                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent font-mono text-slate-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1.5">Contraseña (auto-generada)</label>
+                    <input
+                      type="text"
+                      value={demoForm.password}
+                      onChange={(e) => setDemoForm({ ...demoForm, password: e.target.value })}
+                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent font-mono text-slate-600"
+                    />
+                  </div>
+                  {demoError && (
+                    <div className="flex items-center gap-2 p-3 bg-red-50 rounded-xl">
+                      <AlertCircle size={14} className="text-red-500 flex-shrink-0" />
+                      <span className="text-xs text-red-600">{demoError}</span>
+                    </div>
+                  )}
+                  <div className="flex gap-3 pt-1">
+                    <button onClick={() => setShowDemoModal(false)} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm">
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleCreateDemoUser}
+                      disabled={demoSaving}
+                      className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-700 font-medium text-sm disabled:opacity-50"
+                    >
+                      {demoSaving ? "Creando..." : "Crear usuario"}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl mb-2">
+                    <CheckCircle size={16} className="text-green-600 flex-shrink-0" />
+                    <span className="text-sm text-green-700 font-medium">Usuario demo creado</span>
+                  </div>
+                  <div className="space-y-3 bg-slate-50 rounded-xl p-4">
+                    <div>
+                      <p className="text-[11px] text-slate-500 mb-1">Email</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <code className="text-sm text-slate-900 font-mono">{demoCreated.email}</code>
+                        <button onClick={() => navigator.clipboard.writeText(demoCreated!.email)} className="text-xs text-slate-500 hover:text-slate-800 px-2 py-1 rounded-lg hover:bg-slate-200">
+                          Copiar
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-slate-500 mb-1">Contraseña</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <code className="text-sm text-slate-900 font-mono">{demoCreated.password}</code>
+                        <button onClick={() => navigator.clipboard.writeText(demoCreated!.password)} className="text-xs text-slate-500 hover:text-slate-800 px-2 py-1 rounded-lg hover:bg-slate-200">
+                          Copiar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 pt-1">
+                    <button onClick={() => setShowDemoModal(false)} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm">
+                      Cerrar
+                    </button>
+                    <button onClick={openDemoModal} className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-700 font-medium text-sm">
+                      Crear otro
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

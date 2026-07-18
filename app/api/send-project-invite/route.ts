@@ -10,10 +10,13 @@ export async function POST(req: NextRequest) {
     invitedByName,
     invitedEmail,
     projectName,
+    workingTitle,
     projectId,
     role,
     isExistingUser,
   } = await req.json();
+
+  const projectLabel = workingTitle || projectName;
 
   if (!invitedEmail || !inviteeName || !projectName || !projectId) {
     return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
@@ -26,7 +29,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await resend.emails.send({
     from:           process.env.RESEND_FROM ?? "Filma Workspace <onboarding@resend.dev>",
     to:             [invitedEmail],
-    subject:        `${invitedByName} te ha invitado a "${projectName}" — Filma Workspace`,
+    subject:        `${projectLabel} | ${invitedByName} te ha invitado`,
     html:           projectInviteHtml({ inviteeName, invitedByName, projectName, role: role ?? "", isExistingUser, loginUrl, registerUrl }),
     text:           projectInviteText({ inviteeName, invitedByName, projectName, role: role ?? "", isExistingUser, loginUrl, registerUrl }),
     idempotencyKey: `project-invite/${projectId}/${invitedEmail}`,

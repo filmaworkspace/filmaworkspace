@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await resend.emails.send({
     from:    process.env.RESEND_FROM ?? "Filma Workspace <onboarding@resend.dev>",
     to:      [email],
-    subject: `${code} es tu código de verificación — Filma Workspace`,
+    subject: `Filma Workspace | ${code} es tu código de verificación`,
     html:    verifyCodeHtml({ name, code }),
     text:    verifyCodeText({ name, code }),
     tags:    [{ name: "type", value: "verify-code" }],

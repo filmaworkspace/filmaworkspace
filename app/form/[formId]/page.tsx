@@ -544,14 +544,24 @@ export default function FormPage() {
   const handlePinChange = (i: number, v: string) => {
     if (!/^\d?$/.test(v)) return;
     const next = [...pinDigits]; next[i] = v; setPinDigits(next); setPinError("");
-    if (v && i < 3) pinRefs[i + 1].current?.focus();
+    if (v && i < 3) { pinRefs[i + 1].current?.focus(); return; }
+    if (v && i === 3) {
+      const entered = next.join("");
+      if (entered !== formDoc?.pin) { setPinError("Código incorrecto"); setPinDigits(["", "", "", ""]); pinRefs[0].current?.focus(); return; }
+      setPinOk(true);
+    }
   };
   const handlePinKeyDown = (i: number, e: React.KeyboardEvent) => {
     if (e.key === "Backspace" && !pinDigits[i] && i > 0) pinRefs[i - 1].current?.focus();
   };
   const handlePinPaste = (e: React.ClipboardEvent) => {
     const text = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
-    if (text.length === 4) { setPinDigits(text.split("")); pinRefs[3].current?.focus(); }
+    if (text.length === 4) {
+      setPinDigits(text.split(""));
+      pinRefs[3].current?.focus();
+      if (text !== formDoc?.pin) { setPinError("Código incorrecto"); setPinDigits(["", "", "", ""]); pinRefs[0].current?.focus(); return; }
+      setPinOk(true);
+    }
   };
   const verifyPin = () => {
     const entered = pinDigits.join("");

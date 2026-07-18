@@ -86,6 +86,7 @@ export default function ConfigUsers() {
   const [userName, setUserName] = useState("");
   const [hasConfigAccess, setHasConfigAccess] = useState(false);
   const [projectName, setProjectName] = useState("");
+  const [workingTitle, setWorkingTitle] = useState("");
   const [members, setMembers] = useState<Member[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -151,6 +152,8 @@ export default function ConfigUsers() {
           setProjectName(projectSnap.data().name);
           setDepartments((projectSnap.data().departments || []).map((d: string) => ({ name: d })));
         }
+        const prodSnap = await getDoc(doc(db, `projects/${id}/config`, "production"));
+        if (prodSnap.exists()) setWorkingTitle(prodSnap.data().workingTitle || "");
 
         const membersSnap = await getDocs(collection(db, `projects/${id}/members`));
         setMembers(membersSnap.docs.map((d) => ({
@@ -241,6 +244,7 @@ export default function ConfigUsers() {
           invitedByName: inviteData.invitedByName,
           invitedEmail:  email,
           projectName:   inviteData.projectName,
+          workingTitle,
           projectId:     id,
           role:          inviteData.role ?? inviteData.position ?? "",
           isExistingUser: inviteData.invitedUserId !== null,
