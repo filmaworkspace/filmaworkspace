@@ -20,10 +20,7 @@ import {
   doc,
   getDocs,
   getDoc,
-  query,
-  Timestamp,
   updateDoc,
-  where,
 } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -31,33 +28,18 @@ import {
   AlertCircle,
   Archive,
   ArchiveRestore,
-  ArrowLeft,
+  BarChart3,
   Bell,
-  BellOff,
-  BellRing,
-  Building2,
-  Calendar,
-  Check,
   CheckCircle,
-  ChevronRight,
-  Clock,
-  CreditCard,
-  ExternalLink,
+  ChevronDown,
   Eye,
   EyeOff,
-  FileText,
+  ExternalLink,
   FolderOpen,
-  Layers,
   Lock,
   LogOut,
   MoreHorizontal,
-  Receipt,
-  Settings,
-  Shield,
-  Sparkles,
   Star,
-  StarOff,
-  User,
   Users,
 } from "lucide-react";
 
@@ -65,7 +47,6 @@ import {
 import { useUser } from "@/contexts/UserContext";
 
 // ─────────────────────────────────────────────────────────────────────────────
-
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -75,17 +56,8 @@ interface ProjectMembership {
   role: string;
   department?: string;
   position?: string;
-  permissions: {
-    config: boolean;
-    accounting: boolean;
-    team: boolean;
-  };
-  notifications: {
-    approvals: boolean;
-    payments: boolean;
-    invoices: boolean;
-    team: boolean;
-  };
+  permissions: { config: boolean; accounting: boolean; team: boolean };
+  notifications: { approvals: boolean; payments: boolean; invoices: boolean; team: boolean };
   archived: boolean;
   favorite: boolean;
   joinedAt: Date;
@@ -94,19 +66,20 @@ interface ProjectMembership {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const PHASES: Record<string, { label: string; color: string }> = {
-  development: { label: "Desarrollo", color: "bg-violet-100 text-violet-700" },
-  preproduction: { label: "Preproducción", color: "bg-amber-100 text-amber-700" },
-  production: { label: "Producción", color: "bg-emerald-100 text-emerald-700" },
-  postproduction: { label: "Postproducción", color: "bg-blue-100 text-blue-700" },
-  delivery: { label: "Entrega", color: "bg-slate-100 text-slate-700" },
+// Keys match the Spanish values stored in Firestore
+const PHASES: Record<string, { bg: string; text: string }> = {
+  Desarrollo:      { bg: "bg-sky-50",     text: "text-sky-700"     },
+  Preproducción:   { bg: "bg-amber-50",   text: "text-amber-700"   },
+  Rodaje:          { bg: "bg-indigo-50",  text: "text-indigo-700"  },
+  Postproducción:  { bg: "bg-purple-50",  text: "text-purple-700"  },
+  Finalizado:      { bg: "bg-emerald-50", text: "text-emerald-700" },
 };
 
 const NOTIFICATION_TYPES = [
-  { id: "approvals", label: "Aprobaciones", description: "POs y facturas pendientes", icon: Check, color: "blue" },
-  { id: "payments", label: "Pagos", description: "Vencimientos y pagos realizados", icon: CreditCard, color: "blue" },
-  { id: "invoices", label: "Facturas", description: "Nuevas facturas y cambios", icon: Receipt, color: "blue" },
-  { id: "team", label: "Equipo", description: "Cambios en el equipo", icon: Users, color: "green" },
+  { id: "approvals", label: "Aprobaciones", description: "POs y facturas pendientes de aprobación" },
+  { id: "payments",  label: "Pagos",        description: "Vencimientos y pagos realizados"        },
+  { id: "invoices",  label: "Facturas",     description: "Nuevas facturas y cambios de estado"    },
+  { id: "team",      label: "Equipo",       description: "Cambios en el equipo del proyecto"      },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,16 +88,16 @@ export default function ProfilePage() {
   const router = useRouter();
   const { user, isLoading, updateUserName } = useUser();
 
-  const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<"account" | "projects">("account");
+  const [saving, setSaving]   = useState(false);
+  const [toast, setToast]     = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [activeTab, setActiveTab]       = useState<"account" | "projects">("account");
   const [activeSection, setActiveSection] = useState<"profile" | "security">("profile");
 
-  const [formData, setFormData] = useState({ name: "", email: "" });
-  const [passwordData, setPasswordData] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
-  const [showPassword, setShowPassword] = useState({ current: false, new: false, confirm: false });
+  const [formData, setFormData]           = useState({ name: "", email: "" });
+  const [passwordData, setPasswordData]   = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [showPassword, setShowPassword]   = useState({ current: false, new: false, confirm: false });
 
-  const [projects, setProjects] = useState<ProjectMembership[]>([]);
+  const [projects, setProjects]           = useState<ProjectMembership[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [projectFilter, setProjectFilter] = useState<"all" | "active" | "archived" | "favorites">("active");
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
@@ -150,52 +123,47 @@ export default function ProfilePage() {
     if (!user?.uid) return;
     setLoadingProjects(true);
     try {
-      // Los proyectos están en userProjects/{uid}/projects
       const userProjectsSnap = await getDocs(collection(db, `userProjects/${user.uid}/projects`));
-      const projectsData: ProjectMembership[] = [];
 
-      for (const upDoc of userProjectsSnap.docs) {
-        const upData = upDoc.data();
-        const projectDoc = await getDoc(doc(db, "projects", upDoc.id));
-        
-        if (projectDoc.exists()) {
-          const pData = projectDoc.data();
-          const memberDoc = await getDoc(doc(db, `projects/${upDoc.id}/members`, user.uid));
-          const memberData = memberDoc.exists() ? memberDoc.data() : {};
+      const projectsData = await Promise.all(
+        userProjectsSnap.docs.map(async (upDoc) => {
+          const upData = upDoc.data();
+          const [projectSnap, memberSnap] = await Promise.all([
+            getDoc(doc(db, "projects", upDoc.id)),
+            getDoc(doc(db, `projects/${upDoc.id}/members`, user.uid)),
+          ]);
+          if (!projectSnap.exists()) return null;
 
-          projectsData.push({
-            projectId: upDoc.id,
+          const pData      = projectSnap.data();
+          const memberData = memberSnap.exists() ? memberSnap.data() : {};
+
+          return {
+            projectId:   upDoc.id,
             projectName: pData.name || "Sin nombre",
-            role: memberData.role || upData.role || "",
-            department: memberData.department,
-            position: memberData.position,
+            role:        memberData.role     || upData.role     || "",
+            department:  memberData.department,
+            position:    memberData.position,
             permissions: {
-              config: upData.permissions?.config || false,
+              config:     upData.permissions?.config     || false,
               accounting: upData.permissions?.accounting || false,
-              team: upData.permissions?.team || false,
+              team:       upData.permissions?.team       || false,
             },
-            notifications: upData.notifications || {
-              approvals: true,
-              payments: true,
-              invoices: true,
-              team: true,
-            },
-            archived: upData.archived || false,
-            favorite: upData.favorite || false,
-            joinedAt: upData.joinedAt?.toDate() || new Date(),
-            phase: pData.phase,
-          });
-        }
-      }
+            notifications: upData.notifications || { approvals: true, payments: true, invoices: true, team: true },
+            archived:  upData.archived  || pData.archived || false,
+            favorite:  upData.favorite  || false,
+            joinedAt:  upData.joinedAt?.toDate() || new Date(),
+            phase:     pData.phase,
+          } as ProjectMembership;
+        })
+      );
 
-      // Ordenar: favoritos primero, luego por nombre
-      projectsData.sort((a, b) => {
+      const valid = projectsData.filter((p): p is ProjectMembership => p !== null);
+      valid.sort((a, b) => {
         if (a.favorite && !b.favorite) return -1;
         if (!a.favorite && b.favorite) return 1;
         return a.projectName.localeCompare(b.projectName);
       });
-
-      setProjects(projectsData);
+      setProjects(valid);
     } catch (error) {
       console.error("Error loading projects:", error);
     } finally {
@@ -208,8 +176,8 @@ export default function ProfilePage() {
     setSaving(true);
     try {
       const currentUser = auth.currentUser;
-      if (!currentUser) { showToast("error", "No hay usuario autenticado"); setSaving(false); return; }
-      if (!formData.name.trim()) { showToast("error", "El nombre no puede estar vacío"); setSaving(false); return; }
+      if (!currentUser)           { showToast("error", "No hay usuario autenticado"); return; }
+      if (!formData.name.trim())  { showToast("error", "El nombre no puede estar vacío"); return; }
       await updateProfile(currentUser, { displayName: formData.name.trim() });
       updateUserName(formData.name.trim());
       showToast("success", "Perfil actualizado");
@@ -225,9 +193,9 @@ export default function ProfilePage() {
     setSaving(true);
     try {
       const currentUser = auth.currentUser;
-      if (!currentUser || !currentUser.email) { showToast("error", "No hay usuario autenticado"); setSaving(false); return; }
-      if (passwordData.newPassword.length < 6) { showToast("error", "Mínimo 6 caracteres"); setSaving(false); return; }
-      if (passwordData.newPassword !== passwordData.confirmPassword) { showToast("error", "Las contraseñas no coinciden"); setSaving(false); return; }
+      if (!currentUser?.email)                                         { showToast("error", "No hay usuario autenticado"); return; }
+      if (passwordData.newPassword.length < 6)                         { showToast("error", "Mínimo 6 caracteres"); return; }
+      if (passwordData.newPassword !== passwordData.confirmPassword)   { showToast("error", "Las contraseñas no coinciden"); return; }
       const credential = EmailAuthProvider.credential(currentUser.email, passwordData.currentPassword);
       await reauthenticateWithCredential(currentUser, credential);
       await updatePassword(currentUser, passwordData.newPassword);
@@ -248,16 +216,15 @@ export default function ProfilePage() {
     if (!user?.uid) return;
     const project = projects.find(p => p.projectId === projectId);
     if (!project) return;
-
     try {
       const newArchived = !project.archived;
-      await updateDoc(doc(db, `userProjects/${user.uid}/projects`, projectId), { archived: newArchived });
-      await updateDoc(doc(db, `projects`, projectId), { archived: newArchived });
-      setProjects(projects.map(p =>
-        p.projectId === projectId ? { ...p, archived: newArchived } : p
-      ));
+      await Promise.all([
+        updateDoc(doc(db, `userProjects/${user.uid}/projects`, projectId), { archived: newArchived }),
+        updateDoc(doc(db, "projects", projectId), { archived: newArchived }),
+      ]);
+      setProjects(projects.map(p => p.projectId === projectId ? { ...p, archived: newArchived } : p));
       showToast("success", project.archived ? "Proyecto restaurado" : "Proyecto archivado");
-    } catch (error) {
+    } catch {
       showToast("error", "Error al actualizar");
     }
     setProjectMenuOpen(null);
@@ -267,15 +234,10 @@ export default function ProfilePage() {
     if (!user?.uid) return;
     const project = projects.find(p => p.projectId === projectId);
     if (!project) return;
-
     try {
-      await updateDoc(doc(db, `userProjects/${user.uid}/projects`, projectId), {
-        favorite: !project.favorite,
-      });
-      setProjects(projects.map(p => 
-        p.projectId === projectId ? { ...p, favorite: !p.favorite } : p
-      ));
-    } catch (error) {
+      await updateDoc(doc(db, `userProjects/${user.uid}/projects`, projectId), { favorite: !project.favorite });
+      setProjects(projects.map(p => p.projectId === projectId ? { ...p, favorite: !p.favorite } : p));
+    } catch {
       showToast("error", "Error al actualizar");
     }
   };
@@ -284,38 +246,23 @@ export default function ProfilePage() {
     if (!user?.uid) return;
     const project = projects.find(p => p.projectId === projectId);
     if (!project) return;
-
     try {
       const newNotifications = { ...project.notifications, [notificationType]: value };
-      await updateDoc(doc(db, `userProjects/${user.uid}/projects`, projectId), {
-        notifications: newNotifications,
-      });
-      setProjects(projects.map(p => 
-        p.projectId === projectId ? { ...p, notifications: newNotifications } : p
-      ));
-    } catch (error) {
+      await updateDoc(doc(db, `userProjects/${user.uid}/projects`, projectId), { notifications: newNotifications });
+      setProjects(projects.map(p => p.projectId === projectId ? { ...p, notifications: newNotifications } : p));
+    } catch {
       showToast("error", "Error al actualizar");
     }
   };
 
   const toggleAllNotifications = async (projectId: string, enable: boolean) => {
     if (!user?.uid) return;
-
     try {
-      const newNotifications = {
-        approvals: enable,
-        payments: enable,
-        invoices: enable,
-        team: enable,
-      };
-      await updateDoc(doc(db, `userProjects/${user.uid}/projects`, projectId), {
-        notifications: newNotifications,
-      });
-      setProjects(projects.map(p => 
-        p.projectId === projectId ? { ...p, notifications: newNotifications } : p
-      ));
+      const newNotifications = { approvals: enable, payments: enable, invoices: enable, team: enable };
+      await updateDoc(doc(db, `userProjects/${user.uid}/projects`, projectId), { notifications: newNotifications });
+      setProjects(projects.map(p => p.projectId === projectId ? { ...p, notifications: newNotifications } : p));
       showToast("success", enable ? "Notificaciones activadas" : "Notificaciones silenciadas");
-    } catch (error) {
+    } catch {
       showToast("error", "Error al actualizar");
     }
   };
@@ -324,59 +271,22 @@ export default function ProfilePage() {
     try {
       await signOut(auth);
       router.push("/");
-    } catch (err) {
+    } catch {
       showToast("error", "Error al cerrar sesión");
     }
   };
 
   const filteredProjects = projects.filter(p => {
-    if (projectFilter === "active") return !p.archived;
-    if (projectFilter === "archived") return p.archived;
-    if (projectFilter === "favorites") return p.favorite && !p.archived;
+    if (projectFilter === "active")    return !p.archived;
+    if (projectFilter === "archived")  return  p.archived;
+    if (projectFilter === "favorites") return  p.favorite && !p.archived;
     return true;
   });
 
-  const getRoleBadge = (role: string, department?: string, position?: string) => {
-    // Roles de Accounting (violeta)
-    if (["EP", "PM", "Controller", "PC"].includes(role)) {
-      return <span className="text-xs font-medium text-violet-700 bg-violet-100 px-2 py-0.5 rounded-lg">{role}</span>;
-    }
-    // Roles de Team/Departamento (ámbar)
-    if (department) {
-      return (
-        <span className="text-xs font-medium text-amber-700 bg-amber-100 px-2 py-0.5 rounded-lg">
-          {department}{position ? ` · ${position}` : ""}
-        </span>
-      );
-    }
-    return null;
-  };
-
-  const getPermissionBadges = (project: ProjectMembership) => {
-    const badges = [];
-    if (project.permissions.config) {
-      badges.push(
-        <span key="config" className="text-xs font-medium text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
-          Config
-        </span>
-      );
-    }
-    if (project.permissions.accounting) {
-      badges.push(
-        <span key="accounting" className="text-xs font-medium text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded">
-          Accounting
-        </span>
-      );
-    }
-    if (project.permissions.team) {
-      badges.push(
-        <span key="team" className="text-xs font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-          Team
-        </span>
-      );
-    }
-    return badges;
-  };
+  const activeProjects   = projects.filter(p => !p.archived).length;
+  const archivedProjects = projects.filter(p =>  p.archived).length;
+  const favoriteProjects = projects.filter(p =>  p.favorite && !p.archived).length;
+  const userInitial      = formData.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U";
 
   if (isLoading) {
     return (
@@ -386,33 +296,30 @@ export default function ProfilePage() {
     );
   }
 
-  const userInitial = formData.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U";
-  const activeProjects = projects.filter(p => !p.archived).length;
-  const archivedProjects = projects.filter(p => p.archived).length;
-
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
+
       {/* Toast */}
       {toast && (
-        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 ${toast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 transition-all ${
+          toast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
+        }`}>
           {toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
           {toast.message}
         </div>
       )}
 
-      {/* Header */}
-      <div className="mt-16 border-b border-slate-200">
-        <div className="px-24 py-6">
-          <div className="flex items-center justify-between">
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div className="mt-[4.5rem]">
+        <div className="px-24 pt-10 pb-0">
+          <div className="flex items-center justify-between mb-8">
+            {/* Avatar + info */}
             <div className="flex items-center gap-4">
-              <Link href="/dashboard" className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
-                <ArrowLeft size={20} />
-              </Link>
-              <div className="w-14 h-14 rounded-full bg-slate-900 text-white flex items-center justify-center text-xl font-semibold">
+              <div className="w-14 h-14 rounded-full bg-slate-900 text-white flex items-center justify-center text-xl font-bold">
                 {userInitial}
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-slate-900">{formData.name || "Usuario"}</h1>
+                <h1 className="text-2xl font-bold text-slate-900">{formData.name || "Usuario"}</h1>
                 <p className="text-sm text-slate-500">{formData.email}</p>
               </div>
             </div>
@@ -422,19 +329,18 @@ export default function ProfilePage() {
               className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl text-sm font-medium transition-colors"
             >
               <LogOut size={16} />
-              <span className="inline">Cerrar sesión</span>
+              Cerrar sesión
             </button>
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-1 mt-6 bg-slate-100 p-1 rounded-xl w-fit">
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
             <button
               onClick={() => setActiveTab("account")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 activeTab === "account" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
               }`}
             >
-              <User size={16} />
               Mi cuenta
             </button>
             <button
@@ -443,62 +349,63 @@ export default function ProfilePage() {
                 activeTab === "projects" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
               }`}
             >
-              <FolderOpen size={16} />
               Mis proyectos
-              <span className="text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-md">{activeProjects}</span>
+              <span className={`text-xs px-1.5 py-0.5 rounded-md ${activeTab === "projects" ? "bg-slate-100 text-slate-600" : "bg-slate-200 text-slate-500"}`}>
+                {activeProjects}
+              </span>
             </button>
           </div>
         </div>
       </div>
 
       <main className="px-24 py-8">
-        {/* TAB: MI CUENTA */}
+
+        {/* ── TAB: MI CUENTA ─────────────────────────────────────────────────── */}
         {activeTab === "account" && (
-          <div className="max-w-3xl mx-auto">
-            {/* Sub-navigation */}
+          <div className="max-w-2xl">
+            {/* Sub-nav */}
             <div className="flex gap-6 mb-8 border-b border-slate-200">
-              <button
-                onClick={() => setActiveSection("profile")}
-                className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeSection === "profile" ? "border-slate-900 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                Información personal
-              </button>
-              <button
-                onClick={() => setActiveSection("security")}
-                className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeSection === "security" ? "border-slate-900 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                Seguridad
-              </button>
+              {(["profile", "security"] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setActiveSection(s)}
+                  className={`pb-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                    activeSection === s
+                      ? "border-slate-900 text-slate-900"
+                      : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  {s === "profile" ? "Información personal" : "Seguridad"}
+                </button>
+              ))}
             </div>
 
-            {/* Perfil */}
+            {/* ─ Perfil ─ */}
             {activeSection === "profile" && (
               <form onSubmit={handleProfileSubmit} className="space-y-6">
-                <div className="bg-white border border-slate-200 rounded-2xl p-6">
-                  <div className="flex items-center gap-5 pb-6 border-b border-slate-100">
-                    <div className="w-20 h-20 rounded-full bg-slate-900 text-white flex items-center justify-center text-3xl font-semibold">
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-6">
+                  {/* Avatar row */}
+                  <div className="flex items-center gap-4 pb-5 border-b border-slate-100">
+                    <div className="w-16 h-16 rounded-full bg-slate-900 text-white flex items-center justify-center text-2xl font-bold">
                       {userInitial}
                     </div>
-                    <div className="flex-1">
-                      <p className="text-lg font-semibold text-slate-900">{formData.name || "Usuario"}</p>
+                    <div>
+                      <p className="font-semibold text-slate-900">{formData.name || "Usuario"}</p>
                       <p className="text-sm text-slate-500 mt-0.5">{formData.email}</p>
-                      <div className="flex items-center gap-2 mt-2">
+                      <div className="flex items-center gap-2 mt-1.5">
                         <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-lg flex items-center gap-1">
                           <CheckCircle size={10} />
                           Verificado
                         </span>
-                        <span className="text-xs text-slate-400">{activeProjects} proyectos activos</span>
+                        <span className="text-xs text-slate-400">{activeProjects} proyecto{activeProjects !== 1 ? "s" : ""} activo{activeProjects !== 1 ? "s" : ""}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-6 pt-6">
+                  {/* Fields */}
+                  <div className="grid grid-cols-2 gap-5">
                     <div>
-                      <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Nombre</label>
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Nombre</label>
                       <input
                         type="text"
                         value={formData.name}
@@ -507,16 +414,17 @@ export default function ProfilePage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Email</label>
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Email</label>
                       <div className="relative">
                         <input
                           type="email"
                           disabled
                           value={formData.email}
-                          className="w-full px-4 py-2.5 border border-slate-200 bg-slate-50 rounded-xl text-sm text-slate-500 pr-10"
+                          className="w-full px-4 py-2.5 border border-slate-200 bg-slate-50 rounded-xl text-sm text-slate-400 pr-10"
                         />
-                        <Lock size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                        <Lock size={13} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" />
                       </div>
+                      <p className="text-[11px] text-slate-400 mt-1.5">El email no se puede cambiar</p>
                     </div>
                   </div>
                 </div>
@@ -533,12 +441,12 @@ export default function ProfilePage() {
               </form>
             )}
 
-            {/* Seguridad */}
+            {/* ─ Seguridad ─ */}
             {activeSection === "security" && (
               <form onSubmit={handlePasswordSubmit} className="space-y-6">
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-6">
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-5">
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Contraseña actual</label>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Contraseña actual</label>
                     <div className="relative">
                       <input
                         type={showPassword.current ? "text" : "password"}
@@ -547,19 +455,16 @@ export default function ProfilePage() {
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm pr-12"
                         placeholder="••••••••"
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword({ ...showPassword, current: !showPassword.current })}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                      >
+                      <button type="button" onClick={() => setShowPassword({ ...showPassword, current: !showPassword.current })}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                         {showPassword.current ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-2 gap-5">
                     <div>
-                      <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Nueva contraseña</label>
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Nueva contraseña</label>
                       <div className="relative">
                         <input
                           type={showPassword.new ? "text" : "password"}
@@ -568,17 +473,14 @@ export default function ProfilePage() {
                           className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm pr-12"
                           placeholder="••••••••"
                         />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword({ ...showPassword, new: !showPassword.new })}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                        >
+                        <button type="button" onClick={() => setShowPassword({ ...showPassword, new: !showPassword.new })}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                           {showPassword.new ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Confirmar</label>
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Confirmar</label>
                       <div className="relative">
                         <input
                           type={showPassword.confirm ? "text" : "password"}
@@ -587,16 +489,14 @@ export default function ProfilePage() {
                           className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm pr-12"
                           placeholder="••••••••"
                         />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword({ ...showPassword, confirm: !showPassword.confirm })}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                        >
+                        <button type="button" onClick={() => setShowPassword({ ...showPassword, confirm: !showPassword.confirm })}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                           {showPassword.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
                       </div>
                     </div>
                   </div>
+                  <p className="text-xs text-slate-400">Mínimo 6 caracteres</p>
                 </div>
 
                 <div className="flex justify-end">
@@ -613,162 +513,249 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* TAB: MIS PROYECTOS */}
+        {/* ── TAB: MIS PROYECTOS ─────────────────────────────────────────────── */}
         {activeTab === "projects" && (
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-3xl">
             {/* Filtros */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex gap-2">
-                {[
-                  { id: "active", label: "Activos", count: activeProjects },
-                  { id: "favorites", label: "Favoritos", count: projects.filter(p => p.favorite && !p.archived).length },
-                  { id: "archived", label: "Archivados", count: archivedProjects },
-                  { id: "all", label: "Todos", count: projects.length },
-                ].map((filter) => (
-                  <button
-                    key={filter.id}
-                    onClick={() => setProjectFilter(filter.id as any)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                      projectFilter === filter.id
-                        ? "bg-slate-900 text-white"
-                        : "text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    {filter.label}
-                    {filter.count > 0 && (
-                      <span className={`ml-1.5 text-xs ${projectFilter === filter.id ? "text-slate-300" : "text-slate-400"}`}>
-                        {filter.count}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
+            <div className="flex gap-2 mb-6">
+              {([
+                { id: "active",    label: "Activos",    count: activeProjects   },
+                { id: "favorites", label: "Favoritos",  count: favoriteProjects },
+                { id: "archived",  label: "Archivados", count: archivedProjects },
+                { id: "all",       label: "Todos",      count: projects.length  },
+              ] as const).map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setProjectFilter(f.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    projectFilter === f.id
+                      ? "bg-slate-900 text-white"
+                      : "text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  {f.label}
+                  {f.count > 0 && (
+                    <span className={`text-xs ${projectFilter === f.id ? "text-slate-300" : "text-slate-400"}`}>
+                      {f.count}
+                    </span>
+                  )}
+                </button>
+              ))}
             </div>
 
-            {/* Lista de proyectos */}
+            {/* Lista */}
             {loadingProjects ? (
               <div className="flex justify-center py-12">
-                <div className="w-8 h-8 border-3 border-slate-200 border-t-slate-600 rounded-full animate-spin" />
+                <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-600 rounded-full animate-spin" />
               </div>
             ) : filteredProjects.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center">
-                <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  {projectFilter === "archived" ? <Archive size={24} className="text-slate-400" /> : <FolderOpen size={24} className="text-slate-400" />}
-                </div>
-                <p className="text-slate-500">
-                  {projectFilter === "archived" ? "No tienes proyectos archivados" : 
-                   projectFilter === "favorites" ? "No tienes proyectos favoritos" :
+              <div className="bg-white border border-dashed border-slate-200 rounded-2xl p-12 text-center">
+                <FolderOpen size={28} className="text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500 text-sm">
+                  {projectFilter === "archived"  ? "No tienes proyectos archivados" :
+                   projectFilter === "favorites" ? "No tienes proyectos favoritos"  :
                    "No tienes proyectos"}
                 </p>
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredProjects.map((project) => (
-                  <div
-                    key={project.projectId}
-                    className={`bg-white border rounded-2xl transition-all ${
-                      project.archived ? "border-slate-200 opacity-60" : "border-slate-200 hover:border-slate-300"
-                    }`}
-                  >
-                    {/* Project Header */}
-                    <div className="px-5 py-4 flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <button
-                          onClick={() => toggleProjectFavorite(project.projectId)}
-                          className={`p-1.5 rounded-lg transition-colors ${
-                            project.favorite ? "text-amber-500 bg-amber-50" : "text-slate-300 hover:text-amber-400 hover:bg-amber-50"
-                          }`}
-                        >
-                          {project.favorite ? <Star size={18} fill="currentColor" /> : <Star size={18} />}
-                        </button>
-                        
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-slate-900">{project.projectName}</h3>
-                            {project.phase && PHASES[project.phase] && (
-                              <span className={`text-xs font-medium px-2 py-0.5 rounded-lg ${PHASES[project.phase].color}`}>
-                                {PHASES[project.phase].label}
-                              </span>
-                            )}
-                            {project.archived && (
-                              <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg flex items-center gap-1">
-                                <Archive size={10} />
-                                Archivado
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                            {getRoleBadge(project.role, project.department, project.position)}
-                            {getPermissionBadges(project).length > 0 && (
-                              <div className="flex items-center gap-1">
-                                {getPermissionBadges(project)}
+                {filteredProjects.map((project) => {
+                  const phaseStyle  = project.phase ? PHASES[project.phase] : null;
+                  const isExpanded  = expandedProject === project.projectId;
+                  const allNotifOn  = Object.values(project.notifications).every(Boolean);
+                  const allNotifOff = Object.values(project.notifications).every(v => !v);
+
+                  return (
+                    <div
+                      key={project.projectId}
+                      className={`bg-white border rounded-2xl transition-all ${
+                        project.archived ? "border-slate-200 opacity-70" : "border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      {/* ─ Card header ─ */}
+                      <div className="px-5 py-4">
+                        <div className="flex items-start justify-between gap-3">
+
+                          {/* Left: star + info */}
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <button
+                              onClick={() => toggleProjectFavorite(project.projectId)}
+                              className={`mt-0.5 p-1 rounded-lg transition-colors flex-shrink-0 ${
+                                project.favorite ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
+                              }`}
+                            >
+                              <Star size={16} fill={project.favorite ? "currentColor" : "none"} />
+                            </button>
+
+                            <div className="flex-1 min-w-0">
+                              {/* Name + badges */}
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="font-semibold text-slate-900 text-sm">{project.projectName}</h3>
+                                {phaseStyle && (
+                                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-lg ${phaseStyle.bg} ${phaseStyle.text}`}>
+                                    {project.phase}
+                                  </span>
+                                )}
+                                {project.archived && (
+                                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-lg bg-amber-50 text-amber-700 flex items-center gap-1">
+                                    <Archive size={9} />
+                                    Archivado
+                                  </span>
+                                )}
                               </div>
-                            )}
-                            <span className="text-xs text-slate-400">
-                              Desde {project.joinedAt.toLocaleDateString("es-ES", { month: "short", year: "numeric" })}
-                            </span>
+
+                              {/* Role */}
+                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                {project.role && (
+                                  <span className="text-[11px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg">
+                                    {project.role}
+                                  </span>
+                                )}
+                                {project.department && (
+                                  <span className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-lg">
+                                    {project.department}{project.position ? ` · ${project.position}` : ""}
+                                  </span>
+                                )}
+                                <span className="text-[11px] text-slate-400">
+                                  desde {project.joinedAt.toLocaleDateString("es-ES", { month: "short", year: "numeric" })}
+                                </span>
+                              </div>
+
+                              {/* ─ Entornos ─ */}
+                              {(project.permissions.accounting || project.permissions.team) && (
+                                <div className="mt-3">
+                                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Entornos</p>
+                                  <div className="flex gap-2">
+                                    {project.permissions.accounting && (
+                                      <Link href={`/project/${project.projectId}/accounting`}>
+                                        <div
+                                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors hover:opacity-80"
+                                          style={{
+                                            backgroundColor: "rgba(47, 82, 224, 0.08)",
+                                            borderColor:     "rgba(47, 82, 224, 0.25)",
+                                            color:           "#2F52E0",
+                                          }}
+                                        >
+                                          <BarChart3 size={11} />
+                                          Accounting
+                                        </div>
+                                      </Link>
+                                    )}
+                                    {project.permissions.team && (
+                                      <Link href={`/project/${project.projectId}/team`}>
+                                        <div
+                                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors hover:opacity-80"
+                                          style={{
+                                            backgroundColor: "rgba(137, 211, 34, 0.12)",
+                                            borderColor:     "rgba(137, 211, 34, 0.35)",
+                                            color:           "#6BA319",
+                                          }}
+                                        >
+                                          <Users size={11} />
+                                          Team
+                                        </div>
+                                      </Link>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Right: actions */}
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <button
+                              onClick={() => setExpandedProject(isExpanded ? null : project.projectId)}
+                              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                isExpanded ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"
+                              }`}
+                            >
+                              <Bell size={13} />
+                              <ChevronDown size={12} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                            </button>
+
+                            <div className="relative">
+                              <button
+                                onClick={() => setProjectMenuOpen(projectMenuOpen === project.projectId ? null : project.projectId)}
+                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                              >
+                                <MoreHorizontal size={16} />
+                              </button>
+                              {projectMenuOpen === project.projectId && (
+                                <>
+                                  <div className="fixed inset-0 z-40" onClick={() => setProjectMenuOpen(null)} />
+                                  <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden">
+                                    <Link
+                                      href={`/project/${project.projectId}`}
+                                      onClick={() => setProjectMenuOpen(null)}
+                                      className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                    >
+                                      <ExternalLink size={13} className="text-slate-400" />
+                                      Ir al proyecto
+                                    </Link>
+                                    <button
+                                      onClick={() => toggleProjectArchive(project.projectId)}
+                                      className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                    >
+                                      {project.archived ? (
+                                        <><ArchiveRestore size={13} className="text-slate-400" />Restaurar</>
+                                      ) : (
+                                        <><Archive size={13} className="text-slate-400" />Archivar</>
+                                      )}
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setExpandedProject(expandedProject === project.projectId ? null : project.projectId)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                            expandedProject === project.projectId
-                              ? "bg-slate-900 text-white"
-                              : "text-slate-600 hover:bg-slate-100"
-                          }`}
-                        >
-                          <Bell size={14} />
-                          Notificaciones
-                          <ChevronRight size={14} className={`transition-transform ${expandedProject === project.projectId ? "rotate-90" : ""}`} />
-                        </button>
-
-                        <div className="relative">
-                          <button
-                            onClick={() => setProjectMenuOpen(projectMenuOpen === project.projectId ? null : project.projectId)}
-                            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
-                          >
-                            <MoreHorizontal size={18} />
-                          </button>
-                          
-                          {projectMenuOpen === project.projectId && (
-                            <>
-                              <div className="fixed inset-0 z-40" onClick={() => setProjectMenuOpen(null)} />
-                              <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1">
-                                <Link
-                                  href={`/project/${project.projectId}`}
-                                  className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                                >
-                                  <ExternalLink size={14} className="text-slate-400" />
-                                  Ir al proyecto
-                                </Link>
+                      {/* ─ Notificaciones expandidas ─ */}
+                      {isExpanded && (
+                        <div className="border-t border-slate-100 px-5 py-4 bg-slate-50/60 rounded-b-2xl">
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Notificaciones</p>
+                            <button
+                              onClick={() => toggleAllNotifications(project.projectId, allNotifOff ? true : !allNotifOn)}
+                              className="text-xs text-slate-500 hover:text-slate-700 font-medium"
+                            >
+                              {allNotifOn ? "Silenciar todo" : "Activar todo"}
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {NOTIFICATION_TYPES.map((nt) => {
+                              const enabled = project.notifications[nt.id as keyof typeof project.notifications];
+                              return (
                                 <button
-                                  onClick={() => toggleProjectArchive(project.projectId)}
-                                  className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                  key={nt.id}
+                                  onClick={() => updateProjectNotification(project.projectId, nt.id, !enabled)}
+                                  className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-left transition-all ${
+                                    enabled
+                                      ? "bg-white border-slate-200 hover:border-slate-300"
+                                      : "bg-slate-100/60 border-slate-200 opacity-60 hover:opacity-80"
+                                  }`}
                                 >
-                                  {project.archived ? (
-                                    <>
-                                      <ArchiveRestore size={14} className="text-slate-400" />
-                                      Restaurar
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Archive size={14} className="text-slate-400" />
-                                      Archivar
-                                    </>
-                                  )}
+                                  <div>
+                                    <p className="text-xs font-medium text-slate-800">{nt.label}</p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">{nt.description}</p>
+                                  </div>
+                                  <div className={`w-8 h-4 rounded-full transition-colors flex-shrink-0 ml-3 relative ${
+                                    enabled ? "bg-slate-900" : "bg-slate-300"
+                                  }`}>
+                                    <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-all ${
+                                      enabled ? "left-4" : "left-0.5"
+                                    }`} />
+                                  </div>
                                 </button>
-                              </div>
-                            </>
-                          )}
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
-
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
