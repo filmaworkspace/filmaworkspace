@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { inter } from "@/lib/fonts";
 import { db } from "@/lib/firebase";
 import {
   doc, collection, addDoc, onSnapshot, updateDoc,
-  serverTimestamp, Timestamp, query, orderBy, setDoc,
+  serverTimestamp, Timestamp, query, orderBy, setDoc, runTransaction, increment,
 } from "firebase/firestore";
 import { useUser } from "@/contexts/UserContext";
 import { MessageCircle, X, Send, Loader2, CheckCheck, ArrowRight } from "lucide-react";
@@ -27,6 +28,7 @@ export default function SupportChat() {
   const [sending,        setSending]        = useState(false);
   const [unread,         setUnread]         = useState(0);
   const [resolved,       setResolved]       = useState(false);
+  const [ticketNumber,   setTicketNumber]   = useState<number | null>(null);
   const [step,           setStep]           = useState<"info" | "type" | "chat">("info");
   const [idName,         setIdName]         = useState("");
   const [idEmail,        setIdEmail]        = useState("");
@@ -38,6 +40,7 @@ export default function SupportChat() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLTextAreaElement>(null);
 
+  const pathname = usePathname();
   const uid     = user?.uid ?? null;
   const isAdmin = user?.role === "admin";
 
@@ -57,6 +60,7 @@ export default function SupportChat() {
         setStep("chat");
         setIdName(d.userName ?? "");
         setIdEmail(d.userEmail ?? "");
+        setTicketNumber(d.ticketNumber ?? null);
         setContactType(d.contactType ?? null);
         setInterestedInFW(d.interestedInFW ?? null);
         if (!open) setUnread(d.unreadUser ?? 0);
@@ -77,7 +81,7 @@ export default function SupportChat() {
   useEffect(() => {
     if (!open || !uid || isAdmin) return;
     setUnread(0);
-    updateDoc(doc(db, "supportChats", uid), { unreadUser: 0 }).catch(() => {});
+    updateDoc(doc(db, "supportChats", uid), { unreadUser: 0, currentPage: pathname }).catch(() => {});
     setTimeout(() => {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
       inputRef.current?.focus();
@@ -111,6 +115,13 @@ export default function SupportChat() {
   const handleTypeNext = async (type: "person" | "company", interested?: boolean) => {
     setIdSaving(true);
     try {
+      const counterRef = doc(db, "meta", "supportTicketCounter");
+      const ticketNum = await runTransaction(db, async (tx) => {
+        const snap = await tx.get(counterRef);
+        const next = (snap.exists() ? snap.data().count : 0) + 1;
+        tx.set(counterRef, { count: next }, { merge: true });
+        return next;
+      });
       await setDoc(chatRef, {
         userId:         uid,
         userName:       idName.trim(),
@@ -118,14 +129,32 @@ export default function SupportChat() {
         contactType:    type,
         interestedInFW: interested ?? null,
         status:         "open",
+        ticketNumber:   ticketNum,
         createdAt:      serverTimestamp(),
         lastMessageAt:  serverTimestamp(),
         lastMessage:    "",
         unreadAdmin:    0,
         unreadUser:     0,
       });
+      setTicketNumber(ticketNum);
       setContactType(type);
       setInterestedInFW(interested ?? null);
+
+      // Auto welcome message
+      const isSales = type === "company" && interested === true;
+      const agentLabel = isSales ? "agente de ventas" : "agente de soporte";
+      const firstName = idName.trim().split(" ")[0];
+      const welcomeText = isSales
+        ? `Hola, ${firstName} 👋 Nos alegra que estéis interesados en Filma. Un ${agentLabel} estará con vosotros en breve — mientras tanto, contadnos un poco sobre vuestro proyecto o lo que necesitáis.`
+        : `Hola, ${firstName} 👋 Un ${agentLabel} te atenderá enseguida. Mientras tanto, cuéntanos qué te trae por aquí.`;
+
+      await addDoc(msgsRef, {
+        text:       welcomeText,
+        sender:     "admin",
+        senderName: "Filma",
+        createdAt:  serverTimestamp(),
+      });
+
       setStep("chat");
       setTimeout(() => inputRef.current?.focus(), 80);
     } finally {
@@ -182,7 +211,12 @@ export default function SupportChat() {
               <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
                 <MessageCircle size={15} className="text-white" />
               </div>
-              <p className="text-sm font-semibold text-white">Soporte</p>
+              <div>
+                <p className="text-sm font-semibold text-white leading-tight">Soporte</p>
+                {ticketNumber && (
+                  <p className="text-[10px] text-white/50 leading-tight">#{String(ticketNumber).padStart(5, "0")}</p>
+                )}
+              </div>
             </div>
             <button onClick={() => setOpen(false)}
               className="w-7 h-7 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors">
@@ -333,10 +367,20 @@ export default function SupportChat() {
                 })}
 
                 {resolved && (
-                  <div className="text-center py-2">
+                  <div className="flex flex-col items-center gap-2 py-3">
                     <span className="text-[11px] bg-green-50 text-green-600 border border-green-100 px-3 py-1 rounded-full">
                       Conversación cerrada
                     </span>
+                    <button
+                      onClick={() => {
+                        setMessages([]);
+                        setResolved(false);
+                        setStep("info");
+                      }}
+                      className="text-xs text-slate-500 hover:text-slate-800 underline underline-offset-2"
+                    >
+                      Iniciar nueva conversación
+                    </button>
                   </div>
                 )}
                 <div ref={bottomRef} />
