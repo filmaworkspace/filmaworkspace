@@ -155,14 +155,16 @@ interface Producer {
 }
 
 interface SupportChat {
-  id:            string;
-  userId:        string;
-  userName:      string;
-  userEmail:     string;
-  status:        "open" | "resolved";
-  lastMessage:   string;
-  lastMessageAt: Timestamp | null;
-  unreadAdmin:   number;
+  id:             string;
+  userId:         string;
+  userName:       string;
+  userEmail:      string;
+  status:         "open" | "resolved";
+  lastMessage:    string;
+  lastMessageAt:  Timestamp | null;
+  unreadAdmin:    number;
+  contactType?:   "person" | "company";
+  interestedInFW?: boolean | null;
 }
 
 interface SupportMessage {
@@ -1846,9 +1848,25 @@ export default function AdminDashboard() {
                 <div className="flex-1 bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden">
                   {/* Conv header */}
                   <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                    <div>
+                    <div className="space-y-0.5">
                       <p className="text-sm font-semibold text-slate-900">{activeChat?.userName}</p>
                       <p className="text-xs text-slate-400">{activeChat?.userEmail}</p>
+                      <div className="flex items-center gap-2 pt-0.5">
+                        {activeChat?.contactType && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium bg-white border-slate-200 text-slate-600">
+                            {activeChat.contactType === "company" ? "🎬 Productora" : "👤 Persona"}
+                          </span>
+                        )}
+                        {activeChat?.contactType === "company" && activeChat.interestedInFW !== null && activeChat.interestedInFW !== undefined && (
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
+                            activeChat.interestedInFW
+                              ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                              : "bg-slate-50 border-slate-200 text-slate-500"
+                          }`}>
+                            {activeChat.interestedInFW ? "✓ Interesada en Filma" : "No interesada en Filma"}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {activeChat?.status === "open" ? (

@@ -436,12 +436,6 @@ export default function ControlHorarioPage() {
               </button>
             </div>
           </div>
-          {config && (
-            <p className="text-center text-sm text-slate-400 mt-1">
-              Envío automático a las <span className="font-medium text-slate-600">{config.sendTime}</span>
-              {config.enabled ? "" : " · Pausado"}
-            </p>
-          )}
         </div>
       </div>
 
@@ -540,8 +534,7 @@ export default function ControlHorarioPage() {
             {!currentDay ? (
               <div className="border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
                 <Users size={28} className="text-slate-300 mx-auto mb-3" />
-                <p className="text-sm font-medium text-slate-500 mb-1">Sin configuración para este día</p>
-                <p className="text-xs text-slate-400 mb-4">Se usarán los destinatarios por defecto al enviar</p>
+                <p className="text-sm font-medium text-slate-500 mb-4">Sin configuración para este día</p>
                 <button onClick={() => getOrCreateDay(selectedDate).then(() => loadDays())}
                   className="text-xs px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50">
                   Crear día
@@ -626,7 +619,6 @@ export default function ControlHorarioPage() {
           <div className="space-y-4">
             {/* Stats card */}
             <div className="bg-white border border-slate-200 rounded-2xl p-5">
-              <p className="text-xs font-medium text-slate-500 mb-4">Resumen del día</p>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-slate-600">Total enviados</span>
@@ -648,9 +640,6 @@ export default function ControlHorarioPage() {
                         width: `${(responded.length / currentDay.recipients.length) * 100}%`,
                       }} />
                     </div>
-                    <p className="text-xs text-slate-400 mt-1.5 text-right">
-                      {Math.round((responded.length / currentDay.recipients.length) * 100)}% completado
-                    </p>
                   </div>
                 )}
               </div>
@@ -658,7 +647,6 @@ export default function ControlHorarioPage() {
 
             {/* Legend */}
             <div className="bg-white border border-slate-200 rounded-2xl p-5">
-              <p className="text-xs font-medium text-slate-500 mb-3">Estado de días</p>
               <div className="space-y-2.5">
                 {[
                   { color: G,        label: "Todos respondieron" },
@@ -677,7 +665,6 @@ export default function ControlHorarioPage() {
             {/* Save template */}
             {currentDay && (
               <div className="bg-white border border-slate-200 rounded-2xl p-5">
-                <p className="text-xs font-medium text-slate-500 mb-3">Guardar como plantilla</p>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -712,7 +699,6 @@ export default function ControlHorarioPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-slate-900">Envío automático</p>
-                  <p className="text-xs text-slate-400">Activar Vercel Cron para envíos automáticos</p>
                 </div>
                 <button onClick={() => setCfgEnabled(!cfgEnabled)}
                   className={`w-10 h-6 rounded-full transition-colors relative ${cfgEnabled ? "" : "bg-slate-200"}`}
@@ -728,9 +714,7 @@ export default function ControlHorarioPage() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-700 block mb-1.5">
-                  Opciones de pausa para comer <span className="font-normal text-slate-400">(separadas por coma)</span>
-                </label>
+                <label className="text-xs font-medium text-slate-700 block mb-1.5">Opciones de pausa para comer</label>
                 <textarea
                   rows={3}
                   value={cfgComidaOptions}
@@ -738,7 +722,6 @@ export default function ControlHorarioPage() {
                   className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2"
                   placeholder="Sin pausa, 30 min, 1 hora, Personalizado"
                 />
-                <p className="text-[11px] text-slate-400 mt-1">La opción "Personalizado" permite escribir un valor libre</p>
               </div>
 
               <div className="flex gap-3 pt-1">
