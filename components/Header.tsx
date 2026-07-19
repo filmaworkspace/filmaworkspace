@@ -3,7 +3,6 @@
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useRealPathname } from "@/contexts/RealPathnameContext";
 import Link from "next/link";
 import Image from "next/image";
 import { inter } from "@/lib/fonts";
@@ -75,10 +74,7 @@ export default function Header() {
     box: false,
   });
   const router   = useRouter();
-  const _pathname = usePathname();
-  const { realPathname } = useRealPathname();
-  // Inside a project, use the real (unmasked) pathname for section detection
-  const pathname = _pathname.startsWith("/project/") && realPathname ? realPathname : _pathname;
+  const pathname = usePathname();
 
   const { user, isLoading } = useUser();
   const userName    = user?.name || "Usuario";
