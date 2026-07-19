@@ -163,8 +163,10 @@ interface SupportChat {
   lastMessage:    string;
   lastMessageAt:  Timestamp | null;
   unreadAdmin:    number;
-  contactType?:   "person" | "company";
+  contactType?:    "person" | "company";
   interestedInFW?: boolean | null;
+  currentPage?:    string;
+  ticketNumber?:   number;
 }
 
 interface SupportMessage {
@@ -1817,6 +1819,11 @@ export default function AdminDashboard() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium text-slate-900 truncate">{chat.userName}</p>
+                          {chat.ticketNumber && (
+                            <span className="text-[9px] text-slate-400 font-mono flex-shrink-0">
+                              #{String(chat.ticketNumber).padStart(5, "0")}
+                            </span>
+                          )}
                           {chat.status === "resolved" && (
                             <span className="text-[9px] bg-emerald-50 text-emerald-600 border border-emerald-100 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">
                               Cerrado
@@ -1849,8 +1856,18 @@ export default function AdminDashboard() {
                   {/* Conv header */}
                   <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                     <div className="space-y-0.5">
-                      <p className="text-sm font-semibold text-slate-900">{activeChat?.userName}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-slate-900">{activeChat?.userName}</p>
+                        {activeChat?.ticketNumber && (
+                          <span className="text-[10px] text-slate-400 font-mono">#{String(activeChat.ticketNumber).padStart(5, "0")}</span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-400">{activeChat?.userEmail}</p>
+                      {activeChat?.currentPage && (
+                        <p className="text-[10px] text-slate-400 font-mono truncate max-w-[260px]" title={activeChat.currentPage}>
+                          📍 {activeChat.currentPage}
+                        </p>
+                      )}
                       <div className="flex items-center gap-2 pt-0.5">
                         {activeChat?.contactType && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium bg-white border-slate-200 text-slate-600">
