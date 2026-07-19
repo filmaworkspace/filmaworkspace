@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import { useParams, usePathname } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
@@ -23,8 +24,9 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   }, [projectName]);
 
   useEffect(() => {
-    // Save the real pathname before masking it
-    setRealPathname(pathname);
+    // Commit the real pathname to context BEFORE masking the URL,
+    // so the Header re-renders with the correct section already set.
+    flushSync(() => setRealPathname(pathname));
     const clean = `/project/${id}`;
     if (window.location.pathname !== clean) {
       window.history.replaceState(null, "", clean);
