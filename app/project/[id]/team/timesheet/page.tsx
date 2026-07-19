@@ -10,9 +10,9 @@ import {
   query, where, orderBy, Timestamp, serverTimestamp,
 } from "firebase/firestore";
 import {
-  AlertCircle, ArrowLeft, ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight,
-  Clock, Copy, Eye, Hash, Link2, Plus, RefreshCw, Send, Settings, Trash2,
-  UserMinus, UserPlus, Users, X, CheckCircle, MoreHorizontal, BookTemplate,
+  AlertCircle, Check, ChevronLeft, ChevronRight,
+  Download, Eye, Hash, Link2, Pencil, Plus, RefreshCw, Send, Settings, Trash2,
+  UserMinus, UserPlus, Users, X, CheckCircle,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 
@@ -23,8 +23,10 @@ const G = "#6BA319";
 interface HorarioConfig {
   enabled:           boolean;
   sendTime:          string;
-  comidaOptions:     string[];
   defaultRecipients: Recipient[];
+  emailContactName?: string;
+  emailContactMail?: string;
+  emailBody?:        string;
 }
 
 interface Recipient {
@@ -56,20 +58,21 @@ interface FormResponse {
   observaciones: string;
 }
 
-interface Template {
+interface Group {
   id:         string;
   name:       string;
   recipients: Recipient[];
 }
 
 interface CrewMember {
-  id:        string;
-  firstName: string;
-  lastName1: string;
-  role:      string;
-  email:     string;
-  status:    string;
-  section:   string;
+  id:         string;
+  firstName:  string;
+  lastName1:  string;
+  role:       string;
+  email:      string;
+  status:     string;
+  section:    string;
+  department: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -110,32 +113,46 @@ export default function ControlHorarioPage() {
   const [days,       setDays]       = useState<Record<string, DayConfig>>({});
   const [forms,      setForms]      = useState<Record<string, FormResponse[]>>({}); // keyed by date
   const [crew,       setCrew]       = useState<CrewMember[]>([]);
-  const [templates,  setTemplates]  = useState<Template[]>([]);
+  const [groups,     setGroups]     = useState<Group[]>([]);
   const [selectedDate, setSelectedDate] = useState(today());
 
   // UI state
   const [showConfig,     setShowConfig]     = useState(false);
   const [showAddMember,  setShowAddMember]  = useState(false);
-  const [showTemplates,  setShowTemplates]  = useState(false);
+  const [showGroups,     setShowGroups]     = useState(false);
+  const [groupView,      setGroupView]      = useState<"list" | "create" | "edit">("list");
+  const [editingGroup,   setEditingGroup]   = useState<Group | null>(null);
+  const [groupFormName,  setGroupFormName]  = useState("");
+  const [groupFormUids,  setGroupFormUids]  = useState<string[]>([]);
   const [showFormDetail, setShowFormDetail] = useState<FormResponse | null>(null);
   const [saving,         setSaving]         = useState(false);
   const [sending,        setSending]        = useState(false);
   const [toast,          setToast]          = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
   // Config form state
-  const [cfgSendTime,      setCfgSendTime]      = useState("19:00");
-  const [cfgEnabled,       setCfgEnabled]       = useState(true);
-  const [cfgComidaOptions, setCfgComidaOptions] = useState("Sin pausa,15 min,30 min,45 min,1 hora,1h 30min,2 horas,Personalizado");
+  const [cfgSendTime,        setCfgSendTime]        = useState("19:00");
+  const [cfgEnabled,         setCfgEnabled]         = useState(true);
+  const [cfgContactName,     setCfgContactName]     = useState("");
+  const [cfgContactMail,     setCfgContactMail]     = useState("");
+  const [cfgEmailBody,       setCfgEmailBody]       = useState("");
 
   // New day jornada edit
   const [editingJornada, setEditingJornada] = useState(false);
   const [jornadaInput,   setJornadaInput]   = useState("");
 
-  // Template save
-  const [templateName, setTemplateName] = useState("");
-
   // Review email sending: keyed by uid → "sending" | "sent" | null
   const [reviewState, setReviewState] = useState<Record<string, "sending" | "sent">>({});
+
+  // Download modal
+  const [showDownload,   setShowDownload]   = useState(false);
+  const [dlMode,         setDlMode]         = useState<"day" | "week" | "month">("month");
+  const [dlMonth,        setDlMonth]        = useState(today().slice(0, 7));      // YYYY-MM
+  const [dlWeek,         setDlWeek]         = useState(() => {
+    const d = new Date(); const y = d.getFullYear();
+    const w = Math.ceil((((d.getTime() - new Date(y, 0, 1).getTime()) / 86400000) + new Date(y, 0, 1).getDay() + 1) / 7);
+    return `${y}-W${String(w).padStart(2, "0")}`;
+  });
+  const [downloading,    setDownloading]    = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => { if (u) loadAll(); });
@@ -152,7 +169,7 @@ export default function ControlHorarioPage() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      await Promise.all([loadConfig(), loadDays(), loadCrew(), loadTemplates()]);
+      await Promise.all([loadConfig(), loadDays(), loadCrew(), loadGroups()]);
     } finally {
       setLoading(false);
     }
@@ -163,14 +180,14 @@ export default function ControlHorarioPage() {
     if (snap.exists()) {
       const d = snap.data() as HorarioConfig;
       setConfig(d);
-      setCfgSendTime(d.sendTime ?? "19:00");
-      setCfgEnabled(d.enabled ?? true);
-      setCfgComidaOptions((d.comidaOptions ?? []).join(","));
+      setCfgSendTime(d.sendTime       ?? "19:00");
+      setCfgEnabled(d.enabled         ?? true);
+      setCfgContactName(d.emailContactName ?? "");
+      setCfgContactMail(d.emailContactMail ?? "");
+      setCfgEmailBody(d.emailBody          ?? "");
     } else {
       const def: HorarioConfig = {
-        enabled: true, sendTime: "19:00",
-        comidaOptions: ["Sin pausa","15 min","30 min","45 min","1 hora","1h 30min","2 horas","Personalizado"],
-        defaultRecipients: [],
+        enabled: true, sendTime: "19:00", defaultRecipients: [],
       };
       await setDoc(doc(db, `projects/${id}/horario/__config__`), def);
       setConfig(def);
@@ -219,14 +236,15 @@ export default function ControlHorarioPage() {
         role:      v.role      || "",
         email:     v.email     || "",
         status:    v.status    || "active",
-        section:   v.section   || "",
+        section:    v.section    || "",
+        department: v.department || "",
       };
     }));
   };
 
-  const loadTemplates = async () => {
-    const snap = await getDocs(collection(db, `projects/${id}/horarioTemplates`));
-    setTemplates(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Template)));
+  const loadGroups = async () => {
+    const snap = await getDocs(collection(db, `projects/${id}/horarioGroups`));
+    setGroups(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Group)));
   };
 
   // ── Day helpers ───────────────────────────────────────────────────────────
@@ -353,6 +371,82 @@ export default function ControlHorarioPage() {
     }
   };
 
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      // Determine date range
+      let dateStart: string, dateEnd: string, label: string;
+      if (dlMode === "day") {
+        dateStart = dateEnd = selectedDate;
+        label = selectedDate;
+      } else if (dlMode === "week") {
+        // Parse YYYY-Www → Monday of that week
+        const [wy, ww] = dlWeek.split("-W").map(Number);
+        const jan4 = new Date(wy, 0, 4);
+        const monday = new Date(jan4.getTime() + (ww - 1) * 7 * 86400000 - (jan4.getDay() || 7 - 1) * 86400000);
+        const sunday = new Date(monday.getTime() + 6 * 86400000);
+        dateStart = monday.toISOString().slice(0, 10);
+        dateEnd   = sunday.toISOString().slice(0, 10);
+        label     = `semana-${dlWeek}`;
+      } else {
+        dateStart = `${dlMonth}-01`;
+        const [y, m] = dlMonth.split("-").map(Number);
+        dateEnd = new Date(y, m, 0).toISOString().slice(0, 10);
+        label   = dlMonth;
+      }
+
+      // Load all submitted forms in range
+      const snap = await getDocs(
+        query(
+          collection(db, `projects/${id}/horarioForms`),
+          where("date", ">=", dateStart),
+          where("date", "<=", dateEnd),
+        )
+      );
+      type FullForm = FormResponse & { date: string; jornada: number };
+      const allForms = snap.docs.map((d) => ({ id: d.id, ...d.data() } as FullForm));
+
+      // Build crew map: uid → { department, section }
+      const crewMap = Object.fromEntries(crew.map((c) => [c.id, c]));
+
+      // Sort: department → name → date
+      const sorted = allForms.sort((a, b) => {
+        const deptA = crewMap[a.recipientUid]?.department || crewMap[a.recipientUid]?.section || "zzz";
+        const deptB = crewMap[b.recipientUid]?.department || crewMap[b.recipientUid]?.section || "zzz";
+        if (deptA !== deptB) return deptA.localeCompare(deptB, "es");
+        if (a.recipientName !== b.recipientName) return a.recipientName.localeCompare(b.recipientName, "es");
+        return a.date.localeCompare(b.date);
+      });
+
+      const header = ["Nombre", "Departamento", "Rol", "Fecha", "Jornada", "Entrada", "Salida", "Pausa (min)", "Observaciones", "Estado"];
+      const rows = sorted.map((f) => {
+        const cm = crewMap[f.recipientUid];
+        return [
+          f.recipientName,
+          cm?.department || cm?.section || "—",
+          f.recipientRole || cm?.role || "—",
+          f.date,
+          String(f.jornada ?? ""),
+          f.entrada  || "—",
+          f.salida   || "—",
+          f.comida   != null ? String(f.comida) : "—",
+          f.observaciones || "",
+          f.submittedAt ? "Rellenado" : "Pendiente",
+        ];
+      });
+
+      const csv = [header, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(";")).join("\n");
+      const a = Object.assign(document.createElement("a"), {
+        href:     URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" })),
+        download: `control-horario-${label}.csv`,
+      });
+      a.click();
+      setShowDownload(false);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const handleUpdateJornada = async () => {
     const n = parseInt(jornadaInput);
     if (isNaN(n) || n < 1) return;
@@ -365,11 +459,12 @@ export default function ControlHorarioPage() {
   const handleSaveConfig = async () => {
     setSaving(true);
     try {
-      const opts = cfgComidaOptions.split(",").map((s) => s.trim()).filter(Boolean);
       const updated: Partial<HorarioConfig> = {
-        enabled: cfgEnabled,
-        sendTime: cfgSendTime,
-        comidaOptions: opts,
+        enabled:          cfgEnabled,
+        sendTime:         cfgSendTime,
+        emailContactName: cfgContactName.trim(),
+        emailContactMail: cfgContactMail.trim(),
+        emailBody:        cfgEmailBody.trim(),
       };
       await updateDoc(doc(db, `projects/${id}/horario/__config__`), updated);
       setConfig((prev) => prev ? { ...prev, ...updated } : null);
@@ -382,29 +477,54 @@ export default function ControlHorarioPage() {
     }
   };
 
-  const handleSaveTemplate = async () => {
-    if (!templateName.trim()) return;
-    const day = currentDay;
-    if (!day) return;
-    const ref = doc(collection(db, `projects/${id}/horarioTemplates`));
-    const tmpl: Template = { id: ref.id, name: templateName.trim(), recipients: day.recipients };
-    await setDoc(ref, { name: tmpl.name, recipients: tmpl.recipients, createdAt: serverTimestamp() });
-    setTemplates((prev) => [...prev, tmpl]);
-    setTemplateName("");
-    showToast("success", "Plantilla guardada");
+  const openCreateGroup = () => {
+    setEditingGroup(null);
+    setGroupFormName("");
+    setGroupFormUids([]);
+    setGroupView("create");
   };
 
-  const handleApplyTemplate = async (tmpl: Template) => {
+  const openEditGroup = (g: Group) => {
+    setEditingGroup(g);
+    setGroupFormName(g.name);
+    setGroupFormUids(g.recipients.map((r) => r.uid));
+    setGroupView("edit");
+  };
+
+  const handleSaveGroup = async () => {
+    if (!groupFormName.trim() || groupFormUids.length === 0) return;
+    const recipients: Recipient[] = crew
+      .filter((m) => groupFormUids.includes(m.id))
+      .map((m) => ({ uid: m.id, name: `${m.firstName} ${m.lastName1}`.trim(), email: m.email, role: m.role }));
+
+    if (groupView === "edit" && editingGroup) {
+      await updateDoc(doc(db, `projects/${id}/horarioGroups`, editingGroup.id), { name: groupFormName.trim(), recipients });
+      setGroups((prev) => prev.map((g) => g.id === editingGroup.id ? { ...g, name: groupFormName.trim(), recipients } : g));
+      showToast("success", "Grupo actualizado");
+    } else {
+      const ref = doc(collection(db, `projects/${id}/horarioGroups`));
+      await setDoc(ref, { name: groupFormName.trim(), recipients, createdAt: serverTimestamp() });
+      setGroups((prev) => [...prev, { id: ref.id, name: groupFormName.trim(), recipients }]);
+      showToast("success", "Grupo creado");
+    }
+    setGroupView("list");
+  };
+
+  const handleApplyGroup = async (g: Group) => {
     const day = await getOrCreateDay(selectedDate);
-    await updateDoc(doc(db, `projects/${id}/horario`, selectedDate), { recipients: tmpl.recipients });
-    setDays((prev) => ({ ...prev, [selectedDate]: { ...day, recipients: tmpl.recipients } }));
-    setShowTemplates(false);
-    showToast("success", `Plantilla "${tmpl.name}" aplicada`);
+    // Merge: add members not already in the day list
+    const existing = new Set(day.recipients.map((r) => r.uid));
+    const toAdd = g.recipients.filter((r) => !existing.has(r.uid));
+    if (toAdd.length === 0) { showToast("error", "Todos ya están en el día"); return; }
+    const updated = [...day.recipients, ...toAdd];
+    await updateDoc(doc(db, `projects/${id}/horario`, selectedDate), { recipients: updated });
+    setDays((prev) => ({ ...prev, [selectedDate]: { ...day, recipients: updated } }));
+    showToast("success", `${toAdd.length} persona${toAdd.length !== 1 ? "s" : ""} añadida${toAdd.length !== 1 ? "s" : ""} del grupo "${g.name}"`);
   };
 
-  const handleDeleteTemplate = async (id_tmpl: string) => {
-    await deleteDoc(doc(db, `projects/${id}/horarioTemplates`, id_tmpl));
-    setTemplates((prev) => prev.filter((t) => t.id !== id_tmpl));
+  const handleDeleteGroup = async (gid: string) => {
+    await deleteDoc(doc(db, `projects/${id}/horarioGroups`, gid));
+    setGroups((prev) => prev.filter((g) => g.id !== gid));
   };
 
   // ── Date strip ────────────────────────────────────────────────────────────
@@ -563,10 +683,10 @@ export default function ControlHorarioPage() {
                   ) : "Sin destinatarios"}
                 </span>
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => setShowTemplates(true)}
+                  <button onClick={() => { setGroupView("list"); setShowGroups(true); }}
                     className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 px-2 py-1.5 rounded-lg hover:bg-slate-100">
-                    <BookTemplate size={13} />
-                    Plantillas
+                    <Users size={13} />
+                    Grupos
                   </button>
                   <button onClick={() => setShowAddMember(true)}
                     className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 px-2 py-1.5 rounded-lg hover:bg-slate-100">
@@ -662,6 +782,14 @@ export default function ControlHorarioPage() {
 
           {/* Right: stats + legend */}
           <div className="space-y-4">
+            {/* Download button */}
+            <button
+              onClick={() => setShowDownload(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 bg-white rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <Download size={14} /> Descargar datos
+            </button>
+
             {/* Stats card */}
             <div className="bg-white border border-slate-200 rounded-2xl p-5">
               <div className="space-y-3">
@@ -707,25 +835,6 @@ export default function ControlHorarioPage() {
               </div>
             </div>
 
-            {/* Save template */}
-            {currentDay && (
-              <div className="bg-white border border-slate-200 rounded-2xl p-5">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Nombre de la plantilla"
-                    value={templateName}
-                    onChange={(e) => setTemplateName(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2"
-                  />
-                  <button onClick={handleSaveTemplate} disabled={!templateName.trim()}
-                    className="px-3 py-2 rounded-xl text-white text-xs font-medium disabled:opacity-40"
-                    style={{ background: G }}>
-                    Guardar
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </main>
@@ -733,14 +842,14 @@ export default function ControlHorarioPage() {
       {/* ── Config Modal ───────────────────────────────────────────────────── */}
       {showConfig && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100 flex-shrink-0">
               <h3 className="text-base font-semibold text-slate-900">Configuración</h3>
               <button onClick={() => setShowConfig(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
                 <X size={16} />
               </button>
             </div>
-            <div className="px-6 py-5 space-y-5">
+            <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-slate-900">Envío automático</p>
@@ -758,27 +867,54 @@ export default function ControlHorarioPage() {
                   className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2" />
               </div>
 
-              <div>
-                <label className="text-xs font-medium text-slate-700 block mb-1.5">Opciones de pausa para comer</label>
-                <textarea
-                  rows={3}
-                  value={cfgComidaOptions}
-                  onChange={(e) => setCfgComidaOptions(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2"
-                  placeholder="Sin pausa, 30 min, 1 hora, Personalizado"
-                />
+              <div className="pt-1 border-t border-slate-100">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Personalización del email</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-medium text-slate-700 block mb-1.5">Mensaje del email</label>
+                    <textarea
+                      rows={4}
+                      value={cfgEmailBody}
+                      onChange={(e) => setCfgEmailBody(e.target.value)}
+                      placeholder={"Por favor, completa tu parte del control horario de hoy. Solo te llevará un momento."}
+                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2"
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">Si lo dejas vacío se usará el mensaje por defecto.</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-700 block mb-1.5">Nombre de contacto</label>
+                    <input
+                      type="text"
+                      value={cfgContactName}
+                      onChange={(e) => setCfgContactName(e.target.value)}
+                      placeholder="Ej: María García (Coordinación)"
+                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-700 block mb-1.5">Email de contacto</label>
+                    <input
+                      type="email"
+                      value={cfgContactMail}
+                      onChange={(e) => setCfgContactMail(e.target.value)}
+                      placeholder="coordinacion@produccion.com"
+                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">Se muestra al pie del email para que el crew pueda contactar si tiene dudas.</p>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex gap-3 pt-1">
-                <button onClick={() => setShowConfig(false)} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
-                  Cancelar
-                </button>
-                <button onClick={handleSaveConfig} disabled={saving}
-                  className="flex-1 px-4 py-2.5 text-white rounded-xl text-sm font-medium disabled:opacity-50"
-                  style={{ background: G }}>
-                  {saving ? "Guardando..." : "Guardar"}
-                </button>
-              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 flex gap-3 flex-shrink-0">
+              <button onClick={() => setShowConfig(false)} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+                Cancelar
+              </button>
+              <button onClick={handleSaveConfig} disabled={saving}
+                className="flex-1 px-4 py-2.5 text-white rounded-xl text-sm font-medium disabled:opacity-50"
+                style={{ background: G }}>
+                {saving ? "Guardando..." : "Guardar"}
+              </button>
             </div>
           </div>
         </div>
@@ -821,38 +957,130 @@ export default function ControlHorarioPage() {
         </div>
       )}
 
-      {/* ── Templates Modal ────────────────────────────────────────────────── */}
-      {showTemplates && (
+      {/* ── Groups Modal ───────────────────────────────────────────────────── */}
+      {showGroups && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm max-h-[70vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-semibold text-slate-900">Plantillas</h3>
-              <button onClick={() => setShowTemplates(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100 flex-shrink-0">
+              {groupView !== "list" ? (
+                <button onClick={() => setGroupView("list")} className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800">
+                  <ChevronLeft size={16} /> Grupos
+                </button>
+              ) : (
+                <h3 className="text-sm font-semibold text-slate-900">Grupos</h3>
+              )}
+              <button onClick={() => setShowGroups(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                 <X size={15} />
               </button>
             </div>
-            <div className="overflow-y-auto divide-y divide-slate-100">
-              {templates.length === 0 ? (
-                <p className="text-sm text-slate-400 text-center py-8">Sin plantillas guardadas</p>
-              ) : templates.map((t) => (
-                <div key={t.id} className="flex items-center justify-between px-5 py-3.5">
+
+            {/* List view */}
+            {groupView === "list" && (
+              <div className="flex flex-col flex-1 overflow-hidden">
+                <div className="overflow-y-auto flex-1 divide-y divide-slate-100">
+                  {groups.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 gap-2">
+                      <Users size={28} className="text-slate-200" />
+                      <p className="text-sm text-slate-400">Sin grupos todavía</p>
+                    </div>
+                  ) : groups.map((g) => (
+                    <div key={g.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50">
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">{g.name}</p>
+                        <p className="text-xs text-slate-400">{g.recipients.length} persona{g.recipients.length !== 1 ? "s" : ""}</p>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button onClick={() => handleApplyGroup(g)}
+                          className="px-3 py-1.5 text-xs font-medium rounded-xl text-white" style={{ background: G }}>
+                          Añadir al día
+                        </button>
+                        <button onClick={() => openEditGroup(g)}
+                          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                          <Pencil size={13} />
+                        </button>
+                        <button onClick={() => handleDeleteGroup(g.id)}
+                          className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-5 py-3 border-t border-slate-100 flex-shrink-0">
+                  <button onClick={openCreateGroup}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium text-white"
+                    style={{ background: G }}>
+                    <Plus size={15} /> Nuevo grupo
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Create / Edit view */}
+            {(groupView === "create" || groupView === "edit") && (
+              <div className="flex flex-col flex-1 overflow-hidden">
+                <div className="px-5 py-4 space-y-4 flex-1 overflow-y-auto">
                   <div>
-                    <p className="text-sm font-medium text-slate-900">{t.name}</p>
-                    <p className="text-xs text-slate-400">{t.recipients.length} personas</p>
+                    <label className="text-xs font-medium text-slate-700 block mb-1.5">Nombre del grupo</label>
+                    <input
+                      type="text"
+                      value={groupFormName}
+                      onChange={(e) => setGroupFormName(e.target.value)}
+                      placeholder="Ej: Cámara, Dirección, Equipo técnico..."
+                      autoFocus
+                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
+                    />
                   </div>
-                  <div className="flex gap-1.5">
-                    <button onClick={() => handleApplyTemplate(t)}
-                      className="px-3 py-1.5 text-xs font-medium rounded-xl text-white" style={{ background: G }}>
-                      Aplicar
-                    </button>
-                    <button onClick={() => handleDeleteTemplate(t.id)}
-                      className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                      <Trash2 size={13} />
-                    </button>
+                  <div>
+                    <label className="text-xs font-medium text-slate-700 block mb-2">
+                      Personas del grupo
+                      <span className="ml-1.5 text-slate-400 font-normal">{groupFormUids.length} seleccionadas</span>
+                    </label>
+                    <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                      {crew.length === 0 ? (
+                        <p className="text-sm text-slate-400 text-center py-6">No hay crew activo</p>
+                      ) : crew.map((m) => {
+                        const checked = groupFormUids.includes(m.id);
+                        return (
+                          <button key={m.id}
+                            onClick={() => setGroupFormUids((prev) =>
+                              checked ? prev.filter((u) => u !== m.id) : [...prev, m.id]
+                            )}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-left transition-colors">
+                            <div className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                              checked ? "border-transparent" : "border-slate-300"
+                            }`} style={checked ? { background: G, borderColor: G } : {}}>
+                              {checked && <Check size={10} className="text-white" strokeWidth={3} />}
+                            </div>
+                            <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-semibold text-slate-600 flex-shrink-0">
+                              {m.firstName.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-900 truncate">{m.firstName} {m.lastName1}</p>
+                              <p className="text-xs text-slate-400 truncate">{m.role || m.department || "—"}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
+                <div className="px-5 py-3 border-t border-slate-100 flex gap-2 flex-shrink-0">
+                  <button onClick={() => setGroupView("list")}
+                    className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
+                    Cancelar
+                  </button>
+                  <button onClick={handleSaveGroup}
+                    disabled={!groupFormName.trim() || groupFormUids.length === 0}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-40"
+                    style={{ background: G }}>
+                    {groupView === "edit" ? "Guardar cambios" : "Crear grupo"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -889,6 +1117,92 @@ export default function ControlHorarioPage() {
               )}
               <p className="text-xs text-slate-400 pt-1">Enviado: {formatTime(showFormDetail.submittedAt)}</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Download modal */}
+      {showDownload && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowDownload(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-base font-semibold text-slate-900">Descargar datos</h3>
+              <button onClick={() => setShowDownload(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Mode selector */}
+            <div className="grid grid-cols-3 gap-2 mb-5">
+              {([
+                { value: "day",   label: "Día" },
+                { value: "week",  label: "Semana" },
+                { value: "month", label: "Mes" },
+              ] as const).map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setDlMode(value)}
+                  className={`py-2 rounded-xl text-sm font-medium border transition-all ${
+                    dlMode === value
+                      ? "text-white border-transparent"
+                      : "border-slate-200 text-slate-600 hover:border-slate-300 bg-white"
+                  }`}
+                  style={dlMode === value ? { background: G, borderColor: G } : {}}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Range picker */}
+            <div className="mb-5">
+              {dlMode === "day" && (
+                <div>
+                  <label className="text-xs font-medium text-slate-600 mb-1 block">Día</label>
+                  <p className="text-sm font-semibold text-slate-900 px-3.5 py-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                    {formatFull(selectedDate)}
+                  </p>
+                </div>
+              )}
+              {dlMode === "week" && (
+                <div>
+                  <label className="text-xs font-medium text-slate-600 mb-1 block">Semana</label>
+                  <input
+                    type="week"
+                    value={dlWeek}
+                    onChange={(e) => setDlWeek(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
+                  />
+                </div>
+              )}
+              {dlMode === "month" && (
+                <div>
+                  <label className="text-xs font-medium text-slate-600 mb-1 block">Mes</label>
+                  <input
+                    type="month"
+                    value={dlMonth}
+                    onChange={(e) => setDlMonth(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
+                  />
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-400 mb-4">
+              El CSV incluye todos los formularios del período, ordenados por departamento y nombre.
+            </p>
+
+            <button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="w-full py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50"
+              style={{ background: G }}
+            >
+              {downloading
+                ? <><RefreshCw size={14} className="animate-spin" /> Generando...</>
+                : <><Download size={14} /> Descargar CSV</>
+              }
+            </button>
           </div>
         </div>
       )}

@@ -24,6 +24,13 @@ export async function POST(req: NextRequest) {
     const workingTitle = prodSnap.data()?.workingTitle ?? "";
     const projectLabel = workingTitle || projectName;
 
+    // Load horario config (email customisation)
+    const cfgSnap = await db.collection("projects").doc(projectId).collection("horario").doc("__config__").get();
+    const cfg = cfgSnap.data() ?? {};
+    const emailBody    = cfg.emailBody    as string | undefined;
+    const contactName  = cfg.emailContactName as string | undefined;
+    const contactMail  = cfg.emailContactMail as string | undefined;
+
     const dayRef = db.collection("projects").doc(projectId).collection("horario").doc(date);
     const daySnap = await dayRef.get();
     if (!daySnap.exists) return NextResponse.json({ error: "Día no encontrado" }, { status: 404 });
@@ -76,8 +83,8 @@ export async function POST(req: NextRequest) {
         from: process.env.RESEND_FROM ?? "Filma Workspace <onboarding@resend.dev>",
         to: [recipient.email],
         subject,
-        html: horarioInviteHtml({ recipientName: recipient.name, projectName, projectLabel, date: formattedDate, jornada, formUrl }),
-        text: horarioInviteText({ recipientName: recipient.name, projectName, projectLabel, date: formattedDate, jornada, formUrl }),
+        html: horarioInviteHtml({ recipientName: recipient.name, projectName, projectLabel, date: formattedDate, jornada, formUrl, emailBody, contactName, contactMail }),
+        text: horarioInviteText({ recipientName: recipient.name, projectName, projectLabel, date: formattedDate, jornada, formUrl, emailBody, contactName, contactMail }),
         tags: [{ name: "type", value: "horario-resend" }],
       });
 
