@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { useParams, usePathname } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { useRealPathname } from "@/contexts/RealPathnameContext";
 
 export default function ProjectLayout({ children }: { children: React.ReactNode }) {
   const { id } = useParams() as { id: string };
   const pathname = usePathname();
+  const { setRealPathname } = useRealPathname();
   const [projectName, setProjectName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -21,6 +23,8 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   }, [projectName]);
 
   useEffect(() => {
+    // Save the real pathname before masking it
+    setRealPathname(pathname);
     const clean = `/project/${id}`;
     if (window.location.pathname !== clean) {
       window.history.replaceState(null, "", clean);
