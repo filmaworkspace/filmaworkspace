@@ -43,6 +43,7 @@ export default function FormHorarioPage() {
   const [obs,      setObs]      = useState("");
   const [saving,   setSaving]   = useState(false);
   const [error,    setError]    = useState("");
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     loadForm();
@@ -50,15 +51,6 @@ export default function FormHorarioPage() {
 
   const loadForm = async () => {
     try {
-      // formId format: we need to find the doc across projects
-      // We use the formId directly — stored as a flat doc path we pass via URL
-      // The form is stored at projects/{projectId}/horario/forms/items/{formId}
-      // but we don't know projectId from the URL, so we use a top-level collection
-      // Actually let's query via collectionGroup
-      const { collection, collectionGroup, query, where, limit, getDocs } = await import("firebase/firestore");
-      const q = query(collectionGroup(db, "items"), where("__name__", "==", formId));
-      // collectionGroup by formId won't work easily — let's store forms also in a top-level collection
-      // for easy lookup by formId
       const formSnap = await getDoc(doc(db, "horarioForms", formId));
       if (!formSnap.exists()) { setStatus("not_found"); return; }
 
@@ -76,8 +68,9 @@ export default function FormHorarioPage() {
 
       if (data.entrada) setEntrada(data.entrada);
       setStatus("ready");
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error("loadForm error:", e?.code, e?.message, e);
+      setLoadError(e?.code ?? e?.message ?? "unknown");
       setStatus("error");
     }
   };
@@ -125,6 +118,7 @@ export default function FormHorarioPage() {
       <div className={`min-h-screen bg-white flex flex-col items-center justify-center gap-4 ${inter.className}`}>
         <AlertCircle size={40} className="text-red-400" />
         <p className="text-slate-500 text-sm">Error al cargar el formulario.</p>
+        {loadError && <p className="text-xs text-red-400 font-mono">{loadError}</p>}
       </div>
     );
   }

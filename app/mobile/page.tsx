@@ -30,9 +30,8 @@ export default function MobilePage() {
       <div className="w-8 h-px bg-slate-200 mt-10 mb-6" />
 
       {/* Closing note */}
-      <p className="text-xs text-slate-400">
-        Perdona las molestias — el equipo de Filma
-      </p>
+      <p className="text-xs text-slate-400">Perdona las molestias.</p>
+      <p className="text-xs text-slate-400 mt-1">El equipo de Filma</p>
     </div>
   );
 }

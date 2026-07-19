@@ -205,9 +205,7 @@ export default function ControlHorarioPage() {
 
   const loadCrew = async () => {
     const snap = await getDocs(
-      query(collection(db, `projects/${id}/crew`),
-        where("status", "==", "active"),
-        where("section", "==", "technical"))
+      query(collection(db, `projects/${id}/crew`), where("status", "==", "active"))
     );
     setCrew(snap.docs.map((d) => {
       const v = d.data();
@@ -218,7 +216,7 @@ export default function ControlHorarioPage() {
         role:      v.role      || "",
         email:     v.email     || "",
         status:    v.status    || "active",
-        section:   v.section   || "technical",
+        section:   v.section   || "",
       };
     }));
   };
@@ -530,59 +528,59 @@ export default function ControlHorarioPage() {
               </div>
             </div>
 
-            {/* Recipients list */}
-            {!currentDay ? (
-              <div className="border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
-                <Users size={28} className="text-slate-300 mx-auto mb-3" />
-                <p className="text-sm font-medium text-slate-500 mb-4">Sin configuración para este día</p>
-                <button onClick={() => getOrCreateDay(selectedDate).then(() => loadDays())}
-                  className="text-xs px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50">
-                  Crear día
-                </button>
-              </div>
-            ) : (
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                {/* Column headers */}
-                <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500">
-                    {currentDay.recipients.length} destinatarios
-                    {currentDay.status === "sent" && ` · ${responded.length} respondieron`}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => setShowTemplates(true)}
-                      className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 px-2 py-1.5 rounded-lg hover:bg-slate-100">
-                      <BookTemplate size={13} />
-                      Plantillas
-                    </button>
-                    <button onClick={() => setShowAddMember(true)}
-                      className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 px-2 py-1.5 rounded-lg hover:bg-slate-100">
-                      <UserPlus size={13} />
-                      Añadir
-                    </button>
-                  </div>
+            {/* Recipients list — always visible, day auto-created on first action */}
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">
+                  {currentDay ? (
+                    <>
+                      {currentDay.recipients.length} destinatarios
+                      {currentDay.status === "sent" && ` · ${responded.length} respondieron`}
+                    </>
+                  ) : "Sin destinatarios"}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => setShowTemplates(true)}
+                    className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 px-2 py-1.5 rounded-lg hover:bg-slate-100">
+                    <BookTemplate size={13} />
+                    Plantillas
+                  </button>
+                  <button onClick={() => setShowAddMember(true)}
+                    className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 px-2 py-1.5 rounded-lg hover:bg-slate-100">
+                    <UserPlus size={13} />
+                    Añadir
+                  </button>
                 </div>
+              </div>
 
+              {!currentDay || currentDay.recipients.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-14 gap-3">
+                  <Users size={24} className="text-slate-300" />
+                  <p className="text-sm text-slate-400">
+                    {crew.length === 0 ? "No hay crew activo en el proyecto" : "Añade personas para este día"}
+                  </p>
+                  <button onClick={() => setShowAddMember(true)}
+                    className="text-xs px-4 py-2 rounded-xl text-white font-medium" style={{ background: G }}>
+                    Añadir personas
+                  </button>
+                </div>
+              ) : (
                 <div className="divide-y divide-slate-100">
                   {currentDay.recipients.map((r) => {
                     const form = currentForms.find((f) => f.recipientUid === r.uid);
                     const submitted = !!form?.submittedAt;
                     return (
                       <div key={r.uid} className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50">
-                        {/* Status dot */}
                         <div className="w-2 h-2 rounded-full flex-shrink-0" style={{
                           background: submitted ? G : currentDay.status === "sent" ? "#fac775" : "#d3d1c7",
                         }} />
-
-                        {/* Avatar */}
                         <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-semibold text-slate-600 flex-shrink-0">
                           {r.name.charAt(0).toUpperCase()}
                         </div>
-
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-900 truncate">{r.name}</p>
                           <p className="text-xs text-slate-400 truncate">{r.role}</p>
                         </div>
-
                         {submitted && form ? (
                           <div className="flex items-center gap-2">
                             <span className="text-xs px-2 py-0.5 rounded-lg font-medium" style={{ background: "#eaf3de", color: "#3b6d11" }}>
@@ -611,8 +609,8 @@ export default function ControlHorarioPage() {
                     );
                   })}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Right: stats + legend */}
@@ -749,19 +747,28 @@ export default function ControlHorarioPage() {
                 <X size={15} />
               </button>
             </div>
-            <div className="overflow-y-auto divide-y divide-slate-100">
-              {crew.filter((m) => !currentDay?.recipients.find((r) => r.uid === m.id)).map((m) => (
-                <button key={m.id} onClick={async () => { await handleAddMember(m); setShowAddMember(false); }}
-                  className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 text-left transition-colors">
-                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-semibold text-slate-600 flex-shrink-0">
-                    {m.firstName.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">{m.firstName} {m.lastName1}</p>
-                    <p className="text-xs text-slate-400">{m.role}</p>
-                  </div>
-                </button>
-              ))}
+            <div className="overflow-y-auto divide-y divide-slate-100 flex-1">
+              {(() => {
+                const available = crew.filter((m) => !currentDay?.recipients.find((r) => r.uid === m.id));
+                if (crew.length === 0) return (
+                  <p className="text-sm text-slate-400 text-center py-10">No hay crew activo en el proyecto</p>
+                );
+                if (available.length === 0) return (
+                  <p className="text-sm text-slate-400 text-center py-10">Todos están ya añadidos</p>
+                );
+                return available.map((m) => (
+                  <button key={m.id} onClick={async () => { await handleAddMember(m); setShowAddMember(false); }}
+                    className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 text-left transition-colors">
+                    <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-semibold text-slate-600 flex-shrink-0">
+                      {m.firstName.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900">{m.firstName} {m.lastName1}</p>
+                      <p className="text-xs text-slate-400">{m.role || m.section || "—"}</p>
+                    </div>
+                  </button>
+                ));
+              })()}
             </div>
           </div>
         </div>
