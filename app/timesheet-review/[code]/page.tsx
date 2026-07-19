@@ -27,7 +27,7 @@ interface FormDoc {
   submittedAt:   any;
   entrada:       string | null;
   salida:        string | null;
-  comida:        string | null;
+  comida:        number | null;
   observaciones: string;
 }
 
@@ -191,7 +191,7 @@ export default function TimesheetReviewPage() {
                           {[
                             { icon: LogIn,  label: "Entrada", value: form.entrada  ?? "—" },
                             { icon: LogOut, label: "Salida",  value: form.salida   ?? "—" },
-                            { icon: Clock,  label: "Pausa",   value: form.comida   ?? "—" },
+                            { icon: Clock,  label: "Pausa",   value: form.comida != null ? `${form.comida} min` : "—" },
                           ].map(({ icon: Icon, label, value }) => (
                             <div key={label} className="bg-white rounded-xl p-3 border border-slate-100">
                               <div className="flex items-center gap-1 mb-1">

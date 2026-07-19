@@ -134,8 +134,8 @@ export default function ControlHorarioPage() {
   // Template save
   const [templateName, setTemplateName] = useState("");
 
-  // Review link copy feedback: keyed by uid
-  const [copiedReview, setCopiedReview] = useState<string | null>(null);
+  // Review email sending: keyed by uid → "sending" | "sent" | null
+  const [reviewState, setReviewState] = useState<Record<string, "sending" | "sent">>({});
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => { if (u) loadAll(); });
@@ -333,27 +333,24 @@ export default function ControlHorarioPage() {
     setDays((prev) => ({ ...prev, [selectedDate]: { ...day, recipients: updated } }));
   };
 
-  const generateReviewLink = async (recipientUid: string, recipientName: string) => {
-    // Deterministic code: stable per person+project, so the same link is always generated
-    const raw   = btoa(`${id}:${recipientUid}`).replace(/[^a-zA-Z0-9]/g, "").slice(0, 24);
-    const ref   = doc(db, "horarioAccess", raw);
-    const snap  = await getDoc(ref);
-    if (!snap.exists() || !snap.data().active) {
-      const projectSnap = await getDoc(doc(db, "projects", id));
-      const projectName = projectSnap.data()?.name ?? "";
-      await setDoc(ref, {
-        projectId:    id,
-        projectName,
-        recipientUid,
-        recipientName,
-        active:       true,
-        createdAt:    new Date().toISOString(),
+  const sendReviewEmail = async (r: Recipient) => {
+    if (reviewState[r.uid] === "sending") return;
+    setReviewState((s) => ({ ...s, [r.uid]: "sending" }));
+    try {
+      const res  = await fetch("/api/horario/send-review", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ projectId: id, recipientUid: r.uid, recipientName: r.name, recipientEmail: r.email }),
       });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error);
+      showToast("success", `Enlace enviado a ${r.name}`);
+      setReviewState((s) => ({ ...s, [r.uid]: "sent" }));
+      setTimeout(() => setReviewState((s) => { const n = { ...s }; delete n[r.uid]; return n; }), 3000);
+    } catch (e: any) {
+      showToast("error", e.message || "Error al enviar");
+      setReviewState((s) => { const n = { ...s }; delete n[r.uid]; return n; });
     }
-    const base = process.env.NEXT_PUBLIC_BASE_URL ?? window.location.origin;
-    await navigator.clipboard.writeText(`${base}/timesheet-review/${raw}`);
-    setCopiedReview(recipientUid);
-    setTimeout(() => setCopiedReview(null), 2000);
   };
 
   const handleUpdateJornada = async () => {
@@ -617,11 +614,16 @@ export default function ControlHorarioPage() {
                               <Eye size={14} />
                             </button>
                             <button
-                              onClick={() => generateReviewLink(r.uid, r.name)}
+                              onClick={() => sendReviewEmail(r)}
+                              disabled={reviewState[r.uid] === "sending"}
                               className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                              title="Copiar enlace de revisión"
+                              title="Enviar enlace de revisión"
                             >
-                              {copiedReview === r.uid ? <Check size={13} className="text-green-500" /> : <Link2 size={13} />}
+                              {reviewState[r.uid] === "sent"
+                                ? <Check size={13} className="text-green-500" />
+                                : reviewState[r.uid] === "sending"
+                                  ? <RefreshCw size={13} className="animate-spin" />
+                                  : <Link2 size={13} />}
                             </button>
                           </div>
                         ) : currentDay.status === "sent" ? (
@@ -632,11 +634,16 @@ export default function ControlHorarioPage() {
                               <RefreshCw size={13} />
                             </button>
                             <button
-                              onClick={() => generateReviewLink(r.uid, r.name)}
+                              onClick={() => sendReviewEmail(r)}
+                              disabled={reviewState[r.uid] === "sending"}
                               className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                              title="Copiar enlace de revisión"
+                              title="Enviar enlace de revisión"
                             >
-                              {copiedReview === r.uid ? <Check size={13} className="text-green-500" /> : <Link2 size={13} />}
+                              {reviewState[r.uid] === "sent"
+                                ? <Check size={13} className="text-green-500" />
+                                : reviewState[r.uid] === "sending"
+                                  ? <RefreshCw size={13} className="animate-spin" />
+                                  : <Link2 size={13} />}
                             </button>
                           </div>
                         ) : (

@@ -19,7 +19,7 @@ interface FormData {
   submittedAt: any;
   entrada: string | null;
   salida: string | null;
-  comida: string | null;
+  comida: number | null;
   observaciones: string;
 }
 
@@ -37,7 +37,7 @@ export default function FormHorarioPage() {
   const [formData, setFormData] = useState<FormData | null>(null);
   const [entrada,  setEntrada]  = useState("07:00");
   const [salida,   setSalida]   = useState("");
-  const [comida,   setComida]   = useState("");
+  const [comida,   setComida]   = useState<string>("");
   const [obs,      setObs]      = useState("");
   const [saving,   setSaving]   = useState(false);
   const [error,    setError]    = useState("");
@@ -59,7 +59,7 @@ export default function FormHorarioPage() {
         setStatus("submitted");
         setEntrada(data.entrada ?? "");
         setSalida(data.salida ?? "");
-        setComida(data.comida ?? "");
+        setComida(data.comida != null ? String(data.comida) : "");
         setObs(data.observaciones ?? "");
         return;
       }
@@ -79,13 +79,20 @@ export default function FormHorarioPage() {
     setSaving(true);
     setError("");
     try {
-      await updateDoc(doc(db, "horarioForms", formId), {
+      const payload = {
         entrada,
         salida,
-        comida:       comida || null,
+        comida:        comida !== "" ? Number(comida) : null,
         observaciones: obs,
-        submittedAt:  serverTimestamp(),
-      });
+        submittedAt:   serverTimestamp(),
+      };
+      // Update top-level doc (public read) and project-level doc (admin panel) in parallel
+      await Promise.all([
+        updateDoc(doc(db, "horarioForms", formId), payload),
+        formData?.projectId
+          ? updateDoc(doc(db, `projects/${formData.projectId}/horarioForms`, formId), payload)
+          : Promise.resolve(),
+      ]);
       setStatus("submitted");
     } catch (e: any) {
       setError(e.message || "Error al guardar");
@@ -150,7 +157,7 @@ export default function FormHorarioPage() {
                 {[
                   { icon: LogIn,    label: "Entrada", value: entrada  },
                   { icon: LogOut,   label: "Salida",  value: salida || "—" },
-                  { icon: Utensils, label: "Comida",  value: comida || "—" },
+                  { icon: Utensils, label: "Pausa",   value: comida ? `${comida} min` : "—" },
                 ].map(({ icon: Icon, label, value }) => (
                   <div key={label} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
                     <div className="flex items-center gap-1.5 mb-1">
@@ -197,13 +204,18 @@ export default function FormHorarioPage() {
                 <label className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-2">
                   <Utensils size={13} className="text-slate-400" /> Pausa para comer <span className="text-slate-400 font-normal">(opcional)</span>
                 </label>
-                <input
-                  type="text"
-                  value={comida}
-                  onChange={(e) => setComida(e.target.value)}
-                  placeholder="Ej: 30 min, 1 hora..."
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent"
-                />
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="480"
+                    value={comida}
+                    onChange={(e) => setComida(e.target.value)}
+                    placeholder="0"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent pr-14"
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">min</span>
+                </div>
               </div>
 
               {/* Observaciones */}
