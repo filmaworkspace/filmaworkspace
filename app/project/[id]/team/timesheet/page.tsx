@@ -11,7 +11,7 @@ import {
 } from "firebase/firestore";
 import {
   AlertCircle, ArrowLeft, ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight,
-  Clock, Copy, Eye, Hash, Plus, RefreshCw, Send, Settings, Trash2,
+  Clock, Copy, Eye, Hash, Link2, Plus, RefreshCw, Send, Settings, Trash2,
   UserMinus, UserPlus, Users, X, CheckCircle, MoreHorizontal, BookTemplate,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
@@ -133,6 +133,9 @@ export default function ControlHorarioPage() {
 
   // Template save
   const [templateName, setTemplateName] = useState("");
+
+  // Review link copy feedback: keyed by uid
+  const [copiedReview, setCopiedReview] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => { if (u) loadAll(); });
@@ -328,6 +331,29 @@ export default function ControlHorarioPage() {
     const updated = day.recipients.filter((r) => r.uid !== uid);
     await updateDoc(doc(db, `projects/${id}/horario`, selectedDate), { recipients: updated });
     setDays((prev) => ({ ...prev, [selectedDate]: { ...day, recipients: updated } }));
+  };
+
+  const generateReviewLink = async (recipientUid: string, recipientName: string) => {
+    // Deterministic code: stable per person+project, so the same link is always generated
+    const raw   = btoa(`${id}:${recipientUid}`).replace(/[^a-zA-Z0-9]/g, "").slice(0, 24);
+    const ref   = doc(db, "horarioAccess", raw);
+    const snap  = await getDoc(ref);
+    if (!snap.exists() || !snap.data().active) {
+      const projectSnap = await getDoc(doc(db, "projects", id));
+      const projectName = projectSnap.data()?.name ?? "";
+      await setDoc(ref, {
+        projectId:    id,
+        projectName,
+        recipientUid,
+        recipientName,
+        active:       true,
+        createdAt:    new Date().toISOString(),
+      });
+    }
+    const base = process.env.NEXT_PUBLIC_BASE_URL ?? window.location.origin;
+    await navigator.clipboard.writeText(`${base}/timesheet-review/${raw}`);
+    setCopiedReview(recipientUid);
+    setTimeout(() => setCopiedReview(null), 2000);
   };
 
   const handleUpdateJornada = async () => {
@@ -582,13 +608,20 @@ export default function ControlHorarioPage() {
                           <p className="text-xs text-slate-400 truncate">{r.role}</p>
                         </div>
                         {submitted && form ? (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             <span className="text-xs px-2 py-0.5 rounded-lg font-medium" style={{ background: "#eaf3de", color: "#3b6d11" }}>
                               {formatTime(form.submittedAt)}
                             </span>
                             <button onClick={() => setShowFormDetail(form)}
                               className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                               <Eye size={14} />
+                            </button>
+                            <button
+                              onClick={() => generateReviewLink(r.uid, r.name)}
+                              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                              title="Copiar enlace de revisión"
+                            >
+                              {copiedReview === r.uid ? <Check size={13} className="text-green-500" /> : <Link2 size={13} />}
                             </button>
                           </div>
                         ) : currentDay.status === "sent" ? (
@@ -597,6 +630,13 @@ export default function ControlHorarioPage() {
                             <button onClick={() => handleResendOne(r.uid)} disabled={sending}
                               className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg" title="Reenviar">
                               <RefreshCw size={13} />
+                            </button>
+                            <button
+                              onClick={() => generateReviewLink(r.uid, r.name)}
+                              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                              title="Copiar enlace de revisión"
+                            >
+                              {copiedReview === r.uid ? <Check size={13} className="text-green-500" /> : <Link2 size={13} />}
                             </button>
                           </div>
                         ) : (

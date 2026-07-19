@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
 
       const formPayload = {
         projectId,
+        projectName,
         projectLabel,
         date,
         jornada,
@@ -73,8 +74,8 @@ export async function POST(req: NextRequest) {
         from:    process.env.RESEND_FROM ?? "Filma Workspace <onboarding@resend.dev>",
         to:      [recipient.email],
         subject,
-        html:    horarioInviteHtml({ recipientName: recipient.name, projectLabel, date: formattedDate, jornada, formUrl }),
-        text:    horarioInviteText({ recipientName: recipient.name, projectLabel, date: formattedDate, jornada, formUrl }),
+        html:    horarioInviteHtml({ recipientName: recipient.name, projectName, projectLabel, date: formattedDate, jornada, formUrl }),
+        text:    horarioInviteText({ recipientName: recipient.name, projectName, projectLabel, date: formattedDate, jornada, formUrl }),
         tags:    [{ name: "type", value: "horario" }],
       });
 

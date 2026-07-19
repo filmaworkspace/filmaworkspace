@@ -23,6 +23,8 @@ export default function ClientLayout({
     pathname === "/register" ||
     pathname === "/forgot-password" ||
     pathname?.startsWith("/form") ||
+    pathname?.startsWith("/timesheet") ||
+    pathname?.startsWith("/timesheet-review") ||
     pathname?.startsWith("/access");
 
   const isMobilePage = pathname === "/mobile";

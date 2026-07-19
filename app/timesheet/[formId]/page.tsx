@@ -2,15 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import Image from "next/image";
 import { inter } from "@/lib/fonts";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { AlertCircle, CheckCircle, Clock, LogIn, LogOut, Utensils } from "lucide-react";
+import { AlertCircle, CheckCircle, LogIn, LogOut, Utensils } from "lucide-react";
 
 const G = "#6BA319";
 
 interface FormData {
+  projectName:  string;
   projectLabel: string;
   date: string;
   jornada: number;
@@ -23,7 +23,6 @@ interface FormData {
   observaciones: string;
 }
 
-const COMIDA_OPTIONS = ["Sin pausa", "15 min", "30 min", "45 min", "1 hora", "1h 30min", "2 horas", "Personalizado"];
 
 function formatDateLabel(dateStr: string): string {
   const [y, m, d] = dateStr.split("-");
@@ -38,8 +37,7 @@ export default function FormHorarioPage() {
   const [formData, setFormData] = useState<FormData | null>(null);
   const [entrada,  setEntrada]  = useState("07:00");
   const [salida,   setSalida]   = useState("");
-  const [comida,   setComida]   = useState("30 min");
-  const [comidaCustom, setComidaCustom] = useState("");
+  const [comida,   setComida]   = useState("");
   const [obs,      setObs]      = useState("");
   const [saving,   setSaving]   = useState(false);
   const [error,    setError]    = useState("");
@@ -61,7 +59,7 @@ export default function FormHorarioPage() {
         setStatus("submitted");
         setEntrada(data.entrada ?? "");
         setSalida(data.salida ?? "");
-        setComida(data.comida ?? "30 min");
+        setComida(data.comida ?? "");
         setObs(data.observaciones ?? "");
         return;
       }
@@ -77,14 +75,14 @@ export default function FormHorarioPage() {
 
   const handleSubmit = async () => {
     if (!entrada) { setError("La hora de entrada es obligatoria"); return; }
+    if (!salida)  { setError("La hora de salida es obligatoria"); return; }
     setSaving(true);
     setError("");
     try {
-      const comidaFinal = comida === "Personalizado" ? comidaCustom : comida;
       await updateDoc(doc(db, "horarioForms", formId), {
         entrada,
-        salida:       salida || null,
-        comida:       comidaFinal,
+        salida,
+        comida:       comida || null,
         observaciones: obs,
         submittedAt:  serverTimestamp(),
       });
@@ -125,21 +123,12 @@ export default function FormHorarioPage() {
 
   return (
     <div className={`min-h-screen bg-slate-50 ${inter.className}`}>
-      {/* Header strip */}
-      <div className="w-full py-4 px-6 flex items-center justify-between border-b border-slate-200 bg-white">
-        <Image src="/logodark.svg" alt="Filma Workspace" width={100} height={24} priority />
-        <div className="flex items-center gap-2">
-          <Clock size={14} style={{ color: G }} />
-          <span className="text-xs font-medium" style={{ color: G }}>Control horario</span>
-        </div>
-      </div>
-
-      <div className="max-w-lg mx-auto px-4 py-8">
-        {/* Card header */}
+      <div className="w-full max-w-lg mx-auto px-4 py-6 sm:py-10">
+        {/* Card */}
         <div className="rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm">
-          <div className="px-6 py-5" style={{ background: `linear-gradient(135deg, ${G}, #4a7a10)` }}>
-            <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">{formData?.projectLabel}</p>
-            <h1 className="text-xl font-semibold text-white">
+          <div className="px-5 py-5 sm:px-6 sm:py-6" style={{ background: `linear-gradient(135deg, ${G}, #4a7a10)` }}>
+            <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">{formData?.projectName || formData?.projectLabel}</p>
+            <h1 className="text-lg sm:text-xl font-semibold text-white leading-snug">
               Control horario · Jornada #{formData?.jornada}
             </h1>
             <p className="text-sm text-white/80 mt-1">{formData ? formatDateLabel(formData.date) : ""}</p>
@@ -161,7 +150,7 @@ export default function FormHorarioPage() {
                 {[
                   { icon: LogIn,    label: "Entrada", value: entrada  },
                   { icon: LogOut,   label: "Salida",  value: salida || "—" },
-                  { icon: Utensils, label: "Comida",  value: comida === "Personalizado" ? comidaCustom : comida },
+                  { icon: Utensils, label: "Comida",  value: comida || "—" },
                 ].map(({ icon: Icon, label, value }) => (
                   <div key={label} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
                     <div className="flex items-center gap-1.5 mb-1">
@@ -192,47 +181,29 @@ export default function FormHorarioPage() {
               {/* Salida */}
               <div>
                 <label className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-2">
-                  <LogOut size={13} className="text-slate-400" /> Hora de salida <span className="text-slate-400 font-normal">(opcional)</span>
+                  <LogOut size={13} className="text-slate-400" /> Hora de salida <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="time"
                   value={salida}
                   onChange={(e) => setSalida(e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent"
+                  style={{ "--tw-ring-color": G } as React.CSSProperties}
                 />
               </div>
 
-              {/* Comida */}
+              {/* Pausa */}
               <div>
                 <label className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-2">
-                  <Utensils size={13} className="text-slate-400" /> Pausa para comer
+                  <Utensils size={13} className="text-slate-400" /> Pausa para comer <span className="text-slate-400 font-normal">(opcional)</span>
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {COMIDA_OPTIONS.map((opt) => (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => setComida(opt)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                        comida === opt
-                          ? "text-white border-transparent"
-                          : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
-                      }`}
-                      style={comida === opt ? { background: G, borderColor: G } : {}}
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-                {comida === "Personalizado" && (
-                  <input
-                    type="text"
-                    placeholder="Ej: 20 min"
-                    value={comidaCustom}
-                    onChange={(e) => setComidaCustom(e.target.value)}
-                    className="mt-2 w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent"
-                  />
-                )}
+                <input
+                  type="text"
+                  value={comida}
+                  onChange={(e) => setComida(e.target.value)}
+                  placeholder="Ej: 30 min, 1 hora..."
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent"
+                />
               </div>
 
               {/* Observaciones */}
