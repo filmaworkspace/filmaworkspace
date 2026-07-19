@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { UserProvider } from "@/contexts/UserContext";
-import { RealPathnameProvider } from "@/contexts/RealPathnameContext";
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -41,7 +40,6 @@ export default function ClientLayout({
   }, [pathname]);
 
   return (
-    <RealPathnameProvider>
     <UserProvider>
       <div className="flex flex-col min-h-screen">
         {!isAuthPage && !isMobilePage && <Header />}
@@ -49,6 +47,5 @@ export default function ClientLayout({
         {!isAuthPage && !isMobilePage && <Footer />}
       </div>
     </UserProvider>
-    </RealPathnameProvider>
   );
 }
