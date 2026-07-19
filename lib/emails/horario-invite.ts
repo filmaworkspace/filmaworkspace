@@ -1,12 +1,13 @@
 interface HorarioInviteProps {
   recipientName: string;
-  projectLabel:  string;
+  projectName:   string; // full project name — shown in body and form
+  projectLabel:  string; // working title or name — used in subject only
   date:          string; // "20/07/2026"
   jornada:       number;
   formUrl:       string;
 }
 
-export function horarioInviteHtml({ recipientName, projectLabel, date, jornada, formUrl }: HorarioInviteProps): string {
+export function horarioInviteHtml({ recipientName, projectName, date, jornada, formUrl }: HorarioInviteProps): string {
   return `<!DOCTYPE html>
 <html lang="es">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Control horario</title></head>
@@ -15,7 +16,7 @@ export function horarioInviteHtml({ recipientName, projectLabel, date, jornada, 
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e5e5;">
         <tr><td style="background:#6BA319;padding:28px 32px;">
-          <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.8);letter-spacing:.05em;text-transform:uppercase;">${projectLabel}</p>
+          <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.8);letter-spacing:.05em;text-transform:uppercase;">${projectName}</p>
           <h1 style="margin:6px 0 0;font-size:22px;font-weight:600;color:#ffffff;">Control horario ${date}</h1>
           <p style="margin:4px 0 0;font-size:14px;color:rgba(255,255,255,0.85);">Jornada #${jornada}</p>
         </td></tr>
@@ -40,6 +41,6 @@ export function horarioInviteHtml({ recipientName, projectLabel, date, jornada, 
 </html>`;
 }
 
-export function horarioInviteText({ recipientName, projectLabel, date, jornada, formUrl }: HorarioInviteProps): string {
-  return `${projectLabel} | Control horario ${date} #${jornada}\n\nHola ${recipientName},\n\nPor favor completa tu control horario de hoy:\n${formUrl}\n\nFilma Workspace`;
+export function horarioInviteText({ recipientName, projectName, projectLabel, date, jornada, formUrl }: HorarioInviteProps): string {
+  return `${projectLabel} | Control horario ${date} #${jornada}\n\nHola ${recipientName},\n\n${projectName} — por favor completa tu control horario de hoy:\n${formUrl}\n\nFilma Workspace`;
 }
