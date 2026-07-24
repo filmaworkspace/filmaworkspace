@@ -176,7 +176,7 @@ export default function ControlHorarioPage() {
   };
 
   const loadConfig = async () => {
-    const snap = await getDoc(doc(db, `projects/${id}/horario/__config__`));
+    const snap = await getDoc(doc(db, `projects/${id}/horario/config`));
     if (snap.exists()) {
       const d = snap.data() as HorarioConfig;
       setConfig(d);
@@ -189,7 +189,7 @@ export default function ControlHorarioPage() {
       const def: HorarioConfig = {
         enabled: true, sendTime: "19:00", defaultRecipients: [],
       };
-      await setDoc(doc(db, `projects/${id}/horario/__config__`), def);
+      await setDoc(doc(db, `projects/${id}/horario/config`), def);
       setConfig(def);
     }
   };
@@ -204,7 +204,7 @@ export default function ControlHorarioPage() {
     // Days stored as docs in projects/{id}/horario collection, docId = date
     const daysSnap = await getDocs(collection(db, `projects/${id}/horario`));
     for (const d of daysSnap.docs) {
-      if (d.id === "__config__") continue;
+      if (d.id === "config") continue;
       if (d.id >= start && d.id <= end) {
         daysMap[d.id] = { ...(d.data() as DayConfig), date: d.id };
       }
@@ -466,7 +466,7 @@ export default function ControlHorarioPage() {
         emailContactMail: cfgContactMail.trim(),
         emailBody:        cfgEmailBody.trim(),
       };
-      await updateDoc(doc(db, `projects/${id}/horario/__config__`), updated);
+      await updateDoc(doc(db, `projects/${id}/horario/config`), updated);
       setConfig((prev) => prev ? { ...prev, ...updated } : null);
       setShowConfig(false);
       showToast("success", "Configuración guardada");

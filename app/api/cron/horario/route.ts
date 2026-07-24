@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
     try {
       const configSnap = await db
         .collection("projects").doc(projectDoc.id)
-        .collection("horario").doc("__config__")
+        .collection("horario").doc("config")
         .get();
 
       if (!configSnap.exists) continue;

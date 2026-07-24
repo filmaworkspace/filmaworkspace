@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     const projectLabel = workingTitle || projectName;
 
     // Load horario config (email customisation)
-    const cfgSnap = await db.collection("projects").doc(projectId).collection("horario").doc("__config__").get();
+    const cfgSnap = await db.collection("projects").doc(projectId).collection("horario").doc("config").get();
     const cfg = cfgSnap.data() ?? {};
     const emailBody    = cfg.emailBody    as string | undefined;
     const contactName  = cfg.emailContactName as string | undefined;
