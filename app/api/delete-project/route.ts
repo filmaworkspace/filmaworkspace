@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, db } from "@/lib/firebase-admin";
 import { getStorage } from "firebase-admin/storage";
 import { FieldPath } from "firebase-admin/firestore";
+import { requireAdmin } from "@/lib/require-admin";
 
 async function deleteStorageFolder(bucket: ReturnType<ReturnType<typeof getStorage>["bucket"]>, prefix: string) {
   const [files] = await bucket.getFiles({ prefix });
@@ -10,6 +11,9 @@ async function deleteStorageFolder(bucket: ReturnType<ReturnType<typeof getStora
 }
 
 export async function POST(req: NextRequest) {
+  const admin = await requireAdmin(req);
+  if (!admin.ok) return admin.response;
+
   try {
     const { projectId } = await req.json();
     if (!projectId) return NextResponse.json({ error: "projectId requerido" }, { status: 400 });

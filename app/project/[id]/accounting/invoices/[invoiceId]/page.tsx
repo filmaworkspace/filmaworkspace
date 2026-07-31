@@ -1987,11 +1987,6 @@ export default function InvoiceDetailPage() {
                   <Clock size={12} />
                   {invoice.approvalSteps.filter(s => s.status === "approved").length}/{invoice.approvalSteps.length}
                 </span>
-              ) : invoice.status === "rejected" ? (
-                <span className="text-xs text-red-600 font-medium flex items-center gap-1">
-                  <XCircle size={12} />
-                  Rechazado
-                </span>
               ) : null}
             </div>
 
@@ -2118,7 +2113,7 @@ export default function InvoiceDetailPage() {
                 showApprovalNoteModal.type === "rejection" ? "bg-red-50 border-red-200" :
                 "bg-slate-50 border-slate-200"
               }`}>
-                <p className="text-sm text-slate-700 italic">"{showApprovalNoteModal.text}"</p>
+                <p className="text-sm text-slate-700 italic">&quot;{showApprovalNoteModal.text}&quot;</p>
               </div>
               
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">

@@ -7,7 +7,7 @@ import Link from "next/link";
 import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
-import { db, storage } from "@/lib/firebase";
+import { auth, db, storage } from "@/lib/firebase";
 import { doc, getDoc, addDoc, updateDoc, collection, Timestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -430,9 +430,10 @@ export default function CrewMemberPage() {
       });
       const realFormUrl = `${window.location.origin}/form/${formRef.id}`;
 
+      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch("/api/send-invite", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           to:          member.email,
           firstName:   member.firstName || member.name || "",
@@ -784,7 +785,7 @@ export default function CrewMemberPage() {
               </div>
 
               <h1 className="text-lg font-bold text-slate-900 leading-tight">{member.name}</h1>
-              {member.artisticName && <p className="text-sm text-slate-400 italic mt-0.5">"{member.artisticName}"</p>}
+              {member.artisticName && <p className="text-sm text-slate-400 italic mt-0.5">&quot;{member.artisticName}&quot;</p>}
               <div className="mt-2">
                 <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${sc.bgColor} ${sc.textColor}`}>
                   {sc.label}

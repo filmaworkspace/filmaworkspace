@@ -30,13 +30,15 @@ export async function GET(req: NextRequest) {
   // doesn't have a cross-collection query for subcollections without collectionGroup
   // Using collectionGroup "horario" is not possible with doc-level config,
   // so we fetch all projects and check their config.
-  // For performance, we only fetch projects that are not in "Finalizado" phase.
-  const projectsSnap = await db.collection("projects").where("phase", "!=", "Finalizado").get();
+  // Filtered in memory (not with a Firestore "!=" query) because that operator
+  // also excludes documents where "phase" isn't set at all.
+  const projectsSnap = await db.collection("projects").get();
+  const activeProjects = projectsSnap.docs.filter((d) => d.data().phase !== "Finalizado");
 
   const triggered: string[] = [];
   const errors: string[] = [];
 
-  for (const projectDoc of projectsSnap.docs) {
+  for (const projectDoc of activeProjects) {
     try {
       const configSnap = await db
         .collection("projects").doc(projectDoc.id)
@@ -63,7 +65,7 @@ export async function GET(req: NextRequest) {
       const base = process.env.NEXT_PUBLIC_BASE_URL ?? "https://filmaworkspace.com";
       const res = await fetch(`${base}/api/horario/send-day`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CRON_SECRET}` },
         body: JSON.stringify({ projectId: projectDoc.id, date: todayStr }),
       });
 

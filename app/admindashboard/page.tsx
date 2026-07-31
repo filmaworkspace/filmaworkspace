@@ -281,7 +281,7 @@ export default function AdminDashboard() {
   const phaseDropdownRef = useRef<HTMLDivElement>(null);
   const roleDropdownRef = useRef<HTMLDivElement>(null);
 
-  const isAdmin = contextUser?.role === "admin" || contextUser?.email === "admin@filmaworkspace.com";
+  const isAdmin = contextUser?.role === "admin";
 
   useEffect(() => {
     if (!userLoading && !isAdmin) {
@@ -636,9 +636,10 @@ export default function AdminDashboard() {
   const _doDeleteProject = async (projectId: string) => {
     setSaving(true);
     try {
+      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch("/api/delete-project", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ projectId }),
       });
       const body = await res.json();
@@ -821,9 +822,10 @@ export default function AdminDashboard() {
   const _doDeleteUser = async (userId: string) => {
     setSaving(true);
     try {
+      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch("/api/delete-user", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ uid: userId }),
       });
       const body = await res.json();
@@ -939,9 +941,10 @@ export default function AdminDashboard() {
       // Fire-and-forget email broadcast if requested
       if (messageForm.sendByEmail) {
         const emails = targetUserIds.map((id) => users.find((u) => u.id === id)?.email).filter(Boolean) as string[];
+        const idToken = await auth.currentUser?.getIdToken();
         fetch("/api/send-broadcast", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
           body: JSON.stringify({ to: emails, title: messageForm.title.trim(), content: messageForm.content.trim(), type: messageForm.type }),
         }).catch(console.error);
       }
@@ -1042,9 +1045,10 @@ export default function AdminDashboard() {
     setDemoSaving(true);
     setDemoError("");
     try {
+      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch("/api/create-demo-user", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ name: demoForm.name.trim(), email: demoForm.email, password: demoForm.password }),
       });
       const body = await res.json();

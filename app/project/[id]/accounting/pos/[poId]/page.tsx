@@ -171,8 +171,11 @@ interface PO {
   invoicedAmount: number;
   remainingAmount?: number;
   status: POStatus;
+  isOpen?: boolean;
   attachmentUrl?: string;
   attachmentFileName?: string;
+  originalAttachmentUrl?: string;
+  originalAttachmentFileName?: string;
   createdAt: Date;
   createdBy: string;
   createdByName: string;
@@ -352,7 +355,7 @@ export default function PODetailPage() {
   };
 
   // Verificar si se puede eliminar (borrador sin versión anterior)
-  const canDeleteDraft = po?.status === "draft" && (!po.version || po.version === 1) && poPerms.canEdit;
+  const canDeleteDraft = po?.status === "draft" && (!po.version || po.version === 1) && getPOPermissions(po).canEdit;
   
   // Verificar si se puede reemplazar el documento
   const canReplaceDocument = () => {
@@ -1075,7 +1078,7 @@ export default function PODetailPage() {
                                           </div>
                                         </div>
                                         {/* Botón de acción - disponible para POs aprobadas y abiertas */}
-                                        {po.status === "approved" && po.isOpen !== false && (permissions.role === "EP" || permissions.role === "PM" || permissions.role === "Controller" || permissions.accessLevel === "manager" || permissions.accessLevel === "admin") && (
+                                        {po.status === "approved" && po.isOpen !== false && (permissions.role === "EP" || permissions.role === "PM" || permissions.role === "Controller" || permissions.accountingAccessLevel === "accounting_extended") && (
                                           <div className="pt-2 border-t border-slate-100">
                                             {item.isClosed ? (
                                               <button
@@ -1174,7 +1177,7 @@ export default function PODetailPage() {
                               {Math.round(itemProgress)}% realizado
                               {isOverInvoiced && <span className="text-amber-600 ml-2">· Excedido en {formatCurrency(itemInvoiced - itemCommitted)} {getCurrencySymbol()}</span>}
                             </p>
-                            {po.status === "approved" && po.isOpen !== false && (permissions.role === "EP" || permissions.role === "PM" || permissions.role === "Controller" || permissions.accessLevel === "manager" || permissions.accessLevel === "admin") && (
+                            {po.status === "approved" && po.isOpen !== false && (permissions.role === "EP" || permissions.role === "PM" || permissions.role === "Controller" || permissions.accountingAccessLevel === "accounting_extended") && (
                               item.isClosed ? (
                                 <button
                                   onClick={() => { setShowReopenItemModal(index); setPasswordInput(""); setPasswordError(""); }}
@@ -1678,7 +1681,7 @@ export default function PODetailPage() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">Reabrir PO-{po.number}</h3>
-                <p className="text-xs text-slate-500">Volverá al estado "Aprobada"</p>
+                <p className="text-xs text-slate-500">Volverá al estado &quot;Aprobada&quot;</p>
               </div>
             </div>
             <div className="p-6">
@@ -1897,7 +1900,7 @@ export default function PODetailPage() {
                 showApprovalNoteModal.type === "rejection" ? "bg-red-50 border-red-200" :
                 "bg-slate-50 border-slate-200"
               }`}>
-                <p className="text-sm text-slate-700 italic">"{showApprovalNoteModal.text}"</p>
+                <p className="text-sm text-slate-700 italic">&quot;{showApprovalNoteModal.text}&quot;</p>
               </div>
               
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">

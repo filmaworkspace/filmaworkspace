@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { fichaInviteHtml, fichaInviteText } from "@/lib/emails/ficha-invite";
+import { requireUser } from "@/lib/require-auth";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
+
   const { to, firstName, projectName, workingTitle, role, formUrl, pin, senderName, memberId } =
     await req.json();
 
@@ -20,9 +24,8 @@ export async function POST(req: NextRequest) {
     subject: `${projectLabel} | Completa tu ficha`,
     html: fichaInviteHtml({ firstName, projectName, role, formUrl, pin, senderName }),
     text: fichaInviteText({ firstName, projectName, role, formUrl, pin, senderName }),
-    idempotencyKey: `ficha-invite/${memberId}/${Date.now()}`,
     tags: [{ name: "type", value: "ficha-invite" }],
-  });
+  }, { idempotencyKey: `ficha-invite/${memberId}/${Date.now()}` });
 
   if (error) {
     console.error("[send-invite]", error);

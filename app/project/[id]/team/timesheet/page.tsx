@@ -276,9 +276,10 @@ export default function ControlHorarioPage() {
     setSending(true);
     try {
       await getOrCreateDay(selectedDate);
+      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch("/api/horario/send-day", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ projectId: id, date: selectedDate }),
       });
       const body = await res.json();
@@ -295,9 +296,10 @@ export default function ControlHorarioPage() {
   const handleResendPending = async () => {
     setSending(true);
     try {
+      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch("/api/horario/resend", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ projectId: id, date: selectedDate, recipientUids: pending.map((r) => r.uid) }),
       });
       const body = await res.json();
@@ -314,9 +316,10 @@ export default function ControlHorarioPage() {
   const handleResendOne = async (recipientUid: string) => {
     setSending(true);
     try {
+      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch("/api/horario/resend", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ projectId: id, date: selectedDate, recipientUids: [recipientUid] }),
       });
       const body = await res.json();
@@ -355,9 +358,10 @@ export default function ControlHorarioPage() {
     if (reviewState[r.uid] === "sending") return;
     setReviewState((s) => ({ ...s, [r.uid]: "sending" }));
     try {
+      const idToken = await auth.currentUser?.getIdToken();
       const res  = await fetch("/api/horario/send-review", {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body:    JSON.stringify({ projectId: id, recipientUid: r.uid, recipientName: r.name, recipientEmail: r.email }),
       });
       const body = await res.json();

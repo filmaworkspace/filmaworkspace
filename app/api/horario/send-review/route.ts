@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { db } from "@/lib/firebase-admin";
 import { horarioReviewHtml, horarioReviewText } from "@/lib/emails/horario-review";
+import { requireUser } from "@/lib/require-auth";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
+
   try {
     const { projectId, recipientUid, recipientName, recipientEmail } = await req.json();
     if (!projectId || !recipientUid || !recipientEmail) {

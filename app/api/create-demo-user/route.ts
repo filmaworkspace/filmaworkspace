@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, db } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { requireAdmin } from "@/lib/require-admin";
 
 export async function POST(req: NextRequest) {
+  const admin = await requireAdmin(req);
+  if (!admin.ok) return admin.response;
+
   try {
     const { name, email, password } = await req.json();
 

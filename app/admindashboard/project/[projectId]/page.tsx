@@ -7,7 +7,7 @@ import Link from "next/link";
 import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import {
   addDoc,
   collection,
@@ -421,13 +421,15 @@ export default function AdminProjectPage() {
     if (!form.email) { showToast("error", "Esta ficha no tiene email"); return; }
     try {
       const url = `${window.location.origin}/form/${form.id}`;
+      const idToken = await auth.currentUser?.getIdToken();
       await fetch("/api/send-form-reminder", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           to: form.email,
           name: `${form.firstName || ""} ${form.lastName1 || ""}`.trim() || form.email,
           formUrl: url,
+          formId: form.id,
           projectName: project?.name || "",
           workingTitle,
         }),
@@ -645,9 +647,10 @@ export default function AdminProjectPage() {
       await addDoc(collection(db, "invitations"), inviteData);
 
       // Send invitation email (fire-and-forget)
+      const idToken = await auth.currentUser?.getIdToken();
       fetch("/api/send-project-invite", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           inviteeName,
           invitedByName: "Equipo de Filma Workspace",

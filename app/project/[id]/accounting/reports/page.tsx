@@ -448,7 +448,7 @@ function downloadXLSX(
   const headers = columns.map(c => (c.isBlank ? "" : c.label));
   const numericCols = detectNumericCols(dataRows);
   const xlsxBytes = buildXlsx(headers, dataRows, titleText, numericCols);
-  const blob = new Blob([xlsxBytes], {
+  const blob = new Blob([xlsxBytes as BlobPart], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
   const url = URL.createObjectURL(blob);
@@ -933,6 +933,53 @@ export default function ReportsPage() {
         }));
       });
       downloadXLSX(columns, dataRows, makeTitle("invoices"), `Facturas_${projectName}_${getCurrentDate()}`);
+    } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
+  };
+
+  const generateInvoicesAccountingReport = async (columns: SelectedColumn[], filters: InvoiceBookFilters) => {
+    setGenerating("invoices_accounting");
+    try {
+      const invoicesSnapshot = await getDocs(query(collection(db, `projects/${id}/invoices`), orderBy("createdAt", "desc")));
+      const dataRows: (string | number)[][] = [];
+
+      invoicesSnapshot.docs.forEach(docSnap => {
+        const data = docSnap.data();
+
+        if (!filters.includeCancelled && data.status === "cancelled") return;
+        if (filters.supplierId && data.supplierId !== filters.supplierId) return;
+        if (filters.dateFrom || filters.dateTo) {
+          const invoiceDate = data.invoiceDate?.toDate ? data.invoiceDate.toDate() : (data.invoiceDate ? new Date(data.invoiceDate) : null);
+          const dateStr = invoiceDate ? invoiceDate.toISOString().slice(0, 10) : "";
+          if (filters.dateFrom && dateStr < filters.dateFrom) return;
+          if (filters.dateTo && dateStr > filters.dateTo) return;
+        }
+        if (filters.paymentStatus !== "all") {
+          const isPaid = data.status === "paid" || !!data.paidAt;
+          if (filters.paymentStatus === "paid" && !isPaid) return;
+          if (filters.paymentStatus === "pending" && isPaid) return;
+        }
+
+        const items = data.items || [];
+        const allEpisodes: number[] = [];
+        items.forEach((item: any) => {
+          if (item.episodeAssignment === "specific" && item.episodes)
+            item.episodes.forEach((ep: any) => { if (!allEpisodes.includes(ep.episode)) allEpisodes.push(ep.episode); });
+        });
+        allEpisodes.sort((a, b) => a - b);
+        dataRows.push(toXlsxRow(columns, {
+          number: data.number || data.displayNumber || "", supplierNumber: data.supplierNumber || "",
+          supplier: data.supplier || "", supplierTaxId: data.supplierTaxId || "", description: data.description || "",
+          poNumber: data.poNumber || "",
+          episode: allEpisodes.length > 0 ? (allEpisodes.length === 1 ? allEpisodes[0].toString() : allEpisodes.join(", ")) : "0",
+          accountCode: items.length > 0 ? (items[0].subAccountCode || "") : "",
+          baseAmount: data.baseAmount || 0, taxAmount: data.vatAmount || data.taxAmount || 0,
+          irpfAmount: data.irpfAmount || 0, totalAmount: data.totalAmount || 0,
+          status: data.status || "", coded: data.codedAt ? "Sí" : "No", accounted: data.accounted ? "Sí" : "No",
+          invoiceDate: formatDate(data.invoiceDate), dueDate: formatDate(data.dueDate),
+          createdAt: formatDate(data.createdAt), paidAt: formatDate(data.paidAt),
+        }));
+      });
+      downloadXLSX(columns, dataRows, makeTitle("invoices"), `Libro_Facturas_${projectName}_${getCurrentDate()}`);
     } catch (error) { console.error("Error:", error); } finally { setGenerating(null); }
   };
 
@@ -1471,7 +1518,7 @@ export default function ReportsPage() {
             <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex gap-3">
               <button onClick={() => setShowInvoiceBookModal(false)} className="flex-1 px-4 py-2.5 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100 transition-colors">Cancelar</button>
               <button
-                onClick={() => generateInvoicesAccountingReport(getDefaultColumns("invoices_accounting"), invoiceBookFilters)}
+                onClick={() => generateInvoicesAccountingReport(getDefaultColumns("invoices"), invoiceBookFilters)}
                 disabled={generating !== null}
                 className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
                 style={{ backgroundColor: "#2F52E0" }}

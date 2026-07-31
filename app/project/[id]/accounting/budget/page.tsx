@@ -601,7 +601,7 @@ export default function BudgetPage() {
 
   const downloadTemplate = () => {
     const bytes = buildTemplateXlsx();
-    const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const blob = new Blob([bytes as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "plantilla_presupuesto.xlsx";

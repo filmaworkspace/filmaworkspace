@@ -44,9 +44,8 @@ export async function POST(req: NextRequest) {
       subject:        "Filma Workspace | Restablecer tu contraseña",
       html:           resetPasswordHtml({ name, resetUrl }),
       text:           resetPasswordText({ name, resetUrl }),
-      idempotencyKey: `reset-password/${email}/${Date.now()}`,
       tags:           [{ name: "type", value: "reset-password" }],
-    });
+    }, { idempotencyKey: `reset-password/${email}/${Date.now()}` });
 
     if (error) {
       console.error("[send-reset] Resend error:", error);

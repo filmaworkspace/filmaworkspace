@@ -304,7 +304,7 @@ function SalarySection({
             <input
               type="number" min={0}
               value={formData.salaryAmount ?? ""}
-              onChange={(e) => setFormData({ ...formData, salaryAmount: e.target.value ? Number(e.target.value) : null })}
+              onChange={(e) => setFormData({ ...formData, salaryAmount: e.target.value ? Number(e.target.value) : undefined })}
               placeholder="0.00"
               className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]"
             />
@@ -997,7 +997,7 @@ export default function CrewPage() {
                             </div>
                             <div>
                               <p className="text-sm font-semibold text-slate-900">{fullName(member)}</p>
-                              {member.artisticName && <p className="text-xs text-slate-400 italic mt-0.5">"{member.artisticName}"</p>}
+                              {member.artisticName && <p className="text-xs text-slate-400 italic mt-0.5">&quot;{member.artisticName}&quot;</p>}
                               {member.section === "cast" && member.character && <p className="text-xs text-violet-500 mt-0.5">{member.character}</p>}
                             </div>
                           </div>
@@ -1225,14 +1225,14 @@ export default function CrewPage() {
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Nº sesiones</label>
                       <input type="number" min={0} value={formData.sessions ?? ""}
-                        onChange={(e) => setFormData({ ...formData, sessions: e.target.value ? Number(e.target.value) : null })}
+                        onChange={(e) => setFormData({ ...formData, sessions: e.target.value ? Number(e.target.value) : undefined })}
                         placeholder="0"
                         className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Salario / sesión (€)</label>
                       <input type="number" min={0} value={formData.salaryPerSession ?? ""}
-                        onChange={(e) => setFormData({ ...formData, salaryPerSession: e.target.value ? Number(e.target.value) : null })}
+                        onChange={(e) => setFormData({ ...formData, salaryPerSession: e.target.value ? Number(e.target.value) : undefined })}
                         placeholder="0.00"
                         className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
                     </div>
@@ -1246,14 +1246,14 @@ export default function CrewPage() {
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Nº sesiones</label>
                     <input type="number" min={0} value={formData.sessions ?? ""}
-                      onChange={(e) => setFormData({ ...formData, sessions: e.target.value ? Number(e.target.value) : null })}
+                      onChange={(e) => setFormData({ ...formData, sessions: e.target.value ? Number(e.target.value) : undefined })}
                       placeholder="0"
                       className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Salario / sesión (€)</label>
                     <input type="number" min={0} value={formData.salaryPerSession ?? ""}
-                      onChange={(e) => setFormData({ ...formData, salaryPerSession: e.target.value ? Number(e.target.value) : null })}
+                      onChange={(e) => setFormData({ ...formData, salaryPerSession: e.target.value ? Number(e.target.value) : undefined })}
                       placeholder="0.00"
                       className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
                   </div>
@@ -1373,7 +1373,7 @@ export default function CrewPage() {
                       formTarget.phone ? ["Teléfono", formTarget.phone] : null,
                       ["Cargo", formTarget.role],
                       formTarget.department ? ["Departamento", formTarget.department] : null,
-                    ].filter(Boolean).map(([label, value]) => (
+                    ].filter((row): row is string[] => row !== null).map(([label, value]) => (
                       <div key={label} className="flex items-center justify-between px-4 py-2.5 gap-3">
                         <span className="text-xs text-slate-400 flex-shrink-0">{label}</span>
                         <span className="text-sm text-slate-700 text-right truncate">{value}</span>

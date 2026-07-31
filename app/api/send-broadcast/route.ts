@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { broadcastHtml, broadcastText } from "@/lib/emails/broadcast";
+import { requireAdmin } from "@/lib/require-admin";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
+  const admin = await requireAdmin(req);
+  if (!admin.ok) return admin.response;
+
   const { to, title, content, type = "info" } = await req.json();
 
   if (!to || !Array.isArray(to) || to.length === 0 || !title || !content) {

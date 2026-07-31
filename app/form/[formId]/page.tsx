@@ -1096,7 +1096,7 @@ export default function FormPage() {
                 </p>
                 {formDoc.coordinatorMessage && (
                   <p className="text-sm text-stone-600 mt-2 italic border-l-2 pl-2" style={{ borderColor: L }}>
-                    "{formDoc.coordinatorMessage}"
+                    &quot;{formDoc.coordinatorMessage}&quot;
                   </p>
                 )}
               </div>
@@ -1213,7 +1213,7 @@ export default function FormPage() {
                 </p>
                 {formDoc?.coordinatorMessage && (
                   <p className="text-sm text-stone-600 mt-2 italic border-l-2 pl-2" style={{ borderColor: L }}>
-                    "{formDoc.coordinatorMessage}"
+                    &quot;{formDoc.coordinatorMessage}&quot;
                   </p>
                 )}
               </div>

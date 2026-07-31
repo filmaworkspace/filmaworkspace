@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { projectInviteHtml, projectInviteText } from "@/lib/emails/project-invite";
+import { requireUser } from "@/lib/require-auth";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
+
   const {
     inviteeName,
     invitedByName,
@@ -32,9 +36,8 @@ export async function POST(req: NextRequest) {
     subject:        `${projectLabel} | ${invitedByName} te ha invitado`,
     html:           projectInviteHtml({ inviteeName, invitedByName, projectName, role: role ?? "", isExistingUser, loginUrl, registerUrl }),
     text:           projectInviteText({ inviteeName, invitedByName, projectName, role: role ?? "", isExistingUser, loginUrl, registerUrl }),
-    idempotencyKey: `project-invite/${projectId}/${invitedEmail}`,
     tags:           [{ name: "type", value: "project-invite" }],
-  });
+  }, { idempotencyKey: `project-invite/${projectId}/${invitedEmail}` });
 
   if (error) {
     console.error("[send-project-invite]", error);

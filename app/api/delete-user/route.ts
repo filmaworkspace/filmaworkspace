@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, db } from "@/lib/firebase-admin";
 import { getStorage } from "firebase-admin/storage";
+import { requireAdmin } from "@/lib/require-admin";
 
 export async function POST(req: NextRequest) {
+  const admin = await requireAdmin(req);
+  if (!admin.ok) return admin.response;
+
   try {
     const { uid } = await req.json();
     if (!uid) return NextResponse.json({ error: "uid requerido" }, { status: 400 });

@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { adminAuth, db } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { horarioInviteHtml, horarioInviteText } from "@/lib/emails/horario-invite";
+import { requireUserOrCronSecret } from "@/lib/require-auth";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -12,6 +13,9 @@ function formatDate(dateStr: string): string {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireUserOrCronSecret(req);
+  if (!auth.ok) return auth.response;
+
   try {
     const { projectId, date } = await req.json();
     if (!projectId || !date) return NextResponse.json({ error: "projectId y date requeridos" }, { status: 400 });

@@ -270,9 +270,10 @@ export default function AccountingUsersPage() {
       await setDoc(doc(collection(db, "invitations")), inviteData);
 
       // Send invitation email (fire-and-forget)
+      const idToken = await auth.currentUser?.getIdToken();
       fetch("/api/send-project-invite", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           inviteeName:    inviteData.invitedName,
           invitedByName:  inviteData.invitedByName,
