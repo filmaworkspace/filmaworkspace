@@ -85,8 +85,6 @@ export function useAuth() {
     setLoading(true);
 
     try {
-      console.log("=== INICIO REGISTRO ===");
-      
       if (password.length < 6) {
         setError("La contraseña debe tener al menos 6 caracteres");
         setLoading(false);
@@ -100,32 +98,22 @@ export function useAuth() {
       }
 
       // 1. Crear usuario en Firebase Auth
-      console.log("1. Creando usuario en Auth...");
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
         password
       );
       const user = userCredential.user;
-      console.log("✅ Usuario creado en Auth:", user.uid);
 
       // 2. Actualizar perfil
-      console.log("2. Actualizando perfil...");
       await updateProfile(user, {
         displayName: name.trim(),
       });
-      console.log("✅ Perfil actualizado");
 
       // 3. Forzar refresh del token
-      console.log("3. Refrescando token...");
       await user.getIdToken(true);
-      console.log("✅ Token refrescado");
 
       // 4. Crear documento en Firestore
-      console.log("4. Creando documento en Firestore...");
-      console.log("   - UID:", user.uid);
-      console.log("   - Email:", email.toLowerCase().trim());
-      
       try {
         await setDoc(doc(db, "users", user.uid), {
           name: name.trim(),
@@ -133,24 +121,12 @@ export function useAuth() {
           role: "user",
           createdAt: serverTimestamp(),
         });
-        console.log("✅ Documento creado en Firestore");
       } catch (firestoreError: any) {
-        console.error("❌ ERROR al crear documento:", firestoreError);
-        console.error("   - Código:", firestoreError.code);
-        console.error("   - Mensaje:", firestoreError.message);
+        console.error("[register] Error al crear documento en Firestore:", firestoreError?.code, firestoreError?.message);
         throw firestoreError;
       }
 
-      // 5. Verificar que el documento existe
-      console.log("5. Verificando documento...");
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      console.log("   - Documento existe:", userDoc.exists());
-      if (userDoc.exists()) {
-        console.log("   - Datos:", userDoc.data());
-      }
-
-      // 6. Actualizar invitaciones
-      console.log("6. Actualizando invitaciones...");
+      // 5. Actualizar invitaciones pendientes con el nuevo uid
       try {
         const invitationsRef = collection(db, "invitations");
         const q = query(
@@ -160,7 +136,6 @@ export function useAuth() {
         );
 
         const invitationsSnapshot = await getDocs(q);
-        console.log("   - Invitaciones encontradas:", invitationsSnapshot.size);
 
         if (!invitationsSnapshot.empty) {
           const updatePromises = invitationsSnapshot.docs.map((inviteDoc) =>
@@ -170,24 +145,16 @@ export function useAuth() {
           );
 
           await Promise.all(updatePromises);
-          console.log("✅ Invitaciones actualizadas");
         }
       } catch (inviteError: any) {
-        console.error("⚠️ Error al actualizar invitaciones (no crítico):", inviteError);
+        console.error("[register] Error al actualizar invitaciones (no crítico):", inviteError);
       }
 
-      // 7. Redirigir
-      console.log("7. Redirigiendo a dashboard...");
+      // 6. Redirigir
       router.push("/dashboard");
-      console.log("=== FIN REGISTRO EXITOSO ===");
-      
     } catch (error: any) {
-      console.error("=== ERROR EN REGISTRO ===");
-      console.error("Error completo:", error);
-      console.error("Código:", error.code);
-      console.error("Mensaje:", error.message);
-      console.error("Stack:", error.stack);
-      
+      console.error("[register] Error en registro:", error?.code, error?.message);
+
       let errorMessage = "Error al crear la cuenta";
 
       if (error.code === "auth/email-already-in-use") {
@@ -202,7 +169,6 @@ export function useAuth() {
         errorMessage = "Error de conexión. Verifica tu internet";
       } else if (error.code === "permission-denied" || error.message?.includes("permission")) {
         errorMessage = "Error de permisos. Contacta al administrador";
-        console.error("⚠️ El usuario se creó en Auth pero falló algo después");
       }
 
       setError(errorMessage);
