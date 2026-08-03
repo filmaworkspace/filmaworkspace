@@ -603,5 +603,18 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
+    match /guides/{guideId} {
+      // Públicas si están publicadas (para el link que Soporte comparte);
+      // admins y agentes de soporte ven también los borradores.
+      allow read: if resource.data.published == true || isAdmin() || isSupportAgent();
+      allow create, delete: if isAdmin();
+      // Cualquiera puede incrementar "views" en una guía publicada (contador
+      // de visitas de la página pública); cualquier otro cambio requiere admin.
+      allow update: if isAdmin() || (
+        resource.data.published == true &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views'])
+      );
+    }
+
   }
 }
