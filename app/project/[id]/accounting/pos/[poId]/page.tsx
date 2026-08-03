@@ -815,13 +815,13 @@ export default function PODetailPage() {
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div className="flex items-center gap-3">
-              <FileText size={24} className="text-slate-400" />
-              <div>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-semibold text-slate-900">Orden de compra</h1>
+        <div className="px-24 pt-10 pb-6">
+          <div className="relative flex items-center justify-center">
+            <div className="flex items-center gap-4">
+              <FileText size={22} className="text-slate-400" />
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-3">
+                  <h1 className="text-3xl font-bold text-slate-900 text-center">Orden de compra</h1>
                   <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm font-mono font-medium">
                     PO-{po.number}
                   </span>
@@ -842,7 +842,7 @@ export default function PODetailPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="absolute right-0 flex items-center gap-2">
               {/* Navegación entre POs */}
               <div className="flex items-center gap-1 mr-2">
                 <button onClick={() => navigatePO("prev")} disabled={currentIndex <= 0} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg disabled:opacity-30">

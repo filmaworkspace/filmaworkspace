@@ -221,12 +221,12 @@ export default function TeamApprovalsPage() {
 
       {/* ── Header (mismo patrón que accounting/approvals) ─────────────────── */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div className="flex items-center gap-3">
-              <ClipboardCheck size={24} style={{ color: TEAM_COLOR }} />
-              <div>
-                <h1 className="text-2xl font-semibold text-slate-900">Aprobaciones</h1>
+        <div className="px-24 pt-10 pb-6">
+          <div className="relative flex items-center justify-center">
+            <div className="flex items-center gap-4">
+              <ClipboardCheck size={22} style={{ color: TEAM_COLOR }} />
+              <div className="text-center">
+                <h1 className="text-3xl font-bold text-slate-900 text-center">Aprobaciones</h1>
                 <p className="text-slate-500 text-sm mt-0.5">
                   {pendingCount} pendiente{pendingCount !== 1 ? "s" : ""}
                 </p>
@@ -234,7 +234,7 @@ export default function TeamApprovalsPage() {
             </div>
 
             {/* Stats */}
-            <div className="flex items-center gap-4">
+            <div className="absolute right-0 flex items-center gap-4">
               <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-xl border border-slate-200">
                 <div className="text-center">
                   <p className="text-lg font-bold text-slate-900">{approvedToday}</p>

@@ -839,17 +839,17 @@ export default function CrewPage() {
 
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
+        <div className="px-24 pt-10 pb-6">
+          <div className="relative flex items-center justify-center">
 
             {/* Left: título solo */}
-            <div className="flex items-center gap-3">
-              <Users size={24} style={{ color: "#6BA319" }} />
-              <h1 className="text-2xl font-semibold text-slate-900">Crew</h1>
+            <div className="flex items-center gap-4">
+              <Users size={22} style={{ color: "#6BA319" }} />
+              <h1 className="text-3xl font-bold text-slate-900 text-center">Crew</h1>
             </div>
 
             {/* Right: stats + botón */}
-            <div className="flex items-center gap-4">
+            <div className="absolute right-0 flex items-center gap-4">
               {/* Stats pill */}
               <div className="flex items-center gap-4 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl">
                 <div className="text-center">

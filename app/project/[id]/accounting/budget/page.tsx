@@ -992,10 +992,8 @@ export default function BudgetPage() {
         <div className="px-24 pt-10 pb-6">
           {/* Page header */}
           <div className="relative flex items-center justify-center">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#2F52E0]/10 flex items-center justify-center">
-                <Wallet size={18} style={{ color: '#2F52E0' }} />
-              </div>
+            <div className="flex items-center gap-4">
+              <Wallet size={22} style={{ color: '#2F52E0' }} />
               <h1 className="text-3xl font-bold text-slate-900 text-center">Presupuesto</h1>
             </div>
 

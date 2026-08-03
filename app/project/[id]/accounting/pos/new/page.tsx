@@ -1113,18 +1113,18 @@ export default function NewPOPage() {
     <div className={cx("min-h-screen bg-white", inter.className)}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
+        <div className="px-24 pt-10 pb-6">
+          <div className="relative flex items-center justify-center">
+            <Link
+              href={"/project/" + id + "/accounting/pos"}
+              className="absolute left-0 w-10 h-10 rounded-xl flex items-center justify-center border border-slate-200 hover:bg-slate-50 transition-colors"
+            >
+              <ArrowLeft size={18} className="text-slate-600" />
+            </Link>
             <div className="flex items-center gap-4">
-              <Link
-                href={"/project/" + id + "/accounting/pos"}
-                className="w-10 h-10 rounded-xl flex items-center justify-center border border-slate-200 hover:bg-slate-50 transition-colors"
-              >
-                <ArrowLeft size={18} className="text-slate-600" />
-              </Link>
-              <FileText size={24} style={{ color: "#2F52E0" }} />
+              <FileText size={22} style={{ color: "#2F52E0" }} />
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-semibold text-slate-900">Nueva orden de compra</h1>
+                <h1 className="text-3xl font-bold text-slate-900 text-center">Nueva orden de compra</h1>
                 {permissions.fixedDepartment && (
                   <span className="px-2 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: "rgba(47, 82, 224, 0.1)", color: "#2F52E0" }}>
                     {permissions.fixedDepartment}
@@ -1133,7 +1133,7 @@ export default function NewPOPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="absolute right-0 flex items-center gap-2">
               {/* Botón de borradores */}
               <div className="relative">
                 <button

@@ -355,18 +355,18 @@ export default function ReplaceDocumentPage() {
     <div className={`${inter.className} min-h-screen bg-white`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
+        <div className="px-24 pt-10 pb-6">
+          <div className="relative flex items-center justify-center">
+            <Link
+              href={`/project/${projectId}/accounting/invoices`}
+              className="absolute left-0 w-10 h-10 rounded-xl flex items-center justify-center border border-slate-200 hover:bg-slate-50 transition-colors"
+            >
+              <ArrowLeft size={18} className="text-slate-600" />
+            </Link>
             <div className="flex items-center gap-4">
-              <Link
-                href={`/project/${projectId}/accounting/invoices`}
-                className="w-10 h-10 rounded-xl flex items-center justify-center border border-slate-200 hover:bg-slate-50 transition-colors"
-              >
-                <ArrowLeft size={18} className="text-slate-600" />
-              </Link>
-              <RefreshCw size={24} style={{ color: "#2F52E0" }} />
+              <RefreshCw size={22} style={{ color: "#2F52E0" }} />
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-semibold text-slate-900">Sustituir documento</h1>
+                <h1 className="text-3xl font-bold text-slate-900 text-center">Sustituir documento</h1>
                 <span className="px-2.5 py-1 bg-violet-100 text-violet-700 rounded-lg text-xs font-medium">
                   Proformas y presupuestos
                 </span>

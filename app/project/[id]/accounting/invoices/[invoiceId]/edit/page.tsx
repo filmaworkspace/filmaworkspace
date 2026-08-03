@@ -918,12 +918,12 @@ export default function EditInvoicePage() {
     <div className={cx("min-h-screen bg-white", inter.className)}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-6">
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div className="flex items-center gap-3">
-              <DocIcon size={24} className={currentDocType.textColor} />
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-semibold text-slate-900">
+        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
+          <div className="relative flex items-center justify-center">
+            <div className="flex items-center gap-4">
+              <DocIcon size={22} className={currentDocType.textColor} />
+              <div className="flex items-center gap-3 flex-wrap justify-center">
+                <h1 className="text-3xl font-bold text-slate-900 text-center">
                   {isAdminCorrection ? "Corrección administrativa" : "Editar"} {currentDocType.label.toLowerCase()}
                 </h1>
                 <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm font-mono font-medium">
@@ -949,7 +949,7 @@ export default function EditInvoicePage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="absolute right-0 flex items-center gap-3">
               <Link href={`/project/${id}/accounting/invoices/${invoiceId}`} className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium transition-colors">
                 <Eye size={16} />
                 Ver

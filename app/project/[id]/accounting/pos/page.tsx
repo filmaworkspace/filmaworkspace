@@ -735,19 +735,19 @@ export default function POsPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
+        <div className="px-24 pt-10 pb-6">
+          <div className="relative flex items-center justify-center">
             <div className="flex items-center gap-4">
-              <FileText size={24} style={{ color: '#2F52E0' }} />
+              <FileText size={22} style={{ color: '#2F52E0' }} />
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-semibold text-slate-900">Órdenes de compra</h1>
+                <h1 className="text-3xl font-bold text-slate-900 text-center">Órdenes de compra</h1>
                 {getRoleBadge()}
               </div>
             </div>
             {permissions.canCreatePO && (
-              <Link 
-                href={`/project/${id}/accounting/pos/new`} 
-                className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+              <Link
+                href={`/project/${id}/accounting/pos/new`}
+                className="absolute right-0 flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: '#2F52E0' }}
               >
                 <Plus size={16} strokeWidth={2.5} />

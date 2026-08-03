@@ -398,10 +398,8 @@ export default function AccountingUsersPage() {
       <div className="mt-[4.5rem]">
         <div className="px-24 pt-10 pb-6">
           <div className="relative flex items-center justify-center">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#2F52E0]/10 flex items-center justify-center">
-                <Users size={18} style={{ color: '#2F52E0' }} />
-              </div>
+            <div className="flex items-center gap-4">
+              <Users size={22} style={{ color: '#2F52E0' }} />
               <h1 className="text-3xl font-bold text-slate-900 text-center">Usuarios</h1>
             </div>
             <button onClick={() => setShowInviteModal(true)} className="absolute right-0 flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity" style={{ backgroundColor: '#2F52E0' }}>

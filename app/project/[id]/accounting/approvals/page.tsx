@@ -815,13 +815,13 @@ export default function ApprovalsPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
+        <div className="px-24 pt-10 pb-6">
           {/* Page header */}
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
+          <div className="relative flex items-center justify-center">
             <div className="flex items-center gap-4">
-              <ClipboardCheck size={24} style={{ color: "#2F52E0" }} />
-              <div>
-                <h1 className="text-2xl font-semibold text-slate-900">Aprobaciones</h1>
+              <ClipboardCheck size={22} style={{ color: "#2F52E0" }} />
+              <div className="text-center">
+                <h1 className="text-3xl font-bold text-slate-900 text-center">Aprobaciones</h1>
                 <p className="text-slate-500 text-sm mt-0.5">
                   {userStats.pendingCount} pendiente{userStats.pendingCount !== 1 ? "s" : ""}
                   {userRole && <span className="text-slate-400"> · {userRole}</span>}
@@ -830,7 +830,7 @@ export default function ApprovalsPage() {
             </div>
 
             {/* Stats */}
-            <div className="flex items-center gap-4">
+            <div className="absolute right-0 flex items-center gap-4">
               <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-xl border border-slate-200">
                 <div className="text-center">
                   <p className="text-lg font-bold text-slate-900">{userStats.approvedToday}</p>

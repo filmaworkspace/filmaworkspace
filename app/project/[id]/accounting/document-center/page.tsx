@@ -425,15 +425,15 @@ export default function DocumentCenterPage() {
   return (
     <div className={cx("min-h-screen bg-white", inter.className)}>
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
+        <div className="px-24 pt-10 pb-6">
+          <div className="relative flex items-center justify-center">
             <div className="flex items-center gap-4">
-              <FolderDown size={24} className="text-blue-600" />
-              <h1 className="text-2xl font-semibold text-slate-900">Centro de documentación</h1>
+              <FolderDown size={22} className="text-blue-600" />
+              <h1 className="text-3xl font-bold text-slate-900 text-center">Centro de documentación</h1>
             </div>
             {selectedIds.size > 0 && (
               <button onClick={downloadSelected} disabled={downloading}
-                className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="absolute right-0 flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
                 style={{ backgroundColor: "#2F52E0" }}>
                 {downloading
                   ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />{dlProgress.current}/{dlProgress.total}</>

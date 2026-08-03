@@ -634,15 +634,13 @@ export default function PayrollPage() {
 
       {/* ── Page header ──────────────────────────────────────────────────── */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div className="flex items-center gap-3">
-              <Banknote size={24} style={{ color: TEAM_COLOR }} />
-              <div>
-                <h1 className="text-2xl font-semibold text-slate-900">Confección de nóminas</h1>
-              </div>
+        <div className="px-24 pt-10 pb-6">
+          <div className="relative flex items-center justify-center">
+            <div className="flex items-center gap-4">
+              <Banknote size={22} style={{ color: TEAM_COLOR }} />
+              <h1 className="text-3xl font-bold text-slate-900 text-center">Confección de nóminas</h1>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="absolute right-0 flex items-center gap-2">
               {saving && <span className="text-xs text-slate-400 animate-pulse mr-1">Guardando…</span>}
               <div className="relative">
                 <button onClick={() => setShowExport(v => !v)}

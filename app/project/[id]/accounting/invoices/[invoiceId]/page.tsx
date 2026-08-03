@@ -1356,13 +1356,13 @@ export default function InvoiceDetailPage() {
       {toast && <div className="fixed bottom-4 right-4 z-50"><div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"} text-white text-sm font-medium`}>{toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}{toast.message}</div></div>}
       
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div className="flex items-center gap-3">
-              <Receipt size={24} className="text-slate-400" />
-              <div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h1 className="text-2xl font-semibold text-slate-900">{docConfig.label}</h1>
+        <div className="px-24 pt-10 pb-6">
+          <div className="relative flex items-center justify-center">
+            <div className="flex items-center gap-4">
+              <Receipt size={22} className="text-slate-400" />
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-3 flex-wrap">
+                  <h1 className="text-3xl font-bold text-slate-900 text-center">{docConfig.label}</h1>
                   <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm font-mono">{invoice.displayNumber}</span>
                   {/* Estado principal */}
                   <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium text-sm ${config.bg} ${config.text}`}><StatusIcon size={14} />{config.label}</span>
@@ -1394,7 +1394,7 @@ export default function InvoiceDetailPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="absolute right-0 flex items-center gap-2">
               <div className="flex items-center gap-1 mr-2">
                 <button onClick={() => navigateInvoice("prev")} disabled={currentIndex <= 0} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg disabled:opacity-30"><ChevronLeft size={18} /></button>
                 <span className="text-xs text-slate-500 px-2">{currentIndex + 1} / {allInvoiceIds.length}</span>

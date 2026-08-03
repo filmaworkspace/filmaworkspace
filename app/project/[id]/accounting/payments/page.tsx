@@ -691,16 +691,16 @@ export default function PaymentsPage() {
       )}
 
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
+        <div className="px-24 pt-10 pb-6">
+          <div className="relative flex items-center justify-center">
             <div className="flex items-center gap-4">
-              <Banknote size={24} style={{ color: "#2F52E0" }} />
-              <div>
-                <h1 className="text-2xl font-semibold text-slate-900">Previsiones de pago</h1>
+              <Banknote size={22} style={{ color: "#2F52E0" }} />
+              <div className="text-center">
+                <h1 className="text-3xl font-bold text-slate-900 text-center">Previsiones de pago</h1>
                 <p className="text-sm text-slate-500 mt-0.5">{forecasts.length} previsiones · {formatCurrency(forecasts.reduce((s, f) => s + f.totalAmount, 0))} € total</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="absolute right-0 flex items-center gap-2">
               <button 
                 onClick={() => { setShowInvoiceStatusSearch(true); setInvoiceStatusSearchTerm(""); setInvoiceStatusResult(null); }}
                 className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"

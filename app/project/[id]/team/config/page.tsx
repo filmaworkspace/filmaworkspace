@@ -1081,14 +1081,14 @@ const renderAccesos = () => (
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div className="flex items-center gap-3">
-              <Settings size={24} style={{ color: TEAM_COLOR }} />
-              <h1 className="text-2xl font-semibold text-slate-900">Configuración de team</h1>
+        <div className="px-24 pt-10 pb-6">
+          <div className="relative flex items-center justify-center">
+            <div className="flex items-center gap-4">
+              <Settings size={22} style={{ color: TEAM_COLOR }} />
+              <h1 className="text-3xl font-bold text-slate-900 text-center">Configuración de team</h1>
             </div>
             <button onClick={handleSave} disabled={saving}
-              className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">
+              className="absolute right-0 flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">
               {saving
                 ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Guardando...</>
                 : <><Save size={16} />Guardar</>}

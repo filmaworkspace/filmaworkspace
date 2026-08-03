@@ -10,7 +10,7 @@ import {
   query, where, orderBy, Timestamp, serverTimestamp,
 } from "firebase/firestore";
 import {
-  AlertCircle, Check, ChevronLeft, ChevronRight,
+  AlertCircle, Check, ChevronLeft, ChevronRight, Clock,
   Download, Eye, Hash, Link2, Pencil, Plus, RefreshCw, Send, Settings, Trash2,
   UserMinus, UserPlus, Users, X, CheckCircle,
 } from "lucide-react";
@@ -573,7 +573,10 @@ export default function ControlHorarioPage() {
       <div className="mt-[4.5rem]">
         <div className="px-24 pt-10 pb-6">
           <div className="relative flex items-center justify-center">
-            <h1 className="text-3xl font-bold text-slate-900 text-center">Control horario</h1>
+            <div className="flex items-center gap-4">
+              <Clock size={22} style={{ color: G }} />
+              <h1 className="text-3xl font-bold text-slate-900 text-center">Control horario</h1>
+            </div>
             <div className="absolute right-0 flex items-center gap-1">
               <button onClick={() => setShowConfig(true)}
                 className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors" title="Configuración">
