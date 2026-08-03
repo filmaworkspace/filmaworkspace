@@ -229,11 +229,10 @@ function StatTile({
   );
 }
 
-const NAV_SECTIONS: { id: "projects" | "users" | "producers" | "messages" | "support"; label: string; icon: React.ElementType }[] = [
+const NAV_SECTIONS: { id: "projects" | "users" | "producers" | "support"; label: string; icon: React.ElementType }[] = [
   { id: "projects", label: "Proyectos", icon: Briefcase },
   { id: "users", label: "Usuarios", icon: Users },
   { id: "producers", label: "Productoras", icon: Building2 },
-  { id: "messages", label: "Mensajes", icon: Bell },
   { id: "support", label: "Soporte", icon: HeadphonesIcon },
 ];
 
@@ -245,7 +244,7 @@ export default function AdminDashboard() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"projects" | "users" | "producers" | "messages" | "support">("projects");
+  const [activeTab, setActiveTab] = useState<"projects" | "users" | "producers" | "support">("projects");
 
   // Support
   const [supportChats,      setSupportChats]      = useState<SupportChat[]>([]);
@@ -263,18 +262,6 @@ export default function AdminDashboard() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [producers, setProducers] = useState<Producer[]>([]);
-  const [activeMessages, setActiveMessages] = useState<{
-    id: string;
-    odId: string;
-    title: string;
-    content: string;
-    type: "info" | "warning" | "success";
-    sentAt: Timestamp;
-    expiresAt: Timestamp | null;
-    sentByName: string;
-    targetProjects: string[] | null;
-    recipientCount: number;
-  }[]>([]);
 
   const [projectSearch, setProjectSearch] = useState("");
   const [projectPhaseFilter, setProjectPhaseFilter] = useState("all");
@@ -317,9 +304,7 @@ export default function AdminDashboard() {
   // Message modal states
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [messageForm, setMessageForm] = useState({
-    title: "",
     content: "",
-    type: "info" as "info" | "warning" | "success",
     recipientMode: "all" as "all" | "projects" | "users",
     selectedProjects: [] as string[],
     selectedUsers: [] as string[],
@@ -329,7 +314,6 @@ export default function AdminDashboard() {
   const [emailConfirmStep, setEmailConfirmStep] = useState(false);
   const [projectSearchInMessage, setProjectSearchInMessage] = useState("");
   const [userSearchInMessage, setUserSearchInMessage] = useState("");
-  const [messageTab, setMessageTab] = useState<"compose" | "history">("compose");
 
   // Custom confirm dialog
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -484,59 +468,6 @@ export default function AdminDashboard() {
           .map((u) => ({ id: u.id, name: u.name, email: u.email }));
       });
       setProducers(producersData);
-
-      // Load active messages from all users
-      const messagesMap = new Map<string, {
-        id: string;
-        odId: string;
-        title: string;
-        content: string;
-        type: "info" | "warning" | "success";
-        sentAt: Timestamp;
-        expiresAt: Timestamp | null;
-        sentByName: string;
-        targetProjects: string[] | null;
-        recipientCount: number;
-      }>();
-
-      for (const user of usersData) {
-        const userMessagesSnap = await getDocs(collection(db, `users/${user.id}/messages`));
-        for (const msgDoc of userMessagesSnap.docs) {
-          const msgData = msgDoc.data();
-          // Use title+content+sentAt as unique key to group same messages
-          const key = `${msgData.title}-${msgData.sentAt?.toMillis()}`;
-          
-          if (messagesMap.has(key)) {
-            const existing = messagesMap.get(key)!;
-            existing.recipientCount++;
-          } else {
-            // Check if expired
-            if (msgData.expiresAt && msgData.expiresAt.toDate() < new Date()) {
-              // Delete expired message
-              await deleteDoc(doc(db, `users/${user.id}/messages`, msgDoc.id));
-              continue;
-            }
-            
-            messagesMap.set(key, {
-              id: msgDoc.id,
-              odId: user.id,
-              title: msgData.title,
-              content: msgData.content,
-              type: msgData.type || "info",
-              sentAt: msgData.sentAt,
-              expiresAt: msgData.expiresAt || null,
-              sentByName: msgData.sentByName || "Admin",
-              targetProjects: msgData.targetProjects || null,
-              recipientCount: 1,
-            });
-          }
-        }
-      }
-
-      const messagesData = Array.from(messagesMap.values()).sort(
-        (a, b) => (b.sentAt?.toMillis() || 0) - (a.sentAt?.toMillis() || 0)
-      );
-      setActiveMessages(messagesData);
 
       setLoading(false);
       setRefreshing(false);
@@ -1092,8 +1023,8 @@ export default function AdminDashboard() {
 
   // Send message to users
   const handleSendMessage = async () => {
-    if (!messageForm.title.trim() || !messageForm.content.trim()) {
-      showToast("error", "Título y mensaje son obligatorios");
+    if (!messageForm.content.trim()) {
+      showToast("error", "Escribe un mensaje");
       return;
     }
     if (messageForm.recipientMode === "projects" && messageForm.selectedProjects.length === 0) {
@@ -1134,9 +1065,8 @@ export default function AdminDashboard() {
 
       // Create a message for each user
       const messageData = {
-        title: messageForm.title.trim(),
         content: messageForm.content.trim(),
-        type: messageForm.type,
+        type: "info",
         sentAt: serverTimestamp(),
         sentBy: contextUser?.uid,
         sentByName: contextUser?.name || contextUser?.email || "Admin",
@@ -1158,16 +1088,14 @@ export default function AdminDashboard() {
         fetch("/api/send-broadcast", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-          body: JSON.stringify({ to: emails, title: messageForm.title.trim(), content: messageForm.content.trim(), type: messageForm.type }),
+          body: JSON.stringify({ to: emails, content: messageForm.content.trim() }),
         }).catch(console.error);
       }
 
       // Reset form and close modal
       setEmailConfirmStep(false);
       setMessageForm({
-        title: "",
         content: "",
-        type: "info",
         recipientMode: "all",
         selectedProjects: [],
         selectedUsers: [],
@@ -1178,7 +1106,6 @@ export default function AdminDashboard() {
       setUserSearchInMessage("");
       setShowMessageModal(false);
       showToast("success", `Mensaje enviado a ${targetUserIds.length} usuario${targetUserIds.length !== 1 ? "s" : ""}${messageForm.sendByEmail ? " (+ email)" : ""}`);
-      await loadData();
     } catch (error) {
       console.error(error);
       showToast("error", "Error al enviar el mensaje");
@@ -1186,37 +1113,6 @@ export default function AdminDashboard() {
       setSaving(false);
     }
   };
-
-  // Delete message from all users
-  const handleDeleteMessage = async (messageTitle: string, messageSentAt: Timestamp) => {
-    showConfirmDialog("Eliminar mensaje", "Se eliminará de todos los usuarios que lo hayan recibido.", () => _doDeleteMessage(messageTitle, messageSentAt));
-  };
-  const _doDeleteMessage = async (messageTitle: string, messageSentAt: Timestamp) => {
-    
-    setSaving(true);
-    try {
-      let deletedCount = 0;
-      for (const user of users) {
-        const userMessagesSnap = await getDocs(collection(db, `users/${user.id}/messages`));
-        for (const msgDoc of userMessagesSnap.docs) {
-          const msgData = msgDoc.data();
-          if (msgData.title === messageTitle && msgData.sentAt?.toMillis() === messageSentAt?.toMillis()) {
-            await deleteDoc(doc(db, `users/${user.id}/messages`, msgDoc.id));
-            deletedCount++;
-          }
-        }
-      }
-      showToast("success", `Mensaje eliminado de ${deletedCount} usuario${deletedCount !== 1 ? "s" : ""}`);
-      setConfirmDialog(null);
-      await loadData();
-    } catch (error) {
-      console.error(error);
-      showToast("error", "Error al eliminar el mensaje");
-    } finally {
-      setSaving(false);
-    }
-  };
-
 
   // Export users to CSV
   const handleExportUsersCSV = () => {
@@ -1372,7 +1268,7 @@ export default function AdminDashboard() {
       )}
 
       {/* ── Shell: sidebar + content ─────────────────────────────────────── */}
-      <div className="mt-[4rem] flex items-stretch" style={{ minHeight: "calc(100vh - 4.5rem)" }}>
+      <div className="mt-[53px] flex items-stretch" style={{ minHeight: "calc(100vh - 53px)" }}>
 
         {/* Sidebar */}
         <aside className="w-60 flex-shrink-0 bg-slate-950 border-r border-slate-800/60 flex flex-col">
@@ -1393,7 +1289,6 @@ export default function AdminDashboard() {
                 item.id === "projects" ? projects.length :
                 item.id === "users" ? users.length :
                 item.id === "producers" ? producers.length :
-                item.id === "messages" ? activeMessages.length :
                 totalUnreadSupport;
               const alert = item.id === "support" && totalUnreadSupport > 0;
               const active = activeTab === item.id;
@@ -1578,17 +1473,17 @@ export default function AdminDashboard() {
                 </button>
               </div>
             ) : (
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden overflow-x-auto">
+              <div className="bg-white border border-slate-200 rounded-xl">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Proyecto</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider rounded-tl-xl">Proyecto</th>
                       <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ID</th>
                       <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Fase</th>
                       <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Productoras</th>
                       <th className="text-center px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Miembros</th>
                       <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Creado</th>
-                      <th className="text-right px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
+                      <th className="text-right px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider rounded-tr-xl">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1796,16 +1691,16 @@ export default function AdminDashboard() {
                 <h3 className="font-semibold text-slate-900">No hay usuarios</h3>
               </div>
             ) : (
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden overflow-x-auto">
+              <div className="bg-white border border-slate-200 rounded-xl">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Usuario</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider rounded-tl-xl">Usuario</th>
                       <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ID</th>
                       <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Teléfono</th>
                       <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Rol</th>
                       <th className="text-center px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Proyectos</th>
-                      <th className="text-right px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
+                      <th className="text-right px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider rounded-tr-xl">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1941,15 +1836,15 @@ export default function AdminDashboard() {
                 </button>
               </div>
             ) : (
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden overflow-x-auto">
+              <div className="bg-white border border-slate-200 rounded-xl">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Productora</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider rounded-tl-xl">Productora</th>
                       <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ID</th>
                       <th className="text-center px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Proyectos</th>
                       <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Usuarios asignados</th>
-                      <th className="text-right px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
+                      <th className="text-right px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider rounded-tr-xl">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -2032,106 +1927,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ==================== MESSAGES TAB ==================== */}
-        {activeTab === "messages" && (
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <p className="text-sm text-slate-500">
-                Mensajes enviados a usuarios. Los mensajes expirados se eliminan automáticamente.
-              </p>
-              <button
-                onClick={() => setShowMessageModal(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium"
-              >
-                <Send size={14} />
-                Nuevo mensaje
-              </button>
-            </div>
-
-            {activeMessages.length === 0 ? (
-              <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
-                <Bell size={28} className="text-slate-300 mx-auto mb-3" />
-                <h3 className="font-semibold text-slate-900 mb-4">No hay mensajes activos</h3>
-                <button
-                  onClick={() => setShowMessageModal(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
-                >
-                  <Send size={14} />
-                  Enviar mensaje
-                </button>
-              </div>
-            ) : (
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="divide-y divide-slate-100">
-                  {activeMessages.map((message) => {
-                    const typeConfig = {
-                      info: { icon: Info, bg: "bg-blue-50", text: "text-blue-700" },
-                      warning: { icon: AlertTriangle, bg: "bg-amber-50", text: "text-amber-700" },
-                      success: { icon: CheckCircle, bg: "bg-emerald-50", text: "text-emerald-700" },
-                    }[message.type];
-                    const Icon = typeConfig.icon;
-
-                    const getExpiryText = () => {
-                      if (!message.expiresAt) return "Indefinido";
-                      const now = new Date();
-                      const expires = message.expiresAt.toDate();
-                      const diffMs = expires.getTime() - now.getTime();
-                      const diffHours = Math.floor(diffMs / 3600000);
-                      const diffDays = Math.floor(diffMs / 86400000);
-                      if (diffDays > 0) return `${diffDays} día${diffDays > 1 ? "s" : ""}`;
-                      if (diffHours > 0) return `${diffHours}h`;
-                      return "< 1h";
-                    };
-
-                    return (
-                      <div key={`${message.title}-${message.sentAt?.toMillis()}`} className="px-5 py-4 hover:bg-slate-50">
-                        <div className="flex items-start gap-4">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${typeConfig.bg}`}>
-                            <Icon size={18} className={typeConfig.text} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h3 className="text-sm font-semibold text-slate-900">{message.title}</h3>
-                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${typeConfig.bg} ${typeConfig.text}`}>
-                                {message.type}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-600 line-clamp-2 mb-2">{message.content}</p>
-                            <div className="flex items-center gap-4 text-xs text-slate-400">
-                              <span className="flex items-center gap-1">
-                                <Users size={12} />
-                                {message.recipientCount} destinatario{message.recipientCount !== 1 ? "s" : ""}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Clock size={12} />
-                                Expira: {getExpiryText()}
-                              </span>
-                              {message.targetProjects && (
-                                <span className="flex items-center gap-1">
-                                  <Briefcase size={12} />
-                                  {message.targetProjects.length} proyecto{message.targetProjects.length !== 1 ? "s" : ""}
-                                </span>
-                              )}
-                              <span>Por: {message.sentByName}</span>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleDeleteMessage(message.title, message.sentAt)}
-                            disabled={saving}
-                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-50"
-                            title="Eliminar de todos los usuarios"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* ==================== SUPPORT TAB ==================== */}
         {activeTab === "support" && (() => {
@@ -2243,9 +2038,9 @@ export default function AdminDashboard() {
               const canReply = isAdmin || isMine;
               const otherAgents = agents.filter((a) => a.id !== activeChat.assignedTo);
               return (
-                <div className="flex-1 bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden">
+                <div className="flex-1 bg-white border border-slate-200 rounded-2xl flex flex-col">
                   {/* Conv header */}
-                  <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50 flex-wrap gap-2">
+                  <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50 flex-wrap gap-2 rounded-t-2xl">
                     <div className="space-y-0.5 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-semibold text-slate-900">{activeChat.userName}</p>
@@ -2390,7 +2185,7 @@ export default function AdminDashboard() {
                   {/* Reply input */}
                   {activeChat.status === "open" ? (
                     canReply ? (
-                      <div className="px-4 py-3.5 border-t border-slate-100 bg-white flex items-end gap-3">
+                      <div className="px-4 py-3.5 border-t border-slate-100 bg-white flex items-end gap-3 rounded-b-2xl">
                         <textarea
                           rows={1}
                           value={supportInput}
@@ -2410,14 +2205,14 @@ export default function AdminDashboard() {
                         </button>
                       </div>
                     ) : (
-                      <div className="px-4 py-3 border-t border-slate-100 bg-white">
+                      <div className="px-4 py-3 border-t border-slate-100 bg-white rounded-b-2xl">
                         <p className="text-xs text-center text-slate-400">
                           {isUnassigned ? "Atiende el ticket para poder responder" : `Asignado a ${activeChat.assignedToName} — solo puede responder ese agente`}
                         </p>
                       </div>
                     )
                   ) : (
-                    <div className="px-4 py-3 border-t border-slate-100 bg-white">
+                    <div className="px-4 py-3 border-t border-slate-100 bg-white rounded-b-2xl">
                       <p className="text-xs text-center text-slate-400">Conversación cerrada</p>
                     </div>
                   )}
@@ -3026,13 +2821,7 @@ export default function AdminDashboard() {
 
       {/* Send Message Modal */}
       {showMessageModal && (() => {
-        const typeConfig = {
-          info: { icon: Info, accent: "#2F52E0", accentBg: "#EFF2FF", label: "Información", badgeBg: "bg-blue-50", badgeText: "text-blue-700", badgeBorder: "border-blue-200" },
-          warning: { icon: AlertTriangle, accent: "#D97706", accentBg: "#FEF3C7", label: "Aviso", badgeBg: "bg-amber-50", badgeText: "text-amber-700", badgeBorder: "border-amber-200" },
-          success: { icon: CheckCircle, accent: "#059669", accentBg: "#D1FAE5", label: "Actualización", badgeBg: "bg-emerald-50", badgeText: "text-emerald-700", badgeBorder: "border-emerald-200" },
-        }[messageForm.type];
-        const TypeIcon = typeConfig.icon;
-        const canSend = messageForm.title.trim() && messageForm.content.trim() &&
+        const canSend = messageForm.content.trim() &&
           (messageForm.recipientMode === "all" ||
           (messageForm.recipientMode === "projects" && messageForm.selectedProjects.length > 0) ||
           (messageForm.recipientMode === "users" && messageForm.selectedUsers.length > 0));
@@ -3055,7 +2844,7 @@ export default function AdminDashboard() {
                 onClick={() => {
                   setShowMessageModal(false);
                   setEmailConfirmStep(false);
-                  setMessageForm({ title: "", content: "", type: "info", recipientMode: "all", selectedProjects: [], selectedUsers: [], duration: "indefinite", sendByEmail: false });
+                  setMessageForm({ content: "", recipientMode: "all", selectedProjects: [], selectedUsers: [], duration: "indefinite", sendByEmail: false });
                   setProjectSearchInMessage("");
                   setUserSearchInMessage("");
                 }}
@@ -3070,44 +2859,6 @@ export default function AdminDashboard() {
 
               {/* ── Left: compose ── */}
               <div className="flex-1 overflow-y-auto p-6 space-y-5 border-r border-slate-100">
-
-                {/* Type */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Tipo</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { value: "info", label: "Informativo", icon: Info, bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
-                      { value: "warning", label: "Aviso", icon: AlertTriangle, bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
-                      { value: "success", label: "Logro", icon: CheckCircle, bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
-                    ].map((t) => {
-                      const Icon = t.icon;
-                      return (
-                        <button
-                          key={t.value}
-                          onClick={() => setMessageForm({ ...messageForm, type: t.value as typeof messageForm.type })}
-                          className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                            messageForm.type === t.value ? `${t.bg} ${t.text} ${t.border}` : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                          }`}
-                        >
-                          <Icon size={14} />
-                          {t.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Title */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Título *</label>
-                  <input
-                    type="text"
-                    value={messageForm.title}
-                    onChange={(e) => setMessageForm({ ...messageForm, title: e.target.value })}
-                    placeholder="Nueva funcionalidad disponible"
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
-                  />
-                </div>
 
                 {/* Content */}
                 <div>
@@ -3296,16 +3047,13 @@ export default function AdminDashboard() {
                   <div className="p-3 flex gap-2.5">
                     <div
                       className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
-                      style={{ backgroundColor: typeConfig.accentBg }}
+                      style={{ backgroundColor: "#EFF2FF" }}
                     >
-                      <TypeIcon size={14} style={{ color: typeConfig.accent }} />
+                      <Info size={14} style={{ color: "#2F52E0" }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-slate-900 leading-snug line-clamp-1">
-                        {messageForm.title || "Título del mensaje"}
-                      </p>
-                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-3 leading-relaxed">
-                        {messageForm.content || "El contenido del mensaje aparecerá aquí..."}
+                      <p className="text-xs text-slate-700 leading-relaxed line-clamp-4">
+                        {messageForm.content || "El mensaje aparecerá aquí..."}
                       </p>
                     </div>
                   </div>
@@ -3376,7 +3124,7 @@ export default function AdminDashboard() {
                   onClick={() => {
                     setShowMessageModal(false);
                     setEmailConfirmStep(false);
-                    setMessageForm({ title: "", content: "", type: "info", recipientMode: "all", selectedProjects: [], selectedUsers: [], duration: "indefinite", sendByEmail: false });
+                    setMessageForm({ content: "", recipientMode: "all", selectedProjects: [], selectedUsers: [], duration: "indefinite", sendByEmail: false });
                     setProjectSearchInMessage("");
                     setUserSearchInMessage("");
                   }}

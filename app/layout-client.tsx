@@ -28,6 +28,7 @@ export default function ClientLayout({
     pathname?.startsWith("/access");
 
   const isMobilePage = pathname === "/mobile";
+  const isAdminDashboard = pathname?.startsWith("/admindashboard");
 
   // Redirigir a /mobile si el usuario accede desde un dispositivo móvil
   // y no está en una página de autenticación ni ya en /mobile.
@@ -44,7 +45,7 @@ export default function ClientLayout({
       <div className="flex flex-col min-h-screen">
         {!isAuthPage && !isMobilePage && <Header />}
         <main className="flex flex-col flex-grow">{children}</main>
-        {!isAuthPage && !isMobilePage && <Footer />}
+        {!isAuthPage && !isMobilePage && !isAdminDashboard && <Footer />}
       </div>
     </UserProvider>
   );

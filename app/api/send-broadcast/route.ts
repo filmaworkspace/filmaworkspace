@@ -9,9 +9,9 @@ export async function POST(req: NextRequest) {
   const admin = await requireAdmin(req);
   if (!admin.ok) return admin.response;
 
-  const { to, title, content, type = "info" } = await req.json();
+  const { to, content } = await req.json();
 
-  if (!to || !Array.isArray(to) || to.length === 0 || !title || !content) {
+  if (!to || !Array.isArray(to) || to.length === 0 || !content) {
     return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
   }
 
@@ -20,8 +20,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No hay emails válidos" }, { status: 400 });
   }
 
-  const html = broadcastHtml({ title, content, type });
-  const text = broadcastText({ title, content, type });
+  const subject = "Mensaje de Filma Workspace";
+  const html = broadcastHtml({ content });
+  const text = broadcastText({ content });
   const from = process.env.RESEND_FROM ?? "Filma Workspace <noreply@filmaworkspace.com>";
 
   try {
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
       const batch = emails.slice(i, i + BATCH_SIZE).map((email) => ({
         from,
         to: [email],
-        subject: title,
+        subject,
         html,
         text,
         tags: [{ name: "type", value: "broadcast" }],

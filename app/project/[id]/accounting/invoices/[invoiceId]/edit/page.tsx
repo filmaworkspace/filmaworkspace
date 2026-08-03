@@ -917,7 +917,7 @@ export default function EditInvoicePage() {
   return (
     <div className={cx("min-h-screen bg-white", inter.className)}>
       {/* Header */}
-      <div className="mt-[4rem]">
+      <div className="mt-[53px]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
           <div className="relative flex items-center justify-center">
             <div className="flex items-center gap-4">

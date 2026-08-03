@@ -114,7 +114,6 @@ interface Invitation {
 
 interface AdminMessage {
   id: string;
-  title: string;
   content: string;
   type: "info" | "warning" | "success";
   sentAt: Timestamp;
@@ -258,22 +257,26 @@ export default function Dashboard() {
         });
         setInvitations(invitationsData);
 
-        // Load admin messages
+        // Load admin messages (limpiando los caducados de paso)
         const messagesRef = collection(db, `users/${userId}/messages`);
         const messagesQuery = query(messagesRef, orderBy("sentAt", "desc"));
         const messagesSnapshot = await getDocs(messagesQuery);
-        const messagesData: AdminMessage[] = messagesSnapshot.docs.map((msgDoc) => {
+        const messagesData: AdminMessage[] = [];
+        for (const msgDoc of messagesSnapshot.docs) {
           const data = msgDoc.data();
-          return {
+          if (data.expiresAt && data.expiresAt.toDate() < new Date()) {
+            deleteDoc(doc(db, `users/${userId}/messages`, msgDoc.id)).catch(() => {});
+            continue;
+          }
+          messagesData.push({
             id: msgDoc.id,
-            title: data.title,
             content: data.content,
             type: data.type || "info",
             sentAt: data.sentAt,
             sentByName: data.sentByName,
             read: data.read || false,
-          };
-        });
+          });
+        }
         setMessages(messagesData);
       } catch (error) {
         console.error("Error al cargar datos:", error);
@@ -657,7 +660,7 @@ export default function Dashboard() {
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header con título y notificaciones */}
-      <div className="mt-[4rem]">
+      <div className="mt-[53px]">
         <div className="px-24 pt-10 pb-6">
           <div className="flex items-center justify-center relative">
             <h1 className="text-3xl font-bold text-slate-900">Panel de proyectos</h1>
@@ -752,10 +755,9 @@ export default function Dashboard() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <p className="text-xs font-medium text-slate-900 truncate">{message.title}</p>
-                              {!message.read && <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />}
+                              <p className="text-xs font-medium text-slate-900 line-clamp-2">{message.content}</p>
+                              {!message.read && <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0 mt-1" />}
                             </div>
-                            <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{message.content}</p>
                             <div className="flex items-center justify-between mt-2">
                               <span className="text-[10px] text-slate-400">{message.sentByName}</span>
                               <button
