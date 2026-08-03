@@ -13,7 +13,7 @@ interface UserData {
   uid: string;
   email: string | null;
   name: string;
-  role: "admin" | "user";
+  role: "admin" | "user" | "support_agent";
   companyId: string | null;
   isLoading: boolean;
 }
@@ -98,6 +98,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
     const { role, companyId } = user;
     const isAdmin = role === "admin";
+    const isSupportAgent = role === "support_agent";
     const isCompanyUser = !!companyId;
     const isAdminPage = pathname.startsWith("/admin");
     const isDashboardPage = pathname === "/dashboard";
@@ -105,6 +106,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
     if (isAdmin) {
       if (isDashboardPage) router.push("/admindashboard");
+      return;
+    }
+
+    if (isSupportAgent) {
+      // Los agentes de soporte solo operan desde /admindashboard (pestaña Soporte)
+      if (isDashboardPage || isCompanyPage) router.push("/admindashboard");
       return;
     }
 

@@ -42,7 +42,7 @@ export default function SupportChat() {
 
   const pathname = usePathname();
   const uid     = user?.uid ?? null;
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "support_agent";
 
   // All hooks before any conditional return
   useEffect(() => {
@@ -122,12 +122,14 @@ export default function SupportChat() {
         tx.set(counterRef, { count: next }, { merge: true });
         return next;
       });
+      const isSales = type === "company" && interested === true;
       await setDoc(chatRef, {
         userId:         uid,
         userName:       idName.trim(),
         userEmail:      idEmail.trim(),
         contactType:    type,
         interestedInFW: interested ?? null,
+        department:     isSales ? "sales" : "technical",
         status:         "open",
         ticketNumber:   ticketNum,
         createdAt:      serverTimestamp(),
@@ -135,13 +137,17 @@ export default function SupportChat() {
         lastMessage:    "",
         unreadAdmin:    0,
         unreadUser:     0,
+        // Cada ticket nuevo entra sin asignar: cualquier agente disponible puede atenderlo
+        assignedTo:     null,
+        assignedToName: null,
+        assignedAt:     null,
+        resolvedAt:     null,
       });
       setTicketNumber(ticketNum);
       setContactType(type);
       setInterestedInFW(interested ?? null);
 
       // Auto welcome message
-      const isSales = type === "company" && interested === true;
       const agentLabel = isSales ? "agente de ventas" : "agente de soporte";
       const firstName = idName.trim().split(" ")[0];
       const welcomeText = isSales
