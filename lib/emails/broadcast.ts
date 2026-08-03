@@ -1,16 +1,10 @@
 interface BroadcastProps {
-  title: string;
   content: string;
-  type: "info" | "warning" | "success";
 }
 
-export function broadcastHtml({ title, content, type }: BroadcastProps): string {
-  const accent =
-    type === "warning" ? "#D97706" : type === "success" ? "#059669" : "#2F52E0";
-  const accentBg =
-    type === "warning" ? "#FEF3C7" : type === "success" ? "#D1FAE5" : "#EFF2FF";
-  const label =
-    type === "warning" ? "Aviso" : type === "success" ? "Actualización" : "Información";
+export function broadcastHtml({ content }: BroadcastProps): string {
+  const accent = "#2F52E0";
+  const accentBg = "#EFF2FF";
 
   return /* html */`
 <!DOCTYPE html>
@@ -18,7 +12,7 @@ export function broadcastHtml({ title, content, type }: BroadcastProps): string 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${title}</title>
+  <title>Mensaje de Filma Workspace</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f1f5f9;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
 
@@ -52,14 +46,10 @@ export function broadcastHtml({ title, content, type }: BroadcastProps): string 
                     <table cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:20px;">
                       <tr>
                         <td style="background-color:${accentBg};border-radius:8px;padding:6px 14px;">
-                          <span style="font-size:12px;font-weight:700;color:${accent};text-transform:uppercase;letter-spacing:0.08em;">${label}</span>
+                          <span style="font-size:12px;font-weight:700;color:${accent};text-transform:uppercase;letter-spacing:0.08em;">Mensaje</span>
                         </td>
                       </tr>
                     </table>
-
-                    <p style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0f172a;line-height:1.3;">
-                      ${title}
-                    </p>
 
                     <p style="margin:0;font-size:15px;color:#475569;line-height:1.7;white-space:pre-wrap;">
                       ${content.replace(/\n/g, "<br/>")}
@@ -98,6 +88,6 @@ export function broadcastHtml({ title, content, type }: BroadcastProps): string 
 `.trim();
 }
 
-export function broadcastText({ title, content }: BroadcastProps): string {
-  return `${title}\n\n${content}\n\n— Filma Workspace`.trim();
+export function broadcastText({ content }: BroadcastProps): string {
+  return `${content}\n\n— Filma Workspace`.trim();
 }
