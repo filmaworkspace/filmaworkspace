@@ -989,15 +989,17 @@ export default function BudgetPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
+        <div className="px-24 pt-10 pb-6">
           {/* Page header */}
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div className="flex items-center gap-4">
-              <Wallet size={24} style={{ color: '#2F52E0' }} />
-              <h1 className="text-2xl font-semibold text-slate-900">Presupuesto</h1>
+          <div className="relative flex items-center justify-center">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#2F52E0]/10 flex items-center justify-center">
+                <Wallet size={18} style={{ color: '#2F52E0' }} />
+              </div>
+              <h1 className="text-3xl font-bold text-slate-900 text-center">Presupuesto</h1>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="absolute right-0 flex items-center gap-2">
               <button onClick={() => setShowImportModal(true)} className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
                 <Upload size={16} />Importar
               </button>

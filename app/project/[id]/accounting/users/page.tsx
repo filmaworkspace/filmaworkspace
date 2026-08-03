@@ -396,13 +396,15 @@ export default function AccountingUsersPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div className="flex items-center gap-4">
-              <Users size={24} style={{ color: '#2F52E0' }} />
-              <h1 className="text-2xl font-semibold text-slate-900">Usuarios</h1>
+        <div className="px-24 pt-10 pb-6">
+          <div className="relative flex items-center justify-center">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#2F52E0]/10 flex items-center justify-center">
+                <Users size={18} style={{ color: '#2F52E0' }} />
+              </div>
+              <h1 className="text-3xl font-bold text-slate-900 text-center">Usuarios</h1>
             </div>
-            <button onClick={() => setShowInviteModal(true)} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity" style={{ backgroundColor: '#2F52E0' }}>
+            <button onClick={() => setShowInviteModal(true)} className="absolute right-0 flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity" style={{ backgroundColor: '#2F52E0' }}>
               <UserPlus size={16} strokeWidth={2.5} />Dar acceso
             </button>
           </div>

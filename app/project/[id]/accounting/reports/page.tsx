@@ -1221,14 +1221,16 @@ export default function ReportsPage() {
   return (
     <div className={"min-h-screen bg-white " + inter.className}>
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div className="flex items-center gap-4">
-              <FileSpreadsheet size={24} style={{ color: "#2F52E0" }} />
-              <h1 className="text-2xl font-semibold text-slate-900">Informes</h1>
+        <div className="px-24 pt-10 pb-6">
+          <div className="relative flex items-center justify-center">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#2F52E0]/10 flex items-center justify-center">
+                <FileSpreadsheet size={18} style={{ color: "#2F52E0" }} />
+              </div>
+              <h1 className="text-3xl font-bold text-slate-900 text-center">Informes</h1>
             </div>
             {episodesEnabled && totalEpisodes > 0 && (
-              <button onClick={() => setSplitByEpisode(!splitByEpisode)} className={"flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all " + (splitByEpisode ? "bg-violet-100 text-violet-700 border border-violet-200" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}>
+              <button onClick={() => setSplitByEpisode(!splitByEpisode)} className={"absolute right-0 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all " + (splitByEpisode ? "bg-violet-100 text-violet-700 border border-violet-200" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}>
                 <Film size={14} />
                 Desglosar por capítulo
               </button>
