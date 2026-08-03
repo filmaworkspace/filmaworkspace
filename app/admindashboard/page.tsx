@@ -33,6 +33,7 @@ import {
   AlertTriangle,
   ArrowRight,
   Bell,
+  BookOpen,
   Briefcase,
   Building2,
   Calendar,
@@ -254,9 +255,13 @@ export default function AdminDashboard() {
   const [supportSending,    setSupportSending]     = useState(false);
   const [totalUnreadSupport, setTotalUnreadSupport] = useState(0);
   const [agents, setAgents] = useState<{ id: string; name: string; email: string; role: string; supportSpecialty?: string }[]>([]);
+  const [publishedGuides, setPublishedGuides] = useState<{ id: string; title: string; slug: string; category: string }[]>([]);
   const [supportQueueFilter, setSupportQueueFilter] = useState<"unassigned" | "mine" | "all" | "resolved">("unassigned");
   const [showTransferMenu, setShowTransferMenu] = useState<string | null>(null);
+  const [showGuidePicker, setShowGuidePicker] = useState<string | null>(null);
+  const [guidePickerSearch, setGuidePickerSearch] = useState("");
   const transferMenuRef = useRef<HTMLDivElement>(null);
+  const guidePickerRef = useRef<HTMLDivElement>(null);
   const supportMsgsRef = useRef<HTMLDivElement>(null);
 
   const [projects, setProjects] = useState<Project[]>([]);
@@ -368,6 +373,10 @@ export default function AdminDashboard() {
       }
       if (transferMenuRef.current && !transferMenuRef.current.contains(e.target as Node)) {
         setShowTransferMenu(null);
+      }
+      if (guidePickerRef.current && !guidePickerRef.current.contains(e.target as Node)) {
+        setShowGuidePicker(null);
+        setGuidePickerSearch("");
       }
       if (roleMenuRef.current && !roleMenuRef.current.contains(e.target as Node)) {
         setShowRoleMenuFor(null);
@@ -505,6 +514,16 @@ export default function AdminDashboard() {
     return () => unsub();
   }, [hasAdminAccess]);
 
+  // Guías publicadas, para poder enviarlas por link desde un ticket de soporte
+  useEffect(() => {
+    if (!hasAdminAccess) return;
+    const q = query(collection(db, "guides"), where("published", "==", true));
+    const unsub = onSnapshot(q, (snap) => {
+      setPublishedGuides(snap.docs.map((d) => ({ id: d.id, ...d.data() } as any)));
+    });
+    return () => unsub();
+  }, [hasAdminAccess]);
+
   // Load messages when active chat changes
   useEffect(() => {
     if (!activeChatId) { setChatMessages([]); return; }
@@ -601,6 +620,30 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error(error);
       showToast("error", "No se pudo transferir el ticket");
+    }
+  };
+
+  // Envía el link de una guía publicada como mensaje del agente en el ticket
+  const handleInsertGuide = async (chatId: string, guide: { title: string; slug: string }) => {
+    try {
+      const url = `${window.location.origin}/guias/${guide.slug}`;
+      await addDoc(collection(db, `supportChats/${chatId}/messages`), {
+        text: `📘 ${guide.title}\n${url}`,
+        sender: "admin",
+        senderName: contextUser?.name || contextUser?.email || "Soporte Filma",
+        createdAt: serverTimestamp(),
+      });
+      await updateDoc(doc(db, "supportChats", chatId), {
+        lastMessage: `📘 ${guide.title}`,
+        lastMessageAt: serverTimestamp(),
+        unreadUser: 1,
+      });
+      setShowGuidePicker(null);
+      setGuidePickerSearch("");
+      showToast("success", "Guía enviada");
+    } catch (error) {
+      console.error(error);
+      showToast("error", "No se pudo enviar la guía");
     }
   };
 
@@ -1315,6 +1358,15 @@ export default function AdminDashboard() {
                 </button>
               );
             })}
+            {isAdmin && (
+              <Link
+                href="/admindashboard/guides"
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-900 transition-colors"
+              >
+                <BookOpen size={15} className="text-slate-500" />
+                <span className="flex-1 text-left">Guías</span>
+              </Link>
+            )}
           </nav>
 
           <div className="px-3 py-4 border-t border-slate-800/60 space-y-1">
@@ -2119,6 +2171,45 @@ export default function AdminDashboard() {
                             )}
                           </>
                         )
+                      )}
+                      {activeChat.status === "open" && canReply && (
+                        <div className="relative" ref={showGuidePicker === activeChat.id ? guidePickerRef : null}>
+                          <button
+                            onClick={() => setShowGuidePicker(showGuidePicker === activeChat.id ? null : activeChat.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-medium transition-colors"
+                          >
+                            <BookOpen size={12} />
+                            Guía
+                          </button>
+                          {showGuidePicker === activeChat.id && (
+                            <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1.5 max-h-72 overflow-y-auto">
+                              <div className="px-2 pb-1.5">
+                                <input
+                                  value={guidePickerSearch}
+                                  onChange={(e) => setGuidePickerSearch(e.target.value)}
+                                  placeholder="Buscar guía"
+                                  autoFocus
+                                  className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-slate-300"
+                                />
+                              </div>
+                              {publishedGuides
+                                .filter((g) => g.title.toLowerCase().includes(guidePickerSearch.toLowerCase()))
+                                .map((g) => (
+                                  <button
+                                    key={g.id}
+                                    onClick={() => handleInsertGuide(activeChat.id, g)}
+                                    className="w-full px-3 py-2 text-left hover:bg-slate-50"
+                                  >
+                                    <p className="text-xs font-medium text-slate-800 truncate">{g.title}</p>
+                                    <p className="text-[10px] text-slate-400">{g.category}</p>
+                                  </button>
+                                ))}
+                              {publishedGuides.filter((g) => g.title.toLowerCase().includes(guidePickerSearch.toLowerCase())).length === 0 && (
+                                <p className="px-3 py-2 text-xs text-slate-400">Sin guías publicadas</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       )}
                       {activeChat.status === "open" ? (
                         <button
