@@ -684,7 +684,7 @@ export default function PaymentsPage() {
   return (
     <div className={cx("min-h-screen bg-white", inter.className)}>
       {toast && (
-        <div className={cx("fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2", toast.type === "success" ? "bg-slate-900 text-white" : "bg-red-600 text-white")}>
+        <div className={cx("fixed bottom-4 left-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2", toast.type === "success" ? "bg-slate-900 text-white" : "bg-red-600 text-white")}>
           {toast.type === "success" ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
           {toast.message}
         </div>

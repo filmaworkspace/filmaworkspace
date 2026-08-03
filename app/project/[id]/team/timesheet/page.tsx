@@ -1216,7 +1216,7 @@ export default function ControlHorarioPage() {
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed bottom-6 right-6 flex items-center gap-3 px-4 py-3 rounded-2xl shadow-lg z-50 text-sm font-medium ${
+        <div className={`fixed bottom-6 left-6 flex items-center gap-3 px-4 py-3 rounded-2xl shadow-lg z-50 text-sm font-medium ${
           toast.type === "success" ? "bg-white border border-slate-200 text-slate-900" : "bg-red-600 text-white"
         }`}>
           {toast.type === "success" ? <CheckCircle size={16} style={{ color: G }} /> : <AlertCircle size={16} />}

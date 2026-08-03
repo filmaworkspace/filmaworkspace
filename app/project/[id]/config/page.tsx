@@ -28,7 +28,6 @@ import {
   Building2,
   Calendar,
   CheckCircle,
-  Clapperboard,
   Clock,
   Copy,
   Edit2,
@@ -318,7 +317,7 @@ export default function ConfigGeneral() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Toast */}
       {toast && (
-        <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-2xl text-sm font-medium shadow-lg flex items-center gap-2 ${
+        <div className={`fixed bottom-4 left-4 z-50 px-4 py-3 rounded-2xl text-sm font-medium shadow-lg flex items-center gap-2 ${
           toast.type === "success" ? "bg-slate-900 text-white" : "bg-red-600 text-white"
         }`}>
           {toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
@@ -492,8 +491,6 @@ export default function ConfigGeneral() {
               </section>
             ) : (
               <section className="py-6 text-center">
-                <Clapperboard size={32} className="mx-auto text-slate-300 mb-3" />
-                <p className="text-sm text-slate-400 mb-4">Aún no has configurado los datos de producción</p>
                 <button
                   onClick={() => setEditingProduction(true)}
                   className="text-sm font-medium text-slate-900 hover:text-slate-700 transition-colors"

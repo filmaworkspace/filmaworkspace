@@ -954,11 +954,9 @@ export default function CrewPage() {
             <h3 className="text-base font-semibold text-slate-900 mb-1">
               {searchTerm || statusFilter !== "all" || sectionFilter !== "all" ? "Sin resultados" : "Sin miembros aún"}
             </h3>
-            <p className="text-slate-500 text-sm">
-              {searchTerm || statusFilter !== "all" || sectionFilter !== "all"
-                ? "Prueba a ajustar los filtros"
-                : "Usa el botón «Añadir miembro» para empezar"}
-            </p>
+            {(searchTerm || statusFilter !== "all" || sectionFilter !== "all") && (
+              <p className="text-slate-500 text-sm">Prueba a ajustar los filtros</p>
+            )}
           </div>
         ) : (
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">

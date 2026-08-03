@@ -592,7 +592,7 @@ export default function PaymentPayPage() {
 
   return (
     <div className={`min-h-screen bg-slate-100 ${inter.className}`}>
-      {toast && <div className="fixed bottom-4 right-4 z-[60]"><div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium ${toast.type === "success" ? "bg-emerald-600" : toast.type === "error" ? "bg-red-600" : "bg-amber-500"}`}>{toast.type === "success" ? <CheckCircle2 size={16} /> : toast.type === "error" ? <AlertCircle size={16} /> : <AlertTriangle size={16} />}{toast.message}</div></div>}
+      {toast && <div className="fixed bottom-4 left-4 z-[60]"><div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium ${toast.type === "success" ? "bg-emerald-600" : toast.type === "error" ? "bg-red-600" : "bg-amber-500"}`}>{toast.type === "success" ? <CheckCircle2 size={16} /> : toast.type === "error" ? <AlertCircle size={16} /> : <AlertTriangle size={16} />}{toast.message}</div></div>}
 
       {/* Header */}
       <div className="bg-emerald-600 text-white px-6 py-3 flex items-center justify-between fixed top-0 left-0 right-0 z-50">

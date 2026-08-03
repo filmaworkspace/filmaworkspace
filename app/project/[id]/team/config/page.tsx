@@ -1099,12 +1099,12 @@ const renderAccesos = () => (
 
       {/* ── Toasts ─────────────────────────────────────────────────────────── */}
       {successMessage && (
-        <div className="fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
+        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
           <CheckCircle2 size={16} /> {successMessage}
         </div>
       )}
       {errorMessage && (
-        <div className="fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
+        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
           <AlertCircle size={16} /> {errorMessage}
         </div>
       )}
