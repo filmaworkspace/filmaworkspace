@@ -358,14 +358,14 @@ export default function ConfigGeneral() {
 
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
+        <div className="px-24 pt-10 pb-6">
+          <div className="relative flex items-center justify-center">
             <div className="flex items-center gap-4">
-              <Settings size={24} className="text-slate-900" />
-              <h1 className="text-2xl font-semibold text-slate-900">Configuración del proyecto</h1>
+              <Settings size={22} className="text-slate-900" />
+              <h1 className="text-3xl font-bold text-slate-900 text-center">Configuración del proyecto</h1>
             </div>
-      
-            <div className="flex items-center gap-2">
+
+            <div className="absolute right-0 flex items-center gap-2">
               {!editingProject && !editingProduction && (
                 <button
                   onClick={() => { setEditingProject(true); setEditingProduction(true); }}

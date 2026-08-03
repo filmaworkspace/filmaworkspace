@@ -17,11 +17,13 @@ import {
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   Timestamp,
   updateDoc,
   addDoc,
+  where,
 } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -65,6 +67,7 @@ import {
   Square,
   Trash2,
   TrendingUp,
+  UserCheck,
   UserPlus,
   Users,
   X,
@@ -134,6 +137,7 @@ interface User {
   email: string;
   phone?: string;
   role: string;
+  supportSpecialty?: "sales" | "technical" | "both";
   isDemo?: boolean;
   projectCount: number;
   projects: UserProject[];
@@ -167,7 +171,18 @@ interface SupportChat {
   interestedInFW?: boolean | null;
   currentPage?:    string;
   ticketNumber?:   number;
+  department?:     "sales" | "technical" | null;
+  assignedTo?:     string | null;
+  assignedToName?: string | null;
+  assignedAt?:     Timestamp | null;
+  resolvedAt?:     Timestamp | null;
 }
+
+const SPECIALTY_LABEL: Record<string, string> = {
+  sales: "Ventas",
+  technical: "Soporte técnico",
+  both: "Ventas + Soporte",
+};
 
 interface SupportMessage {
   id:         string;
@@ -175,7 +190,52 @@ interface SupportMessage {
   sender:     "user" | "admin";
   senderName: string;
   createdAt:  Timestamp | null;
+  system?:    boolean;
 }
+
+// ─── UI helpers ────────────────────────────────────────────────────────────────
+
+const STAT_ACCENTS: Record<string, string> = {
+  blue: "text-blue-600 bg-blue-50",
+  violet: "text-violet-600 bg-violet-50",
+  amber: "text-amber-600 bg-amber-50",
+  emerald: "text-emerald-600 bg-emerald-50",
+  red: "text-red-600 bg-red-50",
+  slate: "text-slate-500 bg-slate-100",
+};
+
+function StatTile({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  accent = "slate",
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: number | string;
+  sub?: string;
+  accent?: keyof typeof STAT_ACCENTS;
+}) {
+  return (
+    <div className="border border-slate-200 rounded-xl px-4 py-3 bg-white">
+      <span className={`inline-flex w-7 h-7 rounded-lg items-center justify-center mb-2 ${STAT_ACCENTS[accent]}`}>
+        <Icon size={14} />
+      </span>
+      <p className="text-2xl font-bold text-slate-900 font-mono tabular-nums leading-none">{value}</p>
+      <p className="text-[11px] text-slate-500 mt-1.5">{label}</p>
+      {sub && <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">{sub}</p>}
+    </div>
+  );
+}
+
+const NAV_SECTIONS: { id: "projects" | "users" | "producers" | "messages" | "support"; label: string; icon: React.ElementType }[] = [
+  { id: "projects", label: "Proyectos", icon: Briefcase },
+  { id: "users", label: "Usuarios", icon: Users },
+  { id: "producers", label: "Productoras", icon: Building2 },
+  { id: "messages", label: "Mensajes", icon: Bell },
+  { id: "support", label: "Soporte", icon: HeadphonesIcon },
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -194,6 +254,10 @@ export default function AdminDashboard() {
   const [supportInput,      setSupportInput]       = useState("");
   const [supportSending,    setSupportSending]     = useState(false);
   const [totalUnreadSupport, setTotalUnreadSupport] = useState(0);
+  const [agents, setAgents] = useState<{ id: string; name: string; email: string; role: string; supportSpecialty?: string }[]>([]);
+  const [supportQueueFilter, setSupportQueueFilter] = useState<"unassigned" | "mine" | "all" | "resolved">("unassigned");
+  const [showTransferMenu, setShowTransferMenu] = useState<string | null>(null);
+  const transferMenuRef = useRef<HTMLDivElement>(null);
   const supportMsgsRef = useRef<HTMLDivElement>(null);
 
   const [projects, setProjects] = useState<Project[]>([]);
@@ -231,6 +295,13 @@ export default function AdminDashboard() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [showAssignCompanyUser, setShowAssignCompanyUser] = useState<string | null>(null);
   const [companyUserSearch, setCompanyUserSearch] = useState("");
+  const [showRoleMenuFor, setShowRoleMenuFor] = useState<string | null>(null);
+  const roleMenuRef = useRef<HTMLDivElement>(null);
+  const [showCreateAgentModal, setShowCreateAgentModal] = useState(false);
+  const [agentForm, setAgentForm] = useState({ name: "", email: "", password: "", specialty: "both" as "sales" | "technical" | "both" });
+  const [agentSaving, setAgentSaving] = useState(false);
+  const [agentError, setAgentError] = useState("");
+  const [agentCreated, setAgentCreated] = useState<{ email: string; password: string } | null>(null);
 
   const [newProject, setNewProject] = useState({ name: "", description: "", phase: "Desarrollo", producers: [] as string[], customId: "", useCustomId: false, language: "es" });
   const [newProducer, setNewProducer] = useState({ name: "" });
@@ -282,12 +353,23 @@ export default function AdminDashboard() {
   const roleDropdownRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = contextUser?.role === "admin";
+  const isSupportAgent = contextUser?.role === "support_agent";
+  const hasAdminAccess = isAdmin || isSupportAgent;
 
   useEffect(() => {
-    if (!userLoading && !isAdmin) {
+    if (!userLoading && !hasAdminAccess) {
       router.push("/dashboard");
     }
-  }, [contextUser, userLoading, router, isAdmin]);
+  }, [contextUser, userLoading, router, hasAdminAccess]);
+
+  // Los agentes de soporte no cargan proyectos/usuarios/productoras/mensajes:
+  // solo trabajan sobre la pestaña de soporte.
+  useEffect(() => {
+    if (isSupportAgent) {
+      setActiveTab("support");
+      setLoading(false);
+    }
+  }, [isSupportAgent]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -299,6 +381,12 @@ export default function AdminDashboard() {
       }
       if (roleDropdownRef.current && !roleDropdownRef.current.contains(e.target as Node)) {
         setShowRoleDropdown(false);
+      }
+      if (transferMenuRef.current && !transferMenuRef.current.contains(e.target as Node)) {
+        setShowTransferMenu(null);
+      }
+      if (roleMenuRef.current && !roleMenuRef.current.contains(e.target as Node)) {
+        setShowRoleMenuFor(null);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -377,6 +465,7 @@ export default function AdminDashboard() {
             email: data.email,
             phone: data.phone || "",
             role: data.role || "user",
+            supportSpecialty: data.supportSpecialty || undefined,
             isDemo: data.isDemo || false,
             projectCount: userProjectsSnap.size,
             projects: userProjects,
@@ -465,7 +554,7 @@ export default function AdminDashboard() {
 
   // Real-time support chats listener
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!hasAdminAccess) return;
     const unsub = onSnapshot(collection(db, "supportChats"), (snap) => {
       const chats = snap.docs.map((d) => ({ id: d.id, ...d.data() } as SupportChat));
       chats.sort((a, b) => (b.lastMessageAt?.seconds ?? 0) - (a.lastMessageAt?.seconds ?? 0));
@@ -473,7 +562,17 @@ export default function AdminDashboard() {
       setTotalUnreadSupport(chats.reduce((sum, c) => sum + (c.unreadAdmin > 0 ? 1 : 0), 0));
     });
     return () => unsub();
-  }, [isAdmin]);
+  }, [hasAdminAccess]);
+
+  // Live roster of agents (full admins + support agents) who can own/receive tickets
+  useEffect(() => {
+    if (!hasAdminAccess) return;
+    const q = query(collection(db, "users"), where("role", "in", ["admin", "support_agent"]));
+    const unsub = onSnapshot(q, (snap) => {
+      setAgents(snap.docs.map((d) => ({ id: d.id, ...d.data() } as any)));
+    });
+    return () => unsub();
+  }, [hasAdminAccess]);
 
   // Load messages when active chat changes
   useEffect(() => {
@@ -509,7 +608,7 @@ export default function AdminDashboard() {
   };
 
   const handleResolveChat = async (chatId: string) => {
-    await updateDoc(doc(db, "supportChats", chatId), { status: "resolved", unreadAdmin: 0 });
+    await updateDoc(doc(db, "supportChats", chatId), { status: "resolved", unreadAdmin: 0, resolvedAt: serverTimestamp() });
     if (activeChatId === chatId) setActiveChatId(null);
   };
 
@@ -517,7 +616,68 @@ export default function AdminDashboard() {
     await updateDoc(doc(db, "supportChats", chatId), { status: "open" });
   };
 
+  // Reclama un ticket sin asignar. La transacción evita que dos agentes se lo
+  // queden a la vez si hacen clic casi simultáneamente.
+  const handleClaimChat = async (chatId: string) => {
+    if (!contextUser?.uid) return;
+    try {
+      await runTransaction(db, async (tx) => {
+        const ref = doc(db, "supportChats", chatId);
+        const snap = await tx.get(ref);
+        if (!snap.exists()) throw new Error("Ticket no encontrado");
+        if (snap.data().assignedTo) throw new Error("Este ticket ya ha sido asignado a otro agente");
+        tx.update(ref, {
+          assignedTo: contextUser.uid,
+          assignedToName: contextUser.name || contextUser.email || "Agente",
+          assignedAt: serverTimestamp(),
+        });
+      });
+      await addDoc(collection(db, `supportChats/${chatId}/messages`), {
+        text: `Ticket asignado a ${contextUser.name || contextUser.email}`,
+        sender: "admin",
+        senderName: "Sistema",
+        system: true,
+        createdAt: serverTimestamp(),
+      });
+      setActiveChatId(chatId);
+      setSupportQueueFilter("mine");
+      showToast("success", "Ticket asignado a ti");
+    } catch (error: any) {
+      showToast("error", error.message || "No se pudo asignar el ticket");
+    }
+  };
+
+  // Pasa el ticket a otro agente: "le salta" — deja de estar en tu bandeja y
+  // aparece en la del agente elegido.
+  const handleTransferChat = async (chatId: string, toAgentId: string) => {
+    const toAgent = agents.find((a) => a.id === toAgentId);
+    if (!toAgent) return;
+    try {
+      await updateDoc(doc(db, "supportChats", chatId), {
+        assignedTo: toAgent.id,
+        assignedToName: toAgent.name,
+        assignedAt: serverTimestamp(),
+      });
+      await addDoc(collection(db, `supportChats/${chatId}/messages`), {
+        text: `Transferido a ${toAgent.name} por ${contextUser?.name || contextUser?.email || "un agente"}`,
+        sender: "admin",
+        senderName: "Sistema",
+        system: true,
+        createdAt: serverTimestamp(),
+      });
+      setShowTransferMenu(null);
+      showToast("success", `Transferido a ${toAgent.name}`);
+    } catch (error) {
+      console.error(error);
+      showToast("error", "No se pudo transferir el ticket");
+    }
+  };
+
   const handleRefresh = async () => {
+    if (!isAdmin) {
+      showToast("success", "Los tickets se actualizan en tiempo real");
+      return;
+    }
     setRefreshing(true);
     await loadData();
     showToast("success", "Datos actualizados");
@@ -782,31 +942,84 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleToggleUserRole = async (odId: string, currentRole: string) => {
-    const newRole = currentRole === "admin" ? "user" : "admin";
-    const user = users.find(u => u.id === odId);
-    showConfirmDialog(
-      newRole === "admin" ? "Hacer administrador" : "Quitar administrador",
-      newRole === "admin"
-        ? `${user?.name} tendrá acceso completo al panel de administración.`
-        : `${user?.name} dejará de ser administrador.`,
-      () => _doToggleUserRole(odId, newRole),
-      { danger: newRole !== "admin", confirmLabel: newRole === "admin" ? "Hacer admin" : "Quitar admin" }
-    );
+  const handleChangeUserRole = (
+    odId: string,
+    newRole: "admin" | "user" | "support_agent",
+    specialty?: "sales" | "technical" | "both"
+  ) => {
+    const user = users.find((u) => u.id === odId);
+    const doChange = () => _doChangeUserRole(odId, newRole, specialty);
+    if (newRole === "admin") {
+      showConfirmDialog(
+        "Hacer administrador",
+        `${user?.name} tendrá acceso completo al panel de administración.`,
+        doChange,
+        { danger: false, confirmLabel: "Hacer admin" }
+      );
+    } else if (newRole === "support_agent") {
+      showConfirmDialog(
+        "Convertir en agente de soporte",
+        `${user?.name} solo tendrá acceso a la pestaña de Soporte, con especialidad "${SPECIALTY_LABEL[specialty || "both"]}".`,
+        doChange,
+        { danger: false, confirmLabel: "Convertir en agente" }
+      );
+    } else {
+      doChange();
+    }
   };
-  const _doToggleUserRole = async (odId: string, newRole: string) => {
+  const _doChangeUserRole = async (odId: string, newRole: string, specialty?: string) => {
     setSaving(true);
     try {
-      await updateDoc(doc(db, "users", odId), { role: newRole });
+      await updateDoc(doc(db, "users", odId), {
+        role: newRole,
+        supportSpecialty: newRole === "support_agent" ? specialty || "both" : null,
+      });
       showToast("success", "Rol actualizado");
       setConfirmDialog(null);
+      setShowRoleMenuFor(null);
       await loadData();
     } catch (error) {
       console.error(error);
-      showToast("error", "Error al actualizar");
+      showToast("error", "Error al actualizar el rol");
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleCreateSupportAgent = async () => {
+    if (!agentForm.name.trim()) { setAgentError("El nombre es obligatorio"); return; }
+    setAgentSaving(true);
+    setAgentError("");
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/create-support-agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({
+          name: agentForm.name.trim(),
+          email: agentForm.email,
+          password: agentForm.password,
+          specialty: agentForm.specialty,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) { setAgentError(body.error || "Error al crear el agente"); return; }
+      setAgentCreated({ email: agentForm.email, password: agentForm.password });
+      await loadData();
+    } catch {
+      setAgentError("Error de red");
+    } finally {
+      setAgentSaving(false);
+    }
+  };
+
+  const openCreateAgentModal = () => {
+    const rand = Math.random().toString(36).slice(2, 7);
+    const pw = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 5).toUpperCase() + "!1";
+    setAgentForm({ name: "", email: `agente.${rand}@filmaworkspace.com`, password: pw, specialty: "both" });
+    setAgentCreated(null);
+    setAgentError("");
+    setShowCreateAgentModal(true);
   };
 
   const handleDeleteUser = (userId: string) => {
@@ -1118,6 +1331,20 @@ export default function AdminDashboard() {
   const activeProjects = projects.filter((p) => p.phase !== "Finalizado").length;
   const adminUsers = users.filter((u) => u.role === "admin").length;
   const totalAssignments = projects.reduce((acc, p) => acc + p.memberCount, 0);
+  const demoUsersCount = users.filter((u) => u.isDemo).length;
+  const openSupportChats = supportChats.filter((c) => c.status === "open").length;
+  const unassignedSupportChats = supportChats.filter((c) => c.status === "open" && !c.assignedTo).length;
+  const myOpenSupportChats = supportChats.filter((c) => c.status === "open" && c.assignedTo === contextUser?.uid).length;
+  const resolvedTodaySupportChats = supportChats.filter((c) => {
+    if (c.status !== "resolved" || !c.resolvedAt) return false;
+    const now = new Date();
+    const resolved = c.resolvedAt.toDate();
+    return resolved.toDateString() === now.toDateString();
+  }).length;
+  const formatDate = (ts?: Timestamp | null) =>
+    ts && typeof (ts as any).toDate === "function"
+      ? ts.toDate().toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })
+      : "—";
 
   // Loading
   if (loading || userLoading) {
@@ -1144,87 +1371,134 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="mt-[4.5rem]">
-        <div className="px-24 pt-10 pb-6">
-          <h1 className="text-3xl font-bold text-slate-900 text-center">Administración</h1>
-        </div>
-      </div>
+      {/* ── Shell: sidebar + content ─────────────────────────────────────── */}
+      <div className="mt-[4.5rem] flex items-stretch" style={{ minHeight: "calc(100vh - 4.5rem)" }}>
 
-      <main className="px-24 py-6">
-        {/* Stats row - minimal */}
-        <div className="flex flex-wrap items-center justify-center gap-6 mb-8 text-sm">
-          <div className="flex items-center gap-2">
-            <Briefcase size={16} className="text-slate-400" />
-            <span className="text-slate-600">{projects.length} proyectos</span>
-            <span className="text-slate-400">·</span>
-            <span className="text-blue-600">{activeProjects} activos</span>
+        {/* Sidebar */}
+        <aside className="w-60 flex-shrink-0 bg-slate-950 border-r border-slate-800/60 flex flex-col">
+          <div className="px-5 py-5 border-b border-slate-800/60">
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="font-mono text-[10px] text-emerald-400 tracking-widest uppercase">System online</span>
+            </div>
+            <h1 className="text-white font-bold text-lg leading-tight">
+              admin<span className="text-slate-600">.</span>console
+            </h1>
+            <p className="font-mono text-[10px] text-slate-500 mt-1">filma-workspace / root</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Users size={16} className="text-slate-400" />
-            <span className="text-slate-600">{users.length} usuarios</span>
-            <span className="text-slate-400">·</span>
-            <span className="text-violet-600">{adminUsers} admins</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Building2 size={16} className="text-slate-400" />
-            <span className="text-slate-600">{producers.length} productoras</span>
-          </div>
-        </div>
 
-        {/* Toolbar con tabs y acciones */}
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6">
-          <div className="flex flex-row gap-4 items-center justify-between">
-            {/* Tabs */}
-            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1">
-              {[
-                { id: "projects",  label: "Proyectos",   icon: Briefcase,       count: projects.length },
-                { id: "users",     label: "Usuarios",    icon: Users,           count: users.length },
-                { id: "producers", label: "Productoras", icon: Building2,       count: producers.length },
-                { id: "messages",  label: "Mensajes",    icon: Bell,            count: activeMessages.length },
-                { id: "support",   label: "Soporte",     icon: HeadphonesIcon,  count: totalUnreadSupport },
-              ].map((tab) => (
+          <nav className="flex-1 px-2.5 py-4 space-y-0.5 overflow-y-auto">
+            {NAV_SECTIONS.filter((s) => isAdmin || s.id === "support").map((item) => {
+              const count =
+                item.id === "projects" ? projects.length :
+                item.id === "users" ? users.length :
+                item.id === "producers" ? producers.length :
+                item.id === "messages" ? activeMessages.length :
+                totalUnreadSupport;
+              const alert = item.id === "support" && totalUnreadSupport > 0;
+              const active = activeTab === item.id;
+              return (
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
-                    activeTab === tab.id
-                      ? "bg-slate-900 text-white"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`relative w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    active ? "bg-slate-800/80 text-white" : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
                   }`}
                 >
-                  <tab.icon size={14} />
-                  {tab.label}
-                  <span
-                    className={`px-1.5 py-0.5 rounded text-xs ${
-                      activeTab === tab.id ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
-                    }`}
-                  >
-                    {tab.count}
-                  </span>
+                  {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-emerald-400" />}
+                  <item.icon size={15} className={active ? "text-emerald-400" : "text-slate-500"} />
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {count > 0 && (
+                    <span
+                      className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
+                        alert ? "bg-red-500/20 text-red-400" : active ? "bg-white/10 text-slate-300" : "bg-slate-800 text-slate-500"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  )}
                 </button>
-              ))}
-            </div>
+              );
+            })}
+          </nav>
 
-            {/* Actions */}
-            <div className="flex items-center gap-2">
+          <div className="px-3 py-4 border-t border-slate-800/60 space-y-1">
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
+              Refrescar datos
+            </button>
+            {isAdmin && (
               <button
                 onClick={() => setShowMessageModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition-colors"
               >
-                <MessageSquare size={14} />
-                Mensaje
+                <MessageSquare size={13} />
+                Emitir mensaje
               </button>
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="p-2 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-              >
-                <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
-              </button>
+            )}
+            <div className="pt-3 mt-2 border-t border-slate-800/60 flex items-center gap-2 px-3">
+              <div className="w-6 h-6 rounded-md bg-slate-800 flex items-center justify-center text-[10px] font-semibold text-slate-300 flex-shrink-0">
+                {(contextUser?.name || contextUser?.email || "A").charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-slate-300 truncate">{contextUser?.name || "Admin"}</p>
+                <p className="font-mono text-[10px] text-slate-600 truncate">
+                  {isSupportAgent
+                    ? `Agente · ${SPECIALTY_LABEL[agents.find((a) => a.id === contextUser?.uid)?.supportSpecialty || "both"]}`
+                    : contextUser?.email}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        </aside>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0 bg-slate-50/60 flex flex-col">
+
+          {/* Stat strip */}
+          <div className="px-8 py-5 bg-white border-b border-slate-200">
+            {isAdmin ? (
+              <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(6, minmax(0,1fr))" }}>
+                <StatTile icon={Briefcase} label="Proyectos" value={projects.length} sub={`${activeProjects} activos`} accent="blue" />
+                <StatTile icon={Users} label="Usuarios" value={users.length} sub={`${adminUsers} admin · ${demoUsersCount} demo`} accent="violet" />
+                <StatTile icon={Building2} label="Productoras" value={producers.length} accent="amber" />
+                <StatTile icon={CheckSquare} label="Asignaciones" value={totalAssignments} sub="miembros × proyecto" accent="emerald" />
+                <StatTile
+                  icon={HeadphonesIcon}
+                  label="Soporte"
+                  value={supportChats.length}
+                  sub={`${openSupportChats} abiertos`}
+                  accent={totalUnreadSupport > 0 ? "red" : "slate"}
+                />
+                <StatTile
+                  icon={UserCheck}
+                  label="Sin asignar"
+                  value={unassignedSupportChats}
+                  sub="en cola"
+                  accent={unassignedSupportChats > 0 ? "amber" : "slate"}
+                />
+              </div>
+            ) : (
+              <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(3, minmax(0,1fr))" }}>
+                <StatTile icon={UserCheck} label="Sin asignar" value={unassignedSupportChats} sub="en cola para todos" accent={unassignedSupportChats > 0 ? "amber" : "slate"} />
+                <StatTile icon={HeadphonesIcon} label="Mis tickets" value={myOpenSupportChats} sub="abiertos" accent="blue" />
+                <StatTile icon={CheckCheck} label="Resueltos hoy" value={resolvedTodaySupportChats} accent="emerald" />
+              </div>
+            )}
+          </div>
+
+          <main className="flex-1 px-8 py-6 overflow-x-hidden">
+            {/* Section eyebrow */}
+            <div className="mb-5">
+              <p className="font-mono text-[10px] text-slate-400 tracking-widest uppercase mb-1">// {activeTab}</p>
+              <h2 className="text-xl font-bold text-slate-900">
+                {NAV_SECTIONS.find((s) => s.id === activeTab)?.label}
+              </h2>
+            </div>
 
         {/* ==================== PROJECTS TAB ==================== */}
         {activeTab === "projects" && (
@@ -1304,115 +1578,124 @@ export default function AdminDashboard() {
                 </button>
               </div>
             ) : (
-              <div className="grid gap-4 grid-cols-4">
-                {filteredProjects.map((project) => {
-                  const phase = phaseConfig[project.phase] || phaseConfig["Desarrollo"];
-                  return (
-                    <div
-                      key={project.id}
-                      className="group bg-white border border-slate-200 rounded-2xl p-5 hover:shadow-md hover:border-slate-300"
-                    >
-                      {/* Header con fase y menú */}
-                      <div className="flex items-center justify-between mb-3">
-                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-lg ${phase.bg} ${phase.text}`}>
-                          {project.phase}
-                        </span>
-                        <div className="relative" ref={activeMenu === project.id ? menuRef : null}>
-                          <button
-                            onClick={() => setActiveMenu(activeMenu === project.id ? null : project.id)}
-                            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 opacity-0 group-hover:opacity-100"
-                          >
-                            <MoreHorizontal size={14} />
-                          </button>
-                          {activeMenu === project.id && (
-                            <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1">
-                              <button
-                                onClick={() => {
-                                  setNewProject({
-                                    name: project.name,
-                                    description: project.description || "",
-                                    phase: project.phase,
-                                    producers: project.producers || [],
-                                    customId: "",
-                                    useCustomId: false,
-                                    language: (project as any).language || "es",
-                                  });
-                                  setShowEditProject(project.id);
-                                  setActiveMenu(null);
-                                }}
-                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                              >
-                                <Edit2 size={14} className="text-slate-400" />
-                                Editar
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setShowAssignUser(project.id);
-                                  setActiveMenu(null);
-                                }}
-                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                              >
-                                <UserPlus size={14} className="text-slate-400" />
-                                Asignar usuario
-                              </button>
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Proyecto</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ID</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Fase</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Productoras</th>
+                      <th className="text-center px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Miembros</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Creado</th>
+                      <th className="text-right px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredProjects.map((project) => {
+                      const phase = phaseConfig[project.phase] || phaseConfig["Desarrollo"];
+                      return (
+                        <tr key={project.id} className="group hover:bg-slate-50/60">
+                          <td className="px-4 py-3 max-w-[260px]">
+                            <p className="font-medium text-slate-900 truncate">{project.name}</p>
+                            {project.description && (
+                              <p className="text-xs text-slate-400 truncate">{project.description}</p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-mono text-[11px] text-slate-500">{project.id}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-lg whitespace-nowrap ${phase.bg} ${phase.text}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${phase.dot}`} />
+                              {project.phase}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-500 max-w-[180px] truncate">
+                            {project.producerNames && project.producerNames.length > 0 ? project.producerNames.join(", ") : "—"}
+                          </td>
+                          <td className="px-4 py-3 text-center font-mono text-xs text-slate-700">{project.memberCount}</td>
+                          <td className="px-4 py-3 font-mono text-[11px] text-slate-400 whitespace-nowrap">{formatDate(project.createdAt)}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-0.5">
                               <Link
-                                href={`/project/${project.id}/config`}
-                                onClick={() => setActiveMenu(null)}
-                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                href={`/admindashboard/project/${project.id}`}
+                                className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
+                                title="Gestionar"
                               >
-                                <Settings size={14} className="text-slate-400" />
-                                Config
+                                <Eye size={14} />
                               </Link>
-                              <div className="border-t border-slate-100 my-1" />
-                              <button
-                                onClick={() => handleDeleteProject(project.id)}
-                                className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                              <Link
+                                href={`/project/${project.id}`}
+                                className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
+                                title="Ir al proyecto"
                               >
-                                <Trash2 size={14} />
-                                Eliminar
-                              </button>
+                                <ExternalLink size={14} />
+                              </Link>
+                              <div className="relative" ref={activeMenu === project.id ? menuRef : null}>
+                                <button
+                                  onClick={() => setActiveMenu(activeMenu === project.id ? null : project.id)}
+                                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                                >
+                                  <MoreHorizontal size={14} />
+                                </button>
+                                {activeMenu === project.id && (
+                                  <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1">
+                                    <button
+                                      onClick={() => {
+                                        setNewProject({
+                                          name: project.name,
+                                          description: project.description || "",
+                                          phase: project.phase,
+                                          producers: project.producers || [],
+                                          customId: "",
+                                          useCustomId: false,
+                                          language: (project as any).language || "es",
+                                        });
+                                        setShowEditProject(project.id);
+                                        setActiveMenu(null);
+                                      }}
+                                      className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                    >
+                                      <Edit2 size={14} className="text-slate-400" />
+                                      Editar
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setShowAssignUser(project.id);
+                                        setActiveMenu(null);
+                                      }}
+                                      className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                    >
+                                      <UserPlus size={14} className="text-slate-400" />
+                                      Asignar usuario
+                                    </button>
+                                    <Link
+                                      href={`/project/${project.id}/config`}
+                                      onClick={() => setActiveMenu(null)}
+                                      className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                    >
+                                      <Settings size={14} className="text-slate-400" />
+                                      Config
+                                    </Link>
+                                    <div className="border-t border-slate-100 my-1" />
+                                    <button
+                                      onClick={() => handleDeleteProject(project.id)}
+                                      className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                    >
+                                      <Trash2 size={14} />
+                                      Eliminar
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Nombre */}
-                      <h3 className="font-semibold text-slate-900 mb-2 line-clamp-1">{project.name}</h3>
-
-                      {/* Info */}
-                      <div className="space-y-1.5 text-xs text-slate-500 mb-4">
-                        {project.producerNames && project.producerNames.length > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            <Building2 size={12} className="text-slate-400" />
-                            <span className="truncate">{project.producerNames.join(", ")}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-1.5">
-                          <Users size={12} className="text-slate-400" />
-                          <span>{project.memberCount} miembros</span>
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex gap-2 pt-3 border-t border-slate-100">
-                        <Link
-                          href={`/admindashboard/project/${project.id}`}
-                          className="flex-1 flex items-center justify-center gap-1.5 p-2 bg-slate-900 text-white rounded-xl text-xs font-medium hover:bg-slate-800"
-                        >
-                          <Eye size={12} />
-                          Gestionar
-                        </Link>
-                        <Link
-                          href={`/project/${project.id}`}
-                          className="p-2 border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-50"
-                          title="Ir al proyecto"
-                        >
-                          <ExternalLink size={12} />
-                        </Link>
-                      </div>
-                    </div>
-                  );
-                })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -1441,7 +1724,9 @@ export default function AdminDashboard() {
                     userRoleFilter !== "all" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 hover:border-slate-300 text-slate-700 bg-white"
                   }`}
                 >
-                  <span className="flex-1 text-left truncate">{userRoleFilter === "all" ? "Todos los roles" : userRoleFilter === "admin" ? "Administradores" : "Usuarios"}</span>
+                  <span className="flex-1 text-left truncate">
+                    {userRoleFilter === "all" ? "Todos los roles" : userRoleFilter === "admin" ? "Administradores" : userRoleFilter === "support_agent" ? "Agentes de soporte" : "Usuarios"}
+                  </span>
                   <ChevronDown size={14} className={`transition-transform ${showRoleDropdown ? "rotate-180" : ""} ${userRoleFilter !== "all" ? "text-white" : "text-slate-400"}`} />
                 </button>
                 {showRoleDropdown && (
@@ -1463,6 +1748,14 @@ export default function AdminDashboard() {
                       Administradores
                     </button>
                     <button
+                      onClick={() => { setUserRoleFilter("support_agent"); setShowRoleDropdown(false); }}
+                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors whitespace-nowrap ${
+                        userRoleFilter === "support_agent" ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      Agentes de soporte
+                    </button>
+                    <button
                       onClick={() => { setUserRoleFilter("user"); setShowRoleDropdown(false); }}
                       className={`w-full text-left px-4 py-2.5 text-sm transition-colors whitespace-nowrap ${
                         userRoleFilter === "user" ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"
@@ -1474,8 +1767,15 @@ export default function AdminDashboard() {
                 )}
               </div>
               <button
+                onClick={openCreateAgentModal}
+                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 ml-auto"
+              >
+                <HeadphonesIcon size={14} />
+                Nuevo agente
+              </button>
+              <button
                 onClick={openDemoModal}
-                className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-700 ml-auto"
+                className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-700"
               >
                 <UserPlus size={14} />
                 Usuario demo
@@ -1489,82 +1789,115 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            {/* Users List */}
+            {/* Users Table */}
             {filteredUsers.length === 0 ? (
               <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
                 <Users size={28} className="text-slate-300 mx-auto mb-3" />
                 <h3 className="font-semibold text-slate-900">No hay usuarios</h3>
               </div>
             ) : (
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="divide-y divide-slate-100">
-                  {filteredUsers.map((user) => (
-                    <div
-                      key={user.id}
-                      className="flex items-center justify-between px-5 py-4 hover:bg-slate-50"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600 text-sm font-medium">
-                          {user.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-medium text-slate-900">{user.name}</h3>
-                            {user.role === "admin" && (
-                              <span className="px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded text-[10px] font-medium">
-                                Admin
-                              </span>
-                            )}
-                            {user.isDemo && (
-                              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-medium">
-                                Demo
-                              </span>
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Usuario</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ID</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Teléfono</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Rol</th>
+                      <th className="text-center px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Proyectos</th>
+                      <th className="text-right px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredUsers.map((user) => (
+                      <tr key={user.id} className="hover:bg-slate-50/60">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600 text-xs font-semibold flex-shrink-0">
+                              {user.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-sm font-medium text-slate-900 truncate">{user.name}</p>
+                                {user.isDemo && (
+                                  <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px] font-medium flex-shrink-0">Demo</span>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3"><span className="font-mono text-[11px] text-slate-400">{user.id}</span></td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-500 whitespace-nowrap">{user.phone || "—"}</td>
+                        <td className="px-4 py-3">
+                          <div className="relative" ref={showRoleMenuFor === user.id ? roleMenuRef : null}>
+                            <button
+                              onClick={() => setShowRoleMenuFor(showRoleMenuFor === user.id ? null : user.id)}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium transition-colors ${
+                                user.role === "admin"
+                                  ? "bg-violet-50 text-violet-700 hover:bg-violet-100"
+                                  : user.role === "support_agent"
+                                  ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                  : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                              }`}
+                            >
+                              {user.role === "admin" && <Shield size={10} />}
+                              {user.role === "support_agent" && <HeadphonesIcon size={10} />}
+                              {user.role === "admin" ? "Admin" : user.role === "support_agent" ? SPECIALTY_LABEL[user.supportSpecialty || "both"] : "Usuario"}
+                              <ChevronDown size={10} />
+                            </button>
+                            {showRoleMenuFor === user.id && (
+                              <div className="absolute left-0 top-full mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1">
+                                <button onClick={() => handleChangeUserRole(user.id, "user")} className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">
+                                  Usuario
+                                </button>
+                                <button onClick={() => handleChangeUserRole(user.id, "admin")} className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                                  <Shield size={12} className="text-violet-500" />
+                                  Administrador
+                                </button>
+                                <div className="border-t border-slate-100 my-1" />
+                                <p className="px-3 pt-1 pb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Agente de soporte</p>
+                                <button onClick={() => handleChangeUserRole(user.id, "support_agent", "sales")} className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">
+                                  Ventas
+                                </button>
+                                <button onClick={() => handleChangeUserRole(user.id, "support_agent", "technical")} className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">
+                                  Soporte técnico
+                                </button>
+                                <button onClick={() => handleChangeUserRole(user.id, "support_agent", "both")} className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">
+                                  Ventas + Soporte
+                                </button>
+                              </div>
                             )}
                           </div>
-                          <p className="text-xs text-slate-500">{user.email}</p>
-                          {user.phone && <p className="text-xs text-slate-400">{user.phone}</p>}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => setShowUserDetails(user.id)}
-                          className="text-xs text-slate-500 hover:text-slate-700"
-                        >
-                          {user.projectCount} proyecto{user.projectCount !== 1 ? "s" : ""}
-                        </button>
-                        <div className="flex items-center gap-0.5">
-                          <button
-                            onClick={() => setShowUserDetails(user.id)}
-                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
-                          >
-                            <Eye size={14} />
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button onClick={() => setShowUserDetails(user.id)} className="font-mono text-xs text-slate-600 hover:text-slate-900 hover:underline">
+                            {user.projectCount}
                           </button>
-                          <button
-                            onClick={() => handleToggleUserRole(user.id, user.role)}
-                            disabled={saving}
-                            className={`p-1.5 rounded-lg ${
-                              user.role === "admin"
-                                ? "text-violet-600 hover:bg-violet-50"
-                                : "text-slate-400 hover:text-violet-600 hover:bg-violet-50"
-                            }`}
-                            title={user.role === "admin" ? "Quitar admin" : "Hacer admin"}
-                          >
-                            <Shield size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(user.id)}
-                            disabled={saving}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                            title="Eliminar usuario"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-0.5">
+                            <button
+                              onClick={() => setShowUserDetails(user.id)}
+                              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
+                              title="Ver detalle"
+                            >
+                              <Eye size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(user.id)}
+                              disabled={saving}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                              title="Eliminar usuario"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -1608,86 +1941,92 @@ export default function AdminDashboard() {
                 </button>
               </div>
             ) : (
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="divide-y divide-slate-100">
-                  {filteredProducers.map((producer) => (
-                    <div
-                      key={producer.id}
-                      className="px-5 py-4 hover:bg-slate-50"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Building2 size={16} className="text-slate-400" />
-                          <div>
-                            <h3 className="text-sm font-medium text-slate-900">{producer.name}</h3>
-                            <p className="text-xs text-slate-500">
-                              {producer.projectCount} proyecto{producer.projectCount !== 1 ? "s" : ""}
-                            </p>
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Productora</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">ID</th>
+                      <th className="text-center px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Proyectos</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Usuarios asignados</th>
+                      <th className="text-right px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredProducers.map((producer) => (
+                      <tr key={producer.id} className="hover:bg-slate-50/60 align-top">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <Building2 size={14} className="text-slate-400 flex-shrink-0" />
+                            <span className="text-sm font-medium text-slate-900">{producer.name}</span>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Link
-                            href={`/companydashboard/${producer.id}`}
-                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
-                            title="Ver panel de productora"
-                          >
-                            <Eye size={14} />
-                          </Link>
-                          <button
-                            onClick={() => setShowAssignCompanyUser(producer.id)}
-                            className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg"
-                            title="Añadir usuario de productora"
-                          >
-                            <UserPlus size={14} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setNewProducer({ name: producer.name });
-                              setShowEditProducer(producer.id);
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
-                          >
-                            <Edit2 size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteProducer(producer.id)}
-                            disabled={saving || producer.projectCount > 0}
-                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={producer.projectCount > 0 ? "Tiene proyectos" : "Eliminar"}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                      
-                      {/* Usuarios de productora */}
-                      {producer.users && producer.users.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-slate-100">
-                          <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mb-2">Usuarios de productora</p>
-                          <div className="flex flex-wrap gap-2">
-                            {producer.users.map((user) => (
-                              <div
-                                key={user.id}
-                                className="flex items-center gap-2 px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg group"
-                              >
-                                <div className="w-5 h-5 bg-emerald-100 rounded flex items-center justify-center text-emerald-700 text-[10px] font-medium">
-                                  {user.name.charAt(0).toUpperCase()}
-                                </div>
-                                <span className="text-xs text-emerald-700">{user.name}</span>
-                                <button
-                                  onClick={() => handleRemoveCompanyUser(user.id)}
-                                  className="p-0.5 text-emerald-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                        </td>
+                        <td className="px-4 py-3"><span className="font-mono text-[11px] text-slate-400">{producer.id}</span></td>
+                        <td className="px-4 py-3 text-center font-mono text-xs text-slate-700">{producer.projectCount}</td>
+                        <td className="px-4 py-3">
+                          {producer.users && producer.users.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {producer.users.map((user) => (
+                                <div
+                                  key={user.id}
+                                  className="flex items-center gap-1.5 pl-1.5 pr-1 py-1 bg-emerald-50 border border-emerald-200 rounded-lg group"
                                 >
-                                  <X size={12} />
-                                </button>
-                              </div>
-                            ))}
+                                  <div className="w-4 h-4 bg-emerald-100 rounded flex items-center justify-center text-emerald-700 text-[9px] font-medium flex-shrink-0">
+                                    {user.name.charAt(0).toUpperCase()}
+                                  </div>
+                                  <span className="text-[11px] text-emerald-700">{user.name}</span>
+                                  <button
+                                    onClick={() => handleRemoveCompanyUser(user.id)}
+                                    className="p-0.5 text-emerald-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    <X size={10} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-0.5">
+                            <Link
+                              href={`/companydashboard/${producer.id}`}
+                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                              title="Ver panel de productora"
+                            >
+                              <Eye size={14} />
+                            </Link>
+                            <button
+                              onClick={() => setShowAssignCompanyUser(producer.id)}
+                              className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                              title="Añadir usuario de productora"
+                            >
+                              <UserPlus size={14} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setNewProducer({ name: producer.name });
+                                setShowEditProducer(producer.id);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteProducer(producer.id)}
+                              disabled={saving || producer.projectCount > 0}
+                              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                              title={producer.projectCount > 0 ? "Tiene proyectos" : "Eliminar"}
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -1795,23 +2134,54 @@ export default function AdminDashboard() {
         )}
 
         {/* ==================== SUPPORT TAB ==================== */}
-        {activeTab === "support" && (
-          <div className="flex gap-4 h-[620px]">
+        {activeTab === "support" && (() => {
+          const myId = contextUser?.uid;
+          const openChats = supportChats.filter((c) => c.status === "open");
+          const unassignedChats = openChats.filter((c) => !c.assignedTo);
+          const myChats = openChats.filter((c) => c.assignedTo === myId);
+          const resolvedChats = supportChats.filter((c) => c.status === "resolved");
+          const visibleChats =
+            supportQueueFilter === "unassigned" ? unassignedChats :
+            supportQueueFilter === "mine" ? myChats :
+            supportQueueFilter === "resolved" ? resolvedChats :
+            isAdmin ? openChats : [...myChats, ...unassignedChats];
+
+          const queueTabs = [
+            { id: "unassigned" as const, label: "Sin asignar", count: unassignedChats.length },
+            { id: "mine" as const, label: "Mías", count: myChats.length },
+            ...(isAdmin ? [{ id: "all" as const, label: "Todas", count: openChats.length }] : []),
+            { id: "resolved" as const, label: "Cerradas", count: resolvedChats.length },
+          ];
+
+          return (
+          <div className="flex gap-4" style={{ height: "calc(100vh - 320px)", minHeight: 480 }}>
 
             {/* Chat list */}
-            <div className="w-72 flex-shrink-0 bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden">
-              <div className="px-4 py-3.5 border-b border-slate-100 flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-900">Conversaciones</p>
-                <span className="text-xs text-slate-400">{supportChats.length}</span>
+            <div className="w-80 flex-shrink-0 bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden">
+              <div className="px-3 py-3 border-b border-slate-100">
+                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                  {queueTabs.map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => setSupportQueueFilter(f.id)}
+                      className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap ${
+                        supportQueueFilter === f.id ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
+                      {f.label}
+                      {f.count > 0 && <span className="font-mono text-[10px] text-slate-400">{f.count}</span>}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto divide-y divide-slate-50">
-                {supportChats.length === 0 && (
+                {visibleChats.length === 0 && (
                   <div className="flex flex-col items-center justify-center h-full gap-3 p-6 text-center">
                     <HeadphonesIcon size={24} className="text-slate-300" />
-                    <p className="text-xs text-slate-400">Sin conversaciones todavía</p>
+                    <p className="text-xs text-slate-400">Nada por aquí</p>
                   </div>
                 )}
-                {supportChats.map((chat) => (
+                {visibleChats.map((chat) => (
                   <button
                     key={chat.id}
                     onClick={() => setActiveChatId(chat.id)}
@@ -1821,11 +2191,16 @@ export default function AdminDashboard() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm font-medium text-slate-900 truncate">{chat.userName}</p>
                           {chat.ticketNumber && (
                             <span className="text-[9px] text-slate-400 font-mono flex-shrink-0">
                               #{String(chat.ticketNumber).padStart(5, "0")}
+                            </span>
+                          )}
+                          {chat.department && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium bg-slate-100 text-slate-500">
+                              {chat.department === "sales" ? "Ventas" : "Técnico"}
                             </span>
                           )}
                           {chat.status === "resolved" && (
@@ -1835,6 +2210,13 @@ export default function AdminDashboard() {
                           )}
                         </div>
                         <p className="text-xs text-slate-400 truncate mt-0.5">{chat.lastMessage || "Sin mensajes"}</p>
+                        {chat.status === "open" && (
+                          chat.assignedTo ? (
+                            <p className="text-[10px] mt-1 font-medium text-blue-600 truncate">→ {chat.assignedToName}</p>
+                          ) : (
+                            <p className="text-[10px] mt-1 font-medium text-amber-600">Sin asignar</p>
+                          )
+                        )}
                       </div>
                       {chat.unreadAdmin > 0 && (
                         <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />
@@ -1855,30 +2237,40 @@ export default function AdminDashboard() {
             {/* Conversation */}
             {activeChatId ? (() => {
               const activeChat = supportChats.find((c) => c.id === activeChatId);
+              if (!activeChat) return null;
+              const isMine = activeChat.assignedTo === myId;
+              const isUnassigned = !activeChat.assignedTo;
+              const canReply = isAdmin || isMine;
+              const otherAgents = agents.filter((a) => a.id !== activeChat.assignedTo);
               return (
                 <div className="flex-1 bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden">
                   {/* Conv header */}
-                  <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                    <div className="space-y-0.5">
+                  <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50 flex-wrap gap-2">
+                    <div className="space-y-0.5 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-slate-900">{activeChat?.userName}</p>
-                        {activeChat?.ticketNumber && (
+                        <p className="text-sm font-semibold text-slate-900">{activeChat.userName}</p>
+                        {activeChat.ticketNumber && (
                           <span className="text-[10px] text-slate-400 font-mono">#{String(activeChat.ticketNumber).padStart(5, "0")}</span>
                         )}
                       </div>
-                      <p className="text-xs text-slate-400">{activeChat?.userEmail}</p>
-                      {activeChat?.currentPage && (
+                      <p className="text-xs text-slate-400">{activeChat.userEmail}</p>
+                      {activeChat.currentPage && (
                         <p className="text-[10px] text-slate-400 font-mono truncate max-w-[260px]" title={activeChat.currentPage}>
                           📍 {activeChat.currentPage}
                         </p>
                       )}
-                      <div className="flex items-center gap-2 pt-0.5">
-                        {activeChat?.contactType && (
+                      <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+                        {activeChat.contactType && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium bg-white border-slate-200 text-slate-600">
                             {activeChat.contactType === "company" ? "🎬 Productora" : "👤 Persona"}
                           </span>
                         )}
-                        {activeChat?.contactType === "company" && activeChat.interestedInFW !== null && activeChat.interestedInFW !== undefined && (
+                        {activeChat.department && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium bg-white border-slate-200 text-slate-600">
+                            {activeChat.department === "sales" ? "💼 Ventas" : "🛠️ Técnico"}
+                          </span>
+                        )}
+                        {activeChat.contactType === "company" && activeChat.interestedInFW !== null && activeChat.interestedInFW !== undefined && (
                           <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
                             activeChat.interestedInFW
                               ? "bg-emerald-50 border-emerald-200 text-emerald-700"
@@ -1889,18 +2281,61 @@ export default function AdminDashboard() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {activeChat?.status === "open" ? (
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {activeChat.status === "open" && (
+                        isUnassigned ? (
+                          <button
+                            onClick={() => handleClaimChat(activeChat.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold transition-colors"
+                          >
+                            <UserCheck size={13} />
+                            Atender ticket
+                          </button>
+                        ) : (
+                          <>
+                            <span className="text-[11px] text-slate-500 font-medium px-1">→ {activeChat.assignedToName}</span>
+                            {(isMine || isAdmin) && (
+                              <div className="relative" ref={showTransferMenu === activeChat.id ? transferMenuRef : null}>
+                                <button
+                                  onClick={() => setShowTransferMenu(showTransferMenu === activeChat.id ? null : activeChat.id)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-medium transition-colors"
+                                >
+                                  <RefreshCw size={12} />
+                                  Transferir
+                                </button>
+                                {showTransferMenu === activeChat.id && (
+                                  <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1 max-h-56 overflow-y-auto">
+                                    {otherAgents.length === 0 && <p className="px-3 py-2 text-xs text-slate-400">No hay otros agentes</p>}
+                                    {otherAgents.map((a) => (
+                                      <button
+                                        key={a.id}
+                                        onClick={() => handleTransferChat(activeChat.id, a.id)}
+                                        className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center justify-between gap-2"
+                                      >
+                                        <span className="truncate">{a.name}</span>
+                                        {a.supportSpecialty && (
+                                          <span className="text-[9px] text-slate-400 flex-shrink-0">{SPECIALTY_LABEL[a.supportSpecialty]}</span>
+                                        )}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )
+                      )}
+                      {activeChat.status === "open" ? (
                         <button
-                          onClick={() => handleResolveChat(activeChatId)}
+                          onClick={() => handleResolveChat(activeChat.id)}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium transition-colors"
                         >
                           <CheckCheck size={13} />
-                          Cerrar conversación
+                          Cerrar
                         </button>
                       ) : (
                         <button
-                          onClick={() => handleReopenChat(activeChatId)}
+                          onClick={() => handleReopenChat(activeChat.id)}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors"
                         >
                           <Circle size={11} />
@@ -1913,11 +2348,18 @@ export default function AdminDashboard() {
                   {/* Messages */}
                   <div className="flex-1 overflow-y-auto px-5 py-5 space-y-3 bg-slate-50">
                     {chatMessages.map((msg) => {
-                      const isAdmin = msg.sender === "admin";
+                      if (msg.system) {
+                        return (
+                          <div key={msg.id} className="flex justify-center">
+                            <span className="text-[10px] text-slate-500 bg-slate-200/70 px-3 py-1 rounded-full">{msg.text}</span>
+                          </div>
+                        );
+                      }
+                      const isAgentMsg = msg.sender === "admin";
                       return (
-                        <div key={msg.id} className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[70%] ${!isAdmin ? "flex items-end gap-2" : ""}`}>
-                            {!isAdmin && (
+                        <div key={msg.id} className={`flex ${isAgentMsg ? "justify-end" : "justify-start"}`}>
+                          <div className={`max-w-[70%] ${!isAgentMsg ? "flex items-end gap-2" : ""}`}>
+                            {!isAgentMsg && (
                               <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0 mb-0.5">
                                 <span className="text-[10px] font-semibold text-slate-600">
                                   {msg.senderName?.[0]?.toUpperCase() ?? "U"}
@@ -1926,13 +2368,13 @@ export default function AdminDashboard() {
                             )}
                             <div>
                               <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                                isAdmin
+                                isAgentMsg
                                   ? "bg-slate-800 text-white rounded-br-sm"
                                   : "bg-white text-slate-800 border border-slate-200 rounded-bl-sm shadow-sm"
                               }`}>
                                 {msg.text}
                               </div>
-                              <p className={`text-[10px] text-slate-400 mt-1 ${isAdmin ? "text-right" : "text-left"}`}>
+                              <p className={`text-[10px] text-slate-400 mt-1 ${isAgentMsg ? "text-right" : "text-left"}`}>
                                 {msg.createdAt
                                   ? msg.createdAt.toDate().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
                                   : ""}
@@ -1946,26 +2388,34 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Reply input */}
-                  {activeChat?.status === "open" ? (
-                    <div className="px-4 py-3.5 border-t border-slate-100 bg-white flex items-end gap-3">
-                      <textarea
-                        rows={1}
-                        value={supportInput}
-                        onChange={(e) => setSupportInput(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSupportReply(); } }}
-                        placeholder="Escribe una respuesta..."
-                        className="flex-1 resize-none text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-transparent leading-relaxed"
-                        style={{ maxHeight: 100 }}
-                      />
-                      <button
-                        onClick={handleSupportReply}
-                        disabled={!supportInput.trim() || supportSending}
-                        className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium flex items-center gap-2 transition-colors"
-                      >
-                        {supportSending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                        Enviar
-                      </button>
-                    </div>
+                  {activeChat.status === "open" ? (
+                    canReply ? (
+                      <div className="px-4 py-3.5 border-t border-slate-100 bg-white flex items-end gap-3">
+                        <textarea
+                          rows={1}
+                          value={supportInput}
+                          onChange={(e) => setSupportInput(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSupportReply(); } }}
+                          placeholder="Escribe una respuesta..."
+                          className="flex-1 resize-none text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-transparent leading-relaxed"
+                          style={{ maxHeight: 100 }}
+                        />
+                        <button
+                          onClick={handleSupportReply}
+                          disabled={!supportInput.trim() || supportSending}
+                          className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium flex items-center gap-2 transition-colors"
+                        >
+                          {supportSending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                          Enviar
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="px-4 py-3 border-t border-slate-100 bg-white">
+                        <p className="text-xs text-center text-slate-400">
+                          {isUnassigned ? "Atiende el ticket para poder responder" : `Asignado a ${activeChat.assignedToName} — solo puede responder ese agente`}
+                        </p>
+                      </div>
+                    )
                   ) : (
                     <div className="px-4 py-3 border-t border-slate-100 bg-white">
                       <p className="text-xs text-center text-slate-400">Conversación cerrada</p>
@@ -1981,8 +2431,11 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
-        )}
-      </main>
+          );
+        })()}
+          </main>
+        </div>
+      </div>
 
       {/* ==================== MODALS ==================== */}
 
@@ -2504,6 +2957,12 @@ export default function AdminDashboard() {
                           <span className="flex items-center gap-1 px-2 py-0.5 bg-violet-100 text-violet-700 rounded-lg text-xs font-semibold">
                             <Crown size={10} />
                             Admin
+                          </span>
+                        )}
+                        {user.role === "support_agent" && (
+                          <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-semibold">
+                            <HeadphonesIcon size={10} />
+                            Agente · {SPECIALTY_LABEL[user.supportSpecialty || "both"]}
                           </span>
                         )}
                       </div>
@@ -3058,6 +3517,135 @@ export default function AdminDashboard() {
                       Cerrar
                     </button>
                     <button onClick={openDemoModal} className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-700 font-medium text-sm">
+                      Crear otro
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Support Agent Modal */}
+      {showCreateAgentModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center">
+                  <HeadphonesIcon size={16} className="text-emerald-600" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-slate-900">Nuevo agente de soporte</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">Solo tendrá acceso a la pestaña de Soporte.</p>
+                </div>
+              </div>
+              <button onClick={() => setShowCreateAgentModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {!agentCreated ? (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1.5">Nombre</label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Ana García"
+                      value={agentForm.name}
+                      onChange={(e) => setAgentForm({ ...agentForm, name: e.target.value })}
+                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1.5">Email</label>
+                    <input
+                      type="text"
+                      value={agentForm.email}
+                      onChange={(e) => setAgentForm({ ...agentForm, email: e.target.value })}
+                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent font-mono text-slate-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1.5">Contraseña (auto-generada)</label>
+                    <input
+                      type="text"
+                      value={agentForm.password}
+                      onChange={(e) => setAgentForm({ ...agentForm, password: e.target.value })}
+                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent font-mono text-slate-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1.5">Especialidad</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(["sales", "technical", "both"] as const).map((spec) => (
+                        <button
+                          key={spec}
+                          type="button"
+                          onClick={() => setAgentForm({ ...agentForm, specialty: spec })}
+                          className={`px-2 py-2.5 rounded-xl border text-xs font-medium transition-all ${
+                            agentForm.specialty === spec
+                              ? "bg-emerald-600 border-emerald-600 text-white"
+                              : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          {SPECIALTY_LABEL[spec]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {agentError && (
+                    <div className="flex items-center gap-2 p-3 bg-red-50 rounded-xl">
+                      <AlertCircle size={14} className="text-red-500 flex-shrink-0" />
+                      <span className="text-xs text-red-600">{agentError}</span>
+                    </div>
+                  )}
+                  <div className="flex gap-3 pt-1">
+                    <button onClick={() => setShowCreateAgentModal(false)} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm">
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleCreateSupportAgent}
+                      disabled={agentSaving}
+                      className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-medium text-sm disabled:opacity-50"
+                    >
+                      {agentSaving ? "Creando..." : "Crear agente"}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl mb-2">
+                    <CheckCircle size={16} className="text-green-600 flex-shrink-0" />
+                    <span className="text-sm text-green-700 font-medium">Agente creado</span>
+                  </div>
+                  <div className="space-y-3 bg-slate-50 rounded-xl p-4">
+                    <div>
+                      <p className="text-[11px] text-slate-500 mb-1">Email</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <code className="text-sm text-slate-900 font-mono">{agentCreated.email}</code>
+                        <button onClick={() => navigator.clipboard.writeText(agentCreated!.email)} className="text-xs text-slate-500 hover:text-slate-800 px-2 py-1 rounded-lg hover:bg-slate-200">
+                          Copiar
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-slate-500 mb-1">Contraseña</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <code className="text-sm text-slate-900 font-mono">{agentCreated.password}</code>
+                        <button onClick={() => navigator.clipboard.writeText(agentCreated!.password)} className="text-xs text-slate-500 hover:text-slate-800 px-2 py-1 rounded-lg hover:bg-slate-200">
+                          Copiar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 pt-1">
+                    <button onClick={() => setShowCreateAgentModal(false)} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm">
+                      Cerrar
+                    </button>
+                    <button onClick={openCreateAgentModal} className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-medium text-sm">
                       Crear otro
                     </button>
                   </div>

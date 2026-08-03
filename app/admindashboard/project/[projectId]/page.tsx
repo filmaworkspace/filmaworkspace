@@ -139,6 +139,42 @@ interface TeamStats {
   invitations: Array<{ id: string; email: string; status: string; createdAt?: Timestamp }>;
 }
 
+// ─── UI helpers ────────────────────────────────────────────────────────────────
+
+const STAT_ACCENTS: Record<string, string> = {
+  blue: "text-blue-600 bg-blue-50",
+  violet: "text-violet-600 bg-violet-50",
+  amber: "text-amber-600 bg-amber-50",
+  emerald: "text-emerald-600 bg-emerald-50",
+  red: "text-red-600 bg-red-50",
+  slate: "text-slate-500 bg-slate-100",
+};
+
+function ProjectStatTile({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  accent = "slate",
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: number | string;
+  sub?: string;
+  accent?: keyof typeof STAT_ACCENTS;
+}) {
+  return (
+    <div className="border border-slate-200 rounded-xl px-4 py-3 bg-white">
+      <span className={`inline-flex w-7 h-7 rounded-lg items-center justify-center mb-2 ${STAT_ACCENTS[accent]}`}>
+        <Icon size={14} />
+      </span>
+      <p className="text-2xl font-bold text-slate-900 font-mono tabular-nums leading-none">{value}</p>
+      <p className="text-[11px] text-slate-500 mt-1.5">{label}</p>
+      {sub && <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">{sub}</p>}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function AdminProjectPage() {
@@ -971,118 +1007,132 @@ export default function AdminProjectPage() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="mt-[4.5rem]">
-        <div className="px-24 pt-10 pb-6">
-          <div className="mb-6">
+      {/* ── Shell: sidebar + content ─────────────────────────────────────── */}
+      <div className="mt-[4.5rem] flex items-stretch" style={{ minHeight: "calc(100vh - 4.5rem)" }}>
+
+        {/* Sidebar */}
+        <aside className="w-60 flex-shrink-0 bg-slate-950 border-r border-slate-800/60 flex flex-col">
+          <div className="px-5 py-5 border-b border-slate-800/60">
             <Link
               href="/admindashboard"
-              className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900"
+              className="inline-flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-slate-300 mb-3 font-mono"
             >
-              <ArrowLeft size={14} />
-              Volver a Administración
+              <ArrowLeft size={12} />
+              admin.console
+            </Link>
+            <h1 className="text-white font-bold text-base leading-tight line-clamp-2">{project.name}</h1>
+            <span className={`inline-block mt-2 text-[10px] font-medium px-2 py-0.5 rounded-lg ${phase.bg} ${phase.text}`}>
+              {project.phase}
+            </span>
+            {project.producerNames && project.producerNames.length > 0 && (
+              <p className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-2">
+                <Building2 size={11} className="text-slate-600 flex-shrink-0" />
+                <span className="truncate">{project.producerNames.join(", ")}</span>
+              </p>
+            )}
+            <p className="font-mono text-[10px] text-slate-600 mt-2 truncate">id: {projectId}</p>
+          </div>
+
+          <nav className="flex-1 px-2.5 py-4 space-y-0.5 overflow-y-auto">
+            {[
+              { id: "general", label: "General", icon: Settings },
+              { id: "accounting", label: "Accounting", icon: BarChart3 },
+              { id: "team", label: "Team", icon: Users },
+              { id: "logs", label: "Logs", icon: Activity },
+            ].map((tab) => {
+              const active = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                  className={`relative w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    active ? "bg-slate-800/80 text-white" : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+                  }`}
+                >
+                  {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-emerald-400" />}
+                  <tab.icon size={15} className={active ? "text-emerald-400" : "text-slate-500"} />
+                  <span className="flex-1 text-left">{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className="px-3 py-4 border-t border-slate-800/60 space-y-1">
+            <button
+              onClick={() => setShowMessageModal(true)}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition-colors"
+            >
+              <MessageSquare size={13} />
+              Enviar mensaje
+            </button>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
+              Refrescar datos
+            </button>
+            <Link
+              href={`/project/${projectId}`}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition-colors"
+            >
+              <ExternalLink size={13} />
+              Ir al proyecto
             </Link>
           </div>
+        </aside>
 
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-bold text-slate-900">{project.name}</h1>
-                <span className={`text-xs font-medium px-2.5 py-1 rounded-lg ${phase.bg} ${phase.text}`}>
-                  {project.phase}
-                </span>
-              </div>
-              {project.producerNames && project.producerNames.length > 0 && (
-                <p className="text-sm text-slate-500 flex items-center gap-1.5">
-                  <Building2 size={14} className="text-slate-400" />
-                  {project.producerNames.join(", ")}
-                </p>
-              )}
-            </div>
+        {/* Content */}
+        <div className="flex-1 min-w-0 bg-slate-50/60 flex flex-col">
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowMessageModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                <MessageSquare size={14} />
-                Mensaje
-              </button>
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="p-2 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-              >
-                <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
-              </button>
-              <Link
-                href={`/project/${projectId}`}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
-              >
-                <ExternalLink size={14} />
-                Ir al proyecto
-              </Link>
+          {/* Stat strip */}
+          <div className="px-8 py-5 bg-white border-b border-slate-200">
+            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(6, minmax(0,1fr))" }}>
+              <ProjectStatTile icon={Users} label="Miembros" value={members.length} sub={`${departments.length} deptos`} accent="blue" />
+              <ProjectStatTile icon={Layers} label="Cuentas" value={accountingStats.accountCount} sub={`${accountingStats.supplierCount} proveedores`} accent="amber" />
+              <ProjectStatTile icon={ShoppingCart} label="POs" value={accountingStats.poCount} accent="violet" />
+              <ProjectStatTile icon={FileText} label="Facturas" value={accountingStats.invoiceCount} accent="emerald" />
+              <ProjectStatTile icon={UserCheck} label="Formularios" value={teamStats.totalForms} sub={`${teamStats.pendingForms} pendientes`} accent="blue" />
+              <ProjectStatTile icon={Activity} label="Logs" value={logs.length} sub="actividad" accent="slate" />
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Closing warning banner */}
-      {daysUntilClose !== null && (
-        <div className="px-24 pb-4">
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
-                  <Clock size={18} className="text-red-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-red-900">
-                    Cierre programado en {daysUntilClose} día{daysUntilClose !== 1 ? "s" : ""}
-                  </p>
-                  <p className="text-xs text-red-600">
-                    El proyecto se eliminará el {project.closingAt?.toDate().toLocaleDateString("es-ES")}
-                  </p>
+          <main className="flex-1 px-8 py-6 overflow-x-hidden">
+
+            {/* Closing warning banner */}
+            {daysUntilClose !== null && (
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+                      <Clock size={18} className="text-red-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-red-900">
+                        Cierre programado en {daysUntilClose} día{daysUntilClose !== 1 ? "s" : ""}
+                      </p>
+                      <p className="text-xs text-red-600">
+                        El proyecto se eliminará el {project.closingAt?.toDate().toLocaleDateString("es-ES")}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleCancelClose}
+                    disabled={saving}
+                    className="px-4 py-2 bg-white border border-red-200 text-red-700 rounded-xl text-sm font-medium hover:bg-red-50 disabled:opacity-50"
+                  >
+                    Cancelar cierre
+                  </button>
                 </div>
               </div>
-              <button
-                onClick={handleCancelClose}
-                disabled={saving}
-                className="px-4 py-2 bg-white border border-red-200 text-red-700 rounded-xl text-sm font-medium hover:bg-red-50 disabled:opacity-50"
-              >
-                Cancelar cierre
-              </button>
+            )}
+
+            {/* Section eyebrow */}
+            <div className="mb-5">
+              <p className="font-mono text-[10px] text-slate-400 tracking-widest uppercase mb-1">// {activeTab}</p>
+              <h2 className="text-xl font-bold text-slate-900 capitalize">{activeTab}</h2>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div className="px-24 pb-2">
-        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl p-1 w-fit">
-          {[
-            { id: "general", label: "General", icon: Settings },
-            { id: "accounting", label: "Accounting", icon: BarChart3 },
-            { id: "team", label: "Team", icon: Users },
-            { id: "logs", label: "Logs", icon: Activity },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeTab === tab.id
-                  ? "bg-white text-slate-900 shadow-sm border border-slate-200"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              <tab.icon size={14} />
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <main className="px-24 py-6">
 
         {/* ══════════════════════════════════ GENERAL TAB ══════════════════════════════════ */}
         {activeTab === "general" && (
@@ -1588,7 +1638,9 @@ export default function AdminProjectPage() {
             )}
           </div>
         )}
-      </main>
+          </main>
+        </div>
+      </div>
 
       {/* ══════════════════════════════════ MODALS ══════════════════════════════════ */}
 

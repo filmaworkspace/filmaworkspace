@@ -352,16 +352,16 @@ export default function ConfigUsers() {
 
       {/* Header */}
       <div className="mt-[4.5rem]">
-        <div className="px-24 py-6">
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
+        <div className="px-24 pt-10 pb-6">
+          <div className="relative flex items-center justify-center">
             <div className="flex items-center gap-4">
-              <UserCog size={24} className="text-slate-900" />
-              <h1 className="text-2xl font-semibold text-slate-900">Usuarios del proyecto</h1>
+              <UserCog size={22} className="text-slate-900" />
+              <h1 className="text-3xl font-bold text-slate-900 text-center">Usuarios del proyecto</h1>
             </div>
-      
+
             <button
               onClick={() => setShowInviteModal(true)}
-              className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors bg-slate-900"
+              className="absolute right-0 flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors bg-slate-900"
             >
               <UserPlus size={16} strokeWidth={2.5} />
               Invitar
