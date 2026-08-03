@@ -1008,7 +1008,7 @@ export default function AdminProjectPage() {
       )}
 
       {/* ── Shell: sidebar + content ─────────────────────────────────────── */}
-      <div className="mt-[4.5rem] flex items-stretch" style={{ minHeight: "calc(100vh - 4.5rem)" }}>
+      <div className="mt-[4rem] flex items-stretch" style={{ minHeight: "calc(100vh - 4.5rem)" }}>
 
         {/* Sidebar */}
         <aside className="w-60 flex-shrink-0 bg-slate-950 border-r border-slate-800/60 flex flex-col">

@@ -1039,7 +1039,7 @@ export default function SupplierDetailPage() {
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
-      <div className="mt-[4.5rem]">
+      <div className="mt-[4rem]">
         <div className="px-24 py-6">
           {/* Breadcrumb y acciones */}
           <div className="flex items-center justify-between mb-6">

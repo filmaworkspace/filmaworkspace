@@ -310,7 +310,7 @@ export default function ProfilePage() {
       )}
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="mt-[4.5rem]">
+      <div className="mt-[4rem]">
         <div className="px-24 pt-10 pb-0">
           <div className="flex items-center justify-between mb-8">
             {/* Avatar + info */}

@@ -354,7 +354,7 @@ export default function ReplaceDocumentPage() {
   return (
     <div className={`${inter.className} min-h-screen bg-white`}>
       {/* Header */}
-      <div className="mt-[4.5rem]">
+      <div className="mt-[4rem]">
         <div className="px-24 pt-10 pb-6">
           <div className="relative flex items-center justify-center">
             <Link

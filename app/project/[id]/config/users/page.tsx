@@ -351,7 +351,7 @@ export default function ConfigUsers() {
       )}
 
       {/* Header */}
-      <div className="mt-[4.5rem]">
+      <div className="mt-[4rem]">
         <div className="px-24 pt-10 pb-6">
           <div className="relative flex items-center justify-center">
             <div className="flex items-center gap-4">

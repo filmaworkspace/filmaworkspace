@@ -657,7 +657,7 @@ export default function Dashboard() {
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header con título y notificaciones */}
-      <div className="mt-[4.5rem]">
+      <div className="mt-[4rem]">
         <div className="px-24 pt-10 pb-6">
           <div className="flex items-center justify-center relative">
             <h1 className="text-3xl font-bold text-slate-900">Panel de proyectos</h1>

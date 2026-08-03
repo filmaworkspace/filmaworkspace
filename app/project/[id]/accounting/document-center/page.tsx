@@ -424,7 +424,7 @@ export default function DocumentCenterPage() {
 
   return (
     <div className={cx("min-h-screen bg-white", inter.className)}>
-      <div className="mt-[4.5rem]">
+      <div className="mt-[4rem]">
         <div className="px-24 pt-10 pb-6">
           <div className="relative flex items-center justify-center">
             <div className="flex items-center gap-4">

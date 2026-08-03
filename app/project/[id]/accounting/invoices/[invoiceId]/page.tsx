@@ -1355,7 +1355,7 @@ export default function InvoiceDetailPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {toast && <div className="fixed bottom-4 left-4 z-50"><div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"} text-white text-sm font-medium`}>{toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}{toast.message}</div></div>}
       
-      <div className="mt-[4.5rem]">
+      <div className="mt-[4rem]">
         <div className="px-24 pt-10 pb-6">
           <div className="relative flex items-center justify-center">
             <div className="flex items-center gap-4">
