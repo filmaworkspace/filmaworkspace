@@ -486,14 +486,14 @@ export default function CalendarPage() {
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="mt-[53px]">
         <div className="px-24 pt-10 pb-6">
-          <div className="relative flex items-center justify-center">
-
+          <div className="flex items-center justify-center">
             <div className="flex items-center gap-4">
               <Calendar size={22} style={{ color: "#6BA319" }} />
               <h1 className="text-3xl font-bold text-slate-900 text-center">Calendario de producción</h1>
             </div>
+          </div>
 
-            <div className="absolute right-0 flex items-center gap-2">
+          <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
               {/* Filter */}
               <div className="relative" ref={filterRef}>
                 <button
@@ -566,7 +566,6 @@ export default function CalendarPage() {
                 <Plus size={15} />
                 Nuevo evento
               </button>
-            </div>
           </div>
         </div>
       </div>
