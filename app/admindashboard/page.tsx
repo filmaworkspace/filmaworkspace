@@ -257,7 +257,6 @@ export default function AdminDashboard() {
   const [totalUnreadSupport, setTotalUnreadSupport] = useState(0);
   const [agents, setAgents] = useState<{ id: string; name: string; email: string; role: string; supportSpecialty?: string }[]>([]);
   const [publishedGuides, setPublishedGuides] = useState<{ id: string; title: string; slug: string; category: string }[]>([]);
-  const [salesAvailabilityMode, setSalesAvailabilityMode] = useState<"auto" | "always" | "never">("auto");
   const [supportQueueFilter, setSupportQueueFilter] = useState<"unassigned" | "mine" | "all" | "resolved">("unassigned");
   const [showTransferMenu, setShowTransferMenu] = useState<string | null>(null);
   const [showGuidePicker, setShowGuidePicker] = useState<string | null>(null);
@@ -526,38 +525,6 @@ export default function AdminDashboard() {
     return () => unsub();
   }, [hasAdminAccess]);
 
-  // Heartbeat de presencia: mientras un admin/agente tiene el admindashboard
-  // abierto, refresca su "lastActiveAt" para que el chat público de la home
-  // pueda saber si hay alguien conectado ahora mismo.
-  useEffect(() => {
-    if (!hasAdminAccess || !contextUser?.uid) return;
-    const ping = () => updateDoc(doc(db, "users", contextUser.uid), { lastActiveAt: serverTimestamp() }).catch(() => {});
-    ping();
-    const interval = setInterval(ping, 45000);
-    return () => clearInterval(interval);
-  }, [hasAdminAccess, contextUser?.uid]);
-
-  // Configuración de disponibilidad del chat público de ventas
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, "meta", "salesAvailability"), (snap) => {
-      setSalesAvailabilityMode((snap.data()?.mode as "auto" | "always" | "never") || "auto");
-    });
-    return () => unsub();
-  }, []);
-
-  const handleSetSalesAvailability = async (mode: "auto" | "always" | "never") => {
-    try {
-      await setDoc(doc(db, "meta", "salesAvailability"), {
-        mode,
-        updatedAt: serverTimestamp(),
-        updatedBy: contextUser?.name || contextUser?.email || "Admin",
-      });
-      showToast("success", "Disponibilidad actualizada");
-    } catch (error) {
-      console.error(error);
-      showToast("error", "No se pudo actualizar");
-    }
-  };
 
   // Load messages when active chat changes
   useEffect(() => {
@@ -2037,33 +2004,7 @@ export default function AdminDashboard() {
           ];
 
           return (
-          <div className="space-y-3">
-          {isAdmin && (
-            <div className="flex items-center gap-3 px-4 py-2.5 bg-white border border-slate-200 rounded-xl flex-wrap">
-              <span className="text-xs font-medium text-slate-500">Disponibilidad del chat público:</span>
-              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
-                {([
-                  { value: "auto", label: "Automático" },
-                  { value: "always", label: "Siempre" },
-                  { value: "never", label: "Nunca" },
-                ] as const).map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => handleSetSalesAvailability(opt.value)}
-                    className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
-                      salesAvailabilityMode === opt.value ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-              {salesAvailabilityMode === "auto" && (
-                <span className="text-[11px] text-slate-400">según quién esté conectado ahora mismo</span>
-              )}
-            </div>
-          )}
-          <div className="flex gap-4" style={{ height: "calc(100vh - 370px)", minHeight: 440 }}>
+          <div className="flex gap-4" style={{ height: "calc(100vh - 320px)", minHeight: 480 }}>
 
             {/* Chat list */}
             <div className="w-80 flex-shrink-0 bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden">
@@ -2400,7 +2341,6 @@ export default function AdminDashboard() {
                 <p className="text-xs text-slate-400">Las respuestas llegan al usuario en tiempo real</p>
               </div>
             )}
-          </div>
           </div>
           );
         })()}
