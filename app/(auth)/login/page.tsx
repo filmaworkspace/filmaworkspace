@@ -87,9 +87,20 @@ export default function LoginPage() {
     <div className={`min-h-screen flex ${inter.className}`}>
 
       {/* ── Left Side ── */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        <Image src="/auth-background.jpg" alt="" fill priority className="object-cover" />
-        <div className="absolute inset-0 bg-black/30" />
+      <div
+        className="hidden lg:flex lg:w-1/2 relative overflow-hidden"
+        style={{
+          background: "linear-gradient(135deg, #1a3a9e 0%, #2F52E0 50%, #4F6FE8 100%)",
+        }}
+      >
+        <div
+          className="absolute top-0 right-0 w-96 h-96 rounded-full opacity-20 blur-3xl"
+          style={{ backgroundColor: "#4F6FE8", transform: "translate(30%, -30%)" }}
+        />
+        <div
+          className="absolute bottom-0 left-0 w-80 h-80 rounded-full opacity-15 blur-3xl"
+          style={{ backgroundColor: "#1a3a9e", transform: "translate(-20%, 20%)" }}
+        />
         <div className="relative z-10 flex items-center justify-center w-full">
           <Image src="/logo.svg" alt="Logo" width={220} height={70} className="opacity-95" priority />
         </div>
