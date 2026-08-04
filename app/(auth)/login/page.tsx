@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { inter } from "@/lib/fonts";
+import AuthNav from "@/components/AuthNav";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth } from "@/lib/firebase";
@@ -84,7 +85,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className={`min-h-screen flex ${inter.className}`}>
+    <div className={`min-h-screen flex flex-col ${inter.className}`}>
+      <AuthNav variant="login" />
+      <div className="flex-1 flex">
 
       {/* ── Left Side ── */}
       <div
@@ -241,6 +244,7 @@ export default function LoginPage() {
         </div>
       </div>
 
+      </div>
     </div>
   );
 }

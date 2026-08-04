@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { inter } from "@/lib/fonts";
+import AuthNav from "@/components/AuthNav";
 
 import { auth, db } from "@/lib/firebase";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
@@ -190,7 +191,9 @@ export default function RegisterPage() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className={`min-h-screen flex ${inter.className}`}>
+    <div className={`min-h-screen flex flex-col ${inter.className}`}>
+      <AuthNav variant="register" />
+      <div className="flex-1 flex">
 
       {/* Left — brand */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden"
@@ -404,6 +407,8 @@ export default function RegisterPage() {
           )}
 
         </div>
+      </div>
+
       </div>
 
       {/* Click-outside to close dropdown */}
