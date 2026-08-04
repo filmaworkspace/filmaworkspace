@@ -9,6 +9,7 @@ import {
   serverTimestamp, Timestamp, query, orderBy, setDoc, runTransaction, increment,
 } from "firebase/firestore";
 import { useUser } from "@/contexts/UserContext";
+import { fetchAutomatedMessages, fillTemplate } from "@/lib/automatedMessages";
 import { MessageCircle, X, Send, Loader2, CheckCheck, ArrowRight, BookOpen, ExternalLink } from "lucide-react";
 
 interface Message {
@@ -19,6 +20,7 @@ interface Message {
   createdAt:  Timestamp | null;
   system?:    boolean;
   guide?:     { title: string; url: string };
+  auto?:      boolean;
 }
 
 export default function SupportChat() {
@@ -149,17 +151,16 @@ export default function SupportChat() {
       setContactType(type);
       setInterestedInFW(interested ?? null);
 
-      // Auto welcome message
-      const agentLabel = isSales ? "agente de ventas" : "agente de soporte";
+      // Auto welcome message (plantilla configurable desde admindashboard)
       const firstName = idName.trim().split(" ")[0];
-      const welcomeText = isSales
-        ? `Hola, ${firstName} 👋 Nos alegra que estéis interesados en Filma. Un ${agentLabel} estará con vosotros en breve — mientras tanto, contadnos un poco sobre vuestro proyecto o lo que necesitáis.`
-        : `Hola, ${firstName} 👋 Un ${agentLabel} te atenderá enseguida. Mientras tanto, cuéntanos qué te trae por aquí.`;
+      const templates = await fetchAutomatedMessages(db);
+      const welcomeText = fillTemplate(isSales ? templates.welcomeSales : templates.welcomeTechnical, { nombre: firstName });
 
       await addDoc(msgsRef, {
         text:       welcomeText,
         sender:     "admin",
         senderName: "Filma",
+        auto:       true,
         createdAt:  serverTimestamp(),
       });
 

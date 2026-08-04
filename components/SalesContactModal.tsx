@@ -20,6 +20,7 @@ import {
   Timestamp,
   updateDoc,
 } from "firebase/firestore";
+import { DEFAULT_AUTOMATED_MESSAGES, fetchAutomatedMessages, fillTemplate } from "@/lib/automatedMessages";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import { AlertCircle, ArrowLeft, ArrowRight, BookOpen, CheckCheck, ExternalLink, Loader2, Mail, MessageCircle, Send, X } from "lucide-react";
@@ -55,10 +56,17 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [slowResponse, setSlowResponse] = useState(false);
+  const [templates, setTemplates] = useState(DEFAULT_AUTOMATED_MESSAGES);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesRef = useRef<Message[]>([]);
+
+  // Plantillas de mensajes automáticos configuradas desde admindashboard
+  useEffect(() => {
+    if (!open) return;
+    fetchAutomatedMessages(db).then(setTemplates);
+  }, [open]);
 
   // Sesión (posiblemente anónima) para poder crear/leer el ticket sin necesitar cuenta
   useEffect(() => {
@@ -162,7 +170,7 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
 
       const firstName = name.trim().split(" ")[0];
       await addDoc(collection(db, `supportChats/${uid}/messages`), {
-        text: `Hola, ${firstName} 👋 Gracias por vuestro interés en Filma Workspace. Un agente de ventas os atenderá enseguida — contadnos un poco sobre vuestra productora o lo que necesitáis.`,
+        text: fillTemplate(templates.welcomeSales, { nombre: firstName }),
         sender: "admin",
         senderName: "Filma",
         auto: true,
@@ -371,10 +379,7 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
               {slowResponse && !resolved && (
                 <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xl">
                   <AlertCircle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-amber-800 leading-relaxed">
-                    Estamos tardando en responder. Mientras tanto, escríbenos a{" "}
-                    <a href="mailto:ventas@filmaworkspace.com" className="font-semibold underline">ventas@filmaworkspace.com</a>.
-                  </p>
+                  <p className="text-xs text-amber-800 leading-relaxed">{templates.slowResponse}</p>
                 </div>
               )}
               {resolved && (
