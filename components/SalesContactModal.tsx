@@ -19,11 +19,10 @@ import {
   setDoc,
   Timestamp,
   updateDoc,
-  where,
 } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { ArrowLeft, ArrowRight, BookOpen, CheckCheck, ExternalLink, Loader2, Mail, MessageCircle, Send, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, BookOpen, CheckCheck, ExternalLink, Loader2, Mail, MessageCircle, Send, X } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -35,58 +34,31 @@ interface Message {
   createdAt: Timestamp | null;
   system?: boolean;
   guide?: { title: string; url: string };
+  auto?: boolean;
 }
 
-// Un admin/agente se considera "conectado" si el heartbeat que refresca
-// admindashboard cada 45s ha escrito hace menos de 90s.
-const PRESENCE_TIMEOUT_MS = 90_000;
+// Si nadie del equipo responde en este tiempo, sugerimos escribir por email
+const SLOW_RESPONSE_MS = 3 * 60 * 1000;
 
 export default function SalesContactModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [uid, setUid] = useState<string | null>(null);
-  const [authError, setAuthError] = useState(false);
   const [screen, setScreen] = useState<"choose" | "form" | "chat">("choose");
   const [existingChat, setExistingChat] = useState(false);
-  const [availabilityMode, setAvailabilityMode] = useState<"auto" | "always" | "never">("auto");
-  const [anyoneOnline, setAnyoneOnline] = useState(false);
-  const available = availabilityMode === "always" ? true : availabilityMode === "never" ? false : anyoneOnline;
-
-  // Modo de disponibilidad configurado desde admindashboard (auto/siempre/nunca)
-  useEffect(() => {
-    if (!open) return;
-    const unsub = onSnapshot(doc(db, "meta", "salesAvailability"), (snap) => {
-      setAvailabilityMode((snap.data()?.mode as "auto" | "always" | "never") || "auto");
-    });
-    return () => unsub();
-  }, [open]);
-
-  // En modo "auto", disponible = algún admin/agente con heartbeat reciente
-  useEffect(() => {
-    if (!open || !uid || availabilityMode !== "auto") return;
-    const q = query(collection(db, "users"), where("role", "in", ["admin", "support_agent"]));
-    const unsub = onSnapshot(q, (snap) => {
-      const now = Date.now();
-      const online = snap.docs.some((d) => {
-        const ts = d.data().lastActiveAt as Timestamp | undefined;
-        return !!ts && now - ts.toDate().getTime() < PRESENCE_TIMEOUT_MS;
-      });
-      setAnyoneOnline(online);
-    }, () => setAnyoneOnline(false));
-    return () => unsub();
-  }, [open, uid, availabilityMode]);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [formError, setFormError] = useState("");
   const [starting, setStarting] = useState(false);
 
-  const [ticketNumber, setTicketNumber] = useState<number | null>(null);
   const [resolved, setResolved] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [slowResponse, setSlowResponse] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const messagesRef = useRef<Message[]>([]);
 
   // Sesión (posiblemente anónima) para poder crear/leer el ticket sin necesitar cuenta
   useEffect(() => {
@@ -97,7 +69,7 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
         const cred = await signInAnonymously(auth);
         setUid(cred.user.uid);
       } catch {
-        setAuthError(true);
+        // Si falla, se avisará al intentar iniciar el chat (submitForm)
       }
     });
     return () => unsub();
@@ -114,7 +86,6 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
         setExistingChat(true);
         setName(d.userName || "");
         setEmail(d.userEmail || "");
-        setTicketNumber(d.ticketNumber || null);
         setResolved(d.status === "resolved");
       },
       () => {}
@@ -134,6 +105,22 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
     if (screen === "chat") setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
   }, [messages.length, screen]);
 
+  // Aviso de respuesta lenta: si nadie del equipo (más allá del mensaje
+  // automático de bienvenida) responde en SLOW_RESPONSE_MS, sugerimos email.
+  useEffect(() => {
+    messagesRef.current = messages;
+    if (messages.some((m) => m.sender === "admin" && !m.auto)) setSlowResponse(false);
+  }, [messages]);
+
+  useEffect(() => {
+    if (screen !== "chat") { setSlowResponse(false); return; }
+    const timer = setTimeout(() => {
+      const hasRealReply = messagesRef.current.some((m) => m.sender === "admin" && !m.auto);
+      if (!hasRealReply) setSlowResponse(true);
+    }, SLOW_RESPONSE_MS);
+    return () => clearTimeout(timer);
+  }, [screen]);
+
   if (!open) return null;
 
   const startChat = () => setScreen(existingChat ? "chat" : "form");
@@ -141,7 +128,7 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
   const submitForm = async () => {
     if (!name.trim()) { setFormError("Indica tu nombre"); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setFormError("Email no válido"); return; }
-    if (!uid) { setFormError("No se pudo iniciar el chat. Prueba de nuevo en unos segundos."); return; }
+    if (!uid) { setFormError("No se pudo iniciar el chat. Prueba de nuevo en unos segundos, o escríbenos por email."); return; }
     setFormError("");
     setStarting(true);
     try {
@@ -172,13 +159,13 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
         assignedAt: null,
         resolvedAt: null,
       });
-      setTicketNumber(ticketNum);
 
       const firstName = name.trim().split(" ")[0];
       await addDoc(collection(db, `supportChats/${uid}/messages`), {
         text: `Hola, ${firstName} 👋 Gracias por vuestro interés en Filma Workspace. Un agente de ventas os atenderá enseguida — contadnos un poco sobre vuestra productora o lo que necesitáis.`,
         sender: "admin",
         senderName: "Filma",
+        auto: true,
         createdAt: serverTimestamp(),
       });
 
@@ -224,38 +211,24 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
     >
       <div
         className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
-        style={{ height: "min(520px, 88vh)" }}
+        style={screen === "chat" ? { height: "min(460px, 82vh)" } : { maxHeight: "85vh" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div
-          className="px-4 py-3.5 flex items-center justify-between border-b border-slate-100 flex-shrink-0"
-          style={{ background: "linear-gradient(135deg, #1e293b, #334155)" }}
-        >
-          <div className="flex items-center gap-2.5">
-            {screen === "form" && (
-              <button onClick={() => setScreen("choose")} className="text-white/60 hover:text-white transition-colors">
-                <ArrowLeft size={16} />
-              </button>
-            )}
-            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-              {screen === "chat" ? <MessageCircle size={15} className="text-white" /> : <Mail size={15} className="text-white" />}
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white leading-tight">Contactar con ventas</p>
-              {ticketNumber && screen === "chat" && (
-                <p className="text-[10px] text-white/50 leading-tight">#{String(ticketNumber).padStart(5, "0")}</p>
-              )}
-            </div>
-          </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors">
-            <X size={14} />
+        {/* Barra mínima: volver (si aplica) + cerrar */}
+        <div className="flex items-center justify-between px-3 pt-3 flex-shrink-0">
+          {screen === "form" ? (
+            <button onClick={() => setScreen("choose")} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+              <ArrowLeft size={16} />
+            </button>
+          ) : <span />}
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+            <X size={16} />
           </button>
         </div>
 
         {/* Choose */}
         {screen === "choose" && (
-          <div className="flex-1 flex flex-col justify-center px-6 py-8 gap-4">
+          <div className="flex flex-col px-6 pb-7 pt-1 gap-4 overflow-y-auto">
             <p className="text-sm font-semibold text-slate-900 text-center">¿Cómo prefieres hablar con nosotros?</p>
 
             <a
@@ -273,22 +246,14 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
 
             <button
               onClick={startChat}
-              disabled={authError}
-              className="flex items-center gap-3 p-4 rounded-2xl border-2 border-slate-200 hover:border-slate-300 transition-colors text-left disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-3 p-4 rounded-2xl border-2 border-slate-200 hover:border-slate-300 transition-colors text-left"
             >
               <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
                 <MessageCircle size={18} className="text-slate-600" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-slate-900">Hablar por chat</p>
-                {existingChat ? (
-                  <p className="text-xs text-slate-500">Continuar conversación</p>
-                ) : (
-                  <p className="flex items-center gap-1.5 text-xs text-slate-500">
-                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${available ? "bg-emerald-500 animate-pulse" : "bg-slate-300"}`} />
-                    {available ? "Disponible ahora" : "No disponible ahora"}
-                  </p>
-                )}
+                <p className="text-xs text-slate-500">{existingChat ? "Continuar conversación" : "Te responderemos en cuanto podamos"}</p>
               </div>
             </button>
           </div>
@@ -296,7 +261,7 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
 
         {/* Form (nombre + email) */}
         {screen === "form" && (
-          <div className="flex-1 flex flex-col justify-center px-6 py-8 gap-5">
+          <div className="flex flex-col px-6 pb-7 pt-1 gap-5 overflow-y-auto">
             <p className="text-sm font-semibold text-slate-900 text-center">Antes de empezar...</p>
             <div className="space-y-3">
               <div>
@@ -338,7 +303,7 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
         {/* Chat */}
         {screen === "chat" && (
           <>
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-slate-50">
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-slate-50">
               {messages.map((msg) => {
                 if (msg.system) {
                   return (
@@ -395,6 +360,15 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
                   </div>
                 );
               })}
+              {slowResponse && !resolved && (
+                <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xl">
+                  <AlertCircle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    Estamos tardando en responder. Mientras tanto, escríbenos a{" "}
+                    <a href="mailto:ventas@filmaworkspace.com" className="font-semibold underline">ventas@filmaworkspace.com</a>.
+                  </p>
+                </div>
+              )}
               {resolved && (
                 <div className="flex justify-center py-2">
                   <span className="text-[11px] bg-emerald-50 text-emerald-600 border border-emerald-100 px-3 py-1 rounded-full">
