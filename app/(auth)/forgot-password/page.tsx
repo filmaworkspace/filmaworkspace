@@ -5,7 +5,6 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { inter } from "@/lib/fonts";
-import AuthNav from "@/components/AuthNav";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 
@@ -55,10 +54,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className={`min-h-screen flex flex-col ${inter.className}`}>
-      <AuthNav variant="forgot" />
-      <div className="flex-1 flex">
-
+    <div className={`min-h-screen flex ${inter.className}`}>
       {/* Left Side - Brand with gradient */}
       <div 
         className="hidden lg:flex lg:w-1/2 relative overflow-hidden"
@@ -230,8 +226,6 @@ export default function ForgotPasswordPage() {
             </>
           )}
         </div>
-      </div>
-
       </div>
     </div>
   );
