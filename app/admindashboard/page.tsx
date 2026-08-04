@@ -60,6 +60,7 @@ import {
   MoreHorizontal,
   Plus,
   RefreshCw,
+  Save,
   Search,
   Send,
   Settings,
@@ -80,6 +81,7 @@ import {
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
+import { AutomatedMessages, DEFAULT_AUTOMATED_MESSAGES, fetchAutomatedMessages } from "@/lib/automatedMessages";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -257,6 +259,10 @@ export default function AdminDashboard() {
   const [totalUnreadSupport, setTotalUnreadSupport] = useState(0);
   const [agents, setAgents] = useState<{ id: string; name: string; email: string; role: string; supportSpecialty?: string }[]>([]);
   const [publishedGuides, setPublishedGuides] = useState<{ id: string; title: string; slug: string; category: string }[]>([]);
+  const [showAutomatedMessagesModal, setShowAutomatedMessagesModal] = useState(false);
+  const [automatedMessagesForm, setAutomatedMessagesForm] = useState<AutomatedMessages>(DEFAULT_AUTOMATED_MESSAGES);
+  const [automatedMessagesLoading, setAutomatedMessagesLoading] = useState(false);
+  const [automatedMessagesSaving, setAutomatedMessagesSaving] = useState(false);
   const [supportQueueFilter, setSupportQueueFilter] = useState<"unassigned" | "mine" | "all" | "resolved">("unassigned");
   const [showTransferMenu, setShowTransferMenu] = useState<string | null>(null);
   const [showGuidePicker, setShowGuidePicker] = useState<string | null>(null);
@@ -647,6 +653,32 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error(error);
       showToast("error", "No se pudo enviar la guía");
+    }
+  };
+
+  const openAutomatedMessagesModal = async () => {
+    setShowAutomatedMessagesModal(true);
+    setAutomatedMessagesLoading(true);
+    const templates = await fetchAutomatedMessages(db);
+    setAutomatedMessagesForm(templates);
+    setAutomatedMessagesLoading(false);
+  };
+
+  const handleSaveAutomatedMessages = async () => {
+    setAutomatedMessagesSaving(true);
+    try {
+      await setDoc(doc(db, "meta", "automatedMessages"), {
+        ...automatedMessagesForm,
+        updatedAt: serverTimestamp(),
+        updatedBy: contextUser?.name || contextUser?.email || "Admin",
+      });
+      showToast("success", "Mensajes automáticos actualizados");
+      setShowAutomatedMessagesModal(false);
+    } catch (error) {
+      console.error(error);
+      showToast("error", "No se pudo guardar");
+    } finally {
+      setAutomatedMessagesSaving(false);
     }
   };
 
@@ -1388,6 +1420,15 @@ export default function AdminDashboard() {
               >
                 <MessageSquare size={13} />
                 Emitir mensaje
+              </button>
+            )}
+            {hasAdminAccess && (
+              <button
+                onClick={openAutomatedMessagesModal}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition-colors"
+              >
+                <Settings size={13} />
+                Mensajes automáticos
               </button>
             )}
             <div className="pt-3 mt-2 border-t border-slate-800/60 flex items-center gap-2 px-3">
@@ -3262,6 +3303,82 @@ export default function AdminDashboard() {
         </div>
         );
       })()}
+
+      {/* Automated Messages Modal */}
+      {showAutomatedMessagesModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center">
+                  <Settings size={16} className="text-slate-700" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">Mensajes automáticos</h3>
+                  <p className="text-xs text-slate-500">Se envían solos al abrirse un ticket. Usa <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">{"{{nombre}}"}</code> para el nombre del visitante.</p>
+                </div>
+              </div>
+              <button onClick={() => setShowAutomatedMessagesModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+                <X size={18} />
+              </button>
+            </div>
+
+            {automatedMessagesLoading ? (
+              <div className="flex-1 flex items-center justify-center py-16">
+                <Loader2 size={20} className="animate-spin text-slate-400" />
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Bienvenida · Ventas</label>
+                  <textarea
+                    value={automatedMessagesForm.welcomeSales}
+                    onChange={(e) => setAutomatedMessagesForm({ ...automatedMessagesForm, welcomeSales: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm resize-none"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">Ticket de ventas: chat de la home y widget cuando el usuario dice ser productora interesada.</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Bienvenida · Soporte técnico</label>
+                  <textarea
+                    value={automatedMessagesForm.welcomeTechnical}
+                    onChange={(e) => setAutomatedMessagesForm({ ...automatedMessagesForm, welcomeTechnical: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm resize-none"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">Widget de soporte dentro de la app, para el resto de casos.</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Aviso de respuesta lenta</label>
+                  <textarea
+                    value={automatedMessagesForm.slowResponse}
+                    onChange={(e) => setAutomatedMessagesForm({ ...automatedMessagesForm, slowResponse: e.target.value })}
+                    rows={2}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm resize-none"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">Aparece en el chat de la home si nadie responde en 3 minutos.</p>
+                </div>
+              </div>
+            )}
+
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex-shrink-0 flex gap-3">
+              <button onClick={() => setShowAutomatedMessagesModal(false)} className="px-5 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveAutomatedMessages}
+                disabled={automatedMessagesSaving || automatedMessagesLoading}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
+              >
+                {automatedMessagesSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {automatedMessagesSaving ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Confirm Dialog */}
       {confirmDialog && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
