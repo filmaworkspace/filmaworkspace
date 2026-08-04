@@ -214,13 +214,21 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
         style={screen === "chat" ? { height: "min(460px, 82vh)" } : { maxHeight: "85vh" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Barra mínima: volver (si aplica) + cerrar */}
-        <div className="flex items-center justify-between px-3 pt-3 flex-shrink-0">
-          {screen === "form" ? (
-            <button onClick={() => setScreen("choose")} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
-              <ArrowLeft size={16} />
-            </button>
-          ) : <span />}
+        {/* Barra mínima: volver (si aplica) + estado + cerrar */}
+        <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            {screen === "form" && (
+              <button onClick={() => setScreen("choose")} className="p-1.5 -ml-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                <ArrowLeft size={16} />
+              </button>
+            )}
+            <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+              {screen === "chat" && (
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${resolved ? "bg-slate-300" : "bg-emerald-500 animate-pulse"}`} />
+              )}
+              {screen === "chat" ? (resolved ? "Conversación cerrada" : "Chat abierto") : "Contacto"}
+            </span>
+          </div>
           <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
             <X size={16} />
           </button>
