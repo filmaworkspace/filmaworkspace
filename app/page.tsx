@@ -102,10 +102,9 @@ export default function HomePage() {
         <section className="border-t border-slate-100 bg-slate-50">
           <div className="max-w-4xl mx-auto px-6 py-16 sm:py-24 text-center">
             <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">¿Tienes dudas o quieres una demo?</h2>
-            <p className="mt-3 text-slate-500">Escríbenos y te respondemos en menos de 24 horas.</p>
             <button
               onClick={() => setShowContact(true)}
-              className="mt-8 inline-flex items-center gap-2 bg-slate-900 text-white rounded-full px-7 py-3.5 text-sm font-semibold hover:bg-slate-800 transition-colors"
+              className="mt-7 inline-flex items-center gap-2 bg-slate-900 text-white rounded-full px-7 py-3.5 text-sm font-semibold hover:bg-slate-800 transition-colors"
             >
               <Mail size={16} />
               Contáctanos

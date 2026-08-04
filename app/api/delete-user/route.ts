@@ -11,25 +11,38 @@ export async function POST(req: NextRequest) {
     const { uid } = await req.json();
     if (!uid) return NextResponse.json({ error: "uid requerido" }, { status: 400 });
 
-    // 1. Borrar de Firebase Auth
-    await adminAuth.deleteUser(uid);
+    // 1. Leer qué proyectos tiene el usuario ANTES de borrar nada. Usamos
+    //    userProjects/{uid}/projects (ya indexado por defecto) en vez de un
+    //    collectionGroup("members") — ese requeriría un índice de collection
+    //    group que no existe en producción y hacía fallar todo el borrado.
+    const userProjectsSnap = await db.collection("userProjects").doc(uid).collection("projects").get();
+    const projectIds = userProjectsSnap.docs.map((d) => d.id);
 
-    // 2. Borrar users/{uid} + subcollections (messages, etc.)
+    const userSnap = await db.collection("users").doc(uid).get().catch(() => null);
+    const email = userSnap?.data()?.email;
+
+    // 2. Quitar al usuario de projects/{id}/members para cada proyecto
+    await Promise.all(
+      projectIds.map((projectId) =>
+        db.collection("projects").doc(projectId).collection("members").doc(uid).delete().catch(() => {})
+      )
+    );
+
+    // 3. Borrar users/{uid} + subcollections (messages, etc.)
     await db.recursiveDelete(db.collection("users").doc(uid));
 
-    // 3. Borrar userProjects/{uid} + subcollections
+    // 4. Borrar userProjects/{uid} + subcollections
     await db.recursiveDelete(db.collection("userProjects").doc(uid));
 
-    // 4. Quitar al usuario de todos los projects/{id}/members donde aparezca
-    const memberDocs = await db.collectionGroup("members").where("userId", "==", uid).get();
-    await Promise.all(memberDocs.docs.map((d) => d.ref.delete()));
-
-    // 5. Cancelar invitaciones pendientes enviadas a este usuario
-    const userDoc = await db.collection("users").doc(uid).get().catch(() => null);
-    const email = userDoc?.data()?.email;
+    // 5. Cancelar invitaciones pendientes enviadas a este usuario (best-effort:
+    //    si el índice compuesto no existe, no debe bloquear el borrado)
     if (email) {
-      const invSnap = await db.collection("invitations").where("invitedEmail", "==", email).where("status", "==", "pending").get();
-      await Promise.all(invSnap.docs.map((d) => d.ref.delete()));
+      try {
+        const invSnap = await db.collection("invitations").where("invitedEmail", "==", email).where("status", "==", "pending").get();
+        await Promise.all(invSnap.docs.map((d) => d.ref.delete()));
+      } catch (invErr) {
+        console.warn("[delete-user] Invitations cleanup skipped:", invErr);
+      }
     }
 
     // 6. Borrar archivos de Storage bajo users/{uid}/ si existen
@@ -40,6 +53,16 @@ export async function POST(req: NextRequest) {
       await Promise.all(files.map((f) => f.delete().catch(() => {})));
     } catch (storageErr) {
       console.warn("[delete-user] Storage cleanup skipped:", storageErr);
+    }
+
+    // 7. Borrar de Firebase Auth AL FINAL: si algún paso anterior falla, el
+    //    usuario sigue existiendo en Auth y se puede reintentar sin toparse
+    //    con "auth/user-not-found". Si ya no existe (por un intento previo
+    //    parcial), no lo tratamos como error.
+    try {
+      await adminAuth.deleteUser(uid);
+    } catch (authErr: any) {
+      if (authErr?.code !== "auth/user-not-found") throw authErr;
     }
 
     return NextResponse.json({ ok: true });

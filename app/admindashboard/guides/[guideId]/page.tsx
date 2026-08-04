@@ -54,6 +54,8 @@ export default function GuideEditorPage() {
 
   const { user: contextUser, isLoading: userLoading } = useUser();
   const isAdmin = contextUser?.role === "admin";
+  const isSupportAgent = contextUser?.role === "support_agent";
+  const hasAccess = isAdmin || isSupportAgent;
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -79,11 +81,11 @@ export default function GuideEditorPage() {
   };
 
   useEffect(() => {
-    if (!userLoading && !isAdmin) router.push("/dashboard");
-  }, [userLoading, isAdmin, router]);
+    if (!userLoading && !hasAccess) router.push("/dashboard");
+  }, [userLoading, hasAccess, router]);
 
   useEffect(() => {
-    if (!isAdmin || isNew) return;
+    if (!hasAccess || isNew) return;
     const load = async () => {
       const snap = await getDoc(doc(db, "guides", guideId));
       if (!snap.exists()) {
@@ -103,7 +105,7 @@ export default function GuideEditorPage() {
       setLoading(false);
     };
     load();
-  }, [isAdmin, isNew, guideId, router]);
+  }, [hasAccess, isNew, guideId, router]);
 
   useEffect(() => {
     if (!slugTouched) setSlug(slugify(title));
@@ -233,7 +235,7 @@ export default function GuideEditorPage() {
       </div>
     );
   }
-  if (!isAdmin) return null;
+  if (!hasAccess) return null;
 
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>

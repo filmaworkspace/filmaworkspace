@@ -192,6 +192,7 @@ interface SupportMessage {
   senderName: string;
   createdAt:  Timestamp | null;
   system?:    boolean;
+  guide?:     { title: string; url: string };
 }
 
 // ─── UI helpers ────────────────────────────────────────────────────────────────
@@ -256,6 +257,7 @@ export default function AdminDashboard() {
   const [totalUnreadSupport, setTotalUnreadSupport] = useState(0);
   const [agents, setAgents] = useState<{ id: string; name: string; email: string; role: string; supportSpecialty?: string }[]>([]);
   const [publishedGuides, setPublishedGuides] = useState<{ id: string; title: string; slug: string; category: string }[]>([]);
+  const [salesAvailabilityMode, setSalesAvailabilityMode] = useState<"auto" | "always" | "never">("auto");
   const [supportQueueFilter, setSupportQueueFilter] = useState<"unassigned" | "mine" | "all" | "resolved">("unassigned");
   const [showTransferMenu, setShowTransferMenu] = useState<string | null>(null);
   const [showGuidePicker, setShowGuidePicker] = useState<string | null>(null);
@@ -524,6 +526,39 @@ export default function AdminDashboard() {
     return () => unsub();
   }, [hasAdminAccess]);
 
+  // Heartbeat de presencia: mientras un admin/agente tiene el admindashboard
+  // abierto, refresca su "lastActiveAt" para que el chat público de la home
+  // pueda saber si hay alguien conectado ahora mismo.
+  useEffect(() => {
+    if (!hasAdminAccess || !contextUser?.uid) return;
+    const ping = () => updateDoc(doc(db, "users", contextUser.uid), { lastActiveAt: serverTimestamp() }).catch(() => {});
+    ping();
+    const interval = setInterval(ping, 45000);
+    return () => clearInterval(interval);
+  }, [hasAdminAccess, contextUser?.uid]);
+
+  // Configuración de disponibilidad del chat público de ventas
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "meta", "salesAvailability"), (snap) => {
+      setSalesAvailabilityMode((snap.data()?.mode as "auto" | "always" | "never") || "auto");
+    });
+    return () => unsub();
+  }, []);
+
+  const handleSetSalesAvailability = async (mode: "auto" | "always" | "never") => {
+    try {
+      await setDoc(doc(db, "meta", "salesAvailability"), {
+        mode,
+        updatedAt: serverTimestamp(),
+        updatedBy: contextUser?.name || contextUser?.email || "Admin",
+      });
+      showToast("success", "Disponibilidad actualizada");
+    } catch (error) {
+      console.error(error);
+      showToast("error", "No se pudo actualizar");
+    }
+  };
+
   // Load messages when active chat changes
   useEffect(() => {
     if (!activeChatId) { setChatMessages([]); return; }
@@ -628,7 +663,8 @@ export default function AdminDashboard() {
     try {
       const url = `${window.location.origin}/guias/${guide.slug}`;
       await addDoc(collection(db, `supportChats/${chatId}/messages`), {
-        text: `📘 ${guide.title}\n${url}`,
+        text: guide.title,
+        guide: { title: guide.title, url },
         sender: "admin",
         senderName: contextUser?.name || contextUser?.email || "Soporte Filma",
         createdAt: serverTimestamp(),
@@ -1358,7 +1394,7 @@ export default function AdminDashboard() {
                 </button>
               );
             })}
-            {isAdmin && (
+            {hasAdminAccess && (
               <Link
                 href="/admindashboard/guides"
                 className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-900 transition-colors"
@@ -2001,7 +2037,33 @@ export default function AdminDashboard() {
           ];
 
           return (
-          <div className="flex gap-4" style={{ height: "calc(100vh - 320px)", minHeight: 480 }}>
+          <div className="space-y-3">
+          {isAdmin && (
+            <div className="flex items-center gap-3 px-4 py-2.5 bg-white border border-slate-200 rounded-xl flex-wrap">
+              <span className="text-xs font-medium text-slate-500">Disponibilidad del chat público:</span>
+              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
+                {([
+                  { value: "auto", label: "Automático" },
+                  { value: "always", label: "Siempre" },
+                  { value: "never", label: "Nunca" },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => handleSetSalesAvailability(opt.value)}
+                    className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
+                      salesAvailabilityMode === opt.value ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {salesAvailabilityMode === "auto" && (
+                <span className="text-[11px] text-slate-400">según quién esté conectado ahora mismo</span>
+              )}
+            </div>
+          )}
+          <div className="flex gap-4" style={{ height: "calc(100vh - 370px)", minHeight: 440 }}>
 
             {/* Chat list */}
             <div className="w-80 flex-shrink-0 bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden">
@@ -2242,6 +2304,28 @@ export default function AdminDashboard() {
                         );
                       }
                       const isAgentMsg = msg.sender === "admin";
+                      if (msg.guide) {
+                        return (
+                          <div key={msg.id} className={`flex ${isAgentMsg ? "justify-end" : "justify-start"}`}>
+                            <a
+                              href={msg.guide.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="max-w-[75%] flex items-center gap-3 px-3.5 py-3 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm transition-all"
+                            >
+                              <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                                <BookOpen size={16} style={{ color: "#2F52E0" }} />
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block text-sm font-medium text-slate-900 truncate">{msg.guide.title}</span>
+                                <span className="flex items-center gap-1 text-xs" style={{ color: "#2F52E0" }}>
+                                  Ver guía <ExternalLink size={11} />
+                                </span>
+                              </span>
+                            </a>
+                          </div>
+                        );
+                      }
                       return (
                         <div key={msg.id} className={`flex ${isAgentMsg ? "justify-end" : "justify-start"}`}>
                           <div className={`max-w-[70%] ${!isAgentMsg ? "flex items-end gap-2" : ""}`}>
@@ -2253,7 +2337,7 @@ export default function AdminDashboard() {
                               </div>
                             )}
                             <div>
-                              <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                              <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words ${
                                 isAgentMsg
                                   ? "bg-slate-800 text-white rounded-br-sm"
                                   : "bg-white text-slate-800 border border-slate-200 rounded-bl-sm shadow-sm"
@@ -2316,6 +2400,7 @@ export default function AdminDashboard() {
                 <p className="text-xs text-slate-400">Las respuestas llegan al usuario en tiempo real</p>
               </div>
             )}
+          </div>
           </div>
           );
         })()}

@@ -1,7 +1,7 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { inter } from "@/lib/fonts";
@@ -14,6 +14,7 @@ import { collection, deleteDoc, doc, onSnapshot, orderBy, query, updateDoc } fro
 import {
   ArrowLeft,
   BookOpen,
+  ChevronDown,
   Copy,
   Edit2,
   Eye,
@@ -34,11 +35,15 @@ export default function GuidesListPage() {
   const router = useRouter();
   const { user: contextUser, isLoading: userLoading } = useUser();
   const isAdmin = contextUser?.role === "admin";
+  const isSupportAgent = contextUser?.role === "support_agent";
+  const hasAccess = isAdmin || isSupportAgent;
 
   const [guides, setGuides] = useState<Guide[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Guide | null>(null);
 
@@ -48,11 +53,21 @@ export default function GuidesListPage() {
   };
 
   useEffect(() => {
-    if (!userLoading && !isAdmin) router.push("/dashboard");
-  }, [userLoading, isAdmin, router]);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
+        setShowCategoryDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!userLoading && !hasAccess) router.push("/dashboard");
+  }, [userLoading, hasAccess, router]);
+
+  useEffect(() => {
+    if (!hasAccess) return;
     const q = query(collection(db, "guides"), orderBy("updatedAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
       setGuides(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Guide)));
@@ -108,7 +123,7 @@ export default function GuidesListPage() {
     );
   }
 
-  if (!isAdmin) return null;
+  if (!hasAccess) return null;
 
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
@@ -184,16 +199,41 @@ export default function GuidesListPage() {
                   className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white"
                 />
               </div>
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white text-slate-700 outline-none"
-              >
-                <option value="all">Todas las categorías</option>
-                {GUIDE_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+              {/* Category Dropdown */}
+              <div className="relative" ref={categoryDropdownRef}>
+                <button
+                  onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                  className={`flex items-center gap-2 px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors min-w-[180px] ${
+                    categoryFilter !== "all" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 hover:border-slate-300 text-slate-700 bg-white"
+                  }`}
+                >
+                  <span className="flex-1 text-left truncate">{categoryFilter === "all" ? "Todas las categorías" : categoryFilter}</span>
+                  <ChevronDown size={14} className={`transition-transform ${showCategoryDropdown ? "rotate-180" : ""} ${categoryFilter !== "all" ? "text-white" : "text-slate-400"}`} />
+                </button>
+                {showCategoryDropdown && (
+                  <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden min-w-full">
+                    <button
+                      onClick={() => { setCategoryFilter("all"); setShowCategoryDropdown(false); }}
+                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors whitespace-nowrap ${
+                        categoryFilter === "all" ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      Todas las categorías
+                    </button>
+                    {GUIDE_CATEGORIES.map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => { setCategoryFilter(c); setShowCategoryDropdown(false); }}
+                        className={`w-full text-left px-4 py-2.5 text-sm transition-colors whitespace-nowrap ${
+                          categoryFilter === c ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <Link
                 href="/admindashboard/guides/new"
                 className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium ml-auto"
@@ -271,13 +311,15 @@ export default function GuidesListPage() {
                             >
                               <Edit2 size={14} />
                             </Link>
-                            <button
-                              onClick={() => setConfirmDelete(guide)}
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                              title="Eliminar"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            {isAdmin && (
+                              <button
+                                onClick={() => setConfirmDelete(guide)}
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                                title="Eliminar"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
