@@ -9,7 +9,7 @@ import {
   serverTimestamp, Timestamp, query, orderBy, setDoc, runTransaction, increment,
 } from "firebase/firestore";
 import { useUser } from "@/contexts/UserContext";
-import { MessageCircle, X, Send, Loader2, CheckCheck, ArrowRight } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, CheckCheck, ArrowRight, BookOpen, ExternalLink } from "lucide-react";
 
 interface Message {
   id:         string;
@@ -17,6 +17,8 @@ interface Message {
   sender:     "user" | "admin";
   senderName: string;
   createdAt:  Timestamp | null;
+  system?:    boolean;
+  guide?:     { title: string; url: string };
 }
 
 export default function SupportChat() {
@@ -345,7 +347,36 @@ export default function SupportChat() {
                 )}
 
                 {messages.map((msg) => {
+                  if (msg.system) {
+                    return (
+                      <div key={msg.id} className="flex justify-center">
+                        <span className="text-[10px] text-slate-500 bg-slate-200/70 px-3 py-1 rounded-full">{msg.text}</span>
+                      </div>
+                    );
+                  }
                   const isUser = msg.sender === "user";
+                  if (msg.guide) {
+                    return (
+                      <div key={msg.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                        <a
+                          href={msg.guide.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="max-w-[80%] flex items-center gap-2.5 px-3 py-2.5 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm transition-all"
+                        >
+                          <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                            <BookOpen size={14} className="text-blue-600" />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-xs font-medium text-slate-900 truncate">{msg.guide.title}</span>
+                            <span className="flex items-center gap-1 text-[11px] text-blue-600">
+                              Ver guía <ExternalLink size={10} />
+                            </span>
+                          </span>
+                        </a>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={msg.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
                       <div className={`max-w-[75%] ${isUser ? "" : "flex items-end gap-1.5"}`}>
@@ -355,7 +386,7 @@ export default function SupportChat() {
                           </div>
                         )}
                         <div>
-                          <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                          <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed break-words ${
                             isUser
                               ? "bg-slate-800 text-white rounded-br-sm"
                               : "bg-white text-slate-800 border border-slate-200 rounded-bl-sm shadow-sm"

@@ -19,10 +19,11 @@ import {
   setDoc,
   Timestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { ArrowLeft, ArrowRight, CheckCheck, Loader2, Mail, MessageCircle, Send, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, CheckCheck, ExternalLink, Loader2, Mail, MessageCircle, Send, X } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -32,13 +33,46 @@ interface Message {
   sender: "user" | "admin";
   senderName: string;
   createdAt: Timestamp | null;
+  system?: boolean;
+  guide?: { title: string; url: string };
 }
+
+// Un admin/agente se considera "conectado" si el heartbeat que refresca
+// admindashboard cada 45s ha escrito hace menos de 90s.
+const PRESENCE_TIMEOUT_MS = 90_000;
 
 export default function SalesContactModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [uid, setUid] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
   const [screen, setScreen] = useState<"choose" | "form" | "chat">("choose");
   const [existingChat, setExistingChat] = useState(false);
+  const [availabilityMode, setAvailabilityMode] = useState<"auto" | "always" | "never">("auto");
+  const [anyoneOnline, setAnyoneOnline] = useState(false);
+  const available = availabilityMode === "always" ? true : availabilityMode === "never" ? false : anyoneOnline;
+
+  // Modo de disponibilidad configurado desde admindashboard (auto/siempre/nunca)
+  useEffect(() => {
+    if (!open) return;
+    const unsub = onSnapshot(doc(db, "meta", "salesAvailability"), (snap) => {
+      setAvailabilityMode((snap.data()?.mode as "auto" | "always" | "never") || "auto");
+    });
+    return () => unsub();
+  }, [open]);
+
+  // En modo "auto", disponible = algún admin/agente con heartbeat reciente
+  useEffect(() => {
+    if (!open || !uid || availabilityMode !== "auto") return;
+    const q = query(collection(db, "users"), where("role", "in", ["admin", "support_agent"]));
+    const unsub = onSnapshot(q, (snap) => {
+      const now = Date.now();
+      const online = snap.docs.some((d) => {
+        const ts = d.data().lastActiveAt as Timestamp | undefined;
+        return !!ts && now - ts.toDate().getTime() < PRESENCE_TIMEOUT_MS;
+      });
+      setAnyoneOnline(online);
+    }, () => setAnyoneOnline(false));
+    return () => unsub();
+  }, [open, uid, availabilityMode]);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -189,7 +223,7 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
+        className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
         style={{ height: "min(520px, 88vh)" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -247,7 +281,14 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
               </div>
               <div>
                 <p className="text-sm font-semibold text-slate-900">Hablar por chat</p>
-                <p className="text-xs text-slate-500">{existingChat ? "Continuar conversación" : "Respuesta en el momento"}</p>
+                {existingChat ? (
+                  <p className="text-xs text-slate-500">Continuar conversación</p>
+                ) : (
+                  <p className="flex items-center gap-1.5 text-xs text-slate-500">
+                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${available ? "bg-emerald-500 animate-pulse" : "bg-slate-300"}`} />
+                    {available ? "Disponible ahora" : "No disponible ahora"}
+                  </p>
+                )}
               </div>
             </button>
           </div>
@@ -299,10 +340,39 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
           <>
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-slate-50">
               {messages.map((msg) => {
+                if (msg.system) {
+                  return (
+                    <div key={msg.id} className="flex justify-center">
+                      <span className="text-[10px] text-slate-500 bg-slate-200/70 px-3 py-1 rounded-full">{msg.text}</span>
+                    </div>
+                  );
+                }
                 const isUser = msg.sender === "user";
+                if (msg.guide) {
+                  return (
+                    <div key={msg.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                      <a
+                        href={msg.guide.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="max-w-[85%] flex items-center gap-2.5 px-3 py-2.5 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm transition-all"
+                      >
+                        <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                          <BookOpen size={14} className="text-blue-600" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-xs font-medium text-slate-900 truncate">{msg.guide.title}</span>
+                          <span className="flex items-center gap-1 text-[11px] text-blue-600">
+                            Ver guía <ExternalLink size={10} />
+                          </span>
+                        </span>
+                      </a>
+                    </div>
+                  );
+                }
                 return (
                   <div key={msg.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[75%] ${!isUser ? "flex items-end gap-1.5" : ""}`}>
+                    <div className={`max-w-[80%] ${!isUser ? "flex items-end gap-1.5" : ""}`}>
                       {!isUser && (
                         <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center flex-shrink-0 mb-0.5">
                           <span className="text-[9px] font-bold text-white">FW</span>
@@ -310,7 +380,7 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
                       )}
                       <div>
                         <div
-                          className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                          className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed break-words ${
                             isUser ? "bg-slate-800 text-white rounded-br-sm" : "bg-white text-slate-800 border border-slate-200 rounded-bl-sm shadow-sm"
                           }`}
                         >

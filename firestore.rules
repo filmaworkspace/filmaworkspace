@@ -600,17 +600,29 @@ service cloud.firestore {
 
     match /meta/{docId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      // salesAvailability se configura solo desde admin (ver excepción abajo);
+      // el resto de docs de meta (ej. supportTicketCounter) los puede tocar
+      // cualquier usuario autenticado, incluidos anónimos.
+      allow write: if isSignedIn() && docId != "salesAvailability";
+    }
+
+    match /meta/salesAvailability {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     match /guides/{guideId} {
       // Públicas si están publicadas (para el link que Soporte comparte);
       // admins y agentes de soporte ven también los borradores.
       allow read: if resource.data.published == true || isAdmin() || isSupportAgent();
-      allow create, delete: if isAdmin();
+      // Admins y agentes de soporte/ventas pueden crear y editar guías;
+      // eliminarlas queda restringido a admins.
+      allow create: if isAdmin() || isSupportAgent();
+      allow delete: if isAdmin();
       // Cualquiera puede incrementar "views" en una guía publicada (contador
-      // de visitas de la página pública); cualquier otro cambio requiere admin.
-      allow update: if isAdmin() || (
+      // de visitas de la página pública); cualquier otro cambio requiere
+      // admin o agente.
+      allow update: if isAdmin() || isSupportAgent() || (
         resource.data.published == true &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views'])
       );
