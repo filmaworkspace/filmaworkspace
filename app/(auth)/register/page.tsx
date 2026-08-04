@@ -195,7 +195,6 @@ export default function RegisterPage() {
       {/* Left — brand */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <Image src="/auth-background.PNG" alt="" fill priority className="object-cover" />
-        <div className="absolute inset-0 bg-black/30" />
         <div className="relative z-10 flex items-center justify-center w-full">
           <Image src="/logo.svg" alt="Logo" width={220} height={70} className="opacity-95" priority />
         </div>
