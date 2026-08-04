@@ -244,7 +244,7 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
 
         {/* Choose */}
         {screen === "choose" && (
-          <div className="flex flex-col px-6 pb-7 pt-1 gap-4 overflow-y-auto">
+          <div className="flex flex-col px-6 pb-7 pt-6 gap-4 overflow-y-auto">
             <p className="text-sm font-semibold text-slate-900 text-center">¿Cómo prefieres hablar con nosotros?</p>
 
             <a
@@ -277,7 +277,7 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
 
         {/* Form (nombre + email) */}
         {screen === "form" && (
-          <div className="flex flex-col px-6 pb-7 pt-1 gap-5 overflow-y-auto">
+          <div className="flex flex-col px-6 pb-7 pt-6 gap-5 overflow-y-auto">
             <p className="text-sm font-semibold text-slate-900 text-center">Antes de empezar...</p>
             <div className="space-y-3">
               <div>
