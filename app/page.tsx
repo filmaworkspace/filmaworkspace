@@ -38,10 +38,10 @@ export default function HomePage() {
 
       {/* ── Nav ── */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-6 py-3 sm:py-0 sm:h-16 flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-2.5 sm:gap-0">
           <Image src="/logodark.svg" alt="Filma Workspace" width={120} height={28} priority />
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center justify-center gap-2 sm:gap-3">
             <Link
               href="/login"
               className="text-sm font-medium text-slate-700 hover:text-slate-900 px-3.5 sm:px-4 py-2 transition-colors"
