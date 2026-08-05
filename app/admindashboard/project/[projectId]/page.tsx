@@ -232,6 +232,8 @@ export default function AdminProjectPage() {
   const [showCloneModal, setShowCloneModal] = useState(false);
   const [showCopySuppliersModal, setShowCopySuppliersModal] = useState(false);
   const [showCopyBudgetModal, setShowCopyBudgetModal] = useState(false);
+  const [showDeleteBudgetModal, setShowDeleteBudgetModal] = useState(false);
+  const [deletingBudget, setDeletingBudget] = useState(false);
 
   // Forms
   const [editMemberForm, setEditMemberForm] = useState({
@@ -953,6 +955,30 @@ export default function AdminProjectPage() {
     }
   };
 
+  // ── Delete budget ────────────────────────────────────────────────────────────
+
+  const handleDeleteBudget = async () => {
+    setDeletingBudget(true);
+    try {
+      const accountsSnap = await getDocs(collection(db, `projects/${projectId}/accounts`));
+      for (const accDoc of accountsSnap.docs) {
+        const subSnap = await getDocs(collection(db, `projects/${projectId}/accounts/${accDoc.id}/subaccounts`));
+        for (const subDoc of subSnap.docs) {
+          await deleteDoc(doc(db, `projects/${projectId}/accounts/${accDoc.id}/subaccounts`, subDoc.id));
+        }
+        await deleteDoc(doc(db, `projects/${projectId}/accounts`, accDoc.id));
+      }
+      setShowDeleteBudgetModal(false);
+      showToast("success", "Presupuesto eliminado por completo");
+      await loadData();
+    } catch (error) {
+      console.error(error);
+      showToast("error", "Error al eliminar el presupuesto");
+    } finally {
+      setDeletingBudget(false);
+    }
+  };
+
   // ── Derived ──────────────────────────────────────────────────────────────────
 
   const getDaysUntilClose = () => {
@@ -1459,6 +1485,30 @@ export default function AdminProjectPage() {
                     Copiar presupuesto a otro proyecto
                   </button>
                 </div>
+              </div>
+            </div>
+
+            {/* Danger zone */}
+            <div className="bg-white border border-red-200 rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-red-100">
+                <h2 className="text-sm font-semibold text-red-700">Zona de peligro</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Acciones irreversibles sobre el presupuesto de este proyecto</p>
+              </div>
+              <div className="p-5 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-slate-900">Eliminar presupuesto</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Borra las {accountingStats.accountCount} cuentas y todas sus subcuentas. Las facturas y POs ya codificadas contra ellas quedarán sin cuenta asignada.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowDeleteBudgetModal(true)}
+                  disabled={accountingStats.accountCount === 0}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white border border-red-200 text-red-600 rounded-xl text-sm font-medium hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                >
+                  <Trash2 size={14} />
+                  Eliminar presupuesto
+                </button>
               </div>
             </div>
           </div>
@@ -2294,6 +2344,47 @@ export default function AdminProjectPage() {
               >
                 <Copy size={14} />
                 {saving ? "Copiando..." : "Copiar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Budget Modal */}
+      {showDeleteBudgetModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-900">Eliminar presupuesto</h3>
+              <button onClick={() => setShowDeleteBudgetModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle size={18} className="text-red-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-red-800">
+                    <p className="font-medium">¿Estás seguro?</p>
+                    <p className="text-xs mt-1">
+                      Se eliminarán las {accountingStats.accountCount} cuentas de "{project.name}" y todas sus subcuentas.
+                      Las facturas y órdenes de compra ya codificadas contra ellas quedarán sin cuenta asignada. Esta acción no se puede deshacer.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3">
+              <button onClick={() => setShowDeleteBudgetModal(false)} className="flex-1 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteBudget}
+                disabled={deletingBudget}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+              >
+                <Trash2 size={14} />
+                {deletingBudget ? "Eliminando..." : "Eliminar presupuesto"}
               </button>
             </div>
           </div>
