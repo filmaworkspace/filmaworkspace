@@ -1160,8 +1160,7 @@ export default function AdminProjectPage() {
                   {members.length === 0 ? (
                     <div className="p-12 text-center">
                       <Users size={28} className="text-slate-300 mx-auto mb-3" />
-                      <p className="text-sm font-medium text-slate-700 mb-1">Sin usuarios asignados</p>
-                      <p className="text-xs text-slate-400">Añade el primer usuario para que pueda acceder al proyecto</p>
+                      <p className="text-sm font-medium text-slate-700">Sin usuarios asignados</p>
                     </div>
                   ) : (
                     <div className="divide-y divide-slate-100">

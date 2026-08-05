@@ -589,7 +589,7 @@ export default function ConfigUsers() {
               <UserCog size={28} className="text-slate-400" />
             </div>
             <h3 className="text-lg font-semibold text-slate-900 mb-2">{searchTerm ? "Sin resultados" : "Sin usuarios"}</h3>
-            <p className="text-slate-500 text-sm">{searchTerm ? "Prueba con otro término" : "Invita al primer usuario del equipo"}</p>
+            {searchTerm && <p className="text-slate-500 text-sm">Prueba con otro término</p>}
           </div>
         )}
       </main>

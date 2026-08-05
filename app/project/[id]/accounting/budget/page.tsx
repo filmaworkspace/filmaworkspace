@@ -1056,7 +1056,7 @@ export default function BudgetPage() {
           <div className="border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
             <FileSpreadsheet size={32} className="text-slate-300 mx-auto mb-3" />
             <h3 className="text-lg font-semibold text-slate-900 mb-1">{searchTerm ? "No se encontraron cuentas" : "No hay cuentas presupuestarias"}</h3>
-            <p className="text-slate-500 text-sm">{searchTerm ? "Intenta ajustar la búsqueda" : "Crea tu primera cuenta o importa un presupuesto"}</p>
+            {searchTerm && <p className="text-slate-500 text-sm">Intenta ajustar la búsqueda</p>}
           </div>
         ) : (
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">

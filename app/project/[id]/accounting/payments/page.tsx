@@ -695,10 +695,7 @@ export default function PaymentsPage() {
           <div className="relative flex items-center justify-center">
             <div className="flex items-center gap-4">
               <Banknote size={22} style={{ color: "#2F52E0" }} />
-              <div className="text-center">
-                <h1 className="text-3xl font-bold text-slate-900 text-center">Previsiones de pago</h1>
-                <p className="text-sm text-slate-500 mt-0.5">{forecasts.length} previsiones · {formatCurrency(forecasts.reduce((s, f) => s + f.totalAmount, 0))} € total</p>
-              </div>
+              <h1 className="text-3xl font-bold text-slate-900 text-center">Previsiones de pago</h1>
             </div>
             <div className="absolute right-0 flex items-center gap-2">
               <button 

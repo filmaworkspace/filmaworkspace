@@ -62,7 +62,9 @@ import {
   Scissors,
   Search,
   Send,
+  Settings,
   ShieldAlert,
+  Sparkles,
   SplitSquareHorizontal,
   Trash2,
   Upload,
@@ -351,6 +353,16 @@ export default function BoxesPage() {
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [nextTransferNumber, setNextTransferNumber] = useState(1);
+
+  // Export config (demo / preview — no conectado todavía a ningún servicio real)
+  const [showExportConfigModal, setShowExportConfigModal] = useState(false);
+  const [exportConfig, setExportConfig] = useState({
+    providerName: "",
+    format: "csv" as "csv" | "excel" | "api",
+    frequency: "manual" as "manual" | "daily" | "weekly",
+    mapCategories: true,
+    mapReceipts: true,
+  });
 
   // PLEO State
   const [boxes, setBoxes] = useState<Box[]>([]);
@@ -2003,12 +2015,18 @@ export default function BoxesPage() {
                 </button>
               )}
               <button
+                onClick={() => setShowExportConfigModal(true)}
+                title="Configurar exportación a servicio de tarjetas"
+                className="p-2 border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-50 hover:text-slate-700 transition-colors">
+                <Settings size={16} />
+              </button>
+              <button
                 onClick={() => mainTab === "tarjetas"
                   ? (setBoxForm({ name: "", code: "", department: "" }), setShowCreateBoxModal(true))
                   : (setTransferEnvelopeForm({ paymentDate: "", notes: "" }), setShowCreateTransferEnvelopeModal(true))}
                 className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90 shadow-lg shadow-orange-500/20"
                 style={{ background: "linear-gradient(135deg, #f59e0b, #f97316)" }}>
-                <Plus size={16} /> {mainTab === "tarjetas" ? "Nueva caja" : "Nuevo sobre"}
+                <Plus size={16} /> {mainTab === "tarjetas" ? "Nueva tarjeta" : "Nuevo sobre"}
               </button>
             </div>
           </div>
@@ -2027,7 +2045,7 @@ export default function BoxesPage() {
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
-                    placeholder={mainTab === "tarjetas" ? "Buscar caja" : "Buscar sobre"}
+                    placeholder={mainTab === "tarjetas" ? "Buscar tarjeta" : "Buscar sobre"}
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                     className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
@@ -4288,6 +4306,153 @@ export default function BoxesPage() {
           </div>
         );
       })()}
+
+      {/* ── Configurar exportación (DEMO / vista previa) ──────────────────── */}
+      {showExportConfigModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto border border-slate-200">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #f59e0b, #f97316)" }}>
+                  <Settings size={18} className="text-white" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold text-slate-900">Exportación a servicio de tarjetas</h2>
+                    <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                      <Sparkles size={10} /> DEMO
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">Vista previa · aún no conectado a ningún proveedor</p>
+                </div>
+              </div>
+              <button onClick={() => setShowExportConfigModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex gap-2.5">
+                <Info size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  Así se verá el panel para sincronizar BOX con el proveedor de tarjetas corporativas del proyecto
+                  (gastos, sobres y justificantes). Todavía es una demo: nada de lo que configures aquí se guarda.
+                </p>
+              </div>
+
+              {/* Proveedor */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Proveedor de tarjetas</label>
+                <input
+                  type="text"
+                  value={exportConfig.providerName}
+                  onChange={(e) => setExportConfig({ ...exportConfig, providerName: e.target.value })}
+                  placeholder="Nombre de tu proveedor de tarjetas corporativas"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                />
+              </div>
+
+              {/* Formato */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Formato de exportación</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { value: "csv", label: "CSV", icon: FileSpreadsheet },
+                    { value: "excel", label: "Excel", icon: FileText },
+                    { value: "api", label: "API / Webhook", icon: Link2 },
+                  ] as const).map((opt) => {
+                    const Icon = opt.icon;
+                    const active = exportConfig.format === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => setExportConfig({ ...exportConfig, format: opt.value })}
+                        className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 text-xs font-medium transition-all ${active ? "border-amber-400 bg-amber-50 text-amber-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
+                      >
+                        <Icon size={16} />
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {exportConfig.format === "api" && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Endpoint / Webhook URL</label>
+                  <input
+                    type="text"
+                    disabled
+                    placeholder="https://api.tu-proveedor.com/webhooks/box"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 text-slate-400 cursor-not-allowed"
+                  />
+                </div>
+              )}
+
+              {/* Frecuencia */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Frecuencia de sincronización</label>
+                <div className="flex gap-2">
+                  {([
+                    { value: "manual", label: "Manual" },
+                    { value: "daily", label: "Diaria" },
+                    { value: "weekly", label: "Semanal" },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setExportConfig({ ...exportConfig, frequency: opt.value })}
+                      className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-all ${exportConfig.frequency === opt.value ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Qué se exporta */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Qué se incluye</label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:border-slate-300 transition-all">
+                    <input
+                      type="checkbox"
+                      checked={exportConfig.mapCategories}
+                      onChange={(e) => setExportConfig({ ...exportConfig, mapCategories: e.target.checked })}
+                      className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+                    />
+                    <span className="text-sm text-slate-700">Mapeo de departamentos y cuentas presupuestarias</span>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:border-slate-300 transition-all">
+                    <input
+                      type="checkbox"
+                      checked={exportConfig.mapReceipts}
+                      onChange={(e) => setExportConfig({ ...exportConfig, mapReceipts: e.target.checked })}
+                      className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+                    />
+                    <span className="text-sm text-slate-700">Adjuntar justificantes y tickets</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 px-6 py-4 border-t border-slate-100 flex-shrink-0">
+              <button
+                onClick={() => setShowExportConfigModal(false)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Cerrar
+              </button>
+              <button
+                onClick={() => { setShowExportConfigModal(false); showToast("success", "Vista previa · esta configuración aún no está conectada"); }}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                style={{ background: "linear-gradient(135deg, #f59e0b, #f97316)" }}
+              >
+                Guardar configuración
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

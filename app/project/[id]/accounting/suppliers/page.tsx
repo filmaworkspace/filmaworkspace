@@ -730,7 +730,7 @@ export default function SuppliersPage() {
           <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
             <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><Building2 size={28} className="text-slate-400" /></div>
             <h3 className="text-lg font-semibold text-slate-900 mb-2">{searchTerm || filterStatus !== "all" ? "No se encontraron proveedores" : "No hay proveedores registrados"}</h3>
-            <p className="text-slate-500 text-sm">{searchTerm || filterStatus !== "all" ? "Intenta ajustar los filtros" : "Añade tu primer proveedor al proyecto"}</p>
+            {(searchTerm || filterStatus !== "all") && <p className="text-slate-500 text-sm">Intenta ajustar los filtros</p>}
           </div>
         ) : (
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">

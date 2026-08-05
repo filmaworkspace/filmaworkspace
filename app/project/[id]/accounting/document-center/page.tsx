@@ -536,7 +536,6 @@ export default function DocumentCenterPage() {
               <FileText size={28} className="text-slate-400" />
             </div>
             <h3 className="text-lg font-semibold text-slate-900 mb-2">No hay documentos</h3>
-            <p className="text-slate-500 text-sm">Ajusta los filtros para encontrar los documentos que buscas</p>
           </div>
         ) : (
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">

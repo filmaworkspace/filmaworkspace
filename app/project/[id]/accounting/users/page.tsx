@@ -447,7 +447,7 @@ export default function AccountingUsersPage() {
           <div className="border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
             <UserCog size={32} className="text-slate-300 mx-auto mb-3" />
             <h3 className="text-lg font-semibold text-slate-900 mb-1">{searchTerm ? "No se encontraron usuarios" : "No hay usuarios con acceso"}</h3>
-            <p className="text-slate-500 text-sm">{searchTerm ? "Intenta ajustar la búsqueda" : "Añade usuarios para dar acceso a contabilidad"}</p>
+            {searchTerm && <p className="text-slate-500 text-sm">Intenta ajustar la búsqueda</p>}
           </div>
         ) : (
           <div className="space-y-8">
@@ -650,7 +650,6 @@ export default function AccountingUsersPage() {
                               <span className="text-[10px] font-medium px-1.5 py-0.5 bg-slate-100 text-slate-400 rounded">no disponible</span>
                             )}
                           </div>
-                          <p className="text-xs text-slate-500">{value.description}</p>
                         </div>
                       </label>
                     );
@@ -667,7 +666,6 @@ export default function AccountingUsersPage() {
                     />
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-slate-900">Acceso a BOX</p>
-                      <p className="text-xs text-slate-500">Ver y gestionar gastos de tarjetas y transferencias</p>
                     </div>
                   </label>
                 </div>
@@ -743,7 +741,6 @@ export default function AccountingUsersPage() {
                         <input type="radio" name="accountingAccessLevel" value={key} checked={inviteForm.accountingAccessLevel === key} onChange={(e) => setInviteForm({ ...inviteForm, accountingAccessLevel: e.target.value as any })} className="mt-1" />
                         <div className="flex-1">
                           <p className="text-sm font-semibold text-slate-900">{value.label}</p>
-                          <p className="text-xs text-slate-500">{value.description}</p>
                         </div>
                       </label>
                     ))}
@@ -759,7 +756,6 @@ export default function AccountingUsersPage() {
                     />
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-slate-900">Acceso a BOX</p>
-                      <p className="text-xs text-slate-500">Permite ver y gestionar gastos de tarjetas y transferencias</p>
                     </div>
                   </label>
                 </div>
