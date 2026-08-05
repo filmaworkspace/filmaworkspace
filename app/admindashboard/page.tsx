@@ -77,6 +77,7 @@ import {
   CheckCheck,
   Circle,
   Loader2,
+  Wrench,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
@@ -244,7 +245,7 @@ const NAV_SECTIONS: { id: "projects" | "users" | "producers" | "support"; label:
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const { user: contextUser, isLoading: userLoading } = useUser();
+  const { user: contextUser, isLoading: userLoading, maintenance } = useUser();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -263,6 +264,10 @@ export default function AdminDashboard() {
   const [automatedMessagesForm, setAutomatedMessagesForm] = useState<AutomatedMessages>(DEFAULT_AUTOMATED_MESSAGES);
   const [automatedMessagesLoading, setAutomatedMessagesLoading] = useState(false);
   const [automatedMessagesSaving, setAutomatedMessagesSaving] = useState(false);
+  const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
+  const [maintenanceMinutes, setMaintenanceMinutes] = useState(10);
+  const [maintenanceMessage, setMaintenanceMessage] = useState("");
+  const [maintenanceSaving, setMaintenanceSaving] = useState(false);
   const [supportQueueFilter, setSupportQueueFilter] = useState<"unassigned" | "mine" | "all" | "resolved">("unassigned");
   const [showTransferMenu, setShowTransferMenu] = useState<string | null>(null);
   const [showGuidePicker, setShowGuidePicker] = useState<string | null>(null);
@@ -679,6 +684,45 @@ export default function AdminDashboard() {
       showToast("error", "No se pudo guardar");
     } finally {
       setAutomatedMessagesSaving(false);
+    }
+  };
+
+  const handleActivateMaintenance = async () => {
+    setMaintenanceSaving(true);
+    try {
+      await setDoc(doc(db, "meta", "maintenance"), {
+        enabled: true,
+        startAt: Timestamp.fromMillis(Date.now() + maintenanceMinutes * 60000),
+        message: maintenanceMessage.trim(),
+        activatedAt: serverTimestamp(),
+        activatedBy: contextUser?.uid || "",
+        activatedByName: contextUser?.name || contextUser?.email || "Admin",
+      });
+      showToast("success", maintenanceMinutes === 0 ? "Mantenimiento activado" : `Mantenimiento programado en ${maintenanceMinutes} min`);
+      setShowMaintenanceModal(false);
+    } catch (error) {
+      console.error(error);
+      showToast("error", "No se pudo activar el mantenimiento");
+    } finally {
+      setMaintenanceSaving(false);
+    }
+  };
+
+  const handleDeactivateMaintenance = async () => {
+    setMaintenanceSaving(true);
+    try {
+      await setDoc(doc(db, "meta", "maintenance"), {
+        enabled: false,
+        deactivatedAt: serverTimestamp(),
+        deactivatedBy: contextUser?.uid || "",
+      }, { merge: true });
+      showToast("success", "Mantenimiento desactivado");
+      setShowMaintenanceModal(false);
+    } catch (error) {
+      console.error(error);
+      showToast("error", "No se pudo desactivar el mantenimiento");
+    } finally {
+      setMaintenanceSaving(false);
     }
   };
 
@@ -1429,6 +1473,18 @@ export default function AdminDashboard() {
               >
                 <Settings size={13} />
                 Mensajes automáticos
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={() => { setMaintenanceMinutes(10); setMaintenanceMessage(maintenance.message); setShowMaintenanceModal(true); }}
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                  maintenance.enabled ? "text-amber-400 hover:text-amber-300 bg-amber-950/40" : "text-slate-400 hover:text-white hover:bg-slate-900"
+                }`}
+              >
+                <Wrench size={13} />
+                Modo mantenimiento
+                {maintenance.enabled && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-400" />}
               </button>
             )}
             <div className="pt-3 mt-2 border-t border-slate-800/60 flex items-center gap-2 px-3">
@@ -3378,6 +3434,112 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* Maintenance Mode Modal */}
+      {showMaintenanceModal && (() => {
+        const startAtMs = maintenance.startAt ? maintenance.startAt.getTime() : null;
+        const isActiveNow = maintenance.enabled && startAtMs !== null && Date.now() >= startAtMs;
+        return (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center">
+                    <Wrench size={16} className="text-amber-700" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-900">Modo mantenimiento</h3>
+                    <p className="text-xs text-slate-500">Bloquea el acceso a todos menos a los admins</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowMaintenanceModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+                  <X size={18} />
+                </button>
+              </div>
+
+              {maintenance.enabled ? (
+                <div className="p-6 space-y-4">
+                  <div className={`p-4 rounded-xl border ${isActiveNow ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"}`}>
+                    <p className={`text-sm font-medium ${isActiveNow ? "text-red-800" : "text-amber-800"}`}>
+                      {isActiveNow ? "Mantenimiento activo ahora mismo" : "Mantenimiento programado"}
+                    </p>
+                    <p className={`text-xs mt-1 ${isActiveNow ? "text-red-600" : "text-amber-700"}`}>
+                      {isActiveNow
+                        ? "Los usuarios (excepto admins) están viendo la pantalla de mantenimiento."
+                        : `Empieza a las ${maintenance.startAt?.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}.`}
+                    </p>
+                    {maintenance.message && <p className="text-xs mt-2 italic text-slate-600">"{maintenance.message}"</p>}
+                  </div>
+                  <button
+                    onClick={handleDeactivateMaintenance}
+                    disabled={maintenanceSaving}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    {maintenanceSaving ? <Loader2 size={14} className="animate-spin" /> : <Wrench size={14} />}
+                    {maintenanceSaving ? "Desactivando..." : "Desactivar mantenimiento"}
+                  </button>
+                </div>
+              ) : (
+                <div className="p-6 space-y-5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Empieza en</label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { label: "Ahora", value: 0 },
+                        { label: "5 min", value: 5 },
+                        { label: "10 min", value: 10 },
+                        { label: "15 min", value: 15 },
+                        { label: "30 min", value: 30 },
+                      ].map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => setMaintenanceMinutes(opt.value)}
+                          className={`px-3 py-1.5 rounded-lg border text-sm font-medium ${
+                            maintenanceMinutes === opt.value ? "bg-slate-900 text-white border-slate-900" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    {maintenanceMinutes > 0 && (
+                      <p className="text-xs text-slate-500 mt-2">
+                        Durante esos {maintenanceMinutes} min todo el mundo verá un aviso para guardar cambios, sin bloquearles todavía.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Mensaje (opcional)</label>
+                    <textarea
+                      value={maintenanceMessage}
+                      onChange={(e) => setMaintenanceMessage(e.target.value)}
+                      rows={2}
+                      placeholder="Volvemos en un rato con mejoras nuevas."
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm resize-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {!maintenance.enabled && (
+                <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3">
+                  <button onClick={() => setShowMaintenanceModal(false)} className="px-5 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleActivateMaintenance}
+                    disabled={maintenanceSaving}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {maintenanceSaving ? <Loader2 size={14} className="animate-spin" /> : <Wrench size={14} />}
+                    {maintenanceSaving ? "Activando..." : "Activar mantenimiento"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Confirm Dialog */}
       {confirmDialog && (

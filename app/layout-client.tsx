@@ -3,9 +3,8 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 // ─── Internal ────────────────────────────────────────────────────────────────
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
 import { UserProvider } from "@/contexts/UserContext";
+import MaintenanceGate from "@/components/MaintenanceGate";
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -43,11 +42,9 @@ export default function ClientLayout({
 
   return (
     <UserProvider>
-      <div className="flex flex-col min-h-screen">
-        {!isAuthPage && !isMobilePage && <Header />}
-        <main className="flex flex-col flex-grow">{children}</main>
-        {!isAuthPage && !isMobilePage && !isAdminDashboard && <Footer />}
-      </div>
+      <MaintenanceGate isAuthPage={isAuthPage} isMobilePage={isMobilePage} isAdminDashboard={isAdminDashboard}>
+        {children}
+      </MaintenanceGate>
     </UserProvider>
   );
 }
