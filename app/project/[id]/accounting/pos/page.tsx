@@ -849,9 +849,9 @@ export default function POsPage() {
             <h3 className="text-lg font-semibold text-slate-900 mb-2">
               {searchTerm || statusFilter !== "all" ? "No se encontraron resultados" : "Sin órdenes de compra"}
             </h3>
-            <p className="text-slate-500 text-sm">
-              {searchTerm || statusFilter !== "all" ? "Prueba a ajustar los filtros de búsqueda" : "Crea tu primera orden de compra para empezar"}
-            </p>
+            {!(searchTerm || statusFilter !== "all") && (
+              <p className="text-slate-500 text-sm">Crea tu primera orden de compra para empezar</p>
+            )}
           </div>
         ) : (
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">

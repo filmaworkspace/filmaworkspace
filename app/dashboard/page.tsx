@@ -822,11 +822,19 @@ export default function Dashboard() {
                         {invitation.roleType === "project" ? invitation.role : invitation.position}
                       </span>
                       {invitation.permissions.accounting && (
-                        <span 
+                        <span
                           className="text-xs px-2 py-1 rounded-lg"
                           style={{ backgroundColor: 'rgba(47, 82, 224, 0.1)', color: '#2F52E0' }}
                         >
                           Accounting
+                        </span>
+                      )}
+                      {invitation.permissions.team && (
+                        <span
+                          className="text-xs px-2 py-1 rounded-lg"
+                          style={{ backgroundColor: 'rgba(137, 211, 34, 0.15)', color: '#6BA319' }}
+                        >
+                          Team
                         </span>
                       )}
                     </div>

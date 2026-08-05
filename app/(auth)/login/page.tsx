@@ -10,6 +10,7 @@ import { inter } from "@/lib/fonts";
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth } from "@/lib/firebase";
 import {
+  browserLocalPersistence,
   browserSessionPersistence,
   setPersistence,
   signInWithEmailAndPassword,
@@ -31,7 +32,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -49,15 +50,13 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // Override to session-only persistence when the user unchecks "Recordarme".
-      // browserLocalPersistence is already set at firebase init, so we only need
-      // to call setPersistence when the user explicitly wants a shorter-lived session.
-      // We do this BEFORE signIn and do NOT await it together with router.push to
-      // avoid the race condition where a transient null auth state redirects the
-      // user back to login.
-      if (!rememberMe) {
-        await setPersistence(auth, browserSessionPersistence);
-      }
+      // Set persistence explicitly on every login (never rely on whatever mode a
+      // previous tab/session left behind) — local (survives closing the browser,
+      // backed by a Firebase-managed refresh token, never the raw password) when
+      // "Recordarme" is checked, session-only otherwise. Done BEFORE signIn and
+      // not awaited together with router.push, to avoid the race condition where
+      // a transient null auth state redirects the user back to login.
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
 
       await signInWithEmailAndPassword(auth, email, password);
 

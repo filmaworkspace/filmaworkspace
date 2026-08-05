@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { inter } from "@/lib/fonts";
 
 import { auth, db } from "@/lib/firebase";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { browserLocalPersistence, createUserWithEmailAndPassword, setPersistence, updateProfile } from "firebase/auth";
 import { doc, setDoc, Timestamp } from "firebase/firestore";
 
 import { AlertCircle, ArrowLeft, ArrowRight, ChevronDown, Eye, EyeOff } from "lucide-react";
@@ -165,6 +165,11 @@ export default function RegisterPage() {
         setTimeout(() => digitRefs[0].current?.focus(), 50);
         return;
       }
+
+      // Sesión persistente por defecto para cuentas recién creadas (mismo criterio
+      // que "Recordarme" en login) — no depende de la persistencia que haya quedado
+      // fijada en una pestaña previa.
+      await setPersistence(auth, browserLocalPersistence);
 
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(cred.user, { displayName: name });

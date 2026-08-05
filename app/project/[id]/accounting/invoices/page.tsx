@@ -809,7 +809,9 @@ export default function InvoicesPage() {
               <Receipt size={28} className="text-slate-400" />
             </div>
             <h3 className="text-lg font-semibold text-slate-900 mb-2">{searchTerm || statusFilter !== "all" || typeFilter !== "all" || showUncodedOnly ? "No se encontraron resultados" : "Sin documentos"}</h3>
-            <p className="text-slate-500 text-sm">{searchTerm || statusFilter !== "all" || typeFilter !== "all" || showUncodedOnly ? "Prueba a ajustar los filtros de búsqueda" : "Sube tu primer documento para empezar"}</p>
+            {!(searchTerm || statusFilter !== "all" || typeFilter !== "all" || showUncodedOnly) && (
+              <p className="text-slate-500 text-sm">Sube tu primer documento para empezar</p>
+            )}
           </div>
         ) : (
           <div className="bg-white border border-slate-200 rounded-2xl">
