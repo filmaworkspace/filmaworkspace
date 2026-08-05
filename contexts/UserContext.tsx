@@ -7,7 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 
 interface UserData {
   uid: string;
@@ -18,18 +18,28 @@ interface UserData {
   isLoading: boolean;
 }
 
+interface MaintenanceState {
+  enabled: boolean;
+  startAt: Date | null;
+  message: string;
+}
+
 interface UserContextType {
   user: UserData | null;
   isLoading: boolean;
   updateUserName: (name: string) => void;
   refreshUser: () => Promise<void>;
+  maintenance: MaintenanceState;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
+const DEFAULT_MAINTENANCE: MaintenanceState = { enabled: false, startAt: null, message: "" };
+
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [maintenance, setMaintenance] = useState<MaintenanceState>(DEFAULT_MAINTENANCE);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -82,6 +92,28 @@ export function UserProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     });
 
+    return () => unsubscribe();
+  }, []);
+
+  // Modo mantenimiento — escucha en tiempo real para que el bloqueo/aviso
+  // aparezca (o desaparezca) sin recargar la página.
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      doc(db, "meta", "maintenance"),
+      (snap) => {
+        const data = snap.data();
+        if (!data) {
+          setMaintenance(DEFAULT_MAINTENANCE);
+          return;
+        }
+        setMaintenance({
+          enabled: !!data.enabled,
+          startAt: data.startAt?.toDate() || null,
+          message: data.message || "",
+        });
+      },
+      () => setMaintenance(DEFAULT_MAINTENANCE)
+    );
     return () => unsubscribe();
   }, []);
 
@@ -151,7 +183,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <UserContext.Provider value={{ user, isLoading, updateUserName, refreshUser }}>
+    <UserContext.Provider value={{ user, isLoading, updateUserName, refreshUser, maintenance }}>
       {children}
     </UserContext.Provider>
   );

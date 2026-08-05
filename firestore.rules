@@ -600,15 +600,20 @@ service cloud.firestore {
 
     match /meta/{docId} {
       allow read: if true;
-      // automatedMessages solo lo edita admin/agente (ver excepción abajo);
+      // automatedMessages y maintenance tienen su propia regla más abajo;
       // el resto de docs de meta (ej. supportTicketCounter) los puede tocar
       // cualquier usuario autenticado, incluidos anónimos.
-      allow write: if isSignedIn() && docId != "automatedMessages";
+      allow write: if isSignedIn() && docId != "automatedMessages" && docId != "maintenance";
     }
 
     match /meta/automatedMessages {
       allow read: if true;
       allow write: if isAdmin() || isSupportAgent();
+    }
+
+    match /meta/maintenance {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     match /guides/{guideId} {
