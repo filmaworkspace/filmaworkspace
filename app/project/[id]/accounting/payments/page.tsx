@@ -843,7 +843,7 @@ export default function PaymentsPage() {
                       <div className="text-center py-10 px-4">
                         <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3">{hasActiveInvoiceFilters ? <Search size={20} className="text-slate-400" /> : <CheckCircle2 size={20} className="text-emerald-500" />}</div>
                         <p className="text-sm font-medium text-slate-700">{hasActiveInvoiceFilters ? "Sin resultados" : "¡Todo al día!"}</p>
-                        <p className="text-xs text-slate-500 mt-1">{hasActiveInvoiceFilters ? "Prueba con otros filtros" : "No hay facturas pendientes"}</p>
+                        {hasActiveInvoiceFilters && <p className="text-xs text-slate-500 mt-1">Prueba con otros filtros</p>}
                       </div>
                     ) : (
                       <div className="p-2 space-y-1">

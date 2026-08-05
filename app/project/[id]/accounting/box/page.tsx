@@ -59,6 +59,7 @@ import {
   Receipt,
   RotateCcw,
   Save,
+  Scale,
   Scissors,
   Search,
   Send,
@@ -187,7 +188,18 @@ interface TransferEnvelope {
   number: number;
   displayNumber: string;
   paymentDate: string;
-  status: "draft" | "pending" | "transferred";
+  status: "draft" | "settled";
+  // Persona del sobre (un sobre = una persona)
+  personName: string;
+  personDepartment?: string;
+  personIban?: string;
+  // Anticipo (opcional)
+  hasAdvance: boolean;
+  advanceAmount?: number;
+  advanceMethod?: "bank" | "cash";
+  advanceProofUrl?: string;
+  advanceProofFileName?: string;
+  // Totales de gasto
   totalBase: number;
   totalVat: number;
   totalAmount: number;
@@ -196,10 +208,15 @@ interface TransferEnvelope {
   createdAt: Date;
   createdBy: string;
   createdByName: string;
-  transferredAt?: Date;
-  transferredBy?: string;
-  transferredByName?: string;
-  transferReference?: string;
+  // Liquidación
+  settledAt?: Date;
+  settledBy?: string;
+  settledByName?: string;
+  settlementDirection?: "production_to_person" | "person_to_production" | "none";
+  settlementAmount?: number;
+  settlementReference?: string;
+  settlementProofUrl?: string;
+  settlementProofFileName?: string;
 }
 
 interface TransferExpenseItem {
@@ -314,9 +331,8 @@ const EXPENSE_STATUS_CONFIG = {
 };
 
 const TRANSFER_STATUS_CONFIG = {
-  draft:       { bg: "bg-slate-100",  text: "text-slate-600",   label: "Borrador"    },
-  pending:     { bg: "bg-amber-50",   text: "text-amber-700",   label: "Pendiente"   },
-  transferred: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Transferido" },
+  draft:   { bg: "bg-slate-100",  text: "text-slate-600",   label: "Borrador"  },
+  settled: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Liquidado" },
 };
 
 const CONFLICT_CONFIG: Record<ConflictType, {
@@ -425,12 +441,14 @@ export default function BoxesPage() {
   const [formSubmissions, setFormSubmissions] = useState<{
     id: string; requesterName: string; createdByName: string; submittedAt: Date;
     totalAmount: number; expenseCount: number; importedToEnvelopeId?: string | null;
+    targetEnvelopeId?: string | null;
     expenses: { description: string; amount: number; fileUrl?: string; fileName?: string }[];
     notes?: string;
   }[]>([]);
   const [showSendBoxFormModal, setShowSendBoxFormModal] = useState(false);
   const [boxFormRequesterName, setBoxFormRequesterName] = useState("");
   const [boxFormMessage, setBoxFormMessage] = useState("");
+  const [boxFormTargetEnvelopeId, setBoxFormTargetEnvelopeId] = useState("");
   const [generatingBoxForm, setGeneratingBoxForm] = useState(false);
   const [generatedBoxResult, setGeneratedBoxResult] = useState<{ url: string; pin: string } | null>(null);
   const [copiedBoxUrl, setCopiedBoxUrl] = useState(false);
@@ -460,15 +478,19 @@ export default function BoxesPage() {
   const [showCreateTransferEnvelopeModal, setShowCreateTransferEnvelopeModal] = useState(false);
   const [showDeleteTransferEnvelopeModal, setShowDeleteTransferEnvelopeModal] = useState<TransferEnvelope | null>(null);
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
-  const [showMarkTransferredModal, setShowMarkTransferredModal] = useState(false);
-  const [transferEnvelopeForm, setTransferEnvelopeForm] = useState({ paymentDate: "", notes: "" });
-  const [expensePersonForm, setExpensePersonForm] = useState({ name: "", department: "", iban: "" });
+  const [showSettleModal, setShowSettleModal] = useState(false);
+  const [transferEnvelopeForm, setTransferEnvelopeForm] = useState({
+    paymentDate: "", notes: "",
+    personName: "", personDepartment: "", personIban: "",
+    hasAdvance: true, advanceAmount: "", advanceMethod: "bank" as "bank" | "cash",
+    advanceProofFile: null as File | null,
+  });
   const [expensesList, setExpensesList] = useState<Array<{
     id: string; type: "invoice" | "ticket"; supplier: string; supplierTaxId: string;
     date: string; irpfRate: number; file: File | null;
     items: Array<{ id: string; subAccountCode: string; subAccountDescription: string; description: string; baseAmount: number; vatRate: number; }>;
   }>>([]);
-  const [transferRef, setTransferRef] = useState("");
+  const [settleForm, setSettleForm] = useState({ reference: "", proofFile: null as File | null });
 
   // Dropdowns
   const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
@@ -593,7 +615,7 @@ export default function BoxesPage() {
       setTransferEnvelopes(trfEnvSnap.docs.map(d => ({
         id: d.id, ...d.data(),
         createdAt: d.data().createdAt?.toDate() || new Date(),
-        transferredAt: d.data().transferredAt?.toDate(),
+        settledAt: d.data().settledAt?.toDate(),
       })) as TransferEnvelope[]);
 
       const trfExpSnap = await getDocs(query(collection(db, `projects/${projectId}/transferExpenses`), orderBy("createdAt", "desc")));
@@ -620,6 +642,7 @@ export default function BoxesPage() {
           totalAmount: rd.totalAmount || 0,
           expenseCount: (rd.expenses || []).length,
           importedToEnvelopeId: v.importedToEnvelopeId ?? null,
+          targetEnvelopeId: v.targetEnvelopeId ?? null,
           expenses: rd.expenses || [],
           notes: rd.notes || "",
         };
@@ -1594,6 +1617,7 @@ export default function BoxesPage() {
         createdAt: Timestamp.now(),
         expiresAt: Timestamp.fromDate(expires),
         importedToEnvelopeId: null,
+        targetEnvelopeId: boxFormTargetEnvelopeId || null,
         prefilled: { requesterName: boxFormRequesterName.trim() },
       });
       setGeneratedBoxResult({ url: `${window.location.origin}/form/${docRef.id}`, pin });
@@ -1617,13 +1641,14 @@ export default function BoxesPage() {
     setShowSendBoxFormModal(false);
     setBoxFormRequesterName("");
     setBoxFormMessage("");
+    setBoxFormTargetEnvelopeId("");
     setGeneratedBoxResult(null);
   };
 
   // ─── Volcar solicitud a sobre ─────────────────────────────────────────────────
 
   const handleVolcarToEnvelope = async (formId: string) => {
-    if (!volcarTargetEnvelopeId) return showToast("error", "Selecciona un sobre de transferencia");
+    if (!volcarTargetEnvelopeId) return showToast("error", "Selecciona un sobre de Petty Cash");
     const submission = formSubmissions.find((f) => f.id === formId);
     if (!submission) return;
     setVolcandoFormId(formId);
@@ -1650,9 +1675,9 @@ export default function BoxesPage() {
         batch.set(newExpRef, {
           envelopeId: volcarTargetEnvelopeId,
           type: "ticket",
-          personName: submission.requesterName,
-          personDepartment: "",
-          personIban: "",
+          personName: envelope.personName || submission.requesterName,
+          personDepartment: envelope.personDepartment || "",
+          personIban: envelope.personIban || "",
           supplier: ed.supplier || submission.requesterName,
           supplierTaxId: ed.supplierTaxId || "",
           items: [{
@@ -1706,28 +1731,53 @@ export default function BoxesPage() {
 
   // ─────────────────────────────────────────────────────────────────────────────
 
+  const emptyTransferEnvelopeForm = {
+    paymentDate: "", notes: "",
+    personName: "", personDepartment: "", personIban: "",
+    hasAdvance: true, advanceAmount: "", advanceMethod: "bank" as "bank" | "cash",
+    advanceProofFile: null as File | null,
+  };
+
   const handleCreateTransferEnvelope = async () => {
-    if (!transferEnvelopeForm.paymentDate.trim()) return showToast("error", "Fecha de pago obligatoria");
+    if (!transferEnvelopeForm.personName.trim()) return showToast("error", "Nombre de la persona obligatorio");
+    if (!transferEnvelopeForm.paymentDate.trim()) return showToast("error", "Fecha obligatoria");
+    if (transferEnvelopeForm.hasAdvance) {
+      if (!Number(transferEnvelopeForm.advanceAmount) || Number(transferEnvelopeForm.advanceAmount) <= 0) return showToast("error", "Importe del anticipo obligatorio");
+      if (!transferEnvelopeForm.advanceProofFile) return showToast("error", "Adjunta el comprobante del anticipo");
+    }
     setSaving(true);
     try {
       const num = nextTransferNumber;
-      const displayNumber = `TRF-${String(num).padStart(3, "0")}`;
-      await addDoc(collection(db, `projects/${projectId}/transferEnvelopes`), {
+      const displayNumber = `PC-${String(num).padStart(3, "0")}`;
+      const docRef = await addDoc(collection(db, `projects/${projectId}/transferEnvelopes`), {
         number: num, displayNumber,
         paymentDate: transferEnvelopeForm.paymentDate.trim(),
         status: "draft", totalBase: 0, totalVat: 0, totalAmount: 0, expenseCount: 0,
         notes: transferEnvelopeForm.notes.trim() || "",
+        personName: transferEnvelopeForm.personName.trim(),
+        personDepartment: transferEnvelopeForm.personDepartment || "",
+        personIban: transferEnvelopeForm.personIban.trim() || "",
+        hasAdvance: transferEnvelopeForm.hasAdvance,
+        advanceAmount: transferEnvelopeForm.hasAdvance ? Number(transferEnvelopeForm.advanceAmount) : 0,
+        advanceMethod: transferEnvelopeForm.hasAdvance ? transferEnvelopeForm.advanceMethod : null,
         createdAt: Timestamp.now(), createdBy: userId, createdByName: userName,
       });
+      if (transferEnvelopeForm.hasAdvance && transferEnvelopeForm.advanceProofFile) {
+        const fileName = `${Date.now()}_${transferEnvelopeForm.advanceProofFile.name}`;
+        const fileRef = ref(storage, `projects/${projectId}/transferEnvelopes/${docRef.id}/advanceProof/${fileName}`);
+        await uploadBytes(fileRef, transferEnvelopeForm.advanceProofFile);
+        const advanceProofUrl = await getDownloadURL(fileRef);
+        await updateDoc(docRef, { advanceProofUrl, advanceProofFileName: transferEnvelopeForm.advanceProofFile.name });
+      }
       await updateDoc(doc(db, `projects/${projectId}`), { nextTransferNumber: num + 1 });
       showToast("success", `Sobre ${displayNumber} creado`);
       setShowCreateTransferEnvelopeModal(false);
-      setTransferEnvelopeForm({ paymentDate: "", notes: "" });
+      setTransferEnvelopeForm(emptyTransferEnvelopeForm);
       loadData();
-    } catch { showToast("error", "Error al crear sobre"); } finally { setSaving(false); }
+    } catch (e) { console.error(e); showToast("error", "Error al crear sobre"); } finally { setSaving(false); }
   };
 
-  const canDeleteTransferEnvelope = (envelope: TransferEnvelope) => envelope.status !== "transferred";
+  const canDeleteTransferEnvelope = (envelope: TransferEnvelope) => envelope.status !== "settled";
 
   const handleDeleteTransferEnvelope = async (envelope: TransferEnvelope) => {
     setSaving(true);
@@ -1792,7 +1842,6 @@ export default function BoxesPage() {
 
   const handleAddAllExpenses = async () => {
     if (!selectedTransferEnvelope) return;
-    if (!expensePersonForm.name.trim()) return showToast("error", "Nombre de persona obligatorio");
     const validExpenses = expensesList.filter(
       exp => exp.supplier.trim() && exp.items.some(item => item.baseAmount > 0 && item.subAccountCode)
     );
@@ -1822,9 +1871,9 @@ export default function BoxesPage() {
           }));
         await addDoc(collection(db, `projects/${projectId}/transferExpenses`), {
           envelopeId: selectedTransferEnvelope.id, type: exp.type,
-          personName: expensePersonForm.name.trim(),
-          personDepartment: expensePersonForm.department || "",
-          personIban: expensePersonForm.iban.trim() || "",
+          personName: selectedTransferEnvelope.personName,
+          personDepartment: selectedTransferEnvelope.personDepartment || "",
+          personIban: selectedTransferEnvelope.personIban || "",
           supplier: exp.supplier.trim(),
           supplierTaxId: exp.supplierTaxId.trim() || "",
           items: itemsData,
@@ -1845,7 +1894,6 @@ export default function BoxesPage() {
       });
       showToast("success", `${validExpenses.length} gasto${validExpenses.length > 1 ? "s" : ""} añadido${validExpenses.length > 1 ? "s" : ""}`);
       setShowAddExpenseModal(false);
-      setExpensePersonForm({ name: "", department: "", iban: "" });
       setExpensesList([]);
       loadData();
     } catch (e) { console.error(e); showToast("error", "Error al añadir gastos"); } finally { setSaving(false); }
@@ -1866,29 +1914,42 @@ export default function BoxesPage() {
     } catch { showToast("error", "Error al eliminar gasto"); }
   };
 
-  const handleSendEnvelope = async (envelope: TransferEnvelope) => {
-    if (envelope.expenseCount === 0) return showToast("error", "Añade al menos un gasto");
-    try {
-      await updateDoc(doc(db, `projects/${projectId}/transferEnvelopes`, envelope.id), { status: "pending" });
-      showToast("success", "Sobre enviado a pendiente");
-      loadData();
-    } catch { showToast("error", "Error al enviar"); }
+  // Calcula quién liquida a quién: si el gasto no supera el anticipo, la
+  // persona devuelve la diferencia; si lo supera, la productora se la paga.
+  const getSettlementPreview = (envelope: TransferEnvelope) => {
+    const diff = Math.round((envelope.totalAmount - (envelope.advanceAmount || 0)) * 100) / 100;
+    if (diff > 0) return { diff, direction: "production_to_person" as const, label: `La productora paga a ${envelope.personName}` };
+    if (diff < 0) return { diff: Math.abs(diff), direction: "person_to_production" as const, label: `${envelope.personName} devuelve a la productora` };
+    return { diff: 0, direction: "none" as const, label: "Sin movimiento — el anticipo cubre exactamente el gasto" };
   };
 
-  const handleMarkTransferred = async () => {
-    if (!selectedTransferEnvelope || !transferRef.trim()) return showToast("error", "Referencia obligatoria");
+  const handleSettleEnvelope = async () => {
+    if (!selectedTransferEnvelope) return;
+    const preview = getSettlementPreview(selectedTransferEnvelope);
+    if (preview.direction !== "none" && !settleForm.proofFile) return showToast("error", "Sube el extracto de la liquidación");
     setSaving(true);
     try {
+      let settlementProofUrl = "", settlementProofFileName = "";
+      if (settleForm.proofFile) {
+        const fileName = `${Date.now()}_${settleForm.proofFile.name}`;
+        const fileRef = ref(storage, `projects/${projectId}/transferEnvelopes/${selectedTransferEnvelope.id}/settlementProof/${fileName}`);
+        await uploadBytes(fileRef, settleForm.proofFile);
+        settlementProofUrl = await getDownloadURL(fileRef);
+        settlementProofFileName = settleForm.proofFile.name;
+      }
       await updateDoc(doc(db, `projects/${projectId}/transferEnvelopes`, selectedTransferEnvelope.id), {
-        status: "transferred", transferredAt: Timestamp.now(),
-        transferredBy: userId, transferredByName: userName,
-        transferReference: transferRef.trim(),
+        status: "settled", settledAt: Timestamp.now(),
+        settledBy: userId, settledByName: userName,
+        settlementDirection: preview.direction,
+        settlementAmount: preview.diff,
+        settlementReference: settleForm.reference.trim() || "",
+        settlementProofUrl, settlementProofFileName,
       });
-      showToast("success", "Transferencia registrada");
-      setShowMarkTransferredModal(false);
-      setTransferRef("");
+      showToast("success", "Sobre liquidado");
+      setShowSettleModal(false);
+      setSettleForm({ reference: "", proofFile: null });
       loadData();
-    } catch { showToast("error", "Error al registrar"); } finally { setSaving(false); }
+    } catch (e) { console.error(e); showToast("error", "Error al liquidar"); } finally { setSaving(false); }
   };
 
   // Derived Data
@@ -1906,7 +1967,6 @@ export default function BoxesPage() {
     ? transferExpenses.filter(e => e.envelopeId === selectedTransferEnvelope.id)
     : [];
   const openEnvelopes = envelopes.filter(e => e.status === "open").length;
-  const pendingTransfers = transferEnvelopes.filter(e => e.status === "pending").length;
   const pendingFormSubmissions = formSubmissions.filter((f) => !f.importedToEnvelopeId).length;
   const totalTarjetasAmount = expenses.reduce((s, e) => s + e.totalAmount, 0);
   const totalTransferAmount = transferEnvelopes.reduce((s, e) => s + e.totalAmount, 0);
@@ -1983,9 +2043,9 @@ export default function BoxesPage() {
                 <button
                   onClick={() => { setMainTab("transfers"); setSelectedBox(null); setSelectedEnvelope(null); setSelectedTransferEnvelope(null); setSearchTerm(""); }}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${mainTab === "transfers" ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"}`}>
-                  <Banknote size={15} /> Transferencias
-                  {(pendingTransfers + pendingFormSubmissions) > 0 && (
-                    <span className="bg-amber-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{pendingTransfers + pendingFormSubmissions}</span>
+                  <Banknote size={15} /> Petty Cash
+                  {pendingFormSubmissions > 0 && (
+                    <span className="bg-amber-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{pendingFormSubmissions}</span>
                   )}
                 </button>
               </div>
@@ -2001,7 +2061,6 @@ export default function BoxesPage() {
                 ) : (
                   <>
                     <span><strong className="text-slate-900">{transferEnvelopes.length}</strong> sobres</span>
-                    <span><strong className="text-amber-600">{pendingTransfers}</strong> pendientes</span>
                     {pendingFormSubmissions > 0 && <span><strong className="text-amber-600">{pendingFormSubmissions}</strong> solicitudes</span>}
                     <span><strong className="text-slate-900">{fmt(totalTransferAmount)} €</strong></span>
                   </>
@@ -2009,7 +2068,7 @@ export default function BoxesPage() {
               </div>
               {mainTab === "transfers" && (
                 <button
-                  onClick={() => { setBoxFormRequesterName(""); setBoxFormMessage(""); setGeneratedBoxResult(null); setShowSendBoxFormModal(true); }}
+                  onClick={() => { setBoxFormRequesterName(""); setBoxFormMessage(""); setBoxFormTargetEnvelopeId(""); setGeneratedBoxResult(null); setShowSendBoxFormModal(true); }}
                   className="flex items-center gap-2 px-3 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
                   <Link2 size={14} /> Enviar solicitud
                 </button>
@@ -2023,7 +2082,7 @@ export default function BoxesPage() {
               <button
                 onClick={() => mainTab === "tarjetas"
                   ? (setBoxForm({ name: "", code: "", department: "" }), setShowCreateBoxModal(true))
-                  : (setTransferEnvelopeForm({ paymentDate: "", notes: "" }), setShowCreateTransferEnvelopeModal(true))}
+                  : (setTransferEnvelopeForm(emptyTransferEnvelopeForm), setShowCreateTransferEnvelopeModal(true))}
                 className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90 shadow-lg shadow-orange-500/20"
                 style={{ background: "linear-gradient(135deg, #f59e0b, #f97316)" }}>
                 <Plus size={16} /> {mainTab === "tarjetas" ? "Nueva tarjeta" : "Nuevo sobre"}
@@ -2115,7 +2174,7 @@ export default function BoxesPage() {
                             <button
                               onClick={() => {
                                 setShowVolcarModal(fs.id);
-                                setVolcarTargetEnvelopeId("");
+                                setVolcarTargetEnvelopeId(fs.targetEnvelopeId && transferEnvelopes.some(e => e.id === fs.targetEnvelopeId && e.status === "draft") ? fs.targetEnvelopeId : "");
                                 const today = new Date().toISOString().slice(0, 10);
                                 setVolcarExpenseData(fs.expenses.map(() => ({
                                   supplier: fs.requesterName,
@@ -2149,12 +2208,12 @@ export default function BoxesPage() {
                         className={`w-full text-left p-3 rounded-xl transition-all ${isSelected ? "bg-slate-900 text-white" : "hover:bg-slate-50"}`}>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSelected ? "bg-white/20" : envelope.status === "transferred" ? "bg-emerald-50" : envelope.status === "pending" ? "bg-amber-50" : "bg-slate-100"}`}>
-                              <Calendar size={16} className={isSelected ? "text-white" : envelope.status === "transferred" ? "text-emerald-500" : envelope.status === "pending" ? "text-amber-500" : "text-slate-400"} />
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSelected ? "bg-white/20" : envelope.status === "settled" ? "bg-emerald-50" : "bg-slate-100"}`}>
+                              <Calendar size={16} className={isSelected ? "text-white" : envelope.status === "settled" ? "text-emerald-500" : "text-slate-400"} />
                             </div>
                             <div>
                               <p className={`text-sm font-medium ${isSelected ? "text-white" : "text-slate-900"}`}>{envelope.displayNumber}</p>
-                              <p className={`text-xs ${isSelected ? "text-white/70" : "text-slate-500"}`}>{envelope.paymentDate}</p>
+                              <p className={`text-xs ${isSelected ? "text-white/70" : "text-slate-500"}`}>{envelope.personName || envelope.paymentDate}</p>
                             </div>
                           </div>
                           <span className={`text-xs px-1.5 py-0.5 rounded-full ${isSelected ? "bg-white/20 text-white" : `${sc.bg} ${sc.text}`}`}>
@@ -2435,11 +2494,11 @@ export default function BoxesPage() {
                 </div>
               )
             ) : (
-              /* ── TRANSFERS TAB ── */
+              /* ── PETTY CASH TAB ── */
               !selectedTransferEnvelope ? (
                 <div className="flex items-center justify-center h-96">
                   <p className="text-sm text-slate-400">
-                    {transferEnvelopes.length === 0 ? "No hay sobres de transferencia" : "Selecciona un sobre"}
+                    {transferEnvelopes.length === 0 ? "No hay sobres de Petty Cash" : "Selecciona un sobre"}
                   </p>
                 </div>
               ) : (
@@ -2457,21 +2516,29 @@ export default function BoxesPage() {
                         </span>
                       </div>
                       <p className="text-sm text-slate-500">
-                        Fecha de pago: {selectedTransferEnvelope.paymentDate} · {selectedTransferEnvelope.expenseCount} gastos · Total: {fmt(selectedTransferEnvelope.totalAmount)} €
+                        {selectedTransferEnvelope.personName}
+                        {selectedTransferEnvelope.personDepartment && ` · ${selectedTransferEnvelope.personDepartment}`}
+                        {" · "}{selectedTransferEnvelope.expenseCount} gastos · Total: {fmt(selectedTransferEnvelope.totalAmount)} €
                       </p>
                     </div>
                     {selectedTransferEnvelope.status === "draft" && (
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => { setExpensePersonForm({ name: "", department: "", iban: "" }); setExpensesList([createEmptyExpense()]); setShowAddExpenseModal(true); }}
+                          onClick={() => { setBoxFormRequesterName(selectedTransferEnvelope.personName); setBoxFormMessage(""); setBoxFormTargetEnvelopeId(selectedTransferEnvelope.id); setGeneratedBoxResult(null); setShowSendBoxFormModal(true); }}
+                          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+                          <Link2 size={16} /> Solicitar tickets
+                        </button>
+                        <button
+                          onClick={() => { setExpensesList([createEmptyExpense()]); setShowAddExpenseModal(true); }}
                           className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
                           <Plus size={16} /> Añadir gasto
                         </button>
                         <button
-                          onClick={() => handleSendEnvelope(selectedTransferEnvelope)}
-                          disabled={selectedTransferEnvelope.expenseCount === 0}
-                          className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50">
-                          <Send size={16} /> Enviar
+                          onClick={() => { setSettleForm({ reference: "", proofFile: null }); setShowSettleModal(true); }}
+                          disabled={!selectedTransferEnvelope.hasAdvance && selectedTransferEnvelope.expenseCount === 0}
+                          className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                          style={{ background: "linear-gradient(135deg, #f59e0b, #f97316)" }}>
+                          <Scale size={16} /> Liquidación
                         </button>
                         {canDeleteTransferEnvelope(selectedTransferEnvelope) && (
                           <button onClick={() => setShowDeleteTransferEnvelopeModal(selectedTransferEnvelope)}
@@ -2481,22 +2548,61 @@ export default function BoxesPage() {
                         )}
                       </div>
                     )}
-                    {selectedTransferEnvelope.status === "pending" && (
-                      <button
-                        onClick={() => { setTransferRef(""); setShowMarkTransferredModal(true); }}
-                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700">
-                        <Check size={16} /> Marcar transferido
-                      </button>
-                    )}
                   </div>
 
-                  {selectedTransferEnvelope.status === "transferred" && (
-                    <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3">
-                      <CheckSquare size={18} className="text-emerald-600 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium text-emerald-800">Transferencia realizada</p>
+                  {/* Resumen anticipo / liquidación estimada — siempre visible en borrador */}
+                  {selectedTransferEnvelope.status === "draft" && (() => {
+                    const preview = getSettlementPreview(selectedTransferEnvelope);
+                    return (
+                      <div className="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                        <div>
+                          <span className="text-slate-500">Anticipo: </span>
+                          {selectedTransferEnvelope.hasAdvance ? (
+                            <>
+                              <span className="font-semibold text-slate-900">{fmt(selectedTransferEnvelope.advanceAmount || 0)} €</span>
+                              <span className="text-slate-400"> · {selectedTransferEnvelope.advanceMethod === "cash" ? "Efectivo" : "Transferencia"}</span>
+                              {selectedTransferEnvelope.advanceProofUrl && (
+                                <a href={selectedTransferEnvelope.advanceProofUrl} target="_blank" rel="noopener noreferrer"
+                                  className="ml-1.5 text-blue-500 hover:text-blue-700 underline">Ver comprobante</a>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-slate-400">Sin anticipo</span>
+                          )}
+                        </div>
+                        <div className="text-slate-300">|</div>
+                        <div>
+                          <span className="text-slate-500">Liquidación estimada: </span>
+                          {preview.direction === "none" ? (
+                            <span className="text-slate-600">{preview.label}</span>
+                          ) : (
+                            <span className="font-semibold text-slate-900">{preview.label}: {fmt(preview.diff)} €</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {selectedTransferEnvelope.status === "settled" && (
+                    <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3">
+                      <CheckSquare size={18} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-emerald-800">
+                          {selectedTransferEnvelope.settlementDirection === "none"
+                            ? "Liquidado — sin movimiento"
+                            : `Liquidado · ${selectedTransferEnvelope.settlementDirection === "production_to_person"
+                                ? `La productora pagó a ${selectedTransferEnvelope.personName}`
+                                : `${selectedTransferEnvelope.personName} devolvió a la productora`}: ${fmt(selectedTransferEnvelope.settlementAmount || 0)} €`}
+                        </p>
                         <p className="text-xs text-emerald-600">
-                          Ref: {selectedTransferEnvelope.transferReference} · Por {selectedTransferEnvelope.transferredByName} · {fmtDate(selectedTransferEnvelope.transferredAt)}
+                          {selectedTransferEnvelope.settlementReference && `Ref: ${selectedTransferEnvelope.settlementReference} · `}
+                          Por {selectedTransferEnvelope.settledByName} · {fmtDate(selectedTransferEnvelope.settledAt)}
+                          {selectedTransferEnvelope.settlementProofUrl && (
+                            <> · <a href={selectedTransferEnvelope.settlementProofUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-emerald-800">Ver extracto</a></>
+                          )}
+                          {selectedTransferEnvelope.hasAdvance && selectedTransferEnvelope.advanceProofUrl && (
+                            <> · <a href={selectedTransferEnvelope.advanceProofUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-emerald-800">Ver comprobante del anticipo</a></>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -2514,7 +2620,7 @@ export default function BoxesPage() {
                         <p className="text-sm text-slate-400 mb-4">No hay gastos en este sobre</p>
                         {selectedTransferEnvelope.status === "draft" && (
                           <button
-                            onClick={() => { setExpensePersonForm({ name: "", department: "", iban: "" }); setExpensesList([createEmptyExpense()]); setShowAddExpenseModal(true); }}
+                            onClick={() => { setExpensesList([createEmptyExpense()]); setShowAddExpenseModal(true); }}
                             className="inline-flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium"
                             style={{ backgroundColor: "#2F52E0" }}>
                             <Plus size={16} /> Añadir gasto
@@ -3651,17 +3757,109 @@ export default function BoxesPage() {
       {showCreateTransferEnvelopeModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setShowCreateTransferEnvelopeModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">Nuevo sobre de transferencia</h3>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+              <h3 className="text-lg font-semibold text-slate-900">Nuevo sobre de Petty Cash</h3>
               <button onClick={() => setShowCreateTransferEnvelopeModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 flex-1 overflow-y-auto space-y-5">
               <div className="p-3 bg-slate-50 rounded-xl text-center">
-                <p className="text-slate-900 font-medium">TRF-{String(nextTransferNumber).padStart(3, "0")}</p>
+                <p className="text-slate-900 font-medium">PC-{String(nextTransferNumber).padStart(3, "0")}</p>
               </div>
+
+              {/* Persona */}
+              <div className="p-4 bg-slate-50 rounded-xl space-y-3">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Persona</p>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Nombre *</label>
+                  <input type="text" value={transferEnvelopeForm.personName}
+                    onChange={e => setTransferEnvelopeForm({ ...transferEnvelopeForm, personName: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div ref={expenseDepartmentDropdownRef} className="relative">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Departamento</label>
+                    <button type="button" onClick={() => setShowExpenseDepartmentDropdown(!showExpenseDepartmentDropdown)}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between bg-white hover:border-slate-300">
+                      <span className={transferEnvelopeForm.personDepartment ? "text-slate-900" : "text-slate-400"}>{transferEnvelopeForm.personDepartment || "Seleccionar"}</span>
+                      <ChevronDown size={16} className="text-slate-400" />
+                    </button>
+                    {showExpenseDepartmentDropdown && (
+                      <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                        <button type="button" onClick={() => { setTransferEnvelopeForm({ ...transferEnvelopeForm, personDepartment: "" }); setShowExpenseDepartmentDropdown(false); }}
+                          className="w-full px-4 py-2 text-left text-sm text-slate-400 hover:bg-slate-50">Sin departamento</button>
+                        {departments.map(d => (
+                          <button key={d} type="button" onClick={() => { setTransferEnvelopeForm({ ...transferEnvelopeForm, personDepartment: d }); setShowExpenseDepartmentDropdown(false); }}
+                            className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50">{d}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">IBAN</label>
+                    <input type="text" value={transferEnvelopeForm.personIban}
+                      onChange={e => setTransferEnvelopeForm({ ...transferEnvelopeForm, personIban: formatIban(e.target.value) })}
+                      placeholder="ES00 0000 0000 0000 0000 0000"
+                      className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 font-mono text-sm bg-white transition-colors ${
+                        transferEnvelopeForm.personIban && !validateIban(transferEnvelopeForm.personIban) ? "border-red-300 focus:ring-red-400"
+                          : transferEnvelopeForm.personIban && validateIban(transferEnvelopeForm.personIban) ? "border-emerald-300 focus:ring-emerald-400"
+                          : "border-slate-200 focus:ring-slate-900"
+                      }`} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Anticipo */}
+              <div className="p-4 bg-slate-50 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">¿Hay anticipo?</p>
+                  <div className="flex border border-slate-200 rounded-lg overflow-hidden bg-white">
+                    <button type="button" onClick={() => setTransferEnvelopeForm({ ...transferEnvelopeForm, hasAdvance: true })}
+                      className={`px-3 py-1.5 text-xs font-medium transition-colors ${transferEnvelopeForm.hasAdvance ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Sí</button>
+                    <button type="button" onClick={() => setTransferEnvelopeForm({ ...transferEnvelopeForm, hasAdvance: false })}
+                      className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-slate-200 ${!transferEnvelopeForm.hasAdvance ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>No</button>
+                  </div>
+                </div>
+                {transferEnvelopeForm.hasAdvance ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Importe del anticipo *</label>
+                        <input type="number" min="0" step="0.01" value={transferEnvelopeForm.advanceAmount}
+                          onChange={e => setTransferEnvelopeForm({ ...transferEnvelopeForm, advanceAmount: e.target.value })}
+                          placeholder="500,00"
+                          className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white font-mono" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Método</label>
+                        <div className="flex border border-slate-200 rounded-xl overflow-hidden bg-white h-[42px]">
+                          <button type="button" onClick={() => setTransferEnvelopeForm({ ...transferEnvelopeForm, advanceMethod: "bank" })}
+                            className={`flex-1 text-xs font-medium transition-colors ${transferEnvelopeForm.advanceMethod === "bank" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Transferencia</button>
+                          <button type="button" onClick={() => setTransferEnvelopeForm({ ...transferEnvelopeForm, advanceMethod: "cash" })}
+                            className={`flex-1 text-xs font-medium transition-colors border-l border-slate-200 ${transferEnvelopeForm.advanceMethod === "cash" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Efectivo</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        {transferEnvelopeForm.advanceMethod === "cash" ? "Recibí firmado *" : "Comprobante de transferencia *"}
+                      </label>
+                      <label className="flex items-center gap-2 px-4 py-2.5 border border-dashed border-slate-300 rounded-xl bg-white cursor-pointer hover:border-slate-400 text-sm text-slate-500">
+                        <Upload size={15} />
+                        {transferEnvelopeForm.advanceProofFile ? transferEnvelopeForm.advanceProofFile.name : "Subir fichero"}
+                        <input type="file" className="hidden" onChange={e => setTransferEnvelopeForm({ ...transferEnvelopeForm, advanceProofFile: e.target.files?.[0] || null })} />
+                      </label>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-slate-500">El sobre se liquidará entero a posteriori, sin anticipo previo.</p>
+                )}
+              </div>
+
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Fecha de pago prevista *</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  {transferEnvelopeForm.hasAdvance ? "Fecha del anticipo *" : "Fecha prevista de liquidación *"}
+                </label>
                 <input type="text" value={transferEnvelopeForm.paymentDate}
                   onChange={e => setTransferEnvelopeForm({ ...transferEnvelopeForm, paymentDate: e.target.value })}
                   placeholder="DD/MM/YYYY"
@@ -3675,9 +3873,9 @@ export default function BoxesPage() {
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none" />
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 flex-shrink-0">
               <button onClick={() => setShowCreateTransferEnvelopeModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
-              <button onClick={handleCreateTransferEnvelope} disabled={saving || !transferEnvelopeForm.paymentDate.trim()}
+              <button onClick={handleCreateTransferEnvelope} disabled={saving || !transferEnvelopeForm.paymentDate.trim() || !transferEnvelopeForm.personName.trim()}
                 className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
                 {saving ? "Creando..." : "Crear sobre"}
               </button>
@@ -3712,61 +3910,13 @@ export default function BoxesPage() {
           onClick={() => setShowAddExpenseModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-              <h3 className="text-lg font-semibold text-slate-900">Añadir gastos</h3>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Añadir gastos</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Contra el sobre de {selectedTransferEnvelope.personName}</p>
+              </div>
               <button onClick={() => setShowAddExpenseModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
             </div>
             <div className="p-6 flex-1 overflow-y-auto space-y-6">
-              {/* Persona */}
-              <div className="p-4 bg-slate-50 rounded-xl">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Datos de la persona</p>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Nombre *</label>
-                    <input type="text" value={expensePersonForm.name}
-                      onChange={e => setExpensePersonForm({ ...expensePersonForm, name: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
-                  </div>
-                  <div ref={expenseDepartmentDropdownRef} className="relative">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Departamento</label>
-                    <button type="button" onClick={() => setShowExpenseDepartmentDropdown(!showExpenseDepartmentDropdown)}
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between bg-white hover:border-slate-300">
-                      <span className={expensePersonForm.department ? "text-slate-900" : "text-slate-400"}>{expensePersonForm.department || "Seleccionar"}</span>
-                      <ChevronDown size={16} className="text-slate-400" />
-                    </button>
-                    {showExpenseDepartmentDropdown && (
-                      <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
-                        <button type="button" onClick={() => { setExpensePersonForm({ ...expensePersonForm, department: "" }); setShowExpenseDepartmentDropdown(false); }}
-                          className="w-full px-4 py-2 text-left text-sm text-slate-400 hover:bg-slate-50">Sin departamento</button>
-                        {departments.map(d => (
-                          <button key={d} type="button" onClick={() => { setExpensePersonForm({ ...expensePersonForm, department: d }); setShowExpenseDepartmentDropdown(false); }}
-                            className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50">{d}</button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">IBAN</label>
-                    <input type="text" value={expensePersonForm.iban}
-                      onChange={e => setExpensePersonForm({ ...expensePersonForm, iban: formatIban(e.target.value) })}
-                      placeholder="ES00 0000 0000 0000 0000 0000"
-                      className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 font-mono text-sm bg-white transition-colors ${
-                        expensePersonForm.iban && !validateIban(expensePersonForm.iban) ? "border-red-300 focus:ring-red-400"
-                          : expensePersonForm.iban && validateIban(expensePersonForm.iban) ? "border-emerald-300 focus:ring-emerald-400"
-                          : "border-slate-200 focus:ring-slate-900"
-                      }`} />
-                    {expensePersonForm.iban && (
-                      <div className="mt-1.5 flex items-center gap-1.5">
-                        {validateIban(expensePersonForm.iban) ? (
-                          <><Check size={12} className="text-emerald-500 flex-shrink-0" /><span className="text-xs text-emerald-600">IBAN válido</span>{detectBank(expensePersonForm.iban) && <span className="text-xs text-slate-400">· {detectBank(expensePersonForm.iban)}</span>}</>
-                        ) : (
-                          <><AlertCircle size={12} className="text-red-400 flex-shrink-0" /><span className="text-xs text-red-500">IBAN no válido</span></>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
               {/* Gastos */}
               <div>
                 <div className="flex items-center justify-between mb-3">
@@ -3886,7 +4036,7 @@ export default function BoxesPage() {
               <div className="flex gap-3">
                 <button onClick={() => setShowAddExpenseModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
                 <button onClick={handleAddAllExpenses}
-                  disabled={saving || !expensePersonForm.name.trim() || expensesList.filter(e => e.supplier.trim() && e.items.some(item => item.baseAmount > 0 && item.subAccountCode)).length === 0}
+                  disabled={saving || expensesList.filter(e => e.supplier.trim() && e.items.some(item => item.baseAmount > 0 && item.subAccountCode)).length === 0}
                   className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
                   {saving ? "Guardando..." : `Añadir ${expensesList.filter(e => e.supplier.trim() && e.items.some(item => item.baseAmount > 0 && item.subAccountCode)).length} gasto${expensesList.filter(e => e.supplier.trim() && e.items.some(item => item.baseAmount > 0 && item.subAccountCode)).length !== 1 ? "s" : ""}`}
                 </button>
@@ -3897,36 +4047,58 @@ export default function BoxesPage() {
       )}
 
       {/* Mark Transferred Modal */}
-      {showMarkTransferredModal && selectedTransferEnvelope && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setShowMarkTransferredModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">Registrar transferencia</h3>
-              <button onClick={() => setShowMarkTransferredModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="p-3 bg-slate-50 rounded-xl">
-                <p className="text-xs text-slate-500 mb-1">Sobre</p>
-                <p className="text-sm font-medium text-slate-900">{selectedTransferEnvelope.displayNumber}</p>
-                <p className="text-sm font-mono text-slate-700">{fmt(selectedTransferEnvelope.totalAmount)} €</p>
+      {showSettleModal && selectedTransferEnvelope && (() => {
+        const preview = getSettlementPreview(selectedTransferEnvelope);
+        return (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowSettleModal(false)}>
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-slate-900">Liquidación</h3>
+                <button onClick={() => setShowSettleModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Referencia de la transferencia *</label>
-                <input type="text" value={transferRef} onChange={e => setTransferRef(e.target.value)} placeholder="2024-TRF-001"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
+              <div className="p-6 space-y-4">
+                <div className="p-4 bg-slate-50 rounded-xl space-y-1.5 text-sm">
+                  <div className="flex justify-between"><span className="text-slate-500">Anticipo</span><span className="font-mono text-slate-900">{fmt(selectedTransferEnvelope.advanceAmount || 0)} €</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Total gastos</span><span className="font-mono text-slate-900">{fmt(selectedTransferEnvelope.totalAmount)} €</span></div>
+                  <div className="border-t border-slate-200 my-1.5" />
+                  <div className="flex justify-between">
+                    <span className="text-slate-700 font-medium">{preview.direction === "none" ? "Resultado" : preview.label}</span>
+                    <span className={`font-mono font-bold ${preview.direction === "none" ? "text-slate-500" : "text-slate-900"}`}>
+                      {preview.direction === "none" ? "0,00 €" : `${fmt(preview.diff)} €`}
+                    </span>
+                  </div>
+                </div>
+                {preview.direction !== "none" && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Extracto del banco *</label>
+                      <label className="flex items-center gap-2 px-4 py-2.5 border border-dashed border-slate-300 rounded-xl bg-white cursor-pointer hover:border-slate-400 text-sm text-slate-500">
+                        <Upload size={15} />
+                        {settleForm.proofFile ? settleForm.proofFile.name : "Subir fichero"}
+                        <input type="file" className="hidden" onChange={e => setSettleForm({ ...settleForm, proofFile: e.target.files?.[0] || null })} />
+                      </label>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Referencia (opcional)</label>
+                      <input type="text" value={settleForm.reference} onChange={e => setSettleForm({ ...settleForm, reference: e.target.value })} placeholder="2024-PC-001"
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
+                    </div>
+                  </>
+                )}
               </div>
-            </div>
-            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-              <button onClick={() => setShowMarkTransferredModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
-              <button onClick={handleMarkTransferred} disabled={saving || !transferRef.trim()}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
-                <Check size={14} /> {saving ? "Guardando..." : "Confirmar"}
-              </button>
+              <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+                <button onClick={() => setShowSettleModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
+                <button onClick={handleSettleEnvelope} disabled={saving || (preview.direction !== "none" && !settleForm.proofFile)}
+                  className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                  style={{ background: "linear-gradient(135deg, #f59e0b, #f97316)" }}>
+                  <Scale size={14} /> {saving ? "Liquidando..." : "Confirmar liquidación"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Account Selector (Transfer modal) */}
       {showAccountSelector && accountSelectorPos && editingExpenseIndex !== null && (
@@ -4088,7 +4260,7 @@ export default function BoxesPage() {
       {/* ── Volcar a sobre Modal ───────────────────────────────────────────── */}
       {showVolcarModal && (() => {
         const fs = formSubmissions.find(f => f.id === showVolcarModal);
-        const openEnvelopes = transferEnvelopes.filter(e => e.status === "draft" || e.status === "pending");
+        const openEnvelopes = transferEnvelopes.filter(e => e.status === "draft");
         const selectedEnv = openEnvelopes.find(e => e.id === volcarTargetEnvelopeId);
         const updateEd = (i: number, patch: Partial<typeof volcarExpenseData[0]>) =>
           setVolcarExpenseData(prev => prev.map((ed, idx) => idx === i ? { ...ed, ...patch } : ed));
@@ -4103,7 +4275,7 @@ export default function BoxesPage() {
               {/* Header */}
               <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 flex-shrink-0">
                 <div>
-                  <h3 className="text-base font-semibold text-slate-900">Volcar a sobre de transferencia</h3>
+                  <h3 className="text-base font-semibold text-slate-900">Volcar a sobre de Petty Cash</h3>
                   {fs && <p className="text-xs text-slate-500 mt-0.5">{fs.requesterName} · {fs.expenseCount} gasto{fs.expenseCount !== 1 ? "s" : ""} · <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(fs.totalAmount)} €</strong></p>}
                 </div>
                 <button onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); }} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"><X size={18} /></button>
@@ -4117,7 +4289,7 @@ export default function BoxesPage() {
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Sobre de destino</label>
                   {openEnvelopes.length === 0 ? (
                     <div className="border border-amber-200 bg-amber-50 rounded-xl px-4 py-3 text-sm text-amber-700">
-                      No hay sobres abiertos. Crea uno en la pestaña de Transferencias primero.
+                      No hay sobres abiertos. Crea uno en la pestaña de Petty Cash primero.
                     </div>
                   ) : (
                     <div className="relative">
