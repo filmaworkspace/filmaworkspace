@@ -273,9 +273,12 @@ export default function Header() {
         {currentSection && (
           <>
             <span className="text-slate-300">/</span>
-            <span className={`font-medium uppercase ${SECTION_COLORS[currentSection] || "text-slate-600"}`}>
+            <Link
+              href={`/project/${projectId}/${currentSection}`}
+              className={`font-medium uppercase hover:opacity-70 transition-opacity ${SECTION_COLORS[currentSection] || "text-slate-600"}`}
+            >
               {SECTION_LABELS[currentSection] || currentSection}
-            </span>
+            </Link>
           </>
         )}
       </div>
