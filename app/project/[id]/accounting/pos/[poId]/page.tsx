@@ -66,12 +66,10 @@ import {
   XCircle,
 } from "lucide-react";
 
-// ─── Libraries ───────────────────────────────────────────────────────────────
-import jsPDF from "jspdf";
-
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { getCostSettings, shouldCommitPO } from "@/lib/budgetRules";
+import { FilmaPDF } from "@/lib/pdfBuilder";
 import { uncommitPO, closePoItem, reopenPoItem } from "@/lib/budgetOperations";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -720,62 +718,53 @@ export default function PODetailPage() {
 
   const generatePDF = () => {
     if (!po) return;
-    const pdf = new jsPDF("p", "mm", "a4");
-    const margin = 20;
-    let y = margin;
-    pdf.setFillColor(30, 41, 59);
-    pdf.rect(0, 0, pdf.internal.pageSize.getWidth(), 45, "F");
-    pdf.setTextColor(255);
-    pdf.setFontSize(24);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("ORDEN DE COMPRA", margin, 20);
-    pdf.setFontSize(32);
-    pdf.text("PO-" + po.number, margin, 35);
-    if (po.version > 1) {
-      pdf.setFontSize(12);
-      pdf.text("V" + String(po.version).padStart(2, "0"), margin + pdf.getTextWidth("PO-" + po.number) + 5, 35);
-    }
-    y = 55;
-    pdf.setFillColor(248, 250, 252);
-    pdf.roundedRect(margin, y, pdf.internal.pageSize.getWidth() - margin * 2, 25, 3, 3, "F");
-    pdf.setTextColor(100, 116, 139);
-    pdf.setFontSize(8);
-    pdf.text("PROVEEDOR", margin + 5, y + 8);
-    pdf.setTextColor(30, 41, 59);
-    pdf.setFontSize(12);
-    pdf.text(po.supplier, margin + 5, y + 18);
-    y += 35;
-    pdf.setFillColor(248, 250, 252);
-    pdf.roundedRect(margin, y, pdf.internal.pageSize.getWidth() - margin * 2, 25, 3, 3, "F");
-    pdf.setTextColor(100, 116, 139);
-    pdf.setFontSize(8);
-    pdf.text("IMPORTE TOTAL", margin + 5, y + 8);
-    pdf.setTextColor(30, 41, 59);
-    pdf.setFontSize(16);
-    pdf.text(formatCurrency(po.totalAmount) + " " + getCurrencySymbol(), margin + 5, y + 18);
-    y += 35;
-    pdf.setTextColor(30, 41, 59);
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("ITEMS (" + po.items.length + ")", margin, y);
-    y += 8;
-    po.items.forEach((item, index) => {
-      pdf.setFillColor(index % 2 === 0 ? 255 : 248, index % 2 === 0 ? 255 : 250, index % 2 === 0 ? 255 : 252);
-      pdf.roundedRect(margin, y, pdf.internal.pageSize.getWidth() - margin * 2, 12, 0, 0, "F");
-      pdf.setTextColor(30, 41, 59);
-      pdf.setFontSize(9);
-      pdf.setFont("helvetica", "normal");
-      pdf.text((item.description || "").substring(0, 50), margin + 5, y + 8);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(formatCurrency(item.totalAmount) + " " + getCurrencySymbol(), pdf.internal.pageSize.getWidth() - margin - 25, y + 8);
-      y += 12;
+    const currency = getCurrencySymbol();
+    const docNumber = "PO-" + po.number + (po.version > 1 ? " · V" + String(po.version).padStart(2, "0") : "");
+
+    const doc = new FilmaPDF({ accent: "accounting", docRef: docNumber });
+    doc.header({
+      eyebrow: "Accounting" + (projectName ? ` · ${projectName}` : ""),
+      title: "Orden de compra",
+      docNumber,
+      meta: config.label,
     });
-    y += 10;
-    pdf.setTextColor(100, 116, 139);
-    pdf.setFontSize(8);
-    pdf.setFont("helvetica", "normal");
-    pdf.text("Generado el " + formatDateTime(new Date()), margin, y);
-    pdf.save("PO-" + po.number + (po.version > 1 ? "-V" + String(po.version).padStart(2, "0") : "") + ".pdf");
+
+    doc.infoCards([
+      { label: "Proveedor", value: po.supplier },
+      { label: "Departamento", value: po.department || "—" },
+      { label: "Importe total", value: `${formatCurrency(po.totalAmount)} ${currency}`, big: true },
+    ]);
+
+    doc.sectionTitle("Items", po.items.length);
+    doc.table(
+      [
+        { label: "Descripción", width: 66 },
+        { label: "Cuenta", width: 28 },
+        { label: "Cant.", width: 18, align: "right" },
+        { label: "Precio", width: 27, align: "right" },
+        { label: "Total", width: 35, align: "right" },
+      ],
+      po.items.map((item) => [
+        item.description || "",
+        item.subAccountCode || "—",
+        String(item.quantity ?? 1),
+        `${formatCurrency(item.unitPrice)} ${currency}`,
+        `${formatCurrency(item.totalAmount)} ${currency}`,
+      ])
+    );
+
+    doc.totalsBlock([
+      { label: "Base imponible", value: `${formatCurrency(po.baseAmount)} ${currency}` },
+      { label: "IVA", value: `+${formatCurrency(po.vatAmount)} ${currency}` },
+      ...(po.irpfAmount ? [{ label: "IRPF", value: `-${formatCurrency(po.irpfAmount)} ${currency}` }] : []),
+      { label: "Total", value: `${formatCurrency(po.totalAmount)} ${currency}`, emphasis: true },
+    ]);
+
+    if (po.generalDescription?.trim()) doc.paragraph("Descripción general", po.generalDescription);
+    if (po.paymentTerms?.trim()) doc.paragraph("Condiciones de pago", po.paymentTerms);
+    if (po.notes?.trim()) doc.paragraph("Notas", po.notes);
+
+    doc.save(docNumber.replace(" · ", "-").replace(/\s/g, "") + ".pdf");
   };
 
   if (permissionsLoading || loading) {
