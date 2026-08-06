@@ -498,12 +498,11 @@ export default function BoxesPage() {
   const [showAddAdvanceModal, setShowAddAdvanceModal] = useState(false);
   const [advanceForm, setAdvanceForm] = useState({
     amount: "", method: "bank" as "bank" | "cash", date: new Date().toISOString().slice(0, 10),
-    proofFile: null as File | null,
+    iban: "", proofFile: null as File | null,
   });
   const [addingAdvance, setAddingAdvance] = useState(false);
   const [transferEnvelopeForm, setTransferEnvelopeForm] = useState({
-    paymentDate: "", notes: "",
-    personName: "", personDepartment: "", personIban: "",
+    notes: "", personName: "", personDepartment: "",
   });
   const [expensesList, setExpensesList] = useState<Array<{
     id: string; type: "invoice" | "ticket"; supplier: string; supplierTaxId: string;
@@ -1751,25 +1750,23 @@ export default function BoxesPage() {
   // ─────────────────────────────────────────────────────────────────────────────
 
   const emptyTransferEnvelopeForm = {
-    paymentDate: "", notes: "",
-    personName: "", personDepartment: "", personIban: "",
+    notes: "", personName: "", personDepartment: "",
   };
 
   const handleCreateTransferEnvelope = async () => {
     if (!transferEnvelopeForm.personName.trim()) return showToast("error", "Nombre de la persona obligatorio");
-    if (!transferEnvelopeForm.paymentDate.trim()) return showToast("error", "Fecha obligatoria");
     setSaving(true);
     try {
       const num = nextTransferNumber;
       const displayNumber = `PC-${String(num).padStart(3, "0")}`;
       await addDoc(collection(db, `projects/${projectId}/transferEnvelopes`), {
         number: num, displayNumber,
-        paymentDate: transferEnvelopeForm.paymentDate.trim(),
+        paymentDate: "",
         status: "draft", totalBase: 0, totalVat: 0, totalAmount: 0, expenseCount: 0,
         notes: transferEnvelopeForm.notes.trim() || "",
         personName: transferEnvelopeForm.personName.trim(),
         personDepartment: transferEnvelopeForm.personDepartment || "",
-        personIban: transferEnvelopeForm.personIban.trim() || "",
+        personIban: "",
         advances: [],
         createdAt: Timestamp.now(), createdBy: userId, createdByName: userName,
       });
@@ -1801,12 +1798,14 @@ export default function BoxesPage() {
         proofUrl, proofFileName: advanceForm.proofFile.name,
         addedAt: new Date(), addedBy: userId || "", addedByName: userName,
       };
-      await updateDoc(doc(db, `projects/${projectId}/transferEnvelopes`, selectedTransferEnvelope.id), {
-        advances: [...selectedTransferEnvelope.advances, { ...entry, addedAt: Timestamp.now() }],
-      });
+      const updates: any = { advances: [...selectedTransferEnvelope.advances, { ...entry, addedAt: Timestamp.now() }] };
+      if (advanceForm.method === "bank" && advanceForm.iban.trim()) {
+        updates.personIban = advanceForm.iban.trim();
+      }
+      await updateDoc(doc(db, `projects/${projectId}/transferEnvelopes`, selectedTransferEnvelope.id), updates);
       showToast("success", "Anticipo añadido");
       setShowAddAdvanceModal(false);
-      setAdvanceForm({ amount: "", method: "bank", date: new Date().toISOString().slice(0, 10), proofFile: null });
+      setAdvanceForm({ amount: "", method: "bank", date: new Date().toISOString().slice(0, 10), iban: "", proofFile: null });
       loadData();
     } catch (e) { console.error(e); showToast("error", "Error al añadir el anticipo"); } finally { setAddingAdvance(false); }
   };
@@ -1956,7 +1955,7 @@ export default function BoxesPage() {
     const diff = Math.round((envelope.totalAmount - getTotalAdvance(envelope)) * 100) / 100;
     if (diff > 0) return { diff, direction: "production_to_person" as const, label: `La productora paga a ${envelope.personName}` };
     if (diff < 0) return { diff: Math.abs(diff), direction: "person_to_production" as const, label: `${envelope.personName} devuelve a la productora` };
-    return { diff: 0, direction: "none" as const, label: "Sin movimiento — el anticipo cubre exactamente el gasto" };
+    return { diff: 0, direction: "none" as const, label: "Sin movimiento" };
   };
 
   const handleSettleEnvelope = async () => {
@@ -2102,13 +2101,6 @@ export default function BoxesPage() {
                   </>
                 )}
               </div>
-              {mainTab === "transfers" && (
-                <button
-                  onClick={() => { setBoxFormRequesterName(""); setBoxFormMessage(""); setBoxFormTargetEnvelopeId(""); setGeneratedBoxResult(null); setShowSendBoxFormModal(true); }}
-                  className="flex items-center gap-2 px-3 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
-                  <Link2 size={14} /> Enviar solicitud
-                </button>
-              )}
               <button
                 onClick={() => setShowExportConfigModal(true)}
                 title="Configurar exportación a servicio de tarjetas"
@@ -2273,7 +2265,11 @@ export default function BoxesPage() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSelected ? "bg-white/20" : envelope.status === "settled" ? "bg-emerald-50" : "bg-slate-100"}`}>
-                              <Calendar size={16} className={isSelected ? "text-white" : envelope.status === "settled" ? "text-emerald-500" : "text-slate-400"} />
+                              {envelope.status === "settled" ? (
+                                <Lock size={16} className={isSelected ? "text-white" : "text-emerald-500"} />
+                              ) : (
+                                <Calendar size={16} className={isSelected ? "text-white" : "text-slate-400"} />
+                              )}
                             </div>
                             <div>
                               <p className={`text-sm font-medium ${isSelected ? "text-white" : "text-slate-900"}`}>{envelope.displayNumber}</p>
@@ -2588,14 +2584,14 @@ export default function BoxesPage() {
                     {selectedTransferEnvelope.status === "draft" && (
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => { setAdvanceForm({ amount: "", method: "bank", date: new Date().toISOString().slice(0, 10), proofFile: null }); setShowAddAdvanceModal(true); }}
+                          onClick={() => { setAdvanceForm({ amount: "", method: "bank", date: new Date().toISOString().slice(0, 10), iban: "", proofFile: null }); setShowAddAdvanceModal(true); }}
                           className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
                           <Banknote size={16} /> Añadir anticipo
                         </button>
                         <button
                           onClick={() => { setBoxFormRequesterName(selectedTransferEnvelope.personName); setBoxFormMessage(""); setBoxFormTargetEnvelopeId(selectedTransferEnvelope.id); setGeneratedBoxResult(null); setShowSendBoxFormModal(true); }}
                           className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
-                          <Link2 size={16} /> Solicitar tickets
+                          <Link2 size={16} /> Enviar solicitud
                         </button>
                         <button
                           onClick={() => { setExpensesList([createEmptyExpense()]); setShowAddExpenseModal(true); }}
@@ -3855,53 +3851,26 @@ export default function BoxesPage() {
                     onChange={e => setTransferEnvelopeForm({ ...transferEnvelopeForm, personName: e.target.value })}
                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div ref={expenseDepartmentDropdownRef} className="relative">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Departamento</label>
-                    <button type="button" onClick={() => setShowExpenseDepartmentDropdown(!showExpenseDepartmentDropdown)}
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between bg-white hover:border-slate-300">
-                      <span className={transferEnvelopeForm.personDepartment ? "text-slate-900" : "text-slate-400"}>{transferEnvelopeForm.personDepartment || "Seleccionar"}</span>
-                      <ChevronDown size={16} className="text-slate-400" />
-                    </button>
-                    {showExpenseDepartmentDropdown && (
-                      <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
-                        <button type="button" onClick={() => { setTransferEnvelopeForm({ ...transferEnvelopeForm, personDepartment: "" }); setShowExpenseDepartmentDropdown(false); }}
-                          className="w-full px-4 py-2 text-left text-sm text-slate-400 hover:bg-slate-50">Sin departamento</button>
-                        {departments.map(d => (
-                          <button key={d} type="button" onClick={() => { setTransferEnvelopeForm({ ...transferEnvelopeForm, personDepartment: d }); setShowExpenseDepartmentDropdown(false); }}
-                            className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50">{d}</button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">IBAN</label>
-                    <input type="text" value={transferEnvelopeForm.personIban}
-                      onChange={e => setTransferEnvelopeForm({ ...transferEnvelopeForm, personIban: formatIban(e.target.value) })}
-                      placeholder="ES00 0000 0000 0000 0000 0000"
-                      className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 font-mono text-sm bg-white transition-colors ${
-                        transferEnvelopeForm.personIban && !validateIban(transferEnvelopeForm.personIban) ? "border-red-300 focus:ring-red-400"
-                          : transferEnvelopeForm.personIban && validateIban(transferEnvelopeForm.personIban) ? "border-emerald-300 focus:ring-emerald-400"
-                          : "border-slate-200 focus:ring-slate-900"
-                      }`} />
-                  </div>
+                <div ref={expenseDepartmentDropdownRef} className="relative">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Departamento</label>
+                  <button type="button" onClick={() => setShowExpenseDepartmentDropdown(!showExpenseDepartmentDropdown)}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between bg-white hover:border-slate-300">
+                    <span className={transferEnvelopeForm.personDepartment ? "text-slate-900" : "text-slate-400"}>{transferEnvelopeForm.personDepartment || "Seleccionar"}</span>
+                    <ChevronDown size={16} className="text-slate-400" />
+                  </button>
+                  {showExpenseDepartmentDropdown && (
+                    <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                      <button type="button" onClick={() => { setTransferEnvelopeForm({ ...transferEnvelopeForm, personDepartment: "" }); setShowExpenseDepartmentDropdown(false); }}
+                        className="w-full px-4 py-2 text-left text-sm text-slate-400 hover:bg-slate-50">Sin departamento</button>
+                      {departments.map(d => (
+                        <button key={d} type="button" onClick={() => { setTransferEnvelopeForm({ ...transferEnvelopeForm, personDepartment: d }); setShowExpenseDepartmentDropdown(false); }}
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50">{d}</button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl">
-                <p className="text-xs text-amber-700">
-                  El anticipo (si lo hay) se añade después, desde dentro del sobre — así puedes ir sumando
-                  más de uno si hace falta (p. ej. 500€ al principio y otros 200€ más adelante) antes de liquidar.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Fecha prevista de liquidación *</label>
-                <input type="text" value={transferEnvelopeForm.paymentDate}
-                  onChange={e => setTransferEnvelopeForm({ ...transferEnvelopeForm, paymentDate: e.target.value })}
-                  placeholder="DD/MM/YYYY"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
-              </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Notas</label>
                 <textarea value={transferEnvelopeForm.notes}
@@ -3912,7 +3881,7 @@ export default function BoxesPage() {
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 flex-shrink-0">
               <button onClick={() => setShowCreateTransferEnvelopeModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
-              <button onClick={handleCreateTransferEnvelope} disabled={saving || !transferEnvelopeForm.paymentDate.trim() || !transferEnvelopeForm.personName.trim()}
+              <button onClick={handleCreateTransferEnvelope} disabled={saving || !transferEnvelopeForm.personName.trim()}
                 className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
                 {saving ? "Creando..." : "Crear sobre"}
               </button>
@@ -4178,6 +4147,19 @@ export default function BoxesPage() {
                   onChange={e => setAdvanceForm({ ...advanceForm, date: e.target.value })}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
               </div>
+              {advanceForm.method === "bank" && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">IBAN de {selectedTransferEnvelope.personName} (opcional)</label>
+                  <input type="text" value={advanceForm.iban}
+                    onChange={e => setAdvanceForm({ ...advanceForm, iban: formatIban(e.target.value) })}
+                    placeholder="ES00 0000 0000 0000 0000 0000"
+                    className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 font-mono text-xs whitespace-nowrap transition-colors ${
+                      advanceForm.iban && !validateIban(advanceForm.iban) ? "border-red-300 focus:ring-red-400"
+                        : advanceForm.iban && validateIban(advanceForm.iban) ? "border-emerald-300 focus:ring-emerald-400"
+                        : "border-slate-200 focus:ring-slate-900"
+                    }`} />
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   {advanceForm.method === "cash" ? "Recibí firmado *" : "Comprobante de transferencia *"}

@@ -117,6 +117,7 @@ interface ExpenseItem {
   fileName?: string;
   uploading?: boolean;
   uploadProgress?: number;
+  uploadError?: string;
 }
 
 // ─── Resguardo PDF ────────────────────────────────────────────────────────────
@@ -392,16 +393,22 @@ function ExpenseUploadRow({ expense, formId, onChange, onRemove }: {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = (file: File) => {
-    if (file.size > 10 * 1024 * 1024) return;
-    onChange(expense.localId, { uploading: true, uploadProgress: 0 });
+    if (file.size > 10 * 1024 * 1024) {
+      onChange(expense.localId, { uploadError: "El archivo pesa más de 10 MB" });
+      return;
+    }
+    onChange(expense.localId, { uploading: true, uploadProgress: 0, uploadError: undefined });
     const storageRef = ref(storage, `forms/${formId}/expenses/${expense.localId}_${Date.now()}_${file.name}`);
     const task = uploadBytesResumable(storageRef, file);
     task.on("state_changed",
       (s) => onChange(expense.localId, { uploadProgress: Math.round((s.bytesTransferred / s.totalBytes) * 100) }),
-      () => onChange(expense.localId, { uploading: false }),
+      (err) => {
+        console.error(err);
+        onChange(expense.localId, { uploading: false, uploadProgress: undefined, uploadError: "No se pudo subir el archivo, inténtalo de nuevo" });
+      },
       async () => {
         const url = await getDownloadURL(task.snapshot.ref);
-        onChange(expense.localId, { fileUrl: url, fileName: file.name, uploading: false, uploadProgress: undefined });
+        onChange(expense.localId, { fileUrl: url, fileName: file.name, uploading: false, uploadProgress: undefined, uploadError: undefined });
       }
     );
   };
@@ -451,12 +458,17 @@ function ExpenseUploadRow({ expense, formId, onChange, onRemove }: {
           </div>
         ) : (
           <button type="button" onClick={() => inputRef.current?.click()}
-            className="flex-1 flex items-center gap-2 px-3 py-2 border border-dashed border-stone-300 rounded-lg text-sm text-stone-400 hover:border-stone-500 hover:text-stone-600 transition-all">
+            className={`flex-1 flex items-center gap-2 px-3 py-2 border border-dashed rounded-lg text-sm transition-all ${
+              expense.uploadError ? "border-red-300 text-red-500 hover:border-red-400" : "border-stone-300 text-stone-400 hover:border-stone-500 hover:text-stone-600"
+            }`}>
             <Upload size={13} />
             <span className="text-xs">Adjuntar justificante</span>
           </button>
         )}
       </div>
+      {expense.uploadError && (
+        <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={11} /> {expense.uploadError}</p>
+      )}
       <input ref={inputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
     </div>
@@ -1065,7 +1077,8 @@ export default function FormPage() {
 
   if (formDoc?.type === "box_request") {
     const total = expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
-    const canSubmit = expenses.length > 0 && expenses.every((e) => e.description.trim() && e.amount);
+    const canSubmit = expenses.length > 0 && expenses.every((e) => e.description.trim() && e.amount && !e.uploading);
+    const stillUploading = expenses.some((e) => e.uploading);
 
     return (
       <div className="min-h-screen" style={{ backgroundColor: "#FAF8F5" }}>
@@ -1159,6 +1172,8 @@ export default function FormPage() {
             style={{ backgroundColor: D }}>
             {boxSubmitting
               ? <span className="flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> Enviando…</span>
+              : stillUploading
+              ? <span className="flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> Subiendo archivos…</span>
               : `Enviar solicitud · ${total.toFixed(2)} €`}
           </button>
 
