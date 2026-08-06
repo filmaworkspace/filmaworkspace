@@ -248,6 +248,17 @@ export default function Header() {
     </Link>
   );
 
+  const SECTION_COLORS: Record<string, string> = {
+    accounting: "text-[#2F52E0]",
+    team: "text-[#6BA319]",
+    config: "text-slate-600",
+  };
+  const SECTION_LABELS: Record<string, string> = {
+    accounting: "Accounting",
+    team: "Team",
+    config: "Config",
+  };
+
   const ProjectBadge = () => {
     if (!isInProjectSection || !projectId || !projectName) return null;
     return (
@@ -259,6 +270,14 @@ export default function Header() {
         >
           {projectName}
         </Link>
+        {currentSection && (
+          <>
+            <span className="text-slate-300">/</span>
+            <span className={`font-medium uppercase ${SECTION_COLORS[currentSection] || "text-slate-600"}`}>
+              {SECTION_LABELS[currentSection] || currentSection}
+            </span>
+          </>
+        )}
       </div>
     );
   };
@@ -276,7 +295,7 @@ export default function Header() {
   };
 
   return (
-    <header className={`fixed top-0 left-0 w-full z-50 bg-white border-b border-slate-200 ${inter.className}`}>
+    <header className={`fixed top-0 left-0 w-full z-50 bg-white border-b border-slate-200 print:hidden ${inter.className}`}>
       <div className="px-6 py-2.5 flex items-center justify-between">
 
         {/* Left: Logo + badge */}

@@ -56,11 +56,8 @@ export default function MaintenanceGate({
     return (
       <div className={`min-h-screen flex items-center justify-center bg-slate-50 px-6 ${inter.className}`}>
         <div className="max-w-md w-full text-center">
-          <div className="flex justify-center mb-6">
+          <div className="flex justify-center mb-8">
             <Image src="/logodark.svg" alt="Filma Workspace" width={160} height={38} priority />
-          </div>
-          <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
-            <Wrench size={28} className="text-amber-600" />
           </div>
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Filma Workspace está en mantenimiento</h1>
           <p className="text-sm text-slate-500">
@@ -84,7 +81,7 @@ export default function MaintenanceGate({
       {maintenance.enabled && !isActive && startAtMs !== null && (
         <div className="fixed bottom-0 left-0 w-full z-[70] bg-amber-500 text-white text-sm font-medium px-4 py-3 flex items-center justify-center gap-2 text-center shadow-lg">
           <AlertTriangle size={15} className="flex-shrink-0" />
-          Filma Workspace entrará en mantenimiento en {formatCountdown(startAtMs - now)} — guarda tus cambios antes de que acabe la cuenta atrás.
+          Filma Workspace entrará en mantenimiento en {formatCountdown(startAtMs - now)} · guarda tus cambios antes de que acabe la cuenta atrás.
         </div>
       )}
 
@@ -93,7 +90,7 @@ export default function MaintenanceGate({
       {isActive && isAdmin && (
         <div className="fixed bottom-0 left-0 w-full z-[70] bg-red-600 text-white text-sm font-medium px-4 py-3 flex items-center justify-center gap-2 text-center shadow-lg">
           <Wrench size={15} className="flex-shrink-0" />
-          Mantenimiento activo — el resto de usuarios no puede entrar. Desactívalo desde AdminDashboard cuando termines.
+          Mantenimiento activo · el resto de usuarios no puede entrar. Desactívalo desde AdminDashboard cuando termines.
         </div>
       )}
     </div>
