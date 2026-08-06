@@ -668,10 +668,10 @@ export default function PayrollPage() {
       {/* ── Controls bar ─────────────────────────────────────────────────── */}
       <div className="px-24 pb-4 flex flex-wrap items-center gap-3">
         {/* Month nav */}
-        <div className="flex items-center border border-slate-200 rounded-xl p-0.5">
-          <button onClick={prevM} className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"><ChevronLeft size={15} /></button>
-          <span className="px-3 text-sm font-semibold text-slate-900 min-w-[130px] text-center">{MONTH_NAMES[month]} {year}</span>
-          <button onClick={nextM} className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"><ChevronRight size={15} /></button>
+        <div className="flex items-center gap-3">
+          <button onClick={prevM} className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"><ChevronLeft size={16} /></button>
+          <h2 className="text-xl font-bold text-slate-900 min-w-[220px] text-center">{MONTH_NAMES[month]} {year}</h2>
+          <button onClick={nextM} className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"><ChevronRight size={16} /></button>
         </div>
 
         {/* View */}

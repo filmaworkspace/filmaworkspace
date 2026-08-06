@@ -79,10 +79,13 @@ interface CrewMember {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-function addDays(dateStr: string, n: number): string {
-  const d = new Date(dateStr);
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+const MONTH_NAMES = [
+  "Enero","Febrero","Marzo","Abril","Mayo","Junio",
+  "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre",
+];
+
+function ymd(year: number, month: number, day: number): string {
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
 function formatShort(dateStr: string): string {
@@ -100,8 +103,6 @@ function formatTime(ts: Timestamp | null | undefined): string {
   return new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }).format(ts.toDate());
 }
 
-const DAYS_WINDOW = 14; // show 14 days around today
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ControlHorarioPage() {
@@ -115,6 +116,8 @@ export default function ControlHorarioPage() {
   const [crew,       setCrew]       = useState<CrewMember[]>([]);
   const [groups,     setGroups]     = useState<Group[]>([]);
   const [selectedDate, setSelectedDate] = useState(today());
+  const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
+  const [currentYear,  setCurrentYear]  = useState(() => new Date().getFullYear());
 
   // UI state
   const [showConfig,     setShowConfig]     = useState(false);
@@ -159,6 +162,18 @@ export default function ControlHorarioPage() {
     return () => unsub();
   }, [id]);
 
+  useEffect(() => { if (!loading) loadDays(); }, [currentMonth, currentYear]);
+
+  const navMonth = (dir: 1 | -1) => {
+    let m = currentMonth + dir;
+    let y = currentYear;
+    if (m < 0) { m = 11; y--; }
+    if (m > 11) { m = 0; y++; }
+    setCurrentMonth(m);
+    setCurrentYear(y);
+    setSelectedDate(y === new Date().getFullYear() && m === new Date().getMonth() ? today() : ymd(y, m, 1));
+  };
+
   const showToast = (type: "success" | "error", msg: string) => {
     setToast({ type, msg });
     setTimeout(() => setToast(null), 3000);
@@ -198,8 +213,9 @@ export default function ControlHorarioPage() {
     const daysMap: Record<string, DayConfig> = {};
     const formsMap: Record<string, FormResponse[]> = {};
 
-    const start = addDays(today(), -7);
-    const end   = addDays(today(), DAYS_WINDOW);
+    const daysInSelectedMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const start = ymd(currentYear, currentMonth, 1);
+    const end   = ymd(currentYear, currentMonth, daysInSelectedMonth);
 
     // Days stored as docs in projects/{id}/horario collection, docId = date
     const daysSnap = await getDocs(collection(db, `projects/${id}/horario`));
@@ -534,8 +550,9 @@ export default function ControlHorarioPage() {
   // ── Date strip ────────────────────────────────────────────────────────────
 
   const dateStrip: string[] = [];
-  for (let i = -3; i <= DAYS_WINDOW; i++) {
-    dateStrip.push(addDays(today(), i));
+  const daysInSelectedMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  for (let d = 1; d <= daysInSelectedMonth; d++) {
+    dateStrip.push(ymd(currentYear, currentMonth, d));
   }
 
   const getDayStatus = (date: string) => {
@@ -588,6 +605,25 @@ export default function ControlHorarioPage() {
       </div>
 
       <main className="px-24 pb-16">
+
+        {/* ── Month nav ──────────────────────────────────────────────────── */}
+        <div className="flex items-center gap-3 mb-6">
+          <button
+            onClick={() => navMonth(-1)}
+            className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <h2 className="text-xl font-bold text-slate-900 min-w-[220px] text-center">
+            {MONTH_NAMES[currentMonth]} {currentYear}
+          </h2>
+          <button
+            onClick={() => navMonth(1)}
+            className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
 
         {/* ── Day strip ──────────────────────────────────────────────────── */}
         <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2">

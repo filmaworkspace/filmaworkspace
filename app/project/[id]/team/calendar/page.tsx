@@ -46,6 +46,7 @@ import {
   X,
   Calendar,
   Filter,
+  Printer,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -493,7 +494,9 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
+          <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2 print:hidden">
+            <div />
+            <div className="flex items-center justify-center gap-2 flex-wrap">
               {/* Filter */}
               <div className="relative" ref={filterRef}>
                 <button
@@ -557,7 +560,16 @@ export default function CalendarPage() {
               >
                 Hoy
               </button>
+            </div>
 
+            <div className="flex justify-end items-center gap-2">
+              <button
+                onClick={() => window.print()}
+                title="Descargar / imprimir en PDF"
+                className="p-2.5 border border-slate-200 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                <Printer size={16} />
+              </button>
               <button
                 onClick={() => openCreate()}
                 className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
@@ -566,6 +578,7 @@ export default function CalendarPage() {
                 <Plus size={15} />
                 Nuevo evento
               </button>
+            </div>
           </div>
         </div>
       </div>
@@ -578,7 +591,7 @@ export default function CalendarPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => viewMode === "month" ? navMonth(-1) : navWeek(-1)}
-              className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+              className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors print:hidden"
             >
               <ChevronLeft size={16} />
             </button>
@@ -595,14 +608,14 @@ export default function CalendarPage() {
             </h2>
             <button
               onClick={() => viewMode === "month" ? navMonth(1) : navWeek(1)}
-              className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+              className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors print:hidden"
             >
               <ChevronRight size={16} />
             </button>
           </div>
 
           {/* Crew stats strip */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 print:hidden">
             {(["technical","cast","specialists"] as CrewSection[]).map((sec) => {
               const count = crew.filter((m) => m.section === sec && m.status === "active").length;
               const colors: Record<CrewSection,string> = { technical: "text-sky-600 bg-sky-50", cast: "text-violet-600 bg-violet-50", specialists: "text-amber-600 bg-amber-50" };
@@ -976,6 +989,10 @@ export default function CalendarPage() {
             })()}
           </div>
         )}
+
+        <p className="hidden print:block text-center text-[10px] text-slate-400 mt-8">
+          Hecho con Filma Workspace
+        </p>
 
       </main>
 
