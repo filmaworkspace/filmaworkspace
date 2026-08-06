@@ -100,6 +100,7 @@ export default function ConfigUsers() {
   const [editPermissions, setEditPermissions] = useState({ config: false, accounting: false, team: false });
   const [departmentDropdownOpen, setDepartmentDropdownOpen] = useState(false);
   const departmentDropdownRef = useRef<HTMLDivElement>(null);
+  const [departmentDropdownPos, setDepartmentDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const [inviteForm, setInviteForm] = useState({
     email: "",
     name: "",
@@ -659,7 +660,13 @@ export default function ConfigUsers() {
                     <div className="relative" ref={departmentDropdownRef}>
                       <button
                         type="button"
-                        onClick={() => setDepartmentDropdownOpen(!departmentDropdownOpen)}
+                        onClick={() => {
+                          if (!departmentDropdownOpen && departmentDropdownRef.current) {
+                            const rect = departmentDropdownRef.current.getBoundingClientRect();
+                            setDepartmentDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+                          }
+                          setDepartmentDropdownOpen(!departmentDropdownOpen);
+                        }}
                         className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 transition-colors"
                       >
                         <span className={inviteForm.department ? "text-slate-900" : "text-slate-400"}>
@@ -667,8 +674,9 @@ export default function ConfigUsers() {
                         </span>
                         <ChevronDown size={16} className={`text-slate-400 transition-transform ${departmentDropdownOpen ? "rotate-180" : ""}`} />
                       </button>
-                      {departmentDropdownOpen && (
-                        <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                      {departmentDropdownOpen && departmentDropdownPos && (
+                        <div className="fixed z-20 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto"
+                          style={{ top: departmentDropdownPos.top, left: departmentDropdownPos.left, width: departmentDropdownPos.width }}>
                           {departments.length > 0 ? (
                             departments.map((d) => (
                               <button

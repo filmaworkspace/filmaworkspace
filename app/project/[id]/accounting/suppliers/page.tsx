@@ -241,8 +241,10 @@ export default function SuppliersPage() {
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const [showPaymentMethodDropdown, setShowPaymentMethodDropdown] = useState(false);
   const paymentMethodDropdownRef = useRef<HTMLDivElement>(null);
+  const [paymentMethodDropdownPos, setPaymentMethodDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const countryDropdownRef = useRef<HTMLDivElement>(null);
+  const [countryDropdownPos, setCountryDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const [countrySearch, setCountrySearch] = useState("");
 
   const [formData, setFormData] = useState({
@@ -831,14 +833,21 @@ export default function SuppliersPage() {
                       <label className="block text-sm font-medium text-slate-700 mb-2">País</label>
                       <button
                         type="button"
-                        onClick={() => { setShowCountryDropdown(!showCountryDropdown); setCountrySearch(""); }}
+                        onClick={() => {
+                          if (!showCountryDropdown && countryDropdownRef.current) {
+                            const rect = countryDropdownRef.current.getBoundingClientRect();
+                            setCountryDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+                          }
+                          setShowCountryDropdown(!showCountryDropdown); setCountrySearch("");
+                        }}
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between hover:border-slate-300 transition-colors"
                       >
                         <span className="text-slate-900">{getCountryInfo(formData.country).name}</span>
                         <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showCountryDropdown ? "rotate-180" : "")} />
                       </button>
-                      {showCountryDropdown && (
-                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                      {showCountryDropdown && countryDropdownPos && (
+                        <div className="fixed z-20 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden"
+                          style={{ top: countryDropdownPos.top, left: countryDropdownPos.left, width: countryDropdownPos.width }}>
                           <div className="p-2 border-b border-slate-100">
                             <input
                               type="text"
@@ -939,14 +948,21 @@ export default function SuppliersPage() {
                       <label className="block text-sm font-medium text-slate-700 mb-2">Método de pago</label>
                       <button
                         type="button"
-                        onClick={() => setShowPaymentMethodDropdown(!showPaymentMethodDropdown)}
+                        onClick={() => {
+                          if (!showPaymentMethodDropdown && paymentMethodDropdownRef.current) {
+                            const rect = paymentMethodDropdownRef.current.getBoundingClientRect();
+                            setPaymentMethodDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+                          }
+                          setShowPaymentMethodDropdown(!showPaymentMethodDropdown);
+                        }}
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between hover:border-slate-300 transition-colors"
                       >
                         <span className="text-slate-900">{PAYMENT_METHODS.find(m => m.value === formData.paymentMethod)?.label}</span>
                         <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showPaymentMethodDropdown ? "rotate-180" : "")} />
                       </button>
-                      {showPaymentMethodDropdown && (
-                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                      {showPaymentMethodDropdown && paymentMethodDropdownPos && (
+                        <div className="fixed z-20 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto"
+                          style={{ top: paymentMethodDropdownPos.top, left: paymentMethodDropdownPos.left, width: paymentMethodDropdownPos.width }}>
                           {PAYMENT_METHODS.map((method) => (
                             <button
                               key={method.value}

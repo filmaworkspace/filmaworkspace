@@ -252,6 +252,7 @@ export default function PaymentsPage() {
   }, [userId, id]);
 
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [openDropdownPos, setOpenDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -1135,7 +1136,12 @@ export default function PaymentsPage() {
                   <div className="relative custom-dropdown">
                     <button
                       type="button"
-                      onClick={() => setOpenDropdown(openDropdown === "invoiceSelect" ? null : "invoiceSelect")}
+                      onClick={(e) => {
+                        if (openDropdown === "invoiceSelect") { setOpenDropdown(null); return; }
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setOpenDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+                        setOpenDropdown("invoiceSelect");
+                      }}
                       className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors"
                     >
                       <span className="text-slate-900 truncate">
@@ -1145,8 +1151,9 @@ export default function PaymentsPage() {
                       </span>
                       <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === "invoiceSelect" ? "rotate-180" : ""}`} />
                     </button>
-                    {openDropdown === "invoiceSelect" && (
-                      <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                    {openDropdown === "invoiceSelect" && openDropdownPos && (
+                      <div className="fixed z-30 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto"
+                        style={{ top: openDropdownPos.top, left: openDropdownPos.left, width: openDropdownPos.width }}>
                         <button
                           type="button"
                           onClick={() => { setNewPayment({ ...newPayment, invoiceId: "" }); setOpenDropdown(null); }}

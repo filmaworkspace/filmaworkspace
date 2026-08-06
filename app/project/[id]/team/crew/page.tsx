@@ -2,6 +2,7 @@
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
 import { inter } from "@/lib/fonts";
 
@@ -140,6 +141,7 @@ function CustomSelect({
   placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const selected = options.find((o) => o.value === value);
 
@@ -151,11 +153,19 @@ function CustomSelect({
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
+  const toggle = () => {
+    if (!open && ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      setPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    }
+    setOpen(!open);
+  };
+
   return (
     <div className="relative" ref={ref}>
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
         className="w-full flex items-center justify-between px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#6BA319] hover:border-slate-300 transition-colors"
       >
         <span className={selected ? "text-slate-900" : "text-slate-400"}>
@@ -163,8 +173,11 @@ function CustomSelect({
         </span>
         <ChevronDown size={14} className={`text-slate-400 transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <div className="absolute z-[200] top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+      {open && pos && typeof document !== "undefined" && createPortal(
+        <div
+          className="fixed z-[200] bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto"
+          style={{ top: pos.top, left: pos.left, width: pos.width }}
+        >
           {options.map((o) => (
             <button
               key={o.value} type="button"
@@ -177,7 +190,8 @@ function CustomSelect({
               {value === o.value && <Check size={13} className="text-[#6BA319]" />}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -195,6 +209,7 @@ function DepartmentSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState(value);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const filtered = q ? options.filter((o) => o.toLowerCase().includes(q.toLowerCase())) : options;
 
@@ -211,17 +226,28 @@ function DepartmentSelect({
     return () => document.removeEventListener("mousedown", h);
   }, [q, options, onChange]);
 
+  const openDropdown = () => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      setPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    }
+    setOpen(true);
+  };
+
   return (
     <div className="relative" ref={ref}>
       <input
         type="text" value={q} placeholder={placeholder}
-        onFocus={() => setOpen(true)}
-        onChange={(e) => { setQ(e.target.value); onChange(e.target.value); setOpen(true); }}
+        onFocus={openDropdown}
+        onChange={(e) => { setQ(e.target.value); onChange(e.target.value); openDropdown(); }}
         className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319] pr-8 bg-white"
       />
       <ChevronDown size={14} className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
-      {open && filtered.length > 0 && (
-        <div className="absolute z-[200] top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+      {open && filtered.length > 0 && pos && typeof document !== "undefined" && createPortal(
+        <div
+          className="fixed z-[200] bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto"
+          style={{ top: pos.top, left: pos.left, width: pos.width }}
+        >
           {filtered.map((opt) => (
             <button
               key={opt} type="button"
@@ -234,7 +260,8 @@ function DepartmentSelect({
               {value === opt && <Check size={13} className="text-[#6BA319]" />}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

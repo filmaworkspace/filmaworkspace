@@ -1086,7 +1086,7 @@ export default function EditPOPage() {
 
 
             {/* Items */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-visible">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <h2 className="font-semibold text-slate-900">Items</h2>

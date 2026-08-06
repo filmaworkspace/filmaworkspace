@@ -414,6 +414,7 @@ export default function BoxesPage() {
   }>>([]);
   const [manualExpenseSaving, setManualExpenseSaving] = useState(false);
   const [showCardTypeDropdown, setShowCardTypeDropdown] = useState<number | null>(null);
+  const [cardTypeDropdownPos, setCardTypeDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const [showCardAccountSelector, setShowCardAccountSelector] = useState(false);
   const [cardAccountSearch, setCardAccountSearch] = useState("");
   const [cardAccountSelectorPos, setCardAccountSelectorPos] = useState<{ top: number; left: number } | null>(null);
@@ -486,6 +487,8 @@ export default function BoxesPage() {
     }>;
   }>>([]);
   const [showVolcarSupplierDropdown, setShowVolcarSupplierDropdown] = useState<number | null>(null);
+  const [volcarSupplierDropdownPos, setVolcarSupplierDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [volcarAccountDropdownPos, setVolcarAccountDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
   // TRANSFERS State
   const [transferEnvelopes, setTransferEnvelopes] = useState<TransferEnvelope[]>([]);
@@ -519,6 +522,9 @@ export default function BoxesPage() {
   const [accountSelectorPos, setAccountSelectorPos] = useState<{ top: number; left: number } | null>(null);
   const [editingExpenseIndex, setEditingExpenseIndex] = useState<number | null>(null);
   const [showTypeDropdown, setShowTypeDropdown] = useState<number | null>(null);
+  const [typeDropdownPos, setTypeDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [showExpenseSupplierDropdown, setShowExpenseSupplierDropdown] = useState<number | null>(null);
+  const [expenseSupplierDropdownPos, setExpenseSupplierDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const departmentDropdownRef = useRef<HTMLDivElement>(null);
   const expenseDepartmentDropdownRef = useRef<HTMLDivElement>(null);
   const accountSelectorRef = useRef<HTMLDivElement>(null);
@@ -3496,15 +3502,21 @@ export default function BoxesPage() {
                       <div className="grid grid-cols-12 gap-3">
                         <div className="col-span-2 relative">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
-                          <button type="button" onClick={() => setShowCardTypeDropdown(showCardTypeDropdown === idx ? null : idx)}
+                          <button type="button" onClick={(e) => {
+                            if (showCardTypeDropdown === idx) { setShowCardTypeDropdown(null); return; }
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setCardTypeDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+                            setShowCardTypeDropdown(idx);
+                          }}
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm flex items-center justify-between hover:border-slate-300">
                             <span className="flex items-center gap-1.5">
                               {exp.type === "ticket" ? <><Receipt size={13} className="text-amber-500" /> Ticket</> : <><FileText size={13} className="text-blue-500" /> Factura</>}
                             </span>
                             <ChevronDown size={13} className="text-slate-400" />
                           </button>
-                          {showCardTypeDropdown === idx && (
-                            <div className="absolute z-50 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                          {showCardTypeDropdown === idx && cardTypeDropdownPos && (
+                            <div className="fixed z-50 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden"
+                              style={{ top: cardTypeDropdownPos.top, left: cardTypeDropdownPos.left, width: cardTypeDropdownPos.width }}>
                               <button type="button" onClick={() => { updateCardExpense(idx, "type", "ticket"); setShowCardTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2"><Receipt size={13} className="text-amber-500" /> Ticket</button>
                               <button type="button" onClick={() => { updateCardExpense(idx, "type", "invoice"); setShowCardTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2"><FileText size={13} className="text-blue-500" /> Factura</button>
                             </div>
@@ -3832,12 +3844,12 @@ export default function BoxesPage() {
       {showCreateTransferEnvelopeModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setShowCreateTransferEnvelopeModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-visible" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
               <h3 className="text-lg font-semibold text-slate-900">Nuevo sobre de Petty Cash</h3>
               <button onClick={() => setShowCreateTransferEnvelopeModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
             </div>
-            <div className="p-6 flex-1 overflow-y-auto space-y-5">
+            <div className="p-6 flex-1 space-y-5 overflow-visible">
               <div className="p-3 bg-slate-50 rounded-xl text-center">
                 <p className="text-slate-900 font-medium">PC-{String(nextTransferNumber).padStart(3, "0")}</p>
               </div>
@@ -3943,36 +3955,37 @@ export default function BoxesPage() {
                         </div>
                       </div>
                       <div className="grid grid-cols-12 gap-3">
-                        <div className="col-span-2 relative">
+                        <div className="col-span-3 relative">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
-                          <button type="button" onClick={() => setShowTypeDropdown(showTypeDropdown === idx ? null : idx)}
+                          <button type="button" onClick={(e) => {
+                            if (showTypeDropdown === idx) { setShowTypeDropdown(null); return; }
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setTypeDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+                            setShowTypeDropdown(idx);
+                          }}
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-left text-sm flex items-center justify-between hover:border-slate-300">
                             <span className="text-slate-900">{exp.type === "ticket" ? "Ticket" : "Factura"}</span>
                             <ChevronDown size={14} className="text-slate-400" />
                           </button>
-                          {showTypeDropdown === idx && (
-                            <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg py-1">
+                          {showTypeDropdown === idx && typeDropdownPos && (
+                            <div className="fixed z-50 bg-white border border-slate-200 rounded-lg shadow-lg py-1"
+                              style={{ top: typeDropdownPos.top, left: typeDropdownPos.left, width: typeDropdownPos.width }}>
                               <button type="button" onClick={() => { updateExpenseInList(idx, "type", "ticket"); setShowTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50">Ticket</button>
                               <button type="button" onClick={() => { updateExpenseInList(idx, "type", "invoice"); setShowTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50">Factura</button>
                             </div>
                           )}
                         </div>
-                        <div className="col-span-2">
+                        <div className="col-span-3">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label>
                           <input type="text" value={exp.date} onChange={e => updateExpenseInList(idx, "date", e.target.value)} placeholder="DD/MM/YYYY"
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
                         </div>
-                        <div className="col-span-4">
-                          <label className="block text-xs font-medium text-slate-600 mb-1">Proveedor *</label>
-                          <input type="text" value={exp.supplier} onChange={e => updateExpenseInList(idx, "supplier", e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
-                        </div>
-                        <div className="col-span-2">
+                        <div className="col-span-3">
                           <label className="block text-xs font-medium text-slate-600 mb-1">IRPF %</label>
                           <input type="number" value={exp.irpfRate} onChange={e => updateExpenseInList(idx, "irpfRate", parseFloat(e.target.value) || 0)} step="1"
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
                         </div>
-                        <div className="col-span-2">
+                        <div className="col-span-3">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Documento</label>
                           <label className="w-full px-3 py-2 border border-dashed border-slate-300 rounded-lg text-sm flex items-center justify-center gap-2 cursor-pointer hover:border-slate-400 hover:bg-slate-50">
                             <Upload size={14} className="text-slate-400" />
@@ -3980,6 +3993,46 @@ export default function BoxesPage() {
                             <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
                               onChange={e => { if (e.target.files?.[0]) updateExpenseInList(idx, "file", e.target.files[0]); }} />
                           </label>
+                        </div>
+                        <div className="col-span-8 relative">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Proveedor (empresa de la factura/ticket) *</label>
+                          <input type="text" value={exp.supplier}
+                            onChange={e => { updateExpenseInList(idx, "supplier", e.target.value); setShowExpenseSupplierDropdown(idx); }}
+                            onFocus={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setExpenseSupplierDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+                              setShowExpenseSupplierDropdown(idx);
+                            }}
+                            placeholder="Nombre del proveedor"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                          {showExpenseSupplierDropdown === idx && expenseSupplierDropdownPos && (() => {
+                            const filtered = cardSuppliers.filter(s =>
+                              s.name.toLowerCase().includes(exp.supplier.toLowerCase()) || s.taxId.includes(exp.supplier)
+                            );
+                            if (filtered.length === 0) return null;
+                            return (
+                              <div className="fixed z-50 bg-white border border-slate-200 rounded-lg shadow-lg py-1 max-h-40 overflow-y-auto"
+                                style={{ top: expenseSupplierDropdownPos.top, left: expenseSupplierDropdownPos.left, width: expenseSupplierDropdownPos.width }}>
+                                {filtered.slice(0, 8).map(s => (
+                                  <button key={s.taxId} type="button"
+                                    onClick={() => {
+                                      setExpensesList(prev => prev.map((e2, i2) => i2 === idx ? { ...e2, supplier: s.name, supplierTaxId: s.taxId } : e2));
+                                      setShowExpenseSupplierDropdown(null);
+                                    }}
+                                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center justify-between">
+                                    <span className="text-slate-900">{s.name}</span>
+                                    <span className="text-xs text-slate-400">{s.taxId}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        <div className="col-span-4">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">CIF / NIF</label>
+                          <input type="text" value={exp.supplierTaxId} onChange={e => updateExpenseInList(idx, "supplierTaxId", e.target.value)}
+                            placeholder="B12345678"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
                         </div>
                       </div>
                       <input type="text" value={(exp as any).description ?? ""} onChange={e => updateExpenseInList(idx, "description", e.target.value)} placeholder="Descripción del gasto"
@@ -4429,9 +4482,9 @@ export default function BoxesPage() {
                   );
 
                   return (
-                    <div key={i} className="border border-slate-200 rounded-2xl overflow-hidden">
+                    <div key={i} className="border border-slate-200 rounded-2xl overflow-visible">
                       {/* Expense header */}
-                      <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-start gap-3">
+                      <div className="bg-slate-50 rounded-t-2xl px-4 py-3 border-b border-slate-200 flex items-start gap-3">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-900 truncate">{exp.description || `Gasto ${i + 1}`}</p>
                           <p className="text-xs text-slate-500 mt-0.5">
@@ -4447,7 +4500,7 @@ export default function BoxesPage() {
 
                       <div className="flex flex-col md:flex-row">
                         {/* Documento — "en un ladito", para consultar mientras se codifica */}
-                        <div className="w-full md:w-52 flex-shrink-0 bg-slate-100 border-b md:border-b-0 md:border-r border-slate-200 p-3">
+                        <div className="w-full md:w-52 flex-shrink-0 bg-slate-100 md:rounded-bl-2xl border-b md:border-b-0 md:border-r border-slate-200 p-3">
                           {!exp.fileUrl ? (
                             <div className="h-40 md:h-full flex flex-col items-center justify-center gap-1.5 text-slate-400 text-center">
                               <FileX size={22} />
@@ -4488,11 +4541,16 @@ export default function BoxesPage() {
                             <label className="block text-xs font-medium text-slate-500 mb-1">Proveedor (empresa de la factura/ticket)</label>
                             <input type="text" value={ed.supplier}
                               onChange={e => { updateEd(i, { supplier: e.target.value }); setShowVolcarSupplierDropdown(i); }}
-                              onFocus={() => setShowVolcarSupplierDropdown(i)}
+                              onFocus={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setVolcarSupplierDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+                                setShowVolcarSupplierDropdown(i);
+                              }}
                               placeholder="Nombre del proveedor"
                               className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
-                            {showVolcarSupplierDropdown === i && filteredSuppliers.length > 0 && (
-                              <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-40 overflow-y-auto">
+                            {showVolcarSupplierDropdown === i && volcarSupplierDropdownPos && filteredSuppliers.length > 0 && (
+                              <div className="fixed z-20 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-40 overflow-y-auto"
+                                style={{ top: volcarSupplierDropdownPos.top, left: volcarSupplierDropdownPos.left, width: volcarSupplierDropdownPos.width }}>
                                 {filteredSuppliers.slice(0, 8).map(s => (
                                   <button key={s.taxId} type="button"
                                     onClick={() => { updateEd(i, { supplier: s.name, supplierTaxId: s.taxId }); setShowVolcarSupplierDropdown(null); }}
@@ -4557,11 +4615,16 @@ export default function BoxesPage() {
                                     <input type="text"
                                       value={item.subAccountCode ? `${item.subAccountCode} · ${item.subAccountDescription}` : item.subAccountSearch}
                                       onChange={e => updateVolcarItem(i, j, { subAccountSearch: e.target.value, subAccountCode: "", subAccountDescription: "" })}
-                                      onFocus={() => updateVolcarItem(i, j, { showSubAccountDropdown: true })}
+                                      onFocus={(e) => {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        setVolcarAccountDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+                                        updateVolcarItem(i, j, { showSubAccountDropdown: true });
+                                      }}
                                       placeholder="Buscar cuenta"
                                       className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
-                                    {item.showSubAccountDropdown && filteredAccounts.length > 0 && (
-                                      <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                                    {item.showSubAccountDropdown && volcarAccountDropdownPos && filteredAccounts.length > 0 && (
+                                      <div className="fixed z-20 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto"
+                                        style={{ top: volcarAccountDropdownPos.top, left: volcarAccountDropdownPos.left, width: volcarAccountDropdownPos.width }}>
                                         {filteredAccounts.slice(0, 10).map(a => (
                                           <button key={a.id} type="button"
                                             onClick={() => updateVolcarItem(i, j, { subAccountCode: a.code, subAccountDescription: a.description, subAccountSearch: "", showSubAccountDropdown: false })}
