@@ -183,6 +183,18 @@ interface BoxSupplier {
   updatedAt?: Date;
 }
 
+interface AdvanceEntry {
+  id: string;
+  amount: number;
+  method: "bank" | "cash";
+  date: string;
+  proofUrl?: string;
+  proofFileName?: string;
+  addedAt: Date;
+  addedBy: string;
+  addedByName: string;
+}
+
 interface TransferEnvelope {
   id: string;
   number: number;
@@ -193,12 +205,9 @@ interface TransferEnvelope {
   personName: string;
   personDepartment?: string;
   personIban?: string;
-  // Anticipo (opcional)
-  hasAdvance: boolean;
-  advanceAmount?: number;
-  advanceMethod?: "bank" | "cash";
-  advanceProofUrl?: string;
-  advanceProofFileName?: string;
+  // Anticipos (opcional, puede haber varios — p. ej. 500€ al inicio y otros
+  // 200€ más adelante si hace falta antes de liquidar)
+  advances: AdvanceEntry[];
   // Totales de gasto
   totalBase: number;
   totalVat: number;
@@ -455,19 +464,26 @@ export default function BoxesPage() {
   const [copiedBoxPin, setCopiedBoxPin] = useState(false);
   const [volcandoFormId, setVolcandoFormId] = useState<string | null>(null);
   const [showVolcarModal, setShowVolcarModal] = useState<string | null>(null);
+  const [showVolcadas, setShowVolcadas] = useState(false);
   const [volcarTargetEnvelopeId, setVolcarTargetEnvelopeId] = useState("");
   const [showVolcarEnvDropdown, setShowVolcarEnvDropdown] = useState(false);
-  // Per-expense completion data when volcando
+  // Per-expense completion data when volcando (codificación: proveedor real,
+  // no la persona que solicitó — factura/ticket, cuenta(s) de presupuesto, IVA, IRPF)
   const [volcarExpenseData, setVolcarExpenseData] = useState<Array<{
     supplier: string;
     supplierTaxId: string;
-    subAccountCode: string;
-    subAccountDescription: string;
+    type: "invoice" | "ticket";
     date: string;
-    vatRate: number;
     irpfRate: number;
-    showSubAccountDropdown: boolean;
-    subAccountSearch: string;
+    items: Array<{
+      id: string;
+      subAccountCode: string;
+      subAccountDescription: string;
+      baseAmount: number;
+      vatRate: number;
+      showSubAccountDropdown: boolean;
+      subAccountSearch: string;
+    }>;
   }>>([]);
   const [showVolcarSupplierDropdown, setShowVolcarSupplierDropdown] = useState<number | null>(null);
 
@@ -479,11 +495,15 @@ export default function BoxesPage() {
   const [showDeleteTransferEnvelopeModal, setShowDeleteTransferEnvelopeModal] = useState<TransferEnvelope | null>(null);
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
   const [showSettleModal, setShowSettleModal] = useState(false);
+  const [showAddAdvanceModal, setShowAddAdvanceModal] = useState(false);
+  const [advanceForm, setAdvanceForm] = useState({
+    amount: "", method: "bank" as "bank" | "cash", date: new Date().toISOString().slice(0, 10),
+    proofFile: null as File | null,
+  });
+  const [addingAdvance, setAddingAdvance] = useState(false);
   const [transferEnvelopeForm, setTransferEnvelopeForm] = useState({
     paymentDate: "", notes: "",
     personName: "", personDepartment: "", personIban: "",
-    hasAdvance: true, advanceAmount: "", advanceMethod: "bank" as "bank" | "cash",
-    advanceProofFile: null as File | null,
   });
   const [expensesList, setExpensesList] = useState<Array<{
     id: string; type: "invoice" | "ticket"; supplier: string; supplierTaxId: string;
@@ -616,6 +636,7 @@ export default function BoxesPage() {
         id: d.id, ...d.data(),
         createdAt: d.data().createdAt?.toDate() || new Date(),
         settledAt: d.data().settledAt?.toDate(),
+        advances: (d.data().advances || []).map((a: any) => ({ ...a, addedAt: a.addedAt?.toDate?.() || new Date() })),
       })) as TransferEnvelope[]);
 
       const trfExpSnap = await getDocs(query(collection(db, `projects/${projectId}/transferExpenses`), orderBy("createdAt", "desc")));
@@ -1662,34 +1683,32 @@ export default function BoxesPage() {
 
       for (let i = 0; i < submission.expenses.length; i++) {
         const exp = submission.expenses[i];
-        const ed = volcarExpenseData[i] || { supplier: submission.requesterName, supplierTaxId: "", subAccountCode: "", subAccountDescription: "", date: new Date().toISOString().slice(0, 10), vatRate: 21, irpfRate: 0 };
-        const totalAmount = Number(exp.amount) || 0;
-
-        // Back-calculate base and VAT from total
-        const vatMultiplier = 1 + (ed.vatRate / 100);
-        const baseAmount = Math.round((totalAmount / vatMultiplier) * 100) / 100;
-        const vatAmount = Math.round((totalAmount - baseAmount) * 100) / 100;
-        const irpfAmount = Math.round((baseAmount * ed.irpfRate / 100) * 100) / 100;
+        const ed = volcarExpenseData[i] || {
+          supplier: "", supplierTaxId: "", type: "ticket" as "invoice" | "ticket",
+          date: new Date().toISOString().slice(0, 10), irpfRate: 0,
+          items: [{ id: crypto.randomUUID(), subAccountCode: "", subAccountDescription: "", baseAmount: Number(exp.amount) || 0, vatRate: 0, showSubAccountDropdown: false, subAccountSearch: "" }],
+        };
+        const { baseAmount, vatAmount, irpfAmount, totalAmount } = computeExpenseTotal(ed);
 
         const newExpRef = doc(collection(db, `projects/${projectId}/transferExpenses`));
         batch.set(newExpRef, {
           envelopeId: volcarTargetEnvelopeId,
-          type: "ticket",
+          type: ed.type,
           personName: envelope.personName || submission.requesterName,
           personDepartment: envelope.personDepartment || "",
           personIban: envelope.personIban || "",
-          supplier: ed.supplier || submission.requesterName,
+          supplier: ed.supplier || "",
           supplierTaxId: ed.supplierTaxId || "",
-          items: [{
-            subAccountCode: ed.subAccountCode,
-            subAccountDescription: ed.subAccountDescription,
+          items: ed.items.map((it) => ({
+            subAccountCode: it.subAccountCode,
+            subAccountDescription: it.subAccountDescription,
             description: exp.description,
-            baseAmount,
-            vatRate: ed.vatRate,
-            vatAmount,
-          }],
-          subAccountCode: ed.subAccountCode,
-          subAccountDescription: ed.subAccountDescription,
+            baseAmount: it.baseAmount,
+            vatRate: it.vatRate,
+            vatAmount: Math.round((it.baseAmount || 0) * (it.vatRate || 0) / 100 * 100) / 100,
+          })),
+          subAccountCode: ed.items[0]?.subAccountCode || "",
+          subAccountDescription: ed.items[0]?.subAccountDescription || "",
           date: ed.date,
           baseAmount,
           vatAmount,
@@ -1734,22 +1753,16 @@ export default function BoxesPage() {
   const emptyTransferEnvelopeForm = {
     paymentDate: "", notes: "",
     personName: "", personDepartment: "", personIban: "",
-    hasAdvance: true, advanceAmount: "", advanceMethod: "bank" as "bank" | "cash",
-    advanceProofFile: null as File | null,
   };
 
   const handleCreateTransferEnvelope = async () => {
     if (!transferEnvelopeForm.personName.trim()) return showToast("error", "Nombre de la persona obligatorio");
     if (!transferEnvelopeForm.paymentDate.trim()) return showToast("error", "Fecha obligatoria");
-    if (transferEnvelopeForm.hasAdvance) {
-      if (!Number(transferEnvelopeForm.advanceAmount) || Number(transferEnvelopeForm.advanceAmount) <= 0) return showToast("error", "Importe del anticipo obligatorio");
-      if (!transferEnvelopeForm.advanceProofFile) return showToast("error", "Adjunta el comprobante del anticipo");
-    }
     setSaving(true);
     try {
       const num = nextTransferNumber;
       const displayNumber = `PC-${String(num).padStart(3, "0")}`;
-      const docRef = await addDoc(collection(db, `projects/${projectId}/transferEnvelopes`), {
+      await addDoc(collection(db, `projects/${projectId}/transferEnvelopes`), {
         number: num, displayNumber,
         paymentDate: transferEnvelopeForm.paymentDate.trim(),
         status: "draft", totalBase: 0, totalVat: 0, totalAmount: 0, expenseCount: 0,
@@ -1757,24 +1770,45 @@ export default function BoxesPage() {
         personName: transferEnvelopeForm.personName.trim(),
         personDepartment: transferEnvelopeForm.personDepartment || "",
         personIban: transferEnvelopeForm.personIban.trim() || "",
-        hasAdvance: transferEnvelopeForm.hasAdvance,
-        advanceAmount: transferEnvelopeForm.hasAdvance ? Number(transferEnvelopeForm.advanceAmount) : 0,
-        advanceMethod: transferEnvelopeForm.hasAdvance ? transferEnvelopeForm.advanceMethod : null,
+        advances: [],
         createdAt: Timestamp.now(), createdBy: userId, createdByName: userName,
       });
-      if (transferEnvelopeForm.hasAdvance && transferEnvelopeForm.advanceProofFile) {
-        const fileName = `${Date.now()}_${transferEnvelopeForm.advanceProofFile.name}`;
-        const fileRef = ref(storage, `projects/${projectId}/transferEnvelopes/${docRef.id}/advanceProof/${fileName}`);
-        await uploadBytes(fileRef, transferEnvelopeForm.advanceProofFile);
-        const advanceProofUrl = await getDownloadURL(fileRef);
-        await updateDoc(docRef, { advanceProofUrl, advanceProofFileName: transferEnvelopeForm.advanceProofFile.name });
-      }
       await updateDoc(doc(db, `projects/${projectId}`), { nextTransferNumber: num + 1 });
       showToast("success", `Sobre ${displayNumber} creado`);
       setShowCreateTransferEnvelopeModal(false);
       setTransferEnvelopeForm(emptyTransferEnvelopeForm);
       loadData();
     } catch (e) { console.error(e); showToast("error", "Error al crear sobre"); } finally { setSaving(false); }
+  };
+
+  // Un sobre puede recibir varios anticipos a lo largo del tiempo (p. ej. 500€
+  // al principio y otros 200€ más adelante si hace falta antes de liquidar).
+  const handleAddAdvance = async () => {
+    if (!selectedTransferEnvelope) return;
+    if (!Number(advanceForm.amount) || Number(advanceForm.amount) <= 0) return showToast("error", "Importe obligatorio");
+    if (!advanceForm.proofFile) return showToast("error", "Adjunta el comprobante del anticipo");
+    setAddingAdvance(true);
+    try {
+      const fileName = `${Date.now()}_${advanceForm.proofFile.name}`;
+      const fileRef = ref(storage, `projects/${projectId}/transferEnvelopes/${selectedTransferEnvelope.id}/advances/${fileName}`);
+      await uploadBytes(fileRef, advanceForm.proofFile);
+      const proofUrl = await getDownloadURL(fileRef);
+      const entry: AdvanceEntry = {
+        id: crypto.randomUUID(),
+        amount: Number(advanceForm.amount),
+        method: advanceForm.method,
+        date: advanceForm.date,
+        proofUrl, proofFileName: advanceForm.proofFile.name,
+        addedAt: new Date(), addedBy: userId || "", addedByName: userName,
+      };
+      await updateDoc(doc(db, `projects/${projectId}/transferEnvelopes`, selectedTransferEnvelope.id), {
+        advances: [...selectedTransferEnvelope.advances, { ...entry, addedAt: Timestamp.now() }],
+      });
+      showToast("success", "Anticipo añadido");
+      setShowAddAdvanceModal(false);
+      setAdvanceForm({ amount: "", method: "bank", date: new Date().toISOString().slice(0, 10), proofFile: null });
+      loadData();
+    } catch (e) { console.error(e); showToast("error", "Error al añadir el anticipo"); } finally { setAddingAdvance(false); }
   };
 
   const canDeleteTransferEnvelope = (envelope: TransferEnvelope) => envelope.status !== "settled";
@@ -1916,8 +1950,10 @@ export default function BoxesPage() {
 
   // Calcula quién liquida a quién: si el gasto no supera el anticipo, la
   // persona devuelve la diferencia; si lo supera, la productora se la paga.
+  const getTotalAdvance = (envelope: TransferEnvelope) => (envelope.advances || []).reduce((s, a) => s + a.amount, 0);
+
   const getSettlementPreview = (envelope: TransferEnvelope) => {
-    const diff = Math.round((envelope.totalAmount - (envelope.advanceAmount || 0)) * 100) / 100;
+    const diff = Math.round((envelope.totalAmount - getTotalAdvance(envelope)) * 100) / 100;
     if (diff > 0) return { diff, direction: "production_to_person" as const, label: `La productora paga a ${envelope.personName}` };
     if (diff < 0) return { diff: Math.abs(diff), direction: "person_to_production" as const, label: `${envelope.personName} devuelve a la productora` };
     return { diff: 0, direction: "none" as const, label: "Sin movimiento — el anticipo cubre exactamente el gasto" };
@@ -2147,55 +2183,83 @@ export default function BoxesPage() {
                 </div>
               ) : (
                 <>
-                {/* Solicitudes recibidas */}
-                {mainTab === "transfers" && formSubmissions.length > 0 && (
+                {/* Solicitudes recibidas (pendientes de volcar) */}
+                {mainTab === "transfers" && pendingFormSubmissions > 0 && (
                   <div className="mb-4">
                     <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">
                       Solicitudes recibidas
-                      {pendingFormSubmissions > 0 && (
-                        <span className="ml-1.5 bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5 text-xs">{pendingFormSubmissions}</span>
-                      )}
+                      <span className="ml-1.5 bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5 text-xs">{pendingFormSubmissions}</span>
                     </p>
                     <div className="space-y-1">
-                      {formSubmissions.map((fs) => (
-                        <div key={fs.id} className={`p-3 rounded-xl border text-left ${fs.importedToEnvelopeId ? "border-emerald-100 bg-emerald-50/50" : "border-amber-100 bg-amber-50"}`}>
+                      {formSubmissions.filter((fs) => !fs.importedToEnvelopeId).map((fs) => (
+                        <div key={fs.id} className="p-3 rounded-xl border border-amber-100 bg-amber-50 text-left">
                           <div className="flex items-start justify-between gap-1 mb-1">
                             <p className="text-sm font-medium text-slate-900 leading-tight">{fs.requesterName}</p>
-                            {fs.importedToEnvelopeId
-                              ? <span className="text-xs text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full flex-shrink-0">Volcado</span>
-                              : <span className="text-xs text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full flex-shrink-0">Pendiente</span>
-                            }
+                            <span className="text-xs text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full flex-shrink-0">Pendiente</span>
                           </div>
                           <p className="text-xs text-slate-500">
                             {fs.expenseCount} gasto{fs.expenseCount !== 1 ? "s" : ""} · <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(fs.totalAmount)} €</strong>
                           </p>
                           <p className="text-xs text-slate-400 mt-0.5">{fs.submittedAt.toLocaleDateString("es-ES")}</p>
-                          {!fs.importedToEnvelopeId && (
-                            <button
-                              onClick={() => {
-                                setShowVolcarModal(fs.id);
-                                setVolcarTargetEnvelopeId(fs.targetEnvelopeId && transferEnvelopes.some(e => e.id === fs.targetEnvelopeId && e.status === "draft") ? fs.targetEnvelopeId : "");
-                                const today = new Date().toISOString().slice(0, 10);
-                                setVolcarExpenseData(fs.expenses.map(() => ({
-                                  supplier: fs.requesterName,
+                          <button
+                            onClick={() => {
+                              setShowVolcarModal(fs.id);
+                              setVolcarTargetEnvelopeId(fs.targetEnvelopeId && transferEnvelopes.some(e => e.id === fs.targetEnvelopeId && e.status === "draft") ? fs.targetEnvelopeId : "");
+                              const today = new Date().toISOString().slice(0, 10);
+                              setVolcarExpenseData(fs.expenses.map((exp) => {
+                                const total = Number(exp.amount) || 0;
+                                const vatRate = 21;
+                                const baseAmount = Math.round((total / (1 + vatRate / 100)) * 100) / 100;
+                                return {
+                                  supplier: "", // el proveedor de la factura/ticket, NO el solicitante
                                   supplierTaxId: "",
-                                  subAccountCode: "",
-                                  subAccountDescription: "",
+                                  type: "ticket" as "invoice" | "ticket",
                                   date: today,
-                                  vatRate: 21,
                                   irpfRate: 0,
-                                  showSubAccountDropdown: false,
-                                  subAccountSearch: "",
-                                })));
-                                setShowVolcarSupplierDropdown(null);
-                              }}
-                              className="mt-2 w-full text-xs font-medium py-1.5 px-2 rounded-lg border border-amber-300 text-amber-800 bg-white hover:bg-amber-50 transition-colors">
-                              Volcar a sobre →
-                            </button>
-                          )}
+                                  items: [{ id: crypto.randomUUID(), subAccountCode: "", subAccountDescription: "", baseAmount, vatRate, showSubAccountDropdown: false, subAccountSearch: "" }],
+                                };
+                              }));
+                              setShowVolcarSupplierDropdown(null);
+                            }}
+                            className="mt-2 w-full text-xs font-medium py-1.5 px-2 rounded-lg border border-amber-300 text-amber-800 bg-white hover:bg-amber-50 transition-colors">
+                            Volcar a sobre →
+                          </button>
                         </div>
                       ))}
                     </div>
+                    <div className="border-t border-slate-100 mt-3 mb-3" />
+                  </div>
+                )}
+
+                {/* Solicitudes volcadas (histórico, colapsado) */}
+                {mainTab === "transfers" && formSubmissions.some((fs) => fs.importedToEnvelopeId) && (
+                  <div className="mb-4">
+                    <button
+                      onClick={() => setShowVolcadas(!showVolcadas)}
+                      className="w-full flex items-center justify-between px-1 mb-2"
+                    >
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        Solicitudes volcadas
+                        <span className="ml-1.5 text-slate-300">{formSubmissions.filter((fs) => fs.importedToEnvelopeId).length}</span>
+                      </p>
+                      <ChevronDown size={12} className={`text-slate-400 transition-transform ${showVolcadas ? "rotate-180" : ""}`} />
+                    </button>
+                    {showVolcadas && (
+                      <div className="space-y-1">
+                        {formSubmissions.filter((fs) => fs.importedToEnvelopeId).map((fs) => (
+                          <div key={fs.id} className="p-3 rounded-xl border border-emerald-100 bg-emerald-50/50 text-left">
+                            <div className="flex items-start justify-between gap-1 mb-1">
+                              <p className="text-sm font-medium text-slate-900 leading-tight">{fs.requesterName}</p>
+                              <span className="text-xs text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full flex-shrink-0">Volcado</span>
+                            </div>
+                            <p className="text-xs text-slate-500">
+                              {fs.expenseCount} gasto{fs.expenseCount !== 1 ? "s" : ""} · <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(fs.totalAmount)} €</strong>
+                            </p>
+                            <p className="text-xs text-slate-400 mt-0.5">{fs.submittedAt.toLocaleDateString("es-ES")}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <div className="border-t border-slate-100 mt-3 mb-3" />
                   </div>
                 )}
@@ -2524,6 +2588,11 @@ export default function BoxesPage() {
                     {selectedTransferEnvelope.status === "draft" && (
                       <div className="flex items-center gap-2">
                         <button
+                          onClick={() => { setAdvanceForm({ amount: "", method: "bank", date: new Date().toISOString().slice(0, 10), proofFile: null }); setShowAddAdvanceModal(true); }}
+                          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+                          <Banknote size={16} /> Añadir anticipo
+                        </button>
+                        <button
                           onClick={() => { setBoxFormRequesterName(selectedTransferEnvelope.personName); setBoxFormMessage(""); setBoxFormTargetEnvelopeId(selectedTransferEnvelope.id); setGeneratedBoxResult(null); setShowSendBoxFormModal(true); }}
                           className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
                           <Link2 size={16} /> Solicitar tickets
@@ -2535,7 +2604,7 @@ export default function BoxesPage() {
                         </button>
                         <button
                           onClick={() => { setSettleForm({ reference: "", proofFile: null }); setShowSettleModal(true); }}
-                          disabled={!selectedTransferEnvelope.hasAdvance && selectedTransferEnvelope.expenseCount === 0}
+                          disabled={selectedTransferEnvelope.advances.length === 0 && selectedTransferEnvelope.expenseCount === 0}
                           className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50"
                           style={{ background: "linear-gradient(135deg, #f59e0b, #f97316)" }}>
                           <Scale size={16} /> Liquidación
@@ -2550,35 +2619,45 @@ export default function BoxesPage() {
                     )}
                   </div>
 
-                  {/* Resumen anticipo / liquidación estimada — siempre visible en borrador */}
+                  {/* Resumen anticipo(s) / liquidación estimada — siempre visible en borrador */}
                   {selectedTransferEnvelope.status === "draft" && (() => {
                     const preview = getSettlementPreview(selectedTransferEnvelope);
+                    const totalAdvance = getTotalAdvance(selectedTransferEnvelope);
                     return (
-                      <div className="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-                        <div>
-                          <span className="text-slate-500">Anticipo: </span>
-                          {selectedTransferEnvelope.hasAdvance ? (
-                            <>
-                              <span className="font-semibold text-slate-900">{fmt(selectedTransferEnvelope.advanceAmount || 0)} €</span>
-                              <span className="text-slate-400"> · {selectedTransferEnvelope.advanceMethod === "cash" ? "Efectivo" : "Transferencia"}</span>
-                              {selectedTransferEnvelope.advanceProofUrl && (
-                                <a href={selectedTransferEnvelope.advanceProofUrl} target="_blank" rel="noopener noreferrer"
-                                  className="ml-1.5 text-blue-500 hover:text-blue-700 underline">Ver comprobante</a>
-                              )}
-                            </>
-                          ) : (
-                            <span className="text-slate-400">Sin anticipo</span>
-                          )}
+                      <div className="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-sm">
+                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                          <div>
+                            <span className="text-slate-500">Anticipo{selectedTransferEnvelope.advances.length > 1 ? "s" : ""}: </span>
+                            {selectedTransferEnvelope.advances.length > 0 ? (
+                              <span className="font-semibold text-slate-900">
+                                {fmt(totalAdvance)} € {selectedTransferEnvelope.advances.length > 1 && <span className="font-normal text-slate-400">({selectedTransferEnvelope.advances.length} pagos)</span>}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">Sin anticipo</span>
+                            )}
+                          </div>
+                          <div className="text-slate-300">|</div>
+                          <div>
+                            <span className="text-slate-500">Liquidación estimada: </span>
+                            {preview.direction === "none" ? (
+                              <span className="text-slate-600">{preview.label}</span>
+                            ) : (
+                              <span className="font-semibold text-slate-900">{preview.label}: {fmt(preview.diff)} €</span>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-slate-300">|</div>
-                        <div>
-                          <span className="text-slate-500">Liquidación estimada: </span>
-                          {preview.direction === "none" ? (
-                            <span className="text-slate-600">{preview.label}</span>
-                          ) : (
-                            <span className="font-semibold text-slate-900">{preview.label}: {fmt(preview.diff)} €</span>
-                          )}
-                        </div>
+                        {selectedTransferEnvelope.advances.length > 0 && (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {selectedTransferEnvelope.advances.map((a) => (
+                              <span key={a.id} className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-600">
+                                {fmt(a.amount)} € · {a.method === "cash" ? "Efectivo" : "Transferencia"} · {a.date}
+                                {a.proofUrl && (
+                                  <a href={a.proofUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">Ver</a>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
@@ -2600,9 +2679,9 @@ export default function BoxesPage() {
                           {selectedTransferEnvelope.settlementProofUrl && (
                             <> · <a href={selectedTransferEnvelope.settlementProofUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-emerald-800">Ver extracto</a></>
                           )}
-                          {selectedTransferEnvelope.hasAdvance && selectedTransferEnvelope.advanceProofUrl && (
-                            <> · <a href={selectedTransferEnvelope.advanceProofUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-emerald-800">Ver comprobante del anticipo</a></>
-                          )}
+                          {selectedTransferEnvelope.advances.map((a, idx) => a.proofUrl && (
+                            <span key={a.id}> · <a href={a.proofUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-emerald-800">Ver anticipo {selectedTransferEnvelope.advances.length > 1 ? idx + 1 : ""}</a></span>
+                          ))}
                         </p>
                       </div>
                     </div>
@@ -3809,57 +3888,15 @@ export default function BoxesPage() {
                 </div>
               </div>
 
-              {/* Anticipo */}
-              <div className="p-4 bg-slate-50 rounded-xl space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">¿Hay anticipo?</p>
-                  <div className="flex border border-slate-200 rounded-lg overflow-hidden bg-white">
-                    <button type="button" onClick={() => setTransferEnvelopeForm({ ...transferEnvelopeForm, hasAdvance: true })}
-                      className={`px-3 py-1.5 text-xs font-medium transition-colors ${transferEnvelopeForm.hasAdvance ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Sí</button>
-                    <button type="button" onClick={() => setTransferEnvelopeForm({ ...transferEnvelopeForm, hasAdvance: false })}
-                      className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-slate-200 ${!transferEnvelopeForm.hasAdvance ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>No</button>
-                  </div>
-                </div>
-                {transferEnvelopeForm.hasAdvance ? (
-                  <>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Importe del anticipo *</label>
-                        <input type="number" min="0" step="0.01" value={transferEnvelopeForm.advanceAmount}
-                          onChange={e => setTransferEnvelopeForm({ ...transferEnvelopeForm, advanceAmount: e.target.value })}
-                          placeholder="500,00"
-                          className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white font-mono" />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Método</label>
-                        <div className="flex border border-slate-200 rounded-xl overflow-hidden bg-white h-[42px]">
-                          <button type="button" onClick={() => setTransferEnvelopeForm({ ...transferEnvelopeForm, advanceMethod: "bank" })}
-                            className={`flex-1 text-xs font-medium transition-colors ${transferEnvelopeForm.advanceMethod === "bank" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Transferencia</button>
-                          <button type="button" onClick={() => setTransferEnvelopeForm({ ...transferEnvelopeForm, advanceMethod: "cash" })}
-                            className={`flex-1 text-xs font-medium transition-colors border-l border-slate-200 ${transferEnvelopeForm.advanceMethod === "cash" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Efectivo</button>
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        {transferEnvelopeForm.advanceMethod === "cash" ? "Recibí firmado *" : "Comprobante de transferencia *"}
-                      </label>
-                      <label className="flex items-center gap-2 px-4 py-2.5 border border-dashed border-slate-300 rounded-xl bg-white cursor-pointer hover:border-slate-400 text-sm text-slate-500">
-                        <Upload size={15} />
-                        {transferEnvelopeForm.advanceProofFile ? transferEnvelopeForm.advanceProofFile.name : "Subir fichero"}
-                        <input type="file" className="hidden" onChange={e => setTransferEnvelopeForm({ ...transferEnvelopeForm, advanceProofFile: e.target.files?.[0] || null })} />
-                      </label>
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-xs text-slate-500">El sobre se liquidará entero a posteriori, sin anticipo previo.</p>
-                )}
+              <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                <p className="text-xs text-amber-700">
+                  El anticipo (si lo hay) se añade después, desde dentro del sobre — así puedes ir sumando
+                  más de uno si hace falta (p. ej. 500€ al principio y otros 200€ más adelante) antes de liquidar.
+                </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  {transferEnvelopeForm.hasAdvance ? "Fecha del anticipo *" : "Fecha prevista de liquidación *"}
-                </label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Fecha prevista de liquidación *</label>
                 <input type="text" value={transferEnvelopeForm.paymentDate}
                   onChange={e => setTransferEnvelopeForm({ ...transferEnvelopeForm, paymentDate: e.target.value })}
                   placeholder="DD/MM/YYYY"
@@ -4059,7 +4096,7 @@ export default function BoxesPage() {
               </div>
               <div className="p-6 space-y-4">
                 <div className="p-4 bg-slate-50 rounded-xl space-y-1.5 text-sm">
-                  <div className="flex justify-between"><span className="text-slate-500">Anticipo</span><span className="font-mono text-slate-900">{fmt(selectedTransferEnvelope.advanceAmount || 0)} €</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Anticipo{selectedTransferEnvelope.advances.length > 1 ? "s" : ""}</span><span className="font-mono text-slate-900">{fmt(getTotalAdvance(selectedTransferEnvelope))} €</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">Total gastos</span><span className="font-mono text-slate-900">{fmt(selectedTransferEnvelope.totalAmount)} €</span></div>
                   <div className="border-t border-slate-200 my-1.5" />
                   <div className="flex justify-between">
@@ -4099,6 +4136,70 @@ export default function BoxesPage() {
           </div>
         );
       })()}
+
+      {/* Add Advance Modal */}
+      {showAddAdvanceModal && selectedTransferEnvelope && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowAddAdvanceModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Añadir anticipo</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {selectedTransferEnvelope.advances.length > 0
+                    ? `Ya hay ${fmt(getTotalAdvance(selectedTransferEnvelope))} € anticipados en este sobre`
+                    : `Sobre ${selectedTransferEnvelope.displayNumber} · ${selectedTransferEnvelope.personName}`}
+                </p>
+              </div>
+              <button onClick={() => setShowAddAdvanceModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Importe *</label>
+                  <input type="number" min="0" step="0.01" value={advanceForm.amount}
+                    onChange={e => setAdvanceForm({ ...advanceForm, amount: e.target.value })}
+                    placeholder="500,00"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Método</label>
+                  <div className="flex border border-slate-200 rounded-xl overflow-hidden h-[42px]">
+                    <button type="button" onClick={() => setAdvanceForm({ ...advanceForm, method: "bank" })}
+                      className={`flex-1 text-xs font-medium transition-colors ${advanceForm.method === "bank" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Transferencia</button>
+                    <button type="button" onClick={() => setAdvanceForm({ ...advanceForm, method: "cash" })}
+                      className={`flex-1 text-xs font-medium transition-colors border-l border-slate-200 ${advanceForm.method === "cash" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Efectivo</button>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Fecha</label>
+                <input type="date" value={advanceForm.date}
+                  onChange={e => setAdvanceForm({ ...advanceForm, date: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  {advanceForm.method === "cash" ? "Recibí firmado *" : "Comprobante de transferencia *"}
+                </label>
+                <label className="flex items-center gap-2 px-4 py-2.5 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-slate-400 text-sm text-slate-500">
+                  <Upload size={15} />
+                  {advanceForm.proofFile ? advanceForm.proofFile.name : "Subir fichero"}
+                  <input type="file" className="hidden" onChange={e => setAdvanceForm({ ...advanceForm, proofFile: e.target.files?.[0] || null })} />
+                </label>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+              <button onClick={() => setShowAddAdvanceModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
+              <button onClick={handleAddAdvance} disabled={addingAdvance}
+                className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                style={{ backgroundColor: "#2F52E0" }}>
+                <Banknote size={14} /> {addingAdvance ? "Añadiendo..." : "Añadir anticipo"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Account Selector (Transfer modal) */}
       {showAccountSelector && accountSelectorPos && editingExpenseIndex !== null && (
@@ -4264,13 +4365,26 @@ export default function BoxesPage() {
         const selectedEnv = openEnvelopes.find(e => e.id === volcarTargetEnvelopeId);
         const updateEd = (i: number, patch: Partial<typeof volcarExpenseData[0]>) =>
           setVolcarExpenseData(prev => prev.map((ed, idx) => idx === i ? { ...ed, ...patch } : ed));
+        const updateVolcarItem = (expIdx: number, itemIdx: number, patch: Partial<typeof volcarExpenseData[0]["items"][0]>) =>
+          setVolcarExpenseData(prev => prev.map((ed, i) => {
+            if (i !== expIdx) return ed;
+            return { ...ed, items: ed.items.map((it, j) => j === itemIdx ? { ...it, ...patch } : it) };
+          }));
+        const addVolcarItem = (expIdx: number) =>
+          setVolcarExpenseData(prev => prev.map((ed, i) =>
+            i === expIdx ? { ...ed, items: [...ed.items, { id: crypto.randomUUID(), subAccountCode: "", subAccountDescription: "", baseAmount: 0, vatRate: 21, showSubAccountDropdown: false, subAccountSearch: "" }] } : ed));
+        const removeVolcarItem = (expIdx: number, itemIdx: number) =>
+          setVolcarExpenseData(prev => prev.map((ed, i) => {
+            if (i !== expIdx || ed.items.length <= 1) return ed;
+            return { ...ed, items: ed.items.filter((_, j) => j !== itemIdx) };
+          }));
         const VAT_RATES = [0, 4, 10, 21];
         const IRPF_RATES = [0, 7, 15, 19];
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
             onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); setShowVolcarSupplierDropdown(null); }}>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
 
               {/* Header */}
               <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 flex-shrink-0">
@@ -4324,14 +4438,9 @@ export default function BoxesPage() {
                   const ed = volcarExpenseData[i];
                   if (!ed) return null;
                   const totalAmt = Number(exp.amount) || 0;
-                  const vatMult = 1 + (ed.vatRate / 100);
-                  const base = Math.round((totalAmt / vatMult) * 100) / 100;
-                  const vat  = Math.round((totalAmt - base) * 100) / 100;
-                  const filteredAccounts = subAccounts.filter(a =>
-                    !ed.subAccountSearch ||
-                    a.code.includes(ed.subAccountSearch) ||
-                    a.description.toLowerCase().includes(ed.subAccountSearch.toLowerCase())
-                  );
+                  const { baseAmount: itemsBase, vatAmount: itemsVat, totalAmount: itemsTotal } = computeExpenseTotal(ed);
+                  const totalMismatch = Math.abs(itemsTotal - totalAmt) > 0.01;
+                  const docType = exp.fileUrl ? getDocumentType(exp.fileUrl) : null;
                   const filteredSuppliers = cardSuppliers.filter(s =>
                     s.name.toLowerCase().includes(ed.supplier.toLowerCase()) ||
                     s.taxId.includes(ed.supplier)
@@ -4341,119 +4450,176 @@ export default function BoxesPage() {
                     <div key={i} className="border border-slate-200 rounded-2xl overflow-hidden">
                       {/* Expense header */}
                       <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-start gap-3">
-                        {exp.fileUrl && (
-                          <a href={exp.fileUrl} target="_blank" rel="noopener noreferrer"
-                            className="w-10 h-10 rounded-lg bg-slate-200 flex-shrink-0 overflow-hidden hover:opacity-80 transition-opacity">
-                            <img src={exp.fileUrl} alt="recibo" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                          </a>
-                        )}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-900 truncate">{exp.description || `Gasto ${i + 1}`}</p>
                           <p className="text-xs text-slate-500 mt-0.5">
-                            Total: <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(totalAmt)} €</strong>
-                            {ed.vatRate > 0 && <span className="ml-2 text-slate-400">Base: {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(base)} € · IVA {ed.vatRate}%: {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(vat)} €</span>}
+                            Total del ticket: <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(totalAmt)} €</strong>
                           </p>
                         </div>
                         {exp.fileUrl && (
-                          <a href={exp.fileUrl} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-slate-600 p-1">
-                            <ExternalLink size={13} />
+                          <a href={exp.fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 flex-shrink-0">
+                            <Maximize2 size={12} /> Abrir
                           </a>
                         )}
                       </div>
 
-                      {/* Fields */}
-                      <div className="p-4 grid grid-cols-2 gap-3">
-
-                        {/* Proveedor */}
-                        <div className="col-span-2 relative">
-                          <label className="block text-xs font-medium text-slate-500 mb-1">Proveedor</label>
-                          <input type="text" value={ed.supplier}
-                            onChange={e => { updateEd(i, { supplier: e.target.value }); setShowVolcarSupplierDropdown(i); }}
-                            onFocus={() => setShowVolcarSupplierDropdown(i)}
-                            placeholder="Nombre del proveedor"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
-                          {showVolcarSupplierDropdown === i && filteredSuppliers.length > 0 && (
-                            <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-40 overflow-y-auto">
-                              {filteredSuppliers.slice(0, 8).map(s => (
-                                <button key={s.taxId} type="button"
-                                  onClick={() => { updateEd(i, { supplier: s.name, supplierTaxId: s.taxId }); setShowVolcarSupplierDropdown(null); }}
-                                  className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center justify-between">
-                                  <span className="text-slate-900">{s.name}</span>
-                                  <span className="text-xs text-slate-400">{s.taxId}</span>
-                                </button>
-                              ))}
+                      <div className="flex flex-col md:flex-row">
+                        {/* Documento — "en un ladito", para consultar mientras se codifica */}
+                        <div className="w-full md:w-52 flex-shrink-0 bg-slate-100 border-b md:border-b-0 md:border-r border-slate-200 p-3">
+                          {!exp.fileUrl ? (
+                            <div className="h-40 md:h-full flex flex-col items-center justify-center gap-1.5 text-slate-400 text-center">
+                              <FileX size={22} />
+                              <span className="text-[11px]">Sin documento adjunto</span>
                             </div>
+                          ) : docType === "pdf" ? (
+                            <a href={exp.fileUrl} target="_blank" rel="noopener noreferrer" className="block h-40 md:h-full">
+                              <iframe src={exp.fileUrl} className="w-full h-full rounded-lg border border-slate-200 pointer-events-none bg-white" title="Documento del gasto" />
+                            </a>
+                          ) : (
+                            <a href={exp.fileUrl} target="_blank" rel="noopener noreferrer" className="block h-40 md:h-full">
+                              <img src={exp.fileUrl} alt="Documento del gasto"
+                                className="w-full h-full object-contain rounded-lg bg-white"
+                                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                            </a>
                           )}
                         </div>
 
-                        {/* CIF/NIF proveedor */}
-                        <div>
-                          <label className="block text-xs font-medium text-slate-500 mb-1">CIF / NIF</label>
-                          <input type="text" value={ed.supplierTaxId}
-                            onChange={e => updateEd(i, { supplierTaxId: e.target.value })}
-                            placeholder="B12345678"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
-                        </div>
+                        {/* Fields */}
+                        <div className="flex-1 p-4 grid grid-cols-2 gap-3">
 
-                        {/* Fecha */}
-                        <div>
-                          <label className="block text-xs font-medium text-slate-500 mb-1">Fecha del gasto</label>
-                          <input type="date" value={ed.date}
-                            onChange={e => updateEd(i, { date: e.target.value })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
-                        </div>
-
-                        {/* Cuenta de presupuesto */}
-                        <div className="col-span-2 relative">
-                          <label className="block text-xs font-medium text-slate-500 mb-1">Cuenta de presupuesto</label>
-                          <input type="text"
-                            value={ed.subAccountCode ? `${ed.subAccountCode} · ${ed.subAccountDescription}` : ed.subAccountSearch}
-                            onChange={e => { updateEd(i, { subAccountSearch: e.target.value, subAccountCode: "", subAccountDescription: "" }); }}
-                            onFocus={() => updateEd(i, { showSubAccountDropdown: true })}
-                            placeholder="Buscar cuenta"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
-                          {ed.showSubAccountDropdown && filteredAccounts.length > 0 && (
-                            <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
-                              {filteredAccounts.slice(0, 10).map(a => (
-                                <button key={a.id} type="button"
-                                  onClick={() => updateEd(i, { subAccountCode: a.code, subAccountDescription: a.description, subAccountSearch: "", showSubAccountDropdown: false })}
-                                  className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50">
-                                  <span className="font-mono text-slate-500 mr-2">{a.code}</span>
-                                  <span className="text-slate-900">{a.description}</span>
+                          {/* Tipo */}
+                          <div className="col-span-2">
+                            <label className="block text-xs font-medium text-slate-500 mb-1">Tipo</label>
+                            <div className="flex gap-1">
+                              {(["ticket", "invoice"] as const).map(t => (
+                                <button key={t} type="button"
+                                  onClick={() => updateEd(i, { type: t })}
+                                  className={`flex-1 py-2 rounded-lg text-xs font-medium border transition-colors ${ed.type === t ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                                  {t === "ticket" ? "Ticket" : "Factura"}
                                 </button>
                               ))}
                             </div>
-                          )}
-                        </div>
-
-                        {/* IVA */}
-                        <div>
-                          <label className="block text-xs font-medium text-slate-500 mb-1">IVA</label>
-                          <div className="flex gap-1">
-                            {VAT_RATES.map(r => (
-                              <button key={r} type="button"
-                                onClick={() => updateEd(i, { vatRate: r })}
-                                className={`flex-1 py-2 rounded-lg text-xs font-medium border transition-colors ${ed.vatRate === r ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
-                                {r}%
-                              </button>
-                            ))}
                           </div>
-                        </div>
 
-                        {/* IRPF */}
-                        <div>
-                          <label className="block text-xs font-medium text-slate-500 mb-1">IRPF</label>
-                          <div className="flex gap-1">
-                            {IRPF_RATES.map(r => (
-                              <button key={r} type="button"
-                                onClick={() => updateEd(i, { irpfRate: r })}
-                                className={`flex-1 py-2 rounded-lg text-xs font-medium border transition-colors ${ed.irpfRate === r ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
-                                {r}%
-                              </button>
-                            ))}
+                          {/* Proveedor */}
+                          <div className="col-span-2 relative">
+                            <label className="block text-xs font-medium text-slate-500 mb-1">Proveedor (empresa de la factura/ticket)</label>
+                            <input type="text" value={ed.supplier}
+                              onChange={e => { updateEd(i, { supplier: e.target.value }); setShowVolcarSupplierDropdown(i); }}
+                              onFocus={() => setShowVolcarSupplierDropdown(i)}
+                              placeholder="Nombre del proveedor"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
+                            {showVolcarSupplierDropdown === i && filteredSuppliers.length > 0 && (
+                              <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-40 overflow-y-auto">
+                                {filteredSuppliers.slice(0, 8).map(s => (
+                                  <button key={s.taxId} type="button"
+                                    onClick={() => { updateEd(i, { supplier: s.name, supplierTaxId: s.taxId }); setShowVolcarSupplierDropdown(null); }}
+                                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center justify-between">
+                                    <span className="text-slate-900">{s.name}</span>
+                                    <span className="text-xs text-slate-400">{s.taxId}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        </div>
 
+                          {/* CIF/NIF proveedor */}
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">CIF / NIF</label>
+                            <input type="text" value={ed.supplierTaxId}
+                              onChange={e => updateEd(i, { supplierTaxId: e.target.value })}
+                              placeholder="B12345678"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
+                          </div>
+
+                          {/* Fecha */}
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">Fecha del gasto</label>
+                            <input type="date" value={ed.date}
+                              onChange={e => updateEd(i, { date: e.target.value })}
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
+                          </div>
+
+                          {/* IRPF */}
+                          <div className="col-span-2">
+                            <label className="block text-xs font-medium text-slate-500 mb-1">IRPF</label>
+                            <div className="flex gap-1">
+                              {IRPF_RATES.map(r => (
+                                <button key={r} type="button"
+                                  onClick={() => updateEd(i, { irpfRate: r })}
+                                  className={`flex-1 py-2 rounded-lg text-xs font-medium border transition-colors ${ed.irpfRate === r ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                                  {r}%
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Cuenta(s) de presupuesto */}
+                          <div className="col-span-2 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="block text-xs font-medium text-slate-500">Cuenta(s) de presupuesto</label>
+                              <button type="button" onClick={() => addVolcarItem(i)}
+                                className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-slate-800">
+                                <Plus size={11} /> Añadir cuenta
+                              </button>
+                            </div>
+                            {ed.items.map((item, j) => {
+                              const filteredAccounts = subAccounts.filter(a =>
+                                !item.subAccountSearch ||
+                                a.code.includes(item.subAccountSearch) ||
+                                a.description.toLowerCase().includes(item.subAccountSearch.toLowerCase())
+                              );
+                              return (
+                                <div key={item.id} className="flex items-start gap-2">
+                                  <div className="flex-1 relative">
+                                    <input type="text"
+                                      value={item.subAccountCode ? `${item.subAccountCode} · ${item.subAccountDescription}` : item.subAccountSearch}
+                                      onChange={e => updateVolcarItem(i, j, { subAccountSearch: e.target.value, subAccountCode: "", subAccountDescription: "" })}
+                                      onFocus={() => updateVolcarItem(i, j, { showSubAccountDropdown: true })}
+                                      placeholder="Buscar cuenta"
+                                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
+                                    {item.showSubAccountDropdown && filteredAccounts.length > 0 && (
+                                      <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                                        {filteredAccounts.slice(0, 10).map(a => (
+                                          <button key={a.id} type="button"
+                                            onClick={() => updateVolcarItem(i, j, { subAccountCode: a.code, subAccountDescription: a.description, subAccountSearch: "", showSubAccountDropdown: false })}
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50">
+                                            <span className="font-mono text-slate-500 mr-2">{a.code}</span>
+                                            <span className="text-slate-900">{a.description}</span>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <input type="number" step="0.01" value={item.baseAmount || ""}
+                                    onChange={e => updateVolcarItem(i, j, { baseAmount: parseFloat(e.target.value) || 0 })}
+                                    placeholder="Base"
+                                    className="w-24 px-3 py-2 border border-slate-200 rounded-xl text-sm text-right focus:outline-none focus:ring-2 focus:ring-slate-200" />
+                                  <div className="relative">
+                                    <select value={item.vatRate}
+                                      onChange={e => updateVolcarItem(i, j, { vatRate: Number(e.target.value) })}
+                                      className="w-20 px-2 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-200 appearance-none">
+                                      {VAT_RATES.map(r => <option key={r} value={r}>{r}% IVA</option>)}
+                                    </select>
+                                  </div>
+                                  {ed.items.length > 1 && (
+                                    <button type="button" onClick={() => removeVolcarItem(i, j)}
+                                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg flex-shrink-0">
+                                      <Trash2 size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            <p className={`text-xs ${totalMismatch ? "text-amber-600" : "text-slate-400"}`}>
+                              {totalMismatch && <AlertTriangle size={11} className="inline mr-1 -mt-0.5" />}
+                              Codificado: {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(itemsTotal)} €
+                              {" "}(base {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(itemsBase)} € · IVA {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(itemsVat)} €)
+                              {totalMismatch && ` — no coincide con el total del ticket (${new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(totalAmt)} €)`}
+                            </p>
+                          </div>
+
+                        </div>
                       </div>
                     </div>
                   );
