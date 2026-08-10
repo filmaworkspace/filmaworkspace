@@ -261,4 +261,10 @@ export class FilmaPDF {
     this.finish();
     this.pdf.save(filename);
   }
+
+  /** Para generar el PDF sin disparar una descarga en el navegador — server-side, adjuntos de email, previews, etc. */
+  toArrayBuffer(): ArrayBuffer {
+    this.finish();
+    return this.pdf.output("arraybuffer");
+  }
 }
