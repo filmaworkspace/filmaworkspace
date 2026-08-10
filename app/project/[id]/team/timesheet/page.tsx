@@ -15,7 +15,7 @@ import {
   UserMinus, UserPlus, Users, X, CheckCircle,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
-import { ScheduleType, ScheduleTimes, SCHEDULE_LABELS, DEFAULT_SCHEDULE_TIMES } from "@/lib/horarioSchedules";
+import { ScheduleType, ScheduleTimes, SCHEDULE_LABELS, DEFAULT_SCHEDULE_TIMES, normalizeSchedules } from "@/lib/horarioSchedules";
 
 const SCHEDULE_TYPES: ScheduleType[] = ["rodaje", "oficina", "general"];
 
@@ -215,7 +215,7 @@ export default function ControlHorarioPage() {
       setCfgContactName(d.emailContactName ?? "");
       setCfgContactMail(d.emailContactMail ?? "");
       setCfgEmailBody(d.emailBody          ?? "");
-      setCfgSchedules(d.schedules ?? DEFAULT_SCHEDULE_TIMES);
+      setCfgSchedules(normalizeSchedules(d.schedules));
       setCfgDefaultSchedules(d.defaultSchedules ?? {});
     } else {
       const def: HorarioConfig = {
@@ -529,7 +529,7 @@ export default function ControlHorarioPage() {
   };
 
   const openSchedulesModal = () => {
-    setCfgSchedules(config?.schedules ?? DEFAULT_SCHEDULE_TIMES);
+    setCfgSchedules(normalizeSchedules(config?.schedules));
     setCfgDefaultSchedules(config?.defaultSchedules ?? {});
     setShowSchedules(true);
   };
