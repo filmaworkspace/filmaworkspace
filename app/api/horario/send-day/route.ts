@@ -4,6 +4,7 @@ import { adminAuth, db } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { horarioInviteHtml, horarioInviteText } from "@/lib/emails/horario-invite";
 import { requireUserOrCronSecret } from "@/lib/require-auth";
+import { ScheduleType, resolveScheduleTimes } from "@/lib/horarioSchedules";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest) {
     const emailBody    = cfg.emailBody    as string | undefined;
     const contactName  = cfg.emailContactName as string | undefined;
     const contactMail  = cfg.emailContactMail as string | undefined;
+    const schedules    = cfg.schedules as Partial<Record<ScheduleType, { entrada: string; salida: string }>> | undefined;
 
     // Load day config — days stored as docs in projects/{id}/horario, docId = date
     const dayRef = db.collection("projects").doc(projectId).collection("horario").doc(date);
@@ -43,7 +45,7 @@ export async function POST(req: NextRequest) {
 
     const dayData = daySnap.data()!;
     const jornada: number = dayData.jornada ?? 1;
-    const recipients: { uid: string; name: string; email: string; role: string }[] = dayData.recipients ?? [];
+    const recipients: { uid: string; name: string; email: string; role: string; schedule?: ScheduleType }[] = dayData.recipients ?? [];
 
     if (recipients.length === 0) return NextResponse.json({ error: "No hay destinatarios para este día" }, { status: 400 });
 
@@ -57,6 +59,9 @@ export async function POST(req: NextRequest) {
       const formRef = db.collection("projects").doc(projectId).collection("horarioForms").doc();
       const formId = formRef.id;
 
+      const scheduleType: ScheduleType = recipient.schedule === "oficina" ? "oficina" : "rodaje";
+      const preset = resolveScheduleTimes(schedules, scheduleType);
+
       const formPayload = {
         projectId,
         projectName,
@@ -69,8 +74,9 @@ export async function POST(req: NextRequest) {
         recipientRole:  recipient.role,
         sentAt:         FieldValue.serverTimestamp(),
         submittedAt:    null,
-        entrada:        null,
-        salida:         null,
+        scheduleType,
+        entrada:        preset.entrada,
+        salida:         preset.salida,
         comida:         null,
         observaciones:  "",
       };

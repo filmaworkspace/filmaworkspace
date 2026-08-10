@@ -4,6 +4,7 @@ import { db } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { horarioInviteHtml, horarioInviteText } from "@/lib/emails/horario-invite";
 import { requireUser } from "@/lib/require-auth";
+import { ScheduleType, resolveScheduleTimes } from "@/lib/horarioSchedules";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
     const emailBody    = cfg.emailBody    as string | undefined;
     const contactName  = cfg.emailContactName as string | undefined;
     const contactMail  = cfg.emailContactMail as string | undefined;
+    const schedules    = cfg.schedules as Partial<Record<ScheduleType, { entrada: string; salida: string }>> | undefined;
 
     const dayRef = db.collection("projects").doc(projectId).collection("horario").doc(date);
     const daySnap = await dayRef.get();
@@ -43,7 +45,7 @@ export async function POST(req: NextRequest) {
     const jornada: number = dayData.jornada ?? 1;
     const formattedDate = formatDate(date);
 
-    let recipients: { uid: string; name: string; email: string; role: string }[] = dayData.recipients ?? [];
+    let recipients: { uid: string; name: string; email: string; role: string; schedule?: ScheduleType }[] = dayData.recipients ?? [];
     if (recipientUids && recipientUids.length > 0) {
       recipients = recipients.filter((r) => recipientUids.includes(r.uid));
     }
@@ -69,12 +71,15 @@ export async function POST(req: NextRequest) {
       } else {
         const formRef = formsRef.doc();
         formId = formRef.id;
+        const scheduleType: ScheduleType = recipient.schedule === "oficina" ? "oficina" : "rodaje";
+        const preset = resolveScheduleTimes(schedules, scheduleType);
         const payload = {
           projectId, projectName, projectLabel, date, jornada,
           recipientUid: recipient.uid, recipientName: recipient.name,
           recipientEmail: recipient.email, recipientRole: recipient.role,
           sentAt: FieldValue.serverTimestamp(), submittedAt: null,
-          entrada: null, salida: null, comida: null, observaciones: "",
+          scheduleType, entrada: preset.entrada, salida: preset.salida,
+          comida: null, observaciones: "",
         };
         await formRef.set(payload);
         await db.collection("horarioForms").doc(formId).set(payload);

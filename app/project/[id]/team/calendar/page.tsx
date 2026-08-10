@@ -494,9 +494,34 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2 print:hidden">
-            <div />
-            <div className="flex items-center justify-center gap-2 flex-wrap">
+          <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            {/* Month/week nav */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => viewMode === "month" ? navMonth(-1) : navWeek(-1)}
+                className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors print:hidden"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <h2 className="text-xl font-bold text-slate-900 min-w-[220px] text-center">
+                {viewMode === "month"
+                  ? `${MONTHS_ES[currentMonth]} ${currentYear}`
+                  : (() => {
+                      const wd = getWeekDays();
+                      const s  = new Date(wd[0] + "T12:00:00");
+                      const e  = new Date(wd[6] + "T12:00:00");
+                      return `${s.getDate()} ${MONTHS_ES[s.getMonth()].slice(0,3)} – ${e.getDate()} ${MONTHS_ES[e.getMonth()].slice(0,3)} ${e.getFullYear()}`;
+                    })()
+                }
+              </h2>
+              <button
+                onClick={() => viewMode === "month" ? navMonth(1) : navWeek(1)}
+                className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors print:hidden"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+            <div className="flex items-center justify-center gap-2 flex-wrap print:hidden">
               {/* Filter */}
               <div className="relative" ref={filterRef}>
                 <button
@@ -562,7 +587,7 @@ export default function CalendarPage() {
               </button>
             </div>
 
-            <div className="flex justify-end items-center gap-2">
+            <div className="flex justify-end items-center gap-2 print:hidden">
               <button
                 onClick={() => window.print()}
                 title="Descargar / imprimir en PDF"
@@ -584,55 +609,7 @@ export default function CalendarPage() {
       </div>
 
       {/* ── Content ──────────────────────────────────────────────────────── */}
-      <main className="px-24 pb-16">
-
-        {/* ─ Nav row ─ */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => viewMode === "month" ? navMonth(-1) : navWeek(-1)}
-              className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors print:hidden"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <h2 className="text-xl font-bold text-slate-900 min-w-[220px] text-center">
-              {viewMode === "month"
-                ? `${MONTHS_ES[currentMonth]} ${currentYear}`
-                : (() => {
-                    const wd = getWeekDays();
-                    const s  = new Date(wd[0] + "T12:00:00");
-                    const e  = new Date(wd[6] + "T12:00:00");
-                    return `${s.getDate()} ${MONTHS_ES[s.getMonth()].slice(0,3)} – ${e.getDate()} ${MONTHS_ES[e.getMonth()].slice(0,3)} ${e.getFullYear()}`;
-                  })()
-              }
-            </h2>
-            <button
-              onClick={() => viewMode === "month" ? navMonth(1) : navWeek(1)}
-              className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors print:hidden"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-
-          {/* Crew stats strip */}
-          <div className="flex items-center gap-3 print:hidden">
-            {(["technical","cast","specialists"] as CrewSection[]).map((sec) => {
-              const count = crew.filter((m) => m.section === sec && m.status === "active").length;
-              const colors: Record<CrewSection,string> = { technical: "text-sky-600 bg-sky-50", cast: "text-violet-600 bg-violet-50", specialists: "text-amber-600 bg-amber-50" };
-              const labels: Record<CrewSection,string> = { technical: "Técnico", cast: "Cast", specialists: "Especialistas" };
-              return (
-                <Link
-                  key={sec}
-                  href={`/project/${id}/team/crew`}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium ${colors[sec]} transition-opacity hover:opacity-80`}
-                >
-                  <Users size={11} />
-                  {count} {labels[sec]}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
+      <main className="px-24 pt-6 pb-16">
 
         {/* ─── MONTH VIEW ─────────────────────────────────────────────────── */}
         {viewMode === "month" && (

@@ -15,6 +15,7 @@ import {
   UserMinus, UserPlus, Users, X, CheckCircle,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
+import { ScheduleType, SCHEDULE_LABELS, DEFAULT_SCHEDULE_TIMES } from "@/lib/horarioSchedules";
 
 const G = "#6BA319";
 
@@ -27,13 +28,19 @@ interface HorarioConfig {
   emailContactName?: string;
   emailContactMail?: string;
   emailBody?:        string;
+  /** Horas de entrada/salida por defecto de cada tipo de jornada. */
+  schedules?:        Record<ScheduleType, { entrada: string; salida: string }>;
+  /** Jornada habitual de cada persona (uid → tipo) — valor por defecto al añadirla a un día. */
+  defaultSchedules?: Record<string, ScheduleType>;
 }
 
 interface Recipient {
-  uid:   string;
-  name:  string;
-  email: string;
-  role:  string;
+  uid:      string;
+  name:     string;
+  email:    string;
+  role:     string;
+  /** Jornada de este día concreto para esta persona; si no está, se trata como "rodaje". */
+  schedule?: ScheduleType;
 }
 
 interface DayConfig {
@@ -138,6 +145,8 @@ export default function ControlHorarioPage() {
   const [cfgContactName,     setCfgContactName]     = useState("");
   const [cfgContactMail,     setCfgContactMail]     = useState("");
   const [cfgEmailBody,       setCfgEmailBody]       = useState("");
+  const [cfgSchedules,       setCfgSchedules]       = useState<Record<ScheduleType, { entrada: string; salida: string }>>(DEFAULT_SCHEDULE_TIMES);
+  const [cfgDefaultSchedules, setCfgDefaultSchedules] = useState<Record<string, ScheduleType>>({});
 
   // New day jornada edit
   const [editingJornada, setEditingJornada] = useState(false);
@@ -200,9 +209,12 @@ export default function ControlHorarioPage() {
       setCfgContactName(d.emailContactName ?? "");
       setCfgContactMail(d.emailContactMail ?? "");
       setCfgEmailBody(d.emailBody          ?? "");
+      setCfgSchedules(d.schedules ?? DEFAULT_SCHEDULE_TIMES);
+      setCfgDefaultSchedules(d.defaultSchedules ?? {});
     } else {
       const def: HorarioConfig = {
         enabled: true, sendTime: "19:00", defaultRecipients: [],
+        schedules: DEFAULT_SCHEDULE_TIMES, defaultSchedules: {},
       };
       await setDoc(doc(db, `projects/${id}/horario/config`), def);
       setConfig(def);
@@ -265,12 +277,16 @@ export default function ControlHorarioPage() {
 
   // ── Day helpers ───────────────────────────────────────────────────────────
 
+  /** Jornada habitual de una persona (config.defaultSchedules), "rodaje" si no está asignada. */
+  const resolveSchedule = (uid: string): ScheduleType => config?.defaultSchedules?.[uid] ?? "rodaje";
+
   const getOrCreateDay = async (date: string): Promise<DayConfig> => {
     if (days[date]) return days[date];
     // Auto-create with default recipients
-    const defaultRecipients = config?.defaultRecipients ?? crew.map((m) => ({
+    const baseRecipients: Recipient[] = config?.defaultRecipients ?? crew.map((m) => ({
       uid: m.id, name: `${m.firstName} ${m.lastName1}`.trim(), email: m.email, role: m.role,
     }));
+    const defaultRecipients = baseRecipients.map((r) => ({ ...r, schedule: r.schedule ?? resolveSchedule(r.uid) }));
     const nextJornada = Object.values(days).filter((d) => d.date <= date && d.jornada).length + 1;
     const newDay: DayConfig = { date, jornada: nextJornada, status: "draft", recipients: defaultRecipients };
     await setDoc(doc(db, `projects/${id}/horario`, date), newDay);
@@ -355,11 +371,20 @@ export default function ControlHorarioPage() {
     const newRecipient: Recipient = {
       uid: member.id, name: `${member.firstName} ${member.lastName1}`.trim(),
       email: member.email, role: member.role,
+      schedule: resolveSchedule(member.id),
     };
     const updated = [...day.recipients, newRecipient];
     await updateDoc(doc(db, `projects/${id}/horario`, selectedDate), { recipients: updated });
     setDays((prev) => ({ ...prev, [selectedDate]: { ...day, recipients: updated } }));
     showToast("success", `${newRecipient.name} añadido`);
+  };
+
+  const handleSetRecipientSchedule = async (uid: string, schedule: ScheduleType) => {
+    const day = currentDay;
+    if (!day) return;
+    const updated = day.recipients.map((r) => r.uid === uid ? { ...r, schedule } : r);
+    await updateDoc(doc(db, `projects/${id}/horario`, selectedDate), { recipients: updated });
+    setDays((prev) => ({ ...prev, [selectedDate]: { ...day, recipients: updated } }));
   };
 
   const handleRemoveMember = async (uid: string) => {
@@ -485,6 +510,8 @@ export default function ControlHorarioPage() {
         emailContactName: cfgContactName.trim(),
         emailContactMail: cfgContactMail.trim(),
         emailBody:        cfgEmailBody.trim(),
+        schedules:        cfgSchedules,
+        defaultSchedules: cfgDefaultSchedules,
       };
       await updateDoc(doc(db, `projects/${id}/horario/config`), updated);
       setConfig((prev) => prev ? { ...prev, ...updated } : null);
@@ -534,7 +561,9 @@ export default function ControlHorarioPage() {
     const day = await getOrCreateDay(selectedDate);
     // Merge: add members not already in the day list
     const existing = new Set(day.recipients.map((r) => r.uid));
-    const toAdd = g.recipients.filter((r) => !existing.has(r.uid));
+    const toAdd = g.recipients
+      .filter((r) => !existing.has(r.uid))
+      .map((r) => ({ ...r, schedule: r.schedule ?? resolveSchedule(r.uid) }));
     if (toAdd.length === 0) { showToast("error", "Todos ya están en el día"); return; }
     const updated = [...day.recipients, ...toAdd];
     await updateDoc(doc(db, `projects/${id}/horario`, selectedDate), { recipients: updated });
@@ -765,7 +794,9 @@ export default function ControlHorarioPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-900 truncate">{r.name}</p>
-                          <p className="text-xs text-slate-400 truncate">{r.role}</p>
+                          <p className="text-xs text-slate-400 truncate">
+                            {r.role}{r.role ? " · " : ""}{SCHEDULE_LABELS[r.schedule ?? "rodaje"]}
+                          </p>
                         </div>
                         {submitted && form ? (
                           <div className="flex items-center gap-1.5">
@@ -810,10 +841,25 @@ export default function ControlHorarioPage() {
                             </button>
                           </div>
                         ) : (
-                          <button onClick={() => handleRemoveMember(r.uid)}
-                            className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Quitar">
-                            <UserMinus size={13} />
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <div className="flex border border-slate-200 rounded-lg overflow-hidden flex-shrink-0">
+                              {(["rodaje", "oficina"] as ScheduleType[]).map((opt) => (
+                                <button key={opt} type="button"
+                                  onClick={() => handleSetRecipientSchedule(r.uid, opt)}
+                                  className={`px-2 py-1 text-[10px] font-medium transition-colors ${
+                                    (r.schedule ?? "rodaje") === opt ? "text-white" : "text-slate-500 hover:bg-slate-50"
+                                  }`}
+                                  style={(r.schedule ?? "rodaje") === opt ? { background: G } : {}}
+                                >
+                                  {SCHEDULE_LABELS[opt]}
+                                </button>
+                              ))}
+                            </div>
+                            <button onClick={() => handleRemoveMember(r.uid)}
+                              className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Quitar">
+                              <UserMinus size={13} />
+                            </button>
+                          </div>
                         )}
                       </div>
                     );
@@ -945,6 +991,71 @@ export default function ControlHorarioPage() {
                     />
                     <p className="text-[11px] text-slate-400 mt-1">Se muestra al pie del email para que el crew pueda contactar si tiene dudas.</p>
                   </div>
+                </div>
+              </div>
+
+              <div className="pt-1 border-t border-slate-100">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Horarios por defecto</p>
+                <p className="text-[11px] text-slate-400 mb-3">Se rellenan solas al fichar según la jornada asignada a cada persona — siempre se pueden cambiar a mano.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {(["rodaje", "oficina"] as ScheduleType[]).map((st) => (
+                    <div key={st} className="border border-slate-200 rounded-xl p-3">
+                      <p className="text-xs font-semibold text-slate-700 mb-2">{SCHEDULE_LABELS[st]}</p>
+                      <div className="space-y-2">
+                        <div>
+                          <label className="text-[11px] text-slate-500 block mb-1">Entrada</label>
+                          <input
+                            type="time"
+                            value={cfgSchedules[st].entrada}
+                            onChange={(e) => setCfgSchedules((prev) => ({ ...prev, [st]: { ...prev[st], entrada: e.target.value } }))}
+                            className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-slate-500 block mb-1">Salida</label>
+                          <input
+                            type="time"
+                            value={cfgSchedules[st].salida}
+                            onChange={(e) => setCfgSchedules((prev) => ({ ...prev, [st]: { ...prev[st], salida: e.target.value } }))}
+                            className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-1 border-t border-slate-100">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Jornada habitual por persona</p>
+                <p className="text-[11px] text-slate-400 mb-3">Valor por defecto al añadir a alguien a un día — siempre se puede cambiar para un día concreto.</p>
+                <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 max-h-56 overflow-y-auto">
+                  {crew.length === 0 ? (
+                    <p className="text-sm text-slate-400 text-center py-6">No hay crew activo</p>
+                  ) : crew.map((m) => {
+                    const st = cfgDefaultSchedules[m.id] ?? "rodaje";
+                    return (
+                      <div key={m.id} className="flex items-center justify-between gap-2 px-3 py-2.5">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-900 truncate">{m.firstName} {m.lastName1}</p>
+                          <p className="text-xs text-slate-400 truncate">{m.role || m.section || "—"}</p>
+                        </div>
+                        <div className="flex border border-slate-200 rounded-lg overflow-hidden flex-shrink-0">
+                          {(["rodaje", "oficina"] as ScheduleType[]).map((opt) => (
+                            <button key={opt} type="button"
+                              onClick={() => setCfgDefaultSchedules((prev) => ({ ...prev, [m.id]: opt }))}
+                              className={`px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                                st === opt ? "text-white" : "text-slate-600 hover:bg-slate-50"
+                              }`}
+                              style={st === opt ? { background: G } : {}}
+                            >
+                              {SCHEDULE_LABELS[opt]}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

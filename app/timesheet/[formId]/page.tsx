@@ -6,6 +6,7 @@ import { inter } from "@/lib/fonts";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { AlertCircle, CheckCircle, LogIn, LogOut, Utensils } from "lucide-react";
+import { ScheduleType, SCHEDULE_LABELS } from "@/lib/horarioSchedules";
 
 const G = "#6BA319";
 
@@ -22,6 +23,7 @@ interface FormData {
   salida: string | null;
   comida: number | null;
   observaciones: string;
+  scheduleType?: ScheduleType;
 }
 
 
@@ -66,6 +68,7 @@ export default function FormHorarioPage() {
       }
 
       if (data.entrada) setEntrada(data.entrada);
+      if (data.salida)  setSalida(data.salida);
       setStatus("ready");
     } catch (e: any) {
       console.error("loadForm error:", e?.code, e?.message, e);
@@ -140,6 +143,11 @@ export default function FormHorarioPage() {
               Control horario · Jornada #{formData?.jornada}
             </h1>
             <p className="text-sm text-white/80 mt-1">{formData ? formatDateLabel(formData.date) : ""}</p>
+            {formData?.scheduleType && (
+              <span className="inline-block mt-2 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-white/15 text-white">
+                Jornada de {SCHEDULE_LABELS[formData.scheduleType].toLowerCase()}
+              </span>
+            )}
           </div>
 
           <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">

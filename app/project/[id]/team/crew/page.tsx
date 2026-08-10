@@ -875,21 +875,8 @@ export default function CrewPage() {
               <h1 className="text-3xl font-bold text-slate-900 text-center">Crew</h1>
             </div>
 
-            {/* Right: stats + botón */}
+            {/* Right: botones */}
             <div className="absolute right-0 flex items-center gap-4">
-              {/* Stats pill */}
-              <div className="flex items-center gap-4 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl">
-                <div className="text-center">
-                  <p className="text-xs text-slate-400 leading-none mb-0.5">Activos</p>
-                  <p className="text-base font-bold text-slate-900 leading-none">{stats.active}</p>
-                </div>
-                <div className="w-px h-6 bg-slate-200" />
-                <div className="text-center">
-                  <p className="text-xs text-slate-400 leading-none mb-0.5">Total</p>
-                  <p className="text-base font-bold text-slate-900 leading-none">{stats.total}</p>
-                </div>
-              </div>
-
               <button
                 onClick={openCrewListModal}
                 disabled={crew.length === 0}
