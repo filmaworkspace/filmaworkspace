@@ -4,7 +4,7 @@ import { db } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { horarioInviteHtml, horarioInviteText } from "@/lib/emails/horario-invite";
 import { requireUser } from "@/lib/require-auth";
-import { ScheduleType, resolveScheduleTimes } from "@/lib/horarioSchedules";
+import { ScheduleType, ScheduleTimes, resolveScheduleTimes } from "@/lib/horarioSchedules";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     const emailBody    = cfg.emailBody    as string | undefined;
     const contactName  = cfg.emailContactName as string | undefined;
     const contactMail  = cfg.emailContactMail as string | undefined;
-    const schedules    = cfg.schedules as Partial<Record<ScheduleType, { entrada: string; salida: string }>> | undefined;
+    const schedules    = cfg.schedules as Partial<Record<ScheduleType, ScheduleTimes>> | undefined;
 
     const dayRef = db.collection("projects").doc(projectId).collection("horario").doc(date);
     const daySnap = await dayRef.get();
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
       } else {
         const formRef = formsRef.doc();
         formId = formRef.id;
-        const scheduleType: ScheduleType = recipient.schedule === "oficina" ? "oficina" : "rodaje";
+        const scheduleType: ScheduleType = recipient.schedule ?? "general";
         const preset = resolveScheduleTimes(schedules, scheduleType);
         const payload = {
           projectId, projectName, projectLabel, date, jornada,
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
           recipientEmail: recipient.email, recipientRole: recipient.role,
           sentAt: FieldValue.serverTimestamp(), submittedAt: null,
           scheduleType, entrada: preset.entrada, salida: preset.salida,
-          comida: null, observaciones: "",
+          comida: preset.descanso, observaciones: "",
         };
         await formRef.set(payload);
         await db.collection("horarioForms").doc(formId).set(payload);

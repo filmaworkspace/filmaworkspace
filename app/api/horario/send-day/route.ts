@@ -4,7 +4,7 @@ import { adminAuth, db } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { horarioInviteHtml, horarioInviteText } from "@/lib/emails/horario-invite";
 import { requireUserOrCronSecret } from "@/lib/require-auth";
-import { ScheduleType, resolveScheduleTimes } from "@/lib/horarioSchedules";
+import { ScheduleType, ScheduleTimes, resolveScheduleTimes } from "@/lib/horarioSchedules";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     const emailBody    = cfg.emailBody    as string | undefined;
     const contactName  = cfg.emailContactName as string | undefined;
     const contactMail  = cfg.emailContactMail as string | undefined;
-    const schedules    = cfg.schedules as Partial<Record<ScheduleType, { entrada: string; salida: string }>> | undefined;
+    const schedules    = cfg.schedules as Partial<Record<ScheduleType, ScheduleTimes>> | undefined;
 
     // Load day config — days stored as docs in projects/{id}/horario, docId = date
     const dayRef = db.collection("projects").doc(projectId).collection("horario").doc(date);
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       const formRef = db.collection("projects").doc(projectId).collection("horarioForms").doc();
       const formId = formRef.id;
 
-      const scheduleType: ScheduleType = recipient.schedule === "oficina" ? "oficina" : "rodaje";
+      const scheduleType: ScheduleType = recipient.schedule ?? "general";
       const preset = resolveScheduleTimes(schedules, scheduleType);
 
       const formPayload = {
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
         scheduleType,
         entrada:        preset.entrada,
         salida:         preset.salida,
-        comida:         null,
+        comida:         preset.descanso,
         observaciones:  "",
       };
       await formRef.set(formPayload);

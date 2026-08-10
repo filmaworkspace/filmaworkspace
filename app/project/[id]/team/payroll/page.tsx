@@ -674,24 +674,25 @@ export default function PayrollPage() {
           <button onClick={nextM} className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"><ChevronRight size={16} /></button>
         </div>
 
-        {/* View */}
-        <div className="flex items-center gap-0.5 border border-slate-200 rounded-xl p-0.5">
-          {(["grid","summary"] as const).map(v => (
-            <button key={v} onClick={() => setViewMode(v)}
-              className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${viewMode===v ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>
-              {v === "grid" ? "Tabla" : "Resumen"}
-            </button>
-          ))}
+        <div className="flex items-center gap-3 ml-auto">
+          {/* View */}
+          <div className="flex items-center gap-0.5 border border-slate-200 rounded-xl p-0.5">
+            {(["grid","summary"] as const).map(v => (
+              <button key={v} onClick={() => setViewMode(v)}
+                className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${viewMode===v ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>
+                {v === "grid" ? "Tabla" : "Resumen"}
+              </button>
+            ))}
+          </div>
+
+          {/* Period config */}
+          <button
+            onClick={() => { setPeriodsDraft({...periods}); setShowPeriodCfg(true); }}
+            className={`flex items-center gap-2 px-3 py-2 border rounded-xl text-xs font-medium transition-colors ${Object.keys(periods).length > 0 ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+            <CalendarRange size={13} />
+            {Object.keys(periods).length > 0 ? `${Object.keys(periods).length} período${Object.keys(periods).length !== 1 ? "s" : ""}` : "Períodos"}
+          </button>
         </div>
-
-        {/* Period config */}
-        <button
-          onClick={() => { setPeriodsDraft({...periods}); setShowPeriodCfg(true); }}
-          className={`flex items-center gap-2 px-3 py-2 border rounded-xl text-xs font-medium transition-colors ${Object.keys(periods).length > 0 ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
-          <CalendarRange size={13} />
-          {Object.keys(periods).length > 0 ? `${Object.keys(periods).length} período${Object.keys(periods).length !== 1 ? "s" : ""}` : "Períodos"}
-        </button>
-
       </div>
 
       {/* ── Legend ───────────────────────────────────────────────────────── */}
@@ -707,7 +708,7 @@ export default function PayrollPage() {
           <span className="text-xs text-slate-500">Otros</span>
         </div>
         <div className="flex items-center gap-1.5 ml-auto">
-          <div className="w-6 h-[5px] rounded-full flex-shrink-0" style={{ backgroundColor: TEAM_COLOR }} />
+          <div className="w-6 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: TEAM_COLOR }} />
           <span className="text-xs text-slate-400">Día trabajado · click para marcar/desmarcar</span>
         </div>
       </div>
@@ -843,7 +844,7 @@ export default function PayrollPage() {
                 {/* Worked days toggle */}
                 <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${rfWorked ? "border-slate-300 bg-slate-50" : "border-slate-100"}`}>
                   <input type="checkbox" checked={rfWorked} onChange={() => setRfWorked(v => !v)} className="sr-only" />
-                  <div className="w-5 h-[5px] rounded-full flex-shrink-0" style={{ backgroundColor: rfWorked ? TEAM_COLOR : "#cbd5e1" }} />
+                  <div className="w-5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: rfWorked ? TEAM_COLOR : "#cbd5e1" }} />
                   <span className="text-xs font-medium text-slate-700 flex-1">Días trabajados (salario)</span>
                   <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border flex-shrink-0 transition-all ${rfWorked ? "border-slate-900 bg-slate-900" : "border-slate-300"}`}>
                     {rfWorked && <Check size={8} className="text-white" />}
@@ -1701,12 +1702,12 @@ export default function PayrollPage() {
                                 {/* Worked-day bar */}
                                 <div
                                   onClick={() => toggleWorked(m, d)}
-                                  className="h-[5px] cursor-pointer transition-colors"
+                                  className="h-2.5 cursor-pointer transition-colors hover:opacity-80"
                                   style={{
-                                    backgroundColor: worked ? TEAM_COLOR : "transparent",
+                                    backgroundColor: worked ? TEAM_COLOR : "#e2e8f0",
                                     marginLeft:  prevWork ? 0 : 2,
                                     marginRight: nextWork ? 0 : 2,
-                                    borderRadius: `${prevWork ? 0 : 3}px ${nextWork ? 0 : 3}px ${nextWork ? 0 : 3}px ${prevWork ? 0 : 3}px`,
+                                    borderRadius: `${prevWork ? 0 : 4}px ${nextWork ? 0 : 4}px ${nextWork ? 0 : 4}px ${prevWork ? 0 : 4}px`,
                                     opacity: outside ? 0.4 : 1,
                                   }}
                                 />

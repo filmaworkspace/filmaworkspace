@@ -69,6 +69,7 @@ export default function FormHorarioPage() {
 
       if (data.entrada) setEntrada(data.entrada);
       if (data.salida)  setSalida(data.salida);
+      if (data.comida != null) setComida(String(data.comida));
       setStatus("ready");
     } catch (e: any) {
       console.error("loadForm error:", e?.code, e?.message, e);
@@ -145,7 +146,7 @@ export default function FormHorarioPage() {
             <p className="text-sm text-white/80 mt-1">{formData ? formatDateLabel(formData.date) : ""}</p>
             {formData?.scheduleType && (
               <span className="inline-block mt-2 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-white/15 text-white">
-                Jornada de {SCHEDULE_LABELS[formData.scheduleType].toLowerCase()}
+                {formData.scheduleType === "general" ? "Jornada general" : `Jornada de ${SCHEDULE_LABELS[formData.scheduleType].toLowerCase()}`}
               </span>
             )}
           </div>
