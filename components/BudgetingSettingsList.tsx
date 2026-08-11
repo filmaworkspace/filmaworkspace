@@ -30,12 +30,11 @@ export interface SettingsListField {
 interface Props {
   draftId: string;
   arrayField: "globals" | "fringes" | "phases";
-  description: string;
   fields: SettingsListField[];
   emptyLabel: string;
 }
 
-export default function BudgetingSettingsList({ draftId, arrayField, description, fields, emptyLabel }: Props) {
+export default function BudgetingSettingsList({ draftId, arrayField, fields, emptyLabel }: Props) {
   const { user } = useUser();
   const [items, setItems] = useState<Record<string, any>[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,8 +115,6 @@ export default function BudgetingSettingsList({ draftId, arrayField, description
 
   return (
     <div className="w-full px-10 py-8 max-w-2xl">
-      <p className="text-sm text-slate-500 mb-6">{description}</p>
-
       <div className="border border-slate-200 rounded-2xl overflow-hidden">
         {items.length === 0 ? (
           <p className="text-xs text-slate-400 text-center py-8">{emptyLabel}</p>
@@ -144,9 +141,9 @@ export default function BudgetingSettingsList({ draftId, arrayField, description
             ))}
           </div>
         )}
-        <div className="px-5 py-3 border-t border-slate-100">
-          <button onClick={openCreate} className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg ${BTN_LIGHT}`}>
-            <Plus size={13} />
+        <div className="px-5 py-2.5 border-t border-slate-100">
+          <button onClick={openCreate} className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg ${BTN_LIGHT}`}>
+            <Plus size={12} />
             Añadir
           </button>
         </div>
