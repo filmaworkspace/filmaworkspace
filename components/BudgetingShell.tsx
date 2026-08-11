@@ -1,263 +1,152 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
-import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
-import { collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { ArrowLeft, FileUp, Plus, Search, Trash2, X } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
-import { BUDGETING_ACCENT, BUDGETING_ACCENT_DARK, BudgetingDraftIndex } from "@/lib/budgeting";
+import { BudgetingDraft } from "@/lib/budgeting";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Sidebar de Budgeting — dos modos según la ruta:
+//  · /budgeting               → solo el logo y el pie (la lista de
+//    presupuestos vive en el propio contenido, como una grid de tarjetas).
+//  · /budgeting/{draftId}/... → nav propia del borrador (Top Sheet,
+//    Categorías, Globales, Seguridad Social, Fases) y el nombre del
+//    borrador, editable aquí — ya no se repite en el contenido.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function BudgetingShell({ children }: { children: React.ReactNode }) {
   const { user } = useUser();
   const pathname = usePathname();
-  const router = useRouter();
 
-  const [drafts, setDrafts] = useState<BudgetingDraftIndex[]>([]);
-  const [search, setSearch] = useState("");
-  const [showNewDraft, setShowNewDraft] = useState(false);
-  const [newDraftName, setNewDraftName] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<BudgetingDraftIndex | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const segments = pathname.split("/").filter(Boolean);
+  const draftId = segments[0] === "budgeting" && segments[1] ? segments[1] : null;
+
+  const [draft, setDraft] = useState<BudgetingDraft | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const editingNameRef = useRef(false);
+  useEffect(() => { editingNameRef.current = editingName; }, [editingName]);
 
   useEffect(() => {
-    if (!user) return;
-    const q = query(collection(db, `userBudgetingDrafts/${user.uid}/drafts`), orderBy("updatedAt", "desc"));
-    const unsub = onSnapshot(q, (snap) => {
-      setDrafts(snap.docs.map((d) => ({ id: d.id, ...d.data() } as BudgetingDraftIndex)));
+    if (!draftId) { setDraft(null); return; }
+    const unsub = onSnapshot(doc(db, "budgetingDrafts", draftId), (snap) => {
+      if (!snap.exists()) return;
+      const data = { id: snap.id, ...snap.data() } as BudgetingDraft;
+      setDraft(data);
+      if (!editingNameRef.current) setNameInput(data.name);
     });
     return () => unsub();
-  }, [user]);
+  }, [draftId]);
 
-  const filteredDrafts = drafts.filter((d) => d.name.toLowerCase().includes(search.trim().toLowerCase()));
-
-  const handleCreateDraft = async () => {
-    if (!newDraftName.trim() || !user) return;
-    setCreating(true);
-    try {
-      const ref = doc(collection(db, "budgetingDrafts"));
-      const now = serverTimestamp();
-      await setDoc(ref, {
-        name: newDraftName.trim(),
-        ownerUid: user.uid,
-        ownerName: user.name,
-        currency: "EUR",
-        createdAt: now,
-        updatedAt: now,
-        sentToProjectId: null,
-        sentToProjectName: null,
-        sentAt: null,
-      });
-      await setDoc(doc(db, `userBudgetingDrafts/${user.uid}/drafts`, ref.id), {
-        name: newDraftName.trim(),
-        updatedAt: now,
-        status: "draft",
-        sentToProjectName: null,
-      });
-      setShowNewDraft(false);
-      setNewDraftName("");
-      router.push(`/budgeting/${ref.id}`);
-    } catch (e) {
-      console.error("[Budgeting] Error creando borrador:", e);
-    } finally {
-      setCreating(false);
-    }
+  const handleRenameDraft = async () => {
+    setEditingName(false);
+    if (!draft || !user || !nameInput.trim() || nameInput.trim() === draft.name) return;
+    const name = nameInput.trim();
+    await Promise.all([
+      updateDoc(doc(db, "budgetingDrafts", draft.id), { name, updatedAt: serverTimestamp() }),
+      updateDoc(doc(db, `userBudgetingDrafts/${user.uid}/drafts`, draft.id), { name, updatedAt: serverTimestamp() }),
+    ]);
   };
 
-  const handleDeleteDraft = async () => {
-    if (!deleteTarget || !user) return;
-    setDeleting(true);
-    try {
-      await Promise.all([
-        deleteDoc(doc(db, "budgetingDrafts", deleteTarget.id)),
-        deleteDoc(doc(db, `userBudgetingDrafts/${user.uid}/drafts`, deleteTarget.id)),
-      ]);
-      if (pathname === `/budgeting/${deleteTarget.id}`) router.push("/budgeting");
-      setDeleteTarget(null);
-    } catch (e) {
-      console.error("[Budgeting] Error borrando borrador:", e);
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const gradient = `linear-gradient(135deg, #6C64F5, ${BUDGETING_ACCENT_DARK})`;
+  const navItems = draftId ? [
+    { href: `/budgeting/${draftId}`, label: "Top Sheet", exact: true },
+    { href: `/budgeting/${draftId}/categories`, label: "Categorías", exact: false },
+    { href: `/budgeting/${draftId}/globals`, label: "Globales", exact: false },
+    { href: `/budgeting/${draftId}/fringes`, label: "Seguridad Social", exact: false },
+    { href: `/budgeting/${draftId}/phases`, label: "Fases", exact: false },
+  ] : [];
 
   return (
-    <div className={`min-h-screen flex flex-col bg-white ${inter.className}`}>
-      {/* Barra de acento superior */}
-      <div className="h-1 flex-shrink-0" style={{ background: gradient }} />
+    <div className={`min-h-screen flex bg-white ${inter.className}`}>
+      <aside className="w-60 flex-shrink-0 border-r border-slate-100 flex flex-col h-screen sticky top-0">
+        <div className="px-5 pt-6 pb-5 flex justify-center border-b border-slate-100">
+          <Link href="/budgeting">
+            <Image src="/logo-budgeting.svg" alt="Budgeting" width={82} height={24} className="h-6 w-auto" priority />
+          </Link>
+        </div>
 
-      <div className="flex flex-1 min-h-0">
-        {/* ── Sidebar ────────────────────────────────────────────────────── */}
-        <aside className="w-64 flex-shrink-0 border-r border-slate-100 flex flex-col h-[calc(100vh-4px)] sticky top-1">
-          <div className="px-5 pt-6 pb-4">
-            <div className="mb-5">
-              <Image src="/logo-budgeting.svg" alt="Budgeting" width={161} height={23} className="h-6 w-auto" priority />
-            </div>
-
-            <button
-              onClick={() => setShowNewDraft(true)}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium text-white shadow-sm hover:shadow-md hover:brightness-105 active:brightness-95 transition-all"
-              style={{ background: gradient }}
-            >
-              <Plus size={14} />
-              Nuevo presupuesto
-            </button>
-          </div>
-
-          <div className="px-5 pb-3">
-            <div className="relative">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar"
-                className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
-              />
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto px-3 space-y-0.5">
-            {filteredDrafts.length === 0 ? (
-              <p className="text-xs text-slate-400 text-center py-8 px-3">
-                {drafts.length === 0 ? "Sin borradores todavía" : "Sin resultados"}
-              </p>
-            ) : filteredDrafts.map((d) => {
-              const isActive = pathname === `/budgeting/${d.id}`;
-              return (
-                <Link
-                  key={d.id}
-                  href={`/budgeting/${d.id}`}
-                  className={`group flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${
-                    isActive ? "bg-[#5B57E0]/[0.08] text-slate-900 font-medium" : "text-slate-600 hover:bg-slate-50"
-                  }`}
+        {draftId ? (
+          <>
+            <div className="px-5 py-4 border-b border-slate-100">
+              <Link href="/budgeting" className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 transition-colors mb-3">
+                <ArrowLeft size={12} />
+                Presupuestos
+              </Link>
+              {editingName ? (
+                <input
+                  autoFocus
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  onBlur={handleRenameDraft}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                    if (e.key === "Escape" && draft) { setNameInput(draft.name); setEditingName(false); }
+                  }}
+                  className="text-sm font-semibold text-slate-900 border-b-2 border-[#5B57E0] focus:outline-none bg-transparent px-0 py-0.5 w-full"
+                />
+              ) : (
+                <button
+                  onClick={() => setEditingName(true)}
+                  className="text-sm font-semibold text-slate-900 hover:text-[#5B57E0] transition-colors text-left truncate block w-full"
+                  title="Renombrar"
                 >
-                  <div
-                    className="w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-semibold text-white flex-shrink-0"
-                    style={{ background: d.status === "sent" ? "linear-gradient(135deg, #34d399, #059669)" : gradient }}
+                  {draft?.name || ""}
+                </button>
+              )}
+            </div>
+
+            <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
+              {navItems.map((item) => {
+                const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
+                      isActive ? "bg-[#5B57E0]/[0.06] text-[#5B57E0] font-medium" : "text-slate-600 hover:bg-slate-50"
+                    }`}
                   >
-                    {d.name.charAt(0).toUpperCase()}
-                  </div>
-                  <span className="flex-1 truncate">{d.name}</span>
-                  <button
-                    onClick={(e) => { e.preventDefault(); setDeleteTarget(d); }}
-                    className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 rounded-md transition-opacity flex-shrink-0"
-                    title="Borrar borrador"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </Link>
-              );
-            })}
-          </div>
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </>
+        ) : (
+          <div className="flex-1" />
+        )}
 
-          <div className="px-3 pb-3">
-            <button
-              disabled
-              title="Próximamente"
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 cursor-not-allowed"
-            >
-              <FileUp size={13} />
-              Cargar presupuesto (.fwb)
-            </button>
-          </div>
-
-          <div className="px-3 py-3 border-t border-slate-100 space-y-2">
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors"
-            >
-              <ArrowLeft size={13} />
-              Volver a Dashboard
-            </Link>
-            <div className="flex items-center gap-2 px-2">
-              <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center text-[10px] font-semibold text-white flex-shrink-0">
-                {user?.name?.charAt(0).toUpperCase() || "?"}
-              </div>
-              <span className="text-xs text-slate-500 truncate">{user?.name}</span>
+        <div className="px-3 py-3 border-t border-slate-100 space-y-2">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors"
+          >
+            <ArrowLeft size={13} />
+            Volver a Dashboard
+          </Link>
+          <div className="flex items-center gap-2 px-2">
+            <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center text-[10px] font-semibold text-white flex-shrink-0">
+              {user?.name?.charAt(0).toUpperCase() || "?"}
             </div>
-          </div>
-        </aside>
-
-        {/* ── Content ────────────────────────────────────────────────────── */}
-        <main className="flex-1 min-w-0 overflow-y-auto">{children}</main>
-      </div>
-
-      {/* ── New draft modal ─────────────────────────────────────────────── */}
-      {showNewDraft && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
-            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-semibold text-slate-900">Nuevo presupuesto</h3>
-              <button onClick={() => setShowNewDraft(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
-                <X size={15} />
-              </button>
-            </div>
-            <div className="px-5 py-4">
-              <label className="text-xs font-medium text-slate-700 block mb-1.5">Nombre</label>
-              <input
-                type="text"
-                value={newDraftName}
-                onChange={(e) => setNewDraftName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleCreateDraft(); }}
-                placeholder="Ej: Marea Alta"
-                autoFocus
-                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
-              />
-            </div>
-            <div className="px-5 py-3 border-t border-slate-100 flex gap-2">
-              <button onClick={() => setShowNewDraft(false)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
-                Cancelar
-              </button>
-              <button
-                onClick={handleCreateDraft}
-                disabled={!newDraftName.trim() || creating}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white shadow-sm hover:shadow-md hover:brightness-105 transition-all disabled:opacity-40 disabled:shadow-none"
-                style={{ background: gradient }}
-              >
-                {creating ? "Creando..." : "Crear"}
-              </button>
-            </div>
+            <span className="text-xs text-slate-500 truncate">{user?.name}</span>
           </div>
         </div>
-      )}
+      </aside>
 
-      {/* ── Delete confirm modal ────────────────────────────────────────── */}
-      {deleteTarget && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
-            <h3 className="text-sm font-semibold text-slate-900 mb-1.5">Borrar "{deleteTarget.name}"</h3>
-            <p className="text-xs text-slate-500 mb-4">Esta acción no se puede deshacer.</p>
-            <div className="flex gap-2">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
-                Cancelar
-              </button>
-              <button
-                onClick={handleDeleteDraft}
-                disabled={deleting}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
-              >
-                {deleting ? "Borrando..." : "Borrar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <main className="flex-1 min-w-0 overflow-y-auto">{children}</main>
     </div>
   );
 }

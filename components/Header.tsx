@@ -17,7 +17,6 @@ import {
   ArrowLeftRight,
   Banknote,
   BarChart3,
-  Calculator,
   Clock,
   Briefcase,
   Building2,
@@ -481,10 +480,10 @@ export default function Header() {
           {user?.budgetingAccess && (
             <Link
               href="/budgeting"
-              className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-[#6C64F5] to-[#4640C7] shadow-sm hover:shadow-md hover:scale-105 transition-all"
+              className="flex items-center justify-center h-8 px-2.5 rounded-lg bg-gradient-to-br from-[#6C64F5] to-[#4640C7] shadow-sm hover:shadow-md hover:scale-105 transition-all"
               title="Budgeting"
             >
-              <Calculator size={14} className="text-white" />
+              <Image src="/logo-budgeting-white.svg" alt="Budgeting" width={26} height={8} className="h-2.5 w-auto" />
             </Link>
           )}
 
