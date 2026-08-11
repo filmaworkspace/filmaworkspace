@@ -172,6 +172,8 @@ export interface BudgetingAccount {
   /** id de una BudgetingCategoryDef del borrador, o null si las categorías están desactivadas / sin asignar. */
   category: string | null;
   createdAt: Timestamp | null;
+  /** Orden manual — por defecto el de creación, pero se puede reordenar libremente. */
+  order?: number;
 }
 
 /** budgetingDrafts/{draftId}/accounts/{chapterId}/subchapters/{subchapterId} — Subcapítulo: también organizativo. */
@@ -180,6 +182,7 @@ export interface BudgetingSubchapter {
   code: string;
   description: string;
   createdAt: Timestamp | null;
+  order?: number;
   /** Suma denormalizada de líneas de otros subcapítulos redirigidas aquí (ver BudgetingLineRoute). Mantenida con increment() al guardar/duplicar/borrar líneas. */
   receivedTotal?: number;
 }
@@ -231,6 +234,7 @@ export interface BudgetingDetailLine {
   /** Si está puesto, el total de esta línea NO suma aquí — suma en el subcapítulo indicado (ver BudgetingLineRoute). */
   routedTo?: BudgetingLineRoute | null;
   createdAt: Timestamp | null;
+  order?: number;
 }
 
 export const UNIT_SUGGESTIONS = ["Día", "Semana", "Mes", "Fijo", "Persona", "%", "Hora"];
@@ -245,6 +249,43 @@ export const CURRENCIES = [
 
 export function newBudgetingId(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2, 10);
+}
+
+/** Valor de orden para un elemento recién creado — monótono creciente, así entra siempre al final. */
+export function nextOrderValue(): number {
+  return Date.now();
+}
+
+/**
+ * Orden por defecto: el campo `order` si existe, si no la fecha de creación
+ * (para que documentos antiguos sin `order` no queden descolocados), si no 0.
+ * El orden se reordena libremente después con moveOrder().
+ */
+export function sortByOrder<T extends { order?: number; createdAt?: { seconds: number } | Timestamp | null }>(items: T[]): T[] {
+  const key = (item: T) => {
+    if (item.order != null) return item.order;
+    const c = item.createdAt as any;
+    if (c && typeof c.seconds === "number") return c.seconds * 1000;
+    if (c && typeof c.toMillis === "function") return c.toMillis();
+    return 0;
+  };
+  return [...items].sort((a, b) => key(a) - key(b));
+}
+
+/** Calcula el intercambio de `order` necesario para mover un elemento un puesto arriba/abajo dentro de `items` (ya en su grupo — p.ej. capítulos de la misma categoría). Devuelve null si ya está en el extremo. */
+export function computeReorder<T extends { id: string; order?: number }>(
+  items: T[], id: string, direction: "up" | "down"
+): { id: string; order: number }[] | null {
+  const sorted = sortByOrder(items);
+  const idx = sorted.findIndex((i) => i.id === id);
+  if (idx < 0) return null;
+  const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= sorted.length) return null;
+  const a = sorted[idx];
+  const b = sorted[swapIdx];
+  const orderA = a.order ?? idx;
+  const orderB = b.order ?? swapIdx;
+  return [{ id: a.id, order: orderB }, { id: b.id, order: orderA }];
 }
 
 export function computeLineTotal(units: number, multiplier: number, rate: number): number {
@@ -501,9 +542,9 @@ export const ICON_BTN_LIGHT =
 export const ROW_INPUT =
   "border border-slate-300 rounded-md bg-white focus:outline-none focus:border-[#8DA7BE] focus:ring-2 focus:ring-[#8DA7BE]/20 transition-colors";
 
-/** Celda de tabla al estilo MMB: sin caja ni placeholder visible, solo la columna vacía — se resalta suavemente al enfocar, nada más. Guarda al perder el foco, sin botón de confirmar. */
+/** Celda de tabla al estilo MMB: sin caja ni placeholder visible, solo la columna vacía en reposo — al enfocar se ilumina de verdad, como la celda activa de Excel. Guarda al perder el foco, sin botón de confirmar. */
 export const CELL_INPUT =
-  "w-full bg-transparent focus:outline-none focus:bg-[#8DA7BE]/[0.08] rounded px-1.5 py-1 transition-colors";
+  "w-full bg-transparent focus:outline-none focus:bg-[#8DA7BE]/[0.14] focus:ring-2 focus:ring-[#8DA7BE] rounded px-1.5 py-1 transition-colors";
 
 // ─── Snapshots / versiones ──────────────────────────────────────────────────
 // budgetingDrafts/{draftId}/snapshots/{snapshotId} — una foto congelada del
