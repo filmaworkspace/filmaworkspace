@@ -9,7 +9,6 @@ export default function BudgetingFringesPage() {
     <BudgetingSettingsList
       draftId={draftId}
       arrayField="fringes"
-      description="Porcentajes de Seguridad Social y cargas sociales aplicables al personal del presupuesto."
       fields={[
         { key: "label", label: "Nombre", type: "text" },
         { key: "percent", label: "Porcentaje", type: "number", suffix: "%" },

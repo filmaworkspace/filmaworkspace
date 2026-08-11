@@ -17,6 +17,7 @@ import {
   BTN_LIGHT, BudgetingCategoryDef, BudgetingDraft, CURRENCIES, ICON_BTN_LIGHT,
   categoriesEnabled, newBudgetingId, resolveCategories,
 } from "@/lib/budgeting";
+import BudgetingDropdown from "@/components/BudgetingDropdown";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -88,40 +89,34 @@ export default function BudgetingCategoriesPage() {
   }
 
   return (
-    <div className="w-full px-10 py-8 max-w-2xl space-y-8">
+    <div className="w-full px-10 py-8 max-w-2xl space-y-7">
       {/* Ajustes generales */}
       <div>
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Ajustes generales</p>
-        <div className="border border-slate-200 rounded-2xl px-5 py-4 flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-slate-900">Moneda</p>
-            <p className="text-xs text-slate-400 mt-0.5">Se aplica a todos los importes del presupuesto</p>
-          </div>
-          <select
+        <p className="text-xs font-medium text-slate-400 mb-2.5">Ajustes generales</p>
+        <div className="border border-slate-200 rounded-2xl px-5 py-3.5 flex items-center justify-between gap-4">
+          <p className="text-sm font-medium text-slate-900">Moneda</p>
+          <BudgetingDropdown
             value={draft.currency}
-            onChange={(e) => persist({ currency: e.target.value })}
-            className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2"
-          >
-            {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
-          </select>
+            options={CURRENCIES.map((c) => ({ value: c.code, label: c.label }))}
+            onChange={(currency) => persist({ currency })}
+            buttonClassName="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded-lg text-sm bg-white hover:border-slate-300 transition-colors"
+            align="right"
+          />
         </div>
       </div>
 
       {/* Categorías */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Categorías</p>
+        <div className="flex items-center justify-between mb-2.5">
+          <p className="text-xs font-medium text-slate-400">Categorías</p>
           <button
             onClick={() => persist({ categoriesEnabled: !enabled })}
-            className={`w-10 h-6 rounded-full transition-colors relative flex-shrink-0`}
+            className="w-9 h-5 rounded-full transition-colors relative flex-shrink-0"
             style={{ background: enabled ? "#5B57E0" : "#e2e8f0" }}
           >
-            <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${enabled ? "left-5" : "left-1"}`} />
+            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${enabled ? "left-4" : "left-0.5"}`} />
           </button>
         </div>
-        <p className="text-xs text-slate-400 mb-3">
-          {enabled ? "Las cuentas del Top Sheet se agrupan por categoría." : "Desactivado. Las cuentas se ven en una lista plana en el Top Sheet."}
-        </p>
 
         {enabled && (
           <div className="border border-slate-200 rounded-2xl overflow-hidden">
@@ -130,7 +125,7 @@ export default function BudgetingCategoriesPage() {
             ) : (
               <div className="divide-y divide-slate-100">
                 {cats.map((c) => (
-                  <div key={c.id} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50 group">
+                  <div key={c.id} className="flex items-center justify-between gap-3 px-5 py-2.5 hover:bg-slate-50 group">
                     <span className="text-sm font-medium text-slate-900 truncate">{c.label}</span>
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                       <button onClick={() => openEdit(c)} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Editar">
@@ -144,9 +139,9 @@ export default function BudgetingCategoriesPage() {
                 ))}
               </div>
             )}
-            <div className="px-5 py-3 border-t border-slate-100">
-              <button onClick={openCreate} className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg ${BTN_LIGHT}`}>
-                <Plus size={13} />
+            <div className="px-5 py-2.5 border-t border-slate-100">
+              <button onClick={openCreate} className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg ${BTN_LIGHT}`}>
+                <Plus size={12} />
                 Añadir categoría
               </button>
             </div>
@@ -195,7 +190,7 @@ export default function BudgetingCategoriesPage() {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
             <h3 className="text-sm font-semibold text-slate-900 mb-1.5">Borrar categoría "{deleteTarget.label}"</h3>
-            <p className="text-xs text-slate-500 mb-4">Las cuentas que ya estaban en esta categoría quedarán sin categoría asignada. Esta acción no se puede deshacer.</p>
+            <p className="text-xs text-slate-500 mb-4">Las cuentas que ya estaban en esta categoría quedarán sin categoría asignada.</p>
             <div className="flex gap-2">
               <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
                 Cancelar

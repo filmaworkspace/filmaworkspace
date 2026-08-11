@@ -9,7 +9,6 @@ export default function BudgetingGlobalsPage() {
     <BudgetingSettingsList
       draftId={draftId}
       arrayField="globals"
-      description="Valores de referencia del presupuesto: semanas de rodaje, semanas de prep, número de unidades"
       fields={[
         { key: "label", label: "Nombre", type: "text" },
         { key: "value", label: "Valor", type: "text" },

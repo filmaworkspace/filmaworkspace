@@ -10,14 +10,15 @@ import { db } from "@/lib/firebase";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp, updateDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { AlertCircle, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
+import { AlertCircle, AlignLeft, ChevronRight, Clock, DollarSign, Hash, ListOrdered, Pencil, Plus, Trash2, X } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
-  BTN_LIGHT, BudgetingAccount, BudgetingDetailLine, BudgetingDraft,
-  ICON_BTN_LIGHT, UNIT_SUGGESTIONS, computeLineTotal, fmtCurrency, fmtDecimal,
+  BTN_LIGHT, BudgetingAccount, BudgetingCategoryDef, BudgetingDetailLine, BudgetingDraft,
+  ICON_BTN_LIGHT, UNIT_SUGGESTIONS, categoriesEnabled, computeLineTotal, fmtCurrency, fmtDecimal, resolveCategories,
 } from "@/lib/budgeting";
+import BudgetingDropdown from "@/components/BudgetingDropdown";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,7 @@ export default function BudgetingAccountPage() {
   const router = useRouter();
 
   const [draft, setDraft] = useState<BudgetingDraft | null>(null);
+  const [allAccounts, setAllAccounts] = useState<BudgetingAccount[]>([]);
   const [account, setAccount] = useState<BudgetingAccount | null>(null);
   const [lines, setLines] = useState<BudgetingDetailLine[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +47,13 @@ export default function BudgetingAccountPage() {
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "budgetingDrafts", draftId), (snap) => {
       if (snap.exists()) setDraft({ id: snap.id, ...snap.data() } as BudgetingDraft);
+    });
+    return () => unsub();
+  }, [draftId]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, `budgetingDrafts/${draftId}/accounts`), (snap) => {
+      setAllAccounts(snap.docs.map((d) => ({ id: d.id, ...d.data() } as BudgetingAccount)));
     });
     return () => unsub();
   }, [draftId]);
@@ -74,6 +83,22 @@ export default function BudgetingAccountPage() {
   const currency = draft?.currency || "EUR";
   const fmt = (n: number) => fmtCurrency(n, currency);
   const total = lines.reduce((s, l) => s + (l.total || 0), 0);
+
+  const catEnabled = categoriesEnabled(draft);
+  const cats: BudgetingCategoryDef[] = catEnabled ? resolveCategories(draft) : [];
+  const siblingAccounts = account
+    ? (catEnabled ? allAccounts.filter((a) => a.category === account.category) : allAccounts)
+    : [];
+
+  const handleSwitchCategory = (categoryId: string) => {
+    const firstAccount = allAccounts.find((a) => a.category === categoryId);
+    if (firstAccount) router.push(`/budgeting/${draftId}/accounts/${firstAccount.id}`);
+    else router.push(`/budgeting/${draftId}`);
+  };
+
+  const handleSwitchAccount = (newAccountId: string) => {
+    if (newAccountId !== accountId) router.push(`/budgeting/${draftId}/accounts/${newAccountId}`);
+  };
 
   const touchDraft = async () => {
     if (!user) return;
@@ -187,21 +212,38 @@ export default function BudgetingAccountPage() {
     );
   }
 
-  const cols = "grid-cols-[110px_1fr_70px_90px_50px_90px_110px_56px]";
+  const cols = "grid-cols-[110px_1fr_70px_90px_50px_90px_100px_56px]";
+  const currentCategory = catEnabled ? cats.find((c) => c.id === account.category) : null;
 
   return (
     <div className="w-full px-10 py-8">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-1.5 text-sm mb-1 text-slate-400">
-        <Link href={`/budgeting/${draftId}`} className="hover:text-[#5B57E0] transition-colors">Topsheet</Link>
-        <ChevronRight size={13} />
-        <span className="text-slate-700 font-medium">{account.code} {account.description}</span>
-        <ChevronRight size={13} />
-        <span className="text-slate-400">Details</span>
+      {/* Breadcrumb con desplegables */}
+      <div className="flex items-center gap-1.5 mb-6">
+        <Link href={`/budgeting/${draftId}`} className="text-sm text-slate-400 hover:text-[#5B57E0] transition-colors">
+          {draft?.name}
+        </Link>
+        {catEnabled && currentCategory && (
+          <>
+            <ChevronRight size={13} className="text-slate-300 flex-shrink-0" />
+            <BudgetingDropdown
+              value={currentCategory.id}
+              options={cats.map((c) => ({ value: c.id, label: c.label }))}
+              onChange={handleSwitchCategory}
+              buttonClassName="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-[#5B57E0] transition-colors"
+            />
+          </>
+        )}
+        <ChevronRight size={13} className="text-slate-300 flex-shrink-0" />
+        <BudgetingDropdown
+          value={account.id}
+          options={siblingAccounts.map((a) => ({ value: a.id, label: `${a.code} ${a.description}` }))}
+          onChange={handleSwitchAccount}
+          buttonClassName="flex items-center gap-1 text-sm font-semibold text-slate-900 hover:text-[#5B57E0] transition-colors"
+        />
       </div>
 
       {/* Top bar */}
-      <div className="flex items-center justify-between gap-4 mt-3 mb-6">
+      <div className="flex items-center justify-between gap-4 mb-6">
         <div className="min-w-0">
           {editingAccount ? (
             <div className="flex items-center gap-2">
@@ -248,14 +290,14 @@ export default function BudgetingAccountPage() {
       {/* Detail lines table */}
       <div className="border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">
         <div className="min-w-[760px]">
-          <div className={`grid ${cols} gap-2 px-5 py-2.5 bg-slate-50 border-b border-slate-200 text-[10px] font-semibold text-slate-400 uppercase tracking-wider`}>
-            <span>Código</span>
-            <span>Descripción</span>
-            <span className="text-right">Cant.</span>
-            <span>Unidad</span>
+          <div className={`grid ${cols} gap-2 px-5 py-2 border-b border-slate-100 text-xs text-slate-400`}>
+            <span className="flex items-center gap-1.5"><Hash size={11} /> Código</span>
+            <span className="flex items-center gap-1.5"><AlignLeft size={11} /> Descripción</span>
+            <span className="flex items-center justify-end gap-1.5"><ListOrdered size={11} /> Cant.</span>
+            <span className="flex items-center gap-1.5"><Clock size={11} /> Unidad</span>
             <span className="text-right">X</span>
-            <span className="text-right">Tarifa</span>
-            <span className="text-right">Total</span>
+            <span className="flex items-center justify-end gap-1.5"><DollarSign size={11} /> Tarifa</span>
+            <span className="flex items-center justify-end gap-1.5"><DollarSign size={11} /> Total</span>
             <span></span>
           </div>
           {lines.length === 0 ? (
@@ -270,7 +312,7 @@ export default function BudgetingAccountPage() {
                   <span className="text-xs text-slate-400 truncate">{line.unit}</span>
                   <span className="text-xs text-slate-400 text-right">×{fmtDecimal(line.multiplier)}</span>
                   <span className="text-xs text-slate-500 text-right">{fmtDecimal(line.rate)}</span>
-                  <span className="text-sm font-semibold text-slate-900 text-right rounded-md px-1.5 py-0.5 bg-slate-50">{fmt(line.total)}</span>
+                  <span className="text-sm font-semibold text-slate-900 text-right">{fmt(line.total)}</span>
                   <span className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => openEditLine(line)} className={`p-1 rounded ${ICON_BTN_LIGHT}`} title="Editar línea">
                       <Pencil size={12} />
@@ -287,8 +329,8 @@ export default function BudgetingAccountPage() {
       </div>
 
       <div className="mt-3">
-        <button onClick={openCreateLine} className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg ${BTN_LIGHT}`}>
-          <Plus size={13} />
+        <button onClick={openCreateLine} className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg ${BTN_LIGHT}`}>
+          <Plus size={12} />
           Añadir línea
         </button>
       </div>

@@ -9,7 +9,6 @@ export default function BudgetingPhasesPage() {
     <BudgetingSettingsList
       draftId={draftId}
       arrayField="phases"
-      description="Fases de producción del proyecto: Prep, Rodaje, Post"
       fields={[
         { key: "label", label: "Nombre", type: "text" },
       ]}

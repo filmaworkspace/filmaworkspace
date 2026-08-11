@@ -19,6 +19,7 @@ import { Check, FileUp, Plus, Search, Trash2, X } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 import { BTN_LIGHT, BudgetingDraftIndex, CURRENCIES, DEFAULT_CATEGORIES } from "@/lib/budgeting";
 import { parseFwbText } from "@/lib/budgetingExport";
+import BudgetingDropdown from "@/components/BudgetingDropdown";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -176,16 +177,16 @@ export default function BudgetingHomePage() {
       <h1 className="text-2xl font-bold text-slate-900 mb-6">Presupuestos</h1>
 
       <div className="flex items-center gap-2 mb-8 flex-wrap">
-        <button onClick={() => setShowNewDraft(true)} className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-medium ${BTN_LIGHT}`}>
-          <Plus size={14} />
+        <button onClick={() => setShowNewDraft(true)} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${BTN_LIGHT}`}>
+          <Plus size={12} />
           Nuevo presupuesto
         </button>
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={importing}
-          className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 ${BTN_LIGHT}`}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium disabled:opacity-50 ${BTN_LIGHT}`}
         >
-          <FileUp size={14} />
+          <FileUp size={12} />
           {importing ? "Cargando..." : "Cargar .fwb"}
         </button>
         <input
@@ -202,7 +203,7 @@ export default function BudgetingHomePage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar"
-            className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
+            className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
           />
         </div>
       </div>
@@ -231,12 +232,9 @@ export default function BudgetingHomePage() {
                 <span className="text-base font-bold text-slate-800 text-center line-clamp-2">{d.name}</span>
               </Link>
               <div className="flex items-center justify-between mt-2 px-0.5">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">{d.name}</p>
-                  <p className="text-xs text-slate-400">
-                    {d.status === "sent" && d.sentToProjectName ? `Enviado a ${d.sentToProjectName}` : `Editado ${relativeTime(d.updatedAt)}`}
-                  </p>
-                </div>
+                <p className="text-xs text-slate-400 truncate">
+                  {d.status === "sent" && d.sentToProjectName ? `Enviado a ${d.sentToProjectName}` : `Editado ${relativeTime(d.updatedAt)}`}
+                </p>
                 <button
                   onClick={() => setDeleteTarget(d)}
                   className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-red-500 rounded-md transition-opacity flex-shrink-0"
@@ -274,15 +272,12 @@ export default function BudgetingHomePage() {
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-700 block mb-1.5">Moneda</label>
-                <select
+                <BudgetingDropdown
                   value={newDraftCurrency}
-                  onChange={(e) => setNewDraftCurrency(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 bg-white"
-                >
-                  {CURRENCIES.map((c) => (
-                    <option key={c.code} value={c.code}>{c.label}</option>
-                  ))}
-                </select>
+                  options={CURRENCIES.map((c) => ({ value: c.code, label: c.label }))}
+                  onChange={setNewDraftCurrency}
+                  buttonClassName="flex items-center justify-between gap-2 w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm bg-white hover:border-slate-300 transition-colors"
+                />
               </div>
             </div>
             <div className="px-5 py-3 border-t border-slate-100 flex gap-2">
