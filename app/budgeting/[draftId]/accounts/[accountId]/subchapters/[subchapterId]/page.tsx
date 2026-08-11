@@ -1,7 +1,7 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -10,19 +10,175 @@ import { db } from "@/lib/firebase";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp, updateDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { AlertCircle, Check, ChevronDown, ChevronRight, Copy, Plus, Search, Trash2, X } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, ChevronRight, Copy, Plus, Search, Sigma, Trash2, X } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
-  BudgetingAccount, BudgetingCategoryDef, BudgetingDetailLine, BudgetingDraft, BudgetingSubchapter,
-  ICON_BTN_LIGHT, UNIT_SUGGESTIONS, categoriesEnabled, computeLineTotal, fmtCurrency, fmtDecimal, resolveCategories,
+  BudgetingAccount, BudgetingDetailLine, BudgetingDraft, BudgetingFringe, BudgetingSubchapter,
+  ROW_INPUT, UNIT_SUGGESTIONS, computeFringeExtras, computeLineTotal, evaluateFieldExpr,
+  fmtCurrency, fmtDecimal, isPlainNumber, lineFringeBreakdown, resolveGlobals,
 } from "@/lib/budgeting";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface LineForm { code: string; description: string; units: string; unit: string; multiplier: string; rate: string; supplier: string; notes: string; tags: string; }
 const emptyForm: LineForm = { code: "", description: "", units: "1", unit: "", multiplier: "1", rate: "0", supplier: "", notes: "", tags: "" };
+const cols = "grid-cols-[90px_1fr_54px_64px_38px_70px_84px_78px]";
+
+// ─── Fila en edición (alta/edición) — componente de módulo: nunca se
+// redefine entre renders, así los inputs no pierden el foco al escribir. ────
+function EditableLineRow({
+  form, total, error, saving, onChange, onSave, onCancel,
+}: {
+  form: LineForm; total: number; error: string; saving: boolean;
+  onChange: (patch: Partial<LineForm>) => void; onSave: () => void; onCancel: () => void;
+}) {
+  return (
+    <div>
+      <div className={`grid ${cols} gap-1.5 items-center px-4 py-2 bg-[#8DA7BE]/[0.05]`}>
+        <input autoFocus placeholder="Código" value={form.code} onChange={(e) => onChange({ code: e.target.value })}
+          onKeyDown={(e) => { if (e.key === "Enter") onSave(); if (e.key === "Escape") onCancel(); }}
+          className={`text-xs font-mono px-1.5 py-1 min-w-0 ${ROW_INPUT}`} />
+        <input placeholder="Descripción" value={form.description} onChange={(e) => onChange({ description: e.target.value })}
+          onKeyDown={(e) => { if (e.key === "Enter") onSave(); if (e.key === "Escape") onCancel(); }}
+          className={`text-xs px-1.5 py-1 min-w-0 ${ROW_INPUT}`} />
+        <input placeholder="Cant." value={form.units} onChange={(e) => onChange({ units: e.target.value })}
+          onKeyDown={(e) => { if (e.key === "Enter") onSave(); if (e.key === "Escape") onCancel(); }}
+          title="Número o fórmula con Globales, p.ej. DIAS_RODAJE"
+          className={`text-xs text-right px-1.5 py-1 w-full ${ROW_INPUT}`} />
+        <input list="unit-suggestions" placeholder="Unidad" value={form.unit} onChange={(e) => onChange({ unit: e.target.value })}
+          className={`text-[11px] px-1.5 py-1 min-w-0 ${ROW_INPUT}`} />
+        <input placeholder="X" value={form.multiplier} onChange={(e) => onChange({ multiplier: e.target.value })}
+          onKeyDown={(e) => { if (e.key === "Enter") onSave(); if (e.key === "Escape") onCancel(); }}
+          title="Número o fórmula con Globales"
+          className={`text-[11px] text-right px-1.5 py-1 w-full ${ROW_INPUT}`} />
+        <input placeholder="Tarifa" value={form.rate} onChange={(e) => onChange({ rate: e.target.value })}
+          onKeyDown={(e) => { if (e.key === "Enter") onSave(); if (e.key === "Escape") onCancel(); }}
+          title="Número o fórmula con Globales, p.ej. TARIFA_BASE * 1.2"
+          className={`text-xs text-right px-1.5 py-1 w-full ${ROW_INPUT}`} />
+        <span className="text-xs font-semibold text-slate-900 text-right">{fmtDecimal(total)}</span>
+        <span className="flex items-center justify-end gap-0.5">
+          <button onClick={onSave} disabled={saving} className="p-1.5 rounded-md text-white disabled:opacity-50" style={{ background: "#8DA7BE" }}><Check size={12} /></button>
+          <button onClick={onCancel} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md"><X size={12} /></button>
+        </span>
+      </div>
+      {error && (
+        <div className="flex items-center gap-1.5 text-xs text-red-600 px-4 pb-2 pt-0.5">
+          <AlertCircle size={12} />
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FringeChip({ fringe, amount, excluded }: { fringe: BudgetingFringe; amount: number; excluded: boolean }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full border"
+      style={{ borderColor: "#8DA7BE", color: "#1D201F", background: "#8DA7BE0d" }}
+      title={excluded ? `No suma aquí — va a: ${fringe.scope === "chapter" ? "total del capítulo" : "total del presupuesto"}` : "Suma en este subcapítulo"}
+    >
+      {fringe.label} · {fmtDecimal(amount)}
+      {excluded && <span className="text-[9px] text-slate-500 font-normal">excl.</span>}
+    </span>
+  );
+}
+
+function LineRow({
+  line, fmt, fringes, isExpanded, fringePickerOpen,
+  onEdit, onToggleExpand, onDuplicate, onDelete, onToggleFringePicker, onToggleFringe, onUpdateSecondary,
+}: {
+  line: BudgetingDetailLine; fmt: (n: number) => string; fringes: BudgetingFringe[];
+  isExpanded: boolean; fringePickerOpen: boolean;
+  onEdit: () => void; onToggleExpand: () => void; onDuplicate: () => void; onDelete: () => void;
+  onToggleFringePicker: () => void; onToggleFringe: (id: string) => void;
+  onUpdateSecondary: (patch: { supplier?: string; notes?: string; tags?: string[] }) => void;
+}) {
+  const breakdown = lineFringeBreakdown(line, fringes);
+  const hasFormula = !!(line.unitsExpr || line.multiplierExpr || line.rateExpr);
+  return (
+    <div>
+      <div className={`grid ${cols} gap-1.5 items-center px-4 py-1.5 hover:bg-slate-50 group`}>
+        <button onClick={onEdit} className="text-xs font-mono text-slate-500 text-left truncate hover:text-[#8DA7BE] transition-colors">{line.code}</button>
+        <button onClick={onEdit} className="text-xs text-slate-800 text-left truncate hover:text-[#8DA7BE] transition-colors flex items-center gap-1">
+          {line.description}
+          {hasFormula && <Sigma size={9} className="text-[#8DA7BE] flex-shrink-0" />}
+        </button>
+        <span className="text-xs text-slate-500 text-right">{fmtDecimal(line.units)}</span>
+        <span className="text-[11px] text-slate-400 truncate">{line.unit}</span>
+        <span className="text-[11px] text-slate-400 text-right">×{fmtDecimal(line.multiplier)}</span>
+        <span className="text-xs text-slate-500 text-right">{fmtDecimal(line.rate)}</span>
+        <span className="text-xs font-semibold text-slate-900 text-right">{fmt(line.total)}</span>
+        <span className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={onToggleExpand} className="p-1 rounded text-slate-400 hover:text-[#8DA7BE] hover:bg-[#8DA7BE]/[0.1] transition-colors" title="Proveedor / notas / etiquetas / fringes">
+            <ChevronDown size={11} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+          </button>
+          <button onClick={onDuplicate} className="p-1 rounded text-slate-400 hover:text-[#8DA7BE] hover:bg-[#8DA7BE]/[0.1] transition-colors" title="Duplicar línea">
+            <Copy size={11} />
+          </button>
+          <button onClick={onDelete} className="p-1 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar línea">
+            <Trash2 size={11} />
+          </button>
+        </span>
+      </div>
+      {breakdown.length > 0 && (
+        <div className="flex flex-wrap gap-1 px-4 pb-1.5 pl-[calc(90px+0.375rem)]">
+          {breakdown.map(({ fringe, amount }) => (
+            <FringeChip key={fringe.id} fringe={fringe} amount={amount} excluded={fringe.scope !== "subchapter"} />
+          ))}
+        </div>
+      )}
+      {isExpanded && (
+        <div className="px-4 pb-3 pl-[calc(90px+0.375rem)] space-y-2.5">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-[10px] text-slate-400 block mb-1">Proveedor</label>
+              <input defaultValue={line.supplier || ""} onBlur={(e) => onUpdateSecondary({ supplier: e.target.value.trim() })}
+                className={`w-full text-xs px-2 py-1 ${ROW_INPUT}`} />
+            </div>
+            <div>
+              <label className="text-[10px] text-slate-400 block mb-1">Notas</label>
+              <input defaultValue={line.notes || ""} onBlur={(e) => onUpdateSecondary({ notes: e.target.value.trim() })}
+                className={`w-full text-xs px-2 py-1 ${ROW_INPUT}`} />
+            </div>
+            <div>
+              <label className="text-[10px] text-slate-400 block mb-1">Etiquetas (separadas por coma)</label>
+              <input defaultValue={(line.tags || []).join(", ")} onBlur={(e) => onUpdateSecondary({ tags: e.target.value.split(",").map((t) => t.trim()).filter(Boolean) })}
+                className={`w-full text-xs px-2 py-1 ${ROW_INPUT}`} />
+            </div>
+          </div>
+          <div className="relative">
+            <label className="text-[10px] text-slate-400 block mb-1">Cargas sociales</label>
+            <button onClick={onToggleFringePicker} className={`text-xs px-2.5 py-1 rounded-md ${ROW_INPUT} text-slate-600 hover:text-[#8DA7BE]`}>
+              {line.fringeIds?.length ? `${line.fringeIds.length} aplicada(s) · añadir/quitar` : "Aplicar carga social..."}
+            </button>
+            {fringePickerOpen && (
+              <div className="absolute z-20 top-full left-0 mt-1 w-64 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 max-h-56 overflow-y-auto">
+                {fringes.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 text-center py-3 px-3">Sin cargas sociales configuradas — añádelas en Cargas sociales.</p>
+                ) : (
+                  fringes.map((f) => {
+                    const checked = (line.fringeIds || []).includes(f.id);
+                    return (
+                      <button key={f.id} onClick={() => onToggleFringe(f.id)} className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-left hover:bg-slate-50">
+                        <span className="text-xs text-slate-700 truncate">{f.label}</span>
+                        <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center ${checked ? "border-[#8DA7BE]" : "border-slate-300"}`} style={{ background: checked ? "#8DA7BE" : "transparent" }}>
+                          {checked && <Check size={9} className="text-white" />}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function BudgetingSubchapterPage() {
   const { draftId, accountId, subchapterId } = useParams() as { draftId: string; accountId: string; subchapterId: string };
@@ -37,9 +193,10 @@ export default function BudgetingSubchapterPage() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [expandedLine, setExpandedLine] = useState<string | null>(null);
+  const [fringePickerFor, setFringePickerFor] = useState<string | null>(null);
 
   const [rowEditor, setRowEditor] = useState<{ mode: "new" | "edit"; lineId?: string; form: LineForm } | null>(null);
-  const [lineCodeError, setLineCodeError] = useState("");
+  const [lineError, setLineError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<BudgetingDetailLine | null>(null);
 
   useEffect(() => {
@@ -78,11 +235,13 @@ export default function BudgetingSubchapterPage() {
 
   const currency = draft?.currency || "EUR";
   const fmt = (n: number) => fmtCurrency(n, currency);
-  const total = lines.reduce((s, l) => s + (l.total || 0), 0);
+  const fringes = draft?.fringes || [];
+  const globals = draft?.globals || [];
+  const globalResolution = useMemo(() => resolveGlobals(globals), [JSON.stringify(globals)]);
 
-  const catEnabled = categoriesEnabled(draft);
-  const cats: BudgetingCategoryDef[] = catEnabled ? resolveCategories(draft) : [];
-  const currentCategory = catEnabled && chapter ? cats.find((c) => c.id === chapter.category) : null;
+  const linesTotal = lines.reduce((s, l) => s + (l.total || 0), 0);
+  const fringeExtras = computeFringeExtras(lines, fringes);
+  const total = Math.round((linesTotal + fringeExtras.subchapterScoped) * 100) / 100;
 
   const q = search.trim().toLowerCase();
   const matchesSearch = (l: BudgetingDetailLine) => !q || l.code.toLowerCase().includes(q) || l.description.toLowerCase().includes(q);
@@ -99,21 +258,25 @@ export default function BudgetingSubchapterPage() {
   const isLineCodeTaken = (code: string, excludeId?: string): boolean =>
     lines.some((l) => l.id !== excludeId && l.code.trim().toLowerCase() === code.trim().toLowerCase());
 
-  const openNewRow = () => { setRowEditor({ mode: "new", form: { ...emptyForm } }); setLineCodeError(""); };
+  const openNewRow = () => { setRowEditor({ mode: "new", form: { ...emptyForm } }); setLineError(""); };
   const openEditRow = (line: BudgetingDetailLine) => {
     setRowEditor({
       mode: "edit", lineId: line.id,
       form: {
-        code: line.code, description: line.description, units: String(line.units), unit: line.unit || "",
-        multiplier: String(line.multiplier), rate: String(line.rate),
+        code: line.code, description: line.description,
+        units: line.unitsExpr ?? String(line.units), unit: line.unit || "",
+        multiplier: line.multiplierExpr ?? String(line.multiplier), rate: line.rateExpr ?? String(line.rate),
         supplier: line.supplier || "", notes: line.notes || "", tags: (line.tags || []).join(", "),
       },
     });
-    setLineCodeError("");
+    setLineError("");
   };
-  const closeRowEditor = () => setRowEditor(null);
+  const closeRowEditor = () => { setRowEditor(null); setLineError(""); };
 
-  const rowEditorTotal = rowEditor ? computeLineTotal(parseFloat(rowEditor.form.units) || 0, parseFloat(rowEditor.form.multiplier) || 0, parseFloat(rowEditor.form.rate) || 0) : 0;
+  const previewEval = (text: string) => evaluateFieldExpr(text, globalResolution.values).value;
+  const rowEditorTotal = rowEditor
+    ? computeLineTotal(previewEval(rowEditor.form.units), previewEval(rowEditor.form.multiplier), previewEval(rowEditor.form.rate))
+    : 0;
 
   const handleSaveRow = async () => {
     if (!rowEditor) return;
@@ -121,24 +284,32 @@ export default function BudgetingSubchapterPage() {
     const description = rowEditor.form.description.trim();
     if (!code || !description) { closeRowEditor(); return; }
     if (isLineCodeTaken(code, rowEditor.lineId)) {
-      setLineCodeError("Ese código ya se usa en otra línea de este subcapítulo");
+      setLineError("Ese código ya se usa en otra línea de este subcapítulo");
       return;
     }
-    const units = parseFloat(rowEditor.form.units) || 0;
-    const multiplier = parseFloat(rowEditor.form.multiplier) || 0;
-    const rate = parseFloat(rowEditor.form.rate) || 0;
-    const total = computeLineTotal(units, multiplier, rate);
+    const unitsEval = evaluateFieldExpr(rowEditor.form.units, globalResolution.values);
+    const multEval = evaluateFieldExpr(rowEditor.form.multiplier, globalResolution.values);
+    const rateEval = evaluateFieldExpr(rowEditor.form.rate, globalResolution.values);
+    const firstError = unitsEval.error || multEval.error || rateEval.error;
+    if (firstError) { setLineError(firstError); return; }
+
+    const total = computeLineTotal(unitsEval.value, multEval.value, rateEval.value);
     const tags = rowEditor.form.tags.split(",").map((t) => t.trim()).filter(Boolean);
     setSaving(true);
     try {
-      const payload = {
-        code, description, units, unit: rowEditor.form.unit.trim(), multiplier, rate, total,
+      const payload: any = {
+        code, description,
+        units: unitsEval.value, unitsExpr: isPlainNumber(rowEditor.form.units) ? null : rowEditor.form.units.trim(),
+        unit: rowEditor.form.unit.trim(),
+        multiplier: multEval.value, multiplierExpr: isPlainNumber(rowEditor.form.multiplier) ? null : rowEditor.form.multiplier.trim(),
+        rate: rateEval.value, rateExpr: isPlainNumber(rowEditor.form.rate) ? null : rowEditor.form.rate.trim(),
+        total,
         supplier: rowEditor.form.supplier.trim(), notes: rowEditor.form.notes.trim(), tags,
       };
       if (rowEditor.mode === "edit" && rowEditor.lineId) {
         await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`, rowEditor.lineId), payload);
       } else {
-        await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`), { ...payload, createdAt: Timestamp.now() });
+        await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`), { ...payload, fringeIds: [], createdAt: Timestamp.now() });
       }
       await touchDraft();
       setRowEditor(null);
@@ -154,9 +325,9 @@ export default function BudgetingSubchapterPage() {
       let n = 2;
       while (isLineCodeTaken(code)) { code = `${line.code}-copia${n}`; n++; }
       await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`), {
-        code, description: line.description, units: line.units, unit: line.unit || "",
-        multiplier: line.multiplier, rate: line.rate, total: line.total,
-        supplier: line.supplier || "", notes: line.notes || "", tags: line.tags || [],
+        code, description: line.description, units: line.units, unitsExpr: line.unitsExpr ?? null, unit: line.unit || "",
+        multiplier: line.multiplier, multiplierExpr: line.multiplierExpr ?? null, rate: line.rate, rateExpr: line.rateExpr ?? null, total: line.total,
+        supplier: line.supplier || "", notes: line.notes || "", tags: line.tags || [], fringeIds: line.fringeIds || [],
         createdAt: Timestamp.now(),
       });
       await touchDraft();
@@ -177,6 +348,17 @@ export default function BudgetingSubchapterPage() {
     }
   };
 
+  const handleToggleFringe = async (line: BudgetingDetailLine, fringeId: string) => {
+    const current = line.fringeIds || [];
+    const next = current.includes(fringeId) ? current.filter((id) => id !== fringeId) : [...current, fringeId];
+    await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`, line.id), { fringeIds: next });
+    await touchDraft();
+  };
+
+  const handleUpdateSecondary = async (line: BudgetingDetailLine, patch: { supplier?: string; notes?: string; tags?: string[] }) => {
+    await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`, line.id), patch);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -194,97 +376,11 @@ export default function BudgetingSubchapterPage() {
     );
   }
 
-  const cols = "grid-cols-[90px_1fr_50px_64px_34px_64px_74px_60px]";
-
-  const LineRow = ({ line }: { line: BudgetingDetailLine }) => {
-    const isEditing = rowEditor?.mode === "edit" && rowEditor.lineId === line.id;
-    const isExpanded = expandedLine === line.id;
-    if (isEditing) return <EditableRow />;
-    return (
-      <div>
-        <div className={`grid ${cols} gap-1.5 items-center px-4 py-1 hover:bg-slate-50 group`}>
-          <button onClick={() => openEditRow(line)} className="text-xs font-mono text-slate-500 text-left truncate hover:text-[#8DA7BE] transition-colors">{line.code}</button>
-          <button onClick={() => openEditRow(line)} className="text-xs text-slate-800 text-left truncate hover:text-[#8DA7BE] transition-colors">{line.description}</button>
-          <span className="text-xs text-slate-500 text-right">{fmtDecimal(line.units)}</span>
-          <span className="text-[11px] text-slate-400 truncate">{line.unit}</span>
-          <span className="text-[11px] text-slate-400 text-right">×{fmtDecimal(line.multiplier)}</span>
-          <span className="text-xs text-slate-500 text-right">{fmtDecimal(line.rate)}</span>
-          <span className="text-xs font-semibold text-slate-900 text-right">{fmt(line.total)}</span>
-          <span className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={() => setExpandedLine(isExpanded ? null : line.id)} className={`p-1 rounded ${ICON_BTN_LIGHT}`} title="Proveedor / notas / etiquetas">
-              <ChevronDown size={11} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-            </button>
-            <button onClick={() => handleDuplicateLine(line)} className={`p-1 rounded ${ICON_BTN_LIGHT}`} title="Duplicar línea">
-              <Copy size={11} />
-            </button>
-            <button onClick={() => setDeleteTarget(line)} className="p-1 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar línea">
-              <Trash2 size={11} />
-            </button>
-          </span>
-        </div>
-        {isExpanded && (
-          <div className="grid grid-cols-3 gap-3 px-4 pb-2 pl-[calc(90px+0.375rem)]">
-            <div>
-              <label className="text-[10px] text-slate-400 block mb-0.5">Proveedor</label>
-              <input defaultValue={line.supplier || ""} onBlur={(e) => updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`, line.id), { supplier: e.target.value.trim() })}
-                className="w-full text-xs border-b border-slate-200 focus:outline-none focus:border-[#8DA7BE] bg-transparent py-0.5" />
-            </div>
-            <div>
-              <label className="text-[10px] text-slate-400 block mb-0.5">Notas</label>
-              <input defaultValue={line.notes || ""} onBlur={(e) => updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`, line.id), { notes: e.target.value.trim() })}
-                className="w-full text-xs border-b border-slate-200 focus:outline-none focus:border-[#8DA7BE] bg-transparent py-0.5" />
-            </div>
-            <div>
-              <label className="text-[10px] text-slate-400 block mb-0.5">Etiquetas (separadas por coma)</label>
-              <input defaultValue={(line.tags || []).join(", ")} onBlur={(e) => updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`, line.id), { tags: e.target.value.split(",").map((t) => t.trim()).filter(Boolean) })}
-                className="w-full text-xs border-b border-slate-200 focus:outline-none focus:border-[#8DA7BE] bg-transparent py-0.5" />
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const EditableRow = () => {
-    if (!rowEditor) return null;
-    const f = rowEditor.form;
-    const set = (patch: Partial<LineForm>) => setRowEditor({ ...rowEditor, form: { ...f, ...patch } });
-    return (
-      <div className={`grid ${cols} gap-1.5 items-center px-4 py-1 bg-slate-50/60`}>
-        <input autoFocus placeholder="Código" value={f.code} onChange={(e) => { set({ code: e.target.value }); setLineCodeError(""); }}
-          onKeyDown={(e) => { if (e.key === "Escape") closeRowEditor(); }}
-          className="text-xs font-mono border-b border-[#8DA7BE] focus:outline-none bg-transparent px-0.5 py-0.5 min-w-0" />
-        <input placeholder="Descripción" value={f.description} onChange={(e) => set({ description: e.target.value })}
-          onKeyDown={(e) => { if (e.key === "Escape") closeRowEditor(); }}
-          className="text-xs border-b border-[#8DA7BE] focus:outline-none bg-transparent px-0.5 py-0.5 min-w-0" />
-        <input type="number" value={f.units} onChange={(e) => set({ units: e.target.value })}
-          className="text-xs text-right border-b border-[#8DA7BE] focus:outline-none bg-transparent px-0.5 py-0.5 w-full" />
-        <input list="unit-suggestions" placeholder="Unidad" value={f.unit} onChange={(e) => set({ unit: e.target.value })}
-          className="text-[11px] border-b border-[#8DA7BE] focus:outline-none bg-transparent px-0.5 py-0.5 min-w-0" />
-        <input type="number" value={f.multiplier} onChange={(e) => set({ multiplier: e.target.value })}
-          className="text-[11px] text-right border-b border-[#8DA7BE] focus:outline-none bg-transparent px-0.5 py-0.5 w-full" />
-        <input type="number" value={f.rate} onChange={(e) => set({ rate: e.target.value })}
-          className="text-xs text-right border-b border-[#8DA7BE] focus:outline-none bg-transparent px-0.5 py-0.5 w-full" />
-        <span className="text-xs font-semibold text-slate-900 text-right">{fmt(rowEditorTotal)}</span>
-        <span className="flex items-center justify-end gap-0.5">
-          <button onClick={handleSaveRow} className={`p-1 rounded ${ICON_BTN_LIGHT}`}><Check size={12} /></button>
-          <button onClick={closeRowEditor} className="p-1 text-slate-300 hover:text-slate-600 rounded"><X size={12} /></button>
-        </span>
-      </div>
-    );
-  };
-
   return (
     <div className="w-full px-10 py-6">
-      {/* Breadcrumb — solo navegación de entrar/volver, sin desplegables */}
+      {/* Breadcrumb — solo navegación de entrar/volver, sin categorías ni desplegables */}
       <div className="flex items-center gap-1.5 mb-4 flex-wrap">
         <Link href={`/budgeting/${draftId}`} className="text-xs text-slate-400 hover:text-[#8DA7BE] transition-colors">{draft?.name}</Link>
-        {currentCategory && (
-          <>
-            <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
-            <span className="text-xs font-medium text-slate-500">{currentCategory.label}</span>
-          </>
-        )}
         <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
         <Link href={`/budgeting/${draftId}/accounts/${accountId}`} className="text-xs font-medium text-slate-600 hover:text-[#8DA7BE] transition-colors">{chapter.code} {chapter.description}</Link>
         <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
@@ -303,8 +399,8 @@ export default function BudgetingSubchapterPage() {
 
       {/* Detail lines */}
       <div className="border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">
-        <div className="min-w-[640px]">
-          <div className={`grid ${cols} gap-1.5 px-4 py-1.5 border-b border-slate-100 text-[10px] text-slate-400`}>
+        <div className="min-w-[680px]">
+          <div className={`grid ${cols} gap-1.5 px-4 py-2 border-b border-slate-200 divide-x divide-slate-100 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
             <span>Código</span>
             <span>Descripción</span>
             <span className="text-right">Cant.</span>
@@ -321,27 +417,72 @@ export default function BudgetingSubchapterPage() {
           {lines.filter(matchesSearch).length === 0 && !q ? (
             <p className="text-xs text-slate-400 text-center py-6">Sin líneas de detalle todavía</p>
           ) : (
-            <div className="divide-y divide-slate-50">
-              {lines.filter(matchesSearch).map((line) => <LineRow key={line.id} line={line} />)}
+            <div className="divide-y divide-slate-100">
+              {lines.filter(matchesSearch).map((line) => (
+                rowEditor?.mode === "edit" && rowEditor.lineId === line.id ? (
+                  <EditableLineRow
+                    key={line.id}
+                    form={rowEditor.form}
+                    total={rowEditorTotal}
+                    error={lineError}
+                    saving={saving}
+                    onChange={(patch) => setRowEditor({ ...rowEditor, form: { ...rowEditor.form, ...patch } })}
+                    onSave={handleSaveRow}
+                    onCancel={closeRowEditor}
+                  />
+                ) : (
+                  <LineRow
+                    key={line.id}
+                    line={line}
+                    fmt={fmt}
+                    fringes={fringes}
+                    isExpanded={expandedLine === line.id}
+                    fringePickerOpen={fringePickerFor === line.id}
+                    onEdit={() => openEditRow(line)}
+                    onToggleExpand={() => setExpandedLine(expandedLine === line.id ? null : line.id)}
+                    onDuplicate={() => handleDuplicateLine(line)}
+                    onDelete={() => setDeleteTarget(line)}
+                    onToggleFringePicker={() => setFringePickerFor(fringePickerFor === line.id ? null : line.id)}
+                    onToggleFringe={(id) => handleToggleFringe(line, id)}
+                    onUpdateSecondary={(patch) => handleUpdateSecondary(line, patch)}
+                  />
+                )
+              ))}
             </div>
           )}
 
           {rowEditor?.mode === "new" ? (
-            <EditableRow />
+            <EditableLineRow
+              form={rowEditor.form}
+              total={rowEditorTotal}
+              error={lineError}
+              saving={saving}
+              onChange={(patch) => setRowEditor({ ...rowEditor, form: { ...rowEditor.form, ...patch } })}
+              onSave={handleSaveRow}
+              onCancel={closeRowEditor}
+            />
           ) : (
-            <div className="px-4 py-1.5 border-t border-slate-100">
-              <button onClick={openNewRow} className={`flex items-center gap-1.5 text-xs font-medium py-1 rounded-lg ${ICON_BTN_LIGHT}`}>
-                <span className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#8DA7BE" }}>
-                  <Plus size={10} className="text-white" />
-                </span>
-                Añadir línea
+            <div className="px-4 py-2 border-t border-slate-100">
+              <button onClick={openNewRow} title="Añadir línea" className="w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-105" style={{ background: "#8DA7BE" }}>
+                <Plus size={12} className="text-white" />
               </button>
             </div>
           )}
-          {lineCodeError && (
-            <div className="flex items-center gap-1.5 text-xs text-red-600 px-4 pb-2">
-              <AlertCircle size={12} />
-              {lineCodeError}
+
+          {(fringeExtras.subchapterScoped > 0 || fringeExtras.chapterScoped > 0 || fringeExtras.totalScoped > 0) && (
+            <div className="px-4 py-1.5 border-t border-slate-100 space-y-0.5">
+              {fringeExtras.subchapterScoped > 0 && (
+                <div className={`grid ${cols} gap-1.5 items-center`}>
+                  <span /><span className="text-[11px] text-slate-500">Cargas sociales</span><span /><span /><span /><span />
+                  <span className="text-[11px] text-slate-600 text-right">{fmt(fringeExtras.subchapterScoped)}</span><span />
+                </div>
+              )}
+              {fringeExtras.chapterScoped > 0 && (
+                <p className="text-[10px] text-slate-400">+{fmt(fringeExtras.chapterScoped)} en cargas sociales → total del capítulo</p>
+              )}
+              {fringeExtras.totalScoped > 0 && (
+                <p className="text-[10px] text-slate-400">+{fmt(fringeExtras.totalScoped)} en cargas sociales → total del presupuesto</p>
+              )}
             </div>
           )}
 
