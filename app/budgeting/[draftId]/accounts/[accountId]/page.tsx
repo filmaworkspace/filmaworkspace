@@ -24,7 +24,7 @@ import {
 type DeleteTarget = { subchapterId: string; label: string };
 const cols = "grid-cols-[26px_100px_1fr_100px_58px]";
 
-// ─── Fila de subcapítulo — siempre editable in situ (MMB-style): sin caja,
+// ─── Fila de subcapítulo, siempre editable in situ (MMB-style): sin caja,
 // sin placeholder, guarda sola al perder el foco. Componente de módulo
 // estable: no se redefine entre renders, así los inputs no pierden el foco. ──
 function SubRow({
@@ -46,7 +46,7 @@ function SubRow({
   };
 
   return (
-    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 py-3 hover:bg-slate-50 group`}>
+    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group`}>
       <Link href={`/budgeting/${draftId}/accounts/${accountId}/subchapters/${sub.id}`} className="flex items-center justify-center" title="Entrar">
         <ChevronRight size={13} className="text-slate-300 group-hover:text-[#8DA7BE] group-hover:translate-x-0.5 transition-all" />
       </Link>
@@ -80,7 +80,7 @@ function NewSubRow({ onCommit }: { onCommit: (code: string, description: string)
   };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter") e.currentTarget.blur(); };
   return (
-    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 py-3`}>
+    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3`}>
       <span />
       <input autoFocus value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown} onFocus={(e) => e.target.select()}
         className={`${CELL_INPUT} font-mono text-xs pl-2`} />
@@ -234,7 +234,7 @@ export default function BudgetingChapterPage() {
 
   return (
     <div className="w-full px-10 py-6">
-      {/* Breadcrumb — solo navegación de entrar/volver, sin categorías ni desplegables */}
+      {/* Breadcrumb: solo navegación de entrar/volver, sin categorías ni desplegables */}
       <div className="flex items-center gap-1.5 mb-4">
         <Link href={`/budgeting/${draftId}`} className="text-xs text-slate-400 hover:text-[#8DA7BE] transition-colors">{draft?.name}</Link>
         <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
@@ -257,11 +257,11 @@ export default function BudgetingChapterPage() {
 
       {/* Subcapítulos */}
       <div className="border border-slate-200 rounded-2xl overflow-hidden">
-        <div className={`grid ${cols} gap-0 px-3 py-2 border-b border-slate-200 divide-x divide-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
+        <div className={`grid ${cols} gap-0 px-3 border-b border-slate-200 divide-x divide-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
           <span></span>
-          <span className="flex items-center pl-2">Código</span>
-          <span className="flex items-center pl-2">Descripción</span>
-          <span className="flex items-center justify-end pr-2">Total</span>
+          <span className="flex items-center py-2 pl-2">Código</span>
+          <span className="flex items-center py-2 pl-2">Descripción</span>
+          <span className="flex items-center justify-end py-2 pr-2">Total</span>
           <span></span>
         </div>
 

@@ -131,7 +131,7 @@ export default function BudgetingVersionsPage() {
 
       {snapshots.length === 0 ? (
         <div className="border border-slate-200 rounded-2xl py-10 text-center">
-          <p className="text-xs text-slate-400">Sin versiones guardadas todavía — usa "Guardar versión" desde el Presupuesto.</p>
+          <p className="text-xs text-slate-400">Sin versiones guardadas todavía: usa "Guardar versión" desde el Presupuesto.</p>
         </div>
       ) : (
         <>

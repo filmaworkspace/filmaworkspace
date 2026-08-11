@@ -23,7 +23,7 @@ import BudgetingFormulaInput from "@/components/BudgetingFormulaInput";
 // ─────────────────────────────────────────────────────────────────────────────
 // Globales: valores reutilizables por todo el borrador, identificados por un
 // código propio. El "Valor" puede ser un número directo o una fórmula que
-// referencia el código de otros Globales (+, -, *, /, paréntesis) — eso
+// referencia el código de otros Globales (+, -, *, /, paréntesis); eso
 // mismo código luego se puede escribir en Cantidad/X/Tarifa de una línea de
 // Detalle. Organizables en carpetas para que la lista no sea un caos.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -294,7 +294,7 @@ export default function BudgetingGlobalsPage() {
               </div>
               {scenarios.length > 0 && (
                 <div className="border-t border-slate-100 pt-3 space-y-2.5">
-                  <p className="text-xs font-medium text-slate-700">Valor por escenario (opcional — vacío = usa el de arriba)</p>
+                  <p className="text-xs font-medium text-slate-700">Valor por escenario (opcional: vacío = usa el de arriba)</p>
                   {scenarios.map((sc) => (
                     <div key={sc.id}>
                       <label className="text-[11px] text-slate-500 block mb-1">{sc.label}</label>

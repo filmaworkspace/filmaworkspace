@@ -39,7 +39,7 @@ function FringeChip({ fringe, amount, excluded }: { fringe: BudgetingFringe; amo
     <span
       className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full border"
       style={{ borderColor: "#8DA7BE", color: "#1D201F", background: "#8DA7BE0d" }}
-      title={excluded ? `No suma aquí — va a: ${fringe.scope === "chapter" ? "total del capítulo" : "total del presupuesto"}` : "Suma en este subcapítulo"}
+      title={excluded ? `No suma aquí: va a ${fringe.scope === "chapter" ? "total del capítulo" : "total del presupuesto"}` : "Suma en este subcapítulo"}
     >
       {fringe.label} · {fmtDecimal(amount)}
       {excluded && <span className="text-[9px] text-slate-500 font-normal">excl.</span>}
@@ -55,7 +55,7 @@ function RouteBadge({ route, draftId }: { route: BudgetingLineRoute; draftId: st
       href={`/budgeting/${draftId}/accounts/${route.chapterId}/subchapters/${route.subchapterId}`}
       className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full border hover:bg-[#8DA7BE]/[0.08] transition-colors"
       style={{ borderColor: "#8DA7BE", color: "#1D201F" }}
-      title={`No suma aquí — va a ${route.chapterCode} ${route.chapterDescription} · ${route.subchapterCode} ${route.subchapterDescription}`}
+      title={`No suma aquí: va a ${route.chapterCode} ${route.chapterDescription} · ${route.subchapterCode} ${route.subchapterDescription}`}
     >
       excl. <ArrowUpRight size={10} /> {route.subchapterCode}
     </Link>
@@ -100,7 +100,7 @@ function RoutePicker({
   );
 }
 
-// ─── Fila de campos — MMB-style: sin caja, sin placeholder, guarda sola al
+// ─── Fila de campos, estilo MMB: sin caja, sin placeholder, guarda sola al
 // perder el foco (sin botón de confirmar). Componente de módulo estable: no
 // se redefine entre renders, así los inputs no pierden el foco al escribir. ──
 function LineFieldsGrid({
@@ -115,7 +115,7 @@ function LineFieldsGrid({
     if (e.key === "Escape") { onEscape(); }
   };
   return (
-    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-4 py-2.5`}>
+    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-4`}>
       <input value={fields.code} onChange={(e) => onChange({ code: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown} onFocus={(e) => e.target.select()}
         className={`${CELL_INPUT} font-mono text-xs`} />
       <input value={fields.description} onChange={(e) => onChange({ description: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown} onFocus={(e) => e.target.select()}
@@ -233,7 +233,7 @@ function LineRow({
               {fringePickerOpen && (
                 <div className="absolute z-20 top-full left-0 mt-1 w-64 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 max-h-56 overflow-y-auto">
                   {fringes.length === 0 ? (
-                    <p className="text-[11px] text-slate-400 text-center py-3 px-3">Sin cargas sociales configuradas — añádelas en Cargas sociales.</p>
+                    <p className="text-[11px] text-slate-400 text-center py-3 px-3">Sin cargas sociales configuradas: añádelas en Cargas sociales.</p>
                   ) : (
                     fringes.map((f) => {
                       const checked = (line.fringeIds || []).includes(f.id);
@@ -362,7 +362,7 @@ export default function BudgetingSubchapterPage() {
     return () => unsub();
   }, [draftId, accountId, subchapterId]);
 
-  // Todos los capítulos/subcapítulos del borrador — para el buscador de "Contabilizar en"
+  // Todos los capítulos/subcapítulos del borrador: para el buscador de "Contabilizar en"
   useEffect(() => {
     const unsub = onSnapshot(collection(db, `budgetingDrafts/${draftId}/accounts`), (snap) => {
       setChapters(snap.docs.map((d) => ({ id: d.id, ...d.data() } as BudgetingAccount)));
@@ -572,7 +572,7 @@ export default function BudgetingSubchapterPage() {
 
   return (
     <div className="w-full px-10 py-6">
-      {/* Breadcrumb — solo navegación de entrar/volver, sin categorías ni desplegables */}
+      {/* Breadcrumb: solo navegación de entrar/volver, sin categorías ni desplegables */}
       <div className="flex items-center gap-1.5 mb-4 flex-wrap">
         <Link href={`/budgeting/${draftId}`} className="text-xs text-slate-400 hover:text-[#8DA7BE] transition-colors">{draft?.name}</Link>
         <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
@@ -594,14 +594,14 @@ export default function BudgetingSubchapterPage() {
       {/* Detail lines */}
       <div className="border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">
         <div className="min-w-[720px]">
-          <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-4 py-2 border-b border-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
-            <span className="flex items-center">Código</span>
-            <span className="flex items-center pl-2">Descripción</span>
-            <span className="flex items-center justify-end pl-2">Cant.</span>
-            <span className="flex items-center pl-2">Unidad</span>
-            <span className="flex items-center justify-end pl-2">X</span>
-            <span className="flex items-center justify-end pl-2">Tarifa</span>
-            <span className="flex items-center justify-end pl-2">Total</span>
+          <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-4 border-b border-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
+            <span className="flex items-center py-2">Código</span>
+            <span className="flex items-center py-2 pl-2">Descripción</span>
+            <span className="flex items-center justify-end py-2 pl-2">Cant.</span>
+            <span className="flex items-center py-2 pl-2">Unidad</span>
+            <span className="flex items-center justify-end py-2 pl-2">X</span>
+            <span className="flex items-center justify-end py-2 pl-2">Tarifa</span>
+            <span className="flex items-center justify-end py-2 pl-2">Total</span>
           </div>
           <datalist id="unit-suggestions">
             {UNIT_SUGGESTIONS.map((u) => <option key={u} value={u} />)}

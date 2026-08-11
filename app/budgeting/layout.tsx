@@ -11,7 +11,7 @@ import BudgetingShell from "@/components/BudgetingShell";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Budgeting no usa el Header/Footer estándar (ver app/layout-client.tsx,
-// prefijo "/budgeting" en isAuthPage) — es una app aparte, con su propio
+// prefijo "/budgeting" en isAuthPage): es una app aparte, con su propio
 // shell (BudgetingShell). Solo entra quien tiene users/{uid}.budgetingAccess.
 // ─────────────────────────────────────────────────────────────────────────────
 

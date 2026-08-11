@@ -33,7 +33,7 @@ type DeleteTarget = { chapterId: string; label: string };
 type EligibleProject = { id: string; name: string };
 const cols = "grid-cols-[26px_100px_1fr_100px_58px]";
 
-// ─── Fila de capítulo — siempre editable in situ (MMB-style): sin caja, sin
+// ─── Fila de capítulo, siempre editable in situ (MMB-style): sin caja, sin
 // placeholder, guarda sola al perder el foco. Componentes de módulo
 // estables: no se redefinen entre renders, así los inputs no pierden el foco. ──
 function ChapterRow({
@@ -55,7 +55,7 @@ function ChapterRow({
   };
 
   return (
-    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 py-3 hover:bg-white group`}>
+    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group`}>
       <Link href={`/budgeting/${draftId}/accounts/${chapter.id}`} className="flex items-center justify-center" title="Entrar">
         <ChevronRight size={13} className="text-slate-300 group-hover:text-[#8DA7BE] group-hover:translate-x-0.5 transition-all" />
       </Link>
@@ -89,7 +89,7 @@ function NewChapterRow({ onCommit }: { onCommit: (code: string, description: str
   };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter") e.currentTarget.blur(); };
   return (
-    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 py-3`}>
+    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3`}>
       <span />
       <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown} onFocus={(e) => e.target.select()}
         className={`${CELL_INPUT} font-mono text-xs pl-2`} />
@@ -189,7 +189,7 @@ export default function BudgetingTopPage() {
   const fringes: BudgetingFringe[] = draft?.fringes || [];
   const scenarios = draft?.scenarios || [];
 
-  // Escenarios: solo una previsualización en vivo — recalcula el total de las
+  // Escenarios: solo una previsualización en vivo, recalcula el total de las
   // líneas con fórmula bajo otro juego de Globales, sin escribir nada. Las
   // líneas sin fórmula (número suelto) no cambian entre escenarios.
   const activeScenarioId = draft?.activeScenarioId || null;
@@ -288,7 +288,7 @@ export default function BudgetingTopPage() {
       await setDoc(doc(db, `userBudgetingDrafts/${user.uid}/drafts`, newRef.id), {
         name: newName, updatedAt: now, status: "draft", sentToProjectName: null,
       });
-      // Nota: la copia no preserva redirecciones entre líneas (routedTo) — se copian como líneas normales, sin redirigir.
+      // Nota: la copia no preserva redirecciones entre líneas (routedTo); se copian como líneas normales, sin redirigir.
       for (const chapter of chapters) {
         const newChapterRef = await addDoc(collection(db, `budgetingDrafts/${newRef.id}/accounts`), {
           code: chapter.code, description: chapter.description, category: chapter.category, createdAt: Timestamp.now(),
@@ -346,7 +346,7 @@ export default function BudgetingTopPage() {
     await updateDoc(doc(db, "budgetingDrafts", draftId), { exportConfig: next, updatedAt: serverTimestamp() });
   };
 
-  // ── Snapshots / versiones — foto congelada del árbol, sin duplicar el borrador ──
+  // ── Snapshots / versiones: foto congelada del árbol, sin duplicar el borrador ──
   const handleSaveSnapshot = async () => {
     if (!user || !snapshotLabel.trim()) return;
     setSavingSnapshot(true);
@@ -448,7 +448,7 @@ export default function BudgetingTopPage() {
     setSending(true);
     setSendError("");
     try {
-      // Dos pasadas: primero una Account por cada Subcapítulo, luego las SubAccounts —
+      // Dos pasadas: primero una Account por cada Subcapítulo, luego las SubAccounts,
       // así una línea con `routedTo` puede colocarse bajo la Account de su destino
       // real en vez de la de su ubicación física.
       const accountIdBySubchapterId: Record<string, string> = {};
@@ -514,7 +514,7 @@ export default function BudgetingTopPage() {
             </span>
           )}
           {scenarios.length > 0 && (
-            <div className="flex items-center gap-1 p-0.5 border border-slate-200 rounded-lg bg-slate-50" title="Vista previa de escenario — no cambia lo guardado">
+            <div className="flex items-center gap-1 p-0.5 border border-slate-200 rounded-lg bg-slate-50" title="Vista previa de escenario: no cambia lo guardado">
               <button onClick={() => setActiveScenario(null)} className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${!activeScenarioId ? BTN_LIGHT_ACTIVE : "text-slate-500 hover:text-slate-700"}`}>
                 Real
               </button>
@@ -592,17 +592,17 @@ export default function BudgetingTopPage() {
       {activeScenarioId && (
         <div className="flex items-center gap-1.5 mb-3 text-[11px] font-medium" style={{ color: "#8DA7BE" }}>
           <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#8DA7BE" }} />
-          Previsualizando "{scenarios.find((s) => s.id === activeScenarioId)?.label}" — los totales de abajo son una simulación, no se ha guardado nada.
+          Previsualizando "{scenarios.find((s) => s.id === activeScenarioId)?.label}": los totales de abajo son una simulación, no se ha guardado nada.
         </div>
       )}
 
       {/* Budget */}
       <div className="border border-slate-200 rounded-2xl overflow-hidden">
-        <div className={`grid ${cols} gap-0 pl-3 pr-3 py-2 border-b border-slate-200 divide-x divide-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
+        <div className={`grid ${cols} gap-0 pl-3 pr-3 border-b border-slate-200 divide-x divide-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
           <span></span>
-          <span className="flex items-center pl-2">Código</span>
-          <span className="flex items-center pl-2">Descripción</span>
-          <span className="flex items-center justify-end pr-2">Total</span>
+          <span className="flex items-center py-2 pl-2">Código</span>
+          <span className="flex items-center py-2 pl-2">Descripción</span>
+          <span className="flex items-center justify-end py-2 pr-2">Total</span>
           <span></span>
         </div>
         {catEnabled && cats.length > 0 ? (
@@ -781,7 +781,7 @@ export default function BudgetingTopPage() {
                     })}
                     {Object.values(projectStatus).includes("occupied") && (
                       <p className="text-[11px] text-slate-400 pt-1">
-                        Los proyectos con actividad en Accounting no se pueden rellenar así — contacta con el equipo de Filma Workspace para cargarlo.
+                        Los proyectos con actividad en Accounting no se pueden rellenar así: contacta con el equipo de Filma Workspace para cargarlo.
                       </p>
                     )}
                   </div>

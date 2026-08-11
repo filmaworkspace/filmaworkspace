@@ -22,7 +22,7 @@ import BudgetingFolderPicker from "@/components/BudgetingFolderPicker";
 // ─────────────────────────────────────────────────────────────────────────────
 // Fringes / Seguridad Social del borrador: por porcentaje sobre la línea, o
 // por importe fijo por periodo con tope opcional (p.ej. cotización topada
-// mensualmente). Cada uno decide dónde computa su importe generado —
+// mensualmente). Cada uno decide dónde computa su importe generado:
 // subcapítulo, capítulo o total del presupuesto. Organizables en carpetas.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -271,7 +271,7 @@ export default function BudgetingFringesPage() {
               )}
 
               <div>
-                <label className="text-xs font-medium text-slate-700 block mb-1.5">Alcance — dónde suma el importe generado</label>
+                <label className="text-xs font-medium text-slate-700 block mb-1.5">Alcance: dónde suma el importe generado</label>
                 <Segmented options={(["subchapter", "chapter", "total"] as FringeScope[]).map((s) => ({ value: s, label: FRINGE_SCOPE_LABELS[s] }))} value={form.scope} onChange={(scope) => setForm((f) => ({ ...f, scope }))} />
               </div>
 
