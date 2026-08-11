@@ -69,6 +69,7 @@ export default function BudgetingShell({ children }: { children: React.ReactNode
     { href: `/budgeting/${draftId}/phases`, label: "Fases", exact: false },
     { href: `/budgeting/${draftId}/fringes`, label: "Cargas sociales", exact: false },
     { href: `/budgeting/${draftId}/globals`, label: "Globales", exact: false },
+    { href: `/budgeting/${draftId}/versions`, label: "Versiones", exact: false },
   ] : [];
 
   return (

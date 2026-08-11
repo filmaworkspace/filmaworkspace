@@ -550,6 +550,14 @@ service cloud.firestore {
           }
         }
       }
+
+      match /snapshots/{snapshotId} {
+        allow read, write: if isSignedIn() && (
+          isAdmin() ||
+          (hasBudgetingAccess() &&
+           get(/databases/$(database)/documents/budgetingDrafts/$(draftId)).data.ownerUid == request.auth.uid)
+        );
+      }
     }
 
     match /userBudgetingDrafts/{userId}/drafts/{draftId} {

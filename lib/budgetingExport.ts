@@ -28,6 +28,8 @@ export interface FwbDetailLine {
   supplier?: string;
   notes?: string;
   tags?: string[];
+  /** Si está puesta, la línea cuenta en el Subcapítulo indicado (por código) en vez del suyo propio — ver BudgetingLineRoute. */
+  routedToSubchapterCode?: string;
 }
 
 export interface FwbSubchapter {
@@ -87,7 +89,10 @@ export function downloadFwb(fwb: FwbFile, filename: string) {
 }
 
 interface LiteEntity { id: string; code: string; description: string; }
-interface LiteLine { code: string; description: string; units: number; unit: string; multiplier: number; rate: number; total: number; supplier?: string; notes?: string; tags?: string[]; }
+interface LiteLine {
+  code: string; description: string; units: number; unit: string; multiplier: number; rate: number; total: number;
+  supplier?: string; notes?: string; tags?: string[]; routedTo?: { subchapterCode: string } | null;
+}
 
 /** Construye un .fwb a partir de los datos ya cargados de un borrador. */
 export function buildFwbFromDraft(params: {
@@ -120,6 +125,7 @@ export function buildFwbFromDraft(params: {
             code: l.code, description: l.description, units: l.units, unit: l.unit,
             multiplier: l.multiplier, rate: l.rate, total: l.total,
             supplier: l.supplier, notes: l.notes, tags: l.tags,
+            routedToSubchapterCode: l.routedTo?.subchapterCode,
           })),
         })),
       })),
@@ -148,7 +154,9 @@ export function flattenFwbToAccountRows(fwb: FwbFile): FlatAccountRow[] {
       for (const sub of chapter.subchapters) {
         rows.push({ code: sub.code, description: sub.description, type: "CUENTA", budgeted: 0, parentCode: null });
         for (const line of sub.detailLines || []) {
-          rows.push({ code: line.code, description: line.description, type: "SUBCUENTA", budgeted: line.total || 0, parentCode: sub.code });
+          // Una línea redirigida ("excl.") cuenta en la Account del Subcapítulo destino, no en la física.
+          const parentCode = line.routedToSubchapterCode || sub.code;
+          rows.push({ code: line.code, description: line.description, type: "SUBCUENTA", budgeted: line.total || 0, parentCode });
         }
       }
     }

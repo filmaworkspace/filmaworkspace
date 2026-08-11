@@ -46,7 +46,9 @@ export interface BudgetingFolder {
  * Global: valor reutilizable en todo el borrador, identificado por `code`.
  * `value` es un número o una fórmula que puede referenciar el código de
  * otros globales (p.ej. "120 * DIAS_RODAJE + DIETA"), resuelta con
- * `resolveGlobals()`.
+ * `resolveGlobals()`. `scenarioOverrides` permite que, bajo un escenario
+ * concreto, este Global tome un valor/fórmula distinto — si no hay override
+ * para el escenario activo, se usa `value` normal.
  */
 export interface BudgetingGlobal {
   id: string;
@@ -54,6 +56,13 @@ export interface BudgetingGlobal {
   label: string;
   value: string;
   folderId?: string | null;
+  scenarioOverrides?: Record<string, string>;
+}
+
+/** Escenario ("qué pasaría si..."): un juego alternativo de valores para ciertos Globales, sin duplicar el borrador. */
+export interface BudgetingScenario {
+  id: string;
+  label: string;
 }
 
 export type FringeType = "percent" | "fixed_period";
@@ -141,6 +150,9 @@ export interface BudgetingDraft {
   fringeFolders?: BudgetingFolder[];
   phases?: BudgetingPhase[];
   exportConfig?: BudgetingExportConfig;
+  scenarios?: BudgetingScenario[];
+  /** Escenario que se está previsualizando ahora mismo — null/undefined = valores reales, sin overrides. */
+  activeScenarioId?: string | null;
 }
 
 /** Doc índice en userBudgetingDrafts/{uid}/drafts/{draftId} — para listar rápido en el sidebar sin leer cada borrador entero. */
@@ -168,6 +180,24 @@ export interface BudgetingSubchapter {
   code: string;
   description: string;
   createdAt: Timestamp | null;
+  /** Suma denormalizada de líneas de otros subcapítulos redirigidas aquí (ver BudgetingLineRoute). Mantenida con increment() al guardar/duplicar/borrar líneas. */
+  receivedTotal?: number;
+}
+
+/**
+ * Destino de una línea "redirigida": su importe deja de sumar en su propio
+ * subcapítulo/capítulo y pasa a sumar en otro — p.ej. una línea de Catering
+ * escrita dentro de Ayudante de Producción que en realidad debe computar en
+ * la partida de Catering. La línea se sigue viendo y editando donde se
+ * escribió (marcada "excl."), con un enlace directo a su destino.
+ */
+export interface BudgetingLineRoute {
+  chapterId: string;
+  chapterCode: string;
+  chapterDescription: string;
+  subchapterId: string;
+  subchapterCode: string;
+  subchapterDescription: string;
 }
 
 /**
@@ -198,6 +228,8 @@ export interface BudgetingDetailLine {
   tags?: string[];
   /** Fringes/SS aplicados a esta línea (ids de BudgetingFringe del borrador). */
   fringeIds?: string[];
+  /** Si está puesto, el total de esta línea NO suma aquí — suma en el subcapítulo indicado (ver BudgetingLineRoute). */
+  routedTo?: BudgetingLineRoute | null;
   createdAt: Timestamp | null;
 }
 
@@ -325,7 +357,7 @@ export interface GlobalResolution {
 }
 
 /** Resuelve todos los Globales de un borrador, permitiendo que unos referencien a otros por `code`. Detecta ciclos. */
-export function resolveGlobals(globals: BudgetingGlobal[]): GlobalResolution {
+export function resolveGlobals(globals: BudgetingGlobal[], activeScenarioId?: string | null): GlobalResolution {
   const byCode = new Map(globals.filter((g) => g.code).map((g) => [g.code, g]));
   const values: Record<string, number> = {};
   const errors: Record<string, string> = {};
@@ -339,7 +371,8 @@ export function resolveGlobals(globals: BudgetingGlobal[]): GlobalResolution {
     if (resolving.has(code)) { errors[code] = "Referencia circular"; return 0; }
     resolving.add(code);
     try {
-      const val = isPlainNumber(g.value) ? parseFloat(g.value) : evaluateExpr(g.value, resolve);
+      const raw = (activeScenarioId && g.scenarioOverrides?.[activeScenarioId]?.trim()) || g.value;
+      const val = isPlainNumber(raw) ? parseFloat(raw) : evaluateExpr(raw, resolve);
       values[code] = val;
       return val;
     } catch (e: any) {
@@ -369,6 +402,23 @@ export function evaluateFieldExpr(text: string, globalValues: Record<string, num
   } catch (e: any) {
     return { value: 0, error: e?.message || "Fórmula inválida" };
   }
+}
+
+/**
+ * Recalcula el total de una línea bajo otro juego de valores de Globales —
+ * usado para previsualizar un Escenario sin tocar lo guardado. Si la línea no
+ * usa ninguna fórmula, su total no depende de Globales y se devuelve tal cual.
+ */
+export function computeLineTotalForScenario(line: BudgetingDetailLine, globalValues: Record<string, number>): number {
+  if (!line.unitsExpr && !line.multiplierExpr && !line.rateExpr) return line.total || 0;
+  const u = line.unitsExpr ? evaluateFieldExpr(line.unitsExpr, globalValues).value : line.units;
+  const m = line.multiplierExpr ? evaluateFieldExpr(line.multiplierExpr, globalValues).value : line.multiplier;
+  const r = line.rateExpr ? evaluateFieldExpr(line.rateExpr, globalValues).value : line.rate;
+  return computeLineTotal(u, m, r);
+}
+
+export function effectiveLineUnits(line: BudgetingDetailLine, globalValues: Record<string, number>): number {
+  return line.unitsExpr ? evaluateFieldExpr(line.unitsExpr, globalValues).value : (line.units || 0);
 }
 
 // ─── Fringes / Seguridad Social ─────────────────────────────────────────────
@@ -418,6 +468,23 @@ export function computeFringeExtras(lines: BudgetingDetailLine[], fringes: Budge
   return extras;
 }
 
+// ─── Redirección de líneas ("excl.") ────────────────────────────────────────
+// Una línea con `routedTo` puesto se sigue viendo y editando en su
+// subcapítulo físico, pero su total no cuenta ahí — cuenta en el subcapítulo
+// destino (denormalizado en `receivedTotal`, ver BudgetingSubchapter). Estos
+// helpers son puramente de lectura; quien escribe `routedTo` es responsable
+// de mantener `receivedTotal` al día con increment()/writeBatch.
+
+/** Suma directa de un conjunto de líneas, excluyendo las que están redirigidas a otro subcapítulo. */
+export function sumOwnLineTotals(lines: BudgetingDetailLine[]): number {
+  return Math.round(lines.filter((l) => !l.routedTo).reduce((s, l) => s + (l.total || 0), 0) * 100) / 100;
+}
+
+/** Total real de un subcapítulo: lo suyo propio (sin lo redirigido a otros) + lo que otros le han redirigido a él. */
+export function subchapterTotal(sub: { receivedTotal?: number }, lines: BudgetingDetailLine[]): number {
+  return Math.round((sumOwnLineTotals(lines) + (sub.receivedTotal || 0)) * 100) / 100;
+}
+
 // ─── Estilo — funcional, no "de color por todas partes": fondo blanco/borde
 // gris por defecto, se ilumina en el acento al hover o cuando está
 // activo/seleccionado. Texto de énfasis en BUDGETING_TEXT, no slate-900. ────
@@ -430,6 +497,78 @@ export const BTN_LIGHT_ACTIVE = "border-[#8DA7BE] bg-[#8DA7BE]/[0.1] text-[#8DA7
 export const ICON_BTN_LIGHT =
   "text-slate-400 hover:text-[#8DA7BE] hover:bg-[#8DA7BE]/[0.1] transition-colors";
 
-/** Input de fila (spreadsheet-like): caja real con borde, no solo una línea inferior. */
+/** Input de fila (spreadsheet-like): caja real con borde, no solo una línea inferior. Para paneles secundarios (proveedor, comentario, etiquetas...), no para las columnas principales de una tabla. */
 export const ROW_INPUT =
   "border border-slate-300 rounded-md bg-white focus:outline-none focus:border-[#8DA7BE] focus:ring-2 focus:ring-[#8DA7BE]/20 transition-colors";
+
+/** Celda de tabla al estilo MMB: sin caja ni placeholder visible, solo la columna vacía — se resalta suavemente al enfocar, nada más. Guarda al perder el foco, sin botón de confirmar. */
+export const CELL_INPUT =
+  "w-full bg-transparent focus:outline-none focus:bg-[#8DA7BE]/[0.08] rounded px-1.5 py-1 transition-colors";
+
+// ─── Snapshots / versiones ──────────────────────────────────────────────────
+// budgetingDrafts/{draftId}/snapshots/{snapshotId} — una foto congelada del
+// árbol completo (con los mismos ids de Firestore que tenía en ese momento,
+// para poder comparar dos fotos, o una foto contra el estado actual).
+
+export interface BudgetingSnapshotLine { id: string; code: string; description: string; total: number; }
+export interface BudgetingSnapshotSubchapter { id: string; code: string; description: string; lines: BudgetingSnapshotLine[]; }
+export interface BudgetingSnapshotChapter { id: string; code: string; description: string; category: string | null; subchapters: BudgetingSnapshotSubchapter[]; }
+
+export interface BudgetingSnapshot {
+  id: string;
+  label: string;
+  createdAt: Timestamp | null;
+  createdBy: string;
+  grandTotal: number;
+  chapters: BudgetingSnapshotChapter[];
+}
+
+export interface SnapshotLineDiff {
+  id: string;
+  code: string;
+  description: string;
+  chapterLabel: string;
+  subchapterLabel: string;
+  kind: "added" | "removed" | "changed";
+  oldTotal?: number;
+  newTotal?: number;
+}
+
+export interface SnapshotDiff {
+  lines: SnapshotLineDiff[];
+  oldTotal: number;
+  newTotal: number;
+}
+
+/** Compara dos árboles de snapshot (o un snapshot contra el estado actual, con la misma forma) línea a línea, por id. */
+export function diffSnapshotTrees(oldChapters: BudgetingSnapshotChapter[], newChapters: BudgetingSnapshotChapter[]): SnapshotDiff {
+  const flatten = (chapters: BudgetingSnapshotChapter[]) => {
+    const map = new Map<string, { line: BudgetingSnapshotLine; chapterLabel: string; subchapterLabel: string }>();
+    for (const c of chapters) {
+      for (const s of c.subchapters) {
+        for (const l of s.lines) {
+          map.set(l.id, { line: l, chapterLabel: `${c.code} ${c.description}`, subchapterLabel: `${s.code} ${s.description}` });
+        }
+      }
+    }
+    return map;
+  };
+  const oldMap = flatten(oldChapters);
+  const newMap = flatten(newChapters);
+  const diffs: SnapshotLineDiff[] = [];
+  const allIds = new Set([...oldMap.keys(), ...newMap.keys()]);
+  for (const id of allIds) {
+    const o = oldMap.get(id);
+    const n = newMap.get(id);
+    if (o && !n) {
+      diffs.push({ id, code: o.line.code, description: o.line.description, chapterLabel: o.chapterLabel, subchapterLabel: o.subchapterLabel, kind: "removed", oldTotal: o.line.total });
+    } else if (!o && n) {
+      diffs.push({ id, code: n.line.code, description: n.line.description, chapterLabel: n.chapterLabel, subchapterLabel: n.subchapterLabel, kind: "added", newTotal: n.line.total });
+    } else if (o && n && Math.round((o.line.total || 0) * 100) !== Math.round((n.line.total || 0) * 100)) {
+      diffs.push({ id, code: n.line.code, description: n.line.description, chapterLabel: n.chapterLabel, subchapterLabel: n.subchapterLabel, kind: "changed", oldTotal: o.line.total, newTotal: n.line.total });
+    }
+  }
+  const oldTotal = Math.round([...oldMap.values()].reduce((s, x) => s + (x.line.total || 0), 0) * 100) / 100;
+  const newTotal = Math.round([...newMap.values()].reduce((s, x) => s + (x.line.total || 0), 0) * 100) / 100;
+  return { lines: diffs, oldTotal, newTotal };
+}
