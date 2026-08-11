@@ -112,7 +112,7 @@ export default function BudgetingCategoriesPage() {
           <button
             onClick={() => persist({ categoriesEnabled: !enabled })}
             className="w-9 h-5 rounded-full transition-colors relative flex-shrink-0"
-            style={{ background: enabled ? "#5B57E0" : "#e2e8f0" }}
+            style={{ background: enabled ? "#8DA7BE" : "#e2e8f0" }}
           >
             <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${enabled ? "left-4" : "left-0.5"}`} />
           </button>

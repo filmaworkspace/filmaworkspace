@@ -2,7 +2,7 @@
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
@@ -10,39 +10,35 @@ import { db } from "@/lib/firebase";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp, updateDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { AlertCircle, AlignLeft, ChevronRight, Clock, DollarSign, Hash, ListOrdered, Pencil, Plus, Trash2, X } from "lucide-react";
+import { AlertCircle, Check, ChevronRight, Plus, Search, Trash2, X } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
-  BTN_LIGHT, BudgetingAccount, BudgetingCategoryDef, BudgetingDetailLine, BudgetingDraft,
-  ICON_BTN_LIGHT, UNIT_SUGGESTIONS, categoriesEnabled, computeLineTotal, fmtCurrency, fmtDecimal, resolveCategories,
+  BudgetingAccount, BudgetingCategoryDef, BudgetingDetailLine, BudgetingDraft, BudgetingSubchapter,
+  ICON_BTN_LIGHT, categoriesEnabled, fmtCurrency, resolveCategories,
 } from "@/lib/budgeting";
-import BudgetingDropdown from "@/components/BudgetingDropdown";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function BudgetingAccountPage() {
+type RowEditor = { mode: "new" | "edit"; subchapterId?: string; code: string; description: string };
+type DeleteTarget = { subchapterId: string; label: string };
+
+export default function BudgetingChapterPage() {
   const { draftId, accountId } = useParams() as { draftId: string; accountId: string };
   const { user } = useUser();
-  const router = useRouter();
 
   const [draft, setDraft] = useState<BudgetingDraft | null>(null);
-  const [allAccounts, setAllAccounts] = useState<BudgetingAccount[]>([]);
-  const [account, setAccount] = useState<BudgetingAccount | null>(null);
-  const [lines, setLines] = useState<BudgetingDetailLine[]>([]);
+  const [chapter, setChapter] = useState<BudgetingAccount | null>(null);
+  const [subchapters, setSubchapters] = useState<BudgetingSubchapter[]>([]);
+  const [linesBySubchapter, setLinesBySubchapter] = useState<Record<string, BudgetingDetailLine[]>>({});
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
 
-  const [editingAccount, setEditingAccount] = useState(false);
-  const [accountForm, setAccountForm] = useState({ code: "", description: "" });
-  const [deleteAccountConfirm, setDeleteAccountConfirm] = useState(false);
-
-  const [lineModal, setLineModal] = useState<{ line: BudgetingDetailLine | null } | null>(null);
-  const [lineForm, setLineForm] = useState({ code: "", description: "", units: "1", unit: "", multiplier: "1", rate: "0" });
-  const [lineCodeError, setLineCodeError] = useState("");
-  const [deleteLineTarget, setDeleteLineTarget] = useState<BudgetingDetailLine | null>(null);
+  const [rowEditor, setRowEditor] = useState<RowEditor | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "budgetingDrafts", draftId), (snap) => {
@@ -52,20 +48,11 @@ export default function BudgetingAccountPage() {
   }, [draftId]);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, `budgetingDrafts/${draftId}/accounts`), (snap) => {
-      setAllAccounts(snap.docs.map((d) => ({ id: d.id, ...d.data() } as BudgetingAccount)));
-    });
-    return () => unsub();
-  }, [draftId]);
-
-  useEffect(() => {
     const unsub = onSnapshot(
       doc(db, `budgetingDrafts/${draftId}/accounts`, accountId),
       (snap) => {
         if (!snap.exists()) { setNotFound(true); setLoading(false); return; }
-        const data = { id: snap.id, ...snap.data() } as BudgetingAccount;
-        setAccount(data);
-        setAccountForm({ code: data.code, description: data.description });
+        setChapter({ id: snap.id, ...snap.data() } as BudgetingAccount);
         setLoading(false);
       },
       () => { setNotFound(true); setLoading(false); }
@@ -74,31 +61,33 @@ export default function BudgetingAccountPage() {
   }, [draftId, accountId]);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/detailLines`), (snap) => {
-      setLines(snap.docs.map((d) => ({ id: d.id, ...d.data() } as BudgetingDetailLine)));
+    const unsub = onSnapshot(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`), (snap) => {
+      setSubchapters(snap.docs.map((d) => ({ id: d.id, ...d.data() } as BudgetingSubchapter)));
     });
     return () => unsub();
   }, [draftId, accountId]);
 
+  useEffect(() => {
+    const unsubs: Record<string, () => void> = {};
+    subchapters.forEach((s) => {
+      unsubs[s.id] = onSnapshot(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${s.id}/detailLines`), (snap) => {
+        setLinesBySubchapter((prev) => ({ ...prev, [s.id]: snap.docs.map((d) => ({ id: d.id, ...d.data() } as BudgetingDetailLine)) }));
+      });
+    });
+    return () => { Object.values(unsubs).forEach((fn) => fn()); };
+  }, [subchapters, draftId, accountId]);
+
   const currency = draft?.currency || "EUR";
   const fmt = (n: number) => fmtCurrency(n, currency);
-  const total = lines.reduce((s, l) => s + (l.total || 0), 0);
+  const subTotal = (subchapterId: string) => (linesBySubchapter[subchapterId] || []).reduce((s, l) => s + (l.total || 0), 0);
+  const chapterTotal = subchapters.reduce((s, sub) => s + subTotal(sub.id), 0);
 
   const catEnabled = categoriesEnabled(draft);
   const cats: BudgetingCategoryDef[] = catEnabled ? resolveCategories(draft) : [];
-  const siblingAccounts = account
-    ? (catEnabled ? allAccounts.filter((a) => a.category === account.category) : allAccounts)
-    : [];
+  const currentCategory = catEnabled && chapter ? cats.find((c) => c.id === chapter.category) : null;
 
-  const handleSwitchCategory = (categoryId: string) => {
-    const firstAccount = allAccounts.find((a) => a.category === categoryId);
-    if (firstAccount) router.push(`/budgeting/${draftId}/accounts/${firstAccount.id}`);
-    else router.push(`/budgeting/${draftId}`);
-  };
-
-  const handleSwitchAccount = (newAccountId: string) => {
-    if (newAccountId !== accountId) router.push(`/budgeting/${draftId}/accounts/${newAccountId}`);
-  };
+  const q = search.trim().toLowerCase();
+  const matchesSearch = (s: BudgetingSubchapter) => !q || s.code.toLowerCase().includes(q) || s.description.toLowerCase().includes(q);
 
   const touchDraft = async () => {
     if (!user) return;
@@ -109,87 +98,39 @@ export default function BudgetingAccountPage() {
     ]);
   };
 
-  const handleSaveAccount = async () => {
-    if (!accountForm.code.trim() || !accountForm.description.trim()) return;
+  const openNewRow = () => setRowEditor({ mode: "new", code: "", description: "" });
+  const openEditRow = (sub: BudgetingSubchapter) => setRowEditor({ mode: "edit", subchapterId: sub.id, code: sub.code, description: sub.description });
+  const closeRowEditor = () => setRowEditor(null);
+
+  const handleSaveRow = async () => {
+    if (!rowEditor || !rowEditor.code.trim() || !rowEditor.description.trim()) { closeRowEditor(); return; }
     setSaving(true);
     try {
-      await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts`, accountId), {
-        code: accountForm.code.trim(), description: accountForm.description.trim(),
-      });
-      await touchDraft();
-      setEditingAccount(false);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    setSaving(true);
-    try {
-      await Promise.all(lines.map((l) => deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/detailLines`, l.id))));
-      await deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts`, accountId));
-      await touchDraft();
-      router.push(`/budgeting/${draftId}`);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const isLineCodeTaken = (code: string, excludeId?: string): boolean =>
-    lines.some((l) => l.id !== excludeId && l.code.trim().toLowerCase() === code.trim().toLowerCase());
-
-  const openCreateLine = () => {
-    setLineForm({ code: "", description: "", units: "1", unit: "", multiplier: "1", rate: "0" });
-    setLineCodeError("");
-    setLineModal({ line: null });
-  };
-
-  const openEditLine = (line: BudgetingDetailLine) => {
-    setLineForm({ code: line.code, description: line.description, units: String(line.units), unit: line.unit || "", multiplier: String(line.multiplier), rate: String(line.rate) });
-    setLineCodeError("");
-    setLineModal({ line });
-  };
-
-  const lineFormTotal = computeLineTotal(parseFloat(lineForm.units) || 0, parseFloat(lineForm.multiplier) || 0, parseFloat(lineForm.rate) || 0);
-
-  const handleSaveLine = async () => {
-    if (!lineModal) return;
-    const code = lineForm.code.trim();
-    const description = lineForm.description.trim();
-    if (!code || !description) return;
-    if (isLineCodeTaken(code, lineModal.line?.id)) {
-      setLineCodeError("Ese código ya se usa en otra línea de esta cuenta");
-      return;
-    }
-    const units = parseFloat(lineForm.units) || 0;
-    const multiplier = parseFloat(lineForm.multiplier) || 0;
-    const rate = parseFloat(lineForm.rate) || 0;
-    const total = computeLineTotal(units, multiplier, rate);
-    setSaving(true);
-    try {
-      if (lineModal.line) {
-        await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/detailLines`, lineModal.line.id), {
-          code, description, units, unit: lineForm.unit.trim(), multiplier, rate, total,
+      if (rowEditor.mode === "edit" && rowEditor.subchapterId) {
+        await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`, rowEditor.subchapterId), {
+          code: rowEditor.code.trim(), description: rowEditor.description.trim(),
         });
       } else {
-        await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/detailLines`), {
-          code, description, units, unit: lineForm.unit.trim(), multiplier, rate, total, createdAt: Timestamp.now(),
+        await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`), {
+          code: rowEditor.code.trim(), description: rowEditor.description.trim(), createdAt: Timestamp.now(),
         });
       }
       await touchDraft();
-      setLineModal(null);
     } finally {
       setSaving(false);
+      setRowEditor(null);
     }
   };
 
-  const handleDeleteLine = async () => {
-    if (!deleteLineTarget) return;
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
     setSaving(true);
     try {
-      await deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/detailLines`, deleteLineTarget.id));
+      const lines = linesBySubchapter[deleteTarget.subchapterId] || [];
+      await Promise.all(lines.map((l) => deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${deleteTarget.subchapterId}/detailLines`, l.id))));
+      await deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`, deleteTarget.subchapterId));
       await touchDraft();
-      setDeleteLineTarget(null);
+      setDeleteTarget(null);
     } finally {
       setSaving(false);
     }
@@ -203,253 +144,138 @@ export default function BudgetingAccountPage() {
     );
   }
 
-  if (notFound || !account) {
+  if (notFound || !chapter) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 px-6">
         <AlertCircle size={28} className="text-slate-300" />
-        <p className="text-sm text-slate-500">Esta cuenta no existe.</p>
+        <p className="text-sm text-slate-500">Este capítulo no existe.</p>
       </div>
     );
   }
 
-  const cols = "grid-cols-[110px_1fr_70px_90px_50px_90px_100px_56px]";
-  const currentCategory = catEnabled ? cats.find((c) => c.id === account.category) : null;
+  const cols = "grid-cols-[110px_1fr_90px_70px]";
+
+  const SubRow = ({ sub }: { sub: BudgetingSubchapter }) => {
+    const isEditing = rowEditor?.mode === "edit" && rowEditor.subchapterId === sub.id;
+    if (isEditing) {
+      return (
+        <div className={`grid ${cols} gap-2 items-center px-4 py-1`}>
+          <input autoFocus value={rowEditor.code} onChange={(e) => setRowEditor({ ...rowEditor, code: e.target.value })}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSaveRow(); if (e.key === "Escape") closeRowEditor(); }}
+            className="text-xs font-mono border-b border-[#8DA7BE] focus:outline-none bg-transparent px-0.5 py-0.5" />
+          <input value={rowEditor.description} onChange={(e) => setRowEditor({ ...rowEditor, description: e.target.value })}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSaveRow(); if (e.key === "Escape") closeRowEditor(); }}
+            onBlur={handleSaveRow}
+            className="text-xs border-b border-[#8DA7BE] focus:outline-none bg-transparent px-0.5 py-0.5" />
+          <span />
+          <span className="flex items-center justify-end gap-0.5">
+            <button onClick={handleSaveRow} className={`p-1 rounded ${ICON_BTN_LIGHT}`}><Check size={12} /></button>
+            <button onClick={closeRowEditor} className="p-1 text-slate-300 hover:text-slate-600 rounded"><X size={12} /></button>
+          </span>
+        </div>
+      );
+    }
+    return (
+      <div className={`grid ${cols} gap-2 items-center px-4 py-1 hover:bg-slate-50 group`}>
+        <button onClick={() => openEditRow(sub)} className="text-xs font-mono text-slate-400 text-left hover:text-[#8DA7BE] transition-colors">{sub.code}</button>
+        <Link href={`/budgeting/${draftId}/accounts/${accountId}/subchapters/${sub.id}`} className="text-xs text-slate-800 truncate group-hover:text-[#8DA7BE] transition-colors">
+          {sub.description}
+        </Link>
+        <span className="text-xs font-medium text-slate-700 text-right justify-self-end">{fmt(subTotal(sub.id))}</span>
+        <span className="flex items-center justify-end gap-0.5">
+          <button onClick={() => setDeleteTarget({ subchapterId: sub.id, label: sub.description })} className="p-1 text-slate-300 hover:text-red-500 rounded transition-colors opacity-0 group-hover:opacity-100" title="Borrar subcapítulo">
+            <Trash2 size={11} />
+          </button>
+          <Link href={`/budgeting/${draftId}/accounts/${accountId}/subchapters/${sub.id}`}>
+            <ChevronRight size={13} className="text-slate-300 group-hover:text-[#8DA7BE] group-hover:translate-x-0.5 transition-all" />
+          </Link>
+        </span>
+      </div>
+    );
+  };
 
   return (
-    <div className="w-full px-10 py-8">
-      {/* Breadcrumb con desplegables */}
-      <div className="flex items-center gap-1.5 mb-6">
-        <Link href={`/budgeting/${draftId}`} className="text-sm text-slate-400 hover:text-[#5B57E0] transition-colors">
-          {draft?.name}
-        </Link>
-        {catEnabled && currentCategory && (
+    <div className="w-full px-10 py-6">
+      {/* Breadcrumb — solo navegación de entrar/volver, sin desplegables */}
+      <div className="flex items-center gap-1.5 mb-4">
+        <Link href={`/budgeting/${draftId}`} className="text-xs text-slate-400 hover:text-[#8DA7BE] transition-colors">{draft?.name}</Link>
+        {currentCategory && (
           <>
-            <ChevronRight size={13} className="text-slate-300 flex-shrink-0" />
-            <BudgetingDropdown
-              value={currentCategory.id}
-              options={cats.map((c) => ({ value: c.id, label: c.label }))}
-              onChange={handleSwitchCategory}
-              buttonClassName="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-[#5B57E0] transition-colors"
-            />
+            <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
+            <span className="text-xs font-medium text-slate-500">{currentCategory.label}</span>
           </>
         )}
-        <ChevronRight size={13} className="text-slate-300 flex-shrink-0" />
-        <BudgetingDropdown
-          value={account.id}
-          options={siblingAccounts.map((a) => ({ value: a.id, label: `${a.code} ${a.description}` }))}
-          onChange={handleSwitchAccount}
-          buttonClassName="flex items-center gap-1 text-sm font-semibold text-slate-900 hover:text-[#5B57E0] transition-colors"
-        />
+        <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
+        <span className="text-xs font-semibold text-slate-900">{chapter.code} {chapter.description}</span>
       </div>
 
       {/* Top bar */}
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <div className="min-w-0">
-          {editingAccount ? (
-            <div className="flex items-center gap-2">
-              <input
-                value={accountForm.code}
-                onChange={(e) => setAccountForm((p) => ({ ...p, code: e.target.value }))}
-                className="w-28 px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2"
-              />
-              <input
-                autoFocus
-                value={accountForm.description}
-                onChange={(e) => setAccountForm((p) => ({ ...p, description: e.target.value }))}
-                className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2"
-              />
-              <button onClick={handleSaveAccount} disabled={saving} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${BTN_LIGHT}`}>
-                Guardar
-              </button>
-              <button onClick={() => { setEditingAccount(false); setAccountForm({ code: account.code, description: account.description }); }} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
-                <X size={15} />
-              </button>
-            </div>
-          ) : (
-            <h1 className="text-lg font-semibold text-slate-900 truncate">{account.description}</h1>
-          )}
-        </div>
-        <div className="flex items-center gap-4 flex-shrink-0">
-          <div className="text-right">
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Total</p>
-            <p className="text-lg font-bold text-slate-900">{fmt(total)}</p>
-          </div>
-          {!editingAccount && (
-            <div className="flex items-center gap-1">
-              <button onClick={() => setEditingAccount(true)} className={`p-2 rounded-lg ${ICON_BTN_LIGHT}`} title="Editar cuenta">
-                <Pencil size={15} />
-              </button>
-              <button onClick={() => setDeleteAccountConfirm(true)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Borrar cuenta">
-                <Trash2 size={15} />
-              </button>
-            </div>
-          )}
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <h1 className="text-sm font-semibold" style={{ color: "#1D201F" }}>{chapter.code} · {chapter.description}</h1>
+        <div className="relative w-44 flex-shrink-0">
+          <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar"
+            className="w-full pl-7 pr-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
+          />
         </div>
       </div>
 
-      {/* Detail lines table */}
-      <div className="border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">
-        <div className="min-w-[760px]">
-          <div className={`grid ${cols} gap-2 px-5 py-2 border-b border-slate-100 text-xs text-slate-400`}>
-            <span className="flex items-center gap-1.5"><Hash size={11} /> Código</span>
-            <span className="flex items-center gap-1.5"><AlignLeft size={11} /> Descripción</span>
-            <span className="flex items-center justify-end gap-1.5"><ListOrdered size={11} /> Cant.</span>
-            <span className="flex items-center gap-1.5"><Clock size={11} /> Unidad</span>
-            <span className="text-right">X</span>
-            <span className="flex items-center justify-end gap-1.5"><DollarSign size={11} /> Tarifa</span>
-            <span className="flex items-center justify-end gap-1.5"><DollarSign size={11} /> Total</span>
-            <span></span>
+      {/* Subcapítulos */}
+      <div className="border border-slate-200 rounded-2xl overflow-hidden">
+        {subchapters.filter(matchesSearch).length === 0 && !q ? (
+          <p className="text-xs text-slate-400 text-center py-6">Sin subcapítulos todavía</p>
+        ) : (
+          subchapters.filter(matchesSearch).map((sub) => <SubRow key={sub.id} sub={sub} />)
+        )}
+
+        {rowEditor?.mode === "new" ? (
+          <div className={`grid ${cols} gap-2 items-center px-4 py-1`}>
+            <input autoFocus placeholder="Código" value={rowEditor.code} onChange={(e) => setRowEditor({ ...rowEditor, code: e.target.value })}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSaveRow(); if (e.key === "Escape") closeRowEditor(); }}
+              className="text-xs font-mono border-b border-[#8DA7BE] focus:outline-none bg-transparent px-0.5 py-0.5" />
+            <input placeholder="Descripción" value={rowEditor.description} onChange={(e) => setRowEditor({ ...rowEditor, description: e.target.value })}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSaveRow(); if (e.key === "Escape") closeRowEditor(); }}
+              onBlur={handleSaveRow}
+              className="text-xs border-b border-[#8DA7BE] focus:outline-none bg-transparent px-0.5 py-0.5" />
+            <span />
+            <span className="flex items-center justify-end gap-0.5">
+              <button onClick={handleSaveRow} className={`p-1 rounded ${ICON_BTN_LIGHT}`}><Check size={12} /></button>
+              <button onClick={closeRowEditor} className="p-1 text-slate-300 hover:text-slate-600 rounded"><X size={12} /></button>
+            </span>
           </div>
-          {lines.length === 0 ? (
-            <p className="text-xs text-slate-400 text-center py-8">Sin líneas de detalle todavía</p>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {lines.map((line) => (
-                <div key={line.id} className={`grid ${cols} gap-2 px-5 py-3 items-center hover:bg-slate-50 group`}>
-                  <span className="text-xs font-mono text-slate-500 truncate">{line.code}</span>
-                  <span className="text-sm text-slate-800 truncate">{line.description}</span>
-                  <span className="text-xs text-slate-500 text-right">{fmtDecimal(line.units)}</span>
-                  <span className="text-xs text-slate-400 truncate">{line.unit}</span>
-                  <span className="text-xs text-slate-400 text-right">×{fmtDecimal(line.multiplier)}</span>
-                  <span className="text-xs text-slate-500 text-right">{fmtDecimal(line.rate)}</span>
-                  <span className="text-sm font-semibold text-slate-900 text-right">{fmt(line.total)}</span>
-                  <span className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => openEditLine(line)} className={`p-1 rounded ${ICON_BTN_LIGHT}`} title="Editar línea">
-                      <Pencil size={12} />
-                    </button>
-                    <button onClick={() => setDeleteLineTarget(line)} className="p-1 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar línea">
-                      <Trash2 size={12} />
-                    </button>
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+        ) : (
+          <div className="px-4 py-1.5 border-t border-slate-100">
+            <button onClick={openNewRow} className={`flex items-center gap-1.5 text-xs font-medium py-1 rounded-lg ${ICON_BTN_LIGHT}`}>
+              <span className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#8DA7BE" }}>
+                <Plus size={10} className="text-white" />
+              </span>
+              Añadir subcapítulo
+            </button>
+          </div>
+        )}
+
+        <div className={`grid ${cols} gap-2 items-center px-4 py-2.5 border-t border-slate-200 bg-slate-50/70`}>
+          <span />
+          <span className="text-xs font-bold" style={{ color: "#1D201F" }}>Total</span>
+          <span className="text-xs font-bold text-right justify-self-end" style={{ color: "#1D201F" }}>{fmt(chapterTotal)}</span>
+          <span />
         </div>
       </div>
 
-      <div className="mt-3">
-        <button onClick={openCreateLine} className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg ${BTN_LIGHT}`}>
-          <Plus size={12} />
-          Añadir línea
-        </button>
-      </div>
-
-      {/* ── Line modal ───────────────────────────────────────────────────── */}
-      {lineModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-semibold text-slate-900">{lineModal.line ? "Editar línea" : "Nueva línea"}</h3>
-              <button onClick={() => setLineModal(null)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
-                <X size={15} />
-              </button>
-            </div>
-            <div className="px-5 py-4 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1.5">Código</label>
-                  <input
-                    autoFocus
-                    value={lineForm.code}
-                    onChange={(e) => { setLineForm((p) => ({ ...p, code: e.target.value })); setLineCodeError(""); }}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1.5">Descripción</label>
-                  <input
-                    value={lineForm.description}
-                    onChange={(e) => setLineForm((p) => ({ ...p, description: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
-                  />
-                </div>
-              </div>
-              {lineCodeError && (
-                <div className="flex items-center gap-1.5 text-xs text-red-600">
-                  <AlertCircle size={12} />
-                  {lineCodeError}
-                </div>
-              )}
-              <div className="grid grid-cols-4 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1.5">Cantidad</label>
-                  <input type="number" value={lineForm.units} onChange={(e) => setLineForm((p) => ({ ...p, units: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-right focus:outline-none focus:ring-2" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1.5">Unidad</label>
-                  <input
-                    list="unit-suggestions"
-                    value={lineForm.unit}
-                    onChange={(e) => setLineForm((p) => ({ ...p, unit: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
-                  />
-                  <datalist id="unit-suggestions">
-                    {UNIT_SUGGESTIONS.map((u) => <option key={u} value={u} />)}
-                  </datalist>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1.5">X</label>
-                  <input type="number" value={lineForm.multiplier} onChange={(e) => setLineForm((p) => ({ ...p, multiplier: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-right focus:outline-none focus:ring-2" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1.5">Tarifa</label>
-                  <input type="number" value={lineForm.rate} onChange={(e) => setLineForm((p) => ({ ...p, rate: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-right focus:outline-none focus:ring-2" />
-                </div>
-              </div>
-              <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-50 rounded-xl">
-                <span className="text-xs text-slate-500">Total</span>
-                <span className="text-sm font-semibold text-slate-900">{fmt(lineFormTotal)}</span>
-              </div>
-            </div>
-            <div className="px-5 py-3 border-t border-slate-100 flex gap-2">
-              <button onClick={() => setLineModal(null)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveLine}
-                disabled={!lineForm.code.trim() || !lineForm.description.trim() || saving}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-medium disabled:opacity-40 ${BTN_LIGHT}`}
-              >
-                {saving ? "Guardando..." : lineModal.line ? "Guardar" : "Crear"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Delete line confirm ──────────────────────────────────────────── */}
-      {deleteLineTarget && (
+      {/* ── Delete confirm ───────────────────────────────────────────────── */}
+      {deleteTarget && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
-            <h3 className="text-sm font-semibold text-slate-900 mb-1.5">Borrar línea "{deleteLineTarget.description}"</h3>
-            <p className="text-xs text-slate-500 mb-4">Esta acción no se puede deshacer.</p>
-            <div className="flex gap-2">
-              <button onClick={() => setDeleteLineTarget(null)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
-                Cancelar
-              </button>
-              <button onClick={handleDeleteLine} disabled={saving} className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50">
-                {saving ? "Borrando..." : "Borrar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Delete account confirm ───────────────────────────────────────── */}
-      {deleteAccountConfirm && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
-            <h3 className="text-sm font-semibold text-slate-900 mb-1.5">Borrar cuenta "{account.description}"</h3>
+            <h3 className="text-sm font-semibold text-slate-900 mb-1.5">Borrar subcapítulo "{deleteTarget.label}"</h3>
             <p className="text-xs text-slate-500 mb-4">Se borrarán también todas sus líneas de detalle. Esta acción no se puede deshacer.</p>
             <div className="flex gap-2">
-              <button onClick={() => setDeleteAccountConfirm(false)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
                 Cancelar
               </button>
-              <button onClick={handleDeleteAccount} disabled={saving} className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50">
+              <button onClick={handleConfirmDelete} disabled={saving} className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50">
                 {saving ? "Borrando..." : "Borrar"}
               </button>
             </div>

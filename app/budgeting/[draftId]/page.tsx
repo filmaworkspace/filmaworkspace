@@ -13,36 +13,42 @@ import {
 } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { AlertCircle, Check, ChevronRight, Copy, Download, Hash, Layers, Pencil, Plus, Send, Trash2, X } from "lucide-react";
+import {
+  AlertCircle, Check, ChevronRight, Copy, Download, FileSpreadsheet,
+  FileText, Plus, Search, Send, Trash2, X,
+} from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
-  BTN_LIGHT, BudgetingDraft, BudgetingCategoryDef, BudgetingAccount, BudgetingDetailLine,
+  BTN_LIGHT, BudgetingDraft, BudgetingCategoryDef, BudgetingAccount, BudgetingSubchapter, BudgetingDetailLine,
   categoriesEnabled, resolveCategories, fmtCurrency, ICON_BTN_LIGHT,
 } from "@/lib/budgeting";
 import { buildFwbFromDraft, downloadFwb } from "@/lib/budgetingExport";
+import { downloadBudgetExcel, downloadBudgetPdf } from "@/lib/budgetingReports";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-type DeleteTarget = { accountId: string; label: string };
+type DeleteTarget = { chapterId: string; label: string };
 type EligibleProject = { id: string; name: string };
+type RowEditor = { mode: "new" | "edit"; category: string | null; chapterId?: string; code: string; description: string };
 
-export default function BudgetingTopSheetPage() {
+export default function BudgetingTopPage() {
   const { draftId } = useParams() as { draftId: string };
   const { user } = useUser();
   const router = useRouter();
 
   const [draft, setDraft] = useState<BudgetingDraft | null>(null);
-  const [accounts, setAccounts] = useState<BudgetingAccount[]>([]);
-  const [linesByAccount, setLinesByAccount] = useState<Record<string, BudgetingDetailLine[]>>({});
+  const [chapters, setChapters] = useState<BudgetingAccount[]>([]);
+  const [subchaptersByChapter, setSubchaptersByChapter] = useState<Record<string, BudgetingSubchapter[]>>({});
+  const [linesBySubchapter, setLinesBySubchapter] = useState<Record<string, BudgetingDetailLine[]>>({});
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [saving, setSaving] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
+  const [search, setSearch] = useState("");
 
-  const [accountModal, setAccountModal] = useState<{ category: string | null; account: BudgetingAccount | null } | null>(null);
-  const [accountForm, setAccountForm] = useState({ code: "", description: "" });
+  const [rowEditor, setRowEditor] = useState<RowEditor | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
   // Enviar a proyecto
@@ -70,34 +76,51 @@ export default function BudgetingTopSheetPage() {
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, `budgetingDrafts/${draftId}/accounts`), (snap) => {
-      setAccounts(snap.docs.map((d) => ({ id: d.id, ...d.data() } as BudgetingAccount)));
+      setChapters(snap.docs.map((d) => ({ id: d.id, ...d.data() } as BudgetingAccount)));
     });
     return () => unsub();
   }, [draftId]);
 
   useEffect(() => {
     const unsubs: Record<string, () => void> = {};
-    accounts.forEach((a) => {
-      unsubs[a.id] = onSnapshot(collection(db, `budgetingDrafts/${draftId}/accounts/${a.id}/detailLines`), (snap) => {
-        setLinesByAccount((prev) => ({ ...prev, [a.id]: snap.docs.map((d) => ({ id: d.id, ...d.data() } as BudgetingDetailLine)) }));
+    chapters.forEach((c) => {
+      unsubs[c.id] = onSnapshot(collection(db, `budgetingDrafts/${draftId}/accounts/${c.id}/subchapters`), (snap) => {
+        setSubchaptersByChapter((prev) => ({ ...prev, [c.id]: snap.docs.map((d) => ({ id: d.id, ...d.data() } as BudgetingSubchapter)) }));
       });
     });
     return () => { Object.values(unsubs).forEach((fn) => fn()); };
-  }, [accounts, draftId]);
+  }, [chapters, draftId]);
+
+  const allSubchapters = Object.entries(subchaptersByChapter).flatMap(([chapterId, subs]) => subs.map((s) => ({ chapterId, sub: s })));
+
+  useEffect(() => {
+    const unsubs: Record<string, () => void> = {};
+    allSubchapters.forEach(({ chapterId, sub }) => {
+      unsubs[sub.id] = onSnapshot(collection(db, `budgetingDrafts/${draftId}/accounts/${chapterId}/subchapters/${sub.id}/detailLines`), (snap) => {
+        setLinesBySubchapter((prev) => ({ ...prev, [sub.id]: snap.docs.map((d) => ({ id: d.id, ...d.data() } as BudgetingDetailLine)) }));
+      });
+    });
+    return () => { Object.values(unsubs).forEach((fn) => fn()); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(allSubchapters.map((s) => s.sub.id)), draftId]);
 
   const catEnabled = categoriesEnabled(draft);
   const cats: BudgetingCategoryDef[] = catEnabled ? resolveCategories(draft) : [];
 
-  const accountsByCategory = (categoryId: string) => accounts.filter((a) => a.category === categoryId);
-  const accountTotal = (accountId: string) => (linesByAccount[accountId] || []).reduce((s, l) => s + (l.total || 0), 0);
-  const categoryTotal = (categoryId: string) => accountsByCategory(categoryId).reduce((s, a) => s + accountTotal(a.id), 0);
+  const chaptersByCategory = (categoryId: string | null) => chapters.filter((c) => c.category === categoryId);
+  const chapterTotal = (chapterId: string) => (subchaptersByChapter[chapterId] || []).reduce((s, sub) => s + (linesBySubchapter[sub.id] || []).reduce((s2, l) => s2 + (l.total || 0), 0), 0);
+  const categoryTotal = (categoryId: string) => chaptersByCategory(categoryId).reduce((s, c) => s + chapterTotal(c.id), 0);
   const grandTotal = catEnabled
     ? cats.reduce((s, c) => s + categoryTotal(c.id), 0)
-    : accounts.reduce((s, a) => s + accountTotal(a.id), 0);
-  const totalLines = Object.values(linesByAccount).reduce((s, lines) => s + lines.length, 0);
+    : chapters.reduce((s, c) => s + chapterTotal(c.id), 0);
+  const totalLines = Object.values(linesBySubchapter).reduce((s, lines) => s + lines.length, 0);
+  const totalSubchapters = allSubchapters.length;
 
   const currency = draft?.currency || "EUR";
   const fmt = (n: number) => fmtCurrency(n, currency);
+
+  const q = search.trim().toLowerCase();
+  const matchesSearch = (c: BudgetingAccount) => !q || c.code.toLowerCase().includes(q) || c.description.toLowerCase().includes(q);
 
   const touchDraft = async () => {
     if (!user) return;
@@ -125,15 +148,22 @@ export default function BudgetingTopSheetPage() {
       await setDoc(doc(db, `userBudgetingDrafts/${user.uid}/drafts`, newRef.id), {
         name: newName, updatedAt: now, status: "draft", sentToProjectName: null,
       });
-      for (const account of accounts) {
-        const newAccountRef = await addDoc(collection(db, `budgetingDrafts/${newRef.id}/accounts`), {
-          code: account.code, description: account.description, category: account.category, createdAt: Timestamp.now(),
+      for (const chapter of chapters) {
+        const newChapterRef = await addDoc(collection(db, `budgetingDrafts/${newRef.id}/accounts`), {
+          code: chapter.code, description: chapter.description, category: chapter.category, createdAt: Timestamp.now(),
         });
-        for (const line of linesByAccount[account.id] || []) {
-          await addDoc(collection(db, `budgetingDrafts/${newRef.id}/accounts/${newAccountRef.id}/detailLines`), {
-            code: line.code, description: line.description, units: line.units, unit: line.unit || "",
-            multiplier: line.multiplier, rate: line.rate, total: line.total, createdAt: Timestamp.now(),
+        for (const sub of subchaptersByChapter[chapter.id] || []) {
+          const newSubRef = await addDoc(collection(db, `budgetingDrafts/${newRef.id}/accounts/${newChapterRef.id}/subchapters`), {
+            code: sub.code, description: sub.description, createdAt: Timestamp.now(),
           });
+          for (const line of linesBySubchapter[sub.id] || []) {
+            await addDoc(collection(db, `budgetingDrafts/${newRef.id}/accounts/${newChapterRef.id}/subchapters/${newSubRef.id}/detailLines`), {
+              code: line.code, description: line.description, units: line.units, unit: line.unit || "",
+              multiplier: line.multiplier, rate: line.rate, total: line.total,
+              supplier: line.supplier || "", notes: line.notes || "", tags: line.tags || [],
+              createdAt: Timestamp.now(),
+            });
+          }
         }
       }
       router.push(`/budgeting/${newRef.id}`);
@@ -144,48 +174,49 @@ export default function BudgetingTopSheetPage() {
     }
   };
 
-  const handleExport = () => {
+  const reportParams = () => ({
+    draftName: draft?.name || "Presupuesto",
+    currency,
+    categoriesEnabled: catEnabled,
+    categories: cats,
+    chaptersByCategory: (categoryId: string | null) => chaptersByCategory(categoryId).map((c) => ({ id: c.id, code: c.code, description: c.description })),
+    subchaptersByChapter: Object.fromEntries(Object.entries(subchaptersByChapter).map(([k, v]) => [k, v.map((s) => ({ id: s.id, code: s.code, description: s.description }))])),
+    linesBySubchapter: Object.fromEntries(Object.entries(linesBySubchapter).map(([k, v]) => [k, v.map((l) => ({ code: l.code, description: l.description, units: l.units, unit: l.unit, multiplier: l.multiplier, rate: l.rate, total: l.total }))])),
+    grandTotal,
+  });
+
+  const handleExportFwb = () => {
     if (!draft) return;
-    const fwb = buildFwbFromDraft({
-      name: draft.name,
-      currency: draft.currency,
-      categoriesEnabled: catEnabled,
-      categories: cats,
-      accountsByCategory: (categoryId) => (catEnabled ? accountsByCategory(categoryId as string) : accounts).map((a) => ({ id: a.id, code: a.code, description: a.description })),
-      linesByAccount,
-    });
+    const { draftName, ...rest } = reportParams();
+    const fwb = buildFwbFromDraft({ name: draftName, ...rest });
     downloadFwb(fwb, draft.name.replace(/[^\w\-]+/g, "_"));
   };
+  const handleExportExcel = () => downloadBudgetExcel(reportParams());
+  const handleExportPdf = () => downloadBudgetPdf(reportParams());
 
-  // ── Accounts ─────────────────────────────────────────────────────────────
-  const openCreateAccount = (category: string | null) => {
-    setAccountForm({ code: "", description: "" });
-    setAccountModal({ category, account: null });
-  };
+  // ── Capítulos: fila inline (sin modal) ──────────────────────────────────
+  const openNewChapterRow = (category: string | null) => setRowEditor({ mode: "new", category, code: "", description: "" });
+  const openEditChapterRow = (chapter: BudgetingAccount) => setRowEditor({ mode: "edit", category: chapter.category, chapterId: chapter.id, code: chapter.code, description: chapter.description });
+  const closeRowEditor = () => setRowEditor(null);
 
-  const openEditAccount = (account: BudgetingAccount) => {
-    setAccountForm({ code: account.code, description: account.description });
-    setAccountModal({ category: account.category, account });
-  };
-
-  const handleSaveAccount = async () => {
-    if (!accountModal || !accountForm.code.trim() || !accountForm.description.trim()) return;
+  const handleSaveRow = async () => {
+    if (!rowEditor || !rowEditor.code.trim() || !rowEditor.description.trim()) { closeRowEditor(); return; }
     setSaving(true);
     try {
-      if (accountModal.account) {
-        await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts`, accountModal.account.id), {
-          code: accountForm.code.trim(), description: accountForm.description.trim(),
+      if (rowEditor.mode === "edit" && rowEditor.chapterId) {
+        await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts`, rowEditor.chapterId), {
+          code: rowEditor.code.trim(), description: rowEditor.description.trim(),
         });
       } else {
         await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts`), {
-          code: accountForm.code.trim(), description: accountForm.description.trim(),
-          category: accountModal.category, createdAt: Timestamp.now(),
+          code: rowEditor.code.trim(), description: rowEditor.description.trim(),
+          category: rowEditor.category, createdAt: Timestamp.now(),
         });
       }
       await touchDraft();
-      setAccountModal(null);
     } finally {
       setSaving(false);
+      setRowEditor(null);
     }
   };
 
@@ -193,9 +224,13 @@ export default function BudgetingTopSheetPage() {
     if (!deleteTarget) return;
     setSaving(true);
     try {
-      const lines = linesByAccount[deleteTarget.accountId] || [];
-      await Promise.all(lines.map((l) => deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${deleteTarget.accountId}/detailLines`, l.id))));
-      await deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts`, deleteTarget.accountId));
+      const subs = subchaptersByChapter[deleteTarget.chapterId] || [];
+      for (const sub of subs) {
+        const lines = linesBySubchapter[sub.id] || [];
+        await Promise.all(lines.map((l) => deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${deleteTarget.chapterId}/subchapters/${sub.id}/detailLines`, l.id))));
+        await deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${deleteTarget.chapterId}/subchapters`, sub.id));
+      }
+      await deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts`, deleteTarget.chapterId));
       await touchDraft();
       setDeleteTarget(null);
     } finally {
@@ -244,11 +279,11 @@ export default function BudgetingTopSheetPage() {
     setSending(true);
     setSendError("");
     try {
-      for (const account of accounts) {
+      for (const sub of allSubchapters) {
         const accountRef = await addDoc(collection(db, `projects/${selectedProject.id}/accounts`), {
-          code: account.code, description: account.description, createdAt: Timestamp.now(), createdBy: user.uid,
+          code: sub.sub.code, description: sub.sub.description, createdAt: Timestamp.now(), createdBy: user.uid,
         });
-        for (const line of linesByAccount[account.id] || []) {
+        for (const line of linesBySubchapter[sub.sub.id] || []) {
           await addDoc(collection(db, `projects/${selectedProject.id}/accounts/${accountRef.id}/subaccounts`), {
             code: line.code, description: line.description, budgeted: line.total || 0,
             committed: 0, actual: 0, accountId: accountRef.id, createdAt: Timestamp.now(), createdBy: user.uid,
@@ -289,205 +324,190 @@ export default function BudgetingTopSheetPage() {
     );
   }
 
-  const colsTop = "grid-cols-[36px_1fr_80px_130px]";
-  const colsAccount = "grid-cols-[36px_1fr_100px_84px]";
+  const cols = "grid-cols-[110px_1fr_90px_70px]";
 
-  const AccountRow = ({ account }: { account: BudgetingAccount }) => (
-    <Link
-      href={`/budgeting/${draftId}/accounts/${account.id}`}
-      className={`grid ${colsAccount} gap-2 items-center pl-9 pr-3 py-2.5 hover:bg-white group`}
-    >
-      <span />
-      <span className="flex items-center gap-2 min-w-0">
-        <span className="text-sm text-slate-800 truncate group-hover:text-[#5B57E0] transition-colors">{account.description}</span>
-        <span className="text-xs text-slate-400 font-mono flex-shrink-0">{account.code}</span>
-      </span>
-      <span className="text-sm font-medium text-slate-700 text-right justify-self-end">{fmt(accountTotal(account.id))}</span>
-      <span className="flex items-center justify-end gap-0.5 flex-shrink-0">
-        <span
-          onClick={(e) => { e.preventDefault(); openEditAccount(account); }}
-          className={`p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity ${ICON_BTN_LIGHT}`}
-          title="Editar cuenta"
-        >
-          <Pencil size={12} />
+  const ChapterRow = ({ chapter }: { chapter: BudgetingAccount }) => {
+    const isEditing = rowEditor?.mode === "edit" && rowEditor.chapterId === chapter.id;
+    if (isEditing) {
+      return (
+        <div className={`grid ${cols} gap-2 items-center pl-7 pr-3 py-1`}>
+          <input
+            autoFocus
+            value={rowEditor.code}
+            onChange={(e) => setRowEditor({ ...rowEditor, code: e.target.value })}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSaveRow(); if (e.key === "Escape") closeRowEditor(); }}
+            className="text-xs font-mono border-b border-[#8DA7BE] focus:outline-none bg-transparent px-0.5 py-0.5"
+          />
+          <input
+            value={rowEditor.description}
+            onChange={(e) => setRowEditor({ ...rowEditor, description: e.target.value })}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSaveRow(); if (e.key === "Escape") closeRowEditor(); }}
+            onBlur={handleSaveRow}
+            className="text-xs border-b border-[#8DA7BE] focus:outline-none bg-transparent px-0.5 py-0.5"
+          />
+          <span />
+          <span className="flex items-center justify-end gap-0.5">
+            <button onClick={handleSaveRow} className={`p-1 rounded ${ICON_BTN_LIGHT}`}><Check size={12} /></button>
+            <button onClick={closeRowEditor} className="p-1 text-slate-300 hover:text-slate-600 rounded"><X size={12} /></button>
+          </span>
+        </div>
+      );
+    }
+    return (
+      <div className={`grid ${cols} gap-2 items-center pl-7 pr-3 py-1 hover:bg-white group`}>
+        <button onClick={() => openEditChapterRow(chapter)} className="text-xs font-mono text-slate-400 text-left hover:text-[#8DA7BE] transition-colors">{chapter.code}</button>
+        <Link href={`/budgeting/${draftId}/accounts/${chapter.id}`} className="text-xs text-slate-800 truncate group-hover:text-[#8DA7BE] transition-colors">
+          {chapter.description}
+        </Link>
+        <span className="text-xs font-medium text-slate-700 text-right justify-self-end">{fmt(chapterTotal(chapter.id))}</span>
+        <span className="flex items-center justify-end gap-0.5">
+          <button
+            onClick={() => setDeleteTarget({ chapterId: chapter.id, label: chapter.description })}
+            className="p-1 text-slate-300 hover:text-red-500 rounded transition-colors opacity-0 group-hover:opacity-100"
+            title="Borrar capítulo"
+          >
+            <Trash2 size={11} />
+          </button>
+          <Link href={`/budgeting/${draftId}/accounts/${chapter.id}`}>
+            <ChevronRight size={13} className="text-slate-300 group-hover:text-[#8DA7BE] group-hover:translate-x-0.5 transition-all" />
+          </Link>
         </span>
-        <span
-          onClick={(e) => { e.preventDefault(); setDeleteTarget({ accountId: account.id, label: account.description }); }}
-          className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-          title="Borrar cuenta"
-        >
-          <Trash2 size={12} />
+      </div>
+    );
+  };
+
+  const NewChapterRow = ({ category }: { category: string | null }) => {
+    if (rowEditor?.mode !== "new" || rowEditor.category !== category) {
+      return (
+        <button onClick={() => openNewChapterRow(category)} className={`flex items-center gap-1.5 text-xs font-medium pl-7 pr-3 py-1.5 rounded-lg ${ICON_BTN_LIGHT}`}>
+          <span className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#8DA7BE" }}>
+            <Plus size={10} className="text-white" />
+          </span>
+          Añadir capítulo
+        </button>
+      );
+    }
+    return (
+      <div className={`grid ${cols} gap-2 items-center pl-7 pr-3 py-1`}>
+        <input
+          autoFocus
+          placeholder="Código"
+          value={rowEditor.code}
+          onChange={(e) => setRowEditor({ ...rowEditor, code: e.target.value })}
+          onKeyDown={(e) => { if (e.key === "Enter") handleSaveRow(); if (e.key === "Escape") closeRowEditor(); }}
+          className="text-xs font-mono border-b border-[#8DA7BE] focus:outline-none bg-transparent px-0.5 py-0.5"
+        />
+        <input
+          placeholder="Descripción"
+          value={rowEditor.description}
+          onChange={(e) => setRowEditor({ ...rowEditor, description: e.target.value })}
+          onKeyDown={(e) => { if (e.key === "Enter") handleSaveRow(); if (e.key === "Escape") closeRowEditor(); }}
+          onBlur={handleSaveRow}
+          className="text-xs border-b border-[#8DA7BE] focus:outline-none bg-transparent px-0.5 py-0.5"
+        />
+        <span />
+        <span className="flex items-center justify-end gap-0.5">
+          <button onClick={handleSaveRow} className={`p-1 rounded ${ICON_BTN_LIGHT}`}><Check size={12} /></button>
+          <button onClick={closeRowEditor} className="p-1 text-slate-300 hover:text-slate-600 rounded"><X size={12} /></button>
         </span>
-        <ChevronRight size={14} className="text-slate-300 group-hover:text-[#5B57E0] group-hover:translate-x-0.5 transition-all" />
-      </span>
-    </Link>
-  );
+      </div>
+    );
+  };
 
   return (
-    <div className="w-full px-10 py-8">
+    <div className="w-full px-10 py-6">
       {/* Top bar */}
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <h1 className="text-sm font-semibold text-slate-500">{draft.name}</h1>
-        <div className="flex items-center gap-4 flex-shrink-0">
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <h1 className="text-sm font-semibold" style={{ color: "#1D201F" }}>{draft.name}</h1>
+        <div className="flex items-center gap-3 flex-shrink-0">
           {draft.sentToProjectId && (
             <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600">
               <Check size={10} /> Enviado a {draft.sentToProjectName}
             </span>
           )}
-          <div className="text-right">
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Total</p>
-            <p className="text-lg font-bold text-slate-900">{fmt(grandTotal)}</p>
+          <div className="relative w-44">
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar"
+              className="w-full pl-7 pr-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
+            />
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={handleExport} className={`p-2 rounded-lg ${ICON_BTN_LIGHT}`} title="Descargar .fwb">
-              <Download size={15} />
+            <button onClick={handleExportFwb} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Descargar .fwb">
+              <Download size={14} />
             </button>
-            <button onClick={handleDuplicateDraft} disabled={duplicating} className={`p-2 rounded-lg ${ICON_BTN_LIGHT} disabled:opacity-50`} title="Duplicar presupuesto">
-              <Copy size={15} />
+            <button onClick={handleExportExcel} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Descargar Excel">
+              <FileSpreadsheet size={14} />
             </button>
-            <button onClick={openSendModal} className={`p-2 rounded-lg ${ICON_BTN_LIGHT}`} title="Enviar a proyecto">
-              <Send size={15} />
+            <button onClick={handleExportPdf} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Descargar PDF">
+              <FileText size={14} />
+            </button>
+            <button onClick={handleDuplicateDraft} disabled={duplicating} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT} disabled:opacity-50`} title="Duplicar presupuesto">
+              <Copy size={14} />
+            </button>
+            <button onClick={openSendModal} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Enviar a proyecto">
+              <Send size={14} />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Top Sheet */}
+      {/* Budget */}
       <div className="border border-slate-200 rounded-2xl overflow-hidden">
         {catEnabled ? (
           <>
-            <div className={`grid ${colsTop} gap-2 px-5 py-2 border-b border-slate-100 text-xs text-slate-400`}>
-              <span className="flex items-center"><Hash size={11} /></span>
-              <span className="flex items-center gap-1.5"><Layers size={11} /> Categoría</span>
-              <span className="text-right">Cuentas</span>
-              <span className="text-right">Total</span>
-            </div>
-
-            {cats.map((cat, catIdx) => {
-              const catAccounts = accountsByCategory(cat.id);
+            {cats.map((cat) => {
+              const catChapters = chaptersByCategory(cat.id).filter(matchesSearch);
+              if (q && catChapters.length === 0) return null;
               return (
                 <div key={cat.id} className="border-b border-slate-100 last:border-0">
-                  <div className={`grid ${colsTop} gap-2 items-center px-5 py-2.5`}>
-                    <span className="text-xs font-mono text-slate-400">{String(catIdx + 1).padStart(2, "0")}</span>
-                    <span className="text-sm font-semibold text-slate-900 truncate">{cat.label}</span>
-                    <span className="text-xs text-slate-400 text-right">{catAccounts.length}</span>
-                    <span className="text-sm font-semibold text-slate-900 text-right justify-self-end">{fmt(categoryTotal(cat.id))}</span>
+                  <div className="flex items-center gap-2 px-4 py-1.5 bg-slate-50/70">
+                    {cat.code && <span className="text-[10px] font-mono text-slate-400">{cat.code}</span>}
+                    <span className="text-xs font-semibold" style={{ color: "#1D201F" }}>{cat.label}</span>
+                    <span className="text-[10px] text-slate-400 ml-auto">{fmt(categoryTotal(cat.id))}</span>
                   </div>
 
                   <div>
-                    {catAccounts.length === 0 ? (
-                      <p className="text-xs text-slate-400 pl-9 py-2">Sin cuentas en esta categoría todavía</p>
-                    ) : (
-                      <div className="divide-y divide-slate-50">
-                        {catAccounts.map((account) => <AccountRow key={account.id} account={account} />)}
-                      </div>
-                    )}
-                    <div className="pl-9 pr-5 py-2">
-                      <button
-                        onClick={() => openCreateAccount(cat.id)}
-                        className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg ${BTN_LIGHT}`}
-                      >
-                        <Plus size={12} />
-                        Añadir cuenta
-                      </button>
+                    {catChapters.map((chapter) => <ChapterRow key={chapter.id} chapter={chapter} />)}
+                    <div className="py-1">
+                      <NewChapterRow category={cat.id} />
                     </div>
                   </div>
                 </div>
               );
             })}
 
-            <div className={`grid ${colsTop} gap-2 items-center px-5 py-3 border-t border-slate-200`}>
+            <div className={`grid ${cols} gap-2 items-center px-4 py-2.5 border-t border-slate-200 bg-slate-50/70`}>
               <span />
-              <span className="text-sm font-bold text-slate-900">Total</span>
+              <span className="text-xs font-bold" style={{ color: "#1D201F" }}>Total</span>
+              <span className="text-xs font-bold text-right justify-self-end" style={{ color: "#1D201F" }}>{fmt(grandTotal)}</span>
               <span />
-              <span className="text-sm font-bold text-slate-900 text-right justify-self-end">{fmt(grandTotal)}</span>
             </div>
           </>
         ) : (
           <>
-            <div className={`grid ${colsAccount} gap-2 px-5 py-2 border-b border-slate-100 text-xs text-slate-400`}>
-              <span />
-              <span>Cuenta</span>
-              <span className="text-right">Total</span>
-              <span></span>
+            {chapters.filter(matchesSearch).map((chapter) => <ChapterRow key={chapter.id} chapter={chapter} />)}
+            <div className="py-1">
+              <NewChapterRow category={null} />
             </div>
-            {accounts.length === 0 ? (
-              <p className="text-xs text-slate-400 text-center py-5">Sin cuentas todavía</p>
-            ) : (
-              <div className="divide-y divide-slate-50">
-                {accounts.map((account) => <AccountRow key={account.id} account={account} />)}
-              </div>
-            )}
-            <div className="px-5 py-2.5 border-t border-slate-100">
-              <button onClick={() => openCreateAccount(null)} className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg ${BTN_LIGHT}`}>
-                <Plus size={12} />
-                Añadir cuenta
-              </button>
-            </div>
-            <div className={`grid ${colsAccount} gap-2 items-center px-5 py-3 border-t border-slate-200`}>
+            <div className={`grid ${cols} gap-2 items-center px-4 py-2.5 border-t border-slate-200 bg-slate-50/70`}>
               <span />
-              <span className="text-sm font-bold text-slate-900">Total</span>
-              <span className="text-sm font-bold text-slate-900 text-right justify-self-end">{fmt(grandTotal)}</span>
+              <span className="text-xs font-bold" style={{ color: "#1D201F" }}>Total</span>
+              <span className="text-xs font-bold text-right justify-self-end" style={{ color: "#1D201F" }}>{fmt(grandTotal)}</span>
               <span />
             </div>
           </>
         )}
       </div>
 
-      {/* ── Account modal ────────────────────────────────────────────────── */}
-      {accountModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
-            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-semibold text-slate-900">{accountModal.account ? "Editar cuenta" : "Nueva cuenta"}</h3>
-              <button onClick={() => setAccountModal(null)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
-                <X size={15} />
-              </button>
-            </div>
-            <div className="px-5 py-4 space-y-3">
-              <div>
-                <label className="text-xs font-medium text-slate-700 block mb-1.5">Código</label>
-                <input
-                  value={accountForm.code}
-                  onChange={(e) => setAccountForm((p) => ({ ...p, code: e.target.value }))}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-700 block mb-1.5">Descripción</label>
-                <input
-                  autoFocus
-                  value={accountForm.description}
-                  onChange={(e) => setAccountForm((p) => ({ ...p, description: e.target.value }))}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
-                />
-              </div>
-              {catEnabled && accountModal.category && (
-                <p className="text-xs text-slate-400">{cats.find((c) => c.id === accountModal.category)?.label}</p>
-              )}
-            </div>
-            <div className="px-5 py-3 border-t border-slate-100 flex gap-2">
-              <button onClick={() => setAccountModal(null)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveAccount}
-                disabled={!accountForm.code.trim() || !accountForm.description.trim() || saving}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-medium disabled:opacity-40 ${BTN_LIGHT}`}
-              >
-                {saving ? "Guardando..." : accountModal.account ? "Guardar" : "Crear"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ── Delete confirm ───────────────────────────────────────────────── */}
       {deleteTarget && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
-            <h3 className="text-sm font-semibold text-slate-900 mb-1.5">Borrar cuenta "{deleteTarget.label}"</h3>
-            <p className="text-xs text-slate-500 mb-4">Se borrarán también todas sus líneas de detalle. Esta acción no se puede deshacer.</p>
+            <h3 className="text-sm font-semibold text-slate-900 mb-1.5">Borrar capítulo "{deleteTarget.label}"</h3>
+            <p className="text-xs text-slate-500 mb-4">Se borrarán también sus subcapítulos y líneas de detalle. Esta acción no se puede deshacer.</p>
             <div className="flex gap-2">
               <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
                 Cancelar
@@ -534,7 +554,7 @@ export default function BudgetingTopSheetPage() {
                           key={p.id}
                           onClick={() => handlePickProject(p)}
                           disabled={status === "checking"}
-                          className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 border border-slate-200 rounded-xl text-left hover:border-[#5B57E0] transition-colors disabled:opacity-60"
+                          className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 border border-slate-200 rounded-xl text-left hover:border-[#8DA7BE] transition-colors disabled:opacity-60"
                         >
                           <span className="text-sm text-slate-800 truncate">{p.name}</span>
                           {status === "checking" && <span className="text-[11px] text-slate-400 flex-shrink-0">Comprobando...</span>}
@@ -559,8 +579,8 @@ export default function BudgetingTopSheetPage() {
                 </p>
                 <div className="border border-slate-200 rounded-xl divide-y divide-slate-100">
                   <div className="flex items-center justify-between px-3.5 py-2 text-sm">
-                    <span className="text-slate-500">Cuentas</span>
-                    <span className="font-medium text-slate-900">{accounts.length}</span>
+                    <span className="text-slate-500">Cuentas (subcapítulos)</span>
+                    <span className="font-medium text-slate-900">{totalSubchapters}</span>
                   </div>
                   <div className="flex items-center justify-between px-3.5 py-2 text-sm">
                     <span className="text-slate-500">Detail lines</span>

@@ -111,7 +111,7 @@ export default function BudgetingHomePage() {
       const name = fwb.name?.trim() || file.name.replace(/\.fwb$/i, "");
       const ref = doc(collection(db, "budgetingDrafts"));
       const now = serverTimestamp();
-      const categories = fwb.categories.map((c) => ({ id: c.id, label: c.label }));
+      const categories = fwb.categories.map((c) => ({ id: c.id, code: c.code, label: c.label }));
       await setDoc(ref, {
         name,
         ownerUid: user.uid,
@@ -132,19 +132,25 @@ export default function BudgetingHomePage() {
         name, updatedAt: now, status: "draft", sentToProjectName: null,
       });
       for (const block of fwb.categories) {
-        for (const account of block.accounts) {
-          const accountRef = await addDoc(collection(db, `budgetingDrafts/${ref.id}/accounts`), {
-            code: account.code,
-            description: account.description,
+        for (const chapter of block.chapters) {
+          const chapterRef = await addDoc(collection(db, `budgetingDrafts/${ref.id}/accounts`), {
+            code: chapter.code,
+            description: chapter.description,
             category: fwb.categoriesEnabled ? block.id : null,
             createdAt: Timestamp.now(),
           });
-          for (const line of account.detailLines || []) {
-            await addDoc(collection(db, `budgetingDrafts/${ref.id}/accounts/${accountRef.id}/detailLines`), {
-              code: line.code, description: line.description, units: line.units, unit: line.unit || "",
-              multiplier: line.multiplier, rate: line.rate, total: line.total,
-              createdAt: Timestamp.now(),
+          for (const sub of chapter.subchapters || []) {
+            const subRef = await addDoc(collection(db, `budgetingDrafts/${ref.id}/accounts/${chapterRef.id}/subchapters`), {
+              code: sub.code, description: sub.description, createdAt: Timestamp.now(),
             });
+            for (const line of sub.detailLines || []) {
+              await addDoc(collection(db, `budgetingDrafts/${ref.id}/accounts/${chapterRef.id}/subchapters/${subRef.id}/detailLines`), {
+                code: line.code, description: line.description, units: line.units, unit: line.unit || "",
+                multiplier: line.multiplier, rate: line.rate, total: line.total,
+                supplier: line.supplier || "", notes: line.notes || "", tags: line.tags || [],
+                createdAt: Timestamp.now(),
+              });
+            }
           }
         }
       }
@@ -173,8 +179,8 @@ export default function BudgetingHomePage() {
   };
 
   return (
-    <div className="px-10 py-8">
-      <h1 className="text-2xl font-bold text-slate-900 mb-6">Presupuestos</h1>
+    <div className="min-h-screen px-10 py-8" style={{ background: "linear-gradient(180deg, #8DA7BE14, #ffffff 55%)" }}>
+      <h1 className="text-2xl font-bold mb-6" style={{ color: "#1D201F" }}>Presupuestos</h1>
 
       <div className="flex items-center gap-2 mb-8 flex-wrap">
         <button onClick={() => setShowNewDraft(true)} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${BTN_LIGHT}`}>
@@ -203,7 +209,7 @@ export default function BudgetingHomePage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar"
-            className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
+            className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-slate-300"
           />
         </div>
       </div>
@@ -222,14 +228,14 @@ export default function BudgetingHomePage() {
             <div key={d.id} className="group">
               <Link
                 href={`/budgeting/${d.id}`}
-                className="relative block h-28 rounded-2xl border border-slate-200 bg-slate-50 hover:border-[#5B57E0] transition-colors flex items-center justify-center px-4 overflow-hidden"
+                className="relative block h-28 rounded-2xl border border-slate-200 bg-white/70 hover:border-[#8DA7BE] transition-colors flex items-center justify-center px-4 overflow-hidden"
               >
                 {d.status === "sent" && (
                   <span className="absolute top-2.5 right-2.5 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[10px] font-medium">
                     <Check size={9} />
                   </span>
                 )}
-                <span className="text-base font-bold text-slate-800 text-center line-clamp-2">{d.name}</span>
+                <span className="text-base font-bold text-center line-clamp-2" style={{ color: "#1D201F" }}>{d.name}</span>
               </Link>
               <div className="flex items-center justify-between mt-2 px-0.5">
                 <p className="text-xs text-slate-400 truncate">
