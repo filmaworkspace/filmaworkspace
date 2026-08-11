@@ -55,15 +55,15 @@ function ChapterRow({
   };
 
   return (
-    <div className={`grid ${cols} gap-1 items-center divide-x divide-slate-100 pl-3 pr-3 py-3 hover:bg-white group`}>
+    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 py-3 hover:bg-white group`}>
       <Link href={`/budgeting/${draftId}/accounts/${chapter.id}`} className="flex items-center justify-center" title="Entrar">
         <ChevronRight size={13} className="text-slate-300 group-hover:text-[#8DA7BE] group-hover:translate-x-0.5 transition-all" />
       </Link>
-      <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
+      <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown} onFocus={(e) => e.target.select()}
         className={`${CELL_INPUT} font-mono text-xs pl-2`} />
-      <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
+      <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown} onFocus={(e) => e.target.select()}
         className={`${CELL_INPUT} text-xs pl-2`} />
-      <span className="text-xs font-medium text-slate-700 text-right justify-self-end pr-2">{fmt(total)}</span>
+      <span className="flex items-center justify-end text-xs font-medium text-slate-700 pr-2">{fmt(total)}</span>
       <span className="flex items-center justify-end gap-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
         <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
           <ChevronUp size={11} />
@@ -89,11 +89,11 @@ function NewChapterRow({ onCommit }: { onCommit: (code: string, description: str
   };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter") e.currentTarget.blur(); };
   return (
-    <div className={`grid ${cols} gap-1 items-center divide-x divide-slate-100 pl-3 pr-3 py-3`}>
+    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 py-3`}>
       <span />
-      <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
+      <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown} onFocus={(e) => e.target.select()}
         className={`${CELL_INPUT} font-mono text-xs pl-2`} />
-      <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
+      <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown} onFocus={(e) => e.target.select()}
         className={`${CELL_INPUT} text-xs pl-2`} />
       <span /><span />
     </div>
@@ -598,11 +598,11 @@ export default function BudgetingTopPage() {
 
       {/* Budget */}
       <div className="border border-slate-200 rounded-2xl overflow-hidden">
-        <div className={`grid ${cols} gap-1 pl-3 pr-3 py-2 border-b border-slate-200 divide-x divide-slate-100 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
+        <div className={`grid ${cols} gap-0 pl-3 pr-3 py-2 border-b border-slate-200 divide-x divide-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
           <span></span>
-          <span className="pl-2">Código</span>
-          <span className="pl-2">Descripción</span>
-          <span className="text-right pr-2">Total</span>
+          <span className="flex items-center pl-2">Código</span>
+          <span className="flex items-center pl-2">Descripción</span>
+          <span className="flex items-center justify-end pr-2">Total</span>
           <span></span>
         </div>
         {catEnabled && cats.length > 0 ? (

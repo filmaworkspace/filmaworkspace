@@ -115,20 +115,20 @@ function LineFieldsGrid({
     if (e.key === "Escape") { onEscape(); }
   };
   return (
-    <div className={`grid ${cols} gap-1 items-center divide-x divide-slate-100 px-4 py-2.5`}>
-      <input value={fields.code} onChange={(e) => onChange({ code: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
+    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-4 py-2.5`}>
+      <input value={fields.code} onChange={(e) => onChange({ code: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown} onFocus={(e) => e.target.select()}
         className={`${CELL_INPUT} font-mono text-xs`} />
-      <input value={fields.description} onChange={(e) => onChange({ description: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
+      <input value={fields.description} onChange={(e) => onChange({ description: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown} onFocus={(e) => e.target.select()}
         className={`${CELL_INPUT} text-xs pl-2`} />
       <BudgetingFormulaInput value={fields.units} onChange={(v) => onChange({ units: v })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
         globals={globals} title="Número o fórmula con Globales" className={`${CELL_INPUT} text-xs text-right pl-2`} />
-      <input list="unit-suggestions" value={fields.unit} onChange={(e) => onChange({ unit: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
+      <input list="unit-suggestions" value={fields.unit} onChange={(e) => onChange({ unit: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown} onFocus={(e) => e.target.select()}
         className={`${CELL_INPUT} text-[11px] pl-2`} />
       <BudgetingFormulaInput value={fields.multiplier} onChange={(v) => onChange({ multiplier: v })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
         globals={globals} title="Número o fórmula con Globales" className={`${CELL_INPUT} text-[11px] text-right pl-2`} />
       <BudgetingFormulaInput value={fields.rate} onChange={(v) => onChange({ rate: v })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
         globals={globals} title="Número o fórmula con Globales" className={`${CELL_INPUT} text-xs text-right pl-2`} />
-      <span className={`text-xs text-right font-semibold pl-2 ${muted ? "text-slate-400 italic" : "text-slate-900"}`}>{fmtDecimal(totalPreview)}</span>
+      <span className={`flex items-center justify-end text-xs font-semibold pl-2 ${muted ? "text-slate-400 italic" : "text-slate-900"}`}>{fmtDecimal(totalPreview)}</span>
     </div>
   );
 }
@@ -594,14 +594,14 @@ export default function BudgetingSubchapterPage() {
       {/* Detail lines */}
       <div className="border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">
         <div className="min-w-[720px]">
-          <div className={`grid ${cols} gap-1 px-4 py-2 border-b border-slate-200 divide-x divide-slate-100 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
-            <span>Código</span>
-            <span>Descripción</span>
-            <span className="text-right">Cant.</span>
-            <span>Unidad</span>
-            <span className="text-right">X</span>
-            <span className="text-right">Tarifa</span>
-            <span className="text-right">Total</span>
+          <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-4 py-2 border-b border-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
+            <span className="flex items-center">Código</span>
+            <span className="flex items-center pl-2">Descripción</span>
+            <span className="flex items-center justify-end pl-2">Cant.</span>
+            <span className="flex items-center pl-2">Unidad</span>
+            <span className="flex items-center justify-end pl-2">X</span>
+            <span className="flex items-center justify-end pl-2">Tarifa</span>
+            <span className="flex items-center justify-end pl-2">Total</span>
           </div>
           <datalist id="unit-suggestions">
             {UNIT_SUGGESTIONS.map((u) => <option key={u} value={u} />)}
