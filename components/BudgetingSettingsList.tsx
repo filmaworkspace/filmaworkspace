@@ -15,7 +15,7 @@ import { useUser } from "@/contexts/UserContext";
 import { BTN_LIGHT, ICON_BTN_LIGHT, newBudgetingId } from "@/lib/budgeting";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Editor genérico de una lista con nombre guardada en budgetingDrafts/{id} —
+// Editor genérico de una lista con nombre guardada en budgetingDrafts/{id}:
 // lo usan Globales, Seguridad Social (fringes) y Fases: mismo patrón de
 // alta/edición/borrado, solo cambian los campos.
 // ─────────────────────────────────────────────────────────────────────────────

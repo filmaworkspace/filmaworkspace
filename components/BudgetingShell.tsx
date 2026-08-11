@@ -21,12 +21,12 @@ import { BudgetingDraft } from "@/lib/budgeting";
 const ACCENT = "#8DA7BE";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sidebar de Budgeting — dos modos según la ruta:
+// Sidebar de Budgeting: dos modos según la ruta.
 //  · /budgeting               → solo el logo y el pie (la lista de
 //    presupuestos vive en el propio contenido, como una grid de tarjetas).
 //  · /budgeting/{draftId}/... → nav propia del borrador (Top Sheet,
 //    Categorías, Globales, Seguridad Social, Fases) y el nombre del
-//    borrador, editable aquí — ya no se repite en el contenido.
+//    borrador, editable aquí; ya no se repite en el contenido.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function BudgetingShell({ children }: { children: React.ReactNode }) {

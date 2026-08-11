@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Desplegable propio de Budgeting — nada de <select> nativo del navegador.
+// Desplegable propio de Budgeting: nada de <select> nativo del navegador.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface BudgetingDropdownOption {

@@ -1,12 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Exportación de un borrador de Budgeting a Excel y PDF (además del .fwb de
 // budgetingExport.ts). El PDF reutiliza el builder de marca compartido
-// (lib/pdfBuilder.ts) con el acento de Budgeting — minimalista, sin adornos.
+// (lib/pdfBuilder.ts) con el acento de Budgeting: minimalista, sin adornos.
 // El Excel usa el mismo método de escritura XML+zip ya probado en el
 // importador de Accounting > Budget (fflate, sin librerías nuevas).
 //
 // `exportConfig` (portada, salto de página por capítulo, campos visibles)
-// es opcional — si no se pasa, se exporta con el comportamiento de siempre.
+// es opcional: si no se pasa, se exporta con el comportamiento de siempre.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { strToU8, zipSync } from "fflate";

@@ -12,7 +12,7 @@ import { BudgetingFolder } from "@/lib/budgeting";
 // ─────────────────────────────────────────────────────────────────────────────
 // Selector de carpeta reutilizado por Globales y Fringes: permite elegir una
 // carpeta existente o crear una nueva al vuelo, sin desplegable nativo del
-// navegador. No hay anidamiento — son carpetas planas, solo para agrupar la
+// navegador. No hay anidamiento: son carpetas planas, solo para agrupar la
 // lista visualmente.
 // ─────────────────────────────────────────────────────────────────────────────
 

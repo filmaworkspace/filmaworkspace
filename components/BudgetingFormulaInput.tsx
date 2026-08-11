@@ -4,11 +4,11 @@
 import { useEffect, useRef, useState } from "react";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Input de texto con autocompletado de códigos de Globales — se usa en
+// Input de texto con autocompletado de códigos de Globales: se usa en
 // cualquier campo que admite fórmulas (Valor de un Global, Cantidad/X/Tarifa
 // de una línea de Detalle). Mientras escribes, si el último token parece el
 // principio de un código, sugiere los Globales que empiezan por ahí; clic o
-// Tab lo completa. No es un <select> — sigue siendo texto libre.
+// Tab lo completa. No es un <select>: sigue siendo texto libre.
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface GlobalOption { code: string; label: string; }

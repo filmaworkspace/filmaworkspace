@@ -8,7 +8,7 @@
 // (Categoría → Capítulo → Subcapítulo → Detalle) porque Budgeting sí la usa,
 // pero Accounting > Budget no tiene más que 2 niveles: al importar ahí, cada
 // Subcapítulo pasa a ser una CUENTA (es el que agrupa Detail Lines
-// directamente) y cada Detalle una SUBCUENTA con su propio código — el mismo
+// directamente) y cada Detalle una SUBCUENTA con su propio código: el mismo
 // que luego se elige en una PO.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -28,7 +28,7 @@ export interface FwbDetailLine {
   supplier?: string;
   notes?: string;
   tags?: string[];
-  /** Si está puesta, la línea cuenta en el Subcapítulo indicado (por código) en vez del suyo propio — ver BudgetingLineRoute. */
+  /** Si está puesta, la línea cuenta en el Subcapítulo indicado (por código) en vez del suyo propio (ver BudgetingLineRoute). */
   routedToSubchapterCode?: string;
 }
 

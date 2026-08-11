@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Budgeting: entorno independiente de proyecto para presupuestar una
 // película/serie de cero (inspirado en Movie Magic Budgeting / Saturation).
-// No cuelga de ningún proyecto — vive en `budgetingDrafts/{draftId}`, con un
+// No cuelga de ningún proyecto: vive en `budgetingDrafts/{draftId}`, con un
 // índice por usuario en `userBudgetingDrafts/{uid}/drafts/{draftId}` para
 // listar rápido en el sidebar. Un borrador terminado se "envía" a un
 // proyecto, que rellena su Accounting > Budget (ver accounting/budget/page.tsx
@@ -15,12 +15,12 @@ import { Timestamp } from "firebase/firestore";
 
 export const BUDGETING_ACCENT = "#8DA7BE";
 export const BUDGETING_TEXT = "#1D201F";
-/** Fondo tenue del acento, para chips/tints — nada de rellenos sólidos por defecto. */
+/** Fondo tenue del acento, para chips/tints; nada de rellenos sólidos por defecto. */
 export const BUDGETING_TINT = `${BUDGETING_ACCENT}1a`;
 
 // ─── Categorías (apartado) ──────────────────────────────────────────────────
 // Clásicas de presupuesto de estudio (Above/Below the line) por defecto, pero
-// configurables por borrador — se pueden renombrar, añadir, quitar, o
+// configurables por borrador: se pueden renombrar, añadir, quitar, o
 // desactivar del todo (draft.categoriesEnabled = false → lista plana).
 
 export interface BudgetingCategoryDef {
@@ -47,7 +47,7 @@ export interface BudgetingFolder {
  * `value` es un número o una fórmula que puede referenciar el código de
  * otros globales (p.ej. "120 * DIAS_RODAJE + DIETA"), resuelta con
  * `resolveGlobals()`. `scenarioOverrides` permite que, bajo un escenario
- * concreto, este Global tome un valor/fórmula distinto — si no hay override
+ * concreto, este Global tome un valor/fórmula distinto: si no hay override
  * para el escenario activo, se usa `value` normal.
  */
 export interface BudgetingGlobal {
@@ -85,15 +85,15 @@ export const FRINGE_SCOPE_LABELS: Record<FringeScope, string> = {
  * Concepto de Seguridad Social / fringe. Dos modos:
  *  - "percent": porcentaje sobre el total de la línea a la que se aplica.
  *  - "fixed_period": importe fijo por periodo (semana/mes/año), con tope
- *    opcional — p.ej. la cotización de la SS española, topada mensualmente.
+ *    opcional, p.ej. la cotización de la SS española, topada mensualmente.
  *    El importe fijo se multiplica por las `units` de la línea (asumiendo que
  *    ya representan el nº de periodos, p.ej. "3" meses); el tope se aplica
- *    por línea — no hay todavía un modelo de "misma persona" entre líneas
- *    distintas para acumular el tope entre ellas (eso requeriría un sistema
- *    de contactos, fuera de alcance por ahora).
+ *    por línea, ya que no hay todavía un modelo de "misma persona" entre
+ *    líneas distintas para acumular el tope entre ellas (eso requeriría un
+ *    sistema de contactos, fuera de alcance por ahora).
  * `scope` decide dónde computa el importe generado: en el propio subcapítulo
  * de la línea, en el capítulo (como partida aparte), o en el total del
- * presupuesto — igual que un "excl." que se puede rastrear hasta su destino.
+ * presupuesto, igual que un "excl." que se puede rastrear hasta su destino.
  */
 export interface BudgetingFringe {
   id: string;
@@ -141,7 +141,7 @@ export interface BudgetingDraft {
   sentToProjectId: string | null;
   sentToProjectName: string | null;
   sentAt: Timestamp | null;
-  /** Si es false, los capítulos no se agrupan por categoría — lista plana en el Budget. */
+  /** Si es false, los capítulos no se agrupan por categoría: lista plana en el Budget. */
   categoriesEnabled?: boolean;
   categories?: BudgetingCategoryDef[];
   globals?: BudgetingGlobal[];
@@ -151,11 +151,11 @@ export interface BudgetingDraft {
   phases?: BudgetingPhase[];
   exportConfig?: BudgetingExportConfig;
   scenarios?: BudgetingScenario[];
-  /** Escenario que se está previsualizando ahora mismo — null/undefined = valores reales, sin overrides. */
+  /** Escenario que se está previsualizando ahora mismo (null/undefined = valores reales, sin overrides). */
   activeScenarioId?: string | null;
 }
 
-/** Doc índice en userBudgetingDrafts/{uid}/drafts/{draftId} — para listar rápido en el sidebar sin leer cada borrador entero. */
+/** Doc índice en userBudgetingDrafts/{uid}/drafts/{draftId}, para listar rápido en el sidebar sin leer cada borrador entero. */
 export interface BudgetingDraftIndex {
   id: string;
   name: string;
@@ -164,7 +164,7 @@ export interface BudgetingDraftIndex {
   sentToProjectName: string | null;
 }
 
-/** budgetingDrafts/{draftId}/accounts/{chapterId} — Capítulo: solo organizativo. */
+/** budgetingDrafts/{draftId}/accounts/{chapterId} (Capítulo): solo organizativo. */
 export interface BudgetingAccount {
   id: string;
   code: string;
@@ -172,11 +172,11 @@ export interface BudgetingAccount {
   /** id de una BudgetingCategoryDef del borrador, o null si las categorías están desactivadas / sin asignar. */
   category: string | null;
   createdAt: Timestamp | null;
-  /** Orden manual — por defecto el de creación, pero se puede reordenar libremente. */
+  /** Orden manual: por defecto el de creación, pero se puede reordenar libremente. */
   order?: number;
 }
 
-/** budgetingDrafts/{draftId}/accounts/{chapterId}/subchapters/{subchapterId} — Subcapítulo: también organizativo. */
+/** budgetingDrafts/{draftId}/accounts/{chapterId}/subchapters/{subchapterId} (Subcapítulo): también organizativo. */
 export interface BudgetingSubchapter {
   id: string;
   code: string;
@@ -189,7 +189,7 @@ export interface BudgetingSubchapter {
 
 /**
  * Destino de una línea "redirigida": su importe deja de sumar en su propio
- * subcapítulo/capítulo y pasa a sumar en otro — p.ej. una línea de Catering
+ * subcapítulo/capítulo y pasa a sumar en otro, p.ej. una línea de Catering
  * escrita dentro de Ayudante de Producción que en realidad debe computar en
  * la partida de Catering. La línea se sigue viendo y editando donde se
  * escribió (marcada "excl."), con un enlace directo a su destino.
@@ -204,7 +204,7 @@ export interface BudgetingLineRoute {
 }
 
 /**
- * .../subchapters/{subchapterId}/detailLines/{lineId} — Detalle: su código es
+ * .../subchapters/{subchapterId}/detailLines/{lineId} (Detalle): su código es
  * el que luego se elige en una PO (equivale al SubAccount de Accounting >
  * Budget). Importe calculado, no escrito a mano.
  *
@@ -219,7 +219,7 @@ export interface BudgetingDetailLine {
   description: string;
   units: number;
   unitsExpr?: string;
-  /** Tipo de unidad (Día, Semana, Fijo...) — solo descriptivo, no afecta al cálculo. */
+  /** Tipo de unidad (Día, Semana, Fijo...): solo descriptivo, no afecta al cálculo. */
   unit: string;
   multiplier: number;
   multiplierExpr?: string;
@@ -231,7 +231,7 @@ export interface BudgetingDetailLine {
   tags?: string[];
   /** Fringes/SS aplicados a esta línea (ids de BudgetingFringe del borrador). */
   fringeIds?: string[];
-  /** Si está puesto, el total de esta línea NO suma aquí — suma en el subcapítulo indicado (ver BudgetingLineRoute). */
+  /** Si está puesto, el total de esta línea NO suma aquí: suma en el subcapítulo indicado (ver BudgetingLineRoute). */
   routedTo?: BudgetingLineRoute | null;
   createdAt: Timestamp | null;
   order?: number;
@@ -251,7 +251,7 @@ export function newBudgetingId(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2, 10);
 }
 
-/** Valor de orden para un elemento recién creado — monótono creciente, así entra siempre al final. */
+/** Valor de orden para un elemento recién creado: monótono creciente, así entra siempre al final. */
 export function nextOrderValue(): number {
   return Date.now();
 }
@@ -272,7 +272,7 @@ export function sortByOrder<T extends { order?: number; createdAt?: { seconds: n
   return [...items].sort((a, b) => key(a) - key(b));
 }
 
-/** Calcula el intercambio de `order` necesario para mover un elemento un puesto arriba/abajo dentro de `items` (ya en su grupo — p.ej. capítulos de la misma categoría). Devuelve null si ya está en el extremo. */
+/** Calcula el intercambio de `order` necesario para mover un elemento un puesto arriba/abajo dentro de `items` (ya en su grupo, p.ej. capítulos de la misma categoría). Devuelve null si ya está en el extremo. */
 export function computeReorder<T extends { id: string; order?: number }>(
   items: T[], id: string, direction: "up" | "down"
 ): { id: string; order: number }[] | null {
@@ -315,7 +315,7 @@ export function fmtDecimal(n: number): string {
 // Evaluador propio (sin eval/Function) para: valores de Global que referencian
 // otros Globales por su `code`, y campos Cantidad/X/Tarifa de una línea de
 // Detalle que referencian Globales. Soporta +, -, *, /, (), decimales y
-// nombres de variable tipo CODE_123. Nada más — no hay funciones ni
+// nombres de variable tipo CODE_123. Nada más: no hay funciones ni
 // condicionales, a propósito, para que quede predecible.
 
 function tokenizeExpr(expr: string): string[] {
@@ -387,7 +387,7 @@ export function evaluateExpr(expr: string, lookup: (code: string) => number): nu
   return result;
 }
 
-/** true si el texto es directamente un número (sin fórmula) — el camino rápido más habitual. */
+/** true si el texto es directamente un número (sin fórmula): el camino rápido más habitual. */
 export function isPlainNumber(text: string): boolean {
   return /^-?[0-9]+(\.[0-9]+)?$/.test(text.trim());
 }
@@ -446,7 +446,7 @@ export function evaluateFieldExpr(text: string, globalValues: Record<string, num
 }
 
 /**
- * Recalcula el total de una línea bajo otro juego de valores de Globales —
+ * Recalcula el total de una línea bajo otro juego de valores de Globales,
  * usado para previsualizar un Escenario sin tocar lo guardado. Si la línea no
  * usa ninguna fórmula, su total no depende de Globales y se devuelve tal cual.
  */
@@ -486,11 +486,11 @@ export function lineFringeBreakdown(line: BudgetingDetailLine, fringes: Budgetin
 }
 
 export interface FringeExtras {
-  /** Suma de fringes con scope "subchapter" — se pliega directamente en el subtotal del propio subcapítulo. */
+  /** Suma de fringes con scope "subchapter": se pliega directamente en el subtotal del propio subcapítulo. */
   subchapterScoped: number;
-  /** Suma de fringes con scope "chapter" — partida aparte a nivel de capítulo. */
+  /** Suma de fringes con scope "chapter": partida aparte a nivel de capítulo. */
   chapterScoped: number;
-  /** Suma de fringes con scope "total" — partida aparte a nivel de presupuesto entero. */
+  /** Suma de fringes con scope "total": partida aparte a nivel de presupuesto entero. */
   totalScoped: number;
 }
 
@@ -511,7 +511,7 @@ export function computeFringeExtras(lines: BudgetingDetailLine[], fringes: Budge
 
 // ─── Redirección de líneas ("excl.") ────────────────────────────────────────
 // Una línea con `routedTo` puesto se sigue viendo y editando en su
-// subcapítulo físico, pero su total no cuenta ahí — cuenta en el subcapítulo
+// subcapítulo físico, pero su total no cuenta ahí: cuenta en el subcapítulo
 // destino (denormalizado en `receivedTotal`, ver BudgetingSubchapter). Estos
 // helpers son puramente de lectura; quien escribe `routedTo` es responsable
 // de mantener `receivedTotal` al día con increment()/writeBatch.
@@ -526,7 +526,7 @@ export function subchapterTotal(sub: { receivedTotal?: number }, lines: Budgetin
   return Math.round((sumOwnLineTotals(lines) + (sub.receivedTotal || 0)) * 100) / 100;
 }
 
-// ─── Estilo — funcional, no "de color por todas partes": fondo blanco/borde
+// ─── Estilo: funcional, no "de color por todas partes". Fondo blanco/borde
 // gris por defecto, se ilumina en el acento al hover o cuando está
 // activo/seleccionado. Texto de énfasis en BUDGETING_TEXT, no slate-900. ────
 
@@ -543,17 +543,19 @@ export const ROW_INPUT =
   "border border-slate-300 rounded-md bg-white focus:outline-none focus:border-[#8DA7BE] focus:ring-2 focus:ring-[#8DA7BE]/20 transition-colors";
 
 /**
- * Celda de tabla al estilo Excel: sin caja ni placeholder visible en reposo,
- * ocupa toda la altura de la fila (no solo el texto) para que las líneas
- * divisorias entre columnas vayan de arriba a abajo de verdad. Al enfocar se
- * rellena entera de gris — nada de contorno — como la celda activa de una
- * hoja de cálculo. Guarda al perder el foco, sin botón de confirmar.
+ * Celda de tabla al estilo Excel: sin caja ni placeholder visible en reposo.
+ * El padding vertical va en la propia celda (no en la fila contenedora) para
+ * que sea justo eso lo que fija la altura de la fila entera: así las líneas
+ * divisorias entre columnas (divide-x en el grid) van de verdad de arriba a
+ * abajo, no solo del alto del texto. Al enfocar se rellena entera de gris,
+ * sin contorno, como la celda activa de una hoja de cálculo. Guarda al
+ * perder el foco, sin botón de confirmar.
  */
 export const CELL_INPUT =
-  "w-full h-full bg-transparent focus:outline-none focus:bg-slate-200/70 px-1.5 transition-colors";
+  "w-full h-full bg-transparent focus:outline-none focus:bg-slate-200/70 px-1.5 py-2.5 transition-colors";
 
 // ─── Snapshots / versiones ──────────────────────────────────────────────────
-// budgetingDrafts/{draftId}/snapshots/{snapshotId} — una foto congelada del
+// budgetingDrafts/{draftId}/snapshots/{snapshotId}: una foto congelada del
 // árbol completo (con los mismos ids de Firestore que tenía en ese momento,
 // para poder comparar dos fotos, o una foto contra el estado actual).
 
