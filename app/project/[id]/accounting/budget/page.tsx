@@ -47,6 +47,7 @@ import { strToU8, unzipSync, zipSync } from "fflate";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { CostSettings, getCostSettings, shouldCommitPO, shouldRealizeInvoice } from "@/lib/budgetRules";
+import { parseFwbText, flattenFwbToAccountRows } from "@/lib/budgetingExport";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -801,13 +802,29 @@ export default function BudgetPage() {
 
   const unassignedSubAccounts = importData.filter(d => d.type === "SUBCUENTA" && !d.parentCode);
 
+  // Importa un .fwb (exportado desde Budgeting) — mismo shape de salida que
+  // parseImportFile, para reutilizar tal cual el resto del flujo de
+  // importación (preview/organize/execute). Las categorías del .fwb
+  // (Above/Below the line) no se preservan: solo Cuentas y Detail Lines.
+  const parseFwbBudgetFile = (fileBytes: Uint8Array): { code: string; description: string; type: string; budgeted: number; parentCode: string | null }[] => {
+    try {
+      const text = new TextDecoder().decode(fileBytes);
+      const fwb = parseFwbText(text);
+      return flattenFwbToAccountRows(fwb);
+    } catch (error: any) {
+      setErrorMessage(error?.message || "No se pudo leer el archivo .fwb");
+      return [];
+    }
+  };
+
   const handleFileSelect = (file: File) => {
     if (!file) return;
     setImportFileName(file.name);
+    const isFwb = file.name.toLowerCase().endsWith(".fwb");
     const reader = new FileReader();
     reader.onload = (e) => {
       const bytes = new Uint8Array(e.target?.result as ArrayBuffer);
-      const parsed = parseImportFile(bytes);
+      const parsed = isFwb ? parseFwbBudgetFile(bytes) : parseImportFile(bytes);
       if (parsed.length > 0) {
         setImportData(parsed);
         // Expandir todas las cuentas por defecto en la vista previa
@@ -831,10 +848,10 @@ export default function BudgetPage() {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
-    if (file && (file.name.endsWith(".xlsx") || file.name.endsWith(".xls"))) {
+    if (file && (file.name.endsWith(".xlsx") || file.name.endsWith(".xls") || file.name.endsWith(".fwb"))) {
       handleFileSelect(file);
     } else {
-      setErrorMessage("Por favor, sube un archivo .xlsx");
+      setErrorMessage("Por favor, sube un archivo .xlsx o .fwb");
     }
   };
 
@@ -1311,15 +1328,15 @@ export default function BudgetPage() {
                       <FileSpreadsheet size={32} className={isDragging ? "text-emerald-600" : "text-slate-400"} />
                     </div>
                     <p className="text-lg font-medium text-slate-900 mb-1">
-                      {isDragging ? "¡Suelta el archivo aquí!" : "Arrastra tu archivo Excel aquí"}
+                      {isDragging ? "¡Suelta el archivo aquí!" : "Arrastra tu archivo aquí"}
                     </p>
-                    <p className="text-sm text-slate-500 mb-4">o haz clic para seleccionar · .xlsx</p>
+                    <p className="text-sm text-slate-500 mb-4">o haz clic para seleccionar · .xlsx o .fwb (Budgeting)</p>
                     <label className="cursor-pointer">
                       <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors">
                         <Upload size={16} />
                         Seleccionar archivo
                       </span>
-                      <input type="file" accept=".xlsx,.xls" onChange={handleImportFile} className="hidden" />
+                      <input type="file" accept=".xlsx,.xls,.fwb" onChange={handleImportFile} className="hidden" />
                     </label>
                   </div>
 
@@ -1363,6 +1380,13 @@ export default function BudgetPage() {
                       </div>
                     </div>
                     <p className="text-xs text-slate-500 mt-2">Si SUBCUENTA está vacía → cuenta padre. Si tiene valor → subcuenta de la cuenta indicada en CUENTA.</p>
+                  </div>
+
+                  {/* .fwb info */}
+                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                    <p className="text-xs text-amber-800">
+                      <span className="font-medium">¿Vienes de Budgeting?</span> Puedes subir directamente el archivo <span className="font-mono">.fwb</span> que hayas descargado de tu borrador — se importan las cuentas y los códigos de detalle igual que con el Excel.
+                    </p>
                   </div>
                 </div>
               )}

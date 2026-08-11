@@ -665,51 +665,55 @@ export default function PayrollPage() {
         </div>
       </div>
 
-      {/* ── Controls bar ─────────────────────────────────────────────────── */}
-      <div className="px-24 pb-4 flex flex-wrap items-center gap-3">
-        {/* Month nav */}
-        <div className="flex items-center gap-3">
-          <button onClick={prevM} className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"><ChevronLeft size={16} /></button>
-          <h2 className="text-xl font-bold text-slate-900 min-w-[220px] text-center">{MONTH_NAMES[month]} {year}</h2>
-          <button onClick={nextM} className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"><ChevronRight size={16} /></button>
-        </div>
+      {/* ── Controls + legend ────────────────────────────────────────────── */}
+      <div className="px-24 pb-6">
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            {/* Month nav */}
+            <div className="flex items-center gap-0.5">
+              <button onClick={prevM} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors"><ChevronLeft size={16} /></button>
+              <h2 className="text-base font-bold text-slate-900 min-w-[180px] text-center px-1">{MONTH_NAMES[month]} {year}</h2>
+              <button onClick={nextM} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors"><ChevronRight size={16} /></button>
+            </div>
 
-        <div className="flex items-center gap-3 ml-auto">
-          {/* View */}
-          <div className="flex items-center gap-0.5 border border-slate-200 rounded-xl p-0.5">
-            {(["grid","summary"] as const).map(v => (
-              <button key={v} onClick={() => setViewMode(v)}
-                className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${viewMode===v ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>
-                {v === "grid" ? "Tabla" : "Resumen"}
+            <div className="flex items-center gap-2">
+              {/* View */}
+              <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-xl p-0.5">
+                {(["grid","summary"] as const).map(v => (
+                  <button key={v} onClick={() => setViewMode(v)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${viewMode===v ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`}>
+                    {v === "grid" ? "Tabla" : "Resumen"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Period config */}
+              <button
+                onClick={() => { setPeriodsDraft({...periods}); setShowPeriodCfg(true); }}
+                className={`flex items-center gap-2 px-3 py-1.5 border rounded-xl text-xs font-medium transition-colors ${Object.keys(periods).length > 0 ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"}`}>
+                <CalendarRange size={13} />
+                {Object.keys(periods).length > 0 ? `${Object.keys(periods).length} período${Object.keys(periods).length !== 1 ? "s" : ""}` : "Períodos"}
               </button>
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="mt-3 pt-3 border-t border-slate-200 flex flex-wrap items-center gap-4">
+            {ALLOWANCES.map(a => (
+              <div key={a.key} className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: a.dot }} />
+                <span className="text-xs text-slate-500">{a.label} · {fmt(cfg[a.rateKey])}</span>
+              </div>
             ))}
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-slate-400 flex-shrink-0" />
+              <span className="text-xs text-slate-500">Otros</span>
+            </div>
+            <div className="flex items-center gap-1.5 ml-auto">
+              <div className="w-6 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: TEAM_COLOR }} />
+              <span className="text-xs text-slate-400">Día trabajado · click para marcar/desmarcar</span>
+            </div>
           </div>
-
-          {/* Period config */}
-          <button
-            onClick={() => { setPeriodsDraft({...periods}); setShowPeriodCfg(true); }}
-            className={`flex items-center gap-2 px-3 py-2 border rounded-xl text-xs font-medium transition-colors ${Object.keys(periods).length > 0 ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
-            <CalendarRange size={13} />
-            {Object.keys(periods).length > 0 ? `${Object.keys(periods).length} período${Object.keys(periods).length !== 1 ? "s" : ""}` : "Períodos"}
-          </button>
-        </div>
-      </div>
-
-      {/* ── Legend ───────────────────────────────────────────────────────── */}
-      <div className="px-24 pb-5 flex flex-wrap items-center gap-4">
-        {ALLOWANCES.map(a => (
-          <div key={a.key} className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: a.dot }} />
-            <span className="text-xs text-slate-500">{a.label} · {fmt(cfg[a.rateKey])}</span>
-          </div>
-        ))}
-        <div className="flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-slate-400 flex-shrink-0" />
-          <span className="text-xs text-slate-500">Otros</span>
-        </div>
-        <div className="flex items-center gap-1.5 ml-auto">
-          <div className="w-6 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: TEAM_COLOR }} />
-          <span className="text-xs text-slate-400">Día trabajado · click para marcar/desmarcar</span>
         </div>
       </div>
 

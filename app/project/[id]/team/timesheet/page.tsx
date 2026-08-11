@@ -666,27 +666,41 @@ export default function ControlHorarioPage() {
 
       <main className="px-24 pb-16">
 
-        {/* ── Month nav ──────────────────────────────────────────────────── */}
-        <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={() => navMonth(-1)}
-            className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <h2 className="text-xl font-bold text-slate-900 min-w-[220px] text-center">
-            {MONTH_NAMES[currentMonth]} {currentYear}
-          </h2>
-          <button
-            onClick={() => navMonth(1)}
-            className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-          >
-            <ChevronRight size={16} />
-          </button>
-        </div>
+        {/* ── Navegador de fecha (mes + tira de días) ──────────────────────── */}
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl px-4 pt-3 pb-3.5 mb-8">
+          {/* Month nav */}
+          <div className="flex items-center gap-0.5 mb-1.5">
+            <button
+              onClick={() => navMonth(-1)}
+              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <h2 className="text-base font-bold text-slate-900 min-w-[180px] text-center px-1">
+              {MONTH_NAMES[currentMonth]} {currentYear}
+            </h2>
+            <button
+              onClick={() => navMonth(1)}
+              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors"
+            >
+              <ChevronRight size={16} />
+            </button>
+            <div className="w-px h-4 bg-slate-200 mx-1" />
+            <button
+              onClick={() => {
+                const t = new Date();
+                setCurrentMonth(t.getMonth());
+                setCurrentYear(t.getFullYear());
+                setSelectedDate(today());
+              }}
+              className="px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 hover:bg-white rounded-lg transition-colors"
+            >
+              Hoy
+            </button>
+          </div>
 
-        {/* ── Day strip ──────────────────────────────────────────────────── */}
-        <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2">
+          {/* Day strip */}
+          <div className="flex items-center gap-2 overflow-x-auto pt-1 pb-1">
           {dateStrip.map((date) => {
             const st   = getDayStatus(date);
             const isT  = date === today();
@@ -711,6 +725,7 @@ export default function ControlHorarioPage() {
               </button>
             );
           })}
+          </div>
         </div>
 
         {/* ── Selected day panel ─────────────────────────────────────────── */}

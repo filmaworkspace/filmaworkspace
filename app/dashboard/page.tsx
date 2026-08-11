@@ -45,6 +45,7 @@ import {
   Search,
   Settings,
   Users,
+  Wallet,
   X as XIcon,
 } from "lucide-react";
 
@@ -682,6 +683,27 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Budgeting — app independiente, fuera de cualquier proyecto */}
+      {user?.budgetingAccess && (
+        <div className="px-24 pb-6">
+          <Link
+            href="/budgeting"
+            className="flex items-center justify-between gap-4 px-6 py-4 bg-white border border-slate-200 rounded-2xl hover:border-amber-300 hover:shadow-sm transition-all group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-11 h-11 bg-amber-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Wallet size={18} className="text-amber-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Budgeting</p>
+                <p className="text-xs text-slate-500 mt-0.5">Presupuesta una película o serie de cero, fuera de tus proyectos</p>
+              </div>
+            </div>
+            <ArrowRight size={16} className="text-slate-300 group-hover:text-amber-500 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+          </Link>
+        </div>
+      )}
 
       {/* Notification Panel - Fixed position fuera del flow */}
       {expandedMessage === "panel" && (

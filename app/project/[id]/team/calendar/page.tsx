@@ -487,23 +487,40 @@ export default function CalendarPage() {
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="mt-[53px]">
         <div className="px-24 pt-10 pb-6">
-          <div className="flex items-center justify-center">
+          <div className="relative flex items-center justify-center">
             <div className="flex items-center gap-4">
               <Calendar size={22} style={{ color: "#6BA319" }} />
               <h1 className="text-3xl font-bold text-slate-900 text-center">Calendario de producción</h1>
             </div>
+            <div className="absolute right-0 flex items-center gap-2 print:hidden">
+              <button
+                onClick={() => window.print()}
+                title="Descargar / imprimir en PDF"
+                className="p-2.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                <Printer size={18} />
+              </button>
+              <button
+                onClick={() => openCreate()}
+                className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+                style={{ backgroundColor: "#6BA319" }}
+              >
+                <Plus size={15} />
+                Nuevo evento
+              </button>
+            </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-            {/* Month/week nav */}
-            <div className="flex items-center gap-3">
+          <div className="mt-5 flex items-center justify-between gap-3 flex-wrap">
+            {/* Date nav — pill contenedor que desaparece al imprimir, dejando solo el nombre del mes/semana */}
+            <div className="flex items-center gap-0.5 bg-slate-50 border border-slate-200 rounded-xl pl-1 pr-3 py-1 print:bg-transparent print:border-0 print:p-0">
               <button
                 onClick={() => viewMode === "month" ? navMonth(-1) : navWeek(-1)}
-                className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors print:hidden"
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors print:hidden"
               >
                 <ChevronLeft size={16} />
               </button>
-              <h2 className="text-xl font-bold text-slate-900 min-w-[220px] text-center">
+              <h2 className="text-base font-bold text-slate-900 min-w-[180px] text-center px-1">
                 {viewMode === "month"
                   ? `${MONTHS_ES[currentMonth]} ${currentYear}`
                   : (() => {
@@ -516,13 +533,21 @@ export default function CalendarPage() {
               </h2>
               <button
                 onClick={() => viewMode === "month" ? navMonth(1) : navWeek(1)}
-                className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors print:hidden"
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors print:hidden"
               >
                 <ChevronRight size={16} />
               </button>
+              <div className="w-px h-4 bg-slate-200 mx-1 print:hidden" />
+              <button
+                onClick={goToday}
+                className="px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 hover:bg-white rounded-lg transition-colors print:hidden"
+              >
+                Hoy
+              </button>
             </div>
-            <div className="flex items-center justify-center gap-2 flex-wrap print:hidden">
-              {/* Filter */}
+
+            {/* Filtro + vista */}
+            <div className="flex items-center gap-2 print:hidden">
               <div className="relative" ref={filterRef}>
                 <button
                   onClick={() => setShowFilterMenu(!showFilterMenu)}
@@ -562,7 +587,6 @@ export default function CalendarPage() {
                 )}
               </div>
 
-              {/* View toggle */}
               <div className="flex border border-slate-200 rounded-xl overflow-hidden">
                 {(["month", "week"] as ViewMode[]).map((v) => (
                   <button
@@ -578,31 +602,6 @@ export default function CalendarPage() {
                   </button>
                 ))}
               </div>
-
-              <button
-                onClick={goToday}
-                className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-              >
-                Hoy
-              </button>
-            </div>
-
-            <div className="flex justify-end items-center gap-2 print:hidden">
-              <button
-                onClick={() => window.print()}
-                title="Descargar / imprimir en PDF"
-                className="p-2.5 border border-slate-200 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                <Printer size={16} />
-              </button>
-              <button
-                onClick={() => openCreate()}
-                className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: "#6BA319" }}
-              >
-                <Plus size={15} />
-                Nuevo evento
-              </button>
             </div>
           </div>
         </div>

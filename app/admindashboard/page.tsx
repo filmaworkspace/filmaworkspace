@@ -78,6 +78,7 @@ import {
   Circle,
   Loader2,
   Wrench,
+  Wallet,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
@@ -143,6 +144,7 @@ interface User {
   role: string;
   supportSpecialty?: "sales" | "technical" | "both";
   isDemo?: boolean;
+  budgetingAccess?: boolean;
   projectCount: number;
   projects: UserProject[];
 }
@@ -472,6 +474,7 @@ export default function AdminDashboard() {
             role: data.role || "user",
             supportSpecialty: data.supportSpecialty || undefined,
             isDemo: data.isDemo || false,
+            budgetingAccess: data.budgetingAccess || false,
             projectCount: userProjectsSnap.size,
             projects: userProjects,
           };
@@ -1138,6 +1141,20 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error(error);
       showToast("error", "Error al eliminar usuario");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleBudgetingAccess = async (odId: string, next: boolean) => {
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, "users", odId), { budgetingAccess: next });
+      setUsers((prev) => prev.map((u) => u.id === odId ? { ...u, budgetingAccess: next } : u));
+      showToast("success", next ? "Acceso a Budgeting concedido" : "Acceso a Budgeting retirado");
+    } catch (error) {
+      console.error(error);
+      showToast("error", "Error al actualizar el acceso a Budgeting");
     } finally {
       setSaving(false);
     }
@@ -2976,6 +2993,26 @@ export default function AdminDashboard() {
                       </div>
                       <p className="text-sm text-slate-500 mt-1">{user.email}</p>
                     </div>
+                  </div>
+
+                  {/* Budgeting access */}
+                  <div className="flex items-center justify-between gap-3 mb-6 pb-6 border-b border-slate-200">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <Wallet size={15} className="text-amber-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">Acceso a Budgeting</p>
+                        <p className="text-xs text-slate-500">Entorno independiente para presupuestar proyectos desde cero</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleToggleBudgetingAccess(user.id, !user.budgetingAccess)}
+                      disabled={saving}
+                      className={`w-10 h-6 rounded-full transition-colors relative flex-shrink-0 disabled:opacity-50 ${user.budgetingAccess ? "bg-amber-500" : "bg-slate-200"}`}
+                    >
+                      <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${user.budgetingAccess ? "left-5" : "left-1"}`} />
+                    </button>
                   </div>
 
                   {/* Projects */}

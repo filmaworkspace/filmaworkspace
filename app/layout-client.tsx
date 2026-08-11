@@ -25,7 +25,8 @@ export default function ClientLayout({
     pathname?.startsWith("/timesheet") ||
     pathname?.startsWith("/timesheet-review") ||
     pathname?.startsWith("/access") ||
-    pathname?.startsWith("/guias");
+    pathname?.startsWith("/guias") ||
+    pathname?.startsWith("/budgeting");
 
   const isMobilePage = pathname === "/mobile";
   const isAdminDashboard = pathname?.startsWith("/admindashboard");
