@@ -542,9 +542,15 @@ export const ICON_BTN_LIGHT =
 export const ROW_INPUT =
   "border border-slate-300 rounded-md bg-white focus:outline-none focus:border-[#8DA7BE] focus:ring-2 focus:ring-[#8DA7BE]/20 transition-colors";
 
-/** Celda de tabla al estilo MMB: sin caja ni placeholder visible, solo la columna vacía en reposo — al enfocar se ilumina de verdad, como la celda activa de Excel. Guarda al perder el foco, sin botón de confirmar. */
+/**
+ * Celda de tabla al estilo Excel: sin caja ni placeholder visible en reposo,
+ * ocupa toda la altura de la fila (no solo el texto) para que las líneas
+ * divisorias entre columnas vayan de arriba a abajo de verdad. Al enfocar se
+ * rellena entera de gris — nada de contorno — como la celda activa de una
+ * hoja de cálculo. Guarda al perder el foco, sin botón de confirmar.
+ */
 export const CELL_INPUT =
-  "w-full bg-transparent focus:outline-none focus:bg-[#8DA7BE]/[0.14] focus:ring-2 focus:ring-[#8DA7BE] rounded px-1.5 py-1 transition-colors";
+  "w-full h-full bg-transparent focus:outline-none focus:bg-slate-200/70 px-1.5 transition-colors";
 
 // ─── Snapshots / versiones ──────────────────────────────────────────────────
 // budgetingDrafts/{draftId}/snapshots/{snapshotId} — una foto congelada del

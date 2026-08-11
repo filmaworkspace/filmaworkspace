@@ -49,14 +49,14 @@ export default function BudgetingFormulaInput({ value, onChange, onBlur, onKeyDo
   };
 
   return (
-    <div ref={wrapRef} className="relative">
+    <div ref={wrapRef} className="relative h-full">
       <input
         ref={inputRef}
         autoFocus={autoFocus}
         title={title}
         value={value}
         onChange={(e) => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
+        onFocus={(e) => { setOpen(true); e.target.select(); }}
         onBlur={onBlur}
         onKeyDown={(e) => {
           if (e.key === "Tab" && open && suggestions.length > 0) { e.preventDefault(); insert(suggestions[0].code); return; }
