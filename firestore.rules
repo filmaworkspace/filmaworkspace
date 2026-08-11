@@ -534,12 +534,20 @@ service cloud.firestore {
            get(/databases/$(database)/documents/budgetingDrafts/$(draftId)).data.ownerUid == request.auth.uid)
         );
 
-        match /detailLines/{lineId} {
+        match /subchapters/{subchapterId} {
           allow read, write: if isSignedIn() && (
             isAdmin() ||
             (hasBudgetingAccess() &&
              get(/databases/$(database)/documents/budgetingDrafts/$(draftId)).data.ownerUid == request.auth.uid)
           );
+
+          match /detailLines/{lineId} {
+            allow read, write: if isSignedIn() && (
+              isAdmin() ||
+              (hasBudgetingAccess() &&
+               get(/databases/$(database)/documents/budgetingDrafts/$(draftId)).data.ownerUid == request.auth.uid)
+            );
+          }
         }
       }
     }

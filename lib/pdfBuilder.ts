@@ -7,7 +7,7 @@
 
 import jsPDF from "jspdf";
 
-export type PdfAccent = "accounting" | "team" | "config" | "neutral";
+export type PdfAccent = "accounting" | "team" | "config" | "budgeting" | "neutral";
 
 type RGB = [number, number, number];
 
@@ -15,6 +15,7 @@ const ACCENTS: Record<PdfAccent, RGB> = {
   accounting: [47, 82, 224],   // #2F52E0
   team: [107, 163, 25],        // #6BA319
   config: [71, 85, 105],       // slate-600
+  budgeting: [141, 167, 190],  // #8DA7BE
   neutral: [15, 23, 42],       // slate-900
 };
 

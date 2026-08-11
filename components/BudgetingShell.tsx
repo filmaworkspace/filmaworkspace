@@ -18,6 +18,8 @@ import { ArrowLeft } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 import { BudgetingDraft } from "@/lib/budgeting";
 
+const ACCENT = "#8DA7BE";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Sidebar de Budgeting — dos modos según la ruta:
 //  · /budgeting               → solo el logo y el pie (la lista de
@@ -62,11 +64,11 @@ export default function BudgetingShell({ children }: { children: React.ReactNode
   };
 
   const navItems = draftId ? [
-    { href: `/budgeting/${draftId}`, label: "Top Sheet", exact: true },
+    { href: `/budgeting/${draftId}`, label: "Budget", exact: true },
     { href: `/budgeting/${draftId}/categories`, label: "Categorías", exact: false },
-    { href: `/budgeting/${draftId}/globals`, label: "Globales", exact: false },
-    { href: `/budgeting/${draftId}/fringes`, label: "Seguridad Social", exact: false },
-    { href: `/budgeting/${draftId}/phases`, label: "Fases", exact: false },
+    { href: `/budgeting/${draftId}/phases`, label: "Phases", exact: false },
+    { href: `/budgeting/${draftId}/fringes`, label: "Fringes", exact: false },
+    { href: `/budgeting/${draftId}/globals`, label: "Globals", exact: false },
   ] : [];
 
   return (
@@ -95,12 +97,13 @@ export default function BudgetingShell({ children }: { children: React.ReactNode
                     if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                     if (e.key === "Escape" && draft) { setNameInput(draft.name); setEditingName(false); }
                   }}
-                  className="text-sm font-semibold text-slate-900 border-b-2 border-[#5B57E0] focus:outline-none bg-transparent px-0 py-0.5 w-full"
+                  className="text-sm font-semibold text-slate-900 border-b-2 focus:outline-none bg-transparent px-0 py-0.5 w-full"
+                  style={{ borderColor: ACCENT }}
                 />
               ) : (
                 <button
                   onClick={() => setEditingName(true)}
-                  className="text-sm font-semibold text-slate-900 hover:text-[#5B57E0] transition-colors text-left truncate block w-full"
+                  className="text-sm font-semibold text-slate-900 hover:text-[#8DA7BE] transition-colors text-left truncate block w-full"
                   title="Renombrar"
                 >
                   {draft?.name || ""}
@@ -115,9 +118,8 @@ export default function BudgetingShell({ children }: { children: React.ReactNode
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                      isActive ? "bg-[#5B57E0]/[0.06] text-[#5B57E0] font-medium" : "text-slate-600 hover:bg-slate-50"
-                    }`}
+                    className={`block px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? "" : "text-slate-600 hover:bg-slate-50"}`}
+                    style={isActive ? { background: `${ACCENT}1a`, color: ACCENT, fontWeight: 500 } : undefined}
                   >
                     {item.label}
                   </Link>
@@ -126,7 +128,16 @@ export default function BudgetingShell({ children }: { children: React.ReactNode
             </nav>
           </>
         ) : (
-          <div className="flex-1" />
+          <nav className="flex-1 px-3 py-3">
+            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider px-3 mb-1.5">Budgeting</p>
+            <Link
+              href="/budgeting"
+              className="block px-3 py-2 rounded-lg text-sm"
+              style={{ background: `${ACCENT}1a`, color: ACCENT, fontWeight: 500 }}
+            >
+              Budgets
+            </Link>
+          </nav>
         )}
 
         <div className="px-3 py-3 border-t border-slate-100 space-y-2">

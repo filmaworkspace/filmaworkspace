@@ -476,11 +476,12 @@ export default function Header() {
             );
           })()}
 
-          {/* Budgeting quick access */}
-          {user?.budgetingAccess && (
+          {/* Budgeting quick access — solo en Dashboard */}
+          {user?.budgetingAccess && pathname === "/dashboard" && (
             <Link
               href="/budgeting"
-              className="flex items-center justify-center h-8 px-2.5 rounded-lg bg-gradient-to-br from-[#6C64F5] to-[#4640C7] shadow-sm hover:shadow-md hover:scale-105 transition-all"
+              className="flex items-center justify-center h-8 px-2.5 rounded-lg shadow-sm hover:shadow-md hover:scale-105 transition-all"
+              style={{ background: "#8DA7BE" }}
               title="Budgeting"
             >
               <Image src="/logo-budgeting-white.svg" alt="Budgeting" width={26} height={8} className="h-2.5 w-auto" />

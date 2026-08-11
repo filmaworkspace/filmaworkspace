@@ -6,37 +6,43 @@
 // listar rápido en el sidebar. Un borrador terminado se "envía" a un
 // proyecto, que rellena su Accounting > Budget (ver accounting/budget/page.tsx
 // para el modelo Account → SubAccount que se replica ahí).
+//
+// Jerarquía (de fuera a dentro): Categoría (apartado, opcional) → Capítulo →
+// Subcapítulo → Detalle (la única con código elegible en una PO).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Timestamp } from "firebase/firestore";
 
-export const BUDGETING_ACCENT = "#5B57E0";
-export const BUDGETING_ACCENT_DARK = "#4640C7";
-export const BUDGETING_GRADIENT = `linear-gradient(135deg, #6C64F5, ${BUDGETING_ACCENT_DARK})`;
+export const BUDGETING_ACCENT = "#8DA7BE";
+export const BUDGETING_TEXT = "#1D201F";
 /** Fondo tenue del acento, para chips/tints — nada de rellenos sólidos por defecto. */
-export const BUDGETING_TINT = `${BUDGETING_ACCENT}0f`;
+export const BUDGETING_TINT = `${BUDGETING_ACCENT}1a`;
 
-// ─── Categorías del Top Sheet ───────────────────────────────────────────────
+// ─── Categorías (apartado) ──────────────────────────────────────────────────
 // Clásicas de presupuesto de estudio (Above/Below the line) por defecto, pero
 // configurables por borrador — se pueden renombrar, añadir, quitar, o
 // desactivar del todo (draft.categoriesEnabled = false → lista plana).
 
 export interface BudgetingCategoryDef {
   id: string;
+  code?: string;
   label: string;
 }
 
 export const DEFAULT_CATEGORIES: BudgetingCategoryDef[] = [
-  { id: "atl", label: "Above The Line" },
-  { id: "btl_production", label: "Below The Line · Producción" },
-  { id: "btl_post", label: "Below The Line · Postproducción" },
-  { id: "other", label: "Otros / Overhead" },
+  { id: "atl", code: "ATL", label: "Above The Line" },
+  { id: "btl_production", code: "BTL-P", label: "Below The Line · Producción" },
+  { id: "btl_post", code: "BTL-Q", label: "Below The Line · Postproducción" },
+  { id: "other", code: "OVH", label: "Otros / Overhead" },
 ];
 
 export interface BudgetingGlobal {
   id: string;
+  code: string;
   label: string;
   value: string;
+  /** id de otro Global referenciado en `value`, si se usa como fórmula — informativo, sin motor de cálculo todavía. */
+  parentId?: string | null;
 }
 
 export interface BudgetingFringe {
@@ -61,7 +67,7 @@ export interface BudgetingDraft {
   sentToProjectId: string | null;
   sentToProjectName: string | null;
   sentAt: Timestamp | null;
-  /** Si es false, las cuentas no se agrupan por categoría — lista plana en el Top Sheet. */
+  /** Si es false, los capítulos no se agrupan por categoría — lista plana en el Budget. */
   categoriesEnabled?: boolean;
   categories?: BudgetingCategoryDef[];
   globals?: BudgetingGlobal[];
@@ -78,7 +84,7 @@ export interface BudgetingDraftIndex {
   sentToProjectName: string | null;
 }
 
-/** budgetingDrafts/{draftId}/accounts/{accountId} — solo organizativa, equivale al Account de Accounting > Budget. */
+/** budgetingDrafts/{draftId}/accounts/{chapterId} — Capítulo: solo organizativo. */
 export interface BudgetingAccount {
   id: string;
   code: string;
@@ -88,10 +94,18 @@ export interface BudgetingAccount {
   createdAt: Timestamp | null;
 }
 
+/** budgetingDrafts/{draftId}/accounts/{chapterId}/subchapters/{subchapterId} — Subcapítulo: también organizativo. */
+export interface BudgetingSubchapter {
+  id: string;
+  code: string;
+  description: string;
+  createdAt: Timestamp | null;
+}
+
 /**
- * budgetingDrafts/{draftId}/accounts/{accountId}/detailLines/{lineId} — su
- * código es el que luego se elige en una PO (equivale al SubAccount de
- * Accounting > Budget). Importe calculado, no escrito a mano.
+ * .../subchapters/{subchapterId}/detailLines/{lineId} — Detalle: su código es
+ * el que luego se elige en una PO (equivale al SubAccount de Accounting >
+ * Budget). Importe calculado, no escrito a mano.
  */
 export interface BudgetingDetailLine {
   id: string;
@@ -103,6 +117,9 @@ export interface BudgetingDetailLine {
   multiplier: number;
   rate: number;
   total: number;
+  supplier?: string;
+  notes?: string;
+  tags?: string[];
   createdAt: Timestamp | null;
 }
 
@@ -143,14 +160,14 @@ export function fmtDecimal(n: number): string {
   return new Intl.NumberFormat("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n || 0);
 }
 
-// ─── Estilo de botones — funcional, no "morado por todas partes": fondo
-// blanco/borde gris por defecto, se ilumina en el acento al hover o cuando
-// está activo/seleccionado. ───────────────────────────────────────────────
+// ─── Estilo — funcional, no "de color por todas partes": fondo blanco/borde
+// gris por defecto, se ilumina en el acento al hover o cuando está
+// activo/seleccionado. Texto de énfasis en BUDGETING_TEXT, no slate-900. ────
 
 export const BTN_LIGHT =
-  "bg-white border border-slate-200 text-slate-700 hover:border-[#5B57E0] hover:text-[#5B57E0] hover:bg-[#5B57E0]/[0.04] transition-colors";
+  "bg-white border border-slate-200 text-slate-700 hover:border-[#8DA7BE] hover:text-[#8DA7BE] hover:bg-[#8DA7BE]/[0.08] transition-colors";
 
-export const BTN_LIGHT_ACTIVE = "border-[#5B57E0] bg-[#5B57E0]/[0.06] text-[#5B57E0]";
+export const BTN_LIGHT_ACTIVE = "border-[#8DA7BE] bg-[#8DA7BE]/[0.1] text-[#8DA7BE]";
 
 export const ICON_BTN_LIGHT =
-  "text-slate-400 hover:text-[#5B57E0] hover:bg-[#5B57E0]/[0.06] transition-colors";
+  "text-slate-400 hover:text-[#8DA7BE] hover:bg-[#8DA7BE]/[0.1] transition-colors";

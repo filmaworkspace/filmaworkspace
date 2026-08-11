@@ -4,17 +4,17 @@
 // en Accounting > Budget (app/project/[id]/accounting/budget/page.tsx), como
 // alternativa al importador de Excel que ya existe ahí.
 //
-// Es JSON por dentro, con extensión propia. Las categorías son dinámicas por
-// borrador (id + label libres, o ninguna si el borrador las tiene
-// desactivadas) — se guardan porque Budgeting sí las usa para el Top Sheet,
-// pero Accounting > Budget no tiene ese concepto: al importar ahí solo se
-// preservan las Cuentas (código y descripción) y las Detail Lines (código,
-// descripción y total), aplanadas a filas CUENTA/SUBCUENTA.
+// Es JSON por dentro, con extensión propia. Guarda la jerarquía completa
+// (Categoría → Capítulo → Subcapítulo → Detalle) porque Budgeting sí la usa,
+// pero Accounting > Budget no tiene más que 2 niveles: al importar ahí, cada
+// Subcapítulo pasa a ser una CUENTA (es el que agrupa Detail Lines
+// directamente) y cada Detalle una SUBCUENTA con su propio código — el mismo
+// que luego se elige en una PO.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { BudgetingCategoryDef } from "./budgeting";
 
-export const FWB_VERSION = 2;
+export const FWB_VERSION = 3;
 export const FWB_EXTENSION = ".fwb";
 
 export interface FwbDetailLine {
@@ -25,18 +25,28 @@ export interface FwbDetailLine {
   multiplier: number;
   rate: number;
   total: number;
+  supplier?: string;
+  notes?: string;
+  tags?: string[];
 }
 
-export interface FwbAccount {
+export interface FwbSubchapter {
   code: string;
   description: string;
   detailLines: FwbDetailLine[];
 }
 
+export interface FwbChapter {
+  code: string;
+  description: string;
+  subchapters: FwbSubchapter[];
+}
+
 export interface FwbCategoryBlock {
   id: string;
+  code?: string;
   label: string;
-  accounts: FwbAccount[];
+  chapters: FwbChapter[];
 }
 
 export interface FwbFile {
@@ -76,14 +86,18 @@ export function downloadFwb(fwb: FwbFile, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-/** Construye un .fwb a partir de los datos ya cargados de un borrador (ver app/budgeting/[draftId]/page.tsx). */
+interface LiteEntity { id: string; code: string; description: string; }
+interface LiteLine { code: string; description: string; units: number; unit: string; multiplier: number; rate: number; total: number; supplier?: string; notes?: string; tags?: string[]; }
+
+/** Construye un .fwb a partir de los datos ya cargados de un borrador. */
 export function buildFwbFromDraft(params: {
   name: string;
   currency: string;
   categoriesEnabled: boolean;
   categories: BudgetingCategoryDef[];
-  accountsByCategory: (categoryId: string | null) => { id: string; code: string; description: string }[];
-  linesByAccount: Record<string, { code: string; description: string; units: number; unit: string; multiplier: number; rate: number; total: number }[]>;
+  chaptersByCategory: (categoryId: string | null) => LiteEntity[];
+  subchaptersByChapter: Record<string, LiteEntity[]>;
+  linesBySubchapter: Record<string, LiteLine[]>;
 }): FwbFile {
   const cats = params.categoriesEnabled ? params.categories : [{ id: "all", label: "Cuentas" }];
   return {
@@ -94,12 +108,19 @@ export function buildFwbFromDraft(params: {
     categoriesEnabled: params.categoriesEnabled,
     categories: cats.map((cat) => ({
       id: cat.id,
+      code: cat.code,
       label: cat.label,
-      accounts: params.accountsByCategory(params.categoriesEnabled ? cat.id : null).map((account) => ({
-        code: account.code,
-        description: account.description,
-        detailLines: (params.linesByAccount[account.id] || []).map((l) => ({
-          code: l.code, description: l.description, units: l.units, unit: l.unit, multiplier: l.multiplier, rate: l.rate, total: l.total,
+      chapters: params.chaptersByCategory(params.categoriesEnabled ? cat.id : null).map((chapter) => ({
+        code: chapter.code,
+        description: chapter.description,
+        subchapters: (params.subchaptersByChapter[chapter.id] || []).map((sub) => ({
+          code: sub.code,
+          description: sub.description,
+          detailLines: (params.linesBySubchapter[sub.id] || []).map((l) => ({
+            code: l.code, description: l.description, units: l.units, unit: l.unit,
+            multiplier: l.multiplier, rate: l.rate, total: l.total,
+            supplier: l.supplier, notes: l.notes, tags: l.tags,
+          })),
         })),
       })),
     })),
@@ -116,18 +137,19 @@ export interface FlatAccountRow {
 
 /**
  * Aplana un .fwb a filas CUENTA/SUBCUENTA, mismo shape que produce el
- * importador de Excel de Accounting > Budget (parseImportFile). Las
- * categorías no se preservan aquí — cada Cuenta pasa a ser una CUENTA y cada
- * Detail Line una SUBCUENTA con su propio código, el mismo que luego se
- * elige en una PO.
+ * importador de Excel de Accounting > Budget (parseImportFile). Cada
+ * Subcapítulo pasa a ser una CUENTA (agrupa Detail Lines directamente) y
+ * cada Detalle una SUBCUENTA con su propio código.
  */
 export function flattenFwbToAccountRows(fwb: FwbFile): FlatAccountRow[] {
   const rows: FlatAccountRow[] = [];
   for (const block of fwb.categories) {
-    for (const account of block.accounts) {
-      rows.push({ code: account.code, description: account.description, type: "CUENTA", budgeted: 0, parentCode: null });
-      for (const line of account.detailLines || []) {
-        rows.push({ code: line.code, description: line.description, type: "SUBCUENTA", budgeted: line.total || 0, parentCode: account.code });
+    for (const chapter of block.chapters) {
+      for (const sub of chapter.subchapters) {
+        rows.push({ code: sub.code, description: sub.description, type: "CUENTA", budgeted: 0, parentCode: null });
+        for (const line of sub.detailLines || []) {
+          rows.push({ code: line.code, description: line.description, type: "SUBCUENTA", budgeted: line.total || 0, parentCode: sub.code });
+        }
       }
     }
   }
