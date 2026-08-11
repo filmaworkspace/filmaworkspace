@@ -15,6 +15,8 @@ interface UserData {
   name: string;
   role: "admin" | "user" | "support_agent";
   companyId: string | null;
+  /** Acceso al entorno Budgeting (fuera de cualquier proyecto) — concedido desde AdminDashboard. */
+  budgetingAccess: boolean;
   isLoading: boolean;
 }
 
@@ -50,7 +52,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
     pathname.startsWith("/admin") ||
     pathname.startsWith("/project") ||
     pathname.startsWith("/profile") ||
-    pathname.startsWith("/companydashboard");
+    pathname.startsWith("/companydashboard") ||
+    pathname.startsWith("/budgeting");
 
   const loadUserData = async (firebaseUser: FirebaseUser) => {
     try {
@@ -67,6 +70,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         name: firebaseUser.displayName || userData?.name || firebaseUser.email?.split("@")[0] || "Usuario",
         role: userData?.role || "user",
         companyId: userData?.companyId || null,
+        budgetingAccess: userData?.budgetingAccess || false,
         isLoading: false,
       });
     } catch (error) {
@@ -77,6 +81,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         name: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "Usuario",
         role: "user",
         companyId: null,
+        budgetingAccess: false,
         isLoading: false,
       });
     }

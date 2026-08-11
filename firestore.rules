@@ -103,6 +103,12 @@ service cloud.firestore {
              exists(/databases/$(database)/documents/companyProjects/$(companyId)/projects/$(projectId));
     }
 
+    function hasBudgetingAccess() {
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.budgetingAccess == true;
+    }
+
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.auth.uid == userId;
@@ -510,6 +516,36 @@ service cloud.firestore {
     match /companyProjects/{companyId}/projects/{projectId} {
       allow read: if isSignedIn() && (isAdmin() || getUserCompanyId() == companyId);
       allow write: if isAdmin();
+    }
+
+    // ── Budgeting: entorno independiente de proyecto, presupuestos de cero ──
+    match /budgetingDrafts/{draftId} {
+      allow read, update, delete: if isSignedIn() && (
+        isAdmin() ||
+        (hasBudgetingAccess() && resource.data.ownerUid == request.auth.uid)
+      );
+      allow create: if isSignedIn() && hasBudgetingAccess() &&
+                       request.resource.data.ownerUid == request.auth.uid;
+
+      match /accounts/{accountId} {
+        allow read, write: if isSignedIn() && (
+          isAdmin() ||
+          (hasBudgetingAccess() &&
+           get(/databases/$(database)/documents/budgetingDrafts/$(draftId)).data.ownerUid == request.auth.uid)
+        );
+
+        match /detailLines/{lineId} {
+          allow read, write: if isSignedIn() && (
+            isAdmin() ||
+            (hasBudgetingAccess() &&
+             get(/databases/$(database)/documents/budgetingDrafts/$(draftId)).data.ownerUid == request.auth.uid)
+          );
+        }
+      }
+    }
+
+    match /userBudgetingDrafts/{userId}/drafts/{draftId} {
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
     match /producers/{producerId} {
