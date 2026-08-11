@@ -55,6 +55,28 @@ function summarize(f: BudgetingFringe): string {
   return `${f.amount || 0}€ / ${FRINGE_PERIOD_LABELS[f.period || "month"].toLowerCase()}${cap}`;
 }
 
+function FringeRow({ f, onEdit, onDelete }: { f: BudgetingFringe; onEdit: () => void; onDelete: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-5 py-2.5 hover:bg-slate-50 group">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span className="text-sm font-medium text-slate-900 truncate">{f.label}</span>
+        <span className="text-xs text-slate-400">{summarize(f)}</span>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full border border-slate-200 text-slate-500">{FRINGE_SCOPE_LABELS[f.scope]}</span>
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={onEdit} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Editar">
+            <Pencil size={12} />
+          </button>
+          <button onClick={onDelete} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Borrar">
+            <Trash2 size={12} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BudgetingFringesPage() {
   const { draftId } = useParams() as { draftId: string };
   const { user } = useUser();
@@ -146,34 +168,10 @@ export default function BudgetingFringesPage() {
     );
   }
 
-  const FringeRow = ({ f }: { f: BudgetingFringe }) => (
-    <div className="flex items-center justify-between gap-3 px-5 py-2.5 hover:bg-slate-50 group">
-      <div className="flex items-center gap-2.5 min-w-0">
-        <span className="text-sm font-medium text-slate-900 truncate">{f.label}</span>
-        <span className="text-xs text-slate-400">{summarize(f)}</span>
-      </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
-        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full border border-slate-200 text-slate-500">{FRINGE_SCOPE_LABELS[f.scope]}</span>
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => openEdit(f)} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Editar">
-            <Pencil size={12} />
-          </button>
-          <button onClick={() => setDeleteTarget(f)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Borrar">
-            <Trash2 size={12} />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
   const unfiled = fringes.filter((f) => !f.folderId);
 
   return (
     <div className="w-full px-10 py-8 max-w-2xl space-y-6">
-      <div>
-        <p className="text-xs text-slate-400">Conceptos de Seguridad Social u otros fringes, aplicables a líneas de detalle desde su desplegable. El "Alcance" decide si el importe generado suma en el propio subcapítulo, en el capítulo, o en el total del presupuesto.</p>
-      </div>
-
       {folders.map((folder) => {
         const items = fringes.filter((f) => f.folderId === folder.id);
         return (
@@ -187,7 +185,7 @@ export default function BudgetingFringesPage() {
                 <p className="text-xs text-slate-400 text-center py-6">Vacía</p>
               ) : (
                 <div className="divide-y divide-slate-100">
-                  {items.map((f) => <FringeRow key={f.id} f={f} />)}
+                  {items.map((f) => <FringeRow key={f.id} f={f} onEdit={() => openEdit(f)} onDelete={() => setDeleteTarget(f)} />)}
                 </div>
               )}
               <div className="px-5 py-2.5 border-t border-slate-100">
@@ -208,7 +206,7 @@ export default function BudgetingFringesPage() {
             <p className="text-xs text-slate-400 text-center py-8">Sin conceptos de Seguridad Social todavía</p>
           ) : (
             <div className="divide-y divide-slate-100">
-              {unfiled.map((f) => <FringeRow key={f.id} f={f} />)}
+              {unfiled.map((f) => <FringeRow key={f.id} f={f} onEdit={() => openEdit(f)} onDelete={() => setDeleteTarget(f)} />)}
             </div>
           )}
           <div className="px-5 py-2.5 border-t border-slate-100">

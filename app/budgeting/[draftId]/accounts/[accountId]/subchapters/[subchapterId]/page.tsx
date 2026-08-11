@@ -7,71 +7,32 @@ import Link from "next/link";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
-import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp, updateDoc } from "firebase/firestore";
+import {
+  addDoc, collection, deleteDoc, doc, increment, onSnapshot, serverTimestamp, Timestamp, updateDoc, writeBatch,
+} from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { AlertCircle, Check, ChevronDown, ChevronRight, Copy, Plus, Search, Sigma, Trash2, X } from "lucide-react";
+import { AlertCircle, ArrowUpRight, Check, ChevronDown, ChevronRight, Copy, Plus, Search, Sigma, Trash2, X } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
-  BudgetingAccount, BudgetingDetailLine, BudgetingDraft, BudgetingFringe, BudgetingSubchapter,
-  ROW_INPUT, UNIT_SUGGESTIONS, computeFringeExtras, computeLineTotal, evaluateFieldExpr,
-  fmtCurrency, fmtDecimal, isPlainNumber, lineFringeBreakdown, resolveGlobals,
+  BudgetingAccount, BudgetingDetailLine, BudgetingDraft, BudgetingFringe, BudgetingLineRoute, BudgetingSubchapter,
+  CELL_INPUT, ROW_INPUT, UNIT_SUGGESTIONS, computeFringeExtras, computeLineTotal, evaluateFieldExpr,
+  fmtCurrency, fmtDecimal, isPlainNumber, lineFringeBreakdown, resolveGlobals, subchapterTotal,
 } from "@/lib/budgeting";
+import BudgetingFormulaInput from "@/components/BudgetingFormulaInput";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface LineForm { code: string; description: string; units: string; unit: string; multiplier: string; rate: string; supplier: string; notes: string; tags: string; }
-const emptyForm: LineForm = { code: "", description: "", units: "1", unit: "", multiplier: "1", rate: "0", supplier: "", notes: "", tags: "" };
-const cols = "grid-cols-[90px_1fr_54px_64px_38px_70px_84px_78px]";
-
-// ─── Fila en edición (alta/edición) — componente de módulo: nunca se
-// redefine entre renders, así los inputs no pierden el foco al escribir. ────
-function EditableLineRow({
-  form, total, error, saving, onChange, onSave, onCancel,
-}: {
-  form: LineForm; total: number; error: string; saving: boolean;
-  onChange: (patch: Partial<LineForm>) => void; onSave: () => void; onCancel: () => void;
-}) {
-  return (
-    <div>
-      <div className={`grid ${cols} gap-1.5 items-center px-4 py-2 bg-[#8DA7BE]/[0.05]`}>
-        <input autoFocus placeholder="Código" value={form.code} onChange={(e) => onChange({ code: e.target.value })}
-          onKeyDown={(e) => { if (e.key === "Enter") onSave(); if (e.key === "Escape") onCancel(); }}
-          className={`text-xs font-mono px-1.5 py-1 min-w-0 ${ROW_INPUT}`} />
-        <input placeholder="Descripción" value={form.description} onChange={(e) => onChange({ description: e.target.value })}
-          onKeyDown={(e) => { if (e.key === "Enter") onSave(); if (e.key === "Escape") onCancel(); }}
-          className={`text-xs px-1.5 py-1 min-w-0 ${ROW_INPUT}`} />
-        <input placeholder="Cant." value={form.units} onChange={(e) => onChange({ units: e.target.value })}
-          onKeyDown={(e) => { if (e.key === "Enter") onSave(); if (e.key === "Escape") onCancel(); }}
-          title="Número o fórmula con Globales, p.ej. DIAS_RODAJE"
-          className={`text-xs text-right px-1.5 py-1 w-full ${ROW_INPUT}`} />
-        <input list="unit-suggestions" placeholder="Unidad" value={form.unit} onChange={(e) => onChange({ unit: e.target.value })}
-          className={`text-[11px] px-1.5 py-1 min-w-0 ${ROW_INPUT}`} />
-        <input placeholder="X" value={form.multiplier} onChange={(e) => onChange({ multiplier: e.target.value })}
-          onKeyDown={(e) => { if (e.key === "Enter") onSave(); if (e.key === "Escape") onCancel(); }}
-          title="Número o fórmula con Globales"
-          className={`text-[11px] text-right px-1.5 py-1 w-full ${ROW_INPUT}`} />
-        <input placeholder="Tarifa" value={form.rate} onChange={(e) => onChange({ rate: e.target.value })}
-          onKeyDown={(e) => { if (e.key === "Enter") onSave(); if (e.key === "Escape") onCancel(); }}
-          title="Número o fórmula con Globales, p.ej. TARIFA_BASE * 1.2"
-          className={`text-xs text-right px-1.5 py-1 w-full ${ROW_INPUT}`} />
-        <span className="text-xs font-semibold text-slate-900 text-right">{fmtDecimal(total)}</span>
-        <span className="flex items-center justify-end gap-0.5">
-          <button onClick={onSave} disabled={saving} className="p-1.5 rounded-md text-white disabled:opacity-50" style={{ background: "#8DA7BE" }}><Check size={12} /></button>
-          <button onClick={onCancel} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md"><X size={12} /></button>
-        </span>
-      </div>
-      {error && (
-        <div className="flex items-center gap-1.5 text-xs text-red-600 px-4 pb-2 pt-0.5">
-          <AlertCircle size={12} />
-          {error}
-        </div>
-      )}
-    </div>
-  );
-}
+interface LineFields { code: string; description: string; units: string; unit: string; multiplier: string; rate: string; }
+const emptyFields: LineFields = { code: "", description: "", units: "", unit: "", multiplier: "", rate: "" };
+const cols = "grid-cols-[90px_1fr_60px_70px_44px_76px_90px_82px]";
+const toFields = (l: BudgetingDetailLine): LineFields => ({
+  code: l.code, description: l.description,
+  units: l.unitsExpr ?? String(l.units), unit: l.unit || "",
+  multiplier: l.multiplierExpr ?? String(l.multiplier), rate: l.rateExpr ?? String(l.rate),
+});
 
 function FringeChip({ fringe, amount, excluded }: { fringe: BudgetingFringe; amount: number; excluded: boolean }) {
   return (
@@ -86,33 +47,134 @@ function FringeChip({ fringe, amount, excluded }: { fringe: BudgetingFringe; amo
   );
 }
 
+interface RouteTarget { chapterId: string; chapterCode: string; chapterDescription: string; sub: BudgetingSubchapter; }
+
+function RouteBadge({ route, draftId }: { route: BudgetingLineRoute; draftId: string }) {
+  return (
+    <Link
+      href={`/budgeting/${draftId}/accounts/${route.chapterId}/subchapters/${route.subchapterId}`}
+      className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full border hover:bg-[#8DA7BE]/[0.08] transition-colors"
+      style={{ borderColor: "#8DA7BE", color: "#1D201F" }}
+      title={`No suma aquí — va a ${route.chapterCode} ${route.chapterDescription} · ${route.subchapterCode} ${route.subchapterDescription}`}
+    >
+      excl. <ArrowUpRight size={10} /> {route.subchapterCode}
+    </Link>
+  );
+}
+
+function RoutePicker({
+  currentSubchapterId, allSubchapters, onPick, onClear, hasRoute,
+}: {
+  currentSubchapterId: string; allSubchapters: RouteTarget[]; onPick: (target: RouteTarget) => void; onClear: () => void; hasRoute: boolean;
+}) {
+  const [q, setQ] = useState("");
+  const query = q.trim().toLowerCase();
+  const options = allSubchapters.filter((o) => o.sub.id !== currentSubchapterId);
+  const filtered = query
+    ? options.filter((o) => `${o.chapterCode} ${o.chapterDescription} ${o.sub.code} ${o.sub.description}`.toLowerCase().includes(query))
+    : options;
+  return (
+    <div className="absolute z-20 top-full left-0 mt-1 w-72 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5">
+      <div className="px-2 pb-1.5">
+        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar cuenta destino..."
+          className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-[#8DA7BE]" />
+      </div>
+      <div className="max-h-56 overflow-y-auto">
+        {hasRoute && (
+          <button onClick={onClear} className="w-full text-left px-3 py-1.5 text-xs text-red-500 hover:bg-red-50">
+            Quitar redirección
+          </button>
+        )}
+        {filtered.length === 0 ? (
+          <p className="text-[11px] text-slate-400 text-center py-3 px-3">Sin resultados</p>
+        ) : (
+          filtered.map((o) => (
+            <button key={o.sub.id} onClick={() => onPick(o)} className="w-full flex flex-col items-start px-3 py-1.5 text-left hover:bg-slate-50">
+              <span className="text-xs text-slate-800 truncate">{o.sub.code} {o.sub.description}</span>
+              <span className="text-[10px] text-slate-400 truncate">{o.chapterCode} {o.chapterDescription}</span>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Fila de campos — MMB-style: sin caja, sin placeholder, guarda sola al
+// perder el foco (sin botón de confirmar). Componente de módulo estable: no
+// se redefine entre renders, así los inputs no pierden el foco al escribir. ──
+function LineFieldsGrid({
+  fields, onChange, onBlurAny, onEnter, onEscape, globals, totalPreview, muted,
+}: {
+  fields: LineFields; onChange: (patch: Partial<LineFields>) => void; onBlurAny: () => void;
+  onEnter: () => void; onEscape: () => void; globals: { code: string; label: string }[];
+  totalPreview: number; muted: boolean;
+}) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") { onEnter(); }
+    if (e.key === "Escape") { onEscape(); }
+  };
+  return (
+    <div className={`grid ${cols} gap-1 items-center px-4 py-2.5`}>
+      <input value={fields.code} onChange={(e) => onChange({ code: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
+        className={`${CELL_INPUT} font-mono text-xs`} />
+      <input value={fields.description} onChange={(e) => onChange({ description: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
+        className={`${CELL_INPUT} text-xs`} />
+      <BudgetingFormulaInput value={fields.units} onChange={(v) => onChange({ units: v })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
+        globals={globals} title="Número o fórmula con Globales" className={`${CELL_INPUT} text-xs text-right`} />
+      <input list="unit-suggestions" value={fields.unit} onChange={(e) => onChange({ unit: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
+        className={`${CELL_INPUT} text-[11px]`} />
+      <BudgetingFormulaInput value={fields.multiplier} onChange={(v) => onChange({ multiplier: v })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
+        globals={globals} title="Número o fórmula con Globales" className={`${CELL_INPUT} text-[11px] text-right`} />
+      <BudgetingFormulaInput value={fields.rate} onChange={(v) => onChange({ rate: v })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
+        globals={globals} title="Número o fórmula con Globales" className={`${CELL_INPUT} text-xs text-right`} />
+      <span className={`text-xs text-right font-semibold ${muted ? "text-slate-400 italic" : "text-slate-900"}`}>{fmtDecimal(totalPreview)}</span>
+    </div>
+  );
+}
+
 function LineRow({
-  line, fmt, fringes, isExpanded, fringePickerOpen,
-  onEdit, onToggleExpand, onDuplicate, onDelete, onToggleFringePicker, onToggleFringe, onUpdateSecondary,
+  line, fmt, fringes, globals, globalValues, draftId, allSubchapters, currentSubchapterId,
+  isExpanded, fringePickerOpen, routePickerOpen, error,
+  onCommit, onToggleExpand, onDuplicate, onDelete, onToggleFringePicker, onToggleFringe,
+  onToggleRoutePicker, onSetRoute, onUpdateSecondary,
 }: {
   line: BudgetingDetailLine; fmt: (n: number) => string; fringes: BudgetingFringe[];
-  isExpanded: boolean; fringePickerOpen: boolean;
-  onEdit: () => void; onToggleExpand: () => void; onDuplicate: () => void; onDelete: () => void;
+  globals: { code: string; label: string }[]; globalValues: Record<string, number>; draftId: string;
+  allSubchapters: RouteTarget[]; currentSubchapterId: string;
+  isExpanded: boolean; fringePickerOpen: boolean; routePickerOpen: boolean; error?: string;
+  onCommit: (fields: LineFields) => void; onToggleExpand: () => void; onDuplicate: () => void; onDelete: () => void;
   onToggleFringePicker: () => void; onToggleFringe: (id: string) => void;
+  onToggleRoutePicker: () => void; onSetRoute: (target: RouteTarget | null) => void;
   onUpdateSecondary: (patch: { supplier?: string; notes?: string; tags?: string[] }) => void;
 }) {
+  const [fields, setFields] = useState<LineFields>(() => toFields(line));
   const breakdown = lineFringeBreakdown(line, fringes);
   const hasFormula = !!(line.unitsExpr || line.multiplierExpr || line.rateExpr);
+  const hasComment = !!line.notes;
+  const preview = computeLineTotal(
+    evaluateFieldExpr(fields.units, globalValues).value,
+    evaluateFieldExpr(fields.multiplier, globalValues).value,
+    evaluateFieldExpr(fields.rate, globalValues).value
+  );
+
   return (
     <div>
-      <div className={`grid ${cols} gap-1.5 items-center px-4 py-1.5 hover:bg-slate-50 group`}>
-        <button onClick={onEdit} className="text-xs font-mono text-slate-500 text-left truncate hover:text-[#8DA7BE] transition-colors">{line.code}</button>
-        <button onClick={onEdit} className="text-xs text-slate-800 text-left truncate hover:text-[#8DA7BE] transition-colors flex items-center gap-1">
-          {line.description}
-          {hasFormula && <Sigma size={9} className="text-[#8DA7BE] flex-shrink-0" />}
-        </button>
-        <span className="text-xs text-slate-500 text-right">{fmtDecimal(line.units)}</span>
-        <span className="text-[11px] text-slate-400 truncate">{line.unit}</span>
-        <span className="text-[11px] text-slate-400 text-right">×{fmtDecimal(line.multiplier)}</span>
-        <span className="text-xs text-slate-500 text-right">{fmtDecimal(line.rate)}</span>
-        <span className="text-xs font-semibold text-slate-900 text-right">{fmt(line.total)}</span>
-        <span className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={onToggleExpand} className="p-1 rounded text-slate-400 hover:text-[#8DA7BE] hover:bg-[#8DA7BE]/[0.1] transition-colors" title="Proveedor / notas / etiquetas / fringes">
+      <div className="group relative">
+        <LineFieldsGrid
+          fields={fields}
+          onChange={(patch) => setFields((f) => ({ ...f, ...patch }))}
+          onBlurAny={() => onCommit(fields)}
+          onEnter={() => onCommit(fields)}
+          onEscape={() => setFields(toFields(line))}
+          globals={globals}
+          totalPreview={preview}
+          muted={!!line.routedTo}
+        />
+        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white">
+          {hasFormula && <span title="Contiene fórmula"><Sigma size={10} className="text-[#8DA7BE]" /></span>}
+          {hasComment && <span title={line.notes} className="text-[10px]">💬</span>}
+          <button onClick={onToggleExpand} className="p-1 rounded text-slate-400 hover:text-[#8DA7BE] hover:bg-[#8DA7BE]/[0.1] transition-colors" title="Proveedor / comentario / etiquetas / fringes / redirección">
             <ChevronDown size={11} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
           </button>
           <button onClick={onDuplicate} className="p-1 rounded text-slate-400 hover:text-[#8DA7BE] hover:bg-[#8DA7BE]/[0.1] transition-colors" title="Duplicar línea">
@@ -123,15 +185,22 @@ function LineRow({
           </button>
         </span>
       </div>
-      {breakdown.length > 0 && (
-        <div className="flex flex-wrap gap-1 px-4 pb-1.5 pl-[calc(90px+0.375rem)]">
+      {error && (
+        <div className="flex items-center gap-1.5 text-xs text-red-600 px-4 pb-1.5">
+          <AlertCircle size={12} />
+          {error}
+        </div>
+      )}
+      {(breakdown.length > 0 || line.routedTo) && (
+        <div className="flex flex-wrap gap-1 px-4 pb-1.5">
+          {line.routedTo && <RouteBadge route={line.routedTo} draftId={draftId} />}
           {breakdown.map(({ fringe, amount }) => (
             <FringeChip key={fringe.id} fringe={fringe} amount={amount} excluded={fringe.scope !== "subchapter"} />
           ))}
         </div>
       )}
       {isExpanded && (
-        <div className="px-4 pb-3 pl-[calc(90px+0.375rem)] space-y-2.5">
+        <div className="px-4 pb-3 space-y-2.5">
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="text-[10px] text-slate-400 block mb-1">Proveedor</label>
@@ -139,7 +208,7 @@ function LineRow({
                 className={`w-full text-xs px-2 py-1 ${ROW_INPUT}`} />
             </div>
             <div>
-              <label className="text-[10px] text-slate-400 block mb-1">Notas</label>
+              <label className="text-[10px] text-slate-400 block mb-1">Comentario</label>
               <input defaultValue={line.notes || ""} onBlur={(e) => onUpdateSecondary({ notes: e.target.value.trim() })}
                 className={`w-full text-xs px-2 py-1 ${ROW_INPUT}`} />
             </div>
@@ -149,31 +218,84 @@ function LineRow({
                 className={`w-full text-xs px-2 py-1 ${ROW_INPUT}`} />
             </div>
           </div>
-          <div className="relative">
-            <label className="text-[10px] text-slate-400 block mb-1">Cargas sociales</label>
-            <button onClick={onToggleFringePicker} className={`text-xs px-2.5 py-1 rounded-md ${ROW_INPUT} text-slate-600 hover:text-[#8DA7BE]`}>
-              {line.fringeIds?.length ? `${line.fringeIds.length} aplicada(s) · añadir/quitar` : "Aplicar carga social..."}
-            </button>
-            {fringePickerOpen && (
-              <div className="absolute z-20 top-full left-0 mt-1 w-64 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 max-h-56 overflow-y-auto">
-                {fringes.length === 0 ? (
-                  <p className="text-[11px] text-slate-400 text-center py-3 px-3">Sin cargas sociales configuradas — añádelas en Cargas sociales.</p>
-                ) : (
-                  fringes.map((f) => {
-                    const checked = (line.fringeIds || []).includes(f.id);
-                    return (
-                      <button key={f.id} onClick={() => onToggleFringe(f.id)} className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-left hover:bg-slate-50">
-                        <span className="text-xs text-slate-700 truncate">{f.label}</span>
-                        <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center ${checked ? "border-[#8DA7BE]" : "border-slate-300"}`} style={{ background: checked ? "#8DA7BE" : "transparent" }}>
-                          {checked && <Check size={9} className="text-white" />}
-                        </span>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            )}
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <label className="text-[10px] text-slate-400 block mb-1">Cargas sociales</label>
+              <button onClick={onToggleFringePicker} className={`text-xs px-2.5 py-1 rounded-md ${ROW_INPUT} text-slate-600 hover:text-[#8DA7BE]`}>
+                {line.fringeIds?.length ? `${line.fringeIds.length} aplicada(s) · añadir/quitar` : "Aplicar carga social..."}
+              </button>
+              {fringePickerOpen && (
+                <div className="absolute z-20 top-full left-0 mt-1 w-64 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 max-h-56 overflow-y-auto">
+                  {fringes.length === 0 ? (
+                    <p className="text-[11px] text-slate-400 text-center py-3 px-3">Sin cargas sociales configuradas — añádelas en Cargas sociales.</p>
+                  ) : (
+                    fringes.map((f) => {
+                      const checked = (line.fringeIds || []).includes(f.id);
+                      return (
+                        <button key={f.id} onClick={() => onToggleFringe(f.id)} className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-left hover:bg-slate-50">
+                          <span className="text-xs text-slate-700 truncate">{f.label}</span>
+                          <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center ${checked ? "border-[#8DA7BE]" : "border-slate-300"}`} style={{ background: checked ? "#8DA7BE" : "transparent" }}>
+                            {checked && <Check size={9} className="text-white" />}
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="relative flex-1">
+              <label className="text-[10px] text-slate-400 block mb-1">Contabilizar en</label>
+              <button onClick={onToggleRoutePicker} className={`text-xs px-2.5 py-1 rounded-md ${ROW_INPUT} text-slate-600 hover:text-[#8DA7BE] w-full text-left truncate`}>
+                {line.routedTo ? `${line.routedTo.chapterCode} · ${line.routedTo.subchapterCode} ${line.routedTo.subchapterDescription}` : "Aquí (sin redirigir)"}
+              </button>
+              {routePickerOpen && (
+                <RoutePicker
+                  currentSubchapterId={currentSubchapterId}
+                  allSubchapters={allSubchapters}
+                  hasRoute={!!line.routedTo}
+                  onPick={onSetRoute}
+                  onClear={() => onSetRoute(null)}
+                />
+              )}
+            </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NewLineRow({ globals, globalValues, error, onCommit }: {
+  globals: { code: string; label: string }[]; globalValues: Record<string, number>; error?: string;
+  onCommit: (fields: LineFields) => Promise<boolean>;
+}) {
+  const [fields, setFields] = useState<LineFields>(emptyFields);
+  const preview = computeLineTotal(
+    evaluateFieldExpr(fields.units, globalValues).value,
+    evaluateFieldExpr(fields.multiplier, globalValues).value,
+    evaluateFieldExpr(fields.rate, globalValues).value
+  );
+  const commit = async () => {
+    const ok = await onCommit(fields);
+    if (ok) setFields(emptyFields);
+  };
+  return (
+    <div>
+      <LineFieldsGrid
+        fields={fields}
+        onChange={(patch) => setFields((f) => ({ ...f, ...patch }))}
+        onBlurAny={commit}
+        onEnter={commit}
+        onEscape={() => setFields(emptyFields)}
+        globals={globals}
+        totalPreview={preview}
+        muted={false}
+      />
+      {error && (
+        <div className="flex items-center gap-1.5 text-xs text-red-600 px-4 pb-1.5">
+          <AlertCircle size={12} />
+          {error}
         </div>
       )}
     </div>
@@ -188,16 +310,18 @@ export default function BudgetingSubchapterPage() {
   const [chapter, setChapter] = useState<BudgetingAccount | null>(null);
   const [subchapter, setSubchapter] = useState<BudgetingSubchapter | null>(null);
   const [lines, setLines] = useState<BudgetingDetailLine[]>([]);
+  const [chapters, setChapters] = useState<BudgetingAccount[]>([]);
+  const [subchaptersByChapter, setSubchaptersByChapter] = useState<Record<string, BudgetingSubchapter[]>>({});
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [expandedLine, setExpandedLine] = useState<string | null>(null);
   const [fringePickerFor, setFringePickerFor] = useState<string | null>(null);
-
-  const [rowEditor, setRowEditor] = useState<{ mode: "new" | "edit"; lineId?: string; form: LineForm } | null>(null);
-  const [lineError, setLineError] = useState("");
+  const [routePickerFor, setRoutePickerFor] = useState<string | null>(null);
+  const [addingLine, setAddingLine] = useState(false);
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [deleteTarget, setDeleteTarget] = useState<BudgetingDetailLine | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "budgetingDrafts", draftId), (snap) => {
@@ -233,15 +357,37 @@ export default function BudgetingSubchapterPage() {
     return () => unsub();
   }, [draftId, accountId, subchapterId]);
 
+  // Todos los capítulos/subcapítulos del borrador — para el buscador de "Contabilizar en"
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, `budgetingDrafts/${draftId}/accounts`), (snap) => {
+      setChapters(snap.docs.map((d) => ({ id: d.id, ...d.data() } as BudgetingAccount)));
+    });
+    return () => unsub();
+  }, [draftId]);
+
+  useEffect(() => {
+    const unsubs: Record<string, () => void> = {};
+    chapters.forEach((c) => {
+      unsubs[c.id] = onSnapshot(collection(db, `budgetingDrafts/${draftId}/accounts/${c.id}/subchapters`), (snap) => {
+        setSubchaptersByChapter((prev) => ({ ...prev, [c.id]: snap.docs.map((d) => ({ id: d.id, ...d.data() } as BudgetingSubchapter)) }));
+      });
+    });
+    return () => { Object.values(unsubs).forEach((fn) => fn()); };
+  }, [chapters, draftId]);
+
+  const allSubchapters: RouteTarget[] = chapters.flatMap((c) =>
+    (subchaptersByChapter[c.id] || []).map((sub) => ({ chapterId: c.id, chapterCode: c.code, chapterDescription: c.description, sub }))
+  );
+
   const currency = draft?.currency || "EUR";
   const fmt = (n: number) => fmtCurrency(n, currency);
   const fringes = draft?.fringes || [];
   const globals = draft?.globals || [];
+  const globalOptions = useMemo(() => globals.map((g) => ({ code: g.code, label: g.label })), [globals]);
   const globalResolution = useMemo(() => resolveGlobals(globals), [JSON.stringify(globals)]);
 
-  const linesTotal = lines.reduce((s, l) => s + (l.total || 0), 0);
   const fringeExtras = computeFringeExtras(lines, fringes);
-  const total = Math.round((linesTotal + fringeExtras.subchapterScoped) * 100) / 100;
+  const total = subchapter ? Math.round((subchapterTotal(subchapter, lines) + fringeExtras.subchapterScoped) * 100) / 100 : 0;
 
   const q = search.trim().toLowerCase();
   const matchesSearch = (l: BudgetingDetailLine) => !q || l.code.toLowerCase().includes(q) || l.description.toLowerCase().includes(q);
@@ -256,80 +402,88 @@ export default function BudgetingSubchapterPage() {
   };
 
   const isLineCodeTaken = (code: string, excludeId?: string): boolean =>
-    lines.some((l) => l.id !== excludeId && l.code.trim().toLowerCase() === code.trim().toLowerCase());
+    !!code && lines.some((l) => l.id !== excludeId && l.code.trim().toLowerCase() === code.trim().toLowerCase());
 
-  const openNewRow = () => { setRowEditor({ mode: "new", form: { ...emptyForm } }); setLineError(""); };
-  const openEditRow = (line: BudgetingDetailLine) => {
-    setRowEditor({
-      mode: "edit", lineId: line.id,
-      form: {
-        code: line.code, description: line.description,
-        units: line.unitsExpr ?? String(line.units), unit: line.unit || "",
-        multiplier: line.multiplierExpr ?? String(line.multiplier), rate: line.rateExpr ?? String(line.rate),
-        supplier: line.supplier || "", notes: line.notes || "", tags: (line.tags || []).join(", "),
-      },
-    });
-    setLineError("");
-  };
-  const closeRowEditor = () => { setRowEditor(null); setLineError(""); };
+  const setRowError = (id: string, msg: string) => setRowErrors((prev) => ({ ...prev, [id]: msg }));
+  const clearRowError = (id: string) => setRowErrors((prev) => { const { [id]: _, ...rest } = prev; return rest; });
 
-  const previewEval = (text: string) => evaluateFieldExpr(text, globalResolution.values).value;
-  const rowEditorTotal = rowEditor
-    ? computeLineTotal(previewEval(rowEditor.form.units), previewEval(rowEditor.form.multiplier), previewEval(rowEditor.form.rate))
-    : 0;
+  const lineRef = (lineId: string) => doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`, lineId);
 
-  const handleSaveRow = async () => {
-    if (!rowEditor) return;
-    const code = rowEditor.form.code.trim();
-    const description = rowEditor.form.description.trim();
-    if (!code || !description) { closeRowEditor(); return; }
-    if (isLineCodeTaken(code, rowEditor.lineId)) {
-      setLineError("Ese código ya se usa en otra línea de este subcapítulo");
-      return;
-    }
-    const unitsEval = evaluateFieldExpr(rowEditor.form.units, globalResolution.values);
-    const multEval = evaluateFieldExpr(rowEditor.form.multiplier, globalResolution.values);
-    const rateEval = evaluateFieldExpr(rowEditor.form.rate, globalResolution.values);
-    const firstError = unitsEval.error || multEval.error || rateEval.error;
-    if (firstError) { setLineError(firstError); return; }
-
+  const buildPayload = (fields: LineFields) => {
+    const unitsEval = evaluateFieldExpr(fields.units, globalResolution.values);
+    const multEval = evaluateFieldExpr(fields.multiplier, globalResolution.values);
+    const rateEval = evaluateFieldExpr(fields.rate, globalResolution.values);
+    const error = unitsEval.error || multEval.error || rateEval.error;
     const total = computeLineTotal(unitsEval.value, multEval.value, rateEval.value);
-    const tags = rowEditor.form.tags.split(",").map((t) => t.trim()).filter(Boolean);
-    setSaving(true);
-    try {
-      const payload: any = {
-        code, description,
-        units: unitsEval.value, unitsExpr: isPlainNumber(rowEditor.form.units) ? null : rowEditor.form.units.trim(),
-        unit: rowEditor.form.unit.trim(),
-        multiplier: multEval.value, multiplierExpr: isPlainNumber(rowEditor.form.multiplier) ? null : rowEditor.form.multiplier.trim(),
-        rate: rateEval.value, rateExpr: isPlainNumber(rowEditor.form.rate) ? null : rowEditor.form.rate.trim(),
+    return {
+      error,
+      total,
+      payload: {
+        code: fields.code.trim(), description: fields.description.trim(),
+        units: unitsEval.value, unitsExpr: isPlainNumber(fields.units) ? null : (fields.units.trim() || null),
+        unit: fields.unit.trim(),
+        multiplier: multEval.value, multiplierExpr: isPlainNumber(fields.multiplier) ? null : (fields.multiplier.trim() || null),
+        rate: rateEval.value, rateExpr: isPlainNumber(fields.rate) ? null : (fields.rate.trim() || null),
         total,
-        supplier: rowEditor.form.supplier.trim(), notes: rowEditor.form.notes.trim(), tags,
-      };
-      if (rowEditor.mode === "edit" && rowEditor.lineId) {
-        await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`, rowEditor.lineId), payload);
-      } else {
-        await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`), { ...payload, fringeIds: [], createdAt: Timestamp.now() });
-      }
-      await touchDraft();
-      setRowEditor(null);
-    } finally {
-      setSaving(false);
+      },
+    };
+  };
+
+  const handleCommitLine = async (line: BudgetingDetailLine, fields: LineFields) => {
+    const code = fields.code.trim();
+    if (isLineCodeTaken(code, line.id)) { setRowError(line.id, "Ese código ya se usa en otra línea de este subcapítulo"); return; }
+    const { error, total, payload } = buildPayload(fields);
+    if (error) { setRowError(line.id, error); return; }
+    clearRowError(line.id);
+    const ref = lineRef(line.id);
+    if (line.routedTo && total !== line.total) {
+      const batch = writeBatch(db);
+      batch.update(ref, payload);
+      const targetRef = doc(db, `budgetingDrafts/${draftId}/accounts/${line.routedTo.chapterId}/subchapters`, line.routedTo.subchapterId);
+      batch.update(targetRef, { receivedTotal: increment(total - (line.total || 0)) });
+      await batch.commit();
+    } else {
+      await updateDoc(ref, payload);
     }
+    await touchDraft();
+  };
+
+  const handleCommitNewLine = async (fields: LineFields): Promise<boolean> => {
+    const code = fields.code.trim();
+    const description = fields.description.trim();
+    if (!code && !description) return false;
+    if (isLineCodeTaken(code)) { setRowError("new", "Ese código ya se usa en otra línea de este subcapítulo"); return false; }
+    const { error, payload } = buildPayload(fields);
+    if (error) { setRowError("new", error); return false; }
+    clearRowError("new");
+    await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`), {
+      ...payload, supplier: "", notes: "", tags: [], fringeIds: [], routedTo: null, createdAt: Timestamp.now(),
+    });
+    await touchDraft();
+    return true;
   };
 
   const handleDuplicateLine = async (line: BudgetingDetailLine) => {
     setSaving(true);
     try {
-      let code = `${line.code}-copia`;
-      let n = 2;
-      while (isLineCodeTaken(code)) { code = `${line.code}-copia${n}`; n++; }
-      await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`), {
+      let code = line.code ? `${line.code}-copia` : "";
+      if (code) { let n = 2; while (isLineCodeTaken(code)) { code = `${line.code}-copia${n}`; n++; } }
+      const newRef = doc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`));
+      const payload = {
         code, description: line.description, units: line.units, unitsExpr: line.unitsExpr ?? null, unit: line.unit || "",
         multiplier: line.multiplier, multiplierExpr: line.multiplierExpr ?? null, rate: line.rate, rateExpr: line.rateExpr ?? null, total: line.total,
         supplier: line.supplier || "", notes: line.notes || "", tags: line.tags || [], fringeIds: line.fringeIds || [],
-        createdAt: Timestamp.now(),
-      });
+        routedTo: line.routedTo || null, createdAt: Timestamp.now(),
+      };
+      if (line.routedTo) {
+        const batch = writeBatch(db);
+        batch.set(newRef, payload);
+        const targetRef = doc(db, `budgetingDrafts/${draftId}/accounts/${line.routedTo.chapterId}/subchapters`, line.routedTo.subchapterId);
+        batch.update(targetRef, { receivedTotal: increment(line.total || 0) });
+        await batch.commit();
+      } else {
+        await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`), payload);
+      }
       await touchDraft();
     } finally {
       setSaving(false);
@@ -340,7 +494,15 @@ export default function BudgetingSubchapterPage() {
     if (!deleteTarget) return;
     setSaving(true);
     try {
-      await deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`, deleteTarget.id));
+      if (deleteTarget.routedTo) {
+        const batch = writeBatch(db);
+        batch.delete(lineRef(deleteTarget.id));
+        const targetRef = doc(db, `budgetingDrafts/${draftId}/accounts/${deleteTarget.routedTo.chapterId}/subchapters`, deleteTarget.routedTo.subchapterId);
+        batch.update(targetRef, { receivedTotal: increment(-(deleteTarget.total || 0)) });
+        await batch.commit();
+      } else {
+        await deleteDoc(lineRef(deleteTarget.id));
+      }
       await touchDraft();
       setDeleteTarget(null);
     } finally {
@@ -351,12 +513,32 @@ export default function BudgetingSubchapterPage() {
   const handleToggleFringe = async (line: BudgetingDetailLine, fringeId: string) => {
     const current = line.fringeIds || [];
     const next = current.includes(fringeId) ? current.filter((id) => id !== fringeId) : [...current, fringeId];
-    await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`, line.id), { fringeIds: next });
+    await updateDoc(lineRef(line.id), { fringeIds: next });
     await touchDraft();
   };
 
+  const handleSetRoute = async (line: BudgetingDetailLine, target: RouteTarget | null) => {
+    const newRoute: BudgetingLineRoute | null = target ? {
+      chapterId: target.chapterId, chapterCode: target.chapterCode, chapterDescription: target.chapterDescription,
+      subchapterId: target.sub.id, subchapterCode: target.sub.code, subchapterDescription: target.sub.description,
+    } : null;
+    const batch = writeBatch(db);
+    batch.update(lineRef(line.id), { routedTo: newRoute });
+    if (line.routedTo) {
+      const oldRef = doc(db, `budgetingDrafts/${draftId}/accounts/${line.routedTo.chapterId}/subchapters`, line.routedTo.subchapterId);
+      batch.update(oldRef, { receivedTotal: increment(-(line.total || 0)) });
+    }
+    if (newRoute) {
+      const newTargetRef = doc(db, `budgetingDrafts/${draftId}/accounts/${newRoute.chapterId}/subchapters`, newRoute.subchapterId);
+      batch.update(newTargetRef, { receivedTotal: increment(line.total || 0) });
+    }
+    await batch.commit();
+    await touchDraft();
+    setRoutePickerFor(null);
+  };
+
   const handleUpdateSecondary = async (line: BudgetingDetailLine, patch: { supplier?: string; notes?: string; tags?: string[] }) => {
-    await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`, line.id), patch);
+    await updateDoc(lineRef(line.id), patch);
   };
 
   if (loading) {
@@ -399,8 +581,8 @@ export default function BudgetingSubchapterPage() {
 
       {/* Detail lines */}
       <div className="border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">
-        <div className="min-w-[680px]">
-          <div className={`grid ${cols} gap-1.5 px-4 py-2 border-b border-slate-200 divide-x divide-slate-100 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
+        <div className="min-w-[720px]">
+          <div className={`grid ${cols} gap-1 px-4 py-2 border-b border-slate-200 divide-x divide-slate-100 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
             <span>Código</span>
             <span>Descripción</span>
             <span className="text-right">Cant.</span>
@@ -408,73 +590,60 @@ export default function BudgetingSubchapterPage() {
             <span className="text-right">X</span>
             <span className="text-right">Tarifa</span>
             <span className="text-right">Total</span>
-            <span></span>
           </div>
           <datalist id="unit-suggestions">
             {UNIT_SUGGESTIONS.map((u) => <option key={u} value={u} />)}
           </datalist>
 
-          {lines.filter(matchesSearch).length === 0 && !q ? (
+          {lines.filter(matchesSearch).length === 0 && !q && !addingLine ? (
             <p className="text-xs text-slate-400 text-center py-6">Sin líneas de detalle todavía</p>
           ) : (
             <div className="divide-y divide-slate-100">
               {lines.filter(matchesSearch).map((line) => (
-                rowEditor?.mode === "edit" && rowEditor.lineId === line.id ? (
-                  <EditableLineRow
-                    key={line.id}
-                    form={rowEditor.form}
-                    total={rowEditorTotal}
-                    error={lineError}
-                    saving={saving}
-                    onChange={(patch) => setRowEditor({ ...rowEditor, form: { ...rowEditor.form, ...patch } })}
-                    onSave={handleSaveRow}
-                    onCancel={closeRowEditor}
-                  />
-                ) : (
-                  <LineRow
-                    key={line.id}
-                    line={line}
-                    fmt={fmt}
-                    fringes={fringes}
-                    isExpanded={expandedLine === line.id}
-                    fringePickerOpen={fringePickerFor === line.id}
-                    onEdit={() => openEditRow(line)}
-                    onToggleExpand={() => setExpandedLine(expandedLine === line.id ? null : line.id)}
-                    onDuplicate={() => handleDuplicateLine(line)}
-                    onDelete={() => setDeleteTarget(line)}
-                    onToggleFringePicker={() => setFringePickerFor(fringePickerFor === line.id ? null : line.id)}
-                    onToggleFringe={(id) => handleToggleFringe(line, id)}
-                    onUpdateSecondary={(patch) => handleUpdateSecondary(line, patch)}
-                  />
-                )
+                <LineRow
+                  key={line.id}
+                  line={line}
+                  fmt={fmt}
+                  fringes={fringes}
+                  globals={globalOptions}
+                  globalValues={globalResolution.values}
+                  draftId={draftId}
+                  allSubchapters={allSubchapters}
+                  currentSubchapterId={subchapterId}
+                  isExpanded={expandedLine === line.id}
+                  fringePickerOpen={fringePickerFor === line.id}
+                  routePickerOpen={routePickerFor === line.id}
+                  error={rowErrors[line.id]}
+                  onCommit={(fields) => handleCommitLine(line, fields)}
+                  onToggleExpand={() => setExpandedLine(expandedLine === line.id ? null : line.id)}
+                  onDuplicate={() => handleDuplicateLine(line)}
+                  onDelete={() => setDeleteTarget(line)}
+                  onToggleFringePicker={() => setFringePickerFor(fringePickerFor === line.id ? null : line.id)}
+                  onToggleFringe={(id) => handleToggleFringe(line, id)}
+                  onToggleRoutePicker={() => setRoutePickerFor(routePickerFor === line.id ? null : line.id)}
+                  onSetRoute={(target) => handleSetRoute(line, target)}
+                  onUpdateSecondary={(patch) => handleUpdateSecondary(line, patch)}
+                />
               ))}
             </div>
           )}
 
-          {rowEditor?.mode === "new" ? (
-            <EditableLineRow
-              form={rowEditor.form}
-              total={rowEditorTotal}
-              error={lineError}
-              saving={saving}
-              onChange={(patch) => setRowEditor({ ...rowEditor, form: { ...rowEditor.form, ...patch } })}
-              onSave={handleSaveRow}
-              onCancel={closeRowEditor}
-            />
+          {addingLine ? (
+            <NewLineRow globals={globalOptions} globalValues={globalResolution.values} error={rowErrors["new"]} onCommit={handleCommitNewLine} />
           ) : (
             <div className="px-4 py-2 border-t border-slate-100">
-              <button onClick={openNewRow} title="Añadir línea" className="w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-105" style={{ background: "#8DA7BE" }}>
+              <button onClick={() => setAddingLine(true)} title="Añadir línea" className="w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-105" style={{ background: "#8DA7BE" }}>
                 <Plus size={12} className="text-white" />
               </button>
             </div>
           )}
 
-          {(fringeExtras.subchapterScoped > 0 || fringeExtras.chapterScoped > 0 || fringeExtras.totalScoped > 0) && (
+          {(fringeExtras.subchapterScoped > 0 || fringeExtras.chapterScoped > 0 || fringeExtras.totalScoped > 0 || (subchapter.receivedTotal || 0) > 0) && (
             <div className="px-4 py-1.5 border-t border-slate-100 space-y-0.5">
               {fringeExtras.subchapterScoped > 0 && (
-                <div className={`grid ${cols} gap-1.5 items-center`}>
+                <div className={`grid ${cols} gap-1 items-center`}>
                   <span /><span className="text-[11px] text-slate-500">Cargas sociales</span><span /><span /><span /><span />
-                  <span className="text-[11px] text-slate-600 text-right">{fmt(fringeExtras.subchapterScoped)}</span><span />
+                  <span className="text-[11px] text-slate-600 text-right">{fmt(fringeExtras.subchapterScoped)}</span>
                 </div>
               )}
               {fringeExtras.chapterScoped > 0 && (
@@ -483,14 +652,16 @@ export default function BudgetingSubchapterPage() {
               {fringeExtras.totalScoped > 0 && (
                 <p className="text-[10px] text-slate-400">+{fmt(fringeExtras.totalScoped)} en cargas sociales → total del presupuesto</p>
               )}
+              {(subchapter.receivedTotal || 0) > 0 && (
+                <p className="text-[10px] text-slate-400">Incl. {fmt(subchapter.receivedTotal || 0)} redirigidos desde otras cuentas</p>
+              )}
             </div>
           )}
 
-          <div className={`grid ${cols} gap-1.5 items-center px-4 py-2.5 border-t border-slate-200 bg-slate-50/70`}>
+          <div className={`grid ${cols} gap-1 items-center px-4 py-2.5 border-t border-slate-200 bg-slate-50/70`}>
             <span /><span className="text-xs font-bold" style={{ color: "#1D201F" }}>Total</span><span /><span /><span />
             <span />
             <span className="text-xs font-bold text-right" style={{ color: "#1D201F" }}>{fmt(total)}</span>
-            <span />
           </div>
         </div>
       </div>

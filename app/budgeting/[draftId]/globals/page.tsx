@@ -14,10 +14,11 @@ import { AlertCircle, Folder, Pencil, Plus, Sigma, Trash2, X } from "lucide-reac
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
-  BTN_LIGHT, BudgetingDraft, BudgetingFolder, BudgetingGlobal, ICON_BTN_LIGHT,
+  BTN_LIGHT, BudgetingDraft, BudgetingFolder, BudgetingGlobal, BudgetingScenario, ICON_BTN_LIGHT,
   fmtDecimal, isPlainNumber, newBudgetingId, resolveGlobals,
 } from "@/lib/budgeting";
 import BudgetingFolderPicker from "@/components/BudgetingFolderPicker";
+import BudgetingFormulaInput from "@/components/BudgetingFormulaInput";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Globales: valores reutilizables por todo el borrador, identificados por un
@@ -27,8 +28,75 @@ import BudgetingFolderPicker from "@/components/BudgetingFolderPicker";
 // Detalle. Organizables en carpetas para que la lista no sea un caos.
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface GlobalForm { code: string; label: string; value: string; folderId: string | null; }
-const emptyForm: GlobalForm = { code: "", label: "", value: "", folderId: null };
+interface GlobalForm { code: string; label: string; value: string; folderId: string | null; scenarioOverrides: Record<string, string>; }
+const emptyForm: GlobalForm = { code: "", label: "", value: "", folderId: null, scenarioOverrides: {} };
+
+function ScenariosBar({ scenarios, onAdd, onRename, onDelete }: {
+  scenarios: BudgetingScenario[]; onAdd: (label: string) => void; onRename: (id: string, label: string) => void; onDelete: (id: string) => void;
+}) {
+  const [newLabel, setNewLabel] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  return (
+    <div>
+      <p className="text-xs font-medium text-slate-400 mb-2">Escenarios</p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {scenarios.map((sc) => (
+          editingId === sc.id ? (
+            <input key={sc.id} autoFocus value={editLabel} onChange={(e) => setEditLabel(e.target.value)}
+              onBlur={() => { if (editLabel.trim()) onRename(sc.id, editLabel.trim()); setEditingId(null); }}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+              className="text-xs px-2.5 py-1 border border-[#8DA7BE] rounded-full focus:outline-none w-28" />
+          ) : (
+            <span key={sc.id} className="inline-flex items-center gap-1 text-xs pl-2.5 pr-1.5 py-1 rounded-full border border-slate-200 text-slate-600">
+              <button onClick={() => { setEditingId(sc.id); setEditLabel(sc.label); }} className="hover:text-[#8DA7BE]">{sc.label}</button>
+              <button onClick={() => onDelete(sc.id)} className="text-slate-300 hover:text-red-500"><X size={10} /></button>
+            </span>
+          )
+        ))}
+        <input
+          value={newLabel}
+          onChange={(e) => setNewLabel(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && newLabel.trim()) { onAdd(newLabel.trim()); setNewLabel(""); } }}
+          placeholder="+ Nuevo escenario"
+          className="text-xs px-2.5 py-1 rounded-full border border-dashed border-slate-300 focus:outline-none focus:border-[#8DA7BE] w-32"
+        />
+      </div>
+    </div>
+  );
+}
+
+function GlobalRow({
+  g, error, value, onEdit, onDelete,
+}: {
+  g: BudgetingGlobal; error?: string; value?: number; onEdit: () => void; onDelete: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-5 py-2.5 hover:bg-slate-50 group">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: "#8DA7BE1a", color: "#1D201F" }}>{g.code}</span>
+        <span className="text-sm font-medium text-slate-900 truncate">{g.label}</span>
+        {!isPlainNumber(g.value) && <span title="Fórmula"><Sigma size={11} className="text-[#8DA7BE] flex-shrink-0" /></span>}
+        <span className="text-xs text-slate-400 truncate font-mono">{g.value}</span>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {error ? (
+          <span className="flex items-center gap-1 text-[11px] text-red-500"><AlertCircle size={11} />{error}</span>
+        ) : (
+          <span className="text-sm font-semibold text-slate-700">{fmtDecimal(value || 0)}</span>
+        )}
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={onEdit} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Editar">
+            <Pencil size={12} />
+          </button>
+          <button onClick={onDelete} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Borrar">
+            <Trash2 size={12} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function BudgetingGlobalsPage() {
   const { draftId } = useParams() as { draftId: string };
@@ -53,6 +121,7 @@ export default function BudgetingGlobalsPage() {
 
   const globals = draft?.globals || [];
   const folders = draft?.globalFolders || [];
+  const scenarios = draft?.scenarios || [];
   const resolution = useMemo(() => resolveGlobals(globals), [JSON.stringify(globals)]);
 
   const persist = async (patch: Partial<BudgetingDraft>) => {
@@ -65,7 +134,17 @@ export default function BudgetingGlobalsPage() {
   };
 
   const openCreate = (folderId: string | null = null) => { setForm({ ...emptyForm, folderId }); setFormError(""); setModalItem(null); };
-  const openEdit = (g: BudgetingGlobal) => { setForm({ code: g.code, label: g.label, value: g.value, folderId: g.folderId ?? null }); setFormError(""); setModalItem(g); };
+  const openEdit = (g: BudgetingGlobal) => { setForm({ code: g.code, label: g.label, value: g.value, folderId: g.folderId ?? null, scenarioOverrides: { ...(g.scenarioOverrides || {}) } }); setFormError(""); setModalItem(g); };
+
+  const handleAddScenario = async (label: string) => {
+    await persist({ scenarios: [...scenarios, { id: newBudgetingId(), label }] });
+  };
+  const handleRenameScenario = async (id: string, label: string) => {
+    await persist({ scenarios: scenarios.map((s) => (s.id === id ? { ...s, label } : s)) });
+  };
+  const handleDeleteScenario = async (id: string) => {
+    await persist({ scenarios: scenarios.filter((s) => s.id !== id), ...(draft?.activeScenarioId === id ? { activeScenarioId: null } : {}) });
+  };
 
   const isCodeTaken = (code: string, excludeId?: string) =>
     globals.some((g) => g.id !== excludeId && g.code.trim().toLowerCase() === code.trim().toLowerCase());
@@ -84,7 +163,8 @@ export default function BudgetingGlobalsPage() {
     }
     setSaving(true);
     try {
-      const entry: BudgetingGlobal = { id: modalItem?.id ?? newBudgetingId(), code, label, value, folderId: form.folderId };
+      const scenarioOverrides = Object.fromEntries(Object.entries(form.scenarioOverrides).filter(([, v]) => v.trim()));
+      const entry: BudgetingGlobal = { id: modalItem?.id ?? newBudgetingId(), code, label, value, folderId: form.folderId, scenarioOverrides };
       const next = modalItem ? globals.map((g) => (g.id === modalItem.id ? entry : g)) : [...globals, entry];
       await persist({ globals: next });
       setModalItem(undefined);
@@ -118,43 +198,11 @@ export default function BudgetingGlobalsPage() {
     );
   }
 
-  const GlobalRow = ({ g }: { g: BudgetingGlobal }) => {
-    const error = resolution.errors[g.code];
-    const value = resolution.values[g.code];
-    return (
-      <div className="flex items-center justify-between gap-3 px-5 py-2.5 hover:bg-slate-50 group">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: "#8DA7BE1a", color: "#1D201F" }}>{g.code}</span>
-          <span className="text-sm font-medium text-slate-900 truncate">{g.label}</span>
-          {!isPlainNumber(g.value) && <span title="Fórmula"><Sigma size={11} className="text-[#8DA7BE] flex-shrink-0" /></span>}
-          <span className="text-xs text-slate-400 truncate font-mono">{g.value}</span>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {error ? (
-            <span className="flex items-center gap-1 text-[11px] text-red-500"><AlertCircle size={11} />{error}</span>
-          ) : (
-            <span className="text-sm font-semibold text-slate-700">{fmtDecimal(value)}</span>
-          )}
-          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={() => openEdit(g)} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Editar">
-              <Pencil size={12} />
-            </button>
-            <button onClick={() => setDeleteTarget(g)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Borrar">
-              <Trash2 size={12} />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   const unfiled = globals.filter((g) => !g.folderId);
 
   return (
     <div className="w-full px-10 py-8 max-w-2xl space-y-6">
-      <div>
-        <p className="text-xs text-slate-400">Valores reutilizables en todo el presupuesto — se referencian por su código, tanto en Cantidad/X/Tarifa de una línea como dentro de otro Global (fórmulas con +, -, *, /, paréntesis).</p>
-      </div>
+      <ScenariosBar scenarios={scenarios} onAdd={handleAddScenario} onRename={handleRenameScenario} onDelete={handleDeleteScenario} />
 
       {folders.map((folder) => {
         const items = globals.filter((g) => g.folderId === folder.id);
@@ -169,7 +217,7 @@ export default function BudgetingGlobalsPage() {
                 <p className="text-xs text-slate-400 text-center py-6">Vacía</p>
               ) : (
                 <div className="divide-y divide-slate-100">
-                  {items.map((g) => <GlobalRow key={g.id} g={g} />)}
+                  {items.map((g) => <GlobalRow key={g.id} g={g} error={resolution.errors[g.code]} value={resolution.values[g.code]} onEdit={() => openEdit(g)} onDelete={() => setDeleteTarget(g)} />)}
                 </div>
               )}
               <div className="px-5 py-2.5 border-t border-slate-100">
@@ -190,7 +238,7 @@ export default function BudgetingGlobalsPage() {
             <p className="text-xs text-slate-400 text-center py-8">Sin globales todavía</p>
           ) : (
             <div className="divide-y divide-slate-100">
-              {unfiled.map((g) => <GlobalRow key={g.id} g={g} />)}
+              {unfiled.map((g) => <GlobalRow key={g.id} g={g} error={resolution.errors[g.code]} value={resolution.values[g.code]} onEdit={() => openEdit(g)} onDelete={() => setDeleteTarget(g)} />)}
             </div>
           )}
           <div className="px-5 py-2.5 border-t border-slate-100">
@@ -233,10 +281,10 @@ export default function BudgetingGlobalsPage() {
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-700 block mb-1.5">Valor (número o fórmula con otros códigos)</label>
-                <input
+                <BudgetingFormulaInput
                   value={form.value}
-                  onChange={(e) => { setForm((f) => ({ ...f, value: e.target.value })); setFormError(""); }}
-                  placeholder="120 * DIAS_RODAJE + DIETA"
+                  onChange={(v) => { setForm((f) => ({ ...f, value: v })); setFormError(""); }}
+                  globals={globals.filter((g) => g.id !== modalItem?.id).map((g) => ({ code: g.code, label: g.label }))}
                   className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2"
                 />
               </div>
@@ -244,6 +292,22 @@ export default function BudgetingGlobalsPage() {
                 <label className="text-xs font-medium text-slate-700 block mb-1.5">Carpeta</label>
                 <BudgetingFolderPicker folders={folders} value={form.folderId} onChange={(id) => setForm((f) => ({ ...f, folderId: id }))} onCreateFolder={handleCreateFolder} />
               </div>
+              {scenarios.length > 0 && (
+                <div className="border-t border-slate-100 pt-3 space-y-2.5">
+                  <p className="text-xs font-medium text-slate-700">Valor por escenario (opcional — vacío = usa el de arriba)</p>
+                  {scenarios.map((sc) => (
+                    <div key={sc.id}>
+                      <label className="text-[11px] text-slate-500 block mb-1">{sc.label}</label>
+                      <BudgetingFormulaInput
+                        value={form.scenarioOverrides[sc.id] || ""}
+                        onChange={(v) => setForm((f) => ({ ...f, scenarioOverrides: { ...f.scenarioOverrides, [sc.id]: v } }))}
+                        globals={globals.filter((g) => g.id !== modalItem?.id).map((g) => ({ code: g.code, label: g.label }))}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
               {formError && (
                 <div className="flex items-center gap-1.5 text-xs text-red-600">
                   <AlertCircle size={12} />
