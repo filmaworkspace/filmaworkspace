@@ -64,11 +64,11 @@ export default function BudgetingShell({ children }: { children: React.ReactNode
   };
 
   const navItems = draftId ? [
-    { href: `/budgeting/${draftId}`, label: "Budget", exact: true },
+    { href: `/budgeting/${draftId}`, label: "Presupuesto", exact: true },
     { href: `/budgeting/${draftId}/categories`, label: "Categorías", exact: false },
-    { href: `/budgeting/${draftId}/phases`, label: "Phases", exact: false },
-    { href: `/budgeting/${draftId}/fringes`, label: "Fringes", exact: false },
-    { href: `/budgeting/${draftId}/globals`, label: "Globals", exact: false },
+    { href: `/budgeting/${draftId}/phases`, label: "Fases", exact: false },
+    { href: `/budgeting/${draftId}/fringes`, label: "Cargas sociales", exact: false },
+    { href: `/budgeting/${draftId}/globals`, label: "Globales", exact: false },
   ] : [];
 
   return (
@@ -135,7 +135,7 @@ export default function BudgetingShell({ children }: { children: React.ReactNode
               className="block px-3 py-2 rounded-lg text-sm"
               style={{ background: `${ACCENT}1a`, color: ACCENT, fontWeight: 500 }}
             >
-              Budgets
+              Presupuestos
             </Link>
           </nav>
         )}

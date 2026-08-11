@@ -4,15 +4,21 @@
 // (lib/pdfBuilder.ts) con el acento de Budgeting — minimalista, sin adornos.
 // El Excel usa el mismo método de escritura XML+zip ya probado en el
 // importador de Accounting > Budget (fflate, sin librerías nuevas).
+//
+// `exportConfig` (portada, salto de página por capítulo, campos visibles)
+// es opcional — si no se pasa, se exporta con el comportamiento de siempre.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { strToU8, zipSync } from "fflate";
-import { FilmaPDF } from "./pdfBuilder";
-import { BudgetingCategoryDef, fmtCurrency } from "./budgeting";
+import { FilmaPDF, PdfTableColumn } from "./pdfBuilder";
+import { BudgetingCategoryDef, BudgetingExportConfig, DEFAULT_EXPORT_CONFIG, fmtCurrency } from "./budgeting";
 
 interface ReportChapter { id: string; code: string; description: string; }
 interface ReportSubchapter { id: string; code: string; description: string; }
-interface ReportLine { code: string; description: string; units: number; unit: string; multiplier: number; rate: number; total: number; }
+interface ReportLine {
+  code: string; description: string; units: number; unit: string; multiplier: number; rate: number; total: number;
+  supplier?: string; notes?: string; tags?: string[];
+}
 
 export interface BudgetReportParams {
   draftName: string;
@@ -23,6 +29,7 @@ export interface BudgetReportParams {
   subchaptersByChapter: Record<string, ReportSubchapter[]>;
   linesBySubchapter: Record<string, ReportLine[]>;
   grandTotal: number;
+  exportConfig?: BudgetingExportConfig;
 }
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -94,21 +101,36 @@ function buildXlsx(sheetName: string, rows: (string | number)[][]): Uint8Array {
 }
 
 export function downloadBudgetExcel(p: BudgetReportParams) {
-  const rows: (string | number)[][] = [["Categoría", "Capítulo", "Subcapítulo", "Código", "Descripción", "Cantidad", "Unidad", "X", "Tarifa", "Total"]];
+  const cfg = p.exportConfig || DEFAULT_EXPORT_CONFIG;
+  const header = ["Categoría", "Capítulo", "Subcapítulo", "Código", "Descripción", "Cantidad"];
+  if (cfg.fields.unit) header.push("Unidad");
+  header.push("X", "Tarifa", "Total");
+  if (cfg.fields.supplier) header.push("Proveedor");
+  if (cfg.fields.notes) header.push("Notas");
+  if (cfg.fields.tags) header.push("Etiquetas");
+
+  const rows: (string | number)[][] = [header];
   const cats = p.categoriesEnabled ? p.categories : [{ id: "all", label: "" } as BudgetingCategoryDef];
   cats.forEach((cat) => {
     p.chaptersByCategory(p.categoriesEnabled ? cat.id : null).forEach((chapter) => {
       (p.subchaptersByChapter[chapter.id] || []).forEach((sub) => {
         (p.linesBySubchapter[sub.id] || []).forEach((line) => {
-          rows.push([
+          const row: (string | number)[] = [
             cat.label, `${chapter.code} ${chapter.description}`, `${sub.code} ${sub.description}`,
-            line.code, line.description, line.units, line.unit, line.multiplier, line.rate, line.total,
-          ]);
+            line.code, line.description, line.units,
+          ];
+          if (cfg.fields.unit) row.push(line.unit);
+          row.push(line.multiplier, line.rate, line.total);
+          if (cfg.fields.supplier) row.push(line.supplier || "");
+          if (cfg.fields.notes) row.push(line.notes || "");
+          if (cfg.fields.tags) row.push((line.tags || []).join(", "));
+          rows.push(row);
         });
       });
     });
   });
-  rows.push(["", "", "", "", "", "", "", "", "Total", p.grandTotal]);
+  const tail = new Array(header.length - 2).fill("");
+  rows.push([...tail, "Total", p.grandTotal]);
   const bytes = buildXlsx("Presupuesto", rows);
   const blob = new Blob([bytes as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const a = document.createElement("a");
@@ -121,32 +143,57 @@ export function downloadBudgetExcel(p: BudgetReportParams) {
 // ─── PDF ─────────────────────────────────────────────────────────────────────
 
 export function downloadBudgetPdf(p: BudgetReportParams) {
+  const cfg = p.exportConfig || DEFAULT_EXPORT_CONFIG;
   const doc = new FilmaPDF({ accent: "budgeting", docRef: p.draftName });
   doc.header({ eyebrow: "Budgeting", title: p.draftName, meta: p.currency });
 
   const cats = p.categoriesEnabled ? p.categories : [{ id: "all", label: "Presupuesto" } as BudgetingCategoryDef];
-  cats.forEach((cat) => {
+  const allChapters = cats.flatMap((cat) => p.chaptersByCategory(p.categoriesEnabled ? cat.id : null));
+  const totalSubchapters = Object.values(p.subchaptersByChapter).reduce((s, subs) => s + subs.length, 0);
+  const totalLines = Object.values(p.linesBySubchapter).reduce((s, lines) => s + lines.length, 0);
+
+  if (cfg.coverSheet) {
+    doc.infoCards([
+      { label: "Total", value: fmtCurrency(p.grandTotal, p.currency), big: true },
+      { label: "Capítulos", value: String(allChapters.length) },
+      { label: "Subcapítulos", value: String(totalSubchapters) },
+      { label: "Líneas", value: String(totalLines) },
+    ]);
+    doc.pdf.addPage();
+    doc.y = doc.margin;
+  }
+
+  cats.forEach((cat, catIdx) => {
     const chapters = p.chaptersByCategory(p.categoriesEnabled ? cat.id : null);
     if (chapters.length === 0) return;
     if (p.categoriesEnabled) doc.sectionTitle(cat.label);
-    chapters.forEach((chapter) => {
+    chapters.forEach((chapter, chapterIdx) => {
+      if (cfg.pageBreakPerChapter && !(catIdx === 0 && chapterIdx === 0)) {
+        doc.pdf.addPage();
+        doc.y = doc.margin;
+      }
       (p.subchaptersByChapter[chapter.id] || []).forEach((sub) => {
         const lines = p.linesBySubchapter[sub.id] || [];
         if (lines.length === 0) return;
         doc.sectionTitle(`${chapter.code} ${chapter.description} · ${sub.code} ${sub.description}`);
+        const columns: PdfTableColumn[] = [
+          { label: "Código", width: 24 },
+          { label: "Descripción", width: cfg.fields.supplier ? 50 : 68 },
+          { label: "Cant.", width: 14, align: "right" },
+        ];
+        if (cfg.fields.unit) columns.push({ label: "Unidad", width: 16, align: "left" as const });
+        columns.push({ label: "Tarifa", width: 21, align: "right" as const }, { label: "Total", width: 21, align: "right" as const });
+        if (cfg.fields.supplier) columns.push({ label: "Proveedor", width: 30, align: "left" as const });
+
         doc.table(
-          [
-            { label: "Código", width: 28 },
-            { label: "Descripción", width: 68 },
-            { label: "Cant.", width: 16, align: "right" },
-            { label: "Unidad", width: 20 },
-            { label: "Tarifa", width: 21, align: "right" },
-            { label: "Total", width: 21, align: "right" },
-          ],
-          lines.map((l) => [
-            l.code, l.description, String(l.units), l.unit || "",
-            fmtCurrency(l.rate, p.currency), fmtCurrency(l.total, p.currency),
-          ])
+          columns,
+          lines.map((l) => {
+            const row = [l.code, l.description, String(l.units)];
+            if (cfg.fields.unit) row.push(l.unit || "");
+            row.push(fmtCurrency(l.rate, p.currency), fmtCurrency(l.total, p.currency));
+            if (cfg.fields.supplier) row.push(l.supplier || "");
+            return row;
+          })
         );
       });
     });
