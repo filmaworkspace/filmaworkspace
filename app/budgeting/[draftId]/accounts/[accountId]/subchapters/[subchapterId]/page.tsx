@@ -12,14 +12,14 @@ import {
 } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { AlertCircle, ArrowUpRight, Check, ChevronDown, ChevronRight, Copy, Plus, Search, Sigma, Trash2, X } from "lucide-react";
+import { AlertCircle, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Search, Sigma, Trash2, X } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
   BudgetingAccount, BudgetingDetailLine, BudgetingDraft, BudgetingFringe, BudgetingLineRoute, BudgetingSubchapter,
-  CELL_INPUT, ROW_INPUT, UNIT_SUGGESTIONS, computeFringeExtras, computeLineTotal, evaluateFieldExpr,
-  fmtCurrency, fmtDecimal, isPlainNumber, lineFringeBreakdown, resolveGlobals, subchapterTotal,
+  CELL_INPUT, ROW_INPUT, UNIT_SUGGESTIONS, computeFringeExtras, computeLineTotal, computeReorder, evaluateFieldExpr,
+  fmtCurrency, fmtDecimal, isPlainNumber, lineFringeBreakdown, nextOrderValue, resolveGlobals, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import BudgetingFormulaInput from "@/components/BudgetingFormulaInput";
 
@@ -115,35 +115,35 @@ function LineFieldsGrid({
     if (e.key === "Escape") { onEscape(); }
   };
   return (
-    <div className={`grid ${cols} gap-1 items-center px-4 py-2.5`}>
+    <div className={`grid ${cols} gap-1 items-center divide-x divide-slate-100 px-4 py-2.5`}>
       <input value={fields.code} onChange={(e) => onChange({ code: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} font-mono text-xs`} />
       <input value={fields.description} onChange={(e) => onChange({ description: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} text-xs`} />
+        className={`${CELL_INPUT} text-xs pl-2`} />
       <BudgetingFormulaInput value={fields.units} onChange={(v) => onChange({ units: v })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
-        globals={globals} title="Número o fórmula con Globales" className={`${CELL_INPUT} text-xs text-right`} />
+        globals={globals} title="Número o fórmula con Globales" className={`${CELL_INPUT} text-xs text-right pl-2`} />
       <input list="unit-suggestions" value={fields.unit} onChange={(e) => onChange({ unit: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} text-[11px]`} />
+        className={`${CELL_INPUT} text-[11px] pl-2`} />
       <BudgetingFormulaInput value={fields.multiplier} onChange={(v) => onChange({ multiplier: v })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
-        globals={globals} title="Número o fórmula con Globales" className={`${CELL_INPUT} text-[11px] text-right`} />
+        globals={globals} title="Número o fórmula con Globales" className={`${CELL_INPUT} text-[11px] text-right pl-2`} />
       <BudgetingFormulaInput value={fields.rate} onChange={(v) => onChange({ rate: v })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
-        globals={globals} title="Número o fórmula con Globales" className={`${CELL_INPUT} text-xs text-right`} />
-      <span className={`text-xs text-right font-semibold ${muted ? "text-slate-400 italic" : "text-slate-900"}`}>{fmtDecimal(totalPreview)}</span>
+        globals={globals} title="Número o fórmula con Globales" className={`${CELL_INPUT} text-xs text-right pl-2`} />
+      <span className={`text-xs text-right font-semibold pl-2 ${muted ? "text-slate-400 italic" : "text-slate-900"}`}>{fmtDecimal(totalPreview)}</span>
     </div>
   );
 }
 
 function LineRow({
   line, fmt, fringes, globals, globalValues, draftId, allSubchapters, currentSubchapterId,
-  isExpanded, fringePickerOpen, routePickerOpen, error,
-  onCommit, onToggleExpand, onDuplicate, onDelete, onToggleFringePicker, onToggleFringe,
+  isExpanded, fringePickerOpen, routePickerOpen, error, isFirst, isLast,
+  onCommit, onToggleExpand, onDuplicate, onDelete, onMove, onToggleFringePicker, onToggleFringe,
   onToggleRoutePicker, onSetRoute, onUpdateSecondary,
 }: {
   line: BudgetingDetailLine; fmt: (n: number) => string; fringes: BudgetingFringe[];
   globals: { code: string; label: string }[]; globalValues: Record<string, number>; draftId: string;
   allSubchapters: RouteTarget[]; currentSubchapterId: string;
-  isExpanded: boolean; fringePickerOpen: boolean; routePickerOpen: boolean; error?: string;
-  onCommit: (fields: LineFields) => void; onToggleExpand: () => void; onDuplicate: () => void; onDelete: () => void;
+  isExpanded: boolean; fringePickerOpen: boolean; routePickerOpen: boolean; error?: string; isFirst: boolean; isLast: boolean;
+  onCommit: (fields: LineFields) => void; onToggleExpand: () => void; onDuplicate: () => void; onDelete: () => void; onMove: (direction: "up" | "down") => void;
   onToggleFringePicker: () => void; onToggleFringe: (id: string) => void;
   onToggleRoutePicker: () => void; onSetRoute: (target: RouteTarget | null) => void;
   onUpdateSecondary: (patch: { supplier?: string; notes?: string; tags?: string[] }) => void;
@@ -174,6 +174,12 @@ function LineRow({
         <span className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white">
           {hasFormula && <span title="Contiene fórmula"><Sigma size={10} className="text-[#8DA7BE]" /></span>}
           {hasComment && <span title={line.notes} className="text-[10px]">💬</span>}
+          <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+            <ChevronUp size={11} />
+          </button>
+          <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+            <ChevronDown size={11} />
+          </button>
           <button onClick={onToggleExpand} className="p-1 rounded text-slate-400 hover:text-[#8DA7BE] hover:bg-[#8DA7BE]/[0.1] transition-colors" title="Proveedor / comentario / etiquetas / fringes / redirección">
             <ChevronDown size={11} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
           </button>
@@ -318,7 +324,6 @@ export default function BudgetingSubchapterPage() {
   const [expandedLine, setExpandedLine] = useState<string | null>(null);
   const [fringePickerFor, setFringePickerFor] = useState<string | null>(null);
   const [routePickerFor, setRoutePickerFor] = useState<string | null>(null);
-  const [addingLine, setAddingLine] = useState(false);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [deleteTarget, setDeleteTarget] = useState<BudgetingDetailLine | null>(null);
   const [saving, setSaving] = useState(false);
@@ -457,10 +462,17 @@ export default function BudgetingSubchapterPage() {
     if (error) { setRowError("new", error); return false; }
     clearRowError("new");
     await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`), {
-      ...payload, supplier: "", notes: "", tags: [], fringeIds: [], routedTo: null, createdAt: Timestamp.now(),
+      ...payload, supplier: "", notes: "", tags: [], fringeIds: [], routedTo: null, order: nextOrderValue(), createdAt: Timestamp.now(),
     });
     await touchDraft();
     return true;
+  };
+
+  const handleMoveLine = async (line: BudgetingDetailLine, direction: "up" | "down") => {
+    const swaps = computeReorder(lines, line.id, direction);
+    if (!swaps) return;
+    await Promise.all(swaps.map((s) => updateDoc(lineRef(s.id), { order: s.order })));
+    await touchDraft();
   };
 
   const handleDuplicateLine = async (line: BudgetingDetailLine) => {
@@ -473,7 +485,7 @@ export default function BudgetingSubchapterPage() {
         code, description: line.description, units: line.units, unitsExpr: line.unitsExpr ?? null, unit: line.unit || "",
         multiplier: line.multiplier, multiplierExpr: line.multiplierExpr ?? null, rate: line.rate, rateExpr: line.rateExpr ?? null, total: line.total,
         supplier: line.supplier || "", notes: line.notes || "", tags: line.tags || [], fringeIds: line.fringeIds || [],
-        routedTo: line.routedTo || null, createdAt: Timestamp.now(),
+        routedTo: line.routedTo || null, order: nextOrderValue(), createdAt: Timestamp.now(),
       };
       if (line.routedTo) {
         const batch = writeBatch(db);
@@ -595,11 +607,10 @@ export default function BudgetingSubchapterPage() {
             {UNIT_SUGGESTIONS.map((u) => <option key={u} value={u} />)}
           </datalist>
 
-          {lines.filter(matchesSearch).length === 0 && !q && !addingLine ? (
-            <p className="text-xs text-slate-400 text-center py-6">Sin líneas de detalle todavía</p>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {lines.filter(matchesSearch).map((line) => (
+          <div className="divide-y divide-slate-100">
+            {(() => {
+              const sorted = sortByOrder(lines.filter(matchesSearch));
+              return sorted.map((line, i) => (
                 <LineRow
                   key={line.id}
                   line={line}
@@ -614,29 +625,23 @@ export default function BudgetingSubchapterPage() {
                   fringePickerOpen={fringePickerFor === line.id}
                   routePickerOpen={routePickerFor === line.id}
                   error={rowErrors[line.id]}
+                  isFirst={i === 0}
+                  isLast={i === sorted.length - 1}
                   onCommit={(fields) => handleCommitLine(line, fields)}
                   onToggleExpand={() => setExpandedLine(expandedLine === line.id ? null : line.id)}
                   onDuplicate={() => handleDuplicateLine(line)}
                   onDelete={() => setDeleteTarget(line)}
+                  onMove={(direction) => handleMoveLine(line, direction)}
                   onToggleFringePicker={() => setFringePickerFor(fringePickerFor === line.id ? null : line.id)}
                   onToggleFringe={(id) => handleToggleFringe(line, id)}
                   onToggleRoutePicker={() => setRoutePickerFor(routePickerFor === line.id ? null : line.id)}
                   onSetRoute={(target) => handleSetRoute(line, target)}
                   onUpdateSecondary={(patch) => handleUpdateSecondary(line, patch)}
                 />
-              ))}
-            </div>
-          )}
-
-          {addingLine ? (
-            <NewLineRow globals={globalOptions} globalValues={globalResolution.values} error={rowErrors["new"]} onCommit={handleCommitNewLine} />
-          ) : (
-            <div className="px-4 py-2 border-t border-slate-100">
-              <button onClick={() => setAddingLine(true)} title="Añadir línea" className="w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-105" style={{ background: "#8DA7BE" }}>
-                <Plus size={12} className="text-white" />
-              </button>
-            </div>
-          )}
+              ));
+            })()}
+            {!q && <NewLineRow globals={globalOptions} globalValues={globalResolution.values} error={rowErrors["new"]} onCommit={handleCommitNewLine} />}
+          </div>
 
           {(fringeExtras.subchapterScoped > 0 || fringeExtras.chapterScoped > 0 || fringeExtras.totalScoped > 0 || (subchapter.receivedTotal || 0) > 0) && (
             <div className="px-4 py-1.5 border-t border-slate-100 space-y-0.5">

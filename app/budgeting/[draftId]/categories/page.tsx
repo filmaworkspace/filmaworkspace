@@ -9,7 +9,7 @@ import { db } from "@/lib/firebase";
 import { doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Pencil, Plus, Trash2, X } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
@@ -69,6 +69,14 @@ export default function BudgetingCategoriesPage() {
     }
   };
 
+  const handleMoveCategory = async (index: number, direction: "up" | "down") => {
+    const swapIndex = direction === "up" ? index - 1 : index + 1;
+    if (swapIndex < 0 || swapIndex >= cats.length) return;
+    const next = [...cats];
+    [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+    await persist({ categories: next });
+  };
+
   const handleDeleteCategory = async () => {
     if (!deleteTarget) return;
     setSaving(true);
@@ -124,10 +132,16 @@ export default function BudgetingCategoriesPage() {
               <p className="text-xs text-slate-400 text-center py-8">Sin categorías todavía</p>
             ) : (
               <div className="divide-y divide-slate-100">
-                {cats.map((c) => (
+                {cats.map((c, i) => (
                   <div key={c.id} className="flex items-center justify-between gap-3 px-5 py-2.5 hover:bg-slate-50 group">
                     <span className="text-sm font-medium text-slate-900 truncate">{c.label}</span>
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <button onClick={() => handleMoveCategory(i, "up")} disabled={i === 0} className={`p-1.5 rounded-lg disabled:opacity-30 disabled:pointer-events-none ${ICON_BTN_LIGHT}`} title="Subir">
+                        <ChevronUp size={12} />
+                      </button>
+                      <button onClick={() => handleMoveCategory(i, "down")} disabled={i === cats.length - 1} className={`p-1.5 rounded-lg disabled:opacity-30 disabled:pointer-events-none ${ICON_BTN_LIGHT}`} title="Bajar">
+                        <ChevronDown size={12} />
+                      </button>
                       <button onClick={() => openEdit(c)} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Editar">
                         <Pencil size={12} />
                       </button>

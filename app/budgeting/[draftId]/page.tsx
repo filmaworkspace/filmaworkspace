@@ -14,15 +14,15 @@ import {
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  AlertCircle, Check, ChevronRight, Copy, Download, FileSpreadsheet,
-  FileText, History, Plus, Search, Send, SlidersHorizontal, Trash2, X,
+  AlertCircle, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Download, FileSpreadsheet,
+  FileText, History, Search, Send, SlidersHorizontal, Trash2, X,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
   BTN_LIGHT, BTN_LIGHT_ACTIVE, BudgetingDraft, BudgetingCategoryDef, BudgetingAccount, BudgetingSubchapter, BudgetingDetailLine, BudgetingExportConfig, BudgetingFringe,
-  CELL_INPUT, DEFAULT_EXPORT_CONFIG, categoriesEnabled, computeLineTotalForScenario, effectiveLineUnits, resolveCategories, resolveGlobals, fmtCurrency, ICON_BTN_LIGHT, subchapterTotal,
+  CELL_INPUT, DEFAULT_EXPORT_CONFIG, categoriesEnabled, computeLineTotalForScenario, computeReorder, effectiveLineUnits, nextOrderValue, resolveCategories, resolveGlobals, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import { buildFwbFromDraft, downloadFwb } from "@/lib/budgetingExport";
 import { downloadBudgetExcel, downloadBudgetPdf } from "@/lib/budgetingReports";
@@ -31,16 +31,16 @@ import { downloadBudgetExcel, downloadBudgetPdf } from "@/lib/budgetingReports";
 
 type DeleteTarget = { chapterId: string; label: string };
 type EligibleProject = { id: string; name: string };
-const cols = "grid-cols-[110px_1fr_100px_36px]";
+const cols = "grid-cols-[26px_100px_1fr_100px_58px]";
 
 // ─── Fila de capítulo — siempre editable in situ (MMB-style): sin caja, sin
 // placeholder, guarda sola al perder el foco. Componentes de módulo
 // estables: no se redefinen entre renders, así los inputs no pierden el foco. ──
 function ChapterRow({
-  chapter, draftId, fmt, total, onCommit, onDelete,
+  chapter, draftId, fmt, total, isFirst, isLast, onCommit, onMove, onDelete,
 }: {
-  chapter: BudgetingAccount; draftId: string; fmt: (n: number) => string; total: number;
-  onCommit: (code: string, description: string) => void; onDelete: () => void;
+  chapter: BudgetingAccount; draftId: string; fmt: (n: number) => string; total: number; isFirst: boolean; isLast: boolean;
+  onCommit: (code: string, description: string) => void; onMove: (direction: "up" | "down") => void; onDelete: () => void;
 }) {
   const [code, setCode] = useState(chapter.code);
   const [description, setDescription] = useState(chapter.description);
@@ -55,19 +55,25 @@ function ChapterRow({
   };
 
   return (
-    <div className={`grid ${cols} gap-2 items-center pl-7 pr-3 py-3 hover:bg-white group`}>
+    <div className={`grid ${cols} gap-1 items-center divide-x divide-slate-100 pl-3 pr-3 py-3 hover:bg-white group`}>
+      <Link href={`/budgeting/${draftId}/accounts/${chapter.id}`} className="flex items-center justify-center" title="Entrar">
+        <ChevronRight size={13} className="text-slate-300 group-hover:text-[#8DA7BE] group-hover:translate-x-0.5 transition-all" />
+      </Link>
       <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} font-mono text-xs`} />
+        className={`${CELL_INPUT} font-mono text-xs pl-2`} />
       <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} text-xs`} />
-      <span className="text-xs font-medium text-slate-700 text-right justify-self-end">{fmt(total)}</span>
-      <span className="flex items-center justify-end gap-0.5">
-        <button onClick={onDelete} className="p-1 text-slate-300 hover:text-red-500 rounded transition-colors opacity-0 group-hover:opacity-100" title="Borrar capítulo">
+        className={`${CELL_INPUT} text-xs pl-2`} />
+      <span className="text-xs font-medium text-slate-700 text-right justify-self-end pr-2">{fmt(total)}</span>
+      <span className="flex items-center justify-end gap-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+          <ChevronUp size={11} />
+        </button>
+        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+          <ChevronDown size={11} />
+        </button>
+        <button onClick={onDelete} className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar capítulo">
           <Trash2 size={11} />
         </button>
-        <Link href={`/budgeting/${draftId}/accounts/${chapter.id}`}>
-          <ChevronRight size={13} className="text-slate-300 hover:text-[#8DA7BE] hover:translate-x-0.5 transition-all" />
-        </Link>
       </span>
     </div>
   );
@@ -83,11 +89,12 @@ function NewChapterRow({ onCommit }: { onCommit: (code: string, description: str
   };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter") e.currentTarget.blur(); };
   return (
-    <div className={`grid ${cols} gap-2 items-center pl-7 pr-3 py-3`}>
+    <div className={`grid ${cols} gap-1 items-center divide-x divide-slate-100 pl-3 pr-3 py-3`}>
+      <span />
       <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} font-mono text-xs`} />
+        className={`${CELL_INPUT} font-mono text-xs pl-2`} />
       <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} text-xs`} />
+        className={`${CELL_INPUT} text-xs pl-2`} />
       <span /><span />
     </div>
   );
@@ -107,7 +114,6 @@ export default function BudgetingTopPage() {
   const [saving, setSaving] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [search, setSearch] = useState("");
-  const [addingChapterFor, setAddingChapterFor] = useState<string | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
@@ -238,7 +244,7 @@ export default function BudgetingTopPage() {
     return Math.round(sum * 100) / 100;
   };
 
-  const chaptersByCategory = (categoryId: string | null) => chapters.filter((c) => c.category === categoryId);
+  const chaptersByCategory = (categoryId: string | null) => sortByOrder(chapters.filter((c) => c.category === categoryId));
   const chapterTotal = (chapterId: string) => Math.round(((subchaptersByChapter[chapterId] || []).reduce((s, sub) => s + subTotal(sub), 0) + chapterFringesTotal(chapterId)) * 100) / 100;
   const categoryTotal = (categoryId: string) => chaptersByCategory(categoryId).reduce((s, c) => s + chapterTotal(c.id), 0);
   const grandTotalFringes = totalScopedFringes();
@@ -370,9 +376,17 @@ export default function BudgetingTopPage() {
   };
 
   const handleCommitNewChapter = async (category: string | null, code: string, description: string): Promise<boolean> => {
-    await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts`), { code, description, category, createdAt: Timestamp.now() });
+    await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts`), { code, description, category, order: nextOrderValue(), createdAt: Timestamp.now() });
     await touchDraft();
     return true;
+  };
+
+  const handleMoveChapter = async (chapter: BudgetingAccount, direction: "up" | "down") => {
+    const siblings = chaptersByCategory(chapter.category);
+    const swaps = computeReorder(siblings, chapter.id, direction);
+    if (!swaps) return;
+    await Promise.all(swaps.map((s) => updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts`, s.id), { order: s.order })));
+    await touchDraft();
   };
 
   const handleConfirmDelete = async () => {
@@ -584,6 +598,13 @@ export default function BudgetingTopPage() {
 
       {/* Budget */}
       <div className="border border-slate-200 rounded-2xl overflow-hidden">
+        <div className={`grid ${cols} gap-1 pl-3 pr-3 py-2 border-b border-slate-200 divide-x divide-slate-100 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
+          <span></span>
+          <span className="pl-2">Código</span>
+          <span className="pl-2">Descripción</span>
+          <span className="text-right pr-2">Total</span>
+          <span></span>
+        </div>
         {catEnabled && cats.length > 0 ? (
           <>
             {cats.map((cat) => {
@@ -597,27 +618,22 @@ export default function BudgetingTopPage() {
                     <span className="text-[10px] text-slate-400 ml-auto">{fmt(categoryTotal(cat.id))}</span>
                   </div>
 
-                  <div>
-                    {catChapters.map((chapter) => (
+                  <div className="divide-y divide-slate-100">
+                    {catChapters.map((chapter, i) => (
                       <ChapterRow
                         key={chapter.id}
                         chapter={chapter}
                         draftId={draftId}
                         fmt={fmt}
                         total={chapterTotal(chapter.id)}
+                        isFirst={i === 0}
+                        isLast={i === catChapters.length - 1}
                         onCommit={(code, description) => handleCommitChapter(chapter, code, description)}
+                        onMove={(direction) => handleMoveChapter(chapter, direction)}
                         onDelete={() => setDeleteTarget({ chapterId: chapter.id, label: chapter.description })}
                       />
                     ))}
-                    {addingChapterFor === cat.id ? (
-                      <NewChapterRow onCommit={(code, description) => handleCommitNewChapter(cat.id, code, description)} />
-                    ) : (
-                      <div className="pl-7 pr-3 py-1.5">
-                        <button onClick={() => setAddingChapterFor(cat.id)} title="Añadir capítulo" className="w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-105" style={{ background: "#8DA7BE" }}>
-                          <Plus size={12} className="text-white" />
-                        </button>
-                      </div>
-                    )}
+                    <NewChapterRow onCommit={(code, description) => handleCommitNewChapter(cat.id, code, description)} />
                   </div>
                 </div>
               );
@@ -626,42 +642,44 @@ export default function BudgetingTopPage() {
             {grandTotalFringes > 0 && (
               <p className="text-[10px] text-slate-400 px-4 pt-1.5">+{fmt(grandTotalFringes)} en cargas sociales del presupuesto entero</p>
             )}
-            <div className={`grid ${cols} gap-2 items-center px-4 py-2.5 border-t border-slate-200 bg-slate-50/70`}>
+            <div className={`grid ${cols} gap-1 items-center pl-3 pr-3 py-2.5 border-t border-slate-200 bg-slate-50/70`}>
               <span />
-              <span className="text-xs font-bold" style={{ color: "#1D201F" }}>Total</span>
-              <span className="text-xs font-bold text-right justify-self-end" style={{ color: "#1D201F" }}>{fmt(grandTotal)}</span>
+              <span />
+              <span className="text-xs font-bold pl-2" style={{ color: "#1D201F" }}>Total</span>
+              <span className="text-xs font-bold text-right pr-2" style={{ color: "#1D201F" }}>{fmt(grandTotal)}</span>
               <span />
             </div>
           </>
         ) : (
           <>
-            {chapters.filter(matchesSearch).map((chapter) => (
-              <ChapterRow
-                key={chapter.id}
-                chapter={chapter}
-                draftId={draftId}
-                fmt={fmt}
-                total={chapterTotal(chapter.id)}
-                onCommit={(code, description) => handleCommitChapter(chapter, code, description)}
-                onDelete={() => setDeleteTarget({ chapterId: chapter.id, label: chapter.description })}
-              />
-            ))}
-            {addingChapterFor === "flat" ? (
-              <NewChapterRow onCommit={(code, description) => handleCommitNewChapter(null, code, description)} />
-            ) : (
-              <div className="pl-7 pr-3 py-1.5">
-                <button onClick={() => setAddingChapterFor("flat")} title="Añadir capítulo" className="w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-105" style={{ background: "#8DA7BE" }}>
-                  <Plus size={12} className="text-white" />
-                </button>
-              </div>
-            )}
+            <div className="divide-y divide-slate-100">
+              {(() => {
+                const flatSorted = sortByOrder(chapters.filter(matchesSearch));
+                return flatSorted.map((chapter, i) => (
+                  <ChapterRow
+                    key={chapter.id}
+                    chapter={chapter}
+                    draftId={draftId}
+                    fmt={fmt}
+                    total={chapterTotal(chapter.id)}
+                    isFirst={i === 0}
+                    isLast={i === flatSorted.length - 1}
+                    onCommit={(code, description) => handleCommitChapter(chapter, code, description)}
+                    onMove={(direction) => handleMoveChapter(chapter, direction)}
+                    onDelete={() => setDeleteTarget({ chapterId: chapter.id, label: chapter.description })}
+                  />
+                ));
+              })()}
+            </div>
+            <NewChapterRow onCommit={(code, description) => handleCommitNewChapter(null, code, description)} />
             {grandTotalFringes > 0 && (
               <p className="text-[10px] text-slate-400 px-4 pt-1.5">+{fmt(grandTotalFringes)} en cargas sociales del presupuesto entero</p>
             )}
-            <div className={`grid ${cols} gap-2 items-center px-4 py-2.5 border-t border-slate-200 bg-slate-50/70`}>
+            <div className={`grid ${cols} gap-1 items-center pl-3 pr-3 py-2.5 border-t border-slate-200 bg-slate-50/70`}>
               <span />
-              <span className="text-xs font-bold" style={{ color: "#1D201F" }}>Total</span>
-              <span className="text-xs font-bold text-right justify-self-end" style={{ color: "#1D201F" }}>{fmt(grandTotal)}</span>
+              <span />
+              <span className="text-xs font-bold pl-2" style={{ color: "#1D201F" }}>Total</span>
+              <span className="text-xs font-bold text-right pr-2" style={{ color: "#1D201F" }}>{fmt(grandTotal)}</span>
               <span />
             </div>
           </>

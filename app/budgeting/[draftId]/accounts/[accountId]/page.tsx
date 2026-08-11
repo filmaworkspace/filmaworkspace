@@ -10,25 +10,28 @@ import { db } from "@/lib/firebase";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp, updateDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { AlertCircle, ChevronRight, Plus, Search, Trash2 } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, Search, Trash2 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
-import { BudgetingAccount, BudgetingDetailLine, BudgetingDraft, BudgetingSubchapter, CELL_INPUT, fmtCurrency, subchapterTotal } from "@/lib/budgeting";
+import {
+  BudgetingAccount, BudgetingDetailLine, BudgetingDraft, BudgetingSubchapter,
+  CELL_INPUT, computeReorder, fmtCurrency, nextOrderValue, sortByOrder, subchapterTotal,
+} from "@/lib/budgeting";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
 type DeleteTarget = { subchapterId: string; label: string };
-const cols = "grid-cols-[110px_1fr_100px_36px]";
+const cols = "grid-cols-[26px_100px_1fr_100px_58px]";
 
 // ─── Fila de subcapítulo — siempre editable in situ (MMB-style): sin caja,
 // sin placeholder, guarda sola al perder el foco. Componente de módulo
 // estable: no se redefine entre renders, así los inputs no pierden el foco. ──
 function SubRow({
-  sub, draftId, accountId, fmt, total, onCommit, onDelete,
+  sub, draftId, accountId, fmt, total, isFirst, isLast, onCommit, onMove, onDelete,
 }: {
-  sub: BudgetingSubchapter; draftId: string; accountId: string; fmt: (n: number) => string; total: number;
-  onCommit: (code: string, description: string) => void; onDelete: () => void;
+  sub: BudgetingSubchapter; draftId: string; accountId: string; fmt: (n: number) => string; total: number; isFirst: boolean; isLast: boolean;
+  onCommit: (code: string, description: string) => void; onMove: (direction: "up" | "down") => void; onDelete: () => void;
 }) {
   const [code, setCode] = useState(sub.code);
   const [description, setDescription] = useState(sub.description);
@@ -43,19 +46,25 @@ function SubRow({
   };
 
   return (
-    <div className={`grid ${cols} gap-2 items-center px-4 py-3 hover:bg-slate-50 group`}>
+    <div className={`grid ${cols} gap-1 items-center divide-x divide-slate-100 px-3 py-3 hover:bg-slate-50 group`}>
+      <Link href={`/budgeting/${draftId}/accounts/${accountId}/subchapters/${sub.id}`} className="flex items-center justify-center" title="Entrar">
+        <ChevronRight size={13} className="text-slate-300 group-hover:text-[#8DA7BE] group-hover:translate-x-0.5 transition-all" />
+      </Link>
       <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} font-mono text-xs`} />
+        className={`${CELL_INPUT} font-mono text-xs pl-2`} />
       <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} text-xs`} />
-      <span className="text-xs font-medium text-slate-700 text-right justify-self-end">{fmt(total)}</span>
-      <span className="flex items-center justify-end gap-0.5">
-        <button onClick={onDelete} className="p-1 text-slate-300 hover:text-red-500 rounded transition-colors opacity-0 group-hover:opacity-100" title="Borrar subcapítulo">
+        className={`${CELL_INPUT} text-xs pl-2`} />
+      <span className="text-xs font-medium text-slate-700 text-right justify-self-end pr-2">{fmt(total)}</span>
+      <span className="flex items-center justify-end gap-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+          <ChevronUp size={11} />
+        </button>
+        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+          <ChevronDown size={11} />
+        </button>
+        <button onClick={onDelete} className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar subcapítulo">
           <Trash2 size={11} />
         </button>
-        <Link href={`/budgeting/${draftId}/accounts/${accountId}/subchapters/${sub.id}`}>
-          <ChevronRight size={13} className="text-slate-300 hover:text-[#8DA7BE] hover:translate-x-0.5 transition-all" />
-        </Link>
       </span>
     </div>
   );
@@ -71,11 +80,12 @@ function NewSubRow({ onCommit }: { onCommit: (code: string, description: string)
   };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter") e.currentTarget.blur(); };
   return (
-    <div className={`grid ${cols} gap-2 items-center px-4 py-3`}>
+    <div className={`grid ${cols} gap-1 items-center divide-x divide-slate-100 px-3 py-3`}>
+      <span />
       <input autoFocus value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} font-mono text-xs`} />
+        className={`${CELL_INPUT} font-mono text-xs pl-2`} />
       <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} text-xs`} />
+        className={`${CELL_INPUT} text-xs pl-2`} />
       <span /><span />
     </div>
   );
@@ -93,8 +103,6 @@ export default function BudgetingChapterPage() {
   const [notFound, setNotFound] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
-  const [addingSub, setAddingSub] = useState(false);
-
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
   useEffect(() => {
@@ -181,9 +189,16 @@ export default function BudgetingChapterPage() {
   };
 
   const handleCommitNewSub = async (code: string, description: string): Promise<boolean> => {
-    await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`), { code, description, createdAt: Timestamp.now() });
+    await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`), { code, description, order: nextOrderValue(), createdAt: Timestamp.now() });
     await touchDraft();
     return true;
+  };
+
+  const handleMoveSub = async (sub: BudgetingSubchapter, direction: "up" | "down") => {
+    const swaps = computeReorder(subchapters, sub.id, direction);
+    if (!swaps) return;
+    await Promise.all(swaps.map((s) => updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`, s.id), { order: s.order })));
+    await touchDraft();
   };
 
   const handleConfirmDelete = async () => {
@@ -242,18 +257,18 @@ export default function BudgetingChapterPage() {
 
       {/* Subcapítulos */}
       <div className="border border-slate-200 rounded-2xl overflow-hidden">
-        <div className={`grid ${cols} gap-2 px-4 py-2 border-b border-slate-200 divide-x divide-slate-100 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
-          <span>Código</span>
-          <span>Descripción</span>
-          <span className="text-right">Total</span>
+        <div className={`grid ${cols} gap-1 px-3 py-2 border-b border-slate-200 divide-x divide-slate-100 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
+          <span></span>
+          <span className="pl-2">Código</span>
+          <span className="pl-2">Descripción</span>
+          <span className="text-right pr-2">Total</span>
           <span></span>
         </div>
 
-        {subchapters.filter(matchesSearch).length === 0 && !q && !addingSub ? (
-          <p className="text-xs text-slate-400 text-center py-6">Sin subcapítulos todavía</p>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {subchapters.filter(matchesSearch).map((sub) => (
+        <div className="divide-y divide-slate-100">
+          {(() => {
+            const sorted = sortByOrder(subchapters.filter(matchesSearch));
+            return sorted.map((sub, i) => (
               <SubRow
                 key={sub.id}
                 sub={sub}
@@ -261,31 +276,26 @@ export default function BudgetingChapterPage() {
                 accountId={accountId}
                 fmt={fmt}
                 total={subTotal(sub)}
+                isFirst={i === 0}
+                isLast={i === sorted.length - 1}
                 onCommit={(code, description) => handleCommitSub(sub, code, description)}
+                onMove={(direction) => handleMoveSub(sub, direction)}
                 onDelete={() => setDeleteTarget({ subchapterId: sub.id, label: sub.description })}
               />
-            ))}
-          </div>
-        )}
-
-        {addingSub ? (
-          <NewSubRow onCommit={handleCommitNewSub} />
-        ) : (
-          <div className="px-4 py-2 border-t border-slate-100">
-            <button onClick={() => setAddingSub(true)} title="Añadir subcapítulo" className="w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-105" style={{ background: "#8DA7BE" }}>
-              <Plus size={12} className="text-white" />
-            </button>
-          </div>
-        )}
+            ));
+          })()}
+          {!q && <NewSubRow onCommit={handleCommitNewSub} />}
+        </div>
 
         {chapterFringes > 0 && (
           <p className="text-[10px] text-slate-400 px-4 pt-1.5">+{fmt(chapterFringes)} en cargas sociales propias de este capítulo</p>
         )}
 
-        <div className={`grid ${cols} gap-2 items-center px-4 py-2.5 border-t border-slate-200 bg-slate-50/70`}>
+        <div className={`grid ${cols} gap-1 items-center px-3 py-2.5 border-t border-slate-200 bg-slate-50/70`}>
           <span />
-          <span className="text-xs font-bold" style={{ color: "#1D201F" }}>Total</span>
-          <span className="text-xs font-bold text-right justify-self-end" style={{ color: "#1D201F" }}>{fmt(chapterTotal)}</span>
+          <span />
+          <span className="text-xs font-bold pl-2" style={{ color: "#1D201F" }}>Total</span>
+          <span className="text-xs font-bold text-right pr-2" style={{ color: "#1D201F" }}>{fmt(chapterTotal)}</span>
           <span />
         </div>
       </div>
