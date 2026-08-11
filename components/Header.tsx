@@ -17,6 +17,7 @@ import {
   ArrowLeftRight,
   Banknote,
   BarChart3,
+  Calculator,
   Clock,
   Briefcase,
   Building2,
@@ -475,6 +476,17 @@ export default function Header() {
               </div>
             );
           })()}
+
+          {/* Budgeting quick access */}
+          {user?.budgetingAccess && (
+            <Link
+              href="/budgeting"
+              className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-[#6C64F5] to-[#4640C7] shadow-sm hover:shadow-md hover:scale-105 transition-all"
+              title="Budgeting"
+            >
+              <Calculator size={14} className="text-white" />
+            </Link>
+          )}
 
           {/* Profile Avatar */}
           <button onClick={() => setProfileOpen(!profileOpen)} className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-semibold hover:bg-slate-800 transition-colors">

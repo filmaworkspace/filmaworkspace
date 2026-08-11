@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
@@ -11,11 +12,11 @@ import { db } from "@/lib/firebase";
 import { collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { ArrowLeft, FileUp, Plus, Search, Trash2, Wallet, X } from "lucide-react";
+import { ArrowLeft, FileUp, Plus, Search, Trash2, X } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
-import { BUDGETING_ACCENT, BudgetingDraftIndex } from "@/lib/budgeting";
+import { BUDGETING_ACCENT, BUDGETING_ACCENT_DARK, BudgetingDraftIndex } from "@/lib/budgeting";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -93,103 +94,109 @@ export default function BudgetingShell({ children }: { children: React.ReactNode
     }
   };
 
+  const gradient = `linear-gradient(135deg, #6C64F5, ${BUDGETING_ACCENT_DARK})`;
+
   return (
-    <div className={`min-h-screen flex bg-white ${inter.className}`}>
-      {/* ── Sidebar ──────────────────────────────────────────────────────── */}
-      <aside className="w-64 flex-shrink-0 border-r border-slate-100 flex flex-col h-screen sticky top-0">
-        <div className="px-5 pt-6 pb-4">
-          <div className="flex items-center gap-2 mb-5">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${BUDGETING_ACCENT}1a` }}>
-              <Wallet size={14} style={{ color: BUDGETING_ACCENT }} />
+    <div className={`min-h-screen flex flex-col bg-white ${inter.className}`}>
+      {/* Barra de acento superior */}
+      <div className="h-1 flex-shrink-0" style={{ background: gradient }} />
+
+      <div className="flex flex-1 min-h-0">
+        {/* ── Sidebar ────────────────────────────────────────────────────── */}
+        <aside className="w-64 flex-shrink-0 border-r border-slate-100 flex flex-col h-[calc(100vh-4px)] sticky top-1">
+          <div className="px-5 pt-6 pb-4">
+            <div className="mb-5">
+              <Image src="/logo-budgeting.svg" alt="Budgeting" width={161} height={23} className="h-6 w-auto" priority />
             </div>
-            <span className="text-sm font-semibold text-slate-900">Budgeting</span>
+
+            <button
+              onClick={() => setShowNewDraft(true)}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium text-white shadow-sm hover:shadow-md hover:brightness-105 active:brightness-95 transition-all"
+              style={{ background: gradient }}
+            >
+              <Plus size={14} />
+              Nuevo presupuesto
+            </button>
           </div>
 
-          <button
-            onClick={() => setShowNewDraft(true)}
-            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-white transition-opacity hover:opacity-90"
-            style={{ background: BUDGETING_ACCENT }}
-          >
-            <Plus size={14} />
-            Nuevo presupuesto
-          </button>
-        </div>
-
-        <div className="px-5 pb-3">
-          <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar..."
-              className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
-            />
+          <div className="px-5 pb-3">
+            <div className="relative">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar"
+                className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
+              />
+            </div>
           </div>
-        </div>
 
-        <div className="flex-1 overflow-y-auto px-3 space-y-0.5">
-          {filteredDrafts.length === 0 ? (
-            <p className="text-xs text-slate-400 text-center py-8 px-3">
-              {drafts.length === 0 ? "Sin borradores todavía" : "Sin resultados"}
-            </p>
-          ) : filteredDrafts.map((d) => {
-            const isActive = pathname === `/budgeting/${d.id}`;
-            return (
-              <Link
-                key={d.id}
-                href={`/budgeting/${d.id}`}
-                className={`group flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  isActive ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                <span
-                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                  style={{ background: d.status === "sent" ? "#10b981" : "#cbd5e1" }}
-                />
-                <span className="flex-1 truncate">{d.name}</span>
-                <button
-                  onClick={(e) => { e.preventDefault(); setDeleteTarget(d); }}
-                  className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 rounded-md transition-opacity flex-shrink-0"
-                  title="Borrar borrador"
+          <div className="flex-1 overflow-y-auto px-3 space-y-0.5">
+            {filteredDrafts.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-8 px-3">
+                {drafts.length === 0 ? "Sin borradores todavía" : "Sin resultados"}
+              </p>
+            ) : filteredDrafts.map((d) => {
+              const isActive = pathname === `/budgeting/${d.id}`;
+              return (
+                <Link
+                  key={d.id}
+                  href={`/budgeting/${d.id}`}
+                  className={`group flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${
+                    isActive ? "bg-[#5B57E0]/[0.08] text-slate-900 font-medium" : "text-slate-600 hover:bg-slate-50"
+                  }`}
                 >
-                  <Trash2 size={12} />
-                </button>
-              </Link>
-            );
-          })}
-        </div>
-
-        <div className="px-3 pb-3">
-          <button
-            disabled
-            title="Próximamente"
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 cursor-not-allowed"
-          >
-            <FileUp size={13} />
-            Cargar presupuesto (.fwb)
-          </button>
-        </div>
-
-        <div className="px-3 py-3 border-t border-slate-100 space-y-2">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors"
-          >
-            <ArrowLeft size={13} />
-            Volver a Dashboard
-          </Link>
-          <div className="flex items-center gap-2 px-2">
-            <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-semibold text-slate-500 flex-shrink-0">
-              {user?.name?.charAt(0).toUpperCase() || "?"}
-            </div>
-            <span className="text-xs text-slate-500 truncate">{user?.name}</span>
+                  <div
+                    className="w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-semibold text-white flex-shrink-0"
+                    style={{ background: d.status === "sent" ? "linear-gradient(135deg, #34d399, #059669)" : gradient }}
+                  >
+                    {d.name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="flex-1 truncate">{d.name}</span>
+                  <button
+                    onClick={(e) => { e.preventDefault(); setDeleteTarget(d); }}
+                    className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 rounded-md transition-opacity flex-shrink-0"
+                    title="Borrar borrador"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </Link>
+              );
+            })}
           </div>
-        </div>
-      </aside>
 
-      {/* ── Content ──────────────────────────────────────────────────────── */}
-      <main className="flex-1 min-w-0 overflow-y-auto">{children}</main>
+          <div className="px-3 pb-3">
+            <button
+              disabled
+              title="Próximamente"
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 cursor-not-allowed"
+            >
+              <FileUp size={13} />
+              Cargar presupuesto (.fwb)
+            </button>
+          </div>
+
+          <div className="px-3 py-3 border-t border-slate-100 space-y-2">
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors"
+            >
+              <ArrowLeft size={13} />
+              Volver a Dashboard
+            </Link>
+            <div className="flex items-center gap-2 px-2">
+              <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center text-[10px] font-semibold text-white flex-shrink-0">
+                {user?.name?.charAt(0).toUpperCase() || "?"}
+              </div>
+              <span className="text-xs text-slate-500 truncate">{user?.name}</span>
+            </div>
+          </div>
+        </aside>
+
+        {/* ── Content ────────────────────────────────────────────────────── */}
+        <main className="flex-1 min-w-0 overflow-y-auto">{children}</main>
+      </div>
 
       {/* ── New draft modal ─────────────────────────────────────────────── */}
       {showNewDraft && (
@@ -208,7 +215,7 @@ export default function BudgetingShell({ children }: { children: React.ReactNode
                 value={newDraftName}
                 onChange={(e) => setNewDraftName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleCreateDraft(); }}
-                placeholder="Ej: Marea Alta — Presupuesto"
+                placeholder="Ej: Marea Alta"
                 autoFocus
                 className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
               />
@@ -220,8 +227,8 @@ export default function BudgetingShell({ children }: { children: React.ReactNode
               <button
                 onClick={handleCreateDraft}
                 disabled={!newDraftName.trim() || creating}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-40"
-                style={{ background: BUDGETING_ACCENT }}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white shadow-sm hover:shadow-md hover:brightness-105 transition-all disabled:opacity-40 disabled:shadow-none"
+                style={{ background: gradient }}
               >
                 {creating ? "Creando..." : "Crear"}
               </button>
