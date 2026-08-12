@@ -27,10 +27,10 @@ import BudgetingFolderPicker from "@/components/BudgetingFolderPicker";
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface FringeForm {
-  label: string; folderId: string | null; type: FringeType;
+  code: string; label: string; folderId: string | null; type: FringeType;
   percent: string; amount: string; period: FringePeriod; capAmount: string; scope: FringeScope;
 }
-const emptyForm: FringeForm = { label: "", folderId: null, type: "percent", percent: "", amount: "", period: "month", capAmount: "", scope: "subchapter" };
+const emptyForm: FringeForm = { code: "", label: "", folderId: null, type: "percent", percent: "", amount: "", period: "month", capAmount: "", scope: "subchapter" };
 
 function Segmented<T extends string>({ options, value, onChange }: { options: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
   return (
@@ -59,6 +59,7 @@ function FringeRow({ f, onEdit, onDelete }: { f: BudgetingFringe; onEdit: () => 
   return (
     <div className="flex items-center justify-between gap-3 px-5 py-2.5 hover:bg-slate-50 group">
       <div className="flex items-center gap-2.5 min-w-0">
+        <span className="text-[10px] font-mono text-slate-400 flex-shrink-0">{f.code}</span>
         <span className="text-sm font-medium text-slate-900 truncate">{f.label}</span>
         <span className="text-xs text-slate-400">{summarize(f)}</span>
       </div>
@@ -113,7 +114,7 @@ export default function BudgetingFringesPage() {
   const openCreate = (folderId: string | null = null) => { setForm({ ...emptyForm, folderId }); setFormError(""); setModalItem(null); };
   const openEdit = (f: BudgetingFringe) => {
     setForm({
-      label: f.label, folderId: f.folderId ?? null, type: f.type,
+      code: f.code, label: f.label, folderId: f.folderId ?? null, type: f.type,
       percent: f.percent != null ? String(f.percent) : "", amount: f.amount != null ? String(f.amount) : "",
       period: f.period || "month", capAmount: f.capAmount != null ? String(f.capAmount) : "", scope: f.scope,
     });
@@ -128,7 +129,7 @@ export default function BudgetingFringesPage() {
     if (form.type === "fixed_period" && !form.amount.trim()) { setFormError("Indica el importe"); return; }
     setSaving(true);
     try {
-      const code = (modalItem?.code) || label.toUpperCase().replace(/[^A-Z0-9]+/g, "_").slice(0, 20) || newBudgetingId().slice(0, 6);
+      const code = form.code.trim() || label.toUpperCase().replace(/[^A-Z0-9]+/g, "_").slice(0, 20) || newBudgetingId().slice(0, 6);
       const entry: BudgetingFringe = {
         id: modalItem?.id ?? newBudgetingId(), code, label, folderId: form.folderId, type: form.type, scope: form.scope,
         ...(form.type === "percent"
@@ -229,10 +230,17 @@ export default function BudgetingFringesPage() {
               </button>
             </div>
             <div className="px-5 py-4 space-y-3.5">
-              <div>
-                <label className="text-xs font-medium text-slate-700 block mb-1.5">Nombre</label>
-                <input autoFocus value={form.label} onChange={(e) => { setForm((f) => ({ ...f, label: e.target.value })); setFormError(""); }}
-                  placeholder="Seguridad Social" className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2" />
+              <div className="grid grid-cols-[1fr_auto] gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1.5">Nombre</label>
+                  <input autoFocus value={form.label} onChange={(e) => { setForm((f) => ({ ...f, label: e.target.value })); setFormError(""); }}
+                    placeholder="Seguridad Social" className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2" />
+                </div>
+                <div className="w-28">
+                  <label className="text-xs font-medium text-slate-700 block mb-1.5">Código</label>
+                  <input value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+                    placeholder="Auto" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2" />
+                </div>
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-700 block mb-1.5">Tipo</label>

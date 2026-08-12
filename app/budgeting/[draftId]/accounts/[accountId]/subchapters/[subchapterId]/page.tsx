@@ -14,7 +14,7 @@ import {
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
   AlertCircle, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy,
-  Search, Settings2, Sigma, SlidersHorizontal, Trash2, X,
+  MoreVertical, Search, Settings2, Sigma, SlidersHorizontal, Trash2, X,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
@@ -49,7 +49,10 @@ const toFields = (l: BudgetingDetailLine): LineFields => ({
  */
 function colTemplate(cfg: BudgetingDetailColumnsConfig): string {
   const w = DETAIL_STAT_COLUMN_PX[cfg.statColumnWidth];
-  const parts = ["90px", "1fr", `${w}px`, `${w}px`, `${w}px`, `${w}px`, "90px"];
+  // Tarifa y Total llevan importes con decimales: van un poco más anchas que
+  // Cant./Unidad/X, y del mismo ancho entre sí.
+  const wide = w + 24;
+  const parts = ["90px", "1fr", `${w}px`, `${w}px`, `${w}px`, `${wide}px`, `${wide}px`];
   if (cfg.showComment) parts.push("160px");
   if (cfg.showTags) parts.push("160px");
   parts.push("120px");
@@ -128,7 +131,7 @@ function DetailSidebar({
             ) : (
               <>
                 <div className="mb-4 pb-3 border-b border-slate-100">
-                  <p className="text-[10px] font-mono text-slate-400">{line.code || "(sin código)"}</p>
+                  <p className="text-[10px] font-mono text-slate-400">{line.code || "(sin ID)"}</p>
                   <p className="text-sm font-medium text-slate-900 truncate">{line.description || "(sin descripción)"}</p>
                 </div>
 
@@ -232,7 +235,7 @@ function LineFieldsGrid({
         globals={globals} title="Número o fórmula con Globales" className={`${CELL_INPUT} text-[11px] text-right pl-2`} />
       <BudgetingFormulaInput value={fields.rate} onChange={(v) => onChange({ rate: v })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
         globals={globals} title="Número o fórmula con Globales" className={`${CELL_INPUT} text-xs text-right pl-2`} />
-      <span className={`flex items-center justify-end text-xs font-semibold pl-2 ${muted ? "text-slate-400 italic" : "text-slate-900"}`}>{fmtDecimal(totalPreview)}</span>
+      <span className={`flex items-center justify-end text-xs font-semibold pl-2 pr-2 ${muted ? "text-slate-400 italic" : "text-slate-900"}`}>{fmtDecimal(totalPreview)}</span>
       {showComment && (
         <input value={fields.comment} onChange={(e) => onChange({ comment: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
           className={`${CELL_INPUT} text-xs pl-2`} />
@@ -499,7 +502,7 @@ export default function BudgetingSubchapterPage() {
 
   const handleCommitLine = async (line: BudgetingDetailLine, fields: LineFields) => {
     const code = fields.code.trim();
-    if (isLineCodeTaken(code, line.id)) { setRowError(line.id, "Ese código ya se usa en otra línea de este subcapítulo"); return; }
+    if (isLineCodeTaken(code, line.id)) { setRowError(line.id, "Ese ID ya se usa en otra línea de este subcapítulo"); return; }
     const { error, total, payload } = buildPayload(fields);
     if (error) { setRowError(line.id, error); return; }
     clearRowError(line.id);
@@ -520,7 +523,7 @@ export default function BudgetingSubchapterPage() {
     const code = fields.code.trim();
     const description = fields.description.trim();
     if (!code && !description) return false;
-    if (isLineCodeTaken(code)) { setRowError("new", "Ese código ya se usa en otra línea de este subcapítulo"); return false; }
+    if (isLineCodeTaken(code)) { setRowError("new", "Ese ID ya se usa en otra línea de este subcapítulo"); return false; }
     const { error, payload } = buildPayload(fields);
     if (error) { setRowError("new", error); return false; }
     clearRowError("new");
@@ -660,16 +663,24 @@ export default function BudgetingSubchapterPage() {
       <div className="border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">
         <div className="min-w-[720px]">
           <div className="grid gap-0 divide-x divide-slate-200 px-4 border-b border-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60" style={{ gridTemplateColumns: template }}>
-            <span className="flex items-center py-2">Código</span>
+            <span className="flex items-center py-2" title="Referencial: el código que se asigna en PO/facturas de Accounting es el del subcapítulo">ID</span>
             <span className="flex items-center py-2 pl-2">Descripción</span>
             <span className="flex items-center justify-center py-2 pl-2">Cant.</span>
             <span className="flex items-center justify-center py-2 pl-2">Unidad</span>
             <span className="flex items-center justify-center py-2 pl-2">X</span>
             <span className="flex items-center justify-center py-2 pl-2">Tarifa</span>
-            <span className="flex items-center justify-end py-2 pl-2">Total</span>
+            <span className="flex items-center justify-end py-2 pl-2 pr-2">Total</span>
             {columnsConfig.showComment && <span className="flex items-center py-2 pl-2">Comentario</span>}
             {columnsConfig.showTags && <span className="flex items-center py-2 pl-2">Etiquetas</span>}
-            <span />
+            <span className="flex items-center justify-end pl-2">
+              <button
+                onClick={() => openSidebar(null)}
+                className="p-1 rounded text-slate-400 hover:text-[#8DA7BE] hover:bg-[#8DA7BE]/[0.1] transition-colors normal-case"
+                title="Mostrar/ocultar columnas"
+              >
+                <MoreVertical size={13} />
+              </button>
+            </span>
           </div>
           <datalist id="unit-suggestions">
             {UNIT_SUGGESTIONS.map((u) => <option key={u} value={u} />)}

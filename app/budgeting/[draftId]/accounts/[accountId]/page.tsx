@@ -10,12 +10,12 @@ import { db } from "@/lib/firebase";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp, updateDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, Search, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowUpRight, ChevronDown, ChevronRight, ChevronUp, Percent, Search, Trash2 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
-  BudgetingAccount, BudgetingDetailLine, BudgetingDraft, BudgetingSubchapter,
+  BudgetingAccount, BudgetingDetailLine, BudgetingDraft, BudgetingFringe, BudgetingSubchapter,
   CELL_INPUT, computeReorder, fmtCurrency, nextOrderValue, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 
@@ -91,6 +91,51 @@ function NewSubRow({ onCommit }: { onCommit: (code: string, description: string)
   );
 }
 
+// ─── Fila de una carga social ("fringe") con alcance de capítulo: aparece
+// como una línea más, con su propio código asignable, pero el importe es
+// solo lectura porque sale calculado de las líneas de detalle, no se escribe
+// a mano aquí. Componente de módulo estable, mismo patrón que SubRow. ──────
+function FringeChapterRow({
+  fringe, amount, fmt, draftId, onCommit,
+}: {
+  fringe: BudgetingFringe; amount: number; fmt: (n: number) => string; draftId: string;
+  onCommit: (code: string, label: string) => void;
+}) {
+  const [code, setCode] = useState(fringe.code);
+  const [label, setLabel] = useState(fringe.label);
+
+  const commit = () => {
+    if (!code.trim() || !label.trim()) { setCode(fringe.code); setLabel(fringe.label); return; }
+    onCommit(code.trim(), label.trim());
+  };
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") e.currentTarget.blur();
+    if (e.key === "Escape") { setCode(fringe.code); setLabel(fringe.label); }
+  };
+
+  return (
+    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group`}>
+      <span className="flex items-center justify-center text-slate-300" title="Carga social de este capítulo">
+        <Percent size={11} />
+      </span>
+      <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
+        className={`${CELL_INPUT} font-mono text-xs pl-2`} />
+      <input value={label} onChange={(e) => setLabel(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
+        className={`${CELL_INPUT} text-xs pl-2`} />
+      <span className="flex items-center justify-end text-xs font-medium text-slate-500 pr-2" title="Importe calculado a partir de las líneas de detalle: no se edita aquí">
+        {fmt(amount)}
+      </span>
+      <Link
+        href={`/budgeting/${draftId}/fringes`}
+        className="flex items-center justify-end gap-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-[#8DA7BE]"
+        title="Ver en Cargas sociales"
+      >
+        <ArrowUpRight size={12} />
+      </Link>
+    </div>
+  );
+}
+
 export default function BudgetingChapterPage() {
   const { draftId, accountId } = useParams() as { draftId: string; accountId: string };
   const { user } = useUser();
@@ -154,20 +199,26 @@ export default function BudgetingChapterPage() {
     }, 0);
     return Math.round((subchapterTotal(sub, lines) + subScoped) * 100) / 100;
   };
-  const chapterFringesTotal = () => {
-    let sum = 0;
+  // Cargas sociales con alcance de capítulo: se desglosan una a una (no en un
+  // único total agregado) porque cada una aparece como su propia línea, con
+  // su propio código, debajo de los subcapítulos.
+  const chapterFringeBreakdown = (() => {
+    const sums = new Map<string, number>();
     for (const lines of Object.values(linesBySubchapter)) {
       for (const l of lines) {
         for (const id of l.fringeIds || []) {
           const f = fringes.find((fr) => fr.id === id);
           if (!f || f.scope !== "chapter") continue;
-          sum += f.type === "percent" ? (l.total || 0) * ((f.percent || 0) / 100) : Math.min(f.amount || 0, f.capAmount ?? Infinity) * (l.units || 0);
+          const amount = f.type === "percent" ? (l.total || 0) * ((f.percent || 0) / 100) : Math.min(f.amount || 0, f.capAmount ?? Infinity) * (l.units || 0);
+          sums.set(f.id, (sums.get(f.id) || 0) + amount);
         }
       }
     }
-    return Math.round(sum * 100) / 100;
-  };
-  const chapterFringes = chapterFringesTotal();
+    return fringes
+      .filter((f) => sums.has(f.id))
+      .map((f) => ({ fringe: f, amount: Math.round((sums.get(f.id) || 0) * 100) / 100 }));
+  })();
+  const chapterFringes = Math.round(chapterFringeBreakdown.reduce((s, b) => s + b.amount, 0) * 100) / 100;
   const chapterTotal = Math.round((subchapters.reduce((s, sub) => s + subTotal(sub), 0) + chapterFringes) * 100) / 100;
 
   const q = search.trim().toLowerCase();
@@ -185,6 +236,16 @@ export default function BudgetingChapterPage() {
   const handleCommitSub = async (sub: BudgetingSubchapter, code: string, description: string) => {
     if (code === sub.code && description === sub.description) return;
     await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`, sub.id), { code, description });
+    await touchDraft();
+  };
+
+  // El código y el nombre de una fringe se pueden editar desde aquí mismo
+  // (misma fringe, no una copia): actualiza la entrada en draft.fringes.
+  // El importe de la fila no se toca aquí, sale calculado de las líneas.
+  const handleCommitFringe = async (fringe: BudgetingFringe, code: string, label: string) => {
+    if (code === fringe.code && label === fringe.label) return;
+    const next = fringes.map((f) => (f.id === fringe.id ? { ...f, code, label } : f));
+    await updateDoc(doc(db, "budgetingDrafts", draftId), { fringes: next, updatedAt: serverTimestamp() });
     await touchDraft();
   };
 
@@ -287,8 +348,22 @@ export default function BudgetingChapterPage() {
           {!q && <NewSubRow onCommit={handleCommitNewSub} />}
         </div>
 
-        {chapterFringes > 0 && (
-          <p className="text-[10px] text-slate-400 px-4 pt-1.5">+{fmt(chapterFringes)} en cargas sociales propias de este capítulo</p>
+        {chapterFringeBreakdown.length > 0 && (
+          <div className="border-t border-slate-200">
+            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide px-4 pt-2 pb-1">Cargas sociales de este capítulo</p>
+            <div className="divide-y divide-slate-100">
+              {chapterFringeBreakdown.map(({ fringe, amount }) => (
+                <FringeChapterRow
+                  key={fringe.id}
+                  fringe={fringe}
+                  amount={amount}
+                  fmt={fmt}
+                  draftId={draftId}
+                  onCommit={(code, label) => handleCommitFringe(fringe, code, label)}
+                />
+              ))}
+            </div>
+          </div>
         )}
 
         <div className={`grid ${cols} gap-1 items-center px-3 py-2.5 border-t border-slate-200 bg-slate-50/70`}>
