@@ -13,12 +13,12 @@ import {
 } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { Check, FileUp, Plus, Search, Trash2, X } from "lucide-react";
+import { Check, FileUp, LayoutTemplate, Plus, Search, Trash2, X } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
-import { BTN_LIGHT, BudgetingDraftIndex, CURRENCIES, DEFAULT_CATEGORIES } from "@/lib/budgeting";
-import { parseFwbText } from "@/lib/budgetingExport";
+import { BTN_LIGHT, BudgetingDraftIndex, BudgetingTemplate, CURRENCIES, DEFAULT_CATEGORIES } from "@/lib/budgeting";
+import { FwbFile, parseFwbText } from "@/lib/budgetingExport";
 import BudgetingDropdown from "@/components/BudgetingDropdown";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -52,6 +52,13 @@ export default function BudgetingHomePage() {
   const [deleteTarget, setDeleteTarget] = useState<BudgetingDraftIndex | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Plantillas guardadas: estructuras reutilizables para arrancar un borrador ya montado
+  const [templates, setTemplates] = useState<BudgetingTemplate[]>([]);
+  const [templatesPanelOpen, setTemplatesPanelOpen] = useState(false);
+  const templatesPanelRef = useRef<HTMLDivElement>(null);
+  const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null);
+  const [deleteTemplateTarget, setDeleteTemplateTarget] = useState<BudgetingTemplate | null>(null);
+
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, `userBudgetingDrafts/${user.uid}/drafts`), orderBy("updatedAt", "desc"));
@@ -60,6 +67,21 @@ export default function BudgetingHomePage() {
     });
     return () => unsub();
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, `userBudgetingTemplates/${user.uid}/templates`), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(q, (snap) => {
+      setTemplates(snap.docs.map((d) => ({ id: d.id, ...d.data() } as BudgetingTemplate)));
+    });
+    return () => unsub();
+  }, [user]);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => { if (templatesPanelRef.current && !templatesPanelRef.current.contains(e.target as Node)) setTemplatesPanelOpen(false); };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
 
   const filteredDrafts = drafts.filter((d) => d.name.toLowerCase().includes(search.trim().toLowerCase()));
 
@@ -101,6 +123,58 @@ export default function BudgetingHomePage() {
     }
   };
 
+  /** Crea un borrador nuevo a partir de un árbol .fwb, venga de un archivo cargado o de una plantilla guardada. */
+  const createDraftFromFwb = async (fwb: FwbFile, fallbackName: string): Promise<string> => {
+    if (!user) throw new Error("Sin sesión");
+    const name = fwb.name?.trim() || fallbackName;
+    const ref = doc(collection(db, "budgetingDrafts"));
+    const now = serverTimestamp();
+    const categories = fwb.categories.map((c) => ({ id: c.id, code: c.code, label: c.label }));
+    await setDoc(ref, {
+      name,
+      ownerUid: user.uid,
+      ownerName: user.name,
+      currency: fwb.currency || "EUR",
+      createdAt: now,
+      updatedAt: now,
+      sentToProjectId: null,
+      sentToProjectName: null,
+      sentAt: null,
+      categoriesEnabled: fwb.categoriesEnabled,
+      categories,
+      globals: [],
+      fringes: [],
+      phases: [],
+    });
+    await setDoc(doc(db, `userBudgetingDrafts/${user.uid}/drafts`, ref.id), {
+      name, updatedAt: now, status: "draft", sentToProjectName: null,
+    });
+    for (const block of fwb.categories) {
+      for (const chapter of block.chapters) {
+        const chapterRef = await addDoc(collection(db, `budgetingDrafts/${ref.id}/accounts`), {
+          code: chapter.code,
+          description: chapter.description,
+          category: fwb.categoriesEnabled ? block.id : null,
+          createdAt: Timestamp.now(),
+        });
+        for (const sub of chapter.subchapters || []) {
+          const subRef = await addDoc(collection(db, `budgetingDrafts/${ref.id}/accounts/${chapterRef.id}/subchapters`), {
+            code: sub.code, description: sub.description, createdAt: Timestamp.now(),
+          });
+          for (const line of sub.detailLines || []) {
+            await addDoc(collection(db, `budgetingDrafts/${ref.id}/accounts/${chapterRef.id}/subchapters/${subRef.id}/detailLines`), {
+              code: line.code, description: line.description, units: line.units, unit: line.unit || "",
+              multiplier: line.multiplier, rate: line.rate, total: line.total,
+              notes: line.notes || "", tags: line.tags || [],
+              createdAt: Timestamp.now(),
+            });
+          }
+        }
+      }
+    }
+    return ref.id;
+  };
+
   const handleImportFwb = async (file: File) => {
     if (!user) return;
     setImporting(true);
@@ -108,58 +182,33 @@ export default function BudgetingHomePage() {
     try {
       const text = await file.text();
       const fwb = parseFwbText(text);
-      const name = fwb.name?.trim() || file.name.replace(/\.fwb$/i, "");
-      const ref = doc(collection(db, "budgetingDrafts"));
-      const now = serverTimestamp();
-      const categories = fwb.categories.map((c) => ({ id: c.id, code: c.code, label: c.label }));
-      await setDoc(ref, {
-        name,
-        ownerUid: user.uid,
-        ownerName: user.name,
-        currency: fwb.currency || "EUR",
-        createdAt: now,
-        updatedAt: now,
-        sentToProjectId: null,
-        sentToProjectName: null,
-        sentAt: null,
-        categoriesEnabled: fwb.categoriesEnabled,
-        categories,
-        globals: [],
-        fringes: [],
-        phases: [],
-      });
-      await setDoc(doc(db, `userBudgetingDrafts/${user.uid}/drafts`, ref.id), {
-        name, updatedAt: now, status: "draft", sentToProjectName: null,
-      });
-      for (const block of fwb.categories) {
-        for (const chapter of block.chapters) {
-          const chapterRef = await addDoc(collection(db, `budgetingDrafts/${ref.id}/accounts`), {
-            code: chapter.code,
-            description: chapter.description,
-            category: fwb.categoriesEnabled ? block.id : null,
-            createdAt: Timestamp.now(),
-          });
-          for (const sub of chapter.subchapters || []) {
-            const subRef = await addDoc(collection(db, `budgetingDrafts/${ref.id}/accounts/${chapterRef.id}/subchapters`), {
-              code: sub.code, description: sub.description, createdAt: Timestamp.now(),
-            });
-            for (const line of sub.detailLines || []) {
-              await addDoc(collection(db, `budgetingDrafts/${ref.id}/accounts/${chapterRef.id}/subchapters/${subRef.id}/detailLines`), {
-                code: line.code, description: line.description, units: line.units, unit: line.unit || "",
-                multiplier: line.multiplier, rate: line.rate, total: line.total,
-                notes: line.notes || "", tags: line.tags || [],
-                createdAt: Timestamp.now(),
-              });
-            }
-          }
-        }
-      }
-      router.push(`/budgeting/${ref.id}`);
+      const draftId = await createDraftFromFwb(fwb, file.name.replace(/\.fwb$/i, ""));
+      router.push(`/budgeting/${draftId}`);
     } catch (e: any) {
       setImportError(e?.message || "No se pudo cargar el archivo .fwb");
     } finally {
       setImporting(false);
     }
+  };
+
+  const handleUseTemplate = async (template: BudgetingTemplate) => {
+    if (!user || !template.structure) return;
+    setApplyingTemplateId(template.id);
+    try {
+      const draftId = await createDraftFromFwb(template.structure, template.name);
+      router.push(`/budgeting/${draftId}`);
+    } catch (e) {
+      console.error("[Budgeting] Error creando borrador desde plantilla:", e);
+    } finally {
+      setApplyingTemplateId(null);
+      setTemplatesPanelOpen(false);
+    }
+  };
+
+  const handleDeleteTemplate = async () => {
+    if (!deleteTemplateTarget || !user) return;
+    await deleteDoc(doc(db, `userBudgetingTemplates/${user.uid}/templates`, deleteTemplateTarget.id));
+    setDeleteTemplateTarget(null);
   };
 
   const handleDeleteDraft = async () => {
@@ -202,6 +251,44 @@ export default function BudgetingHomePage() {
           className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportFwb(f); e.target.value = ""; }}
         />
+        {templates.length > 0 && (
+          <div ref={templatesPanelRef} className="relative">
+            <button
+              onClick={() => setTemplatesPanelOpen((o) => !o)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${BTN_LIGHT}`}
+            >
+              <LayoutTemplate size={12} />
+              Plantillas
+            </button>
+            {templatesPanelOpen && (
+              <div className="absolute z-30 top-full left-0 mt-1 w-72 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 max-h-80 overflow-y-auto">
+                {templates.map((t) => (
+                  <div key={t.id} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 group">
+                    <button
+                      onClick={() => handleUseTemplate(t)}
+                      disabled={applyingTemplateId === t.id}
+                      className="flex-1 min-w-0 text-left disabled:opacity-50"
+                    >
+                      <p className="text-xs font-medium text-slate-800 truncate">{t.name}</p>
+                      <p className="text-[10px] text-slate-400">{t.chapterCount} capítulos · {t.lineCount} líneas</p>
+                    </button>
+                    {applyingTemplateId === t.id ? (
+                      <span className="text-[10px] text-slate-400 flex-shrink-0">Creando...</span>
+                    ) : (
+                      <button
+                        onClick={() => setDeleteTemplateTarget(t)}
+                        className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 rounded transition-opacity flex-shrink-0"
+                        title="Borrar plantilla"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div className="relative ml-auto w-56">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
           <input
@@ -318,6 +405,27 @@ export default function BudgetingHomePage() {
                 className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
               >
                 {deleting ? "Borrando..." : "Borrar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete template confirm modal ───────────────────────────────── */}
+      {deleteTemplateTarget && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
+            <h3 className="text-sm font-semibold text-slate-900 mb-1.5">Borrar plantilla "{deleteTemplateTarget.name}"</h3>
+            <p className="text-xs text-slate-500 mb-4">Esta acción no se puede deshacer. Los presupuestos ya creados desde ella no se ven afectados.</p>
+            <div className="flex gap-2">
+              <button onClick={() => setDeleteTemplateTarget(null)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteTemplate}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+              >
+                Borrar
               </button>
             </div>
           </div>

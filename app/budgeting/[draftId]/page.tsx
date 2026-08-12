@@ -14,8 +14,8 @@ import {
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  AlertCircle, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Download, FileSpreadsheet,
-  FileText, History, Search, Send, SlidersHorizontal, Trash2, X,
+  AlertCircle, BookmarkPlus, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Download, FileDown, FileSpreadsheet,
+  FileText, FolderOutput, History, Search, Trash2, X,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
@@ -132,7 +132,8 @@ export default function BudgetingTopPage() {
   const [snapshotLabel, setSnapshotLabel] = useState("");
   const [savingSnapshot, setSavingSnapshot] = useState(false);
 
-  // Configuración de exportación (portada, paginación, campos)
+  // Exportar: un solo botón desplegable con las descargas (.fwb/Excel/PDF) y,
+  // debajo, la configuración (portada, paginación, campos) de ese mismo menú.
   const [exportPanelOpen, setExportPanelOpen] = useState(false);
   const exportPanelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -140,6 +141,11 @@ export default function BudgetingTopPage() {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
+
+  // Guardar como plantilla: estructura reutilizable para arrancar otro borrador
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -341,6 +347,28 @@ export default function BudgetingTopPage() {
   const handleExportExcel = () => downloadBudgetExcel(reportParams());
   const handleExportPdf = () => downloadBudgetPdf(reportParams());
 
+  // ── Guardar como plantilla: misma estructura que un .fwb, pero se queda
+  // guardada en la cuenta del usuario para arrancar otro borrador desde ahí. ──
+  const handleSaveTemplate = async () => {
+    if (!user || !draft || !templateName.trim()) return;
+    setSavingTemplate(true);
+    try {
+      const { draftName, ...rest } = reportParams();
+      const structure = buildFwbFromDraft({ name: templateName.trim(), ...rest });
+      await addDoc(collection(db, `userBudgetingTemplates/${user.uid}/templates`), {
+        name: templateName.trim(),
+        structure,
+        chapterCount: chapters.length,
+        lineCount: totalLines,
+        createdAt: Timestamp.now(),
+      });
+      setShowTemplateModal(false);
+      setTemplateName("");
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
   const exportConfig: BudgetingExportConfig = draft?.exportConfig || DEFAULT_EXPORT_CONFIG;
   const updateExportConfig = async (patch: { coverSheet?: boolean; pageBreakPerChapter?: boolean; fields?: Partial<BudgetingExportConfig["fields"]> }) => {
     const next: BudgetingExportConfig = { ...exportConfig, ...patch, fields: { ...exportConfig.fields, ...(patch.fields || {}) } };
@@ -505,17 +533,17 @@ export default function BudgetingTopPage() {
 
   return (
     <div className="w-full px-10 py-6">
-      {/* Top bar */}
+      {/* Top bar: título, luego acciones, y Buscar cerrando la barra del todo a la derecha */}
       <div className="flex items-center justify-between gap-4 mb-4">
-        <h1 className="text-sm font-semibold" style={{ color: "#1D201F" }}>{draft.name}</h1>
-        <div className="flex items-center gap-3 flex-shrink-0">
+        <h1 className="text-sm font-semibold flex-shrink-0" style={{ color: "#1D201F" }}>{draft.name}</h1>
+        <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
           {draft.sentToProjectId && (
-            <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+            <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 flex-shrink-0">
               <Check size={10} /> Enviado a {draft.sentToProjectName}
             </span>
           )}
           {scenarios.length > 0 && (
-            <div className="flex items-center gap-1 p-0.5 border border-slate-200 rounded-lg bg-slate-50" title="Vista previa de escenario: no cambia lo guardado">
+            <div className="flex items-center gap-1 p-0.5 border border-slate-200 rounded-lg bg-slate-50 flex-shrink-0" title="Vista previa de escenario: no cambia lo guardado">
               <button onClick={() => setActiveScenario(null)} className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${!activeScenarioId ? BTN_LIGHT_ACTIVE : "text-slate-500 hover:text-slate-700"}`}>
                 Real
               </button>
@@ -526,40 +554,42 @@ export default function BudgetingTopPage() {
               ))}
             </div>
           )}
-          <div className="relative w-44">
-            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar"
-              className="w-full pl-7 pr-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
-            />
-          </div>
-          <div className="flex items-center gap-1">
-            <button onClick={handleExportFwb} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Descargar .fwb">
-              <Download size={14} />
+
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button onClick={() => setShowTemplateModal(true)} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Guardar como plantilla">
+              <BookmarkPlus size={14} />
             </button>
-            <button onClick={handleExportExcel} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Descargar Excel">
-              <FileSpreadsheet size={14} />
-            </button>
-            <button onClick={handleExportPdf} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Descargar PDF">
-              <FileText size={14} />
-            </button>
+
+            {/* Exportar: un solo botón, el desplegable trae las descargas y su configuración */}
             <div ref={exportPanelRef} className="relative">
-              <button onClick={() => setExportPanelOpen((o) => !o)} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Configurar exportación">
-                <SlidersHorizontal size={14} />
+              <button onClick={() => setExportPanelOpen((o) => !o)} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Exportar">
+                <FileDown size={14} />
               </button>
               {exportPanelOpen && (
                 <div className="absolute z-30 top-full right-0 mt-1 w-64 bg-white border border-slate-200 rounded-xl shadow-lg p-3.5 space-y-3">
-                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Exportación Excel / PDF</p>
-                  <label className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-slate-700">Portada con totales</span>
-                    <input type="checkbox" checked={exportConfig.coverSheet} onChange={(e) => updateExportConfig({ coverSheet: e.target.checked })} className="accent-[#8DA7BE]" />
-                  </label>
-                  <label className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-slate-700">Salto de página por capítulo</span>
-                    <input type="checkbox" checked={exportConfig.pageBreakPerChapter} onChange={(e) => updateExportConfig({ pageBreakPerChapter: e.target.checked })} className="accent-[#8DA7BE]" />
-                  </label>
+                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Descargar</p>
+                  <div className="space-y-0.5">
+                    <button onClick={handleExportPdf} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-slate-50">
+                      <FileText size={13} className="text-slate-400" /> PDF
+                    </button>
+                    <button onClick={handleExportExcel} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-slate-50">
+                      <FileSpreadsheet size={13} className="text-slate-400" /> Excel
+                    </button>
+                    <button onClick={handleExportFwb} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-slate-50">
+                      <Download size={13} className="text-slate-400" /> Archivo .fwb
+                    </button>
+                  </div>
+                  <div className="border-t border-slate-100 pt-2.5">
+                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mb-1.5">Configuración Excel / PDF</p>
+                    <label className="flex items-center justify-between gap-2 mb-1.5">
+                      <span className="text-xs text-slate-700">Portada con totales</span>
+                      <input type="checkbox" checked={exportConfig.coverSheet} onChange={(e) => updateExportConfig({ coverSheet: e.target.checked })} className="accent-[#8DA7BE]" />
+                    </label>
+                    <label className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-slate-700">Salto de página por capítulo</span>
+                      <input type="checkbox" checked={exportConfig.pageBreakPerChapter} onChange={(e) => updateExportConfig({ pageBreakPerChapter: e.target.checked })} className="accent-[#8DA7BE]" />
+                    </label>
+                  </div>
                   <div className="border-t border-slate-100 pt-2.5">
                     <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mb-1.5">Campos visibles</p>
                     <div className="space-y-1.5">
@@ -574,6 +604,7 @@ export default function BudgetingTopPage() {
                 </div>
               )}
             </div>
+
             <Link href={`/budgeting/${draftId}/versions`} className={`p-1.5 rounded-lg inline-flex ${ICON_BTN_LIGHT}`} title="Versiones">
               <History size={14} />
             </Link>
@@ -583,9 +614,20 @@ export default function BudgetingTopPage() {
             <button onClick={handleDuplicateDraft} disabled={duplicating} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT} disabled:opacity-50`} title="Duplicar presupuesto">
               <Copy size={14} />
             </button>
+            {/* Icono propio (no el de enviar mensaje): esto manda el presupuesto a un proyecto, no a una persona */}
             <button onClick={openSendModal} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Enviar a proyecto">
-              <Send size={14} />
+              <FolderOutput size={14} />
             </button>
+          </div>
+
+          <div className="relative w-44 flex-shrink-0">
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar"
+              className="w-full pl-7 pr-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
+            />
           </div>
         </div>
       </div>
@@ -736,6 +778,40 @@ export default function BudgetingTopPage() {
               </button>
               <button onClick={handleSaveSnapshot} disabled={!snapshotLabel.trim() || savingSnapshot} className={`flex-1 py-2.5 rounded-xl text-sm font-medium disabled:opacity-40 ${BTN_LIGHT}`}>
                 {savingSnapshot ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Guardar como plantilla ───────────────────────────────────────── */}
+      {showTemplateModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
+              <h3 className="text-sm font-semibold text-slate-900">Guardar como plantilla</h3>
+              <button onClick={() => setShowTemplateModal(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+                <X size={15} />
+              </button>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-xs text-slate-500 mb-3">Guarda la estructura de este presupuesto (categorías, capítulos, subcapítulos y detalle) para arrancar otro desde aquí más adelante.</p>
+              <label className="text-xs font-medium text-slate-700 block mb-1.5">Nombre de la plantilla</label>
+              <input
+                autoFocus
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && templateName.trim()) handleSaveTemplate(); }}
+                placeholder={draft.name}
+                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
+              />
+            </div>
+            <div className="px-5 py-3 border-t border-slate-100 flex gap-2">
+              <button onClick={() => setShowTemplateModal(false)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
+                Cancelar
+              </button>
+              <button onClick={handleSaveTemplate} disabled={!templateName.trim() || savingTemplate} className={`flex-1 py-2.5 rounded-xl text-sm font-medium disabled:opacity-40 ${BTN_LIGHT}`}>
+                {savingTemplate ? "Guardando..." : "Guardar"}
               </button>
             </div>
           </div>

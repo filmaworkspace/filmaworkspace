@@ -1,7 +1,7 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -13,8 +13,8 @@ import {
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  AlertCircle, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy, MoreVertical,
-  Search, Sigma, SlidersHorizontal, Trash2, X,
+  AlertCircle, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy,
+  Search, Settings2, Sigma, SlidersHorizontal, Trash2, X,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
@@ -38,72 +38,41 @@ const toFields = (l: BudgetingDetailLine): LineFields => ({
   comment: l.notes || "", tags: (l.tags || []).join(", "),
 });
 
-function buildCols(cfg: BudgetingDetailColumnsConfig): string {
+/**
+ * Ancho de columnas del grid como plantilla CSS de verdad (no una clase de
+ * Tailwind construida a mano): las clases `grid-cols-[...]` arbitrarias solo
+ * funcionan si aparecen completas y literales en el código fuente, porque
+ * Tailwind las detecta escaneando el texto en build time — al construirlas
+ * por interpolación en runtime (como aquí, que cambian con la configuración
+ * del usuario) nunca se generaría el CSS y la fila se rompería. Por eso el
+ * ancho va como `style={{ gridTemplateColumns }}` en vez de como clase.
+ */
+function colTemplate(cfg: BudgetingDetailColumnsConfig): string {
   const w = DETAIL_STAT_COLUMN_PX[cfg.statColumnWidth];
   const parts = ["90px", "1fr", `${w}px`, `${w}px`, `${w}px`, `${w}px`, "90px"];
   if (cfg.showComment) parts.push("160px");
   if (cfg.showTags) parts.push("160px");
   parts.push("120px");
-  return `grid-cols-[${parts.join("_")}]`;
+  return parts.join(" ");
 }
 
 interface RouteTarget { chapterId: string; chapterCode: string; chapterDescription: string; sub: BudgetingSubchapter; }
 
-// ─── Menú de columnas (los tres puntitos de la cabecera): qué columnas
-// opcionales se ven y con qué ancho las numéricas — persistido en el borrador. ──
-function ColumnsMenu({ config, onChange }: { config: BudgetingDetailColumnsConfig; onChange: (patch: Partial<BudgetingDetailColumnsConfig>) => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, []);
-  return (
-    <div ref={ref} className="relative flex items-center justify-center h-full">
-      <button onClick={() => setOpen((o) => !o)} className="p-1 rounded text-slate-400 hover:text-[#8DA7BE] hover:bg-[#8DA7BE]/[0.1] transition-colors" title="Columnas">
-        <MoreVertical size={13} />
-      </button>
-      {open && (
-        <div className="absolute z-30 top-full right-0 mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-lg p-3 space-y-3 normal-case">
-          <label className="flex items-center justify-between gap-2">
-            <span className="text-xs text-slate-700">Comentario</span>
-            <input type="checkbox" checked={config.showComment} onChange={(e) => onChange({ showComment: e.target.checked })} className="accent-[#8DA7BE]" />
-          </label>
-          <label className="flex items-center justify-between gap-2">
-            <span className="text-xs text-slate-700">Etiquetas</span>
-            <input type="checkbox" checked={config.showTags} onChange={(e) => onChange({ showTags: e.target.checked })} className="accent-[#8DA7BE]" />
-          </label>
-          <div className="border-t border-slate-100 pt-2.5">
-            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mb-1.5">Ancho de columnas</p>
-            <div className="flex items-center gap-1 p-0.5 border border-slate-200 rounded-lg bg-slate-50 w-fit">
-              {(["compact", "normal", "wide"] as DetailStatColumnWidth[]).map((w) => (
-                <button
-                  key={w}
-                  onClick={() => onChange({ statColumnWidth: w })}
-                  className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${config.statColumnWidth === w ? BTN_LIGHT_ACTIVE : "text-slate-500 hover:text-slate-700"}`}
-                >
-                  {w === "compact" ? "Compacto" : w === "normal" ? "Normal" : "Ancho"}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Sidebar de la línea: Cargas sociales + Sumar en, fuera de la fila para
-// que ésta quede limpia — se abre desde el icono de ajustes de cada línea. ──
-function LineSidebar({
-  line, fringes, allSubchapters, currentSubchapterId, draftId, onClose, onToggleFringe, onSetRoute,
+// ─── Sidebar único: ajustes de columnas de la tabla arriba, y (si hay una
+// línea elegida) sus Cargas sociales + Sumar en debajo — un solo panel, no
+// un popover para uno y un cajón aparte para lo otro. ──────────────────────
+function DetailSidebar({
+  columnsConfig, onChangeColumns, line, fringes, allSubchapters, currentSubchapterId, draftId,
+  onClose, onToggleFringe, onSetRoute,
 }: {
-  line: BudgetingDetailLine; fringes: BudgetingFringe[]; allSubchapters: RouteTarget[]; currentSubchapterId: string; draftId: string;
+  columnsConfig: BudgetingDetailColumnsConfig; onChangeColumns: (patch: Partial<BudgetingDetailColumnsConfig>) => void;
+  line: BudgetingDetailLine | null; fringes: BudgetingFringe[]; allSubchapters: RouteTarget[]; currentSubchapterId: string; draftId: string;
   onClose: () => void; onToggleFringe: (fringeId: string) => void; onSetRoute: (target: RouteTarget | null) => void;
 }) {
   const [routeSearch, setRouteSearch] = useState("");
-  const breakdown = lineFringeBreakdown(line, fringes);
+  useEffect(() => { setRouteSearch(""); }, [line?.id]);
+
+  const breakdown = line ? lineFringeBreakdown(line, fringes) : [];
   const query = routeSearch.trim().toLowerCase();
   const options = allSubchapters.filter((o) => o.sub.id !== currentSubchapterId);
   const filtered = query
@@ -114,78 +83,117 @@ function LineSidebar({
     <>
       <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />
       <div className="fixed right-0 top-0 h-full w-[340px] bg-white border-l border-slate-200 shadow-xl z-50 flex flex-col">
-        <div className="flex items-start justify-between gap-2 px-5 py-4 border-b border-slate-100">
-          <div className="min-w-0">
-            <p className="text-[10px] font-mono text-slate-400">{line.code || "(sin código)"}</p>
-            <p className="text-sm font-semibold text-slate-900 truncate">{line.description || "(sin descripción)"}</p>
-          </div>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg flex-shrink-0">
+        <div className="flex items-center justify-between gap-2 px-5 py-4 border-b border-slate-100 flex-shrink-0">
+          <p className="text-sm font-semibold text-slate-900">Ajustes del detalle</p>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
             <X size={15} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
-          <div>
-            <p className="text-xs font-medium text-slate-700 mb-2">Cargas sociales</p>
-            {fringes.length === 0 ? (
-              <p className="text-xs text-slate-400">Sin cargas sociales configuradas todavía.</p>
-            ) : (
-              <div className="space-y-1">
-                {fringes.map((f) => {
-                  const checked = (line.fringeIds || []).includes(f.id);
-                  const amount = breakdown.find((b) => b.fringe.id === f.id)?.amount;
-                  return (
-                    <button
-                      key={f.id}
-                      onClick={() => onToggleFringe(f.id)}
-                      className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border transition-colors ${checked ? "border-[#8DA7BE] bg-[#8DA7BE]/[0.06]" : "border-slate-200 hover:border-slate-300"}`}
-                    >
-                      <span className="text-xs text-slate-700 truncate">{f.label}</span>
-                      <span className="flex items-center gap-2 flex-shrink-0">
-                        {checked && amount != null && <span className="text-xs font-medium text-slate-600">{fmtDecimal(amount)}</span>}
-                        <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${checked ? "border-[#8DA7BE]" : "border-slate-300"}`} style={{ background: checked ? "#8DA7BE" : "transparent" }}>
-                          {checked && <Check size={9} className="text-white" />}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })}
+
+        <div className="flex-1 overflow-y-auto">
+          {/* Columnas de la tabla */}
+          <div className="px-5 py-4 border-b border-slate-100 space-y-3">
+            <p className="text-xs font-medium text-slate-700">Columnas</p>
+            <label className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-600">Mostrar Comentario</span>
+              <input type="checkbox" checked={columnsConfig.showComment} onChange={(e) => onChangeColumns({ showComment: e.target.checked })} className="accent-[#8DA7BE]" />
+            </label>
+            <label className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-600">Mostrar Etiquetas</span>
+              <input type="checkbox" checked={columnsConfig.showTags} onChange={(e) => onChangeColumns({ showTags: e.target.checked })} className="accent-[#8DA7BE]" />
+            </label>
+            <div>
+              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mb-1.5">Ancho de Cant./Unidad/X/Tarifa</p>
+              <div className="flex items-center gap-1 p-0.5 border border-slate-200 rounded-lg bg-slate-50 w-fit">
+                {(["compact", "normal", "wide"] as DetailStatColumnWidth[]).map((w) => (
+                  <button
+                    key={w}
+                    onClick={() => onChangeColumns({ statColumnWidth: w })}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${columnsConfig.statColumnWidth === w ? BTN_LIGHT_ACTIVE : "text-slate-500 hover:text-slate-700"}`}
+                  >
+                    {w === "compact" ? "Compacto" : w === "normal" ? "Normal" : "Ancho"}
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-medium text-slate-700 mb-2">Sumar en</p>
-            {line.routedTo ? (
-              <div className="border border-slate-200 rounded-lg p-3 space-y-2">
-                <Link
-                  href={`/budgeting/${draftId}/accounts/${line.routedTo.chapterId}/subchapters/${line.routedTo.subchapterId}`}
-                  className="text-xs hover:underline flex items-center gap-1"
-                  style={{ color: "#8DA7BE" }}
-                >
-                  {line.routedTo.chapterCode} · {line.routedTo.subchapterCode} {line.routedTo.subchapterDescription}
-                  <ArrowUpRight size={11} />
-                </Link>
-                <button onClick={() => onSetRoute(null)} className="text-xs text-red-500 hover:underline">Quitar redirección</button>
-              </div>
+
+          {/* Línea seleccionada */}
+          <div className="px-5 py-4">
+            <p className="text-xs font-medium text-slate-700 mb-2">Línea seleccionada</p>
+            {!line ? (
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Pasa el ratón por una línea y pulsa su icono <SlidersHorizontal size={11} className="inline mx-0.5 -mt-0.5" /> para configurar sus cargas sociales o a qué cuenta suma.
+              </p>
             ) : (
               <>
-                <input
-                  value={routeSearch}
-                  onChange={(e) => setRouteSearch(e.target.value)}
-                  placeholder="Buscar cuenta destino..."
-                  className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-[#8DA7BE] mb-2"
-                />
-                <div className="max-h-48 overflow-y-auto space-y-0.5">
-                  {filtered.length === 0 ? (
-                    <p className="text-[11px] text-slate-400 text-center py-3">Sin resultados</p>
-                  ) : (
-                    filtered.map((o) => (
-                      <button key={o.sub.id} onClick={() => onSetRoute(o)} className="w-full flex flex-col items-start px-2.5 py-1.5 rounded-lg text-left hover:bg-slate-50">
-                        <span className="text-xs text-slate-800 truncate">{o.sub.code} {o.sub.description}</span>
-                        <span className="text-[10px] text-slate-400 truncate">{o.chapterCode} {o.chapterDescription}</span>
-                      </button>
-                    ))
-                  )}
+                <div className="mb-4 pb-3 border-b border-slate-100">
+                  <p className="text-[10px] font-mono text-slate-400">{line.code || "(sin código)"}</p>
+                  <p className="text-sm font-medium text-slate-900 truncate">{line.description || "(sin descripción)"}</p>
                 </div>
+
+                <p className="text-xs font-medium text-slate-700 mb-2">Cargas sociales</p>
+                {fringes.length === 0 ? (
+                  <p className="text-xs text-slate-400 mb-4">Sin cargas sociales configuradas todavía.</p>
+                ) : (
+                  <div className="space-y-1 mb-4">
+                    {fringes.map((f) => {
+                      const checked = (line.fringeIds || []).includes(f.id);
+                      const amount = breakdown.find((b) => b.fringe.id === f.id)?.amount;
+                      return (
+                        <button
+                          key={f.id}
+                          onClick={() => onToggleFringe(f.id)}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border transition-colors ${checked ? "border-[#8DA7BE] bg-[#8DA7BE]/[0.06]" : "border-slate-200 hover:border-slate-300"}`}
+                        >
+                          <span className="text-xs text-slate-700 truncate">{f.label}</span>
+                          <span className="flex items-center gap-2 flex-shrink-0">
+                            {checked && amount != null && <span className="text-xs font-medium text-slate-600">{fmtDecimal(amount)}</span>}
+                            <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${checked ? "border-[#8DA7BE]" : "border-slate-300"}`} style={{ background: checked ? "#8DA7BE" : "transparent" }}>
+                              {checked && <Check size={9} className="text-white" />}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <p className="text-xs font-medium text-slate-700 mb-2">Sumar en</p>
+                {line.routedTo ? (
+                  <div className="border border-slate-200 rounded-lg p-3 space-y-2">
+                    <Link
+                      href={`/budgeting/${draftId}/accounts/${line.routedTo.chapterId}/subchapters/${line.routedTo.subchapterId}`}
+                      className="text-xs hover:underline flex items-center gap-1"
+                      style={{ color: "#8DA7BE" }}
+                    >
+                      {line.routedTo.chapterCode} · {line.routedTo.subchapterCode} {line.routedTo.subchapterDescription}
+                      <ArrowUpRight size={11} />
+                    </Link>
+                    <button onClick={() => onSetRoute(null)} className="text-xs text-red-500 hover:underline">Quitar redirección</button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      value={routeSearch}
+                      onChange={(e) => setRouteSearch(e.target.value)}
+                      placeholder="Buscar cuenta destino..."
+                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-[#8DA7BE] mb-2"
+                    />
+                    <div className="max-h-48 overflow-y-auto space-y-0.5">
+                      {filtered.length === 0 ? (
+                        <p className="text-[11px] text-slate-400 text-center py-3">Sin resultados</p>
+                      ) : (
+                        filtered.map((o) => (
+                          <button key={o.sub.id} onClick={() => onSetRoute(o)} className="w-full flex flex-col items-start px-2.5 py-1.5 rounded-lg text-left hover:bg-slate-50">
+                            <span className="text-xs text-slate-800 truncate">{o.sub.code} {o.sub.description}</span>
+                            <span className="text-[10px] text-slate-400 truncate">{o.chapterCode} {o.chapterDescription}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -199,11 +207,11 @@ function LineSidebar({
 // perder el foco (sin botón de confirmar). Componente de módulo estable: no
 // se redefine entre renders, así los inputs no pierden el foco al escribir. ──
 function LineFieldsGrid({
-  fields, onChange, onBlurAny, onEnter, onEscape, globals, totalPreview, muted, cols, showComment, showTags, indicators, actions,
+  fields, onChange, onBlurAny, onEnter, onEscape, globals, totalPreview, muted, template, showComment, showTags, indicators, actions,
 }: {
   fields: LineFields; onChange: (patch: Partial<LineFields>) => void; onBlurAny: () => void;
   onEnter: () => void; onEscape: () => void; globals: { code: string; label: string }[];
-  totalPreview: number; muted: boolean; cols: string; showComment: boolean; showTags: boolean;
+  totalPreview: number; muted: boolean; template: string; showComment: boolean; showTags: boolean;
   indicators?: React.ReactNode; actions?: React.ReactNode;
 }) {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -211,7 +219,7 @@ function LineFieldsGrid({
     if (e.key === "Escape") { onEscape(); }
   };
   return (
-    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-4`}>
+    <div className="grid gap-0 divide-x divide-slate-200 px-4" style={{ gridTemplateColumns: template }}>
       <input value={fields.code} onChange={(e) => onChange({ code: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} font-mono text-xs`} />
       <input value={fields.description} onChange={(e) => onChange({ description: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
@@ -242,12 +250,12 @@ function LineFieldsGrid({
 }
 
 function LineRow({
-  line, fringes, globals, globalValues, columnsConfig, cols, isFirst, isLast, error, sidebarOpen,
+  line, fringes, globals, globalValues, columnsConfig, template, isFirst, isLast, error, sidebarOpen,
   onCommit, onDuplicate, onDelete, onMove, onOpenSidebar,
 }: {
   line: BudgetingDetailLine; fringes: BudgetingFringe[];
   globals: { code: string; label: string }[]; globalValues: Record<string, number>;
-  columnsConfig: BudgetingDetailColumnsConfig; cols: string; isFirst: boolean; isLast: boolean; error?: string; sidebarOpen: boolean;
+  columnsConfig: BudgetingDetailColumnsConfig; template: string; isFirst: boolean; isLast: boolean; error?: string; sidebarOpen: boolean;
   onCommit: (fields: LineFields) => void; onDuplicate: () => void; onDelete: () => void; onMove: (direction: "up" | "down") => void; onOpenSidebar: () => void;
 }) {
   const [fields, setFields] = useState<LineFields>(() => toFields(line));
@@ -271,7 +279,7 @@ function LineRow({
         globals={globals}
         totalPreview={preview}
         muted={!!line.routedTo}
-        cols={cols}
+        template={template}
         showComment={columnsConfig.showComment}
         showTags={columnsConfig.showTags}
         indicators={
@@ -313,9 +321,9 @@ function LineRow({
   );
 }
 
-function NewLineRow({ globals, globalValues, columnsConfig, cols, error, onCommit }: {
+function NewLineRow({ globals, globalValues, columnsConfig, template, error, onCommit }: {
   globals: { code: string; label: string }[]; globalValues: Record<string, number>;
-  columnsConfig: BudgetingDetailColumnsConfig; cols: string; error?: string;
+  columnsConfig: BudgetingDetailColumnsConfig; template: string; error?: string;
   onCommit: (fields: LineFields) => Promise<boolean>;
 }) {
   const [fields, setFields] = useState<LineFields>(emptyFields);
@@ -339,7 +347,7 @@ function NewLineRow({ globals, globalValues, columnsConfig, cols, error, onCommi
         globals={globals}
         totalPreview={preview}
         muted={false}
-        cols={cols}
+        template={template}
         showComment={columnsConfig.showComment}
         showTags={columnsConfig.showTags}
       />
@@ -366,6 +374,7 @@ export default function BudgetingSubchapterPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [search, setSearch] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarLineId, setSidebarLineId] = useState<string | null>(null);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [deleteTarget, setDeleteTarget] = useState<BudgetingDetailLine | null>(null);
@@ -434,7 +443,7 @@ export default function BudgetingSubchapterPage() {
   const globalOptions = useMemo(() => globals.map((g) => ({ code: g.code, label: g.label })), [globals]);
   const globalResolution = useMemo(() => resolveGlobals(globals), [JSON.stringify(globals)]);
   const columnsConfig = draft?.detailColumnsConfig || DEFAULT_DETAIL_COLUMNS_CONFIG;
-  const cols = buildCols(columnsConfig);
+  const template = colTemplate(columnsConfig);
 
   const fringeExtras = computeFringeExtras(lines, fringes);
   const total = subchapter ? Math.round((subchapterTotal(subchapter, lines) + fringeExtras.subchapterScoped) * 100) / 100 : 0;
@@ -455,6 +464,8 @@ export default function BudgetingSubchapterPage() {
     const next: BudgetingDetailColumnsConfig = { ...columnsConfig, ...patch };
     await updateDoc(doc(db, "budgetingDrafts", draftId), { detailColumnsConfig: next, updatedAt: serverTimestamp() });
   };
+
+  const openSidebar = (lineId: string | null) => { setSidebarLineId(lineId); setSidebarOpen(true); };
 
   const isLineCodeTaken = (code: string, excludeId?: string): boolean =>
     !!code && lines.some((l) => l.id !== excludeId && l.code.trim().toLowerCase() === code.trim().toLowerCase());
@@ -633,17 +644,22 @@ export default function BudgetingSubchapterPage() {
       {/* Top bar */}
       <div className="flex items-center justify-between gap-4 mb-4">
         <h1 className="text-sm font-semibold" style={{ color: "#1D201F" }}>{subchapter.code} · {subchapter.description}</h1>
-        <div className="relative w-44 flex-shrink-0">
-          <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar"
-            className="w-full pl-7 pr-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300" />
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="relative w-44">
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar"
+              className="w-full pl-7 pr-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300" />
+          </div>
+          <button onClick={() => openSidebar(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-[#8DA7BE] hover:bg-[#8DA7BE]/[0.1] transition-colors" title="Ajustes del detalle">
+            <Settings2 size={14} />
+          </button>
         </div>
       </div>
 
       {/* Detail lines */}
       <div className="border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">
         <div className="min-w-[720px]">
-          <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-4 border-b border-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
+          <div className="grid gap-0 divide-x divide-slate-200 px-4 border-b border-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60" style={{ gridTemplateColumns: template }}>
             <span className="flex items-center py-2">Código</span>
             <span className="flex items-center py-2 pl-2">Descripción</span>
             <span className="flex items-center justify-center py-2 pl-2">Cant.</span>
@@ -653,7 +669,7 @@ export default function BudgetingSubchapterPage() {
             <span className="flex items-center justify-end py-2 pl-2">Total</span>
             {columnsConfig.showComment && <span className="flex items-center py-2 pl-2">Comentario</span>}
             {columnsConfig.showTags && <span className="flex items-center py-2 pl-2">Etiquetas</span>}
-            <ColumnsMenu config={columnsConfig} onChange={updateColumnsConfig} />
+            <span />
           </div>
           <datalist id="unit-suggestions">
             {UNIT_SUGGESTIONS.map((u) => <option key={u} value={u} />)}
@@ -670,20 +686,20 @@ export default function BudgetingSubchapterPage() {
                   globals={globalOptions}
                   globalValues={globalResolution.values}
                   columnsConfig={columnsConfig}
-                  cols={cols}
+                  template={template}
                   error={rowErrors[line.id]}
                   isFirst={i === 0}
                   isLast={i === sorted.length - 1}
-                  sidebarOpen={sidebarLineId === line.id}
+                  sidebarOpen={sidebarOpen && sidebarLineId === line.id}
                   onCommit={(fields) => handleCommitLine(line, fields)}
                   onDuplicate={() => handleDuplicateLine(line)}
                   onDelete={() => setDeleteTarget(line)}
                   onMove={(direction) => handleMoveLine(line, direction)}
-                  onOpenSidebar={() => setSidebarLineId(sidebarLineId === line.id ? null : line.id)}
+                  onOpenSidebar={() => openSidebar(line.id)}
                 />
               ));
             })()}
-            {!q && <NewLineRow globals={globalOptions} globalValues={globalResolution.values} columnsConfig={columnsConfig} cols={cols} error={rowErrors["new"]} onCommit={handleCommitNewLine} />}
+            {!q && <NewLineRow globals={globalOptions} globalValues={globalResolution.values} columnsConfig={columnsConfig} template={template} error={rowErrors["new"]} onCommit={handleCommitNewLine} />}
           </div>
 
           {(fringeExtras.subchapterScoped > 0 || fringeExtras.chapterScoped > 0 || fringeExtras.totalScoped > 0 || (subchapter.receivedTotal || 0) > 0) && (
@@ -713,17 +729,19 @@ export default function BudgetingSubchapterPage() {
         </div>
       </div>
 
-      {/* ── Sidebar: Cargas sociales + Sumar en ─────────────────────────────── */}
-      {sidebarLine && (
-        <LineSidebar
+      {/* ── Sidebar único: columnas + línea seleccionada ────────────────────── */}
+      {sidebarOpen && (
+        <DetailSidebar
+          columnsConfig={columnsConfig}
+          onChangeColumns={updateColumnsConfig}
           line={sidebarLine}
           fringes={fringes}
           allSubchapters={allSubchapters}
           currentSubchapterId={subchapterId}
           draftId={draftId}
-          onClose={() => setSidebarLineId(null)}
-          onToggleFringe={(id) => handleToggleFringe(sidebarLine, id)}
-          onSetRoute={(target) => handleSetRoute(sidebarLine, target)}
+          onClose={() => setSidebarOpen(false)}
+          onToggleFringe={(id) => sidebarLine && handleToggleFringe(sidebarLine, id)}
+          onSetRoute={(target) => sidebarLine && handleSetRoute(sidebarLine, target)}
         />
       )}
 

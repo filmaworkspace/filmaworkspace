@@ -3,6 +3,7 @@
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { inter } from "@/lib/fonts";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
@@ -25,9 +26,23 @@ export default function BudgetingLayout({ children }: { children: React.ReactNod
   }, [isLoading, user, router]);
 
   if (isLoading || !user || !user.budgetingAccess) {
+    // Mismo logo que la transición del badge en Header.tsx: si se viene de ahí,
+    // esta pantalla continúa la animación en vez de cortar a un spinner suelto.
     return (
-      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-        {(isLoading || !user) && <div className="w-10 h-10 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />}
+      <div
+        className={`min-h-screen flex items-center justify-center ${inter.className}`}
+        style={{ background: "linear-gradient(180deg, #8DA7BE1a, #ffffff 60%)" }}
+      >
+        {(isLoading || !user) && (
+          <Image
+            src="/logo-budgeting-text.svg"
+            alt="Budgeting"
+            width={368}
+            height={48}
+            className="w-64 h-auto animate-budgetingLogoIn"
+            priority
+          />
+        )}
       </div>
     );
   }
