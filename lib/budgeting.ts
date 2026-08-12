@@ -344,8 +344,9 @@ export function fmtCurrency(n: number, currency: string): string {
   return new Intl.NumberFormat("es-ES", { style: "currency", currency: currency || "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
 }
 
+/** Los importes en Budgeting van siempre con dos decimales, nunca menos (0 se ve "0,00", no "0"). */
 export function fmtDecimal(n: number): string {
-  return new Intl.NumberFormat("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n || 0);
+  return new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
 }
 
 // ─── Motor de fórmulas ──────────────────────────────────────────────────────

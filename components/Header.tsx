@@ -87,7 +87,7 @@ export default function Header() {
   const [launchingBudgeting, setLaunchingBudgeting] = useState(false);
   const openBudgeting = () => {
     setLaunchingBudgeting(true);
-    setTimeout(() => router.push("/budgeting"), 550);
+    setTimeout(() => router.push("/budgeting"), 750);
   };
 
   // ── Detect accounts section ──────────────────────────────────────────────
