@@ -59,9 +59,9 @@ function ChapterRow({
       <Link href={`/budgeting/${draftId}/accounts/${chapter.id}`} className="flex items-center justify-center" title="Entrar">
         <ChevronRight size={13} className="text-slate-300 group-hover:text-[#8DA7BE] group-hover:translate-x-0.5 transition-all" />
       </Link>
-      <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown} onFocus={(e) => e.target.select()}
+      <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} font-mono text-xs pl-2`} />
-      <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown} onFocus={(e) => e.target.select()}
+      <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} text-xs pl-2`} />
       <span className="flex items-center justify-end text-xs font-medium text-slate-700 pr-2">{fmt(total)}</span>
       <span className="flex items-center justify-end gap-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -91,9 +91,9 @@ function NewChapterRow({ onCommit }: { onCommit: (code: string, description: str
   return (
     <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3`}>
       <span />
-      <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown} onFocus={(e) => e.target.select()}
+      <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} font-mono text-xs pl-2`} />
-      <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown} onFocus={(e) => e.target.select()}
+      <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} text-xs pl-2`} />
       <span /><span />
     </div>
@@ -284,6 +284,7 @@ export default function BudgetingTopPage() {
         globals: draft.globals ?? [], globalFolders: draft.globalFolders ?? [],
         fringes: draft.fringes ?? [], fringeFolders: draft.fringeFolders ?? [],
         phases: draft.phases ?? [], exportConfig: draft.exportConfig ?? null,
+        detailColumnsConfig: draft.detailColumnsConfig ?? null,
       });
       await setDoc(doc(db, `userBudgetingDrafts/${user.uid}/drafts`, newRef.id), {
         name: newName, updatedAt: now, status: "draft", sentToProjectName: null,
@@ -301,7 +302,7 @@ export default function BudgetingTopPage() {
             await addDoc(collection(db, `budgetingDrafts/${newRef.id}/accounts/${newChapterRef.id}/subchapters/${newSubRef.id}/detailLines`), {
               code: line.code, description: line.description, units: line.units, unitsExpr: line.unitsExpr ?? null, unit: line.unit || "",
               multiplier: line.multiplier, multiplierExpr: line.multiplierExpr ?? null, rate: line.rate, rateExpr: line.rateExpr ?? null, total: line.total,
-              supplier: line.supplier || "", notes: line.notes || "", tags: line.tags || [], fringeIds: line.fringeIds || [],
+              notes: line.notes || "", tags: line.tags || [], fringeIds: line.fringeIds || [],
               createdAt: Timestamp.now(),
             });
           }
@@ -324,7 +325,7 @@ export default function BudgetingTopPage() {
     subchaptersByChapter: Object.fromEntries(Object.entries(subchaptersByChapter).map(([k, v]) => [k, v.map((s) => ({ id: s.id, code: s.code, description: s.description }))])),
     linesBySubchapter: Object.fromEntries(Object.entries(linesBySubchapter).map(([k, v]) => [k, v.map((l) => ({
       code: l.code, description: l.description, units: l.units, unit: l.unit, multiplier: l.multiplier, rate: l.rate, total: l.total,
-      supplier: l.supplier, notes: l.notes, tags: l.tags,
+      notes: l.notes, tags: l.tags,
       routedTo: l.routedTo ? { subchapterCode: l.routedTo.subchapterCode } : null,
     }))])),
     grandTotal,
@@ -562,7 +563,7 @@ export default function BudgetingTopPage() {
                   <div className="border-t border-slate-100 pt-2.5">
                     <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mb-1.5">Campos visibles</p>
                     <div className="space-y-1.5">
-                      {([["unit", "Unidad"], ["supplier", "Proveedor"], ["notes", "Notas"], ["tags", "Etiquetas"]] as const).map(([key, label]) => (
+                      {([["unit", "Unidad"], ["notes", "Comentario"], ["tags", "Etiquetas"]] as const).map(([key, label]) => (
                         <label key={key} className="flex items-center justify-between gap-2">
                           <span className="text-xs text-slate-700">{label}</span>
                           <input type="checkbox" checked={exportConfig.fields[key]} onChange={(e) => updateExportConfig({ fields: { [key]: e.target.checked } as Partial<BudgetingExportConfig["fields"]> })} className="accent-[#8DA7BE]" />

@@ -147,7 +147,7 @@ export default function BudgetingHomePage() {
               await addDoc(collection(db, `budgetingDrafts/${ref.id}/accounts/${chapterRef.id}/subchapters/${subRef.id}/detailLines`), {
                 code: line.code, description: line.description, units: line.units, unit: line.unit || "",
                 multiplier: line.multiplier, rate: line.rate, total: line.total,
-                supplier: line.supplier || "", notes: line.notes || "", tags: line.tags || [],
+                notes: line.notes || "", tags: line.tags || [],
                 createdAt: Timestamp.now(),
               });
             }
