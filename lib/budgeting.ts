@@ -8,7 +8,10 @@
 // para el modelo Account → SubAccount que se replica ahí).
 //
 // Jerarquía (de fuera a dentro): Categoría (apartado, opcional) → Capítulo →
-// Subcapítulo → Detalle (la única con código elegible en una PO).
+// Cuenta (BudgetingSubchapter en el código) → Detalle. Al enviar a un
+// proyecto, Capítulo pasa a ser la Account de Accounting y Cuenta su
+// SubAccount, con el importe presupuestado sumado de sus líneas de detalle;
+// el Detalle no se envía como entidad propia, solo cuenta para esa suma.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Timestamp } from "firebase/firestore";
@@ -151,6 +154,25 @@ export const DEFAULT_DETAIL_COLUMNS_CONFIG: BudgetingDetailColumnsConfig = {
   statColumnWidth: "normal",
 };
 
+/**
+ * Si se ven las cargas sociales como líneas propias (con su código) en cada
+ * nivel, una por alcance: "total" en el Top Sheet, "chapter" en la página de
+ * Capítulo, "subchapter" en la de Detalle. Configurable desde el menú de
+ * columnas de cada nivel (mismo kebab que activa/desactiva columnas), para
+ * poder verlas independientemente de dónde estén asignadas.
+ */
+export interface BudgetingFringeVisibility {
+  topSheet: boolean;
+  chapter: boolean;
+  detail: boolean;
+}
+
+export const DEFAULT_FRINGE_VISIBILITY: BudgetingFringeVisibility = {
+  topSheet: true,
+  chapter: true,
+  detail: true,
+};
+
 export interface BudgetingDraft {
   id: string;
   name: string;
@@ -175,6 +197,7 @@ export interface BudgetingDraft {
   /** Escenario que se está previsualizando ahora mismo (null/undefined = valores reales, sin overrides). */
   activeScenarioId?: string | null;
   detailColumnsConfig?: BudgetingDetailColumnsConfig;
+  fringeVisibility?: BudgetingFringeVisibility;
 }
 
 /** Doc índice en userBudgetingDrafts/{uid}/drafts/{draftId}, para listar rápido en el sidebar sin leer cada borrador entero. */
@@ -201,7 +224,7 @@ export interface BudgetingTemplate {
   structure: FwbFile;
 }
 
-/** budgetingDrafts/{draftId}/accounts/{chapterId} (Capítulo): solo organizativo. */
+/** budgetingDrafts/{draftId}/accounts/{chapterId} (Capítulo): dentro de Budgeting es organizativo (agrupa Cuentas), pero es el nivel que se envía a Accounting como Account. */
 export interface BudgetingAccount {
   id: string;
   code: string;
@@ -213,7 +236,7 @@ export interface BudgetingAccount {
   order?: number;
 }
 
-/** budgetingDrafts/{draftId}/accounts/{chapterId}/subchapters/{subchapterId} (Subcapítulo): también organizativo. */
+/** budgetingDrafts/{draftId}/accounts/{chapterId}/subchapters/{subchapterId} (Cuenta, "Subcapítulo" en el código): el nivel que se envía a Accounting como SubAccount, con su importe presupuestado sumado de sus líneas de detalle. */
 export interface BudgetingSubchapter {
   id: string;
   code: string;
@@ -241,9 +264,12 @@ export interface BudgetingLineRoute {
 }
 
 /**
- * .../subchapters/{subchapterId}/detailLines/{lineId} (Detalle): su código es
- * el que luego se elige en una PO (equivale al SubAccount de Accounting >
- * Budget). Importe calculado, no escrito a mano.
+ * .../subchapters/{subchapterId}/detailLines/{lineId} (Detalle): su código
+ * es solo referencial dentro de Budgeting, no se envía a Accounting como
+ * entidad propia. El código elegible en una PO es el de su Cuenta contenedora
+ * (BudgetingSubchapter, equivale al SubAccount de Accounting > Budget), cuyo
+ * importe presupuestado sale de sumar el total de todas sus líneas.
+ * Importe calculado, no escrito a mano.
  *
  * `units`/`multiplier`/`rate` son siempre el número resuelto (lo que se usa
  * para calcular `total`); si el usuario ha escrito una fórmula referenciando

@@ -5,11 +5,12 @@
 // alternativa al importador de Excel que ya existe ahí.
 //
 // Es JSON por dentro, con extensión propia. Guarda la jerarquía completa
-// (Categoría → Capítulo → Subcapítulo → Detalle) porque Budgeting sí la usa,
-// pero Accounting > Budget no tiene más que 2 niveles: al importar ahí, cada
-// Subcapítulo pasa a ser una CUENTA (es el que agrupa Detail Lines
-// directamente) y cada Detalle una SUBCUENTA con su propio código: el mismo
-// que luego se elige en una PO.
+// (Categoría → Capítulo → Cuenta → Detalle, "Cuenta" es BudgetingSubchapter
+// en el modelo de datos) porque Budgeting sí la usa, pero Accounting > Budget
+// no tiene más que 2 niveles: al importar ahí, cada Capítulo pasa a ser una
+// CUENTA y cada Cuenta de Budgeting una SUBCUENTA, con su importe = suma de
+// todas sus líneas de detalle. Las líneas no se importan como entidades
+// propias, solo su suma.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { BudgetingCategoryDef } from "./budgeting";
@@ -142,21 +143,40 @@ export interface FlatAccountRow {
 
 /**
  * Aplana un .fwb a filas CUENTA/SUBCUENTA, mismo shape que produce el
- * importador de Excel de Accounting > Budget (parseImportFile). Cada
- * Subcapítulo pasa a ser una CUENTA (agrupa Detail Lines directamente) y
- * cada Detalle una SUBCUENTA con su propio código.
+ * importador de Excel de Accounting > Budget (parseImportFile). Accounting
+ * solo tiene dos niveles: cada Capítulo pasa a ser una CUENTA, y cada Cuenta
+ * de Budgeting (el 3er nivel, "Subcapítulo" en el modelo de datos) una
+ * SUBCUENTA con su importe = suma de todas sus líneas de detalle. Las
+ * líneas de detalle no se importan como entidades propias, solo su suma.
  */
 export function flattenFwbToAccountRows(fwb: FwbFile): FlatAccountRow[] {
-  const rows: FlatAccountRow[] = [];
+  // Primera pasada: suma de cada Cuenta (Subcapítulo) por su código,
+  // incluyendo las líneas redirigidas ("excl.") desde otra Cuenta hacia ella.
+  const sumsByCode = new Map<string, number>();
   for (const block of fwb.categories) {
     for (const chapter of block.chapters) {
       for (const sub of chapter.subchapters) {
-        rows.push({ code: sub.code, description: sub.description, type: "CUENTA", budgeted: 0, parentCode: null });
+        if (!sumsByCode.has(sub.code)) sumsByCode.set(sub.code, 0);
         for (const line of sub.detailLines || []) {
-          // Una línea redirigida ("excl.") cuenta en la Account del Subcapítulo destino, no en la física.
-          const parentCode = line.routedToSubchapterCode || sub.code;
-          rows.push({ code: line.code, description: line.description, type: "SUBCUENTA", budgeted: line.total || 0, parentCode });
+          const targetCode = line.routedToSubchapterCode || sub.code;
+          sumsByCode.set(targetCode, (sumsByCode.get(targetCode) || 0) + (line.total || 0));
         }
+      }
+    }
+  }
+
+  const rows: FlatAccountRow[] = [];
+  for (const block of fwb.categories) {
+    for (const chapter of block.chapters) {
+      rows.push({ code: chapter.code, description: chapter.description, type: "CUENTA", budgeted: 0, parentCode: null });
+      for (const sub of chapter.subchapters) {
+        rows.push({
+          code: sub.code,
+          description: sub.description,
+          type: "SUBCUENTA",
+          budgeted: Math.round((sumsByCode.get(sub.code) || 0) * 100) / 100,
+          parentCode: chapter.code,
+        });
       }
     }
   }
