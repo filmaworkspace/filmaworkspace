@@ -81,6 +81,15 @@ export default function Header() {
   const userInitial = userName.charAt(0).toUpperCase();
   const isAdmin     = user?.role === "admin";
 
+  // ── Transición al abrir Budgeting: el logo entra a pantalla completa antes
+  // de navegar, y el gate de app/budgeting/layout.tsx recoge el mismo logo
+  // mientras carga, para que se sienta como una sola animación continua. ──
+  const [launchingBudgeting, setLaunchingBudgeting] = useState(false);
+  const openBudgeting = () => {
+    setLaunchingBudgeting(true);
+    setTimeout(() => router.push("/budgeting"), 550);
+  };
+
   // ── Detect accounts section ──────────────────────────────────────────────
   const accountsMatch = pathname.match(
     /^\/companydashboard\/([^/]+)\/accounts\/([^/]+)(\/.*)?$/
@@ -478,14 +487,33 @@ export default function Header() {
 
           {/* Budgeting quick access — solo en Dashboard */}
           {user?.budgetingAccess && pathname === "/dashboard" && (
-            <Link
-              href="/budgeting"
+            <button
+              onClick={openBudgeting}
               className="flex items-center justify-center h-8 px-2.5 rounded-lg shadow-sm hover:shadow-md hover:scale-105 transition-all"
               style={{ background: "#8DA7BE" }}
               title="Budgeting"
             >
               <Image src="/logo-budgeting-white.svg" alt="Budgeting" width={26} height={8} className="h-2.5 w-auto" />
-            </Link>
+            </button>
+          )}
+
+          {/* Transición de entrada: el logo completo aparece a pantalla completa
+              antes de navegar a /budgeting (ver app/budgeting/layout.tsx, que
+              recoge el mismo logo mientras carga el acceso del usuario). */}
+          {launchingBudgeting && (
+            <div
+              className="fixed inset-0 z-[100] flex items-center justify-center"
+              style={{ background: "linear-gradient(180deg, #8DA7BE1a, #ffffff 60%)" }}
+            >
+              <Image
+                src="/logo-budgeting-text.svg"
+                alt="Budgeting"
+                width={368}
+                height={48}
+                className="w-64 h-auto animate-budgetingLogoIn"
+                priority
+              />
+            </div>
           )}
 
           {/* Profile Avatar */}

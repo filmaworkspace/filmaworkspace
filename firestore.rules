@@ -564,6 +564,10 @@ service cloud.firestore {
       allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
+    match /userBudgetingTemplates/{userId}/templates/{templateId} {
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
+
     match /producers/{producerId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();

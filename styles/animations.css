@@ -12,3 +12,34 @@
 .animate-fadeIn {
   animation: fadeIn 0.2s ease-out;
 }
+
+/* Transición al abrir Budgeting desde el Dashboard (ver Header.tsx y
+   app/budgeting/layout.tsx): el logo entra con un ligero rebote, se
+   mantiene un instante y el overlay se retira dejando paso al contenido. */
+@keyframes budgetingLogoIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(6px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.015) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes budgetingOverlayOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.animate-budgetingLogoIn {
+  animation: budgetingLogoIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-budgetingOverlayOut {
+  animation: budgetingOverlayOut 0.25s ease-in forwards;
+}

@@ -12,6 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Timestamp } from "firebase/firestore";
+import type { FwbFile } from "./budgetingExport";
 
 export const BUDGETING_ACCENT = "#8DA7BE";
 export const BUDGETING_TEXT = "#1D201F";
@@ -183,6 +184,21 @@ export interface BudgetingDraftIndex {
   updatedAt: Timestamp | null;
   status: "draft" | "sent";
   sentToProjectName: string | null;
+}
+
+/**
+ * Plantilla reutilizable en userBudgetingTemplates/{uid}/templates/{id}: la
+ * estructura completa de un borrador (categorías, capítulos, subcapítulos y
+ * detalle) guardada con el mismo formato que un .fwb, para arrancar un
+ * borrador nuevo ya montado en vez de partir de cero cada vez.
+ */
+export interface BudgetingTemplate {
+  id: string;
+  name: string;
+  createdAt: Timestamp | null;
+  chapterCount: number;
+  lineCount: number;
+  structure: FwbFile;
 }
 
 /** budgetingDrafts/{draftId}/accounts/{chapterId} (Capítulo): solo organizativo. */
