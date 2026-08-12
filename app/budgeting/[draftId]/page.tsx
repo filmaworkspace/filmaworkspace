@@ -21,11 +21,13 @@ import {
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
-  BTN_LIGHT, BTN_LIGHT_ACTIVE, BudgetingDraft, BudgetingCategoryDef, BudgetingAccount, BudgetingSubchapter, BudgetingDetailLine, BudgetingExportConfig, BudgetingFringe,
-  CELL_INPUT, DEFAULT_EXPORT_CONFIG, categoriesEnabled, computeLineTotalForScenario, computeReorder, effectiveLineUnits, nextOrderValue, resolveCategories, resolveGlobals, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
+  BTN_LIGHT, BTN_LIGHT_ACTIVE, BudgetingDraft, BudgetingCategoryDef, BudgetingAccount, BudgetingSubchapter, BudgetingDetailLine, BudgetingExportConfig, BudgetingFringe, BudgetingFringeVisibility,
+  CELL_INPUT, DEFAULT_EXPORT_CONFIG, DEFAULT_FRINGE_VISIBILITY, categoriesEnabled, computeLineTotalForScenario, computeReorder, effectiveLineUnits, nextOrderValue, resolveCategories, resolveGlobals, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import { buildFwbFromDraft, downloadFwb } from "@/lib/budgetingExport";
 import { downloadBudgetExcel, downloadBudgetPdf } from "@/lib/budgetingReports";
+import BudgetingColumnsMenu from "@/components/BudgetingColumnsMenu";
+import BudgetingFringeLineRow from "@/components/BudgetingFringeLineRow";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -146,6 +148,7 @@ export default function BudgetingTopPage() {
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templateError, setTemplateError] = useState("");
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -193,6 +196,7 @@ export default function BudgetingTopPage() {
   const catEnabled = categoriesEnabled(draft);
   const cats: BudgetingCategoryDef[] = catEnabled ? resolveCategories(draft) : [];
   const fringes: BudgetingFringe[] = draft?.fringes || [];
+  const fringeVisibility: BudgetingFringeVisibility = draft?.fringeVisibility || DEFAULT_FRINGE_VISIBILITY;
   const scenarios = draft?.scenarios || [];
 
   // Escenarios: solo una previsualización en vivo, recalcula el total de las
@@ -237,23 +241,29 @@ export default function BudgetingTopPage() {
     }
     return sum;
   };
-  const totalScopedFringes = () => {
-    let sum = 0;
+  // Cargas sociales con alcance de todo el presupuesto: desglosadas una a una
+  // (no en un único total agregado) porque cada una aparece como su propia
+  // línea, con su propio código, en el Top Sheet.
+  const topFringeBreakdown = (() => {
+    const sums = new Map<string, number>();
     for (const sub of allSubchapters) {
       for (const l of effectiveLines(sub.sub.id)) {
         for (const id of l.fringeIds || []) {
           const f = fringes.find((fr) => fr.id === id);
-          if (f && f.scope === "total") sum += fringeAmount(f, l);
+          if (!f || f.scope !== "total") continue;
+          sums.set(f.id, (sums.get(f.id) || 0) + fringeAmount(f, l));
         }
       }
     }
-    return Math.round(sum * 100) / 100;
-  };
+    return fringes
+      .filter((f) => sums.has(f.id))
+      .map((f) => ({ fringe: f, amount: Math.round((sums.get(f.id) || 0) * 100) / 100 }));
+  })();
 
   const chaptersByCategory = (categoryId: string | null) => sortByOrder(chapters.filter((c) => c.category === categoryId));
   const chapterTotal = (chapterId: string) => Math.round(((subchaptersByChapter[chapterId] || []).reduce((s, sub) => s + subTotal(sub), 0) + chapterFringesTotal(chapterId)) * 100) / 100;
   const categoryTotal = (categoryId: string) => chaptersByCategory(categoryId).reduce((s, c) => s + chapterTotal(c.id), 0);
-  const grandTotalFringes = totalScopedFringes();
+  const grandTotalFringes = Math.round(topFringeBreakdown.reduce((s, b) => s + b.amount, 0) * 100) / 100;
   const grandTotal = (catEnabled
     ? cats.reduce((s, c) => s + categoryTotal(c.id), 0)
     : chapters.reduce((s, c) => s + chapterTotal(c.id), 0)) + grandTotalFringes;
@@ -273,6 +283,21 @@ export default function BudgetingTopPage() {
       updateDoc(doc(db, "budgetingDrafts", draftId), { updatedAt: now }),
       updateDoc(doc(db, `userBudgetingDrafts/${user.uid}/drafts`, draftId), { updatedAt: now }),
     ]);
+  };
+
+  // El código y el nombre de una fringe se pueden editar desde su propia
+  // línea en el Top Sheet (misma fringe, no una copia): actualiza la entrada
+  // en draft.fringes. El importe de la fila no se toca aquí, sale calculado.
+  const handleCommitFringe = async (fringe: BudgetingFringe, code: string, label: string) => {
+    if (code === fringe.code && label === fringe.label) return;
+    const next = fringes.map((f) => (f.id === fringe.id ? { ...f, code, label } : f));
+    await updateDoc(doc(db, "budgetingDrafts", draftId), { fringes: next, updatedAt: serverTimestamp() });
+    await touchDraft();
+  };
+
+  const updateFringeVisibility = async (patch: Partial<BudgetingFringeVisibility>) => {
+    await updateDoc(doc(db, "budgetingDrafts", draftId), { fringeVisibility: { ...fringeVisibility, ...patch }, updatedAt: serverTimestamp() });
+    await touchDraft();
   };
 
   const handleDuplicateDraft = async () => {
@@ -352,6 +377,7 @@ export default function BudgetingTopPage() {
   const handleSaveTemplate = async () => {
     if (!user || !draft || !templateName.trim()) return;
     setSavingTemplate(true);
+    setTemplateError("");
     try {
       const { draftName, ...rest } = reportParams();
       const structure = buildFwbFromDraft({ name: templateName.trim(), ...rest });
@@ -364,6 +390,9 @@ export default function BudgetingTopPage() {
       });
       setShowTemplateModal(false);
       setTemplateName("");
+    } catch (e: any) {
+      console.error("[Budgeting] Error guardando plantilla:", e);
+      setTemplateError(e?.message || "No se pudo guardar la plantilla");
     } finally {
       setSavingTemplate(false);
     }
@@ -477,25 +506,36 @@ export default function BudgetingTopPage() {
     setSending(true);
     setSendError("");
     try {
-      // Dos pasadas: primero una Account por cada Subcapítulo, luego las SubAccounts,
-      // así una línea con `routedTo` puede colocarse bajo la Account de su destino
-      // real en vez de la de su ubicación física.
-      const accountIdBySubchapterId: Record<string, string> = {};
-      for (const sub of allSubchapters) {
-        const accountRef = await addDoc(collection(db, `projects/${selectedProject.id}/accounts`), {
-          code: sub.sub.code, description: sub.sub.description, createdAt: Timestamp.now(), createdBy: user.uid,
-        });
-        accountIdBySubchapterId[sub.sub.id] = accountRef.id;
-      }
+      // Accounting solo tiene dos niveles: Capítulo pasa a ser una Account, y
+      // Cuenta (el 3er nivel de Budgeting, "Subcapítulo" en el código) una
+      // SubAccount con su importe presupuestado = suma de todas sus líneas de
+      // detalle. Las líneas de detalle no se envían como entidades propias,
+      // solo su suma; una línea con `routedTo` suma en la Cuenta destino, no
+      // en la física.
+      const sumBySubId: Record<string, number> = {};
+      for (const sub of allSubchapters) sumBySubId[sub.sub.id] = 0;
       for (const sub of allSubchapters) {
         for (const line of linesBySubchapter[sub.sub.id] || []) {
           const targetSubId = line.routedTo?.subchapterId ?? sub.sub.id;
-          const accountId = accountIdBySubchapterId[targetSubId] ?? accountIdBySubchapterId[sub.sub.id];
-          await addDoc(collection(db, `projects/${selectedProject.id}/accounts/${accountId}/subaccounts`), {
-            code: line.code, description: line.description, budgeted: line.total || 0,
-            committed: 0, actual: 0, accountId, createdAt: Timestamp.now(), createdBy: user.uid,
-          });
+          sumBySubId[targetSubId] = (sumBySubId[targetSubId] || 0) + (line.total || 0);
         }
+      }
+
+      const accountIdByChapterId: Record<string, string> = {};
+      for (const chapter of chapters) {
+        const accountRef = await addDoc(collection(db, `projects/${selectedProject.id}/accounts`), {
+          code: chapter.code, description: chapter.description, createdAt: Timestamp.now(), createdBy: user.uid,
+        });
+        accountIdByChapterId[chapter.id] = accountRef.id;
+      }
+      for (const sub of allSubchapters) {
+        const accountId = accountIdByChapterId[sub.chapterId];
+        if (!accountId) continue;
+        await addDoc(collection(db, `projects/${selectedProject.id}/accounts/${accountId}/subaccounts`), {
+          code: sub.sub.code, description: sub.sub.description,
+          budgeted: Math.round((sumBySubId[sub.sub.id] || 0) * 100) / 100,
+          committed: 0, actual: 0, accountId, createdAt: Timestamp.now(), createdBy: user.uid,
+        });
       }
       const now = serverTimestamp();
       await updateDoc(doc(db, "budgetingDrafts", draftId), {
@@ -556,7 +596,7 @@ export default function BudgetingTopPage() {
           )}
 
           <div className="flex items-center gap-1 flex-shrink-0">
-            <button onClick={() => setShowTemplateModal(true)} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Guardar como plantilla">
+            <button onClick={() => { setTemplateError(""); setShowTemplateModal(true); }} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Guardar como plantilla">
               <BookmarkPlus size={14} />
             </button>
 
@@ -646,7 +686,14 @@ export default function BudgetingTopPage() {
           <span className="flex items-center py-2 pl-2">Código</span>
           <span className="flex items-center py-2 pl-2">Descripción</span>
           <span className="flex items-center justify-end py-2 pr-2">Total</span>
-          <span></span>
+          <span className="flex items-center justify-end pl-2">
+            <BudgetingColumnsMenu title="Columnas">
+              <label className="flex items-center justify-between gap-2">
+                <span className="text-xs text-slate-700">Mostrar cargas sociales</span>
+                <input type="checkbox" checked={fringeVisibility.topSheet} onChange={(e) => updateFringeVisibility({ topSheet: e.target.checked })} className="accent-[#8DA7BE]" />
+              </label>
+            </BudgetingColumnsMenu>
+          </span>
         </div>
         {catEnabled && cats.length > 0 ? (
           <>
@@ -682,8 +729,24 @@ export default function BudgetingTopPage() {
               );
             })}
 
-            {grandTotalFringes > 0 && (
-              <p className="text-[10px] text-slate-400 px-4 pt-1.5">+{fmt(grandTotalFringes)} en cargas sociales del presupuesto entero</p>
+            {fringeVisibility.topSheet && topFringeBreakdown.length > 0 && (
+              <div className="border-t border-slate-200">
+                <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide px-4 pt-2 pb-1">Cargas sociales de todo el presupuesto</p>
+                <div className="divide-y divide-slate-100">
+                  {topFringeBreakdown.map(({ fringe, amount }) => (
+                    <BudgetingFringeLineRow
+                      key={fringe.id}
+                      fringe={fringe}
+                      amount={amount}
+                      fmt={fmt}
+                      draftId={draftId}
+                      cols={cols}
+                      tooltip="Carga social de todo el presupuesto"
+                      onCommit={(code, label) => handleCommitFringe(fringe, code, label)}
+                    />
+                  ))}
+                </div>
+              </div>
             )}
             <div className={`grid ${cols} gap-1 items-center pl-3 pr-3 py-2.5 border-t border-slate-200 bg-slate-50/70`}>
               <span />
@@ -715,8 +778,24 @@ export default function BudgetingTopPage() {
               })()}
             </div>
             <NewChapterRow onCommit={(code, description) => handleCommitNewChapter(null, code, description)} />
-            {grandTotalFringes > 0 && (
-              <p className="text-[10px] text-slate-400 px-4 pt-1.5">+{fmt(grandTotalFringes)} en cargas sociales del presupuesto entero</p>
+            {fringeVisibility.topSheet && topFringeBreakdown.length > 0 && (
+              <div className="border-t border-slate-200">
+                <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide px-4 pt-2 pb-1">Cargas sociales de todo el presupuesto</p>
+                <div className="divide-y divide-slate-100">
+                  {topFringeBreakdown.map(({ fringe, amount }) => (
+                    <BudgetingFringeLineRow
+                      key={fringe.id}
+                      fringe={fringe}
+                      amount={amount}
+                      fmt={fmt}
+                      draftId={draftId}
+                      cols={cols}
+                      tooltip="Carga social de todo el presupuesto"
+                      onCommit={(code, label) => handleCommitFringe(fringe, code, label)}
+                    />
+                  ))}
+                </div>
+              </div>
             )}
             <div className={`grid ${cols} gap-1 items-center pl-3 pr-3 py-2.5 border-t border-slate-200 bg-slate-50/70`}>
               <span />
@@ -805,6 +884,12 @@ export default function BudgetingTopPage() {
                 placeholder={draft.name}
                 className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
               />
+              {templateError && (
+                <div className="flex items-center gap-1.5 text-xs text-red-600 mt-2.5">
+                  <AlertCircle size={12} />
+                  {templateError}
+                </div>
+              )}
             </div>
             <div className="px-5 py-3 border-t border-slate-100 flex gap-2">
               <button onClick={() => setShowTemplateModal(false)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
@@ -873,11 +958,15 @@ export default function BudgetingTopPage() {
                 </p>
                 <div className="border border-slate-200 rounded-xl divide-y divide-slate-100">
                   <div className="flex items-center justify-between px-3.5 py-2 text-sm">
-                    <span className="text-slate-500">Cuentas (subcapítulos)</span>
+                    <span className="text-slate-500">Cuentas (capítulos)</span>
+                    <span className="font-medium text-slate-900">{chapters.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between px-3.5 py-2 text-sm">
+                    <span className="text-slate-500">Subcuentas (cuentas)</span>
                     <span className="font-medium text-slate-900">{totalSubchapters}</span>
                   </div>
                   <div className="flex items-center justify-between px-3.5 py-2 text-sm">
-                    <span className="text-slate-500">Detail lines</span>
+                    <span className="text-slate-500">Líneas de detalle (se suman en cada subcuenta)</span>
                     <span className="font-medium text-slate-900">{totalLines}</span>
                   </div>
                   <div className="flex items-center justify-between px-3.5 py-2 text-sm">

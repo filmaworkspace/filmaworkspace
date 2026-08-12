@@ -14,14 +14,14 @@ import {
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
   AlertCircle, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy,
-  MoreVertical, Search, Settings2, Sigma, SlidersHorizontal, Trash2, X,
+  MoreVertical, Percent, Search, Settings2, Sigma, SlidersHorizontal, Trash2, X,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
-  BTN_LIGHT_ACTIVE, BudgetingAccount, BudgetingDetailColumnsConfig, BudgetingDetailLine, BudgetingDraft, BudgetingFringe,
-  BudgetingLineRoute, BudgetingSubchapter, CELL_INPUT, DEFAULT_DETAIL_COLUMNS_CONFIG, DETAIL_STAT_COLUMN_PX, DetailStatColumnWidth,
+  BTN_LIGHT_ACTIVE, BudgetingAccount, BudgetingDetailColumnsConfig, BudgetingDetailLine, BudgetingDraft, BudgetingFringe, BudgetingFringeVisibility,
+  BudgetingLineRoute, BudgetingSubchapter, CELL_INPUT, DEFAULT_DETAIL_COLUMNS_CONFIG, DEFAULT_FRINGE_VISIBILITY, DETAIL_STAT_COLUMN_PX, DetailStatColumnWidth,
   UNIT_SUGGESTIONS, computeFringeExtras, computeLineTotal, computeReorder, evaluateFieldExpr,
   fmtCurrency, fmtDecimal, isPlainNumber, lineFringeBreakdown, nextOrderValue, resolveGlobals, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
@@ -30,7 +30,8 @@ import BudgetingFormulaInput from "@/components/BudgetingFormulaInput";
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface LineFields { code: string; description: string; units: string; unit: string; multiplier: string; rate: string; comment: string; tags: string; }
-const emptyFields: LineFields = { code: "", description: "", units: "", unit: "", multiplier: "", rate: "", comment: "", tags: "" };
+// X (multiplicador) empieza siempre en 1 por defecto: es el caso más común, y así no hace falta escribirlo a mano en cada línea nueva.
+const emptyFields: LineFields = { code: "", description: "", units: "", unit: "", multiplier: "1", rate: "", comment: "", tags: "" };
 const toFields = (l: BudgetingDetailLine): LineFields => ({
   code: l.code, description: l.description,
   units: l.unitsExpr ?? String(l.units), unit: l.unit || "",
@@ -61,14 +62,64 @@ function colTemplate(cfg: BudgetingDetailColumnsConfig): string {
 
 interface RouteTarget { chapterId: string; chapterCode: string; chapterDescription: string; sub: BudgetingSubchapter; }
 
+// ─── Fila de una carga social ("fringe") con alcance de subcapítulo: aparece
+// como una línea más de la tabla, alineada a las mismas columnas (con las de
+// Cant./Unidad/X/Tarifa en blanco), con su código y nombre editables, pero
+// el importe es de solo lectura porque sale calculado de las líneas. ───────
+function SubchapterFringeRow({
+  fringe, amount, draftId, template, columnsConfig, onCommit,
+}: {
+  fringe: BudgetingFringe; amount: number; draftId: string; template: string; columnsConfig: BudgetingDetailColumnsConfig;
+  onCommit: (code: string, label: string) => void;
+}) {
+  const [code, setCode] = useState(fringe.code);
+  const [label, setLabel] = useState(fringe.label);
+
+  const commit = () => {
+    if (!code.trim() || !label.trim()) { setCode(fringe.code); setLabel(fringe.label); return; }
+    onCommit(code.trim(), label.trim());
+  };
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") e.currentTarget.blur();
+    if (e.key === "Escape") { setCode(fringe.code); setLabel(fringe.label); }
+  };
+
+  return (
+    <div className="grid gap-0 divide-x divide-slate-200 px-4 hover:bg-slate-50 group" style={{ gridTemplateColumns: template }}>
+      <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
+        className={`${CELL_INPUT} font-mono text-xs`} />
+      <input value={label} onChange={(e) => setLabel(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
+        className={`${CELL_INPUT} text-xs pl-2`} />
+      <span />
+      <span />
+      <span />
+      <span />
+      <span className="flex items-center justify-end text-xs font-semibold pl-2 pr-2 text-slate-500" title="Importe calculado a partir de las líneas: no se edita aquí">
+        {fmtDecimal(amount)}
+      </span>
+      {columnsConfig.showComment && <span />}
+      {columnsConfig.showTags && <span />}
+      <Link
+        href={`/budgeting/${draftId}/fringes`}
+        className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-[#8DA7BE]"
+        title="Ver en Cargas sociales"
+      >
+        <Percent size={10} />
+        <ArrowUpRight size={12} />
+      </Link>
+    </div>
+  );
+}
+
 // ─── Sidebar único: ajustes de columnas de la tabla arriba, y (si hay una
 // línea elegida) sus Cargas sociales + Sumar en debajo — un solo panel, no
 // un popover para uno y un cajón aparte para lo otro. ──────────────────────
 function DetailSidebar({
-  columnsConfig, onChangeColumns, line, fringes, allSubchapters, currentSubchapterId, draftId,
+  columnsConfig, onChangeColumns, showFringes, onToggleShowFringes, line, fringes, allSubchapters, currentSubchapterId, draftId,
   onClose, onToggleFringe, onSetRoute,
 }: {
   columnsConfig: BudgetingDetailColumnsConfig; onChangeColumns: (patch: Partial<BudgetingDetailColumnsConfig>) => void;
+  showFringes: boolean; onToggleShowFringes: (v: boolean) => void;
   line: BudgetingDetailLine | null; fringes: BudgetingFringe[]; allSubchapters: RouteTarget[]; currentSubchapterId: string; draftId: string;
   onClose: () => void; onToggleFringe: (fringeId: string) => void; onSetRoute: (target: RouteTarget | null) => void;
 }) {
@@ -104,6 +155,10 @@ function DetailSidebar({
             <label className="flex items-center justify-between gap-2">
               <span className="text-xs text-slate-600">Mostrar Etiquetas</span>
               <input type="checkbox" checked={columnsConfig.showTags} onChange={(e) => onChangeColumns({ showTags: e.target.checked })} className="accent-[#8DA7BE]" />
+            </label>
+            <label className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-600">Mostrar cargas sociales</span>
+              <input type="checkbox" checked={showFringes} onChange={(e) => onToggleShowFringes(e.target.checked)} className="accent-[#8DA7BE]" />
             </label>
             <div>
               <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mb-1.5">Ancho de Cant./Unidad/X/Tarifa</p>
@@ -447,9 +502,27 @@ export default function BudgetingSubchapterPage() {
   const globalResolution = useMemo(() => resolveGlobals(globals), [JSON.stringify(globals)]);
   const columnsConfig = draft?.detailColumnsConfig || DEFAULT_DETAIL_COLUMNS_CONFIG;
   const template = colTemplate(columnsConfig);
+  const fringeVisibility: BudgetingFringeVisibility = draft?.fringeVisibility || DEFAULT_FRINGE_VISIBILITY;
 
   const fringeExtras = computeFringeExtras(lines, fringes);
   const total = subchapter ? Math.round((subchapterTotal(subchapter, lines) + fringeExtras.subchapterScoped) * 100) / 100 : 0;
+
+  // Cargas sociales con alcance de este subcapítulo: desglosadas una a una
+  // (no en un único total agregado) porque cada una puede aparecer como su
+  // propia línea, con su propio código, si el toggle "Mostrar cargas
+  // sociales" está activado.
+  const subchapterFringeBreakdown = (() => {
+    const sums = new Map<string, number>();
+    for (const line of lines) {
+      for (const { fringe, amount } of lineFringeBreakdown(line, fringes)) {
+        if (fringe.scope !== "subchapter") continue;
+        sums.set(fringe.id, (sums.get(fringe.id) || 0) + amount);
+      }
+    }
+    return fringes
+      .filter((f) => sums.has(f.id))
+      .map((f) => ({ fringe: f, amount: Math.round((sums.get(f.id) || 0) * 100) / 100 }));
+  })();
 
   const q = search.trim().toLowerCase();
   const matchesSearch = (l: BudgetingDetailLine) => !q || l.code.toLowerCase().includes(q) || l.description.toLowerCase().includes(q);
@@ -466,6 +539,21 @@ export default function BudgetingSubchapterPage() {
   const updateColumnsConfig = async (patch: Partial<BudgetingDetailColumnsConfig>) => {
     const next: BudgetingDetailColumnsConfig = { ...columnsConfig, ...patch };
     await updateDoc(doc(db, "budgetingDrafts", draftId), { detailColumnsConfig: next, updatedAt: serverTimestamp() });
+  };
+
+  const updateFringeVisibility = async (patch: Partial<BudgetingFringeVisibility>) => {
+    await updateDoc(doc(db, "budgetingDrafts", draftId), { fringeVisibility: { ...fringeVisibility, ...patch }, updatedAt: serverTimestamp() });
+    await touchDraft();
+  };
+
+  // El código y el nombre de una fringe se pueden editar desde su propia
+  // línea aquí (misma fringe, no una copia): actualiza la entrada en
+  // draft.fringes. El importe de la fila no se toca, sale calculado.
+  const handleCommitFringe = async (fringe: BudgetingFringe, code: string, label: string) => {
+    if (code === fringe.code && label === fringe.label) return;
+    const next = fringes.map((f) => (f.id === fringe.id ? { ...f, code, label } : f));
+    await updateDoc(doc(db, "budgetingDrafts", draftId), { fringes: next, updatedAt: serverTimestamp() });
+    await touchDraft();
   };
 
   const openSidebar = (lineId: string | null) => { setSidebarLineId(lineId); setSidebarOpen(true); };
@@ -713,9 +801,28 @@ export default function BudgetingSubchapterPage() {
             {!q && <NewLineRow globals={globalOptions} globalValues={globalResolution.values} columnsConfig={columnsConfig} template={template} error={rowErrors["new"]} onCommit={handleCommitNewLine} />}
           </div>
 
+          {fringeVisibility.detail && subchapterFringeBreakdown.length > 0 && (
+            <div className="border-t border-slate-100">
+              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide px-4 pt-2 pb-1">Cargas sociales de este subcapítulo</p>
+              <div className="divide-y divide-slate-100">
+                {subchapterFringeBreakdown.map(({ fringe, amount }) => (
+                  <SubchapterFringeRow
+                    key={fringe.id}
+                    fringe={fringe}
+                    amount={amount}
+                    draftId={draftId}
+                    template={template}
+                    columnsConfig={columnsConfig}
+                    onCommit={(code, label) => handleCommitFringe(fringe, code, label)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           {(fringeExtras.subchapterScoped > 0 || fringeExtras.chapterScoped > 0 || fringeExtras.totalScoped > 0 || (subchapter.receivedTotal || 0) > 0) && (
             <div className="px-4 py-1.5 border-t border-slate-100 space-y-0.5">
-              {fringeExtras.subchapterScoped > 0 && (
+              {fringeExtras.subchapterScoped > 0 && !(fringeVisibility.detail && subchapterFringeBreakdown.length > 0) && (
                 <p className="text-[11px] text-slate-500 flex items-center justify-between">
                   <span>Cargas sociales</span>
                   <span className="text-slate-600 font-medium">{fmt(fringeExtras.subchapterScoped)}</span>
@@ -745,6 +852,8 @@ export default function BudgetingSubchapterPage() {
         <DetailSidebar
           columnsConfig={columnsConfig}
           onChangeColumns={updateColumnsConfig}
+          showFringes={fringeVisibility.detail}
+          onToggleShowFringes={(v) => updateFringeVisibility({ detail: v })}
           line={sidebarLine}
           fringes={fringes}
           allSubchapters={allSubchapters}

@@ -10,14 +10,16 @@ import { db } from "@/lib/firebase";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp, updateDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { AlertCircle, ArrowUpRight, ChevronDown, ChevronRight, ChevronUp, Percent, Search, Trash2 } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, Search, Trash2 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
-  BudgetingAccount, BudgetingDetailLine, BudgetingDraft, BudgetingFringe, BudgetingSubchapter,
-  CELL_INPUT, computeReorder, fmtCurrency, nextOrderValue, sortByOrder, subchapterTotal,
+  BudgetingAccount, BudgetingDetailLine, BudgetingDraft, BudgetingFringe, BudgetingFringeVisibility, BudgetingSubchapter,
+  CELL_INPUT, DEFAULT_FRINGE_VISIBILITY, computeReorder, fmtCurrency, nextOrderValue, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
+import BudgetingColumnsMenu from "@/components/BudgetingColumnsMenu";
+import BudgetingFringeLineRow from "@/components/BudgetingFringeLineRow";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -91,51 +93,6 @@ function NewSubRow({ onCommit }: { onCommit: (code: string, description: string)
   );
 }
 
-// ─── Fila de una carga social ("fringe") con alcance de capítulo: aparece
-// como una línea más, con su propio código asignable, pero el importe es
-// solo lectura porque sale calculado de las líneas de detalle, no se escribe
-// a mano aquí. Componente de módulo estable, mismo patrón que SubRow. ──────
-function FringeChapterRow({
-  fringe, amount, fmt, draftId, onCommit,
-}: {
-  fringe: BudgetingFringe; amount: number; fmt: (n: number) => string; draftId: string;
-  onCommit: (code: string, label: string) => void;
-}) {
-  const [code, setCode] = useState(fringe.code);
-  const [label, setLabel] = useState(fringe.label);
-
-  const commit = () => {
-    if (!code.trim() || !label.trim()) { setCode(fringe.code); setLabel(fringe.label); return; }
-    onCommit(code.trim(), label.trim());
-  };
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") e.currentTarget.blur();
-    if (e.key === "Escape") { setCode(fringe.code); setLabel(fringe.label); }
-  };
-
-  return (
-    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group`}>
-      <span className="flex items-center justify-center text-slate-300" title="Carga social de este capítulo">
-        <Percent size={11} />
-      </span>
-      <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} font-mono text-xs pl-2`} />
-      <input value={label} onChange={(e) => setLabel(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} text-xs pl-2`} />
-      <span className="flex items-center justify-end text-xs font-medium text-slate-500 pr-2" title="Importe calculado a partir de las líneas de detalle: no se edita aquí">
-        {fmt(amount)}
-      </span>
-      <Link
-        href={`/budgeting/${draftId}/fringes`}
-        className="flex items-center justify-end gap-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-[#8DA7BE]"
-        title="Ver en Cargas sociales"
-      >
-        <ArrowUpRight size={12} />
-      </Link>
-    </div>
-  );
-}
-
 export default function BudgetingChapterPage() {
   const { draftId, accountId } = useParams() as { draftId: string; accountId: string };
   const { user } = useUser();
@@ -190,6 +147,7 @@ export default function BudgetingChapterPage() {
   const currency = draft?.currency || "EUR";
   const fmt = (n: number) => fmtCurrency(n, currency);
   const fringes = draft?.fringes || [];
+  const fringeVisibility: BudgetingFringeVisibility = draft?.fringeVisibility || DEFAULT_FRINGE_VISIBILITY;
 
   const subTotal = (sub: BudgetingSubchapter) => {
     const lines = linesBySubchapter[sub.id] || [];
@@ -246,6 +204,11 @@ export default function BudgetingChapterPage() {
     if (code === fringe.code && label === fringe.label) return;
     const next = fringes.map((f) => (f.id === fringe.id ? { ...f, code, label } : f));
     await updateDoc(doc(db, "budgetingDrafts", draftId), { fringes: next, updatedAt: serverTimestamp() });
+    await touchDraft();
+  };
+
+  const updateFringeVisibility = async (patch: Partial<BudgetingFringeVisibility>) => {
+    await updateDoc(doc(db, "budgetingDrafts", draftId), { fringeVisibility: { ...fringeVisibility, ...patch }, updatedAt: serverTimestamp() });
     await touchDraft();
   };
 
@@ -323,7 +286,14 @@ export default function BudgetingChapterPage() {
           <span className="flex items-center py-2 pl-2">Código</span>
           <span className="flex items-center py-2 pl-2">Descripción</span>
           <span className="flex items-center justify-end py-2 pr-2">Total</span>
-          <span></span>
+          <span className="flex items-center justify-end pl-2">
+            <BudgetingColumnsMenu title="Columnas">
+              <label className="flex items-center justify-between gap-2">
+                <span className="text-xs text-slate-700">Mostrar cargas sociales</span>
+                <input type="checkbox" checked={fringeVisibility.chapter} onChange={(e) => updateFringeVisibility({ chapter: e.target.checked })} className="accent-[#8DA7BE]" />
+              </label>
+            </BudgetingColumnsMenu>
+          </span>
         </div>
 
         <div className="divide-y divide-slate-100">
@@ -348,17 +318,19 @@ export default function BudgetingChapterPage() {
           {!q && <NewSubRow onCommit={handleCommitNewSub} />}
         </div>
 
-        {chapterFringeBreakdown.length > 0 && (
+        {fringeVisibility.chapter && chapterFringeBreakdown.length > 0 && (
           <div className="border-t border-slate-200">
             <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide px-4 pt-2 pb-1">Cargas sociales de este capítulo</p>
             <div className="divide-y divide-slate-100">
               {chapterFringeBreakdown.map(({ fringe, amount }) => (
-                <FringeChapterRow
+                <BudgetingFringeLineRow
                   key={fringe.id}
                   fringe={fringe}
                   amount={amount}
                   fmt={fmt}
                   draftId={draftId}
+                  cols={cols}
+                  tooltip="Carga social de este capítulo"
                   onCommit={(code, label) => handleCommitFringe(fringe, code, label)}
                 />
               ))}

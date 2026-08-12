@@ -58,6 +58,7 @@ export default function BudgetingHomePage() {
   const templatesPanelRef = useRef<HTMLDivElement>(null);
   const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null);
   const [deleteTemplateTarget, setDeleteTemplateTarget] = useState<BudgetingTemplate | null>(null);
+  const [templateError, setTemplateError] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -194,14 +195,16 @@ export default function BudgetingHomePage() {
   const handleUseTemplate = async (template: BudgetingTemplate) => {
     if (!user || !template.structure) return;
     setApplyingTemplateId(template.id);
+    setTemplateError("");
     try {
       const draftId = await createDraftFromFwb(template.structure, template.name);
       router.push(`/budgeting/${draftId}`);
-    } catch (e) {
+      setTemplatesPanelOpen(false);
+    } catch (e: any) {
       console.error("[Budgeting] Error creando borrador desde plantilla:", e);
+      setTemplateError(e?.message || "No se pudo crear el borrador desde la plantilla");
     } finally {
       setApplyingTemplateId(null);
-      setTemplatesPanelOpen(false);
     }
   };
 
@@ -285,6 +288,9 @@ export default function BudgetingHomePage() {
                     )}
                   </div>
                 ))}
+                {templateError && (
+                  <p className="text-[11px] text-red-600 px-3 pt-1.5">{templateError}</p>
+                )}
               </div>
             )}
           </div>
