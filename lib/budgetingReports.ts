@@ -17,7 +17,7 @@ interface ReportChapter { id: string; code: string; description: string; }
 interface ReportSubchapter { id: string; code: string; description: string; }
 interface ReportLine {
   code: string; description: string; units: number; unit: string; multiplier: number; rate: number; total: number;
-  supplier?: string; notes?: string; tags?: string[];
+  notes?: string; tags?: string[];
 }
 
 export interface BudgetReportParams {
@@ -105,8 +105,7 @@ export function downloadBudgetExcel(p: BudgetReportParams) {
   const header = ["Categoría", "Capítulo", "Subcapítulo", "Código", "Descripción", "Cantidad"];
   if (cfg.fields.unit) header.push("Unidad");
   header.push("X", "Tarifa", "Total");
-  if (cfg.fields.supplier) header.push("Proveedor");
-  if (cfg.fields.notes) header.push("Notas");
+  if (cfg.fields.notes) header.push("Comentario");
   if (cfg.fields.tags) header.push("Etiquetas");
 
   const rows: (string | number)[][] = [header];
@@ -121,7 +120,6 @@ export function downloadBudgetExcel(p: BudgetReportParams) {
           ];
           if (cfg.fields.unit) row.push(line.unit);
           row.push(line.multiplier, line.rate, line.total);
-          if (cfg.fields.supplier) row.push(line.supplier || "");
           if (cfg.fields.notes) row.push(line.notes || "");
           if (cfg.fields.tags) row.push((line.tags || []).join(", "));
           rows.push(row);
@@ -178,12 +176,11 @@ export function downloadBudgetPdf(p: BudgetReportParams) {
         doc.sectionTitle(`${chapter.code} ${chapter.description} · ${sub.code} ${sub.description}`);
         const columns: PdfTableColumn[] = [
           { label: "Código", width: 24 },
-          { label: "Descripción", width: cfg.fields.supplier ? 50 : 68 },
+          { label: "Descripción", width: 68 },
           { label: "Cant.", width: 14, align: "right" },
         ];
         if (cfg.fields.unit) columns.push({ label: "Unidad", width: 16, align: "left" as const });
         columns.push({ label: "Tarifa", width: 21, align: "right" as const }, { label: "Total", width: 21, align: "right" as const });
-        if (cfg.fields.supplier) columns.push({ label: "Proveedor", width: 30, align: "left" as const });
 
         doc.table(
           columns,
@@ -191,7 +188,6 @@ export function downloadBudgetPdf(p: BudgetReportParams) {
             const row = [l.code, l.description, String(l.units)];
             if (cfg.fields.unit) row.push(l.unit || "");
             row.push(fmtCurrency(l.rate, p.currency), fmtCurrency(l.total, p.currency));
-            if (cfg.fields.supplier) row.push(l.supplier || "");
             return row;
           })
         );

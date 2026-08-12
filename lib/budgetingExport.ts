@@ -25,7 +25,6 @@ export interface FwbDetailLine {
   multiplier: number;
   rate: number;
   total: number;
-  supplier?: string;
   notes?: string;
   tags?: string[];
   /** Si está puesta, la línea cuenta en el Subcapítulo indicado (por código) en vez del suyo propio (ver BudgetingLineRoute). */
@@ -91,7 +90,7 @@ export function downloadFwb(fwb: FwbFile, filename: string) {
 interface LiteEntity { id: string; code: string; description: string; }
 interface LiteLine {
   code: string; description: string; units: number; unit: string; multiplier: number; rate: number; total: number;
-  supplier?: string; notes?: string; tags?: string[]; routedTo?: { subchapterCode: string } | null;
+  notes?: string; tags?: string[]; routedTo?: { subchapterCode: string } | null;
 }
 
 /** Construye un .fwb a partir de los datos ya cargados de un borrador. */
@@ -124,7 +123,7 @@ export function buildFwbFromDraft(params: {
           detailLines: (params.linesBySubchapter[sub.id] || []).map((l) => ({
             code: l.code, description: l.description, units: l.units, unit: l.unit,
             multiplier: l.multiplier, rate: l.rate, total: l.total,
-            supplier: l.supplier, notes: l.notes, tags: l.tags,
+            notes: l.notes, tags: l.tags,
             routedToSubchapterCode: l.routedTo?.subchapterCode,
           })),
         })),

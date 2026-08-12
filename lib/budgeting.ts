@@ -118,7 +118,6 @@ export interface BudgetingExportConfig {
   pageBreakPerChapter: boolean;
   fields: {
     unit: boolean;
-    supplier: boolean;
     notes: boolean;
     tags: boolean;
   };
@@ -127,7 +126,28 @@ export interface BudgetingExportConfig {
 export const DEFAULT_EXPORT_CONFIG: BudgetingExportConfig = {
   coverSheet: true,
   pageBreakPerChapter: false,
-  fields: { unit: true, supplier: false, notes: false, tags: false },
+  fields: { unit: true, notes: false, tags: false },
+};
+
+/** Ancho de las columnas numéricas (Cant./Unidad/X/Tarifa) del nivel de Detalle, en px, elegido por el usuario. */
+export type DetailStatColumnWidth = "compact" | "normal" | "wide";
+export const DETAIL_STAT_COLUMN_PX: Record<DetailStatColumnWidth, number> = {
+  compact: 56,
+  normal: 72,
+  wide: 96,
+};
+
+/** Qué columnas opcionales se ven en la tabla de Detalle y con qué ancho las columnas numéricas — configurable desde el menú de la cabecera. */
+export interface BudgetingDetailColumnsConfig {
+  showComment: boolean;
+  showTags: boolean;
+  statColumnWidth: DetailStatColumnWidth;
+}
+
+export const DEFAULT_DETAIL_COLUMNS_CONFIG: BudgetingDetailColumnsConfig = {
+  showComment: true,
+  showTags: false,
+  statColumnWidth: "normal",
 };
 
 export interface BudgetingDraft {
@@ -153,6 +173,7 @@ export interface BudgetingDraft {
   scenarios?: BudgetingScenario[];
   /** Escenario que se está previsualizando ahora mismo (null/undefined = valores reales, sin overrides). */
   activeScenarioId?: string | null;
+  detailColumnsConfig?: BudgetingDetailColumnsConfig;
 }
 
 /** Doc índice en userBudgetingDrafts/{uid}/drafts/{draftId}, para listar rápido en el sidebar sin leer cada borrador entero. */
@@ -226,7 +247,7 @@ export interface BudgetingDetailLine {
   rate: number;
   rateExpr?: string;
   total: number;
-  supplier?: string;
+  /** Comentario, integrado en la propia línea (columna opcional, no en un panel aparte). */
   notes?: string;
   tags?: string[];
   /** Fringes/SS aplicados a esta línea (ids de BudgetingFringe del borrador). */
@@ -547,12 +568,16 @@ export const ROW_INPUT =
  * El padding vertical va en la propia celda (no en la fila contenedora) para
  * que sea justo eso lo que fija la altura de la fila entera: así las líneas
  * divisorias entre columnas (divide-x en el grid) van de verdad de arriba a
- * abajo, no solo del alto del texto. Al enfocar se rellena entera de gris,
- * sin contorno, como la celda activa de una hoja de cálculo. Guarda al
- * perder el foco, sin botón de confirmar.
+ * abajo, no solo del alto del texto. Al enfocar se sombrea entera y se le
+ * marca el borde completo en el acento, como la celda activa seleccionada de
+ * una hoja de cálculo. Al hacer clic el cursor se coloca donde se ha
+ * pulsado (no selecciona todo el texto) para poder seguir escribiendo desde
+ * ahí; seleccionar/copiar sigue funcionando igual que en cualquier campo de
+ * texto normal (arrastrar, Cmd/Ctrl+A...). Guarda al perder el foco, sin
+ * botón de confirmar.
  */
 export const CELL_INPUT =
-  "w-full h-full bg-transparent focus:outline-none focus:bg-slate-200/70 px-1.5 py-2.5 transition-colors";
+  "w-full h-full bg-transparent focus:outline-none focus:bg-slate-200/70 focus:ring-2 focus:ring-inset focus:ring-[#8DA7BE] px-1.5 py-2.5 transition-colors";
 
 // ─── Snapshots / versiones ──────────────────────────────────────────────────
 // budgetingDrafts/{draftId}/snapshots/{snapshotId}: una foto congelada del
