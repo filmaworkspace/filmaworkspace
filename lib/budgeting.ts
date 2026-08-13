@@ -271,6 +271,8 @@ export interface BudgetingAccount {
   order?: number;
   /** Si es true, esta fila es solo una nota de texto (sin código ni importe): no suma, no se puede entrar dentro. */
   isTextLine?: boolean;
+  /** Si es true, esta fila muestra la suma de las filas de arriba desde el subtotal anterior (o el principio): no editable, no cuenta como fila propia en el siguiente subtotal. */
+  isSubtotal?: boolean;
   textBold?: boolean;
   textColor?: string;
 }
@@ -286,6 +288,8 @@ export interface BudgetingSubchapter {
   receivedTotal?: number;
   /** Si es true, esta fila es solo una nota de texto (sin código ni importe): no suma, no se puede entrar dentro. */
   isTextLine?: boolean;
+  /** Si es true, esta fila muestra la suma de las filas de arriba desde el subtotal anterior (o el principio): no editable, no cuenta como fila propia en el siguiente subtotal. */
+  isSubtotal?: boolean;
   textBold?: boolean;
   textColor?: string;
 }
@@ -343,6 +347,8 @@ export interface BudgetingDetailLine {
   order?: number;
   /** Si es true, esta fila es solo una nota de texto (sin código ni importe): no suma, no lleva cantidad/tarifa. */
   isTextLine?: boolean;
+  /** Si es true, esta fila muestra la suma de las filas de arriba desde el subtotal anterior (o el principio): no editable, no cuenta como fila propia en el siguiente subtotal. */
+  isSubtotal?: boolean;
   textBold?: boolean;
   textColor?: string;
 }
@@ -371,15 +377,36 @@ export function nextOrderValue(): number {
  * (para que documentos antiguos sin `order` no queden descolocados), si no 0.
  * El orden se reordena libremente después con moveOrder().
  */
+function effectiveOrder(item: { order?: number; createdAt?: { seconds: number } | Timestamp | null }): number {
+  if (item.order != null) return item.order;
+  const c = item.createdAt as any;
+  if (c && typeof c.seconds === "number") return c.seconds * 1000;
+  if (c && typeof c.toMillis === "function") return c.toMillis();
+  return 0;
+}
+
 export function sortByOrder<T extends { order?: number; createdAt?: { seconds: number } | Timestamp | null }>(items: T[]): T[] {
-  const key = (item: T) => {
-    if (item.order != null) return item.order;
-    const c = item.createdAt as any;
-    if (c && typeof c.seconds === "number") return c.seconds * 1000;
-    if (c && typeof c.toMillis === "function") return c.toMillis();
-    return 0;
-  };
-  return [...items].sort((a, b) => key(a) - key(b));
+  return [...items].sort((a, b) => effectiveOrder(a) - effectiveOrder(b));
+}
+
+/**
+ * Valor de `order` para insertar una fila nueva justo después de `afterId`
+ * (o al principio si `afterId` es null) en una lista ya ordenada con
+ * `sortByOrder`, usado por el menú contextual de clic derecho ("Insertar
+ * línea/línea de texto/subtotal aquí"). Punto medio entre los dos vecinos,
+ * así no hace falta reescribir el `order` de nadie más.
+ */
+export function orderAfter<T extends { id: string; order?: number; createdAt?: { seconds: number } | Timestamp | null }>(
+  sorted: T[], afterId: string | null
+): number {
+  if (sorted.length === 0) return nextOrderValue();
+  if (afterId === null) return effectiveOrder(sorted[0]) - 1;
+  const idx = sorted.findIndex((i) => i.id === afterId);
+  if (idx < 0) return nextOrderValue();
+  const curOrder = effectiveOrder(sorted[idx]);
+  const next = sorted[idx + 1];
+  if (!next) return curOrder + 1;
+  return (curOrder + effectiveOrder(next)) / 2;
 }
 
 /** Calcula el intercambio de `order` necesario para mover un elemento un puesto arriba/abajo dentro de `items` (ya en su grupo, p.ej. capítulos de la misma categoría). Devuelve null si ya está en el extremo. */
