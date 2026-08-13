@@ -14,7 +14,7 @@ import {
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
   AlertCircle, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy,
-  MoreVertical, Percent, Plus, Search, Settings2, Sigma, SlidersHorizontal, Trash2, X,
+  MoreVertical, Percent, Search, Settings2, Sigma, SlidersHorizontal, Trash2, X,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
@@ -637,18 +637,6 @@ export default function BudgetingSubchapterPage() {
     await touchDraft();
   };
 
-  // Fila en blanco a demanda: al pulsar "+ Añadir línea" se crea vacía y se
-  // autoenfoca, en vez de regenerarse sola cada vez que se rellena la última.
-  // X (multiplicador) empieza en 1, igual que en emptyFields.
-  const handleAddLine = async () => {
-    const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`), {
-      code: "", description: "", units: 0, unit: "", multiplier: 1, rate: 0, total: 0,
-      notes: "", tags: [], fringeIds: [], routedTo: null, order: nextOrderValue(), createdAt: Timestamp.now(),
-    });
-    await touchDraft();
-    setJustAddedId(ref.id);
-  };
-
   // ── Línea de texto / subtotal (mismo doc de Detalle, marcado con
   // isTextLine/isSubtotal, para poder intercalarlas entre líneas reales). Se
   // insertan justo debajo de la fila donde se abrió el menú contextual. ──
@@ -656,7 +644,7 @@ export default function BudgetingSubchapterPage() {
     const sorted = sortByOrder(lines);
     const order = orderAfter(sorted, afterId);
     const base: Record<string, unknown> = {
-      code: "", description: "", units: 0, unit: "", multiplier: 0, rate: 0, total: 0,
+      code: "", description: "", units: 0, unit: "", multiplier: 1, rate: 0, total: 0,
       notes: "", tags: [], fringeIds: [], routedTo: null, order, createdAt: Timestamp.now(),
     };
     if (kind === "text") Object.assign(base, { isTextLine: true, textBold: false, textColor: DEFAULT_TEXT_LINE_COLOR });
@@ -850,6 +838,16 @@ export default function BudgetingSubchapterPage() {
                   onDelete: () => setDeleteTarget(line),
                 });
               };
+              if (sorted.length === 0) {
+                return !q ? (
+                  <div
+                    className="px-4 py-3 text-[10px] text-slate-300 italic select-none"
+                    onContextMenu={(e) => { e.preventDefault(); setLineMenu({ x: e.clientX, y: e.clientY, rowId: null }); }}
+                  >
+                    Clic derecho para añadir una línea
+                  </div>
+                ) : null;
+              }
               return sorted.map((line, i) =>
                 line.isTextLine || line.isSubtotal ? (
                   <TextLineRow
@@ -890,11 +888,6 @@ export default function BudgetingSubchapterPage() {
                 )
               );
             })()}
-            {!q && (
-              <button onClick={handleAddLine} className="flex items-center gap-1 px-4 py-1.5 text-[10px] text-slate-400 hover:text-[#8DA7BE] transition-colors">
-                <Plus size={10} /> Añadir línea
-              </button>
-            )}
           </div>
 
           {fringeVisibility.detail && subchapterFringeBreakdown.length > 0 && (

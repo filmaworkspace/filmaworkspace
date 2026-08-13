@@ -15,14 +15,14 @@ import {
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
   AlertCircle, Building2, BookmarkPlus, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Download, FileDown, FileSpreadsheet,
-  FileText, FolderOutput, History, Plus, Search, Trash2, X,
+  FileText, FolderOutput, History, Search, Trash2, X,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
   BTN_LIGHT, BTN_LIGHT_ACTIVE, BudgetingDraft, BudgetingCategoryDef, BudgetingAccount, BudgetingSubchapter, BudgetingDetailLine, BudgetingExportConfig, BudgetingFringe, BudgetingFringeVisibility, BudgetingProjectInfo,
-  CELL_INPUT, DEFAULT_EXPORT_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, PDF_FONT_SIZE_LABELS, PdfFontSize, categoriesEnabled, computeLineTotalForScenario, computeReorder, effectiveLineUnits, nextOrderValue, orderAfter, resolveCategories, resolveGlobals, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
+  CELL_INPUT, DEFAULT_EXPORT_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, PDF_FONT_SIZE_LABELS, PdfFontSize, categoriesEnabled, computeLineTotalForScenario, computeReorder, effectiveLineUnits, orderAfter, resolveCategories, resolveGlobals, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import { buildFwbFromDraft, downloadFwb } from "@/lib/budgetingExport";
 import { downloadBudgetExcel, downloadBudgetPdf } from "@/lib/budgetingReports";
@@ -487,14 +487,6 @@ export default function BudgetingTopPage() {
     await touchDraft();
   };
 
-  // Fila en blanco a demanda: al pulsar "+ Añadir línea" se crea vacía y se
-  // autoenfoca, en vez de regenerarse sola cada vez que se rellena la última.
-  const handleAddChapter = async (category: string | null) => {
-    const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts`), { code: "", description: "", category, order: nextOrderValue(), createdAt: Timestamp.now() });
-    await touchDraft();
-    setJustAddedId(ref.id);
-  };
-
   // ── Línea de texto / subtotal (mismo doc de capítulo, marcado con
   // isTextLine/isSubtotal, para poder intercalarlas entre capítulos reales).
   // Se insertan justo debajo de la fila donde se abrió el menú contextual. ──
@@ -849,9 +841,18 @@ export default function BudgetingTopPage() {
                         }}
                       />
                     ))}
-                    <button onClick={() => handleAddChapter(cat.id)} className="flex items-center gap-1 pl-3 py-1.5 text-[10px] text-slate-400 hover:text-[#8DA7BE] transition-colors">
-                      <Plus size={10} /> Añadir línea
-                    </button>
+                    {catChapters.length === 0 && (
+                      <div
+                        className="px-3 py-3 text-[10px] text-slate-300 italic select-none"
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setChapterMenuCategory(cat.id);
+                          setChapterMenu({ x: e.clientX, y: e.clientY, rowId: null });
+                        }}
+                      >
+                        Clic derecho para añadir una línea
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -889,6 +890,20 @@ export default function BudgetingTopPage() {
             <div className="divide-y divide-slate-100">
               {(() => {
                 const flatSorted = sortByOrder(chapters.filter(matchesSearch));
+                if (flatSorted.length === 0) {
+                  return (
+                    <div
+                      className="px-3 py-3 text-[10px] text-slate-300 italic select-none"
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setChapterMenuCategory(null);
+                        setChapterMenu({ x: e.clientX, y: e.clientY, rowId: null });
+                      }}
+                    >
+                      Clic derecho para añadir una línea
+                    </div>
+                  );
+                }
                 return flatSorted.map((chapter, i) => (
                   <ChapterRow
                     key={chapter.id}
@@ -921,9 +936,6 @@ export default function BudgetingTopPage() {
                 ));
               })()}
             </div>
-            <button onClick={() => handleAddChapter(null)} className="flex items-center gap-1 pl-3 py-1.5 text-[10px] text-slate-400 hover:text-[#8DA7BE] transition-colors">
-              <Plus size={10} /> Añadir línea
-            </button>
             {fringeVisibility.topSheet && topFringeBreakdown.length > 0 && (
               <div className="border-t border-slate-200">
                 <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide px-4 pt-2 pb-1">Cargas sociales de todo el presupuesto</p>

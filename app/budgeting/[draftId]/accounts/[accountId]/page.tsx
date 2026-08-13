@@ -10,13 +10,13 @@ import { db } from "@/lib/firebase";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp, updateDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, Plus, Search, Trash2 } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, Search, Trash2 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
   BudgetingAccount, BudgetingDetailLine, BudgetingDraft, BudgetingFringe, BudgetingFringeVisibility, BudgetingSubchapter,
-  CELL_INPUT, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, computeReorder, fmtCurrency, nextOrderValue, orderAfter, sortByOrder, subchapterTotal,
+  CELL_INPUT, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, computeReorder, fmtCurrency, orderAfter, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import BudgetingColumnsMenu from "@/components/BudgetingColumnsMenu";
 import BudgetingFringeLineRow from "@/components/BudgetingFringeLineRow";
@@ -239,14 +239,6 @@ export default function BudgetingChapterPage() {
     await touchDraft();
   };
 
-  // Fila en blanco a demanda: al pulsar "+ Añadir línea" se crea vacía y se
-  // autoenfoca, en vez de regenerarse sola cada vez que se rellena la última.
-  const handleAddSub = async () => {
-    const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`), { code: "", description: "", order: nextOrderValue(), createdAt: Timestamp.now() });
-    await touchDraft();
-    setJustAddedId(ref.id);
-  };
-
   // ── Línea de texto / subtotal (mismo doc de subcapítulo, marcado con
   // isTextLine/isSubtotal, para poder intercalarlas entre cuentas reales).
   // Se insertan justo debajo de la fila donde se abrió el menú contextual. ──
@@ -359,6 +351,19 @@ export default function BudgetingChapterPage() {
         <div className="divide-y divide-slate-100">
           {(() => {
             const sorted = sortByOrder(subchapters.filter(matchesSearch));
+            if (sorted.length === 0) {
+              return !q ? (
+                <div
+                  className="px-3 py-3 text-[10px] text-slate-300 italic select-none"
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setSubMenu({ x: e.clientX, y: e.clientY, rowId: null });
+                  }}
+                >
+                  Clic derecho para añadir una línea
+                </div>
+              ) : null;
+            }
             return sorted.map((sub, i) => (
               <SubRow
                 key={sub.id}
@@ -390,11 +395,6 @@ export default function BudgetingChapterPage() {
               />
             ));
           })()}
-          {!q && (
-            <button onClick={handleAddSub} className="flex items-center gap-1 px-3 py-1.5 text-[10px] text-slate-400 hover:text-[#8DA7BE] transition-colors">
-              <Plus size={10} /> Añadir línea
-            </button>
-          )}
         </div>
 
         {fringeVisibility.chapter && chapterFringeBreakdown.length > 0 && (
