@@ -14,20 +14,21 @@ import {
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  AlertCircle, BookmarkPlus, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Download, FileDown, FileSpreadsheet,
-  FileText, FolderOutput, History, Search, Trash2, X,
+  AlertCircle, Building2, BookmarkPlus, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Download, FileDown, FileSpreadsheet,
+  FileText, FolderOutput, History, Search, Trash2, Type, X,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
-  BTN_LIGHT, BTN_LIGHT_ACTIVE, BudgetingDraft, BudgetingCategoryDef, BudgetingAccount, BudgetingSubchapter, BudgetingDetailLine, BudgetingExportConfig, BudgetingFringe, BudgetingFringeVisibility,
-  CELL_INPUT, DEFAULT_EXPORT_CONFIG, DEFAULT_FRINGE_VISIBILITY, categoriesEnabled, computeLineTotalForScenario, computeReorder, effectiveLineUnits, nextOrderValue, resolveCategories, resolveGlobals, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
+  BTN_LIGHT, BTN_LIGHT_ACTIVE, BudgetingDraft, BudgetingCategoryDef, BudgetingAccount, BudgetingSubchapter, BudgetingDetailLine, BudgetingExportConfig, BudgetingFringe, BudgetingFringeVisibility, BudgetingProjectInfo,
+  CELL_INPUT, DEFAULT_EXPORT_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, PDF_FONT_SIZE_LABELS, PdfFontSize, categoriesEnabled, computeLineTotalForScenario, computeReorder, effectiveLineUnits, nextOrderValue, resolveCategories, resolveGlobals, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import { buildFwbFromDraft, downloadFwb } from "@/lib/budgetingExport";
 import { downloadBudgetExcel, downloadBudgetPdf } from "@/lib/budgetingReports";
 import BudgetingColumnsMenu from "@/components/BudgetingColumnsMenu";
 import BudgetingFringeLineRow from "@/components/BudgetingFringeLineRow";
+import BudgetingTextLineControls from "@/components/BudgetingTextLineControls";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -39,10 +40,12 @@ const cols = "grid-cols-[26px_100px_1fr_100px_58px]";
 // placeholder, guarda sola al perder el foco. Componentes de módulo
 // estables: no se redefinen entre renders, así los inputs no pierden el foco. ──
 function ChapterRow({
-  chapter, draftId, fmt, total, isFirst, isLast, onCommit, onMove, onDelete,
+  chapter, draftId, fmt, total, isFirst, isLast, autoFocusText, onCommit, onCommitTextLine, onMove, onDelete,
 }: {
-  chapter: BudgetingAccount; draftId: string; fmt: (n: number) => string; total: number; isFirst: boolean; isLast: boolean;
-  onCommit: (code: string, description: string) => void; onMove: (direction: "up" | "down") => void; onDelete: () => void;
+  chapter: BudgetingAccount; draftId: string; fmt: (n: number) => string; total: number; isFirst: boolean; isLast: boolean; autoFocusText?: boolean;
+  onCommit: (code: string, description: string) => void;
+  onCommitTextLine: (patch: { description?: string; textBold?: boolean; textColor?: string }) => void;
+  onMove: (direction: "up" | "down") => void; onDelete: () => void;
 }) {
   const [code, setCode] = useState(chapter.code);
   const [description, setDescription] = useState(chapter.description);
@@ -55,6 +58,49 @@ function ChapterRow({
     if (e.key === "Enter") e.currentTarget.blur();
     if (e.key === "Escape") { setCode(chapter.code); setDescription(chapter.description); }
   };
+
+  if (chapter.isTextLine) {
+    const commitText = () => {
+      if (!description.trim()) { setDescription(chapter.description); return; }
+      if (description.trim() !== chapter.description) onCommitTextLine({ description: description.trim() });
+    };
+    const handleTextKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") e.currentTarget.blur();
+      if (e.key === "Escape") setDescription(chapter.description);
+    };
+    return (
+      <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group`}>
+        <span />
+        <input
+          autoFocus={autoFocusText}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          onBlur={commitText}
+          onKeyDown={handleTextKeyDown}
+          placeholder="Texto..."
+          style={{ gridColumn: "2 / 5", color: chapter.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: chapter.textBold ? 700 : 400 }}
+          className={`${CELL_INPUT} text-xs pl-2`}
+        />
+        <span className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <BudgetingTextLineControls
+            bold={!!chapter.textBold}
+            color={chapter.textColor || DEFAULT_TEXT_LINE_COLOR}
+            onChangeBold={(v) => onCommitTextLine({ textBold: v })}
+            onChangeColor={(c) => onCommitTextLine({ textColor: c })}
+          />
+          <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+            <ChevronUp size={11} />
+          </button>
+          <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+            <ChevronDown size={11} />
+          </button>
+          <button onClick={onDelete} className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar línea">
+            <Trash2 size={11} />
+          </button>
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group`}>
@@ -118,6 +164,8 @@ export default function BudgetingTopPage() {
   const [search, setSearch] = useState("");
 
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  // id de la última línea de texto recién creada, para autoenfocarla al aparecer
+  const [justAddedTextId, setJustAddedTextId] = useState<string | null>(null);
 
   // Enviar a proyecto
   const [showSendModal, setShowSendModal] = useState(false);
@@ -324,16 +372,19 @@ export default function BudgetingTopPage() {
       for (const chapter of chapters) {
         const newChapterRef = await addDoc(collection(db, `budgetingDrafts/${newRef.id}/accounts`), {
           code: chapter.code, description: chapter.description, category: chapter.category, createdAt: Timestamp.now(),
+          isTextLine: chapter.isTextLine || false, textBold: chapter.textBold || false, textColor: chapter.textColor || null,
         });
         for (const sub of subchaptersByChapter[chapter.id] || []) {
           const newSubRef = await addDoc(collection(db, `budgetingDrafts/${newRef.id}/accounts/${newChapterRef.id}/subchapters`), {
             code: sub.code, description: sub.description, createdAt: Timestamp.now(),
+            isTextLine: sub.isTextLine || false, textBold: sub.textBold || false, textColor: sub.textColor || null,
           });
           for (const line of linesBySubchapter[sub.id] || []) {
             await addDoc(collection(db, `budgetingDrafts/${newRef.id}/accounts/${newChapterRef.id}/subchapters/${newSubRef.id}/detailLines`), {
               code: line.code, description: line.description, units: line.units, unitsExpr: line.unitsExpr ?? null, unit: line.unit || "",
               multiplier: line.multiplier, multiplierExpr: line.multiplierExpr ?? null, rate: line.rate, rateExpr: line.rateExpr ?? null, total: line.total,
               notes: line.notes || "", tags: line.tags || [], fringeIds: line.fringeIds || [],
+              isTextLine: line.isTextLine || false, textBold: line.textBold || false, textColor: line.textColor || null,
               createdAt: Timestamp.now(),
             });
           }
@@ -347,18 +398,22 @@ export default function BudgetingTopPage() {
     }
   };
 
+  // Las líneas de texto son solo notas dentro de la app: no se mandan a
+  // Excel/PDF/.fwb (ahí no tienen importe ni código que mostrar).
   const reportParams = () => ({
     draftName: draft?.name || "Presupuesto",
     currency,
     categoriesEnabled: catEnabled,
     categories: cats,
-    chaptersByCategory: (categoryId: string | null) => chaptersByCategory(categoryId).map((c) => ({ id: c.id, code: c.code, description: c.description })),
-    subchaptersByChapter: Object.fromEntries(Object.entries(subchaptersByChapter).map(([k, v]) => [k, v.map((s) => ({ id: s.id, code: s.code, description: s.description }))])),
-    linesBySubchapter: Object.fromEntries(Object.entries(linesBySubchapter).map(([k, v]) => [k, v.map((l) => ({
+    chaptersByCategory: (categoryId: string | null) => chaptersByCategory(categoryId).filter((c) => !c.isTextLine).map((c) => ({ id: c.id, code: c.code, description: c.description })),
+    subchaptersByChapter: Object.fromEntries(Object.entries(subchaptersByChapter).map(([k, v]) => [k, v.filter((s) => !s.isTextLine).map((s) => ({ id: s.id, code: s.code, description: s.description, receivedTotal: s.receivedTotal || 0 }))])),
+    linesBySubchapter: Object.fromEntries(Object.entries(linesBySubchapter).map(([k, v]) => [k, v.filter((l) => !l.isTextLine).map((l) => ({
       code: l.code, description: l.description, units: l.units, unit: l.unit, multiplier: l.multiplier, rate: l.rate, total: l.total,
-      notes: l.notes, tags: l.tags,
+      notes: l.notes, tags: l.tags, fringeIds: l.fringeIds || [],
       routedTo: l.routedTo ? { subchapterCode: l.routedTo.subchapterCode } : null,
     }))])),
+    fringes,
+    projectInfo: draft?.projectInfo,
     grandTotal,
     exportConfig: draft?.exportConfig,
   });
@@ -399,9 +454,25 @@ export default function BudgetingTopPage() {
   };
 
   const exportConfig: BudgetingExportConfig = draft?.exportConfig || DEFAULT_EXPORT_CONFIG;
-  const updateExportConfig = async (patch: { coverSheet?: boolean; pageBreakPerChapter?: boolean; fields?: Partial<BudgetingExportConfig["fields"]> }) => {
+  const updateExportConfig = async (patch: { coverSheet?: boolean; pageBreakPerChapter?: boolean; pdfFontSize?: PdfFontSize; fields?: Partial<BudgetingExportConfig["fields"]> }) => {
     const next: BudgetingExportConfig = { ...exportConfig, ...patch, fields: { ...exportConfig.fields, ...(patch.fields || {}) } };
     await updateDoc(doc(db, "budgetingDrafts", draftId), { exportConfig: next, updatedAt: serverTimestamp() });
+  };
+
+  // ── Datos de producción para la portada del PDF (ver lib/budgetingReports.ts) ──
+  const projectInfo: BudgetingProjectInfo = draft?.projectInfo || {};
+  const [showProjectInfoModal, setShowProjectInfoModal] = useState(false);
+  const [projectInfoForm, setProjectInfoForm] = useState<BudgetingProjectInfo>({});
+  const openProjectInfoModal = () => { setProjectInfoForm(projectInfo); setShowProjectInfoModal(true); };
+  const [savingProjectInfo, setSavingProjectInfo] = useState(false);
+  const handleSaveProjectInfo = async () => {
+    setSavingProjectInfo(true);
+    try {
+      await updateDoc(doc(db, "budgetingDrafts", draftId), { projectInfo: projectInfoForm, updatedAt: serverTimestamp() });
+      setShowProjectInfoModal(false);
+    } finally {
+      setSavingProjectInfo(false);
+    }
   };
 
   // ── Snapshots / versiones: foto congelada del árbol, sin duplicar el borrador ──
@@ -437,6 +508,21 @@ export default function BudgetingTopPage() {
     await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts`), { code, description, category, order: nextOrderValue(), createdAt: Timestamp.now() });
     await touchDraft();
     return true;
+  };
+
+  // ── Línea de texto (nota, sin código ni importe): mismo doc de capítulo,
+  // marcado con isTextLine, para poder intercalarla entre capítulos reales. ──
+  const handleAddTextChapter = async (category: string | null) => {
+    const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts`), {
+      code: "", description: "", category, isTextLine: true, textBold: false, textColor: DEFAULT_TEXT_LINE_COLOR,
+      order: nextOrderValue(), createdAt: Timestamp.now(),
+    });
+    await touchDraft();
+    setJustAddedTextId(ref.id);
+  };
+  const handleCommitTextChapter = async (chapter: BudgetingAccount, patch: { description?: string; textBold?: boolean; textColor?: string }) => {
+    await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts`, chapter.id), patch);
+    await touchDraft();
   };
 
   const handleMoveChapter = async (chapter: BudgetingAccount, direction: "up" | "down") => {
@@ -522,13 +608,13 @@ export default function BudgetingTopPage() {
       }
 
       const accountIdByChapterId: Record<string, string> = {};
-      for (const chapter of chapters) {
+      for (const chapter of chapters.filter((c) => !c.isTextLine)) {
         const accountRef = await addDoc(collection(db, `projects/${selectedProject.id}/accounts`), {
           code: chapter.code, description: chapter.description, createdAt: Timestamp.now(), createdBy: user.uid,
         });
         accountIdByChapterId[chapter.id] = accountRef.id;
       }
-      for (const sub of allSubchapters) {
+      for (const sub of allSubchapters.filter((s) => !s.sub.isTextLine)) {
         const accountId = accountIdByChapterId[sub.chapterId];
         if (!accountId) continue;
         await addDoc(collection(db, `projects/${selectedProject.id}/accounts/${accountId}/subaccounts`), {
@@ -622,7 +708,7 @@ export default function BudgetingTopPage() {
                   <div className="border-t border-slate-100 pt-2.5">
                     <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mb-1.5">Configuración Excel / PDF</p>
                     <label className="flex items-center justify-between gap-2 mb-1.5">
-                      <span className="text-xs text-slate-700">Portada con totales</span>
+                      <span className="text-xs text-slate-700">Top Sheet (portada)</span>
                       <input type="checkbox" checked={exportConfig.coverSheet} onChange={(e) => updateExportConfig({ coverSheet: e.target.checked })} className="accent-[#8DA7BE]" />
                     </label>
                     <label className="flex items-center justify-between gap-2">
@@ -640,6 +726,29 @@ export default function BudgetingTopPage() {
                         </label>
                       ))}
                     </div>
+                  </div>
+                  <div className="border-t border-slate-100 pt-2.5 space-y-2">
+                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">PDF</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-slate-700">Tamaño de letra</span>
+                      <div className="flex items-center gap-0.5 p-0.5 border border-slate-200 rounded-lg bg-slate-50">
+                        {(["small", "normal", "large"] as PdfFontSize[]).map((size) => (
+                          <button
+                            key={size}
+                            onClick={() => updateExportConfig({ pdfFontSize: size })}
+                            className={`px-2 py-1 rounded-md text-[10.5px] font-medium transition-colors ${exportConfig.pdfFontSize === size ? BTN_LIGHT_ACTIVE : "text-slate-500 hover:text-slate-700"}`}
+                          >
+                            {PDF_FONT_SIZE_LABELS[size]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => { setExportPanelOpen(false); openProjectInfoModal(); }}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-slate-50 border border-slate-200"
+                    >
+                      <Building2 size={13} className="text-slate-400" /> Datos de producción
+                    </button>
                   </div>
                 </div>
               )}
@@ -718,12 +827,17 @@ export default function BudgetingTopPage() {
                         total={chapterTotal(chapter.id)}
                         isFirst={i === 0}
                         isLast={i === catChapters.length - 1}
+                        autoFocusText={chapter.id === justAddedTextId}
                         onCommit={(code, description) => handleCommitChapter(chapter, code, description)}
+                        onCommitTextLine={(patch) => handleCommitTextChapter(chapter, patch)}
                         onMove={(direction) => handleMoveChapter(chapter, direction)}
                         onDelete={() => setDeleteTarget({ chapterId: chapter.id, label: chapter.description })}
                       />
                     ))}
                     <NewChapterRow onCommit={(code, description) => handleCommitNewChapter(cat.id, code, description)} />
+                    <button onClick={() => handleAddTextChapter(cat.id)} className="flex items-center gap-1 pl-3 py-1.5 text-[10px] text-slate-400 hover:text-[#8DA7BE] transition-colors">
+                      <Type size={10} /> Añadir línea de texto
+                    </button>
                   </div>
                 </div>
               );
@@ -770,7 +884,9 @@ export default function BudgetingTopPage() {
                     total={chapterTotal(chapter.id)}
                     isFirst={i === 0}
                     isLast={i === flatSorted.length - 1}
+                    autoFocusText={chapter.id === justAddedTextId}
                     onCommit={(code, description) => handleCommitChapter(chapter, code, description)}
+                    onCommitTextLine={(patch) => handleCommitTextChapter(chapter, patch)}
                     onMove={(direction) => handleMoveChapter(chapter, direction)}
                     onDelete={() => setDeleteTarget({ chapterId: chapter.id, label: chapter.description })}
                   />
@@ -778,6 +894,9 @@ export default function BudgetingTopPage() {
               })()}
             </div>
             <NewChapterRow onCommit={(code, description) => handleCommitNewChapter(null, code, description)} />
+            <button onClick={() => handleAddTextChapter(null)} className="flex items-center gap-1 pl-3 py-1.5 text-[10px] text-slate-400 hover:text-[#8DA7BE] transition-colors">
+              <Type size={10} /> Añadir línea de texto
+            </button>
             {fringeVisibility.topSheet && topFringeBreakdown.length > 0 && (
               <div className="border-t border-slate-200">
                 <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide px-4 pt-2 pb-1">Cargas sociales de todo el presupuesto</p>
@@ -897,6 +1016,50 @@ export default function BudgetingTopPage() {
               </button>
               <button onClick={handleSaveTemplate} disabled={!templateName.trim() || savingTemplate} className={`flex-1 py-2.5 rounded-xl text-sm font-medium disabled:opacity-40 ${BTN_LIGHT}`}>
                 {savingTemplate ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Datos de producción (portada del PDF) ────────────────────────── */}
+      {showProjectInfoModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
+              <h3 className="text-sm font-semibold text-slate-900">Datos de producción</h3>
+              <button onClick={() => setShowProjectInfoModal(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+                <X size={15} />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-xs text-slate-500">Aparecen en la portada del PDF exportado. Se quedan guardados en este presupuesto, no hace falta rellenarlos cada vez.</p>
+              {([
+                ["title", "Título de producción", draft.name],
+                ["productionCompany", "Productora", ""],
+                ["format", "Formato", "Largometraje, Serie, Publicidad..."],
+                ["director", "Dirección", ""],
+                ["producer", "Producción", ""],
+                ["preparedBy", "Preparado por", ""],
+                ["dateLabel", "Fecha", "Se usa la de hoy si se deja en blanco"],
+              ] as const).map(([key, label, placeholder]) => (
+                <div key={key}>
+                  <label className="text-xs font-medium text-slate-700 block mb-1.5">{label}</label>
+                  <input
+                    value={projectInfoForm[key] || ""}
+                    onChange={(e) => setProjectInfoForm((f) => ({ ...f, [key]: e.target.value }))}
+                    placeholder={placeholder}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="px-5 py-3 border-t border-slate-100 flex gap-2">
+              <button onClick={() => setShowProjectInfoModal(false)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
+                Cancelar
+              </button>
+              <button onClick={handleSaveProjectInfo} disabled={savingProjectInfo} className={`flex-1 py-2.5 rounded-xl text-sm font-medium disabled:opacity-40 ${BTN_LIGHT}`}>
+                {savingProjectInfo ? "Guardando..." : "Guardar"}
               </button>
             </div>
           </div>

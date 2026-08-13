@@ -14,18 +14,19 @@ import {
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
   AlertCircle, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy,
-  MoreVertical, Percent, Search, Settings2, Sigma, SlidersHorizontal, Trash2, X,
+  MoreVertical, Percent, Search, Settings2, Sigma, SlidersHorizontal, Trash2, Type, X,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
   BTN_LIGHT_ACTIVE, BudgetingAccount, BudgetingDetailColumnsConfig, BudgetingDetailLine, BudgetingDraft, BudgetingFringe, BudgetingFringeVisibility,
-  BudgetingLineRoute, BudgetingSubchapter, CELL_INPUT, DEFAULT_DETAIL_COLUMNS_CONFIG, DEFAULT_FRINGE_VISIBILITY, DETAIL_STAT_COLUMN_PX, DetailStatColumnWidth,
+  BudgetingLineRoute, BudgetingSubchapter, CELL_INPUT, DEFAULT_DETAIL_COLUMNS_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, DETAIL_STAT_COLUMN_PX, DetailStatColumnWidth,
   UNIT_SUGGESTIONS, computeFringeExtras, computeLineTotal, computeReorder, evaluateFieldExpr,
   fmtCurrency, fmtDecimal, isPlainNumber, lineFringeBreakdown, nextOrderValue, resolveGlobals, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import BudgetingFormulaInput from "@/components/BudgetingFormulaInput";
+import BudgetingTextLineControls from "@/components/BudgetingTextLineControls";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -419,6 +420,66 @@ function NewLineRow({ globals, globalValues, columnsConfig, template, error, onC
   );
 }
 
+// ─── Línea de solo texto (nota, sin código ni importe): la descripción ocupa
+// desde ID hasta Total, dejando Comentario/Etiquetas en blanco y las
+// acciones en su columna habitual, para que la fila siga alineada con las
+// demás pese al ancho de columnas dinámico. ────────────────────────────────
+function TextLineRow({
+  line, template, columnsConfig, isFirst, isLast, autoFocusText, onCommitTextLine, onMove, onDelete,
+}: {
+  line: BudgetingDetailLine; template: string; columnsConfig: BudgetingDetailColumnsConfig; isFirst: boolean; isLast: boolean; autoFocusText?: boolean;
+  onCommitTextLine: (patch: { description?: string; textBold?: boolean; textColor?: string }) => void;
+  onMove: (direction: "up" | "down") => void; onDelete: () => void;
+}) {
+  const [description, setDescription] = useState(line.description);
+  const commit = () => {
+    if (!description.trim()) { setDescription(line.description); return; }
+    if (description.trim() !== line.description) onCommitTextLine({ description: description.trim() });
+  };
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") e.currentTarget.blur();
+    if (e.key === "Escape") setDescription(line.description);
+  };
+  let actionsCol = 8;
+  if (columnsConfig.showComment) actionsCol++;
+  if (columnsConfig.showTags) actionsCol++;
+
+  return (
+    <div className="grid gap-0 divide-x divide-slate-200 px-4 group" style={{ gridTemplateColumns: template }}>
+      <input
+        autoFocus={autoFocusText}
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        onBlur={commit}
+        onKeyDown={handleKeyDown}
+        placeholder="Texto..."
+        style={{ gridColumn: "1 / 8", color: line.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: line.textBold ? 700 : 400 }}
+        className={`${CELL_INPUT} text-xs`}
+      />
+      <span
+        className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ gridColumn: `${actionsCol} / ${actionsCol + 1}` }}
+      >
+        <BudgetingTextLineControls
+          bold={!!line.textBold}
+          color={line.textColor || DEFAULT_TEXT_LINE_COLOR}
+          onChangeBold={(v) => onCommitTextLine({ textBold: v })}
+          onChangeColor={(c) => onCommitTextLine({ textColor: c })}
+        />
+        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+          <ChevronUp size={11} />
+        </button>
+        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+          <ChevronDown size={11} />
+        </button>
+        <button onClick={onDelete} className="p-1 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar línea">
+          <Trash2 size={11} />
+        </button>
+      </span>
+    </div>
+  );
+}
+
 export default function BudgetingSubchapterPage() {
   const { draftId, accountId, subchapterId } = useParams() as { draftId: string; accountId: string; subchapterId: string };
   const { user } = useUser();
@@ -437,6 +498,7 @@ export default function BudgetingSubchapterPage() {
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [deleteTarget, setDeleteTarget] = useState<BudgetingDetailLine | null>(null);
   const [saving, setSaving] = useState(false);
+  const [justAddedTextId, setJustAddedTextId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "budgetingDrafts", draftId), (snap) => {
@@ -490,8 +552,9 @@ export default function BudgetingSubchapterPage() {
     return () => { Object.values(unsubs).forEach((fn) => fn()); };
   }, [chapters, draftId]);
 
+  // Las líneas de texto (sin importe) no son cuentas de verdad: no aparecen como destino de "Sumar en".
   const allSubchapters: RouteTarget[] = chapters.flatMap((c) =>
-    (subchaptersByChapter[c.id] || []).map((sub) => ({ chapterId: c.id, chapterCode: c.code, chapterDescription: c.description, sub }))
+    (subchaptersByChapter[c.id] || []).filter((sub) => !sub.isTextLine).map((sub) => ({ chapterId: c.id, chapterCode: c.code, chapterDescription: c.description, sub }))
   );
 
   const currency = draft?.currency || "EUR";
@@ -620,6 +683,23 @@ export default function BudgetingSubchapterPage() {
     });
     await touchDraft();
     return true;
+  };
+
+  // ── Línea de texto (nota, sin código ni importe): mismo doc de Detalle,
+  // marcado con isTextLine, para poder intercalarla entre líneas reales. ──
+  const handleAddTextLine = async () => {
+    const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`), {
+      code: "", description: "", units: 0, unit: "", multiplier: 0, rate: 0, total: 0,
+      notes: "", tags: [], fringeIds: [], routedTo: null,
+      isTextLine: true, textBold: false, textColor: DEFAULT_TEXT_LINE_COLOR,
+      order: nextOrderValue(), createdAt: Timestamp.now(),
+    });
+    await touchDraft();
+    setJustAddedTextId(ref.id);
+  };
+  const handleCommitTextLine = async (line: BudgetingDetailLine, patch: { description?: string; textBold?: boolean; textColor?: string }) => {
+    await updateDoc(lineRef(line.id), patch);
+    await touchDraft();
   };
 
   const handleMoveLine = async (line: BudgetingDetailLine, direction: "up" | "down") => {
@@ -777,28 +857,48 @@ export default function BudgetingSubchapterPage() {
           <div className="divide-y divide-slate-100">
             {(() => {
               const sorted = sortByOrder(lines.filter(matchesSearch));
-              return sorted.map((line, i) => (
-                <LineRow
-                  key={line.id}
-                  line={line}
-                  fringes={fringes}
-                  globals={globalOptions}
-                  globalValues={globalResolution.values}
-                  columnsConfig={columnsConfig}
-                  template={template}
-                  error={rowErrors[line.id]}
-                  isFirst={i === 0}
-                  isLast={i === sorted.length - 1}
-                  sidebarOpen={sidebarOpen && sidebarLineId === line.id}
-                  onCommit={(fields) => handleCommitLine(line, fields)}
-                  onDuplicate={() => handleDuplicateLine(line)}
-                  onDelete={() => setDeleteTarget(line)}
-                  onMove={(direction) => handleMoveLine(line, direction)}
-                  onOpenSidebar={() => openSidebar(line.id)}
-                />
-              ));
+              return sorted.map((line, i) =>
+                line.isTextLine ? (
+                  <TextLineRow
+                    key={line.id}
+                    line={line}
+                    template={template}
+                    columnsConfig={columnsConfig}
+                    isFirst={i === 0}
+                    isLast={i === sorted.length - 1}
+                    autoFocusText={line.id === justAddedTextId}
+                    onCommitTextLine={(patch) => handleCommitTextLine(line, patch)}
+                    onMove={(direction) => handleMoveLine(line, direction)}
+                    onDelete={() => setDeleteTarget(line)}
+                  />
+                ) : (
+                  <LineRow
+                    key={line.id}
+                    line={line}
+                    fringes={fringes}
+                    globals={globalOptions}
+                    globalValues={globalResolution.values}
+                    columnsConfig={columnsConfig}
+                    template={template}
+                    error={rowErrors[line.id]}
+                    isFirst={i === 0}
+                    isLast={i === sorted.length - 1}
+                    sidebarOpen={sidebarOpen && sidebarLineId === line.id}
+                    onCommit={(fields) => handleCommitLine(line, fields)}
+                    onDuplicate={() => handleDuplicateLine(line)}
+                    onDelete={() => setDeleteTarget(line)}
+                    onMove={(direction) => handleMoveLine(line, direction)}
+                    onOpenSidebar={() => openSidebar(line.id)}
+                  />
+                )
+              );
             })()}
             {!q && <NewLineRow globals={globalOptions} globalValues={globalResolution.values} columnsConfig={columnsConfig} template={template} error={rowErrors["new"]} onCommit={handleCommitNewLine} />}
+            {!q && (
+              <button onClick={handleAddTextLine} className="flex items-center gap-1 px-4 py-1.5 text-[10px] text-slate-400 hover:text-[#8DA7BE] transition-colors">
+                <Type size={10} /> Añadir línea de texto
+              </button>
+            )}
           </div>
 
           {fringeVisibility.detail && subchapterFringeBreakdown.length > 0 && (

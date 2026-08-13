@@ -10,16 +10,17 @@ import { db } from "@/lib/firebase";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp, updateDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, Search, Trash2 } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, Search, Trash2, Type } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
   BudgetingAccount, BudgetingDetailLine, BudgetingDraft, BudgetingFringe, BudgetingFringeVisibility, BudgetingSubchapter,
-  CELL_INPUT, DEFAULT_FRINGE_VISIBILITY, computeReorder, fmtCurrency, nextOrderValue, sortByOrder, subchapterTotal,
+  CELL_INPUT, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, computeReorder, fmtCurrency, nextOrderValue, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import BudgetingColumnsMenu from "@/components/BudgetingColumnsMenu";
 import BudgetingFringeLineRow from "@/components/BudgetingFringeLineRow";
+import BudgetingTextLineControls from "@/components/BudgetingTextLineControls";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -30,10 +31,12 @@ const cols = "grid-cols-[26px_100px_1fr_100px_58px]";
 // sin placeholder, guarda sola al perder el foco. Componente de módulo
 // estable: no se redefine entre renders, así los inputs no pierden el foco. ──
 function SubRow({
-  sub, draftId, accountId, fmt, total, isFirst, isLast, onCommit, onMove, onDelete,
+  sub, draftId, accountId, fmt, total, isFirst, isLast, autoFocusText, onCommit, onCommitTextLine, onMove, onDelete,
 }: {
-  sub: BudgetingSubchapter; draftId: string; accountId: string; fmt: (n: number) => string; total: number; isFirst: boolean; isLast: boolean;
-  onCommit: (code: string, description: string) => void; onMove: (direction: "up" | "down") => void; onDelete: () => void;
+  sub: BudgetingSubchapter; draftId: string; accountId: string; fmt: (n: number) => string; total: number; isFirst: boolean; isLast: boolean; autoFocusText?: boolean;
+  onCommit: (code: string, description: string) => void;
+  onCommitTextLine: (patch: { description?: string; textBold?: boolean; textColor?: string }) => void;
+  onMove: (direction: "up" | "down") => void; onDelete: () => void;
 }) {
   const [code, setCode] = useState(sub.code);
   const [description, setDescription] = useState(sub.description);
@@ -46,6 +49,49 @@ function SubRow({
     if (e.key === "Enter") e.currentTarget.blur();
     if (e.key === "Escape") { setCode(sub.code); setDescription(sub.description); }
   };
+
+  if (sub.isTextLine) {
+    const commitText = () => {
+      if (!description.trim()) { setDescription(sub.description); return; }
+      if (description.trim() !== sub.description) onCommitTextLine({ description: description.trim() });
+    };
+    const handleTextKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") e.currentTarget.blur();
+      if (e.key === "Escape") setDescription(sub.description);
+    };
+    return (
+      <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group`}>
+        <span />
+        <input
+          autoFocus={autoFocusText}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          onBlur={commitText}
+          onKeyDown={handleTextKeyDown}
+          placeholder="Texto..."
+          style={{ gridColumn: "2 / 5", color: sub.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: sub.textBold ? 700 : 400 }}
+          className={`${CELL_INPUT} text-xs pl-2`}
+        />
+        <span className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <BudgetingTextLineControls
+            bold={!!sub.textBold}
+            color={sub.textColor || DEFAULT_TEXT_LINE_COLOR}
+            onChangeBold={(v) => onCommitTextLine({ textBold: v })}
+            onChangeColor={(c) => onCommitTextLine({ textColor: c })}
+          />
+          <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+            <ChevronUp size={11} />
+          </button>
+          <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+            <ChevronDown size={11} />
+          </button>
+          <button onClick={onDelete} className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar línea">
+            <Trash2 size={11} />
+          </button>
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group`}>
@@ -106,6 +152,7 @@ export default function BudgetingChapterPage() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [justAddedTextId, setJustAddedTextId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "budgetingDrafts", draftId), (snap) => {
@@ -218,6 +265,21 @@ export default function BudgetingChapterPage() {
     return true;
   };
 
+  // ── Línea de texto (nota, sin código ni importe): mismo doc de subcapítulo,
+  // marcado con isTextLine, para poder intercalarla entre cuentas reales. ──
+  const handleAddTextSub = async () => {
+    const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`), {
+      code: "", description: "", isTextLine: true, textBold: false, textColor: DEFAULT_TEXT_LINE_COLOR,
+      order: nextOrderValue(), createdAt: Timestamp.now(),
+    });
+    await touchDraft();
+    setJustAddedTextId(ref.id);
+  };
+  const handleCommitTextSub = async (sub: BudgetingSubchapter, patch: { description?: string; textBold?: boolean; textColor?: string }) => {
+    await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`, sub.id), patch);
+    await touchDraft();
+  };
+
   const handleMoveSub = async (sub: BudgetingSubchapter, direction: "up" | "down") => {
     const swaps = computeReorder(subchapters, sub.id, direction);
     if (!swaps) return;
@@ -309,13 +371,20 @@ export default function BudgetingChapterPage() {
                 total={subTotal(sub)}
                 isFirst={i === 0}
                 isLast={i === sorted.length - 1}
+                autoFocusText={sub.id === justAddedTextId}
                 onCommit={(code, description) => handleCommitSub(sub, code, description)}
+                onCommitTextLine={(patch) => handleCommitTextSub(sub, patch)}
                 onMove={(direction) => handleMoveSub(sub, direction)}
                 onDelete={() => setDeleteTarget({ subchapterId: sub.id, label: sub.description })}
               />
             ));
           })()}
           {!q && <NewSubRow onCommit={handleCommitNewSub} />}
+          {!q && (
+            <button onClick={handleAddTextSub} className="flex items-center gap-1 px-3 py-1.5 text-[10px] text-slate-400 hover:text-[#8DA7BE] transition-colors">
+              <Type size={10} /> Añadir línea de texto
+            </button>
+          )}
         </div>
 
         {fringeVisibility.chapter && chapterFringeBreakdown.length > 0 && (
