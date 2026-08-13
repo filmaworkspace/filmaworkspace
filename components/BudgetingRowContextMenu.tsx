@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { Bold, Plus, Sigma, Trash2, Type } from "lucide-react";
+import { Bold, Clipboard, Copy, Plus, Scissors, Sigma, Trash2, Type } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { TEXT_LINE_COLORS } from "@/lib/budgeting";
@@ -12,8 +12,9 @@ import { TEXT_LINE_COLORS } from "@/lib/budgeting";
 // ─────────────────────────────────────────────────────────────────────────────
 // Menú de clic derecho sobre una fila, igual en Top Sheet, Capítulo y
 // Detalle: insertar una línea/línea de texto/subtotal justo debajo de la
-// fila pulsada, y (si la fila es de texto o subtotal) negrita/color.
-// Un solo componente, montado una vez por página en la posición del clic.
+// fila pulsada, (si la fila es de texto o subtotal) negrita/color, y
+// copiar/cortar/pegar la fila entera. Un solo componente, montado una vez
+// por página en la posición del clic.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface BudgetingRowContextMenuState {
@@ -24,6 +25,11 @@ export interface BudgetingRowContextMenuState {
   /** Si la fila pulsada es de texto o subtotal, se puede tocar negrita/color desde aquí mismo. */
   style?: { bold: boolean; color: string; onChangeBold: (v: boolean) => void; onChangeColor: (c: string) => void };
   onDelete?: () => void;
+  /** Copiar/cortar solo tienen sentido sobre una fila real (rowId !== null). */
+  onCopy?: () => void;
+  onCut?: () => void;
+  /** Pegar vale tanto sobre una fila (pegar debajo) como en un hueco vacío; se omite si no hay nada en el portapapeles. */
+  onPaste?: () => void;
 }
 
 export default function BudgetingRowContextMenu({
@@ -69,6 +75,27 @@ export default function BudgetingRowContextMenu({
       <button className={itemClass} onClick={() => { onInsertSubtotal(); onClose(); }}>
         <Sigma size={13} className="text-slate-400" /> Insertar subtotal
       </button>
+
+      {(state.onCopy || state.onCut || state.onPaste) && (
+        <>
+          <div className="border-t border-slate-100 my-1.5" />
+          {state.onCopy && (
+            <button className={itemClass} onClick={() => { state.onCopy!(); onClose(); }}>
+              <Copy size={13} className="text-slate-400" /> Copiar
+            </button>
+          )}
+          {state.onCut && (
+            <button className={itemClass} onClick={() => { state.onCut!(); onClose(); }}>
+              <Scissors size={13} className="text-slate-400" /> Cortar
+            </button>
+          )}
+          {state.onPaste && (
+            <button className={itemClass} onClick={() => { state.onPaste!(); onClose(); }}>
+              <Clipboard size={13} className="text-slate-400" /> Pegar
+            </button>
+          )}
+        </>
+      )}
 
       {state.style && (
         <>

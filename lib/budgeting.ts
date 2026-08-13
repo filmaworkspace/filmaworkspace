@@ -778,3 +778,40 @@ export function diffSnapshotTrees(oldChapters: BudgetingSnapshotChapter[], newCh
   const newTotal = Math.round([...newMap.values()].reduce((s, x) => s + (x.line.total || 0), 0) * 100) / 100;
   return { lines: diffs, oldTotal, newTotal };
 }
+
+// ─── Portapapeles de filas (copiar/cortar/pegar) ────────────────────────────
+// Un único slot compartido en sessionStorage: sobrevive a la navegación entre
+// páginas del borrador (copiar una línea aquí, pegarla en otra Cuenta) pero
+// no entre pestañas ni tras cerrar el navegador. `kind` evita pegar el
+// contenido de un nivel (línea/cuenta/capítulo) en otro que no encaja.
+
+export type BudgetingClipboardKind = "line";
+export interface BudgetingClipboardEntry<T> {
+  kind: BudgetingClipboardKind;
+  mode: "copy" | "cut";
+  data: T;
+}
+
+const BUDGETING_CLIPBOARD_KEY = "budgeting:clipboard";
+
+export function setBudgetingClipboard<T>(entry: BudgetingClipboardEntry<T>) {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(BUDGETING_CLIPBOARD_KEY, JSON.stringify(entry));
+}
+
+export function getBudgetingClipboard<T>(kind: BudgetingClipboardKind): BudgetingClipboardEntry<T> | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.sessionStorage.getItem(BUDGETING_CLIPBOARD_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as BudgetingClipboardEntry<T>;
+    return parsed.kind === kind ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearBudgetingClipboard() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(BUDGETING_CLIPBOARD_KEY);
+}
