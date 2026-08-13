@@ -51,6 +51,8 @@ export interface FilmaPdfOptions {
   orientation?: "p" | "l";
   /** Texto corto que aparece en el pie de cada página, p. ej. "PO-014 · Proyecto X" */
   docRef?: string;
+  /** Marca del pie de página; por defecto "Hecho con Filma Workspace". Cada módulo puede pasar la suya. */
+  footerBrand?: string;
 }
 
 /**
@@ -74,6 +76,7 @@ export class FilmaPDF {
   pageH: number;
   accentColor: RGB;
   private docRef?: string;
+  private footerBrand: string;
 
   constructor(opts: FilmaPdfOptions = {}) {
     this.pdf = new jsPDF(opts.orientation || "p", "mm", "a4");
@@ -82,6 +85,7 @@ export class FilmaPDF {
     this.pageH = this.pdf.internal.pageSize.getHeight();
     this.accentColor = ACCENTS[opts.accent || "neutral"];
     this.docRef = opts.docRef;
+    this.footerBrand = opts.footerBrand || "Hecho con Filma Workspace";
     this.y = this.margin;
   }
 
@@ -253,7 +257,7 @@ export class FilmaPDF {
       this.text(SLATE[400]);
       this.pdf.setFont("helvetica", "normal");
       this.pdf.setFontSize(7.5);
-      this.pdf.text(this.docRef ? `Hecho con Filma Workspace · ${this.docRef}` : "Hecho con Filma Workspace", this.margin, this.pageH - 10);
+      this.pdf.text(this.docRef ? `${this.footerBrand} · ${this.docRef}` : this.footerBrand, this.margin, this.pageH - 10);
       this.pdf.text(`Página ${i} de ${pageCount}`, this.pageW - this.margin, this.pageH - 10, { align: "right" });
     }
   }
