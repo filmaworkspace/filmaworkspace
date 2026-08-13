@@ -29,7 +29,7 @@ export interface FwbDetailLine {
   notes?: string;
   tags?: string[];
   /** Si está puesta, la línea cuenta en el Subcapítulo indicado (por código) en vez del suyo propio (ver BudgetingLineRoute). */
-  routedToSubchapterCode?: string;
+  routedToSubchapterCode?: string | null;
 }
 
 export interface FwbSubchapter {
@@ -104,6 +104,11 @@ export function buildFwbFromDraft(params: {
   subchaptersByChapter: Record<string, LiteEntity[]>;
   linesBySubchapter: Record<string, LiteLine[]>;
 }): FwbFile {
+  // Firestore no admite `undefined` como valor de campo (a diferencia de
+  // JSON.stringify, que simplemente lo omite): por eso aquí todo lo opcional
+  // se normaliza explícitamente a `null`/""/[] en vez de dejarlo pasar tal
+  // cual, para que este mismo árbol sirva tanto para descargar un .fwb como
+  // para guardarlo directamente en Firestore (plantillas).
   const cats = params.categoriesEnabled ? params.categories : [{ id: "all", label: "Cuentas" }];
   return {
     fwbVersion: FWB_VERSION,
@@ -113,7 +118,7 @@ export function buildFwbFromDraft(params: {
     categoriesEnabled: params.categoriesEnabled,
     categories: cats.map((cat) => ({
       id: cat.id,
-      code: cat.code,
+      ...(cat.code ? { code: cat.code } : {}),
       label: cat.label,
       chapters: params.chaptersByCategory(params.categoriesEnabled ? cat.id : null).map((chapter) => ({
         code: chapter.code,
@@ -122,10 +127,10 @@ export function buildFwbFromDraft(params: {
           code: sub.code,
           description: sub.description,
           detailLines: (params.linesBySubchapter[sub.id] || []).map((l) => ({
-            code: l.code, description: l.description, units: l.units, unit: l.unit,
-            multiplier: l.multiplier, rate: l.rate, total: l.total,
-            notes: l.notes, tags: l.tags,
-            routedToSubchapterCode: l.routedTo?.subchapterCode,
+            code: l.code, description: l.description, units: l.units ?? 0, unit: l.unit || "",
+            multiplier: l.multiplier ?? 0, rate: l.rate ?? 0, total: l.total ?? 0,
+            notes: l.notes || "", tags: l.tags || [],
+            routedToSubchapterCode: l.routedTo?.subchapterCode ?? null,
           })),
         })),
       })),

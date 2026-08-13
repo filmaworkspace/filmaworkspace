@@ -117,9 +117,19 @@ export interface BudgetingPhase {
   label: string;
 }
 
+/** Tamaño de letra del PDF exportado: escala cabeceras, tabla y totales juntos. */
+export type PdfFontSize = "small" | "normal" | "large";
+export const PDF_FONT_SIZE_LABELS: Record<PdfFontSize, string> = { small: "Pequeño", normal: "Normal", large: "Grande" };
+export const PDF_FONT_SIZES: Record<PdfFontSize, { title: number; heading: number; label: number; body: number; total: number }> = {
+  small: { title: 15, heading: 10.5, label: 7, body: 7.5, total: 10 },
+  normal: { title: 18, heading: 12, label: 7.5, body: 8.5, total: 12 },
+  large: { title: 21, heading: 13.5, label: 8, body: 10, total: 14 },
+};
+
 export interface BudgetingExportConfig {
   coverSheet: boolean;
   pageBreakPerChapter: boolean;
+  pdfFontSize: PdfFontSize;
   fields: {
     unit: boolean;
     notes: boolean;
@@ -130,8 +140,24 @@ export interface BudgetingExportConfig {
 export const DEFAULT_EXPORT_CONFIG: BudgetingExportConfig = {
   coverSheet: true,
   pageBreakPerChapter: false,
+  pdfFontSize: "normal",
   fields: { unit: true, notes: false, tags: false },
 };
+
+/**
+ * Datos de producción para la portada del PDF exportado (estilo Top Sheet de
+ * Movie Magic Budgeting): quedan guardados en el borrador y se editan desde
+ * el menú de exportación, no hace falta rellenarlos cada vez que se exporta.
+ */
+export interface BudgetingProjectInfo {
+  title?: string;
+  productionCompany?: string;
+  director?: string;
+  producer?: string;
+  format?: string;
+  preparedBy?: string;
+  dateLabel?: string;
+}
 
 /** Ancho de las columnas numéricas (Cant./Unidad/X/Tarifa) del nivel de Detalle, en px, elegido por el usuario. */
 export type DetailStatColumnWidth = "compact" | "normal" | "wide";
@@ -198,6 +224,7 @@ export interface BudgetingDraft {
   activeScenarioId?: string | null;
   detailColumnsConfig?: BudgetingDetailColumnsConfig;
   fringeVisibility?: BudgetingFringeVisibility;
+  projectInfo?: BudgetingProjectInfo;
 }
 
 /** Doc índice en userBudgetingDrafts/{uid}/drafts/{draftId}, para listar rápido en el sidebar sin leer cada borrador entero. */
@@ -225,6 +252,14 @@ export interface BudgetingTemplate {
 }
 
 /** budgetingDrafts/{draftId}/accounts/{chapterId} (Capítulo): dentro de Budgeting es organizativo (agrupa Cuentas), pero es el nivel que se envía a Accounting como Account. */
+/**
+ * Paleta de colores para líneas de solo texto (ver `isTextLine` más abajo):
+ * un puñado de opciones fijas en vez de un selector de color libre, para no
+ * complicar la UI. El primero es el color de texto por defecto del nivel.
+ */
+export const TEXT_LINE_COLORS = ["#1D201F", "#8DA7BE", "#DC2626", "#059669", "#D97706", "#7C3AED"];
+export const DEFAULT_TEXT_LINE_COLOR = TEXT_LINE_COLORS[0];
+
 export interface BudgetingAccount {
   id: string;
   code: string;
@@ -234,6 +269,10 @@ export interface BudgetingAccount {
   createdAt: Timestamp | null;
   /** Orden manual: por defecto el de creación, pero se puede reordenar libremente. */
   order?: number;
+  /** Si es true, esta fila es solo una nota de texto (sin código ni importe): no suma, no se puede entrar dentro. */
+  isTextLine?: boolean;
+  textBold?: boolean;
+  textColor?: string;
 }
 
 /** budgetingDrafts/{draftId}/accounts/{chapterId}/subchapters/{subchapterId} (Cuenta, "Subcapítulo" en el código): el nivel que se envía a Accounting como SubAccount, con su importe presupuestado sumado de sus líneas de detalle. */
@@ -245,6 +284,10 @@ export interface BudgetingSubchapter {
   order?: number;
   /** Suma denormalizada de líneas de otros subcapítulos redirigidas aquí (ver BudgetingLineRoute). Mantenida con increment() al guardar/duplicar/borrar líneas. */
   receivedTotal?: number;
+  /** Si es true, esta fila es solo una nota de texto (sin código ni importe): no suma, no se puede entrar dentro. */
+  isTextLine?: boolean;
+  textBold?: boolean;
+  textColor?: string;
 }
 
 /**
@@ -298,6 +341,10 @@ export interface BudgetingDetailLine {
   routedTo?: BudgetingLineRoute | null;
   createdAt: Timestamp | null;
   order?: number;
+  /** Si es true, esta fila es solo una nota de texto (sin código ni importe): no suma, no lleva cantidad/tarifa. */
+  isTextLine?: boolean;
+  textBold?: boolean;
+  textColor?: string;
 }
 
 export const UNIT_SUGGESTIONS = ["Día", "Semana", "Mes", "Fijo", "Persona", "%", "Hora"];
@@ -366,13 +413,28 @@ export function categoriesEnabled(draft: BudgetingDraft | null): boolean {
   return draft?.categoriesEnabled ?? true;
 }
 
-export function fmtCurrency(n: number, currency: string): string {
-  return new Intl.NumberFormat("es-ES", { style: "currency", currency: currency || "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
+const CURRENCY_SYMBOLS: Record<string, string> = { EUR: "€", USD: "$", GBP: "£", MXN: "$", ARS: "$" };
+
+/**
+ * `Intl.NumberFormat("es-ES")` no agrupa los miles para números de 4 cifras
+ * (1000-9999): "6000,00" en vez de "6.000,00" (a partir de 10000 sí agrupa
+ * bien). Es un comportamiento real del motor JS, no algo puntual de un
+ * número raro, así que se agrupa a mano en vez de fiarse del locale.
+ */
+function groupThousands(intStr: string): string {
+  return intStr.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
 
 /** Los importes en Budgeting van siempre con dos decimales, nunca menos (0 se ve "0,00", no "0"). */
 export function fmtDecimal(n: number): string {
-  return new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
+  const v = Math.round((n || 0) * 100) / 100;
+  const neg = v < 0;
+  const [intPart, decPart] = Math.abs(v).toFixed(2).split(".");
+  return `${neg ? "-" : ""}${groupThousands(intPart)},${decPart}`;
+}
+
+export function fmtCurrency(n: number, currency: string): string {
+  return `${fmtDecimal(n)} ${CURRENCY_SYMBOLS[currency] || currency || "€"}`;
 }
 
 // ─── Motor de fórmulas ──────────────────────────────────────────────────────
