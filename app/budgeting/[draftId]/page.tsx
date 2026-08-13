@@ -382,24 +382,35 @@ export default function BudgetingTopPage() {
   };
 
   // Las líneas de texto son solo notas dentro de la app: no se mandan a
-  // Excel/PDF/.fwb (ahí no tienen importe ni código que mostrar).
-  const reportParams = () => ({
+  // Excel/.fwb (ahí no tienen importe ni código que mostrar). El PDF sí las
+  // incluye, con su negrita/color, porque ahí se ve el presupuesto completo
+  // tal cual está montado en pantalla.
+  const buildReportParams = (includeTextLines: boolean) => ({
     draftName: draft?.name || "Presupuesto",
     currency,
     categoriesEnabled: catEnabled,
     categories: cats,
-    chaptersByCategory: (categoryId: string | null) => chaptersByCategory(categoryId).filter((c) => !c.isTextLine && !c.isSubtotal).map((c) => ({ id: c.id, code: c.code, description: c.description })),
-    subchaptersByChapter: Object.fromEntries(Object.entries(subchaptersByChapter).map(([k, v]) => [k, v.filter((s) => !s.isTextLine && !s.isSubtotal).map((s) => ({ id: s.id, code: s.code, description: s.description, receivedTotal: s.receivedTotal || 0 }))])),
-    linesBySubchapter: Object.fromEntries(Object.entries(linesBySubchapter).map(([k, v]) => [k, v.filter((l) => !l.isTextLine && !l.isSubtotal).map((l) => ({
-      code: l.code, description: l.description, units: l.units, unit: l.unit, multiplier: l.multiplier, rate: l.rate, total: l.total,
-      notes: l.notes, tags: l.tags, fringeIds: l.fringeIds || [],
-      routedTo: l.routedTo ? { subchapterCode: l.routedTo.subchapterCode } : null,
-    }))])),
+    chaptersByCategory: (categoryId: string | null) => chaptersByCategory(categoryId)
+      .filter((c) => includeTextLines || (!c.isTextLine && !c.isSubtotal))
+      .map((c) => ({ id: c.id, code: c.code, description: c.description, isTextLine: c.isTextLine || false, isSubtotal: c.isSubtotal || false, textBold: c.textBold || false, textColor: c.textColor || null })),
+    subchaptersByChapter: Object.fromEntries(Object.entries(subchaptersByChapter).map(([k, v]) => [k, v
+      .filter((s) => includeTextLines || (!s.isTextLine && !s.isSubtotal))
+      .map((s) => ({ id: s.id, code: s.code, description: s.description, receivedTotal: s.receivedTotal || 0, isTextLine: s.isTextLine || false, isSubtotal: s.isSubtotal || false, textBold: s.textBold || false, textColor: s.textColor || null }))])),
+    linesBySubchapter: Object.fromEntries(Object.entries(linesBySubchapter).map(([k, v]) => [k, v
+      .filter((l) => includeTextLines || (!l.isTextLine && !l.isSubtotal))
+      .map((l) => ({
+        id: l.id, code: l.code, description: l.description, units: l.units, unit: l.unit, multiplier: l.multiplier, rate: l.rate, total: l.total,
+        notes: l.notes, tags: l.tags, fringeIds: l.fringeIds || [],
+        routedTo: l.routedTo ? { subchapterCode: l.routedTo.subchapterCode } : null,
+        isTextLine: l.isTextLine || false, isSubtotal: l.isSubtotal || false, textBold: l.textBold || false, textColor: l.textColor || null,
+      }))])),
     fringes,
     projectInfo: draft?.projectInfo,
     grandTotal,
     exportConfig: draft?.exportConfig,
   });
+  const reportParams = () => buildReportParams(false);
+  const pdfReportParams = () => buildReportParams(true);
 
   const handleExportFwb = () => {
     if (!draft) return;
@@ -408,7 +419,7 @@ export default function BudgetingTopPage() {
     downloadFwb(fwb, draft.name.replace(/[^\w\-]+/g, "_"));
   };
   const handleExportExcel = () => downloadBudgetExcel(reportParams());
-  const handleExportPdf = () => downloadBudgetPdf(reportParams());
+  const handleExportPdf = () => downloadBudgetPdf(pdfReportParams());
 
   // ── Guardar como plantilla: misma estructura que un .fwb, pero se queda
   // guardada en la cuenta del usuario para arrancar otro borrador desde ahí. ──
