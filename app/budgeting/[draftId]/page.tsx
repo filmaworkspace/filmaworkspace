@@ -15,20 +15,21 @@ import {
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
   AlertCircle, Building2, BookmarkPlus, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Download, FileDown, FileSpreadsheet,
-  FileText, FolderOutput, History, Search, Trash2, Type, X,
+  FileText, FolderOutput, History, Search, Trash2, X,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
   BTN_LIGHT, BTN_LIGHT_ACTIVE, BudgetingDraft, BudgetingCategoryDef, BudgetingAccount, BudgetingSubchapter, BudgetingDetailLine, BudgetingExportConfig, BudgetingFringe, BudgetingFringeVisibility, BudgetingProjectInfo,
-  CELL_INPUT, DEFAULT_EXPORT_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, PDF_FONT_SIZE_LABELS, PdfFontSize, categoriesEnabled, computeLineTotalForScenario, computeReorder, effectiveLineUnits, nextOrderValue, resolveCategories, resolveGlobals, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
+  CELL_INPUT, DEFAULT_EXPORT_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, PDF_FONT_SIZE_LABELS, PdfFontSize, categoriesEnabled, computeLineTotalForScenario, computeReorder, effectiveLineUnits, nextOrderValue, orderAfter, resolveCategories, resolveGlobals, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import { buildFwbFromDraft, downloadFwb } from "@/lib/budgetingExport";
 import { downloadBudgetExcel, downloadBudgetPdf } from "@/lib/budgetingReports";
 import BudgetingColumnsMenu from "@/components/BudgetingColumnsMenu";
 import BudgetingFringeLineRow from "@/components/BudgetingFringeLineRow";
 import BudgetingTextLineControls from "@/components/BudgetingTextLineControls";
+import BudgetingRowContextMenu, { BudgetingRowContextMenuState } from "@/components/BudgetingRowContextMenu";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -40,12 +41,12 @@ const cols = "grid-cols-[26px_100px_1fr_100px_58px]";
 // placeholder, guarda sola al perder el foco. Componentes de módulo
 // estables: no se redefinen entre renders, así los inputs no pierden el foco. ──
 function ChapterRow({
-  chapter, draftId, fmt, total, isFirst, isLast, autoFocusText, onCommit, onCommitTextLine, onMove, onDelete,
+  chapter, draftId, fmt, total, subtotalValue, isFirst, isLast, autoFocus, onCommit, onCommitTextLine, onMove, onDelete, onContextMenu,
 }: {
-  chapter: BudgetingAccount; draftId: string; fmt: (n: number) => string; total: number; isFirst: boolean; isLast: boolean; autoFocusText?: boolean;
+  chapter: BudgetingAccount; draftId: string; fmt: (n: number) => string; total: number; subtotalValue?: number; isFirst: boolean; isLast: boolean; autoFocus?: boolean;
   onCommit: (code: string, description: string) => void;
   onCommitTextLine: (patch: { description?: string; textBold?: boolean; textColor?: string }) => void;
-  onMove: (direction: "up" | "down") => void; onDelete: () => void;
+  onMove: (direction: "up" | "down") => void; onDelete: () => void; onContextMenu: (e: React.MouseEvent) => void;
 }) {
   const [code, setCode] = useState(chapter.code);
   const [description, setDescription] = useState(chapter.description);
@@ -59,7 +60,8 @@ function ChapterRow({
     if (e.key === "Escape") { setCode(chapter.code); setDescription(chapter.description); }
   };
 
-  if (chapter.isTextLine) {
+  if (chapter.isTextLine || chapter.isSubtotal) {
+    const isSubtotal = !!chapter.isSubtotal;
     const commitText = () => {
       if (!description.trim()) { setDescription(chapter.description); return; }
       if (description.trim() !== chapter.description) onCommitTextLine({ description: description.trim() });
@@ -69,18 +71,23 @@ function ChapterRow({
       if (e.key === "Escape") setDescription(chapter.description);
     };
     return (
-      <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group`}>
+      <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group`} onContextMenu={onContextMenu}>
         <span />
         <input
-          autoFocus={autoFocusText}
+          autoFocus={autoFocus}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           onBlur={commitText}
           onKeyDown={handleTextKeyDown}
-          placeholder="Texto..."
-          style={{ gridColumn: "2 / 5", color: chapter.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: chapter.textBold ? 700 : 400 }}
+          placeholder={isSubtotal ? "Subtotal" : "Texto..."}
+          style={{ gridColumn: isSubtotal ? "2 / 4" : "2 / 5", color: chapter.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: chapter.textBold ? 700 : 400 }}
           className={`${CELL_INPUT} text-xs pl-2`}
         />
+        {isSubtotal && (
+          <span className="flex items-center justify-end text-xs pr-2" style={{ color: chapter.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: chapter.textBold ? 700 : 400 }}>
+            {fmt(subtotalValue || 0)}
+          </span>
+        )}
         <span className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <BudgetingTextLineControls
             bold={!!chapter.textBold}
@@ -103,11 +110,11 @@ function ChapterRow({
   }
 
   return (
-    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group`}>
+    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group`} onContextMenu={onContextMenu}>
       <Link href={`/budgeting/${draftId}/accounts/${chapter.id}`} className="flex items-center justify-center" title="Entrar">
         <ChevronRight size={13} className="text-slate-300 group-hover:text-[#8DA7BE] group-hover:translate-x-0.5 transition-all" />
       </Link>
-      <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
+      <input autoFocus={autoFocus} value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} font-mono text-xs pl-2`} />
       <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} text-xs pl-2`} />
@@ -165,7 +172,11 @@ export default function BudgetingTopPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   // id de la última línea de texto recién creada, para autoenfocarla al aparecer
-  const [justAddedTextId, setJustAddedTextId] = useState<string | null>(null);
+  const [justAddedId, setJustAddedId] = useState<string | null>(null);
+  // Menú de clic derecho: la categoría se guarda aparte porque el componente
+  // compartido no la conoce, solo hace falta para saber dónde insertar.
+  const [chapterMenu, setChapterMenu] = useState<BudgetingRowContextMenuState | null>(null);
+  const [chapterMenuCategory, setChapterMenuCategory] = useState<string | null>(null);
 
   // Enviar a proyecto
   const [showSendModal, setShowSendModal] = useState(false);
@@ -372,19 +383,19 @@ export default function BudgetingTopPage() {
       for (const chapter of chapters) {
         const newChapterRef = await addDoc(collection(db, `budgetingDrafts/${newRef.id}/accounts`), {
           code: chapter.code, description: chapter.description, category: chapter.category, createdAt: Timestamp.now(),
-          isTextLine: chapter.isTextLine || false, textBold: chapter.textBold || false, textColor: chapter.textColor || null,
+          isTextLine: chapter.isTextLine || false, isSubtotal: chapter.isSubtotal || false, textBold: chapter.textBold || false, textColor: chapter.textColor || null,
         });
         for (const sub of subchaptersByChapter[chapter.id] || []) {
           const newSubRef = await addDoc(collection(db, `budgetingDrafts/${newRef.id}/accounts/${newChapterRef.id}/subchapters`), {
             code: sub.code, description: sub.description, createdAt: Timestamp.now(),
-            isTextLine: sub.isTextLine || false, textBold: sub.textBold || false, textColor: sub.textColor || null,
+            isTextLine: sub.isTextLine || false, isSubtotal: sub.isSubtotal || false, textBold: sub.textBold || false, textColor: sub.textColor || null,
           });
           for (const line of linesBySubchapter[sub.id] || []) {
             await addDoc(collection(db, `budgetingDrafts/${newRef.id}/accounts/${newChapterRef.id}/subchapters/${newSubRef.id}/detailLines`), {
               code: line.code, description: line.description, units: line.units, unitsExpr: line.unitsExpr ?? null, unit: line.unit || "",
               multiplier: line.multiplier, multiplierExpr: line.multiplierExpr ?? null, rate: line.rate, rateExpr: line.rateExpr ?? null, total: line.total,
               notes: line.notes || "", tags: line.tags || [], fringeIds: line.fringeIds || [],
-              isTextLine: line.isTextLine || false, textBold: line.textBold || false, textColor: line.textColor || null,
+              isTextLine: line.isTextLine || false, isSubtotal: line.isSubtotal || false, textBold: line.textBold || false, textColor: line.textColor || null,
               createdAt: Timestamp.now(),
             });
           }
@@ -405,9 +416,9 @@ export default function BudgetingTopPage() {
     currency,
     categoriesEnabled: catEnabled,
     categories: cats,
-    chaptersByCategory: (categoryId: string | null) => chaptersByCategory(categoryId).filter((c) => !c.isTextLine).map((c) => ({ id: c.id, code: c.code, description: c.description })),
-    subchaptersByChapter: Object.fromEntries(Object.entries(subchaptersByChapter).map(([k, v]) => [k, v.filter((s) => !s.isTextLine).map((s) => ({ id: s.id, code: s.code, description: s.description, receivedTotal: s.receivedTotal || 0 }))])),
-    linesBySubchapter: Object.fromEntries(Object.entries(linesBySubchapter).map(([k, v]) => [k, v.filter((l) => !l.isTextLine).map((l) => ({
+    chaptersByCategory: (categoryId: string | null) => chaptersByCategory(categoryId).filter((c) => !c.isTextLine && !c.isSubtotal).map((c) => ({ id: c.id, code: c.code, description: c.description })),
+    subchaptersByChapter: Object.fromEntries(Object.entries(subchaptersByChapter).map(([k, v]) => [k, v.filter((s) => !s.isTextLine && !s.isSubtotal).map((s) => ({ id: s.id, code: s.code, description: s.description, receivedTotal: s.receivedTotal || 0 }))])),
+    linesBySubchapter: Object.fromEntries(Object.entries(linesBySubchapter).map(([k, v]) => [k, v.filter((l) => !l.isTextLine && !l.isSubtotal).map((l) => ({
       code: l.code, description: l.description, units: l.units, unit: l.unit, multiplier: l.multiplier, rate: l.rate, total: l.total,
       notes: l.notes, tags: l.tags, fringeIds: l.fringeIds || [],
       routedTo: l.routedTo ? { subchapterCode: l.routedTo.subchapterCode } : null,
@@ -510,19 +521,35 @@ export default function BudgetingTopPage() {
     return true;
   };
 
-  // ── Línea de texto (nota, sin código ni importe): mismo doc de capítulo,
-  // marcado con isTextLine, para poder intercalarla entre capítulos reales. ──
-  const handleAddTextChapter = async (category: string | null) => {
-    const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts`), {
-      code: "", description: "", category, isTextLine: true, textBold: false, textColor: DEFAULT_TEXT_LINE_COLOR,
-      order: nextOrderValue(), createdAt: Timestamp.now(),
-    });
+  // ── Línea de texto / subtotal (mismo doc de capítulo, marcado con
+  // isTextLine/isSubtotal, para poder intercalarlas entre capítulos reales).
+  // Se insertan justo debajo de la fila donde se abrió el menú contextual. ──
+  const handleInsertChapter = async (afterId: string | null, category: string | null, kind: "item" | "text" | "subtotal") => {
+    const siblings = chaptersByCategory(category);
+    const order = orderAfter(siblings, afterId);
+    const base: Record<string, unknown> = { category, order, createdAt: Timestamp.now(), code: "", description: "" };
+    if (kind === "text") Object.assign(base, { isTextLine: true, textBold: false, textColor: DEFAULT_TEXT_LINE_COLOR });
+    if (kind === "subtotal") Object.assign(base, { description: "Subtotal", isSubtotal: true, textBold: true, textColor: DEFAULT_TEXT_LINE_COLOR });
+    const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts`), base);
     await touchDraft();
-    setJustAddedTextId(ref.id);
+    setJustAddedId(ref.id);
   };
   const handleCommitTextChapter = async (chapter: BudgetingAccount, patch: { description?: string; textBold?: boolean; textColor?: string }) => {
     await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts`, chapter.id), patch);
     await touchDraft();
+  };
+  /** Suma de los capítulos normales desde el subtotal anterior (o el principio) hasta `subtotalId`, dentro de la misma categoría. */
+  const chapterSubtotalValue = (category: string | null, subtotalId: string): number => {
+    const siblings = chaptersByCategory(category);
+    const idx = siblings.findIndex((c) => c.id === subtotalId);
+    if (idx < 0) return 0;
+    let sum = 0;
+    for (let i = idx - 1; i >= 0; i--) {
+      const c = siblings[i];
+      if (c.isSubtotal) break;
+      if (!c.isTextLine) sum += chapterTotal(c.id);
+    }
+    return Math.round(sum * 100) / 100;
   };
 
   const handleMoveChapter = async (chapter: BudgetingAccount, direction: "up" | "down") => {
@@ -608,13 +635,13 @@ export default function BudgetingTopPage() {
       }
 
       const accountIdByChapterId: Record<string, string> = {};
-      for (const chapter of chapters.filter((c) => !c.isTextLine)) {
+      for (const chapter of chapters.filter((c) => !c.isTextLine && !c.isSubtotal)) {
         const accountRef = await addDoc(collection(db, `projects/${selectedProject.id}/accounts`), {
           code: chapter.code, description: chapter.description, createdAt: Timestamp.now(), createdBy: user.uid,
         });
         accountIdByChapterId[chapter.id] = accountRef.id;
       }
-      for (const sub of allSubchapters.filter((s) => !s.sub.isTextLine)) {
+      for (const sub of allSubchapters.filter((s) => !s.sub.isTextLine && !s.sub.isSubtotal)) {
         const accountId = accountIdByChapterId[sub.chapterId];
         if (!accountId) continue;
         await addDoc(collection(db, `projects/${selectedProject.id}/accounts/${accountId}/subaccounts`), {
@@ -825,19 +852,30 @@ export default function BudgetingTopPage() {
                         draftId={draftId}
                         fmt={fmt}
                         total={chapterTotal(chapter.id)}
+                        subtotalValue={chapter.isSubtotal ? chapterSubtotalValue(cat.id, chapter.id) : undefined}
                         isFirst={i === 0}
                         isLast={i === catChapters.length - 1}
-                        autoFocusText={chapter.id === justAddedTextId}
+                        autoFocus={chapter.id === justAddedId}
                         onCommit={(code, description) => handleCommitChapter(chapter, code, description)}
                         onCommitTextLine={(patch) => handleCommitTextChapter(chapter, patch)}
                         onMove={(direction) => handleMoveChapter(chapter, direction)}
                         onDelete={() => setDeleteTarget({ chapterId: chapter.id, label: chapter.description })}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setChapterMenuCategory(cat.id);
+                          setChapterMenu({
+                            x: e.clientX, y: e.clientY, rowId: chapter.id,
+                            style: (chapter.isTextLine || chapter.isSubtotal) ? {
+                              bold: !!chapter.textBold, color: chapter.textColor || DEFAULT_TEXT_LINE_COLOR,
+                              onChangeBold: (v) => handleCommitTextChapter(chapter, { textBold: v }),
+                              onChangeColor: (c) => handleCommitTextChapter(chapter, { textColor: c }),
+                            } : undefined,
+                            onDelete: () => setDeleteTarget({ chapterId: chapter.id, label: chapter.description }),
+                          });
+                        }}
                       />
                     ))}
                     <NewChapterRow onCommit={(code, description) => handleCommitNewChapter(cat.id, code, description)} />
-                    <button onClick={() => handleAddTextChapter(cat.id)} className="flex items-center gap-1 pl-3 py-1.5 text-[10px] text-slate-400 hover:text-[#8DA7BE] transition-colors">
-                      <Type size={10} /> Añadir línea de texto
-                    </button>
                   </div>
                 </div>
               );
@@ -882,21 +920,32 @@ export default function BudgetingTopPage() {
                     draftId={draftId}
                     fmt={fmt}
                     total={chapterTotal(chapter.id)}
+                    subtotalValue={chapter.isSubtotal ? chapterSubtotalValue(null, chapter.id) : undefined}
                     isFirst={i === 0}
                     isLast={i === flatSorted.length - 1}
-                    autoFocusText={chapter.id === justAddedTextId}
+                    autoFocus={chapter.id === justAddedId}
                     onCommit={(code, description) => handleCommitChapter(chapter, code, description)}
                     onCommitTextLine={(patch) => handleCommitTextChapter(chapter, patch)}
                     onMove={(direction) => handleMoveChapter(chapter, direction)}
                     onDelete={() => setDeleteTarget({ chapterId: chapter.id, label: chapter.description })}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setChapterMenuCategory(null);
+                      setChapterMenu({
+                        x: e.clientX, y: e.clientY, rowId: chapter.id,
+                        style: (chapter.isTextLine || chapter.isSubtotal) ? {
+                          bold: !!chapter.textBold, color: chapter.textColor || DEFAULT_TEXT_LINE_COLOR,
+                          onChangeBold: (v) => handleCommitTextChapter(chapter, { textBold: v }),
+                          onChangeColor: (c) => handleCommitTextChapter(chapter, { textColor: c }),
+                        } : undefined,
+                        onDelete: () => setDeleteTarget({ chapterId: chapter.id, label: chapter.description }),
+                      });
+                    }}
                   />
                 ));
               })()}
             </div>
             <NewChapterRow onCommit={(code, description) => handleCommitNewChapter(null, code, description)} />
-            <button onClick={() => handleAddTextChapter(null)} className="flex items-center gap-1 pl-3 py-1.5 text-[10px] text-slate-400 hover:text-[#8DA7BE] transition-colors">
-              <Type size={10} /> Añadir línea de texto
-            </button>
             {fringeVisibility.topSheet && topFringeBreakdown.length > 0 && (
               <div className="border-t border-slate-200">
                 <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide px-4 pt-2 pb-1">Cargas sociales de todo el presupuesto</p>
@@ -926,6 +975,16 @@ export default function BudgetingTopPage() {
           </>
         )}
       </div>
+
+      {chapterMenu && (
+        <BudgetingRowContextMenu
+          state={chapterMenu}
+          onClose={() => setChapterMenu(null)}
+          onInsertLine={() => handleInsertChapter(chapterMenu.rowId, chapterMenuCategory, "item")}
+          onInsertText={() => handleInsertChapter(chapterMenu.rowId, chapterMenuCategory, "text")}
+          onInsertSubtotal={() => handleInsertChapter(chapterMenu.rowId, chapterMenuCategory, "subtotal")}
+        />
+      )}
 
       {/* ── Delete confirm ───────────────────────────────────────────────── */}
       {deleteTarget && (

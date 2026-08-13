@@ -14,7 +14,7 @@ import {
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
   AlertCircle, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy,
-  MoreVertical, Percent, Search, Settings2, Sigma, SlidersHorizontal, Trash2, Type, X,
+  MoreVertical, Percent, Search, Settings2, Sigma, SlidersHorizontal, Trash2, X,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
@@ -23,10 +23,11 @@ import {
   BTN_LIGHT_ACTIVE, BudgetingAccount, BudgetingDetailColumnsConfig, BudgetingDetailLine, BudgetingDraft, BudgetingFringe, BudgetingFringeVisibility,
   BudgetingLineRoute, BudgetingSubchapter, CELL_INPUT, DEFAULT_DETAIL_COLUMNS_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, DETAIL_STAT_COLUMN_PX, DetailStatColumnWidth,
   UNIT_SUGGESTIONS, computeFringeExtras, computeLineTotal, computeReorder, evaluateFieldExpr,
-  fmtCurrency, fmtDecimal, isPlainNumber, lineFringeBreakdown, nextOrderValue, resolveGlobals, sortByOrder, subchapterTotal,
+  fmtCurrency, fmtDecimal, isPlainNumber, lineFringeBreakdown, nextOrderValue, orderAfter, resolveGlobals, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import BudgetingFormulaInput from "@/components/BudgetingFormulaInput";
 import BudgetingTextLineControls from "@/components/BudgetingTextLineControls";
+import BudgetingRowContextMenu, { BudgetingRowContextMenuState } from "@/components/BudgetingRowContextMenu";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -266,11 +267,11 @@ function DetailSidebar({
 // perder el foco (sin botón de confirmar). Componente de módulo estable: no
 // se redefine entre renders, así los inputs no pierden el foco al escribir. ──
 function LineFieldsGrid({
-  fields, onChange, onBlurAny, onEnter, onEscape, globals, totalPreview, muted, template, showComment, showTags, indicators, actions,
+  fields, onChange, onBlurAny, onEnter, onEscape, globals, totalPreview, muted, template, showComment, showTags, autoFocus, indicators, actions,
 }: {
   fields: LineFields; onChange: (patch: Partial<LineFields>) => void; onBlurAny: () => void;
   onEnter: () => void; onEscape: () => void; globals: { code: string; label: string }[];
-  totalPreview: number; muted: boolean; template: string; showComment: boolean; showTags: boolean;
+  totalPreview: number; muted: boolean; template: string; showComment: boolean; showTags: boolean; autoFocus?: boolean;
   indicators?: React.ReactNode; actions?: React.ReactNode;
 }) {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -279,7 +280,7 @@ function LineFieldsGrid({
   };
   return (
     <div className="grid gap-0 divide-x divide-slate-200 px-4" style={{ gridTemplateColumns: template }}>
-      <input value={fields.code} onChange={(e) => onChange({ code: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
+      <input autoFocus={autoFocus} value={fields.code} onChange={(e) => onChange({ code: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} font-mono text-xs`} />
       <input value={fields.description} onChange={(e) => onChange({ description: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} text-xs pl-2`} />
@@ -309,13 +310,14 @@ function LineFieldsGrid({
 }
 
 function LineRow({
-  line, fringes, globals, globalValues, columnsConfig, template, isFirst, isLast, error, sidebarOpen,
-  onCommit, onDuplicate, onDelete, onMove, onOpenSidebar,
+  line, fringes, globals, globalValues, columnsConfig, template, isFirst, isLast, autoFocus, error, sidebarOpen,
+  onCommit, onDuplicate, onDelete, onMove, onOpenSidebar, onContextMenu,
 }: {
   line: BudgetingDetailLine; fringes: BudgetingFringe[];
   globals: { code: string; label: string }[]; globalValues: Record<string, number>;
-  columnsConfig: BudgetingDetailColumnsConfig; template: string; isFirst: boolean; isLast: boolean; error?: string; sidebarOpen: boolean;
+  columnsConfig: BudgetingDetailColumnsConfig; template: string; isFirst: boolean; isLast: boolean; autoFocus?: boolean; error?: string; sidebarOpen: boolean;
   onCommit: (fields: LineFields) => void; onDuplicate: () => void; onDelete: () => void; onMove: (direction: "up" | "down") => void; onOpenSidebar: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
 }) {
   const [fields, setFields] = useState<LineFields>(() => toFields(line));
   const hasFormula = !!(line.unitsExpr || line.multiplierExpr || line.rateExpr);
@@ -328,7 +330,7 @@ function LineRow({
   );
 
   return (
-    <div className="group">
+    <div className="group" onContextMenu={onContextMenu}>
       <LineFieldsGrid
         fields={fields}
         onChange={(patch) => setFields((f) => ({ ...f, ...patch }))}
@@ -341,6 +343,7 @@ function LineRow({
         template={template}
         showComment={columnsConfig.showComment}
         showTags={columnsConfig.showTags}
+        autoFocus={autoFocus}
         indicators={
           (hasFormula || hasHiddenComment) && (
             <span className="flex items-center gap-1">
@@ -425,12 +428,13 @@ function NewLineRow({ globals, globalValues, columnsConfig, template, error, onC
 // acciones en su columna habitual, para que la fila siga alineada con las
 // demás pese al ancho de columnas dinámico. ────────────────────────────────
 function TextLineRow({
-  line, template, columnsConfig, isFirst, isLast, autoFocusText, onCommitTextLine, onMove, onDelete,
+  line, template, columnsConfig, isFirst, isLast, subtotalValue, autoFocus, onCommitTextLine, onMove, onDelete, onContextMenu,
 }: {
-  line: BudgetingDetailLine; template: string; columnsConfig: BudgetingDetailColumnsConfig; isFirst: boolean; isLast: boolean; autoFocusText?: boolean;
+  line: BudgetingDetailLine; template: string; columnsConfig: BudgetingDetailColumnsConfig; isFirst: boolean; isLast: boolean; subtotalValue?: number; autoFocus?: boolean;
   onCommitTextLine: (patch: { description?: string; textBold?: boolean; textColor?: string }) => void;
-  onMove: (direction: "up" | "down") => void; onDelete: () => void;
+  onMove: (direction: "up" | "down") => void; onDelete: () => void; onContextMenu: (e: React.MouseEvent) => void;
 }) {
+  const isSubtotal = !!line.isSubtotal;
   const [description, setDescription] = useState(line.description);
   const commit = () => {
     if (!description.trim()) { setDescription(line.description); return; }
@@ -445,17 +449,25 @@ function TextLineRow({
   if (columnsConfig.showTags) actionsCol++;
 
   return (
-    <div className="grid gap-0 divide-x divide-slate-200 px-4 group" style={{ gridTemplateColumns: template }}>
+    <div className="grid gap-0 divide-x divide-slate-200 px-4 group" style={{ gridTemplateColumns: template }} onContextMenu={onContextMenu}>
       <input
-        autoFocus={autoFocusText}
+        autoFocus={autoFocus}
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         onBlur={commit}
         onKeyDown={handleKeyDown}
-        placeholder="Texto..."
-        style={{ gridColumn: "1 / 8", color: line.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: line.textBold ? 700 : 400 }}
+        placeholder={isSubtotal ? "Subtotal" : "Texto..."}
+        style={{ gridColumn: isSubtotal ? "1 / 7" : "1 / 8", color: line.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: line.textBold ? 700 : 400 }}
         className={`${CELL_INPUT} text-xs`}
       />
+      {isSubtotal && (
+        <span
+          className="flex items-center justify-end text-xs pl-2 pr-2"
+          style={{ gridColumn: "7 / 8", color: line.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: line.textBold ? 700 : 400 }}
+        >
+          {fmtDecimal(subtotalValue || 0)}
+        </span>
+      )}
       <span
         className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity"
         style={{ gridColumn: `${actionsCol} / ${actionsCol + 1}` }}
@@ -498,7 +510,8 @@ export default function BudgetingSubchapterPage() {
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [deleteTarget, setDeleteTarget] = useState<BudgetingDetailLine | null>(null);
   const [saving, setSaving] = useState(false);
-  const [justAddedTextId, setJustAddedTextId] = useState<string | null>(null);
+  const [justAddedId, setJustAddedId] = useState<string | null>(null);
+  const [lineMenu, setLineMenu] = useState<BudgetingRowContextMenuState | null>(null);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "budgetingDrafts", draftId), (snap) => {
@@ -554,7 +567,7 @@ export default function BudgetingSubchapterPage() {
 
   // Las líneas de texto (sin importe) no son cuentas de verdad: no aparecen como destino de "Sumar en".
   const allSubchapters: RouteTarget[] = chapters.flatMap((c) =>
-    (subchaptersByChapter[c.id] || []).filter((sub) => !sub.isTextLine).map((sub) => ({ chapterId: c.id, chapterCode: c.code, chapterDescription: c.description, sub }))
+    (subchaptersByChapter[c.id] || []).filter((sub) => !sub.isTextLine && !sub.isSubtotal).map((sub) => ({ chapterId: c.id, chapterCode: c.code, chapterDescription: c.description, sub }))
   );
 
   const currency = draft?.currency || "EUR";
@@ -685,21 +698,38 @@ export default function BudgetingSubchapterPage() {
     return true;
   };
 
-  // ── Línea de texto (nota, sin código ni importe): mismo doc de Detalle,
-  // marcado con isTextLine, para poder intercalarla entre líneas reales. ──
-  const handleAddTextLine = async () => {
-    const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`), {
+  // ── Línea de texto / subtotal (mismo doc de Detalle, marcado con
+  // isTextLine/isSubtotal, para poder intercalarlas entre líneas reales). Se
+  // insertan justo debajo de la fila donde se abrió el menú contextual. ──
+  const handleInsertLine = async (afterId: string | null, kind: "item" | "text" | "subtotal") => {
+    const sorted = sortByOrder(lines);
+    const order = orderAfter(sorted, afterId);
+    const base: Record<string, unknown> = {
       code: "", description: "", units: 0, unit: "", multiplier: 0, rate: 0, total: 0,
-      notes: "", tags: [], fringeIds: [], routedTo: null,
-      isTextLine: true, textBold: false, textColor: DEFAULT_TEXT_LINE_COLOR,
-      order: nextOrderValue(), createdAt: Timestamp.now(),
-    });
+      notes: "", tags: [], fringeIds: [], routedTo: null, order, createdAt: Timestamp.now(),
+    };
+    if (kind === "text") Object.assign(base, { isTextLine: true, textBold: false, textColor: DEFAULT_TEXT_LINE_COLOR });
+    if (kind === "subtotal") Object.assign(base, { description: "Subtotal", isSubtotal: true, textBold: true, textColor: DEFAULT_TEXT_LINE_COLOR });
+    const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`), base);
     await touchDraft();
-    setJustAddedTextId(ref.id);
+    setJustAddedId(ref.id);
   };
   const handleCommitTextLine = async (line: BudgetingDetailLine, patch: { description?: string; textBold?: boolean; textColor?: string }) => {
     await updateDoc(lineRef(line.id), patch);
     await touchDraft();
+  };
+  /** Suma de las líneas normales desde el subtotal anterior (o el principio) hasta `subtotalId`. */
+  const lineSubtotalValue = (subtotalId: string): number => {
+    const sorted = sortByOrder(lines);
+    const idx = sorted.findIndex((l) => l.id === subtotalId);
+    if (idx < 0) return 0;
+    let sum = 0;
+    for (let i = idx - 1; i >= 0; i--) {
+      const l = sorted[i];
+      if (l.isSubtotal) break;
+      if (!l.isTextLine) sum += l.total || 0;
+    }
+    return Math.round(sum * 100) / 100;
   };
 
   const handleMoveLine = async (line: BudgetingDetailLine, direction: "up" | "down") => {
@@ -857,8 +887,20 @@ export default function BudgetingSubchapterPage() {
           <div className="divide-y divide-slate-100">
             {(() => {
               const sorted = sortByOrder(lines.filter(matchesSearch));
+              const openLineMenu = (line: BudgetingDetailLine, e: React.MouseEvent) => {
+                e.preventDefault();
+                setLineMenu({
+                  x: e.clientX, y: e.clientY, rowId: line.id,
+                  style: (line.isTextLine || line.isSubtotal) ? {
+                    bold: !!line.textBold, color: line.textColor || DEFAULT_TEXT_LINE_COLOR,
+                    onChangeBold: (v) => handleCommitTextLine(line, { textBold: v }),
+                    onChangeColor: (c) => handleCommitTextLine(line, { textColor: c }),
+                  } : undefined,
+                  onDelete: () => setDeleteTarget(line),
+                });
+              };
               return sorted.map((line, i) =>
-                line.isTextLine ? (
+                line.isTextLine || line.isSubtotal ? (
                   <TextLineRow
                     key={line.id}
                     line={line}
@@ -866,10 +908,12 @@ export default function BudgetingSubchapterPage() {
                     columnsConfig={columnsConfig}
                     isFirst={i === 0}
                     isLast={i === sorted.length - 1}
-                    autoFocusText={line.id === justAddedTextId}
+                    subtotalValue={line.isSubtotal ? lineSubtotalValue(line.id) : undefined}
+                    autoFocus={line.id === justAddedId}
                     onCommitTextLine={(patch) => handleCommitTextLine(line, patch)}
                     onMove={(direction) => handleMoveLine(line, direction)}
                     onDelete={() => setDeleteTarget(line)}
+                    onContextMenu={(e) => openLineMenu(line, e)}
                   />
                 ) : (
                   <LineRow
@@ -883,22 +927,19 @@ export default function BudgetingSubchapterPage() {
                     error={rowErrors[line.id]}
                     isFirst={i === 0}
                     isLast={i === sorted.length - 1}
+                    autoFocus={line.id === justAddedId}
                     sidebarOpen={sidebarOpen && sidebarLineId === line.id}
                     onCommit={(fields) => handleCommitLine(line, fields)}
                     onDuplicate={() => handleDuplicateLine(line)}
                     onDelete={() => setDeleteTarget(line)}
                     onMove={(direction) => handleMoveLine(line, direction)}
                     onOpenSidebar={() => openSidebar(line.id)}
+                    onContextMenu={(e) => openLineMenu(line, e)}
                   />
                 )
               );
             })()}
             {!q && <NewLineRow globals={globalOptions} globalValues={globalResolution.values} columnsConfig={columnsConfig} template={template} error={rowErrors["new"]} onCommit={handleCommitNewLine} />}
-            {!q && (
-              <button onClick={handleAddTextLine} className="flex items-center gap-1 px-4 py-1.5 text-[10px] text-slate-400 hover:text-[#8DA7BE] transition-colors">
-                <Type size={10} /> Añadir línea de texto
-              </button>
-            )}
           </div>
 
           {fringeVisibility.detail && subchapterFringeBreakdown.length > 0 && (
@@ -962,6 +1003,16 @@ export default function BudgetingSubchapterPage() {
           onClose={() => setSidebarOpen(false)}
           onToggleFringe={(id) => sidebarLine && handleToggleFringe(sidebarLine, id)}
           onSetRoute={(target) => sidebarLine && handleSetRoute(sidebarLine, target)}
+        />
+      )}
+
+      {lineMenu && (
+        <BudgetingRowContextMenu
+          state={lineMenu}
+          onClose={() => setLineMenu(null)}
+          onInsertLine={() => handleInsertLine(lineMenu.rowId, "item")}
+          onInsertText={() => handleInsertLine(lineMenu.rowId, "text")}
+          onInsertSubtotal={() => handleInsertLine(lineMenu.rowId, "subtotal")}
         />
       )}
 

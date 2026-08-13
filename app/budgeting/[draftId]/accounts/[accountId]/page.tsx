@@ -10,17 +10,18 @@ import { db } from "@/lib/firebase";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp, updateDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, Search, Trash2, Type } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, Search, Trash2 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
   BudgetingAccount, BudgetingDetailLine, BudgetingDraft, BudgetingFringe, BudgetingFringeVisibility, BudgetingSubchapter,
-  CELL_INPUT, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, computeReorder, fmtCurrency, nextOrderValue, sortByOrder, subchapterTotal,
+  CELL_INPUT, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, computeReorder, fmtCurrency, nextOrderValue, orderAfter, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import BudgetingColumnsMenu from "@/components/BudgetingColumnsMenu";
 import BudgetingFringeLineRow from "@/components/BudgetingFringeLineRow";
 import BudgetingTextLineControls from "@/components/BudgetingTextLineControls";
+import BudgetingRowContextMenu, { BudgetingRowContextMenuState } from "@/components/BudgetingRowContextMenu";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -31,12 +32,12 @@ const cols = "grid-cols-[26px_100px_1fr_100px_58px]";
 // sin placeholder, guarda sola al perder el foco. Componente de módulo
 // estable: no se redefine entre renders, así los inputs no pierden el foco. ──
 function SubRow({
-  sub, draftId, accountId, fmt, total, isFirst, isLast, autoFocusText, onCommit, onCommitTextLine, onMove, onDelete,
+  sub, draftId, accountId, fmt, total, subtotalValue, isFirst, isLast, autoFocus, onCommit, onCommitTextLine, onMove, onDelete, onContextMenu,
 }: {
-  sub: BudgetingSubchapter; draftId: string; accountId: string; fmt: (n: number) => string; total: number; isFirst: boolean; isLast: boolean; autoFocusText?: boolean;
+  sub: BudgetingSubchapter; draftId: string; accountId: string; fmt: (n: number) => string; total: number; subtotalValue?: number; isFirst: boolean; isLast: boolean; autoFocus?: boolean;
   onCommit: (code: string, description: string) => void;
   onCommitTextLine: (patch: { description?: string; textBold?: boolean; textColor?: string }) => void;
-  onMove: (direction: "up" | "down") => void; onDelete: () => void;
+  onMove: (direction: "up" | "down") => void; onDelete: () => void; onContextMenu: (e: React.MouseEvent) => void;
 }) {
   const [code, setCode] = useState(sub.code);
   const [description, setDescription] = useState(sub.description);
@@ -50,7 +51,8 @@ function SubRow({
     if (e.key === "Escape") { setCode(sub.code); setDescription(sub.description); }
   };
 
-  if (sub.isTextLine) {
+  if (sub.isTextLine || sub.isSubtotal) {
+    const isSubtotal = !!sub.isSubtotal;
     const commitText = () => {
       if (!description.trim()) { setDescription(sub.description); return; }
       if (description.trim() !== sub.description) onCommitTextLine({ description: description.trim() });
@@ -60,18 +62,23 @@ function SubRow({
       if (e.key === "Escape") setDescription(sub.description);
     };
     return (
-      <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group`}>
+      <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group`} onContextMenu={onContextMenu}>
         <span />
         <input
-          autoFocus={autoFocusText}
+          autoFocus={autoFocus}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           onBlur={commitText}
           onKeyDown={handleTextKeyDown}
-          placeholder="Texto..."
-          style={{ gridColumn: "2 / 5", color: sub.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: sub.textBold ? 700 : 400 }}
+          placeholder={isSubtotal ? "Subtotal" : "Texto..."}
+          style={{ gridColumn: isSubtotal ? "2 / 4" : "2 / 5", color: sub.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: sub.textBold ? 700 : 400 }}
           className={`${CELL_INPUT} text-xs pl-2`}
         />
+        {isSubtotal && (
+          <span className="flex items-center justify-end text-xs pr-2" style={{ color: sub.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: sub.textBold ? 700 : 400 }}>
+            {fmt(subtotalValue || 0)}
+          </span>
+        )}
         <span className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <BudgetingTextLineControls
             bold={!!sub.textBold}
@@ -94,11 +101,11 @@ function SubRow({
   }
 
   return (
-    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group`}>
+    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group`} onContextMenu={onContextMenu}>
       <Link href={`/budgeting/${draftId}/accounts/${accountId}/subchapters/${sub.id}`} className="flex items-center justify-center" title="Entrar">
         <ChevronRight size={13} className="text-slate-300 group-hover:text-[#8DA7BE] group-hover:translate-x-0.5 transition-all" />
       </Link>
-      <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
+      <input autoFocus={autoFocus} value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} font-mono text-xs pl-2`} />
       <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} text-xs pl-2`} />
@@ -152,7 +159,8 @@ export default function BudgetingChapterPage() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
-  const [justAddedTextId, setJustAddedTextId] = useState<string | null>(null);
+  const [justAddedId, setJustAddedId] = useState<string | null>(null);
+  const [subMenu, setSubMenu] = useState<BudgetingRowContextMenuState | null>(null);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "budgetingDrafts", draftId), (snap) => {
@@ -265,19 +273,35 @@ export default function BudgetingChapterPage() {
     return true;
   };
 
-  // ── Línea de texto (nota, sin código ni importe): mismo doc de subcapítulo,
-  // marcado con isTextLine, para poder intercalarla entre cuentas reales. ──
-  const handleAddTextSub = async () => {
-    const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`), {
-      code: "", description: "", isTextLine: true, textBold: false, textColor: DEFAULT_TEXT_LINE_COLOR,
-      order: nextOrderValue(), createdAt: Timestamp.now(),
-    });
+  // ── Línea de texto / subtotal (mismo doc de subcapítulo, marcado con
+  // isTextLine/isSubtotal, para poder intercalarlas entre cuentas reales).
+  // Se insertan justo debajo de la fila donde se abrió el menú contextual. ──
+  const handleInsertSub = async (afterId: string | null, kind: "item" | "text" | "subtotal") => {
+    const sorted = sortByOrder(subchapters);
+    const order = orderAfter(sorted, afterId);
+    const base: Record<string, unknown> = { order, createdAt: Timestamp.now(), code: "", description: "" };
+    if (kind === "text") Object.assign(base, { isTextLine: true, textBold: false, textColor: DEFAULT_TEXT_LINE_COLOR });
+    if (kind === "subtotal") Object.assign(base, { description: "Subtotal", isSubtotal: true, textBold: true, textColor: DEFAULT_TEXT_LINE_COLOR });
+    const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`), base);
     await touchDraft();
-    setJustAddedTextId(ref.id);
+    setJustAddedId(ref.id);
   };
   const handleCommitTextSub = async (sub: BudgetingSubchapter, patch: { description?: string; textBold?: boolean; textColor?: string }) => {
     await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`, sub.id), patch);
     await touchDraft();
+  };
+  /** Suma de los subcapítulos normales desde el subtotal anterior (o el principio) hasta `subtotalId`. */
+  const subSubtotalValue = (subtotalId: string): number => {
+    const sorted = sortByOrder(subchapters);
+    const idx = sorted.findIndex((s) => s.id === subtotalId);
+    if (idx < 0) return 0;
+    let sum = 0;
+    for (let i = idx - 1; i >= 0; i--) {
+      const s = sorted[i];
+      if (s.isSubtotal) break;
+      if (!s.isTextLine) sum += subTotal(s);
+    }
+    return Math.round(sum * 100) / 100;
   };
 
   const handleMoveSub = async (sub: BudgetingSubchapter, direction: "up" | "down") => {
@@ -369,22 +393,30 @@ export default function BudgetingChapterPage() {
                 accountId={accountId}
                 fmt={fmt}
                 total={subTotal(sub)}
+                subtotalValue={sub.isSubtotal ? subSubtotalValue(sub.id) : undefined}
                 isFirst={i === 0}
                 isLast={i === sorted.length - 1}
-                autoFocusText={sub.id === justAddedTextId}
+                autoFocus={sub.id === justAddedId}
                 onCommit={(code, description) => handleCommitSub(sub, code, description)}
                 onCommitTextLine={(patch) => handleCommitTextSub(sub, patch)}
                 onMove={(direction) => handleMoveSub(sub, direction)}
                 onDelete={() => setDeleteTarget({ subchapterId: sub.id, label: sub.description })}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setSubMenu({
+                    x: e.clientX, y: e.clientY, rowId: sub.id,
+                    style: (sub.isTextLine || sub.isSubtotal) ? {
+                      bold: !!sub.textBold, color: sub.textColor || DEFAULT_TEXT_LINE_COLOR,
+                      onChangeBold: (v) => handleCommitTextSub(sub, { textBold: v }),
+                      onChangeColor: (c) => handleCommitTextSub(sub, { textColor: c }),
+                    } : undefined,
+                    onDelete: () => setDeleteTarget({ subchapterId: sub.id, label: sub.description }),
+                  });
+                }}
               />
             ));
           })()}
           {!q && <NewSubRow onCommit={handleCommitNewSub} />}
-          {!q && (
-            <button onClick={handleAddTextSub} className="flex items-center gap-1 px-3 py-1.5 text-[10px] text-slate-400 hover:text-[#8DA7BE] transition-colors">
-              <Type size={10} /> Añadir línea de texto
-            </button>
-          )}
         </div>
 
         {fringeVisibility.chapter && chapterFringeBreakdown.length > 0 && (
@@ -415,6 +447,16 @@ export default function BudgetingChapterPage() {
           <span />
         </div>
       </div>
+
+      {subMenu && (
+        <BudgetingRowContextMenu
+          state={subMenu}
+          onClose={() => setSubMenu(null)}
+          onInsertLine={() => handleInsertSub(subMenu.rowId, "item")}
+          onInsertText={() => handleInsertSub(subMenu.rowId, "text")}
+          onInsertSubtotal={() => handleInsertSub(subMenu.rowId, "subtotal")}
+        />
+      )}
 
       {/* ── Delete confirm ───────────────────────────────────────────────── */}
       {deleteTarget && (
