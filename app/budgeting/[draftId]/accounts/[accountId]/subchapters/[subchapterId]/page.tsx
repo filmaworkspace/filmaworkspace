@@ -2,7 +2,7 @@
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
@@ -13,7 +13,7 @@ import {
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  AlertCircle, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy,
+  AlertCircle, ArrowUpRight, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy,
   MoreVertical, Percent, Search, Settings2, Sigma, SlidersHorizontal, Trash2, X,
 } from "lucide-react";
 
@@ -22,8 +22,8 @@ import { useUser } from "@/contexts/UserContext";
 import {
   BTN_LIGHT_ACTIVE, BudgetingAccount, BudgetingDetailColumnsConfig, BudgetingDetailLine, BudgetingDraft, BudgetingFringe, BudgetingFringeVisibility,
   BudgetingLineRoute, BudgetingSubchapter, CELL_INPUT, DEFAULT_DETAIL_COLUMNS_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, DETAIL_STAT_COLUMN_PX, DetailStatColumnWidth,
-  UNIT_SUGGESTIONS, computeFringeExtras, computeLineTotal, computeReorder, evaluateFieldExpr,
-  fmtCurrency, fmtDecimal, isPlainNumber, lineFringeBreakdown, nextOrderValue, orderAfter, resolveGlobals, sortByOrder, subchapterTotal,
+  UNIT_SUGGESTIONS, clearBudgetingClipboard, computeFringeExtras, computeLineTotal, computeReorder, evaluateFieldExpr,
+  fmtCurrency, fmtDecimal, getBudgetingClipboard, isPlainNumber, lineFringeBreakdown, nextOrderValue, orderAfter, resolveGlobals, setBudgetingClipboard, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import BudgetingFormulaInput from "@/components/BudgetingFormulaInput";
 import BudgetingRowContextMenu, { BudgetingRowContextMenuState } from "@/components/BudgetingRowContextMenu";
@@ -62,6 +62,14 @@ function colTemplate(cfg: BudgetingDetailColumnsConfig): string {
 }
 
 interface RouteTarget { chapterId: string; chapterCode: string; chapterDescription: string; sub: BudgetingSubchapter; }
+
+/** Todo lo que hace falta para recrear una línea entera al pegarla (copiar/cortar), sin id/order/createdAt. */
+interface LineClipboardData {
+  code: string; description: string; units: number; unitsExpr: string | null; unit: string;
+  multiplier: number; multiplierExpr: string | null; rate: number; rateExpr: string | null; total: number;
+  notes: string; tags: string[]; fringeIds: string[]; routedTo: BudgetingLineRoute | null;
+  isTextLine: boolean; isSubtotal: boolean; textBold: boolean; textColor: string | null;
+}
 
 // ─── Fila de una carga social ("fringe") con alcance de subcapítulo: aparece
 // como una línea más de la tabla, alineada a las mismas columnas (con las de
@@ -448,6 +456,7 @@ function TextLineRow({
 
 export default function BudgetingSubchapterPage() {
   const { draftId, accountId, subchapterId } = useParams() as { draftId: string; accountId: string; subchapterId: string };
+  const router = useRouter();
   const { user } = useUser();
 
   const [draft, setDraft] = useState<BudgetingDraft | null>(null);
@@ -519,10 +528,13 @@ export default function BudgetingSubchapterPage() {
     return () => { Object.values(unsubs).forEach((fn) => fn()); };
   }, [chapters, draftId]);
 
-  // Las líneas de texto (sin importe) no son cuentas de verdad: no aparecen como destino de "Sumar en".
-  const allSubchapters: RouteTarget[] = chapters.flatMap((c) =>
-    (subchaptersByChapter[c.id] || []).filter((sub) => !sub.isTextLine && !sub.isSubtotal).map((sub) => ({ chapterId: c.id, chapterCode: c.code, chapterDescription: c.description, sub }))
+  // Las líneas de texto (sin importe) no son cuentas de verdad: no aparecen como destino de "Sumar en"
+  // ni en el navegador de cuentas de la cabecera. Mismo orden que en Capítulo/Top Sheet.
+  const allSubchapters: RouteTarget[] = sortByOrder(chapters).flatMap((c) =>
+    sortByOrder((subchaptersByChapter[c.id] || []).filter((sub) => !sub.isTextLine && !sub.isSubtotal)).map((sub) => ({ chapterId: c.id, chapterCode: c.code, chapterDescription: c.description, sub }))
   );
+  const accountNavIndex = allSubchapters.findIndex((o) => o.sub.id === subchapterId);
+  const goToAccount = (target: RouteTarget) => router.push(`/budgeting/${draftId}/accounts/${target.chapterId}/subchapters/${target.sub.id}`);
 
   const currency = draft?.currency || "EUR";
   const fmt = (n: number) => fmtCurrency(n, currency);
@@ -705,6 +717,85 @@ export default function BudgetingSubchapterPage() {
     }
   };
 
+  // ── Copiar/cortar/pegar la línea entera (código, cantidades, notas,
+  // etiquetas, fringes, redirección...) desde el menú de clic derecho.
+  // Portapapeles en sessionStorage: sobrevive a navegar a otra Cuenta, así
+  // se puede copiar aquí y pegar en el subcapítulo de al lado. ──────────────
+  const lineToClipboardData = (line: BudgetingDetailLine): LineClipboardData => ({
+    code: line.code, description: line.description, units: line.units, unitsExpr: line.unitsExpr ?? null, unit: line.unit || "",
+    multiplier: line.multiplier, multiplierExpr: line.multiplierExpr ?? null, rate: line.rate, rateExpr: line.rateExpr ?? null, total: line.total,
+    notes: line.notes || "", tags: line.tags || [], fringeIds: line.fringeIds || [], routedTo: line.routedTo || null,
+    isTextLine: line.isTextLine || false, isSubtotal: line.isSubtotal || false, textBold: line.textBold || false, textColor: line.textColor || null,
+  });
+
+  const handleCopyLine = (line: BudgetingDetailLine) => {
+    setBudgetingClipboard<LineClipboardData>({ kind: "line", mode: "copy", data: lineToClipboardData(line) });
+  };
+
+  const handleCutLine = async (line: BudgetingDetailLine) => {
+    setBudgetingClipboard<LineClipboardData>({ kind: "line", mode: "cut", data: lineToClipboardData(line) });
+    setSaving(true);
+    try {
+      if (line.routedTo) {
+        const batch = writeBatch(db);
+        batch.delete(lineRef(line.id));
+        const targetRef = doc(db, `budgetingDrafts/${draftId}/accounts/${line.routedTo.chapterId}/subchapters`, line.routedTo.subchapterId);
+        batch.update(targetRef, { receivedTotal: increment(-(line.total || 0)) });
+        await batch.commit();
+      } else {
+        await deleteDoc(lineRef(line.id));
+      }
+      await touchDraft();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** Pega la línea del portapapeles justo debajo de `afterId` (o al principio si es null), igual que "Insertar línea". */
+  const handlePasteLine = async (afterId: string | null) => {
+    const clip = getBudgetingClipboard<LineClipboardData>("line");
+    if (!clip) return;
+    const src = clip.data;
+    // El código solo se toca si ya existe en el subcapítulo de destino (al
+    // pegar en otra Cuenta distinta no hace falta renombrarlo).
+    let code = src.code || "";
+    if (code && isLineCodeTaken(code)) {
+      let candidate = `${code}-copia`;
+      let n = 2;
+      while (isLineCodeTaken(candidate)) { candidate = `${code}-copia${n}`; n++; }
+      code = candidate;
+    }
+    setSaving(true);
+    try {
+      const order = orderAfter(sortByOrder(lines), afterId);
+      const payload = {
+        code, description: src.description, units: src.units, unitsExpr: src.unitsExpr, unit: src.unit,
+        multiplier: src.multiplier, multiplierExpr: src.multiplierExpr, rate: src.rate, rateExpr: src.rateExpr, total: src.total,
+        notes: src.notes, tags: src.tags, fringeIds: src.fringeIds, routedTo: src.routedTo,
+        isTextLine: src.isTextLine, isSubtotal: src.isSubtotal, textBold: src.textBold, textColor: src.textColor,
+        order, createdAt: Timestamp.now(),
+      };
+      let newId: string;
+      if (src.routedTo) {
+        const newRef = doc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`));
+        const batch = writeBatch(db);
+        batch.set(newRef, payload);
+        const targetRef = doc(db, `budgetingDrafts/${draftId}/accounts/${src.routedTo.chapterId}/subchapters`, src.routedTo.subchapterId);
+        batch.update(targetRef, { receivedTotal: increment(src.total || 0) });
+        await batch.commit();
+        newId = newRef.id;
+      } else {
+        const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`), payload);
+        newId = ref.id;
+      }
+      await touchDraft();
+      setJustAddedId(newId);
+      if (clip.mode === "cut") clearBudgetingClipboard();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDeleteLine = async () => {
     if (!deleteTarget) return;
     setSaving(true);
@@ -772,13 +863,50 @@ export default function BudgetingSubchapterPage() {
 
   return (
     <div className="w-full px-10 py-6">
-      {/* Breadcrumb: solo navegación de entrar/volver, sin categorías ni desplegables */}
-      <div className="flex items-center gap-1.5 mb-4 flex-wrap">
-        <Link href={`/budgeting/${draftId}`} className="text-xs text-slate-400 hover:text-[#8DA7BE] transition-colors">{draft?.name}</Link>
-        <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
-        <Link href={`/budgeting/${draftId}/accounts/${accountId}`} className="text-xs font-medium text-slate-600 hover:text-[#8DA7BE] transition-colors">{chapter.code} {chapter.description}</Link>
-        <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
-        <span className="text-xs font-semibold text-slate-900">{subchapter.code} {subchapter.description}</span>
+      {/* Breadcrumb: solo navegación de entrar/volver, sin categorías ni desplegables. A la
+          derecha, un navegador para saltar directamente a otra Cuenta del presupuesto. */}
+      <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Link href={`/budgeting/${draftId}`} className="text-xs text-slate-400 hover:text-[#8DA7BE] transition-colors">{draft?.name}</Link>
+          <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
+          <Link href={`/budgeting/${draftId}/accounts/${accountId}`} className="text-xs font-medium text-slate-600 hover:text-[#8DA7BE] transition-colors">{chapter.code} {chapter.description}</Link>
+          <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
+          <span className="text-xs font-semibold text-slate-900">{subchapter.code} {subchapter.description}</span>
+        </div>
+
+        {allSubchapters.length > 1 && (
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button
+              onClick={() => accountNavIndex > 0 && goToAccount(allSubchapters[accountNavIndex - 1])}
+              disabled={accountNavIndex <= 0}
+              className="p-1 rounded text-slate-400 hover:text-[#8DA7BE] hover:bg-[#8DA7BE]/[0.1] transition-colors disabled:opacity-20 disabled:pointer-events-none"
+              title="Cuenta anterior"
+            >
+              <ChevronLeft size={13} />
+            </button>
+            <select
+              value={subchapterId}
+              onChange={(e) => {
+                const target = allSubchapters.find((o) => o.sub.id === e.target.value);
+                if (target) goToAccount(target);
+              }}
+              className="max-w-[220px] text-xs text-slate-600 border border-slate-200 rounded-lg pl-2 pr-1 py-1 focus:outline-none focus:ring-1 focus:ring-slate-300 bg-white"
+              title="Ir a otra cuenta del presupuesto"
+            >
+              {allSubchapters.map((o) => (
+                <option key={o.sub.id} value={o.sub.id}>{o.chapterCode} · {o.sub.code} {o.sub.description}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => accountNavIndex >= 0 && accountNavIndex < allSubchapters.length - 1 && goToAccount(allSubchapters[accountNavIndex + 1])}
+              disabled={accountNavIndex < 0 || accountNavIndex >= allSubchapters.length - 1}
+              className="p-1 rounded text-slate-400 hover:text-[#8DA7BE] hover:bg-[#8DA7BE]/[0.1] transition-colors disabled:opacity-20 disabled:pointer-events-none"
+              title="Cuenta siguiente"
+            >
+              <ChevronRight size={13} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Top bar */}
@@ -826,6 +954,7 @@ export default function BudgetingSubchapterPage() {
           <div className="divide-y divide-slate-100">
             {(() => {
               const sorted = sortByOrder(lines.filter(matchesSearch));
+              const canPaste = !!getBudgetingClipboard<LineClipboardData>("line");
               const openLineMenu = (line: BudgetingDetailLine, e: React.MouseEvent) => {
                 e.preventDefault();
                 setLineMenu({
@@ -836,13 +965,19 @@ export default function BudgetingSubchapterPage() {
                     onChangeColor: (c) => handleCommitTextLine(line, { textColor: c }),
                   } : undefined,
                   onDelete: () => setDeleteTarget(line),
+                  onCopy: () => handleCopyLine(line),
+                  onCut: () => handleCutLine(line),
+                  onPaste: canPaste ? () => handlePasteLine(line.id) : undefined,
                 });
               };
               if (sorted.length === 0) {
                 return !q ? (
                   <div
                     className="px-4 py-3 text-[10px] text-slate-300 italic select-none"
-                    onContextMenu={(e) => { e.preventDefault(); setLineMenu({ x: e.clientX, y: e.clientY, rowId: null }); }}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setLineMenu({ x: e.clientX, y: e.clientY, rowId: null, onPaste: canPaste ? () => handlePasteLine(null) : undefined });
+                    }}
                   >
                     Clic derecho para añadir una línea
                   </div>
