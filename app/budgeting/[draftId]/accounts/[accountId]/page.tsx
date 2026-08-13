@@ -10,7 +10,7 @@ import { db } from "@/lib/firebase";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp, updateDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, Search, Trash2 } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, Plus, Search, Trash2 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
@@ -20,7 +20,6 @@ import {
 } from "@/lib/budgeting";
 import BudgetingColumnsMenu from "@/components/BudgetingColumnsMenu";
 import BudgetingFringeLineRow from "@/components/BudgetingFringeLineRow";
-import BudgetingTextLineControls from "@/components/BudgetingTextLineControls";
 import BudgetingRowContextMenu, { BudgetingRowContextMenuState } from "@/components/BudgetingRowContextMenu";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -80,12 +79,6 @@ function SubRow({
           </span>
         )}
         <span className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <BudgetingTextLineControls
-            bold={!!sub.textBold}
-            color={sub.textColor || DEFAULT_TEXT_LINE_COLOR}
-            onChangeBold={(v) => onCommitTextLine({ textBold: v })}
-            onChangeColor={(c) => onCommitTextLine({ textColor: c })}
-          />
           <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
             <ChevronUp size={11} />
           </button>
@@ -121,27 +114,6 @@ function SubRow({
           <Trash2 size={11} />
         </button>
       </span>
-    </div>
-  );
-}
-
-function NewSubRow({ onCommit }: { onCommit: (code: string, description: string) => Promise<boolean> }) {
-  const [code, setCode] = useState("");
-  const [description, setDescription] = useState("");
-  const commit = async () => {
-    if (!code.trim() || !description.trim()) return;
-    const ok = await onCommit(code.trim(), description.trim());
-    if (ok) { setCode(""); setDescription(""); }
-  };
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter") e.currentTarget.blur(); };
-  return (
-    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3`}>
-      <span />
-      <input autoFocus value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} font-mono text-xs pl-2`} />
-      <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} text-xs pl-2`} />
-      <span /><span />
     </div>
   );
 }
@@ -267,10 +239,12 @@ export default function BudgetingChapterPage() {
     await touchDraft();
   };
 
-  const handleCommitNewSub = async (code: string, description: string): Promise<boolean> => {
-    await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`), { code, description, order: nextOrderValue(), createdAt: Timestamp.now() });
+  // Fila en blanco a demanda: al pulsar "+ Añadir línea" se crea vacía y se
+  // autoenfoca, en vez de regenerarse sola cada vez que se rellena la última.
+  const handleAddSub = async () => {
+    const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`), { code: "", description: "", order: nextOrderValue(), createdAt: Timestamp.now() });
     await touchDraft();
-    return true;
+    setJustAddedId(ref.id);
   };
 
   // ── Línea de texto / subtotal (mismo doc de subcapítulo, marcado con
@@ -416,7 +390,11 @@ export default function BudgetingChapterPage() {
               />
             ));
           })()}
-          {!q && <NewSubRow onCommit={handleCommitNewSub} />}
+          {!q && (
+            <button onClick={handleAddSub} className="flex items-center gap-1 px-3 py-1.5 text-[10px] text-slate-400 hover:text-[#8DA7BE] transition-colors">
+              <Plus size={10} /> Añadir línea
+            </button>
+          )}
         </div>
 
         {fringeVisibility.chapter && chapterFringeBreakdown.length > 0 && (

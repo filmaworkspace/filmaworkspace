@@ -15,7 +15,7 @@ import {
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
   AlertCircle, Building2, BookmarkPlus, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Download, FileDown, FileSpreadsheet,
-  FileText, FolderOutput, History, Search, Trash2, X,
+  FileText, FolderOutput, History, Plus, Search, Trash2, X,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
@@ -28,7 +28,6 @@ import { buildFwbFromDraft, downloadFwb } from "@/lib/budgetingExport";
 import { downloadBudgetExcel, downloadBudgetPdf } from "@/lib/budgetingReports";
 import BudgetingColumnsMenu from "@/components/BudgetingColumnsMenu";
 import BudgetingFringeLineRow from "@/components/BudgetingFringeLineRow";
-import BudgetingTextLineControls from "@/components/BudgetingTextLineControls";
 import BudgetingRowContextMenu, { BudgetingRowContextMenuState } from "@/components/BudgetingRowContextMenu";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,12 +88,6 @@ function ChapterRow({
           </span>
         )}
         <span className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <BudgetingTextLineControls
-            bold={!!chapter.textBold}
-            color={chapter.textColor || DEFAULT_TEXT_LINE_COLOR}
-            onChangeBold={(v) => onCommitTextLine({ textBold: v })}
-            onChangeColor={(c) => onCommitTextLine({ textColor: c })}
-          />
           <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
             <ChevronUp size={11} />
           </button>
@@ -130,27 +123,6 @@ function ChapterRow({
           <Trash2 size={11} />
         </button>
       </span>
-    </div>
-  );
-}
-
-function NewChapterRow({ onCommit }: { onCommit: (code: string, description: string) => Promise<boolean> }) {
-  const [code, setCode] = useState("");
-  const [description, setDescription] = useState("");
-  const commit = async () => {
-    if (!code.trim() || !description.trim()) return;
-    const ok = await onCommit(code.trim(), description.trim());
-    if (ok) { setCode(""); setDescription(""); }
-  };
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter") e.currentTarget.blur(); };
-  return (
-    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3`}>
-      <span />
-      <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} font-mono text-xs pl-2`} />
-      <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} text-xs pl-2`} />
-      <span /><span />
     </div>
   );
 }
@@ -515,10 +487,12 @@ export default function BudgetingTopPage() {
     await touchDraft();
   };
 
-  const handleCommitNewChapter = async (category: string | null, code: string, description: string): Promise<boolean> => {
-    await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts`), { code, description, category, order: nextOrderValue(), createdAt: Timestamp.now() });
+  // Fila en blanco a demanda: al pulsar "+ Añadir línea" se crea vacía y se
+  // autoenfoca, en vez de regenerarse sola cada vez que se rellena la última.
+  const handleAddChapter = async (category: string | null) => {
+    const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts`), { code: "", description: "", category, order: nextOrderValue(), createdAt: Timestamp.now() });
     await touchDraft();
-    return true;
+    setJustAddedId(ref.id);
   };
 
   // ── Línea de texto / subtotal (mismo doc de capítulo, marcado con
@@ -875,7 +849,9 @@ export default function BudgetingTopPage() {
                         }}
                       />
                     ))}
-                    <NewChapterRow onCommit={(code, description) => handleCommitNewChapter(cat.id, code, description)} />
+                    <button onClick={() => handleAddChapter(cat.id)} className="flex items-center gap-1 pl-3 py-1.5 text-[10px] text-slate-400 hover:text-[#8DA7BE] transition-colors">
+                      <Plus size={10} /> Añadir línea
+                    </button>
                   </div>
                 </div>
               );
@@ -945,7 +921,9 @@ export default function BudgetingTopPage() {
                 ));
               })()}
             </div>
-            <NewChapterRow onCommit={(code, description) => handleCommitNewChapter(null, code, description)} />
+            <button onClick={() => handleAddChapter(null)} className="flex items-center gap-1 pl-3 py-1.5 text-[10px] text-slate-400 hover:text-[#8DA7BE] transition-colors">
+              <Plus size={10} /> Añadir línea
+            </button>
             {fringeVisibility.topSheet && topFringeBreakdown.length > 0 && (
               <div className="border-t border-slate-200">
                 <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide px-4 pt-2 pb-1">Cargas sociales de todo el presupuesto</p>

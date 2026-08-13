@@ -14,7 +14,7 @@ import {
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
   AlertCircle, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy,
-  MoreVertical, Percent, Search, Settings2, Sigma, SlidersHorizontal, Trash2, X,
+  MoreVertical, Percent, Plus, Search, Settings2, Sigma, SlidersHorizontal, Trash2, X,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
@@ -26,7 +26,6 @@ import {
   fmtCurrency, fmtDecimal, isPlainNumber, lineFringeBreakdown, nextOrderValue, orderAfter, resolveGlobals, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import BudgetingFormulaInput from "@/components/BudgetingFormulaInput";
-import BudgetingTextLineControls from "@/components/BudgetingTextLineControls";
 import BudgetingRowContextMenu, { BudgetingRowContextMenuState } from "@/components/BudgetingRowContextMenu";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -383,45 +382,6 @@ function LineRow({
   );
 }
 
-function NewLineRow({ globals, globalValues, columnsConfig, template, error, onCommit }: {
-  globals: { code: string; label: string }[]; globalValues: Record<string, number>;
-  columnsConfig: BudgetingDetailColumnsConfig; template: string; error?: string;
-  onCommit: (fields: LineFields) => Promise<boolean>;
-}) {
-  const [fields, setFields] = useState<LineFields>(emptyFields);
-  const preview = computeLineTotal(
-    evaluateFieldExpr(fields.units, globalValues).value,
-    evaluateFieldExpr(fields.multiplier, globalValues).value,
-    evaluateFieldExpr(fields.rate, globalValues).value
-  );
-  const commit = async () => {
-    const ok = await onCommit(fields);
-    if (ok) setFields(emptyFields);
-  };
-  return (
-    <div>
-      <LineFieldsGrid
-        fields={fields}
-        onChange={(patch) => setFields((f) => ({ ...f, ...patch }))}
-        onBlurAny={commit}
-        onEnter={commit}
-        onEscape={() => setFields(emptyFields)}
-        globals={globals}
-        totalPreview={preview}
-        muted={false}
-        template={template}
-        showComment={columnsConfig.showComment}
-        showTags={columnsConfig.showTags}
-      />
-      {error && (
-        <div className="flex items-center gap-1.5 text-xs text-red-600 px-4 pb-1.5 pt-0.5">
-          <AlertCircle size={12} />
-          {error}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ─── Línea de solo texto (nota, sin código ni importe): la descripción ocupa
 // desde ID hasta Total, dejando Comentario/Etiquetas en blanco y las
@@ -472,12 +432,6 @@ function TextLineRow({
         className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity"
         style={{ gridColumn: `${actionsCol} / ${actionsCol + 1}` }}
       >
-        <BudgetingTextLineControls
-          bold={!!line.textBold}
-          color={line.textColor || DEFAULT_TEXT_LINE_COLOR}
-          onChangeBold={(v) => onCommitTextLine({ textBold: v })}
-          onChangeColor={(c) => onCommitTextLine({ textColor: c })}
-        />
         <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
           <ChevronUp size={11} />
         </button>
@@ -683,19 +637,16 @@ export default function BudgetingSubchapterPage() {
     await touchDraft();
   };
 
-  const handleCommitNewLine = async (fields: LineFields): Promise<boolean> => {
-    const code = fields.code.trim();
-    const description = fields.description.trim();
-    if (!code && !description) return false;
-    if (isLineCodeTaken(code)) { setRowError("new", "Ese ID ya se usa en otra línea de este subcapítulo"); return false; }
-    const { error, payload } = buildPayload(fields);
-    if (error) { setRowError("new", error); return false; }
-    clearRowError("new");
-    await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`), {
-      ...payload, fringeIds: [], routedTo: null, order: nextOrderValue(), createdAt: Timestamp.now(),
+  // Fila en blanco a demanda: al pulsar "+ Añadir línea" se crea vacía y se
+  // autoenfoca, en vez de regenerarse sola cada vez que se rellena la última.
+  // X (multiplicador) empieza en 1, igual que en emptyFields.
+  const handleAddLine = async () => {
+    const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`), {
+      code: "", description: "", units: 0, unit: "", multiplier: 1, rate: 0, total: 0,
+      notes: "", tags: [], fringeIds: [], routedTo: null, order: nextOrderValue(), createdAt: Timestamp.now(),
     });
     await touchDraft();
-    return true;
+    setJustAddedId(ref.id);
   };
 
   // ── Línea de texto / subtotal (mismo doc de Detalle, marcado con
@@ -939,7 +890,11 @@ export default function BudgetingSubchapterPage() {
                 )
               );
             })()}
-            {!q && <NewLineRow globals={globalOptions} globalValues={globalResolution.values} columnsConfig={columnsConfig} template={template} error={rowErrors["new"]} onCommit={handleCommitNewLine} />}
+            {!q && (
+              <button onClick={handleAddLine} className="flex items-center gap-1 px-4 py-1.5 text-[10px] text-slate-400 hover:text-[#8DA7BE] transition-colors">
+                <Plus size={10} /> Añadir línea
+              </button>
+            )}
           </div>
 
           {fringeVisibility.detail && subchapterFringeBreakdown.length > 0 && (
