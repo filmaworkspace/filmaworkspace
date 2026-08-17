@@ -130,7 +130,11 @@ export default function BudgetingHomePage() {
     const name = fwb.name?.trim() || fallbackName;
     const ref = doc(collection(db, "budgetingDrafts"));
     const now = serverTimestamp();
-    const categories = fwb.categories.map((c) => ({ id: c.id, code: c.code, label: c.label }));
+    // `code` es opcional en el .fwb (los .fwb con categorías desactivadas
+    // vienen sin él): sin este fallback, Firestore rechaza el setDoc entero
+    // por "Unsupported field value: undefined" en cuanto una categoría no
+    // trae código.
+    const categories = fwb.categories.map((c) => ({ id: c.id, code: c.code || "", label: c.label }));
     await setDoc(ref, {
       name,
       ownerUid: user.uid,

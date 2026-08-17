@@ -50,10 +50,11 @@ function ChapterRow({
   const [code, setCode] = useState(chapter.code);
   const [description, setDescription] = useState(chapter.description);
 
-  const commit = () => {
-    if (!code.trim() || !description.trim()) { setCode(chapter.code); setDescription(chapter.description); return; }
-    onCommit(code.trim(), description.trim());
-  };
+  // Las filas ya existen desde que se crean (botón "+ Añadir línea" o clic
+  // derecho), así que cada campo se guarda por su cuenta al salir de la
+  // celda: no hace falta rellenar código y descripción a la vez, o el otro
+  // se borraba solo al perder el foco.
+  const commit = () => onCommit(code.trim(), description.trim());
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") e.currentTarget.blur();
     if (e.key === "Escape") { setCode(chapter.code); setDescription(chapter.description); }
@@ -393,10 +394,14 @@ export default function BudgetingTopPage() {
     chaptersByCategory: (categoryId: string | null) => chaptersByCategory(categoryId)
       .filter((c) => includeTextLines || (!c.isTextLine && !c.isSubtotal))
       .map((c) => ({ id: c.id, code: c.code, description: c.description, isTextLine: c.isTextLine || false, isSubtotal: c.isSubtotal || false, textBold: c.textBold || false, textColor: c.textColor || null })),
-    subchaptersByChapter: Object.fromEntries(Object.entries(subchaptersByChapter).map(([k, v]) => [k, v
+    // `subchaptersByChapter`/`linesBySubchapter` vienen de onSnapshot en el
+    // orden que Firestore quiera darlos, no en el orden manual de la app
+    // (campo `order`): hay que ordenarlos aquí igual que en pantalla, o el
+    // export sale con las filas descolocadas frente a lo que se ve.
+    subchaptersByChapter: Object.fromEntries(Object.entries(subchaptersByChapter).map(([k, v]) => [k, sortByOrder(v)
       .filter((s) => includeTextLines || (!s.isTextLine && !s.isSubtotal))
       .map((s) => ({ id: s.id, code: s.code, description: s.description, receivedTotal: s.receivedTotal || 0, isTextLine: s.isTextLine || false, isSubtotal: s.isSubtotal || false, textBold: s.textBold || false, textColor: s.textColor || null }))])),
-    linesBySubchapter: Object.fromEntries(Object.entries(linesBySubchapter).map(([k, v]) => [k, v
+    linesBySubchapter: Object.fromEntries(Object.entries(linesBySubchapter).map(([k, v]) => [k, sortByOrder(v)
       .filter((l) => includeTextLines || (!l.isTextLine && !l.isSubtotal))
       .map((l) => ({
         id: l.id, code: l.code, description: l.description, units: l.units, unit: l.unit, multiplier: l.multiplier, rate: l.rate, total: l.total,
@@ -474,11 +479,13 @@ export default function BudgetingTopPage() {
     if (!user || !snapshotLabel.trim()) return;
     setSavingSnapshot(true);
     try {
-      const tree = chapters.map((chapter) => ({
+      // Mismo orden que en pantalla (campo `order`), no el que devuelva
+      // Firestore, para que el comparador de versiones no salga descolocado.
+      const tree = sortByOrder(chapters).map((chapter) => ({
         id: chapter.id, code: chapter.code, description: chapter.description, category: chapter.category,
-        subchapters: (subchaptersByChapter[chapter.id] || []).map((sub) => ({
+        subchapters: sortByOrder(subchaptersByChapter[chapter.id] || []).map((sub) => ({
           id: sub.id, code: sub.code, description: sub.description,
-          lines: (linesBySubchapter[sub.id] || []).map((l) => ({ id: l.id, code: l.code, description: l.description, total: l.total || 0 })),
+          lines: sortByOrder(linesBySubchapter[sub.id] || []).map((l) => ({ id: l.id, code: l.code, description: l.description, total: l.total || 0 })),
         })),
       }));
       await addDoc(collection(db, `budgetingDrafts/${draftId}/snapshots`), {

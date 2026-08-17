@@ -41,10 +41,11 @@ function SubRow({
   const [code, setCode] = useState(sub.code);
   const [description, setDescription] = useState(sub.description);
 
-  const commit = () => {
-    if (!code.trim() || !description.trim()) { setCode(sub.code); setDescription(sub.description); return; }
-    onCommit(code.trim(), description.trim());
-  };
+  // Las filas ya existen desde que se crean (botón "+ Añadir línea" o clic
+  // derecho), así que cada campo se guarda por su cuenta al salir de la
+  // celda: no hace falta rellenar código y descripción a la vez, o el otro
+  // se borraba solo al perder el foco.
+  const commit = () => onCommit(code.trim(), description.trim());
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") e.currentTarget.blur();
     if (e.key === "Escape") { setCode(sub.code); setDescription(sub.description); }
