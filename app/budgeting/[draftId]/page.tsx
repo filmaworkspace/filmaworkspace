@@ -29,6 +29,7 @@ import { downloadBudgetExcel, downloadBudgetPdf } from "@/lib/budgetingReports";
 import BudgetingColumnsMenu from "@/components/BudgetingColumnsMenu";
 import BudgetingFringeLineRow from "@/components/BudgetingFringeLineRow";
 import BudgetingRowContextMenu, { BudgetingRowContextMenuState } from "@/components/BudgetingRowContextMenu";
+import BudgetLevelMappingChoice, { BudgetSubaccountLevel } from "@/components/BudgetLevelMappingChoice";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -89,10 +90,10 @@ function ChapterRow({
           </span>
         )}
         <span className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+          <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#C2652F] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
             <ChevronUp size={11} />
           </button>
-          <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+          <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#C2652F] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
             <ChevronDown size={11} />
           </button>
           <button onClick={onDelete} className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar línea">
@@ -106,7 +107,7 @@ function ChapterRow({
   return (
     <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group`} onContextMenu={onContextMenu}>
       <Link href={`/budgeting/${draftId}/accounts/${chapter.id}`} className="flex items-center justify-center" title="Entrar">
-        <ChevronRight size={13} className="text-slate-300 group-hover:text-[#8DA7BE] group-hover:translate-x-0.5 transition-all" />
+        <ChevronRight size={13} className="text-slate-300 group-hover:text-[#C2652F] group-hover:translate-x-0.5 transition-all" />
       </Link>
       <input autoFocus={autoFocus} value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} font-mono text-xs pl-2`} />
@@ -114,10 +115,10 @@ function ChapterRow({
         className={`${CELL_INPUT} text-xs pl-2`} />
       <span className="flex items-center justify-end text-xs font-medium text-slate-700 pr-2">{fmt(total)}</span>
       <span className="flex items-center justify-end gap-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#C2652F] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
           <ChevronUp size={11} />
         </button>
-        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#C2652F] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
           <ChevronDown size={11} />
         </button>
         <button onClick={onDelete} className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar capítulo">
@@ -153,12 +154,15 @@ export default function BudgetingTopPage() {
 
   // Enviar a proyecto
   const [showSendModal, setShowSendModal] = useState(false);
-  const [sendStep, setSendStep] = useState<"pick" | "confirm" | "done">("pick");
+  const [sendStep, setSendStep] = useState<"pick" | "mapping" | "confirm" | "done">("pick");
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [eligibleProjects, setEligibleProjects] = useState<EligibleProject[]>([]);
   const [selectedProject, setSelectedProject] = useState<EligibleProject | null>(null);
   const [projectStatus, setProjectStatus] = useState<Record<string, "checking" | "empty" | "occupied">>({});
   const [sending, setSending] = useState(false);
+  // Budgeting tiene 3 niveles (Capítulo→Cuenta→Detalle), Accounting solo 2
+  // (Cuenta→Subcuenta): hay que elegir cuál se queda como código operativo.
+  const [subaccountLevel, setSubaccountLevel] = useState<BudgetSubaccountLevel>("subchapter");
   const [sendError, setSendError] = useState("");
 
   // Snapshots / versiones
@@ -568,6 +572,7 @@ export default function BudgetingTopPage() {
     setSendStep("pick");
     setSelectedProject(null);
     setSendError("");
+    setSubaccountLevel("subchapter");
     if (!user) return;
     setLoadingProjects(true);
     try {
@@ -595,7 +600,7 @@ export default function BudgetingTopPage() {
     ]);
     const empty = accSnap.empty && posSnap.empty && invSnap.empty;
     setProjectStatus((p) => ({ ...p, [project.id]: empty ? "empty" : "occupied" }));
-    if (empty) setSendStep("confirm");
+    if (empty) setSendStep("mapping");
   };
 
   const handleSendToProject = async () => {
@@ -603,36 +608,58 @@ export default function BudgetingTopPage() {
     setSending(true);
     setSendError("");
     try {
-      // Accounting solo tiene dos niveles: Capítulo pasa a ser una Account, y
-      // Cuenta (el 3er nivel de Budgeting, "Subcapítulo" en el código) una
-      // SubAccount con su importe presupuestado = suma de todas sus líneas de
-      // detalle. Las líneas de detalle no se envían como entidades propias,
-      // solo su suma; una línea con `routedTo` suma en la Cuenta destino, no
-      // en la física.
-      const sumBySubId: Record<string, number> = {};
-      for (const sub of allSubchapters) sumBySubId[sub.sub.id] = 0;
-      for (const sub of allSubchapters) {
-        for (const line of linesBySubchapter[sub.sub.id] || []) {
-          const targetSubId = line.routedTo?.subchapterId ?? sub.sub.id;
-          sumBySubId[targetSubId] = (sumBySubId[targetSubId] || 0) + (line.total || 0);
+      // Accounting solo tiene dos niveles (Cuenta → Subcuenta) y Budgeting
+      // tres (Capítulo → Cuenta → Detalle): según lo elegido en el paso
+      // anterior, o bien Capítulo→Cuenta/Cuenta→Subcuenta (de siempre), o
+      // bien Cuenta→Cuenta/Detalle→Subcuenta (el Capítulo no se conserva).
+      if (subaccountLevel === "detailLine") {
+        for (const sub of allSubchapters.filter((s) => !s.sub.isTextLine && !s.sub.isSubtotal)) {
+          const accountRef = await addDoc(collection(db, `projects/${selectedProject.id}/accounts`), {
+            code: sub.sub.code, description: sub.sub.description, createdAt: Timestamp.now(), createdBy: user.uid,
+          });
+          // El código de la línea es referencial y puede venir vacío: si no
+          // tiene, se usa su posición dentro de la Cuenta para no perderla.
+          // La redirección "Sumar en" no tiene un destino de nivel línea
+          // claro aquí, así que no se traslada: cada línea queda en su
+          // Cuenta física con su propio importe.
+          const lines = sortByOrder(linesBySubchapter[sub.sub.id] || []).filter((l) => !l.isTextLine && !l.isSubtotal);
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            await addDoc(collection(db, `projects/${selectedProject.id}/accounts/${accountRef.id}/subaccounts`), {
+              code: line.code?.trim() || String(i + 1).padStart(2, "0"), description: line.description,
+              budgeted: Math.round((line.total || 0) * 100) / 100,
+              committed: 0, actual: 0, accountId: accountRef.id, createdAt: Timestamp.now(), createdBy: user.uid,
+            });
+          }
         }
-      }
+      } else {
+        // Las líneas de detalle no se envían como entidades propias, solo su
+        // suma; una línea con `routedTo` suma en la Cuenta destino, no en la física.
+        const sumBySubId: Record<string, number> = {};
+        for (const sub of allSubchapters) sumBySubId[sub.sub.id] = 0;
+        for (const sub of allSubchapters) {
+          for (const line of linesBySubchapter[sub.sub.id] || []) {
+            const targetSubId = line.routedTo?.subchapterId ?? sub.sub.id;
+            sumBySubId[targetSubId] = (sumBySubId[targetSubId] || 0) + (line.total || 0);
+          }
+        }
 
-      const accountIdByChapterId: Record<string, string> = {};
-      for (const chapter of chapters.filter((c) => !c.isTextLine && !c.isSubtotal)) {
-        const accountRef = await addDoc(collection(db, `projects/${selectedProject.id}/accounts`), {
-          code: chapter.code, description: chapter.description, createdAt: Timestamp.now(), createdBy: user.uid,
-        });
-        accountIdByChapterId[chapter.id] = accountRef.id;
-      }
-      for (const sub of allSubchapters.filter((s) => !s.sub.isTextLine && !s.sub.isSubtotal)) {
-        const accountId = accountIdByChapterId[sub.chapterId];
-        if (!accountId) continue;
-        await addDoc(collection(db, `projects/${selectedProject.id}/accounts/${accountId}/subaccounts`), {
-          code: sub.sub.code, description: sub.sub.description,
-          budgeted: Math.round((sumBySubId[sub.sub.id] || 0) * 100) / 100,
-          committed: 0, actual: 0, accountId, createdAt: Timestamp.now(), createdBy: user.uid,
-        });
+        const accountIdByChapterId: Record<string, string> = {};
+        for (const chapter of chapters.filter((c) => !c.isTextLine && !c.isSubtotal)) {
+          const accountRef = await addDoc(collection(db, `projects/${selectedProject.id}/accounts`), {
+            code: chapter.code, description: chapter.description, createdAt: Timestamp.now(), createdBy: user.uid,
+          });
+          accountIdByChapterId[chapter.id] = accountRef.id;
+        }
+        for (const sub of allSubchapters.filter((s) => !s.sub.isTextLine && !s.sub.isSubtotal)) {
+          const accountId = accountIdByChapterId[sub.chapterId];
+          if (!accountId) continue;
+          await addDoc(collection(db, `projects/${selectedProject.id}/accounts/${accountId}/subaccounts`), {
+            code: sub.sub.code, description: sub.sub.description,
+            budgeted: Math.round((sumBySubId[sub.sub.id] || 0) * 100) / 100,
+            committed: 0, actual: 0, accountId, createdAt: Timestamp.now(), createdBy: user.uid,
+          });
+        }
       }
       const now = serverTimestamp();
       await updateDoc(doc(db, "budgetingDrafts", draftId), {
@@ -720,11 +747,11 @@ export default function BudgetingTopPage() {
                     <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mb-1.5">Configuración Excel / PDF</p>
                     <label className="flex items-center justify-between gap-2 mb-1.5">
                       <span className="text-xs text-slate-700">Top Sheet (portada)</span>
-                      <input type="checkbox" checked={exportConfig.coverSheet} onChange={(e) => updateExportConfig({ coverSheet: e.target.checked })} className="accent-[#8DA7BE]" />
+                      <input type="checkbox" checked={exportConfig.coverSheet} onChange={(e) => updateExportConfig({ coverSheet: e.target.checked })} className="accent-[#C2652F]" />
                     </label>
                     <label className="flex items-center justify-between gap-2">
                       <span className="text-xs text-slate-700">Salto de página por capítulo</span>
-                      <input type="checkbox" checked={exportConfig.pageBreakPerChapter} onChange={(e) => updateExportConfig({ pageBreakPerChapter: e.target.checked })} className="accent-[#8DA7BE]" />
+                      <input type="checkbox" checked={exportConfig.pageBreakPerChapter} onChange={(e) => updateExportConfig({ pageBreakPerChapter: e.target.checked })} className="accent-[#C2652F]" />
                     </label>
                   </div>
                   <div className="border-t border-slate-100 pt-2.5">
@@ -733,7 +760,7 @@ export default function BudgetingTopPage() {
                       {([["unit", "Unidad"], ["notes", "Comentario"], ["tags", "Etiquetas"]] as const).map(([key, label]) => (
                         <label key={key} className="flex items-center justify-between gap-2">
                           <span className="text-xs text-slate-700">{label}</span>
-                          <input type="checkbox" checked={exportConfig.fields[key]} onChange={(e) => updateExportConfig({ fields: { [key]: e.target.checked } as Partial<BudgetingExportConfig["fields"]> })} className="accent-[#8DA7BE]" />
+                          <input type="checkbox" checked={exportConfig.fields[key]} onChange={(e) => updateExportConfig({ fields: { [key]: e.target.checked } as Partial<BudgetingExportConfig["fields"]> })} className="accent-[#C2652F]" />
                         </label>
                       ))}
                     </div>
@@ -793,8 +820,8 @@ export default function BudgetingTopPage() {
       </div>
 
       {activeScenarioId && (
-        <div className="flex items-center gap-1.5 mb-3 text-[11px] font-medium" style={{ color: "#8DA7BE" }}>
-          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#8DA7BE" }} />
+        <div className="flex items-center gap-1.5 mb-3 text-[11px] font-medium" style={{ color: "#C2652F" }}>
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#C2652F" }} />
           Previsualizando "{scenarios.find((s) => s.id === activeScenarioId)?.label}": los totales de abajo son una simulación, no se ha guardado nada.
         </div>
       )}
@@ -810,7 +837,7 @@ export default function BudgetingTopPage() {
             <BudgetingColumnsMenu title="Columnas">
               <label className="flex items-center justify-between gap-2">
                 <span className="text-xs text-slate-700">Mostrar cargas sociales</span>
-                <input type="checkbox" checked={fringeVisibility.topSheet} onChange={(e) => updateFringeVisibility({ topSheet: e.target.checked })} className="accent-[#8DA7BE]" />
+                <input type="checkbox" checked={fringeVisibility.topSheet} onChange={(e) => updateFringeVisibility({ topSheet: e.target.checked })} className="accent-[#C2652F]" />
               </label>
             </BudgetingColumnsMenu>
           </span>
@@ -1140,6 +1167,7 @@ export default function BudgetingTopPage() {
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
               <h3 className="text-sm font-semibold text-slate-900">
                 {sendStep === "pick" && "Enviar a proyecto"}
+                {sendStep === "mapping" && "Cuentas y subcuentas"}
                 {sendStep === "confirm" && "Confirmar envío"}
                 {sendStep === "done" && "Enviado"}
               </h3>
@@ -1163,7 +1191,7 @@ export default function BudgetingTopPage() {
                           key={p.id}
                           onClick={() => handlePickProject(p)}
                           disabled={status === "checking"}
-                          className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 border border-slate-200 rounded-xl text-left hover:border-[#8DA7BE] transition-colors disabled:opacity-60"
+                          className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 border border-slate-200 rounded-xl text-left hover:border-[#C2652F] transition-colors disabled:opacity-60"
                         >
                           <span className="text-sm text-slate-800 truncate">{p.name}</span>
                           {status === "checking" && <span className="text-[11px] text-slate-400 flex-shrink-0">Comprobando...</span>}
@@ -1181,24 +1209,52 @@ export default function BudgetingTopPage() {
               </div>
             )}
 
+            {sendStep === "mapping" && (
+              <div className="px-5 py-4 space-y-3">
+                <p className="text-xs text-slate-500">
+                  Accounting solo tiene dos niveles (Cuenta y Subcuenta), Budgeting tiene tres. Elige qué código quieres que se pueda asignar en PO, facturas y cajas.
+                </p>
+                <BudgetLevelMappingChoice value={subaccountLevel} onChange={setSubaccountLevel} />
+              </div>
+            )}
+
             {sendStep === "confirm" && selectedProject && (
               <div className="px-5 py-4 space-y-4">
                 <p className="text-sm text-slate-600">
                   Se creará el presupuesto en <span className="font-medium text-slate-900">{selectedProject.name}</span>:
                 </p>
                 <div className="border border-slate-200 rounded-xl divide-y divide-slate-100">
-                  <div className="flex items-center justify-between px-3.5 py-2 text-sm">
-                    <span className="text-slate-500">Cuentas (capítulos)</span>
-                    <span className="font-medium text-slate-900">{chapters.length}</span>
-                  </div>
-                  <div className="flex items-center justify-between px-3.5 py-2 text-sm">
-                    <span className="text-slate-500">Subcuentas (cuentas)</span>
-                    <span className="font-medium text-slate-900">{totalSubchapters}</span>
-                  </div>
-                  <div className="flex items-center justify-between px-3.5 py-2 text-sm">
-                    <span className="text-slate-500">Líneas de detalle (se suman en cada subcuenta)</span>
-                    <span className="font-medium text-slate-900">{totalLines}</span>
-                  </div>
+                  {subaccountLevel === "detailLine" ? (
+                    <>
+                      <div className="flex items-center justify-between px-3.5 py-2 text-sm">
+                        <span className="text-slate-500">Cuentas (cuentas de Budgeting)</span>
+                        <span className="font-medium text-slate-900">{totalSubchapters}</span>
+                      </div>
+                      <div className="flex items-center justify-between px-3.5 py-2 text-sm">
+                        <span className="text-slate-500">Subcuentas (líneas de detalle)</span>
+                        <span className="font-medium text-slate-900">{totalLines}</span>
+                      </div>
+                      <div className="flex items-center justify-between px-3.5 py-2 text-sm">
+                        <span className="text-slate-500">Capítulos</span>
+                        <span className="font-medium text-slate-400">no se conservan</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between px-3.5 py-2 text-sm">
+                        <span className="text-slate-500">Cuentas (capítulos)</span>
+                        <span className="font-medium text-slate-900">{chapters.length}</span>
+                      </div>
+                      <div className="flex items-center justify-between px-3.5 py-2 text-sm">
+                        <span className="text-slate-500">Subcuentas (cuentas)</span>
+                        <span className="font-medium text-slate-900">{totalSubchapters}</span>
+                      </div>
+                      <div className="flex items-center justify-between px-3.5 py-2 text-sm">
+                        <span className="text-slate-500">Líneas de detalle (se suman en cada subcuenta)</span>
+                        <span className="font-medium text-slate-900">{totalLines}</span>
+                      </div>
+                    </>
+                  )}
                   <div className="flex items-center justify-between px-3.5 py-2 text-sm">
                     <span className="text-slate-500">Total</span>
                     <span className="font-semibold text-slate-900">{fmt(grandTotal)}</span>
@@ -1223,9 +1279,19 @@ export default function BudgetingTopPage() {
             )}
 
             <div className="px-5 py-3 border-t border-slate-100 flex gap-2">
-              {sendStep === "confirm" && (
+              {sendStep === "mapping" && (
                 <>
                   <button onClick={() => setSendStep("pick")} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
+                    Volver
+                  </button>
+                  <button onClick={() => setSendStep("confirm")} className={`flex-1 py-2.5 rounded-xl text-sm font-medium ${BTN_LIGHT}`}>
+                    Continuar
+                  </button>
+                </>
+              )}
+              {sendStep === "confirm" && (
+                <>
+                  <button onClick={() => setSendStep("mapping")} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
                     Volver
                   </button>
                   <button

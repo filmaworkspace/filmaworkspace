@@ -223,6 +223,19 @@ export default function AdminProjectPage() {
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Modal de confirmación genérico (igual que en /admindashboard): sustituye
+  // al confirm() nativo del navegador en todas las acciones destructivas.
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    danger?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
+  const showConfirmDialog = (title: string, message: string, onConfirm: () => void, options?: { confirmLabel?: string; danger?: boolean }) => {
+    setConfirmDialog({ title, message, onConfirm, danger: options?.danger ?? true, confirmLabel: options?.confirmLabel });
+  };
+
   // Modals
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
@@ -618,13 +631,16 @@ export default function AdminProjectPage() {
 
   // ── Members ──────────────────────────────────────────────────────────────────
 
-  const handleRemoveMember = async (memberId: string, memberName: string) => {
-    if (!confirm(`¿Eliminar a ${memberName} del proyecto?`)) return;
+  const handleRemoveMember = (memberId: string, memberName: string) => {
+    showConfirmDialog(`Eliminar a ${memberName}`, "Perderá el acceso a este proyecto.", () => _doRemoveMember(memberId));
+  };
+  const _doRemoveMember = async (memberId: string) => {
     setSaving(true);
     try {
       await deleteDoc(doc(db, `projects/${projectId}/members`, memberId));
       await deleteDoc(doc(db, `userProjects/${memberId}/projects`, projectId));
       showToast("success", "Miembro eliminado");
+      setConfirmDialog(null);
       await loadData();
     } catch (error) {
       console.error(error);
@@ -905,13 +921,30 @@ export default function AdminProjectPage() {
     }
     setSaving(true);
     try {
-      const sourceAccountsSnap = await getDocs(collection(db, `projects/${projectId}/accounts`));
       const targetAccountsSnap = await getDocs(collection(db, `projects/${copyBudgetTargetId}/accounts`));
-      const overwrite =
-        targetAccountsSnap.size > 0
-          ? confirm(`El proyecto destino ya tiene ${targetAccountsSnap.size} cuenta(s). ¿Sobreescribir?`)
-          : false;
+      if (targetAccountsSnap.size > 0) {
+        setSaving(false);
+        showConfirmDialog(
+          "Sobrescribir presupuesto",
+          `El proyecto destino ya tiene ${targetAccountsSnap.size} cuenta(s). Se borrarán antes de copiar.`,
+          () => _doCopyBudget(true),
+          { confirmLabel: "Sobrescribir" },
+        );
+        return;
+      }
+      await _doCopyBudget(false);
+    } catch (error) {
+      console.error(error);
+      showToast("error", "Error al copiar presupuesto");
+      setSaving(false);
+    }
+  };
+  const _doCopyBudget = async (overwrite: boolean) => {
+    setSaving(true);
+    try {
+      const sourceAccountsSnap = await getDocs(collection(db, `projects/${projectId}/accounts`));
       if (overwrite) {
+        const targetAccountsSnap = await getDocs(collection(db, `projects/${copyBudgetTargetId}/accounts`));
         for (const accDoc of targetAccountsSnap.docs) {
           const subSnap = await getDocs(collection(db, `projects/${copyBudgetTargetId}/accounts/${accDoc.id}/subaccounts`));
           for (const subDoc of subSnap.docs) {
@@ -946,6 +979,7 @@ export default function AdminProjectPage() {
       setShowCopyBudgetModal(false);
       setCopyBudgetTargetId("");
       setCopyBudgetSearch("");
+      setConfirmDialog(null);
       showToast("success", "Presupuesto copiado correctamente");
     } catch (error) {
       console.error(error);
@@ -2385,6 +2419,30 @@ export default function AdminProjectPage() {
               >
                 <Trash2 size={14} />
                 {deletingBudget ? "Eliminando..." : "Eliminar presupuesto"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
+            <p className="text-sm text-slate-500 mb-6">{confirmDialog.message}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDialog.onConfirm}
+                className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-sm text-white transition-colors ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
+              >
+                {confirmDialog.confirmLabel || "Confirmar"}
               </button>
             </div>
           </div>

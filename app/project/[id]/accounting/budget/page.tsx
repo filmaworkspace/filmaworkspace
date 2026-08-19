@@ -47,7 +47,8 @@ import { strToU8, unzipSync, zipSync } from "fflate";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { CostSettings, getCostSettings, shouldCommitPO, shouldRealizeInvoice } from "@/lib/budgetRules";
-import { parseFwbText, flattenFwbToAccountRows } from "@/lib/budgetingExport";
+import { parseFwbText, flattenFwbToAccountRows, FwbSubaccountLevel } from "@/lib/budgetingExport";
+import BudgetLevelMappingChoice from "@/components/BudgetLevelMappingChoice";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -131,6 +132,11 @@ export default function BudgetPage() {
   const [expandedImportAccounts, setExpandedImportAccounts] = useState<Set<string>>(new Set());
   // Fase dentro del paso preview: "select" = elegir cuentas, "organize" = ver distribución
   const [importPhase, setImportPhase] = useState<"select" | "organize">("select");
+  // Al elegir un .fwb (Budgeting tiene 3 niveles, Accounting solo 2), primero
+  // se pregunta qué nivel se queda como código operativo antes de parsear.
+  const [pendingFwbBytes, setPendingFwbBytes] = useState<Uint8Array | null>(null);
+  const [showFwbMappingModal, setShowFwbMappingModal] = useState(false);
+  const [fwbSubaccountLevel, setFwbSubaccountLevel] = useState<FwbSubaccountLevel>("subchapter");
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => { if (user) setUserId(user.uid); });
@@ -806,14 +812,27 @@ export default function BudgetPage() {
   // parseImportFile, para reutilizar tal cual el resto del flujo de
   // importación (preview/organize/execute). Las categorías del .fwb
   // (Above/Below the line) no se preservan: solo Cuentas y Detail Lines.
-  const parseFwbBudgetFile = (fileBytes: Uint8Array): { code: string; description: string; type: string; budgeted: number; parentCode: string | null }[] => {
+  // Budgeting tiene 3 niveles y Accounting solo 2, así que `subaccountLevel`
+  // (elegido en el modal antes de llegar aquí) decide cuál se queda como
+  // código operativo — ver flattenFwbToAccountRows.
+  const parseFwbBudgetFile = (fileBytes: Uint8Array, subaccountLevel: FwbSubaccountLevel): { code: string; description: string; type: string; budgeted: number; parentCode: string | null }[] => {
     try {
       const text = new TextDecoder().decode(fileBytes);
       const fwb = parseFwbText(text);
-      return flattenFwbToAccountRows(fwb);
+      return flattenFwbToAccountRows(fwb, subaccountLevel);
     } catch (error: any) {
       setErrorMessage(error?.message || "No se pudo leer el archivo .fwb");
       return [];
+    }
+  };
+
+  const applyImportData = (parsed: { code: string; description: string; type: string; budgeted: number; parentCode: string | null }[]) => {
+    if (parsed.length > 0) {
+      setImportData(parsed);
+      // Expandir todas las cuentas por defecto en la vista previa
+      const accountCodes = new Set(parsed.filter(d => d.type === "CUENTA").map(d => d.code));
+      setExpandedImportAccounts(accountCodes);
+      setImportStep("preview");
     }
   };
 
@@ -824,16 +843,24 @@ export default function BudgetPage() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const bytes = new Uint8Array(e.target?.result as ArrayBuffer);
-      const parsed = isFwb ? parseFwbBudgetFile(bytes) : parseImportFile(bytes);
-      if (parsed.length > 0) {
-        setImportData(parsed);
-        // Expandir todas las cuentas por defecto en la vista previa
-        const accountCodes = new Set(parsed.filter(d => d.type === "CUENTA").map(d => d.code));
-        setExpandedImportAccounts(accountCodes);
-        setImportStep("preview");
+      if (isFwb) {
+        // El .fwb tiene 3 niveles: hay que preguntar antes de aplanarlo a
+        // Cuenta/Subcuenta, no se puede decidir el importData todavía.
+        setFwbSubaccountLevel("subchapter");
+        setPendingFwbBytes(bytes);
+        setShowFwbMappingModal(true);
+        return;
       }
+      applyImportData(parseImportFile(bytes));
     };
     reader.readAsArrayBuffer(file);
+  };
+
+  const confirmFwbMapping = () => {
+    if (!pendingFwbBytes) return;
+    applyImportData(parseFwbBudgetFile(pendingFwbBytes, fwbSubaccountLevel));
+    setShowFwbMappingModal(false);
+    setPendingFwbBytes(null);
   };
 
   const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1225,7 +1252,7 @@ export default function BudgetPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Código</label>
-                  <input type="text" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} placeholder={modalMode === "account" ? "Ej: 01, 02, A1..." : "Ej: 01.01, 02-A, 1.1.1..."} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 " />
+                  <input type="text" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} placeholder="Código" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 " />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Descripción</label>
@@ -1586,6 +1613,43 @@ export default function BudgetPage() {
                 className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-sm text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
               >
                 {confirmDialog.confirmLabel || "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* .fwb: elegir qué nivel de Budgeting se queda como código operativo antes de aplanarlo */}
+      {showFwbMappingModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-900">Cuentas y subcuentas</h3>
+              <button
+                onClick={() => { setShowFwbMappingModal(false); setPendingFwbBytes(null); }}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-3">
+              <p className="text-sm text-slate-500">
+                Accounting solo tiene dos niveles (Cuenta y Subcuenta), Budgeting tiene tres. Elige qué código quieres que se pueda asignar en PO, facturas y cajas.
+              </p>
+              <BudgetLevelMappingChoice value={fwbSubaccountLevel} onChange={setFwbSubaccountLevel} />
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
+              <button
+                onClick={() => { setShowFwbMappingModal(false); setPendingFwbBytes(null); }}
+                className="flex-1 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmFwbMapping}
+                className="flex-1 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium"
+              >
+                Continuar
               </button>
             </div>
           </div>

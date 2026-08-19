@@ -80,10 +80,10 @@ function SubRow({
           </span>
         )}
         <span className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+          <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#C2652F] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
             <ChevronUp size={11} />
           </button>
-          <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+          <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#C2652F] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
             <ChevronDown size={11} />
           </button>
           <button onClick={onDelete} className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar línea">
@@ -97,7 +97,7 @@ function SubRow({
   return (
     <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group`} onContextMenu={onContextMenu}>
       <Link href={`/budgeting/${draftId}/accounts/${accountId}/subchapters/${sub.id}`} className="flex items-center justify-center" title="Entrar">
-        <ChevronRight size={13} className="text-slate-300 group-hover:text-[#8DA7BE] group-hover:translate-x-0.5 transition-all" />
+        <ChevronRight size={13} className="text-slate-300 group-hover:text-[#C2652F] group-hover:translate-x-0.5 transition-all" />
       </Link>
       <input autoFocus={autoFocus} value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} font-mono text-xs pl-2`} />
@@ -105,10 +105,10 @@ function SubRow({
         className={`${CELL_INPUT} text-xs pl-2`} />
       <span className="flex items-center justify-end text-xs font-medium text-slate-700 pr-2">{fmt(total)}</span>
       <span className="flex items-center justify-end gap-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#C2652F] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
           <ChevronUp size={11} />
         </button>
-        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#8DA7BE] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#C2652F] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
           <ChevronDown size={11} />
         </button>
         <button onClick={onDelete} className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar subcapítulo">
@@ -313,7 +313,7 @@ export default function BudgetingChapterPage() {
     <div className="w-full px-10 py-6">
       {/* Breadcrumb: solo navegación de entrar/volver, sin categorías ni desplegables */}
       <div className="flex items-center gap-1.5 mb-4">
-        <Link href={`/budgeting/${draftId}`} className="text-xs text-slate-400 hover:text-[#8DA7BE] transition-colors">{draft?.name}</Link>
+        <Link href={`/budgeting/${draftId}`} className="text-xs text-slate-400 hover:text-[#C2652F] transition-colors">{draft?.name}</Link>
         <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
         <span className="text-xs font-semibold text-slate-900">{chapter.code} {chapter.description}</span>
       </div>
@@ -343,7 +343,7 @@ export default function BudgetingChapterPage() {
             <BudgetingColumnsMenu title="Columnas">
               <label className="flex items-center justify-between gap-2">
                 <span className="text-xs text-slate-700">Mostrar cargas sociales</span>
-                <input type="checkbox" checked={fringeVisibility.chapter} onChange={(e) => updateFringeVisibility({ chapter: e.target.checked })} className="accent-[#8DA7BE]" />
+                <input type="checkbox" checked={fringeVisibility.chapter} onChange={(e) => updateFringeVisibility({ chapter: e.target.checked })} className="accent-[#C2652F]" />
               </label>
             </BudgetingColumnsMenu>
           </span>

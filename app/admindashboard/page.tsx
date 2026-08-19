@@ -100,8 +100,6 @@ const phaseConfig: Record<string, { bg: string; text: string; border: string; do
   Finalizado: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" },
 };
 
-const PROJECT_ROLES = ["EP", "PM", "Controller", "PC", "Supervisor"];
-
 const DEFAULT_DEPARTMENTS = [
   { name: "Producción", color: "#3B82F6" },
   { name: "Dirección", color: "#8B5CF6" },
@@ -295,7 +293,6 @@ export default function AdminDashboard() {
   const [showCreateProducer, setShowCreateProducer] = useState(false);
   const [showEditProducer, setShowEditProducer] = useState<string | null>(null);
   const [showUserDetails, setShowUserDetails] = useState<string | null>(null);
-  const [showAssignUser, setShowAssignUser] = useState<string | null>(null);
   const [showEditProject, setShowEditProject] = useState<string | null>(null);
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -311,7 +308,6 @@ export default function AdminDashboard() {
 
   const [newProject, setNewProject] = useState({ name: "", description: "", phase: "Desarrollo", producers: [] as string[], customId: "", useCustomId: false, language: "es" });
   const [newProducer, setNewProducer] = useState({ name: "" });
-  const [assignUserForm, setAssignUserForm] = useState({ odId: "", role: "" });
 
   // Demo user modal
   const [showDemoModal, setShowDemoModal] = useState(false);
@@ -931,49 +927,6 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error(error);
       showToast("error", "Error al eliminar");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleAssignUser = async () => {
-    if (!assignUserForm.odId || !assignUserForm.role || !showAssignUser) {
-      showToast("error", "Selecciona usuario y rol");
-      return;
-    }
-    setSaving(true);
-    try {
-      const user = users.find((u) => u.id === assignUserForm.odId);
-      const project = projects.find((p) => p.id === showAssignUser);
-      if (!user || !project) return;
-      if (project.members?.some((m) => m.odId === user.id)) {
-        showToast("error", "Usuario ya asignado");
-        setSaving(false);
-        return;
-      }
-      await setDoc(doc(db, `projects/${showAssignUser}/members`, user.id), {
-        odId: user.id,
-        name: user.name,
-        email: user.email,
-        role: assignUserForm.role,
-        permissions: { config: true, accounting: true, team: true },
-        accountingAccessLevel: "accounting_extended",
-        addedAt: serverTimestamp(),
-      });
-      await setDoc(doc(db, `userProjects/${user.id}/projects/${showAssignUser}`), {
-        projectId: showAssignUser,
-        role: assignUserForm.role,
-        permissions: { config: true, accounting: true, team: true },
-        accountingAccessLevel: "accounting_extended",
-        addedAt: serverTimestamp(),
-      });
-      setAssignUserForm({ odId: "", role: "" });
-      setShowAssignUser(null);
-      showToast("success", "Usuario asignado");
-      await loadData();
-    } catch (error) {
-      console.error(error);
-      showToast("error", "Error al asignar");
     } finally {
       setSaving(false);
     }
@@ -1723,16 +1676,6 @@ export default function AdminDashboard() {
                                     >
                                       <Edit2 size={14} className="text-slate-400" />
                                       Editar
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setShowAssignUser(project.id);
-                                        setActiveMenu(null);
-                                      }}
-                                      className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                                    >
-                                      <UserPlus size={14} className="text-slate-400" />
-                                      Asignar usuario
                                     </button>
                                     <Link
                                       href={`/project/${project.id}/config`}
@@ -2879,78 +2822,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Assign User Modal */}
-      {showAssignUser && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-                  <UserPlus size={20} className="text-emerald-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Asignar usuario</h3>
-                  <p className="text-xs text-slate-500">
-                    {projects.find((p) => p.id === showAssignUser)?.name}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setShowAssignUser(null);
-                  setAssignUserForm({ odId: "", role: "" });
-                }}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-6 space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Usuario *</label>
-                <select
-                  value={assignUserForm.odId}
-                  onChange={(e) => setAssignUserForm({ ...assignUserForm, odId: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white appearance-none cursor-pointer pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')] bg-[length:16px] bg-[right_12px_center] bg-no-repeat"
-                >
-                  <option value="">Seleccionar usuario...</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.name} ({user.email})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Rol en el proyecto *</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {PROJECT_ROLES.map((role) => (
-                    <button
-                      key={role}
-                      onClick={() => setAssignUserForm({ ...assignUserForm, role })}
-                      className={`px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                        assignUserForm.role === role
-                          ? "bg-slate-900 text-white border-slate-900"
-                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                      }`}
-                    >
-                      {role}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <button
-                onClick={handleAssignUser}
-                disabled={saving || !assignUserForm.odId || !assignUserForm.role}
-                className="w-full px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                {saving ? "Asignando..." : "Asignar usuario"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* User Details Modal */}
       {showUserDetails &&
         (() => {
@@ -2998,8 +2869,8 @@ export default function AdminDashboard() {
                   {/* Budgeting access */}
                   <div className="flex items-center justify-between gap-3 mb-6 pb-6 border-b border-slate-200">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#8DA7BE1a" }}>
-                        <Calculator size={15} style={{ color: "#8DA7BE" }} />
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#C2652F1a" }}>
+                        <Calculator size={15} style={{ color: "#C2652F" }} />
                       </div>
                       <p className="text-sm font-medium text-slate-900">Acceso a Budgeting</p>
                     </div>
@@ -3007,7 +2878,7 @@ export default function AdminDashboard() {
                       onClick={() => handleToggleBudgetingAccess(user.id, !user.budgetingAccess)}
                       disabled={saving}
                       className="w-10 h-6 rounded-full transition-colors relative flex-shrink-0 disabled:opacity-50"
-                      style={{ background: user.budgetingAccess ? "#8DA7BE" : "#e2e8f0" }}
+                      style={{ background: user.budgetingAccess ? "#C2652F" : "#e2e8f0" }}
                     >
                       <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${user.budgetingAccess ? "left-5" : "left-1"}`} />
                     </button>

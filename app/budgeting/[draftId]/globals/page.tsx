@@ -46,10 +46,10 @@ function ScenariosBar({ scenarios, onAdd, onRename, onDelete }: {
             <input key={sc.id} autoFocus value={editLabel} onChange={(e) => setEditLabel(e.target.value)}
               onBlur={() => { if (editLabel.trim()) onRename(sc.id, editLabel.trim()); setEditingId(null); }}
               onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-              className="text-xs px-2.5 py-1 border border-[#8DA7BE] rounded-full focus:outline-none w-28" />
+              className="text-xs px-2.5 py-1 border border-[#C2652F] rounded-full focus:outline-none w-28" />
           ) : (
             <span key={sc.id} className="inline-flex items-center gap-1 text-xs pl-2.5 pr-1.5 py-1 rounded-full border border-slate-200 text-slate-600">
-              <button onClick={() => { setEditingId(sc.id); setEditLabel(sc.label); }} className="hover:text-[#8DA7BE]">{sc.label}</button>
+              <button onClick={() => { setEditingId(sc.id); setEditLabel(sc.label); }} className="hover:text-[#C2652F]">{sc.label}</button>
               <button onClick={() => onDelete(sc.id)} className="text-slate-300 hover:text-red-500"><X size={10} /></button>
             </span>
           )
@@ -59,7 +59,7 @@ function ScenariosBar({ scenarios, onAdd, onRename, onDelete }: {
           onChange={(e) => setNewLabel(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && newLabel.trim()) { onAdd(newLabel.trim()); setNewLabel(""); } }}
           placeholder="+ Nuevo escenario"
-          className="text-xs px-2.5 py-1 rounded-full border border-dashed border-slate-300 focus:outline-none focus:border-[#8DA7BE] w-32"
+          className="text-xs px-2.5 py-1 rounded-full border border-dashed border-slate-300 focus:outline-none focus:border-[#C2652F] w-32"
         />
       </div>
     </div>
@@ -74,9 +74,9 @@ function GlobalRow({
   return (
     <div className="flex items-center justify-between gap-3 px-5 py-2.5 hover:bg-slate-50 group">
       <div className="flex items-center gap-2.5 min-w-0">
-        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: "#8DA7BE1a", color: "#1D201F" }}>{g.code}</span>
+        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: "#C2652F1a", color: "#1D201F" }}>{g.code}</span>
         <span className="text-sm font-medium text-slate-900 truncate">{g.label}</span>
-        {!isPlainNumber(g.value) && <span title="Fórmula"><Sigma size={11} className="text-[#8DA7BE] flex-shrink-0" /></span>}
+        {!isPlainNumber(g.value) && <span title="Fórmula"><Sigma size={11} className="text-[#C2652F] flex-shrink-0" /></span>}
         <span className="text-xs text-slate-400 truncate font-mono">{g.value}</span>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
