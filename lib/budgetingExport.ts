@@ -147,14 +147,49 @@ export interface FlatAccountRow {
 }
 
 /**
- * Aplana un .fwb a filas CUENTA/SUBCUENTA, mismo shape que produce el
- * importador de Excel de Accounting > Budget (parseImportFile). Accounting
- * solo tiene dos niveles: cada Capítulo pasa a ser una CUENTA, y cada Cuenta
- * de Budgeting (el 3er nivel, "Subcapítulo" en el modelo de datos) una
- * SUBCUENTA con su importe = suma de todas sus líneas de detalle. Las
- * líneas de detalle no se importan como entidades propias, solo su suma.
+ * Budgeting tiene tres niveles (Capítulo → Cuenta → Detalle) pero Accounting
+ * solo dos (Cuenta → Subcuenta): hay que elegir cuál de los dos niveles de
+ * Budgeting se queda como el código operativo (el que se asigna en PO,
+ * facturas y cajas).
+ * - "subchapter" (por defecto, el comportamiento de siempre): Capítulo →
+ *   CUENTA, Cuenta → SUBCUENTA. El código operativo es el de cada Cuenta.
+ * - "detailLine": Cuenta → CUENTA, Detalle → SUBCUENTA. El código operativo
+ *   es el de cada línea de Detalle; el Capítulo no se conserva.
  */
-export function flattenFwbToAccountRows(fwb: FwbFile): FlatAccountRow[] {
+export type FwbSubaccountLevel = "subchapter" | "detailLine";
+
+/**
+ * Aplana un .fwb a filas CUENTA/SUBCUENTA, mismo shape que produce el
+ * importador de Excel de Accounting > Budget (parseImportFile).
+ */
+export function flattenFwbToAccountRows(fwb: FwbFile, subaccountLevel: FwbSubaccountLevel = "subchapter"): FlatAccountRow[] {
+  if (subaccountLevel === "detailLine") {
+    // Cada Cuenta de Budgeting es la CUENTA de Accounting; cada línea de
+    // Detalle, su propia SUBCUENTA. El código de la línea es opcional en
+    // Budgeting (solo referencial): si viene vacío se rellena con su
+    // posición dentro de la Cuenta, para no perder la fila. La redirección
+    // "Sumar en" (routedToSubchapterCode) no tiene un destino de nivel línea
+    // claro aquí, así que no se traslada: cada línea se queda en su Cuenta física.
+    const rows: FlatAccountRow[] = [];
+    for (const block of fwb.categories) {
+      for (const chapter of block.chapters) {
+        for (const sub of chapter.subchapters) {
+          rows.push({ code: sub.code, description: sub.description, type: "CUENTA", budgeted: 0, parentCode: null });
+          (sub.detailLines || []).forEach((line, i) => {
+            rows.push({
+              code: line.code.trim() || String(i + 1).padStart(2, "0"),
+              description: line.description,
+              type: "SUBCUENTA",
+              budgeted: Math.round((line.total || 0) * 100) / 100,
+              parentCode: sub.code,
+            });
+          });
+        }
+      }
+    }
+    return rows;
+  }
+
   // Primera pasada: suma de cada Cuenta (Subcapítulo) por su código,
   // incluyendo las líneas redirigidas ("excl.") desde otra Cuenta hacia ella.
   const sumsByCode = new Map<string, number>();

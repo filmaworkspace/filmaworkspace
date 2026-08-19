@@ -51,7 +51,7 @@ export default function BudgetingFringeLineRow({
       </span>
       <Link
         href={`/budgeting/${draftId}/fringes`}
-        className="flex items-center justify-end gap-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-[#8DA7BE]"
+        className="flex items-center justify-end gap-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-[#C2652F]"
         title="Ver en Cargas sociales"
       >
         <ArrowUpRight size={12} />

@@ -54,7 +54,7 @@ export default function BudgetingFolderPicker({ folders, value, onChange, onCrea
           <button
             onClick={() => { onChange(null); setOpen(false); }}
             className={`w-full text-left px-3.5 py-1.5 text-sm hover:bg-slate-50 ${!value ? "font-medium" : "text-slate-600"}`}
-            style={!value ? { color: "#8DA7BE" } : undefined}
+            style={!value ? { color: "#C2652F" } : undefined}
           >
             Sin carpeta
           </button>
@@ -63,7 +63,7 @@ export default function BudgetingFolderPicker({ folders, value, onChange, onCrea
               key={f.id}
               onClick={() => { onChange(f.id); setOpen(false); }}
               className={`w-full text-left px-3.5 py-1.5 text-sm hover:bg-slate-50 truncate ${value === f.id ? "font-medium" : "text-slate-600"}`}
-              style={value === f.id ? { color: "#8DA7BE" } : undefined}
+              style={value === f.id ? { color: "#C2652F" } : undefined}
             >
               {f.label}
             </button>
@@ -74,12 +74,12 @@ export default function BudgetingFolderPicker({ folders, value, onChange, onCrea
               onChange={(e) => setNewLabel(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && newLabel.trim()) { onCreateFolder(newLabel.trim()); setNewLabel(""); } }}
               placeholder="Nueva carpeta..."
-              className="flex-1 min-w-0 text-xs px-2 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-[#8DA7BE]"
+              className="flex-1 min-w-0 text-xs px-2 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-[#C2652F]"
             />
             <button
               onClick={() => { if (newLabel.trim()) { onCreateFolder(newLabel.trim()); setNewLabel(""); } }}
               className="p-1.5 rounded-lg text-white flex-shrink-0"
-              style={{ background: "#8DA7BE" }}
+              style={{ background: "#C2652F" }}
             >
               <Plus size={12} />
             </button>
