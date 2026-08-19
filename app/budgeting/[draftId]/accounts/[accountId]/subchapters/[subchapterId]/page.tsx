@@ -110,7 +110,7 @@ function SubchapterFringeRow({
       {columnsConfig.showTags && <span />}
       <Link
         href={`/budgeting/${draftId}/fringes`}
-        className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-[#C2652F]"
+        className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-[#414E82]"
         title="Ver en Cargas sociales"
       >
         <Percent size={10} />
@@ -159,15 +159,15 @@ function DetailSidebar({
             <p className="text-xs font-medium text-slate-700">Columnas</p>
             <label className="flex items-center justify-between gap-2">
               <span className="text-xs text-slate-600">Mostrar Comentario</span>
-              <input type="checkbox" checked={columnsConfig.showComment} onChange={(e) => onChangeColumns({ showComment: e.target.checked })} className="accent-[#C2652F]" />
+              <input type="checkbox" checked={columnsConfig.showComment} onChange={(e) => onChangeColumns({ showComment: e.target.checked })} className="accent-[#414E82]" />
             </label>
             <label className="flex items-center justify-between gap-2">
               <span className="text-xs text-slate-600">Mostrar Etiquetas</span>
-              <input type="checkbox" checked={columnsConfig.showTags} onChange={(e) => onChangeColumns({ showTags: e.target.checked })} className="accent-[#C2652F]" />
+              <input type="checkbox" checked={columnsConfig.showTags} onChange={(e) => onChangeColumns({ showTags: e.target.checked })} className="accent-[#414E82]" />
             </label>
             <label className="flex items-center justify-between gap-2">
               <span className="text-xs text-slate-600">Mostrar cargas sociales</span>
-              <input type="checkbox" checked={showFringes} onChange={(e) => onToggleShowFringes(e.target.checked)} className="accent-[#C2652F]" />
+              <input type="checkbox" checked={showFringes} onChange={(e) => onToggleShowFringes(e.target.checked)} className="accent-[#414E82]" />
             </label>
             <div>
               <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mb-1.5">Ancho de Cant./Unidad/X/Tarifa</p>
@@ -211,12 +211,12 @@ function DetailSidebar({
                         <button
                           key={f.id}
                           onClick={() => onToggleFringe(f.id)}
-                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border transition-colors ${checked ? "border-[#C2652F] bg-[#C2652F]/[0.06]" : "border-slate-200 hover:border-slate-300"}`}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border transition-colors ${checked ? "border-[#414E82] bg-[#414E82]/[0.06]" : "border-slate-200 hover:border-slate-300"}`}
                         >
                           <span className="text-xs text-slate-700 truncate">{f.label}</span>
                           <span className="flex items-center gap-2 flex-shrink-0">
                             {checked && amount != null && <span className="text-xs font-medium text-slate-600">{fmtDecimal(amount)}</span>}
-                            <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${checked ? "border-[#C2652F]" : "border-slate-300"}`} style={{ background: checked ? "#C2652F" : "transparent" }}>
+                            <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${checked ? "border-[#414E82]" : "border-slate-300"}`} style={{ background: checked ? "#414E82" : "transparent" }}>
                               {checked && <Check size={9} className="text-white" />}
                             </span>
                           </span>
@@ -232,7 +232,7 @@ function DetailSidebar({
                     <Link
                       href={`/budgeting/${draftId}/accounts/${line.routedTo.chapterId}/subchapters/${line.routedTo.subchapterId}`}
                       className="text-xs hover:underline flex items-center gap-1"
-                      style={{ color: "#C2652F" }}
+                      style={{ color: "#414E82" }}
                     >
                       {line.routedTo.chapterCode} · {line.routedTo.subchapterCode} {line.routedTo.subchapterDescription}
                       <ArrowUpRight size={11} />
@@ -245,7 +245,7 @@ function DetailSidebar({
                       value={routeSearch}
                       onChange={(e) => setRouteSearch(e.target.value)}
                       placeholder="Buscar cuenta destino"
-                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-[#C2652F] mb-2"
+                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-[#414E82] mb-2"
                     />
                     <div className="max-h-48 overflow-y-auto space-y-0.5">
                       {filtered.length === 0 ? (
@@ -337,7 +337,7 @@ function LineRow({
   );
 
   return (
-    <div className={`group ${selected ? "bg-[#C2652F]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+    <div className={`group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
       <LineFieldsGrid
         fields={fields}
         onChange={(patch) => setFields((f) => ({ ...f, ...patch }))}
@@ -354,24 +354,24 @@ function LineRow({
         indicators={
           (hasFormula || hasHiddenComment) && (
             <span className="flex items-center gap-1">
-              {hasFormula && <span title="Contiene fórmula"><Sigma size={10} className="text-[#C2652F]" /></span>}
+              {hasFormula && <span title="Contiene fórmula"><Sigma size={10} className="text-[#414E82]" /></span>}
               {hasHiddenComment && <span title={line.notes} className="text-[10px]">💬</span>}
             </span>
           )
         }
         actions={
           <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#C2652F] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+            <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#414E82] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
               <ChevronUp size={11} />
             </button>
-            <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#C2652F] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+            <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#414E82] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
               <ChevronDown size={11} />
             </button>
-            <button onClick={onOpenSidebar} className={`relative p-1 rounded transition-colors ${sidebarOpen ? "text-[#C2652F] bg-[#C2652F]/[0.1]" : "text-slate-400 hover:text-[#C2652F] hover:bg-[#C2652F]/[0.1]"}`} title="Cargas sociales y Sumar en">
+            <button onClick={onOpenSidebar} className={`relative p-1 rounded transition-colors ${sidebarOpen ? "text-[#414E82] bg-[#414E82]/[0.1]" : "text-slate-400 hover:text-[#414E82] hover:bg-[#414E82]/[0.1]"}`} title="Cargas sociales y Sumar en">
               <SlidersHorizontal size={11} />
-              {hasFringesOrRoute && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full" style={{ background: "#C2652F" }} />}
+              {hasFringesOrRoute && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full" style={{ background: "#414E82" }} />}
             </button>
-            <button onClick={onDuplicate} className="p-1 rounded text-slate-400 hover:text-[#C2652F] hover:bg-[#C2652F]/[0.1] transition-colors" title="Duplicar línea">
+            <button onClick={onDuplicate} className="p-1 rounded text-slate-400 hover:text-[#414E82] hover:bg-[#414E82]/[0.1] transition-colors" title="Duplicar línea">
               <Copy size={11} />
             </button>
             <button onClick={onDelete} className="p-1 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar línea">
@@ -417,7 +417,7 @@ function TextLineRow({
   if (columnsConfig.showTags) actionsCol++;
 
   return (
-    <div className={`grid gap-0 divide-x divide-slate-200 px-4 group ${selected ? "bg-[#C2652F]/[0.08]" : ""}`} style={{ gridTemplateColumns: template }} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+    <div className={`grid gap-0 divide-x divide-slate-200 px-4 group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} style={{ gridTemplateColumns: template }} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
       <input
         autoFocus={autoFocus}
         value={description}
@@ -440,10 +440,10 @@ function TextLineRow({
         className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity"
         style={{ gridColumn: `${actionsCol} / ${actionsCol + 1}` }}
       >
-        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#C2652F] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#414E82] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
           <ChevronUp size={11} />
         </button>
-        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#C2652F] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#414E82] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
           <ChevronDown size={11} />
         </button>
         <button onClick={onDelete} className="p-1 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar línea">
@@ -997,9 +997,9 @@ export default function BudgetingSubchapterPage() {
           derecha, un navegador para saltar directamente a otra Cuenta del presupuesto. */}
       <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <Link href={`/budgeting/${draftId}`} className="text-xs text-slate-400 hover:text-[#C2652F] transition-colors">{draft?.name}</Link>
+          <Link href={`/budgeting/${draftId}`} className="text-xs text-slate-400 hover:text-[#414E82] transition-colors">{draft?.name}</Link>
           <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
-          <Link href={`/budgeting/${draftId}/accounts/${accountId}`} className="text-xs font-medium text-slate-600 hover:text-[#C2652F] transition-colors">{chapter.code} {chapter.description}</Link>
+          <Link href={`/budgeting/${draftId}/accounts/${accountId}`} className="text-xs font-medium text-slate-600 hover:text-[#414E82] transition-colors">{chapter.code} {chapter.description}</Link>
           <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
           <span className="text-xs font-semibold text-slate-900">{subchapter.code} {subchapter.description}</span>
         </div>
@@ -1009,7 +1009,7 @@ export default function BudgetingSubchapterPage() {
             <button
               onClick={() => accountNavIndex > 0 && goToAccount(allSubchapters[accountNavIndex - 1])}
               disabled={accountNavIndex <= 0}
-              className="p-1 rounded text-slate-400 hover:text-[#C2652F] hover:bg-[#C2652F]/[0.1] transition-colors disabled:opacity-20 disabled:pointer-events-none"
+              className="p-1 rounded text-slate-400 hover:text-[#414E82] hover:bg-[#414E82]/[0.1] transition-colors disabled:opacity-20 disabled:pointer-events-none"
               title="Cuenta anterior"
             >
               <ChevronLeft size={13} />
@@ -1030,7 +1030,7 @@ export default function BudgetingSubchapterPage() {
             <button
               onClick={() => accountNavIndex >= 0 && accountNavIndex < allSubchapters.length - 1 && goToAccount(allSubchapters[accountNavIndex + 1])}
               disabled={accountNavIndex < 0 || accountNavIndex >= allSubchapters.length - 1}
-              className="p-1 rounded text-slate-400 hover:text-[#C2652F] hover:bg-[#C2652F]/[0.1] transition-colors disabled:opacity-20 disabled:pointer-events-none"
+              className="p-1 rounded text-slate-400 hover:text-[#414E82] hover:bg-[#414E82]/[0.1] transition-colors disabled:opacity-20 disabled:pointer-events-none"
               title="Cuenta siguiente"
             >
               <ChevronRight size={13} />
@@ -1048,7 +1048,7 @@ export default function BudgetingSubchapterPage() {
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar"
               className="w-full pl-7 pr-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300" />
           </div>
-          <button onClick={() => openSidebar(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-[#C2652F] hover:bg-[#C2652F]/[0.1] transition-colors" title="Ajustes del detalle">
+          <button onClick={() => openSidebar(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-[#414E82] hover:bg-[#414E82]/[0.1] transition-colors" title="Ajustes del detalle">
             <Settings2 size={14} />
           </button>
         </div>
@@ -1070,7 +1070,7 @@ export default function BudgetingSubchapterPage() {
             <span className="flex items-center justify-end pl-2">
               <button
                 onClick={() => openSidebar(null)}
-                className="p-1 rounded text-slate-400 hover:text-[#C2652F] hover:bg-[#C2652F]/[0.1] transition-colors normal-case"
+                className="p-1 rounded text-slate-400 hover:text-[#414E82] hover:bg-[#414E82]/[0.1] transition-colors normal-case"
                 title="Mostrar/ocultar columnas"
               >
                 <MoreVertical size={13} />

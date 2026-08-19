@@ -91,7 +91,7 @@ function ChapterRow({
       if (e.key === "Escape") setDescription(chapter.description);
     };
     return (
-      <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#C2652F]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+      <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
         <span />
         <input
           autoFocus={autoFocus}
@@ -109,10 +109,10 @@ function ChapterRow({
           </span>
         )}
         <span className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#C2652F] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+          <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#414E82] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
             <ChevronUp size={11} />
           </button>
-          <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#C2652F] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+          <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#414E82] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
             <ChevronDown size={11} />
           </button>
           <button onClick={onDelete} className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar línea">
@@ -124,9 +124,9 @@ function ChapterRow({
   }
 
   return (
-    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#C2652F]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
       <Link href={`/budgeting/${draftId}/accounts/${chapter.id}`} className="flex items-center justify-center" title="Entrar">
-        <ChevronRight size={13} className="text-slate-300 group-hover:text-[#C2652F] group-hover:translate-x-0.5 transition-all" />
+        <ChevronRight size={13} className="text-slate-300 group-hover:text-[#414E82] group-hover:translate-x-0.5 transition-all" />
       </Link>
       <input autoFocus={autoFocus} value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} font-mono text-xs pl-2`} />
@@ -134,10 +134,10 @@ function ChapterRow({
         className={`${CELL_INPUT} text-xs pl-2`} />
       <span className="flex items-center justify-end text-xs font-medium text-slate-700 pr-2">{fmt(total)}</span>
       <span className="flex items-center justify-end gap-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#C2652F] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#414E82] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
           <ChevronUp size={11} />
         </button>
-        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#C2652F] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#414E82] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
           <ChevronDown size={11} />
         </button>
         <button onClick={onDelete} className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar capítulo">
@@ -978,11 +978,11 @@ export default function BudgetingTopPage() {
                     <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mb-1.5">Configuración Excel / PDF</p>
                     <label className="flex items-center justify-between gap-2 mb-1.5">
                       <span className="text-xs text-slate-700">Top Sheet (portada)</span>
-                      <input type="checkbox" checked={exportConfig.coverSheet} onChange={(e) => updateExportConfig({ coverSheet: e.target.checked })} className="accent-[#C2652F]" />
+                      <input type="checkbox" checked={exportConfig.coverSheet} onChange={(e) => updateExportConfig({ coverSheet: e.target.checked })} className="accent-[#414E82]" />
                     </label>
                     <label className="flex items-center justify-between gap-2">
                       <span className="text-xs text-slate-700">Salto de página por capítulo</span>
-                      <input type="checkbox" checked={exportConfig.pageBreakPerChapter} onChange={(e) => updateExportConfig({ pageBreakPerChapter: e.target.checked })} className="accent-[#C2652F]" />
+                      <input type="checkbox" checked={exportConfig.pageBreakPerChapter} onChange={(e) => updateExportConfig({ pageBreakPerChapter: e.target.checked })} className="accent-[#414E82]" />
                     </label>
                   </div>
                   <div className="border-t border-slate-100 pt-2.5">
@@ -991,7 +991,7 @@ export default function BudgetingTopPage() {
                       {([["unit", "Unidad"], ["notes", "Comentario"], ["tags", "Etiquetas"]] as const).map(([key, label]) => (
                         <label key={key} className="flex items-center justify-between gap-2">
                           <span className="text-xs text-slate-700">{label}</span>
-                          <input type="checkbox" checked={exportConfig.fields[key]} onChange={(e) => updateExportConfig({ fields: { [key]: e.target.checked } as Partial<BudgetingExportConfig["fields"]> })} className="accent-[#C2652F]" />
+                          <input type="checkbox" checked={exportConfig.fields[key]} onChange={(e) => updateExportConfig({ fields: { [key]: e.target.checked } as Partial<BudgetingExportConfig["fields"]> })} className="accent-[#414E82]" />
                         </label>
                       ))}
                     </div>
@@ -1051,8 +1051,8 @@ export default function BudgetingTopPage() {
       </div>
 
       {activeScenarioId && (
-        <div className="flex items-center gap-1.5 mb-3 text-[11px] font-medium" style={{ color: "#C2652F" }}>
-          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#C2652F" }} />
+        <div className="flex items-center gap-1.5 mb-3 text-[11px] font-medium" style={{ color: "#414E82" }}>
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#414E82" }} />
           Previsualizando "{scenarios.find((s) => s.id === activeScenarioId)?.label}": los totales de abajo son una simulación, no se ha guardado nada.
         </div>
       )}
@@ -1068,7 +1068,7 @@ export default function BudgetingTopPage() {
             <BudgetingColumnsMenu title="Columnas">
               <label className="flex items-center justify-between gap-2">
                 <span className="text-xs text-slate-700">Mostrar cargas sociales</span>
-                <input type="checkbox" checked={fringeVisibility.topSheet} onChange={(e) => updateFringeVisibility({ topSheet: e.target.checked })} className="accent-[#C2652F]" />
+                <input type="checkbox" checked={fringeVisibility.topSheet} onChange={(e) => updateFringeVisibility({ topSheet: e.target.checked })} className="accent-[#414E82]" />
               </label>
             </BudgetingColumnsMenu>
           </span>
@@ -1408,7 +1408,7 @@ export default function BudgetingTopPage() {
                           key={p.id}
                           onClick={() => handlePickProject(p)}
                           disabled={status === "checking"}
-                          className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 border border-slate-200 rounded-xl text-left hover:border-[#C2652F] transition-colors disabled:opacity-60"
+                          className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 border border-slate-200 rounded-xl text-left hover:border-[#414E82] transition-colors disabled:opacity-60"
                         >
                           <span className="text-sm text-slate-800 truncate">{p.name}</span>
                           {status === "checking" && <span className="text-[11px] text-slate-400 flex-shrink-0">Comprobando...</span>}

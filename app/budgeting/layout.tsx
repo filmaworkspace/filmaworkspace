@@ -31,7 +31,7 @@ export default function BudgetingLayout({ children }: { children: React.ReactNod
     return (
       <div
         className={`min-h-screen flex items-center justify-center ${inter.className}`}
-        style={{ background: "linear-gradient(180deg, #C2652F1a, #ffffff 60%)" }}
+        style={{ background: "linear-gradient(180deg, #414E821a, #ffffff 60%)" }}
       >
         {(isLoading || !user) && (
           <Image
