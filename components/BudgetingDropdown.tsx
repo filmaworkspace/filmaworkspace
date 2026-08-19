@@ -27,7 +27,9 @@ export default function BudgetingDropdown({
   align?: "left" | "right";
 }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ left?: number; right?: number; minWidth: number; top?: number; bottom?: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const current = options.find((o) => o.value === value);
 
   useEffect(() => {
@@ -38,9 +40,31 @@ export default function BudgetingDropdown({
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
+  // `fixed` respecto al viewport (calculado desde el botón), no `absolute`
+  // dentro del formulario: así no se queda recortado por el overflow de un
+  // modal cuando el campo está pegado abajo. Si no cabe hacia abajo, se abre
+  // hacia arriba.
+  useEffect(() => {
+    if (!open || !btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    const estHeight = 280;
+    const openUp = window.innerHeight - rect.bottom < estHeight && rect.top > estHeight;
+    const horizontal = align === "right" ? { right: window.innerWidth - rect.right } : { left: rect.left };
+    setPos({
+      ...horizontal,
+      minWidth: rect.width,
+      ...(openUp ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }),
+    });
+    const close = () => setOpen(false);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => { window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); };
+  }, [open, align]);
+
   return (
     <div ref={ref} className={`relative ${className || ""}`}>
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={
@@ -51,8 +75,11 @@ export default function BudgetingDropdown({
         <span className={current ? "text-slate-900 truncate" : "text-slate-400 truncate"}>{current?.label || placeholder || "Selecciona"}</span>
         <ChevronDown size={13} className={`text-slate-400 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <div className={`absolute top-full mt-1.5 min-w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 z-50 max-h-64 overflow-y-auto ${align === "right" ? "right-0" : "left-0"}`}>
+      {open && pos && (
+        <div
+          className="fixed bg-white border border-slate-200 rounded-xl shadow-lg py-1 z-[70] max-h-64 overflow-y-auto"
+          style={{ left: pos.left, right: pos.right, minWidth: pos.minWidth, top: pos.top, bottom: pos.bottom }}
+        >
           {options.map((o) => (
             <button
               key={o.value}

@@ -8,33 +8,37 @@ import Link from "next/link";
 import { ArrowUpRight, Percent } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
-import { BudgetingFringe, CELL_INPUT } from "@/lib/budgeting";
+import { CELL_INPUT, FringeGroupTarget } from "@/lib/budgeting";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fila de una carga social ("fringe") representada en el nivel donde su
 // alcance calcula el importe (Top Sheet para "total", Capítulo para
 // "chapter"): aparece como una línea más, con su propio código y nombre
-// editables (misma fringe de draft.fringes, no una copia), pero el importe
-// es de solo lectura porque sale calculado de las líneas de detalle.
+// editables — el importe es de solo lectura porque sale calculado de las
+// líneas de detalle. Si varios fringes comparten carpeta, ya vienen fundidos
+// en una sola fila (ver groupFringeSumsByFolder): en ese caso, editar el
+// código/nombre aquí edita la carpeta, no un fringe suelto (`target` decide
+// a qué documento escribir; lo resuelve el `onCommit` de quien la use).
 // Usa el mismo `cols` que las filas de esa tabla para alinearse con ellas.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function BudgetingFringeLineRow({
-  fringe, amount, fmt, draftId, cols, tooltip, onCommit,
+  code: initialCode, label: initialLabel, amount, target, fmt, draftId, cols, tooltip, onCommit,
 }: {
-  fringe: BudgetingFringe; amount: number; fmt: (n: number) => string; draftId: string; cols: string; tooltip: string;
-  onCommit: (code: string, label: string) => void;
+  code: string; label: string; amount: number; target: FringeGroupTarget;
+  fmt: (n: number) => string; draftId: string; cols: string; tooltip: string;
+  onCommit: (target: FringeGroupTarget, code: string, label: string) => void;
 }) {
-  const [code, setCode] = useState(fringe.code);
-  const [label, setLabel] = useState(fringe.label);
+  const [code, setCode] = useState(initialCode);
+  const [label, setLabel] = useState(initialLabel);
 
   const commit = () => {
-    if (!code.trim() || !label.trim()) { setCode(fringe.code); setLabel(fringe.label); return; }
-    onCommit(code.trim(), label.trim());
+    if (!code.trim() || !label.trim()) { setCode(initialCode); setLabel(initialLabel); return; }
+    onCommit(target, code.trim(), label.trim());
   };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") e.currentTarget.blur();
-    if (e.key === "Escape") { setCode(fringe.code); setLabel(fringe.label); }
+    if (e.key === "Escape") { setCode(initialCode); setLabel(initialLabel); }
   };
 
   return (

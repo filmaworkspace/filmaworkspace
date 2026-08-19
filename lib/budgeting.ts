@@ -40,10 +40,17 @@ export const DEFAULT_CATEGORIES: BudgetingCategoryDef[] = [
   { id: "other", code: "OVH", label: "Otros / Overhead" },
 ];
 
-/** Carpeta simple (sin anidar) para organizar Globales o Seguridad Social en su página de ajustes. */
+/**
+ * Carpeta simple (sin anidar) para organizar Globales o Seguridad Social en
+ * su página de ajustes. `code` solo lo usan las carpetas de Fringes: cuando
+ * varios fringes comparten carpeta, se funden en una sola línea de
+ * presupuesto (ver groupFringeSumsByFolder) y es esa carpeta, no cada fringe
+ * suelto, la que lleva el código de esa línea.
+ */
 export interface BudgetingFolder {
   id: string;
   label: string;
+  code?: string;
 }
 
 /**
@@ -217,6 +224,7 @@ export interface BudgetingDraft {
   globalFolders?: BudgetingFolder[];
   fringes?: BudgetingFringe[];
   fringeFolders?: BudgetingFolder[];
+  units?: BudgetingUnit[];
   phases?: BudgetingPhase[];
   exportConfig?: BudgetingExportConfig;
   scenarios?: BudgetingScenario[];
@@ -353,7 +361,41 @@ export interface BudgetingDetailLine {
   textColor?: string;
 }
 
-export const UNIT_SUGGESTIONS = ["Día", "Semana", "Mes", "Fijo", "Persona", "%", "Hora"];
+/**
+ * Unidad personalizable del borrador (página "Unidades" del navbar): singular
+ * y plural, para que el campo Unidad de una línea de Detalle se muestre en
+ * una u otra forma según la Cantidad (1 = singular, más de 1 = plural).
+ */
+export interface BudgetingUnit {
+  id: string;
+  singular: string;
+  plural: string;
+}
+
+/** Semilla con la que arranca un borrador que todavía no ha tocado "Unidades" (mismas unidades que antes, ahora editables). */
+export const DEFAULT_UNITS: BudgetingUnit[] = [
+  { id: "u_dia", singular: "Día", plural: "Días" },
+  { id: "u_semana", singular: "Semana", plural: "Semanas" },
+  { id: "u_mes", singular: "Mes", plural: "Meses" },
+  { id: "u_fijo", singular: "Fijo", plural: "Fijo" },
+  { id: "u_persona", singular: "Persona", plural: "Personas" },
+  { id: "u_pct", singular: "%", plural: "%" },
+  { id: "u_hora", singular: "Hora", plural: "Horas" },
+];
+
+/**
+ * Forma singular o plural de un texto de unidad según la cantidad: si
+ * coincide (sin distinguir mayúsculas) con el singular de alguna unidad del
+ * borrador, se muestra su plural cuando `qty !== 1`; si no coincide con
+ * ninguna (texto libre, no está en la lista), se deja tal cual.
+ */
+export function pluralizeUnit(unitText: string | undefined, qty: number, units: BudgetingUnit[]): string {
+  const text = (unitText || "").trim();
+  if (!text) return text;
+  const match = units.find((u) => u.singular.trim().toLowerCase() === text.toLowerCase());
+  if (!match) return text;
+  return qty === 1 ? match.singular : (match.plural || match.singular);
+}
 
 export const CURRENCIES = [
   { code: "EUR", label: "€ Euro" },
@@ -660,6 +702,52 @@ export function computeFringeExtras(lines: BudgetingDetailLine[], fringes: Budge
   extras.chapterScoped = Math.round(extras.chapterScoped * 100) / 100;
   extras.totalScoped = Math.round(extras.totalScoped * 100) / 100;
   return extras;
+}
+
+/** A qué documento escribir si se edita el código/nombre de una fila de desglose de fringes. */
+export type FringeGroupTarget = { type: "folder"; folderId: string } | { type: "fringe"; fringeId: string };
+
+export interface FringeGroupRow {
+  code: string;
+  label: string;
+  amount: number;
+  target: FringeGroupTarget;
+}
+
+/**
+ * Agrupa las sumas por fringe (fringeId → importe, ya calculadas por scope)
+ * en filas por carpeta: todos los fringes de una misma carpeta se funden en
+ * una única línea de presupuesto, con el código y el nombre de la carpeta
+ * (no los de cada fringe suelto) — así, aunque un capítulo solo tenga
+ * aplicados unos u otros fringes de "Seg. Social", aparecen como una sola
+ * línea. Los fringes sin carpeta siguen apareciendo cada uno con su propio
+ * código, como antes.
+ */
+export function groupFringeSumsByFolder(
+  sumsByFringeId: Map<string, number>,
+  fringes: BudgetingFringe[],
+  folders: BudgetingFolder[],
+): FringeGroupRow[] {
+  const amounts = new Map<string, number>();
+  const meta = new Map<string, { code: string; label: string; target: FringeGroupTarget }>();
+  for (const f of fringes) {
+    if (!sumsByFringeId.has(f.id)) continue;
+    const amt = sumsByFringeId.get(f.id) || 0;
+    const key = f.folderId || `fringe:${f.id}`;
+    amounts.set(key, (amounts.get(key) || 0) + amt);
+    if (!meta.has(key)) {
+      if (f.folderId) {
+        const folder = folders.find((fo) => fo.id === f.folderId);
+        meta.set(key, { code: folder?.code || "", label: folder?.label || f.label, target: { type: "folder", folderId: f.folderId } });
+      } else {
+        meta.set(key, { code: f.code, label: f.label, target: { type: "fringe", fringeId: f.id } });
+      }
+    }
+  }
+  return Array.from(amounts.entries()).map(([key, amount]) => {
+    const m = meta.get(key)!;
+    return { code: m.code, label: m.label, amount: Math.round(amount * 100) / 100, target: m.target };
+  });
 }
 
 // ─── Redirección de líneas ("excl.") ────────────────────────────────────────

@@ -11,7 +11,7 @@
 
 import { strToU8, zipSync } from "fflate";
 import { FilmaPDF } from "./pdfBuilder";
-import { BUDGETING_TEXT, BudgetingCategoryDef, BudgetingExportConfig, BudgetingFringe, BudgetingProjectInfo, DEFAULT_EXPORT_CONFIG, DEFAULT_TEXT_LINE_COLOR, PDF_FONT_SIZES, fmtCurrency } from "./budgeting";
+import { BUDGETING_TEXT, BudgetingCategoryDef, BudgetingExportConfig, BudgetingFolder, BudgetingFringe, BudgetingProjectInfo, BudgetingUnit, DEFAULT_EXPORT_CONFIG, DEFAULT_TEXT_LINE_COLOR, PDF_FONT_SIZES, fmtCurrency, groupFringeSumsByFolder, pluralizeUnit } from "./budgeting";
 
 // Las líneas de texto/subtotal (isTextLine/isSubtotal) son opcionales en las
 // tres interfaces: el Excel/.fwb las sigue excluyendo (reportParams las
@@ -35,6 +35,10 @@ export interface BudgetReportParams {
   linesBySubchapter: Record<string, ReportLine[]>;
   /** Para desglosar las cargas sociales en el PDF, igual que en pantalla. */
   fringes?: BudgetingFringe[];
+  /** Carpetas de cargas sociales: las que comparten carpeta se funden en una sola línea, igual que en pantalla. */
+  fringeFolders?: BudgetingFolder[];
+  /** Unidades del borrador (singular/plural): la columna Unidad se pluraliza según la Cantidad de cada línea, igual que en pantalla. */
+  units?: BudgetingUnit[];
   /** Datos de producción para la cabecera del PDF (portada estilo Top Sheet). */
   projectInfo?: BudgetingProjectInfo;
   grandTotal: number;
@@ -127,7 +131,7 @@ export function downloadBudgetExcel(p: BudgetReportParams) {
             cat.label, `${chapter.code} ${chapter.description}`, `${sub.code} ${sub.description}`,
             line.code, line.description, line.units,
           ];
-          if (cfg.fields.unit) row.push(line.unit);
+          if (cfg.fields.unit) row.push(pluralizeUnit(line.unit, line.units, p.units || []));
           row.push(line.multiplier, line.rate, line.total);
           if (cfg.fields.notes) row.push(line.notes || "");
           if (cfg.fields.tags) row.push((line.tags || []).join(", "));
@@ -177,6 +181,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   const cfg = p.exportConfig || DEFAULT_EXPORT_CONFIG;
   const F = PDF_FONT_SIZES[cfg.pdfFontSize || "normal"];
   const fringes = p.fringes || [];
+  const fringeFolders = p.fringeFolders || [];
   const info = p.projectInfo || {};
   const doc = new FilmaPDF({ accent: "budgeting", docRef: p.draftName, footerBrand: "Filma Workspace Budgeting · filmaworkspace.com" });
   doc.y = doc.margin;
@@ -283,7 +288,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
         }
       }
     }
-    return fringes.filter((f) => sums.has(f.id)).map((f) => ({ fringe: f, amount: Math.round((sums.get(f.id) || 0) * 100) / 100 }));
+    return groupFringeSumsByFolder(sums, fringes, fringeFolders);
   };
   // Una línea redirigida ("excl.") no cuenta en su subcapítulo físico, cuenta
   // en el destino (denormalizado en receivedTotal), igual que en pantalla.
@@ -409,8 +414,8 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
     });
 
     const totalFringes = fringeBreakdownFor(allSubIds, "total");
-    totalFringes.forEach(({ fringe, amount }) => {
-      dataRow(topCols, [fringe.code, fringe.label, fmt(amount)], { size: F.body, color: MUTED });
+    totalFringes.forEach(({ code, label, amount }) => {
+      dataRow(topCols, [code, label, fmt(amount)], { size: F.body, color: MUTED });
     });
 
     doc.y += 2;
@@ -548,11 +553,11 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
           lineTotals.set(l.id, l.total || 0);
           detailDataRow(detailRowValues({
             desc: l.description, qty: String(l.units),
-            unit: l.unit || "", mult: String(l.multiplier), rate: fmt(l.rate), subtotal: fmt(l.total),
+            unit: pluralizeUnit(l.unit, l.units, p.units || []), mult: String(l.multiplier), rate: fmt(l.rate), subtotal: fmt(l.total),
           }), { size: F.body, color: l.routedTo ? MUTED : INK });
         });
-        subFringes.forEach(({ fringe, amount }) => {
-          detailDataRow(detailRowValues({ desc: `${fringe.code} ${fringe.label}`, subtotal: fmt(amount) }), { size: F.body, color: MUTED });
+        subFringes.forEach(({ code, label, amount }) => {
+          detailDataRow(detailRowValues({ desc: `${code} ${label}`, subtotal: fmt(amount) }), { size: F.body, color: MUTED });
         });
 
         const realLines = allLines.filter((l) => !l.isTextLine && !l.isSubtotal);
@@ -565,8 +570,8 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
 
       const realSubs = subs.filter((s) => !s.isTextLine && !s.isSubtotal);
       const chapterFringes = fringeBreakdownFor(realSubs.map((s) => s.id), "chapter");
-      chapterFringes.forEach(({ fringe, amount }) => {
-        detailDataRow(detailRowValues({ desc: `${fringe.code} ${fringe.label}`, subtotal: fmt(amount) }), { size: F.body, color: MUTED });
+      chapterFringes.forEach(({ code, label, amount }) => {
+        detailDataRow(detailRowValues({ desc: `${code} ${label}`, subtotal: fmt(amount) }), { size: F.body, color: MUTED });
       });
       chapterSum += chapterFringes.reduce((s, b) => s + b.amount, 0);
 
