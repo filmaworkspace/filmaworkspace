@@ -16,7 +16,7 @@ import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, Search, Trash2 } fro
 import { useUser } from "@/contexts/UserContext";
 import {
   BudgetingAccount, BudgetingDetailLine, BudgetingDraft, BudgetingFolder, BudgetingFringe, BudgetingFringeVisibility, BudgetingSubchapter, FringeGroupTarget,
-  CELL_INPUT, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, computeReorder, fmtCurrency, groupFringeSumsByFolder, orderAfter, sortByOrder, subchapterTotal,
+  CELL_INPUT, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, clearBudgetingClipboard, computeReorder, fmtCurrency, getBudgetingClipboard, groupFringeSumsByFolder, orderAfter, setBudgetingClipboard, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import BudgetingColumnsMenu from "@/components/BudgetingColumnsMenu";
 import BudgetingFringeLineRow from "@/components/BudgetingFringeLineRow";
@@ -27,16 +27,28 @@ import BudgetingRowContextMenu, { BudgetingRowContextMenuState } from "@/compone
 type DeleteTarget = { subchapterId: string; label: string };
 const cols = "grid-cols-[26px_100px_1fr_100px_58px]";
 
+/** Todo lo que hace falta para recrear una Cuenta entera al copiarla/cortarla: sus líneas de Detalle. */
+interface SubLineClipboardData {
+  code: string; description: string; units: number; unitsExpr: string | null; unit: string;
+  multiplier: number; multiplierExpr: string | null; rate: number; rateExpr: string | null; total: number;
+  notes: string; tags: string[]; fringeIds: string[];
+  isTextLine: boolean; isSubtotal: boolean; textBold: boolean; textColor: string | null;
+}
+interface SubClipboardData {
+  code: string; description: string; isTextLine: boolean; isSubtotal: boolean; textBold: boolean; textColor: string | null;
+  lines: SubLineClipboardData[];
+}
+
 // ─── Fila de subcapítulo, siempre editable in situ (MMB-style): sin caja,
 // sin placeholder, guarda sola al perder el foco. Componente de módulo
 // estable: no se redefine entre renders, así los inputs no pierden el foco. ──
 function SubRow({
-  sub, draftId, accountId, fmt, total, subtotalValue, isFirst, isLast, autoFocus, onCommit, onCommitTextLine, onMove, onDelete, onContextMenu,
+  sub, draftId, accountId, fmt, total, subtotalValue, isFirst, isLast, autoFocus, selected, onCommit, onCommitTextLine, onMove, onDelete, onContextMenu, onRowMouseDown,
 }: {
-  sub: BudgetingSubchapter; draftId: string; accountId: string; fmt: (n: number) => string; total: number; subtotalValue?: number; isFirst: boolean; isLast: boolean; autoFocus?: boolean;
+  sub: BudgetingSubchapter; draftId: string; accountId: string; fmt: (n: number) => string; total: number; subtotalValue?: number; isFirst: boolean; isLast: boolean; autoFocus?: boolean; selected?: boolean;
   onCommit: (code: string, description: string) => void;
   onCommitTextLine: (patch: { description?: string; textBold?: boolean; textColor?: string }) => void;
-  onMove: (direction: "up" | "down") => void; onDelete: () => void; onContextMenu: (e: React.MouseEvent) => void;
+  onMove: (direction: "up" | "down") => void; onDelete: () => void; onContextMenu: (e: React.MouseEvent) => void; onRowMouseDown: (e: React.MouseEvent) => void;
 }) {
   const [code, setCode] = useState(sub.code);
   const [description, setDescription] = useState(sub.description);
@@ -62,7 +74,7 @@ function SubRow({
       if (e.key === "Escape") setDescription(sub.description);
     };
     return (
-      <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group`} onContextMenu={onContextMenu}>
+      <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#C2652F]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
         <span />
         <input
           autoFocus={autoFocus}
@@ -134,6 +146,10 @@ export default function BudgetingChapterPage() {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
   const [subMenu, setSubMenu] = useState<BudgetingRowContextMenuState | null>(null);
+  // Selección múltiple de Cuentas (mismo patrón que en Detalle/Top Sheet):
+  // shift = rango desde la última ancla, cmd/ctrl = suelta una a una.
+  const [selectedSubIds, setSelectedSubIds] = useState<Set<string>>(new Set());
+  const [subSelectionAnchor, setSubSelectionAnchor] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "budgetingDrafts", draftId), (snap) => {
@@ -287,6 +303,170 @@ export default function BudgetingChapterPage() {
     await touchDraft();
   };
 
+  // ── Copiar/cortar/pegar una o varias Cuentas enteras, con sus líneas de
+  // Detalle (misma simplificación que Capítulos: no se preserva `routedTo`
+  // al copiar). Portapapeles compartido con Detalle/Top Sheet, "kind" propio. ──
+  const subToClipboardData = (sub: BudgetingSubchapter): SubClipboardData => ({
+    code: sub.code, description: sub.description,
+    isTextLine: sub.isTextLine || false, isSubtotal: sub.isSubtotal || false,
+    textBold: sub.textBold || false, textColor: sub.textColor || null,
+    lines: (linesBySubchapter[sub.id] || []).map((line) => ({
+      code: line.code, description: line.description, units: line.units, unitsExpr: line.unitsExpr ?? null, unit: line.unit || "",
+      multiplier: line.multiplier, multiplierExpr: line.multiplierExpr ?? null, rate: line.rate, rateExpr: line.rateExpr ?? null, total: line.total,
+      notes: line.notes || "", tags: line.tags || [], fringeIds: line.fringeIds || [],
+      isTextLine: line.isTextLine || false, isSubtotal: line.isSubtotal || false, textBold: line.textBold || false, textColor: line.textColor || null,
+    })),
+  });
+
+  const handleCopySubs = (list: BudgetingSubchapter[]) => {
+    if (list.length === 0) return;
+    setBudgetingClipboard<SubClipboardData[]>({ kind: "subchapter", mode: "copy", data: list.map(subToClipboardData) });
+  };
+
+  const handleCutSubs = async (list: BudgetingSubchapter[]) => {
+    if (list.length === 0) return;
+    setBudgetingClipboard<SubClipboardData[]>({ kind: "subchapter", mode: "cut", data: list.map(subToClipboardData) });
+    setSaving(true);
+    try {
+      for (const sub of list) {
+        const lines = linesBySubchapter[sub.id] || [];
+        await Promise.all(lines.map((l) => deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${sub.id}/detailLines`, l.id))));
+        await deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`, sub.id));
+      }
+      await touchDraft();
+      setSelectedSubIds(new Set());
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** Pega todas las Cuentas del portapapeles, con sus líneas, justo debajo de `afterId` (o al principio si es null). */
+  const handlePasteSubs = async (afterId: string | null) => {
+    const clip = getBudgetingClipboard<SubClipboardData[]>("subchapter");
+    if (!clip || clip.data.length === 0) return;
+    setSaving(true);
+    try {
+      const cursor: { id: string; order?: number; createdAt?: Timestamp | null }[] =
+        sortByOrder(subchapters).map((s) => ({ id: s.id, order: s.order, createdAt: s.createdAt }));
+      let anchorId = afterId;
+      let firstNewId: string | null = null;
+      for (const src of clip.data) {
+        const order = orderAfter(cursor, anchorId);
+        const subRef = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`), {
+          code: src.code, description: src.description, order, createdAt: Timestamp.now(),
+          isTextLine: src.isTextLine, isSubtotal: src.isSubtotal, textBold: src.textBold, textColor: src.textColor,
+        });
+        for (const line of src.lines) {
+          await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subRef.id}/detailLines`), {
+            code: line.code, description: line.description, units: line.units, unitsExpr: line.unitsExpr, unit: line.unit,
+            multiplier: line.multiplier, multiplierExpr: line.multiplierExpr, rate: line.rate, rateExpr: line.rateExpr, total: line.total,
+            notes: line.notes, tags: line.tags, fringeIds: line.fringeIds,
+            isTextLine: line.isTextLine, isSubtotal: line.isSubtotal, textBold: line.textBold, textColor: line.textColor,
+            createdAt: Timestamp.now(),
+          });
+        }
+        cursor.splice(cursor.findIndex((c) => c.id === anchorId) + 1, 0, { id: subRef.id, order });
+        anchorId = subRef.id;
+        if (!firstNewId) firstNewId = subRef.id;
+      }
+      await touchDraft();
+      if (firstNewId) setJustAddedId(firstNewId);
+      setSelectedSubIds(new Set());
+      if (clip.mode === "cut") clearBudgetingClipboard();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Selección múltiple sobre las filas visibles: shift extiende el rango
+  // desde la última ancla, cmd/ctrl suelta una a una, clic normal la limpia
+  // sin robar el foco (pero recuerda la fila como ancla para un futuro
+  // Shift+clic — así "de la primera a la última" funciona empezando con un
+  // clic normal en la primera). Solo el botón izquierdo: el derecho también
+  // dispara mousedown antes del contextmenu, y si no se ignora aquí, el clic
+  // derecho para copiar/cortar varias Cuentas las deseleccionaba antes de
+  // abrir el menú. ──────────────────────────────────────────────────────────
+  const handleSubMouseDown = (sub: BudgetingSubchapter, visible: BudgetingSubchapter[], e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    if (e.shiftKey) {
+      e.preventDefault();
+      (document.activeElement as HTMLElement | null)?.blur();
+      const anchorId = subSelectionAnchor || sub.id;
+      const anchorIdx = visible.findIndex((s) => s.id === anchorId);
+      const clickedIdx = visible.findIndex((s) => s.id === sub.id);
+      if (anchorIdx < 0 || clickedIdx < 0) { setSelectedSubIds(new Set([sub.id])); setSubSelectionAnchor(sub.id); return; }
+      const [from, to] = anchorIdx < clickedIdx ? [anchorIdx, clickedIdx] : [clickedIdx, anchorIdx];
+      setSelectedSubIds(new Set(visible.slice(from, to + 1).map((s) => s.id)));
+    } else if (e.metaKey || e.ctrlKey) {
+      e.preventDefault();
+      (document.activeElement as HTMLElement | null)?.blur();
+      setSelectedSubIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(sub.id)) next.delete(sub.id); else next.add(sub.id);
+        return next;
+      });
+      setSubSelectionAnchor(sub.id);
+    } else {
+      setSubSelectionAnchor(sub.id);
+      if (selectedSubIds.size > 0) setSelectedSubIds(new Set());
+    }
+  };
+
+  // Cmd/Ctrl+C/X/V sobre la selección múltiple, igual que en Detalle/Top Sheet.
+  useEffect(() => {
+    const isEditable = (el: Element | null) => !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && selectedSubIds.size > 0 && !isEditable(document.activeElement)) {
+        setSelectedSubIds(new Set());
+        setSubSelectionAnchor(null);
+        return;
+      }
+      if (!(e.metaKey || e.ctrlKey) || isEditable(document.activeElement)) return;
+      const key = e.key.toLowerCase();
+      if ((key === "c" || key === "x") && selectedSubIds.size === 0) return;
+      const visible = sortByOrder(subchapters);
+      if (key === "c") {
+        e.preventDefault();
+        handleCopySubs(visible.filter((s) => selectedSubIds.has(s.id)));
+      } else if (key === "x") {
+        e.preventDefault();
+        handleCutSubs(visible.filter((s) => selectedSubIds.has(s.id)));
+      } else if (key === "v") {
+        const clip = getBudgetingClipboard<SubClipboardData[]>("subchapter");
+        if (!clip) return;
+        e.preventDefault();
+        const selectedVisible = visible.filter((s) => selectedSubIds.has(s.id));
+        const anchorId = selectedVisible.length > 0 ? selectedVisible[selectedVisible.length - 1].id : (visible.length > 0 ? visible[visible.length - 1].id : null);
+        handlePasteSubs(anchorId);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSubIds, subchapters]);
+
+  // Clic derecho sobre una Cuenta que ya forma parte de la selección actúa
+  // sobre toda la selección; sobre una suelta, solo sobre esa.
+  const openSubMenu = (sub: BudgetingSubchapter, visible: BudgetingSubchapter[], e: React.MouseEvent) => {
+    e.preventDefault();
+    const targetSubs = selectedSubIds.has(sub.id) && selectedSubIds.size > 1
+      ? visible.filter((s) => selectedSubIds.has(s.id))
+      : [sub];
+    const canPaste = !!getBudgetingClipboard<SubClipboardData[]>("subchapter");
+    setSubMenu({
+      x: e.clientX, y: e.clientY, rowId: sub.id,
+      style: (targetSubs.length === 1 && (sub.isTextLine || sub.isSubtotal)) ? {
+        bold: !!sub.textBold, color: sub.textColor || DEFAULT_TEXT_LINE_COLOR,
+        onChangeBold: (v) => handleCommitTextSub(sub, { textBold: v }),
+        onChangeColor: (c) => handleCommitTextSub(sub, { textColor: c }),
+      } : undefined,
+      onDelete: () => setDeleteTarget({ subchapterId: sub.id, label: sub.description }),
+      onCopy: () => handleCopySubs(targetSubs),
+      onCut: () => handleCutSubs(targetSubs),
+      onPaste: canPaste ? () => handlePasteSubs(sub.id) : undefined,
+    });
+  };
+
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
     setSaving(true);
@@ -367,7 +547,8 @@ export default function BudgetingChapterPage() {
                   className="px-3 py-3 text-[10px] text-slate-300 italic select-none"
                   onContextMenu={(e) => {
                     e.preventDefault();
-                    setSubMenu({ x: e.clientX, y: e.clientY, rowId: null });
+                    const canPaste = !!getBudgetingClipboard<SubClipboardData[]>("subchapter");
+                    setSubMenu({ x: e.clientX, y: e.clientY, rowId: null, onPaste: canPaste ? () => handlePasteSubs(null) : undefined });
                   }}
                 >
                   Clic derecho para añadir una línea
@@ -386,22 +567,13 @@ export default function BudgetingChapterPage() {
                 isFirst={i === 0}
                 isLast={i === sorted.length - 1}
                 autoFocus={sub.id === justAddedId}
+                selected={selectedSubIds.has(sub.id)}
+                onRowMouseDown={(e) => handleSubMouseDown(sub, sorted, e)}
                 onCommit={(code, description) => handleCommitSub(sub, code, description)}
                 onCommitTextLine={(patch) => handleCommitTextSub(sub, patch)}
                 onMove={(direction) => handleMoveSub(sub, direction)}
                 onDelete={() => setDeleteTarget({ subchapterId: sub.id, label: sub.description })}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setSubMenu({
-                    x: e.clientX, y: e.clientY, rowId: sub.id,
-                    style: (sub.isTextLine || sub.isSubtotal) ? {
-                      bold: !!sub.textBold, color: sub.textColor || DEFAULT_TEXT_LINE_COLOR,
-                      onChangeBold: (v) => handleCommitTextSub(sub, { textBold: v }),
-                      onChangeColor: (c) => handleCommitTextSub(sub, { textColor: c }),
-                    } : undefined,
-                    onDelete: () => setDeleteTarget({ subchapterId: sub.id, label: sub.description }),
-                  });
-                }}
+                onContextMenu={(e) => openSubMenu(sub, sorted, e)}
               />
             ));
           })()}

@@ -22,7 +22,7 @@ import {
 import { useUser } from "@/contexts/UserContext";
 import {
   BTN_LIGHT, BTN_LIGHT_ACTIVE, BudgetingDraft, BudgetingCategoryDef, BudgetingAccount, BudgetingSubchapter, BudgetingDetailLine, BudgetingExportConfig, BudgetingFolder, BudgetingFringe, BudgetingFringeVisibility, BudgetingProjectInfo, FringeGroupTarget,
-  CELL_INPUT, DEFAULT_EXPORT_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, DEFAULT_UNITS, PDF_FONT_SIZE_LABELS, PdfFontSize, categoriesEnabled, computeLineTotalForScenario, computeReorder, effectiveLineUnits, groupFringeSumsByFolder, orderAfter, resolveCategories, resolveGlobals, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
+  CELL_INPUT, DEFAULT_EXPORT_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, DEFAULT_UNITS, PDF_FONT_SIZE_LABELS, PdfFontSize, categoriesEnabled, clearBudgetingClipboard, computeLineTotalForScenario, computeReorder, effectiveLineUnits, getBudgetingClipboard, groupFringeSumsByFolder, orderAfter, resolveCategories, resolveGlobals, setBudgetingClipboard, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import { buildFwbFromDraft, downloadFwb } from "@/lib/budgetingExport";
 import { downloadBudgetExcel, downloadBudgetPdf } from "@/lib/budgetingReports";
@@ -37,16 +37,32 @@ type DeleteTarget = { chapterId: string; label: string };
 type EligibleProject = { id: string; name: string };
 const cols = "grid-cols-[26px_100px_1fr_100px_58px]";
 
+/** Todo lo que hace falta para recrear un Capítulo entero al copiarlo/cortarlo: sus Cuentas y las líneas de Detalle de cada una. */
+interface ChapterLineClipboardData {
+  code: string; description: string; units: number; unitsExpr: string | null; unit: string;
+  multiplier: number; multiplierExpr: string | null; rate: number; rateExpr: string | null; total: number;
+  notes: string; tags: string[]; fringeIds: string[];
+  isTextLine: boolean; isSubtotal: boolean; textBold: boolean; textColor: string | null;
+}
+interface ChapterSubClipboardData {
+  code: string; description: string; isTextLine: boolean; isSubtotal: boolean; textBold: boolean; textColor: string | null;
+  lines: ChapterLineClipboardData[];
+}
+interface ChapterClipboardData {
+  code: string; description: string; isTextLine: boolean; isSubtotal: boolean; textBold: boolean; textColor: string | null;
+  subchapters: ChapterSubClipboardData[];
+}
+
 // ─── Fila de capítulo, siempre editable in situ (MMB-style): sin caja, sin
 // placeholder, guarda sola al perder el foco. Componentes de módulo
 // estables: no se redefinen entre renders, así los inputs no pierden el foco. ──
 function ChapterRow({
-  chapter, draftId, fmt, total, subtotalValue, isFirst, isLast, autoFocus, onCommit, onCommitTextLine, onMove, onDelete, onContextMenu,
+  chapter, draftId, fmt, total, subtotalValue, isFirst, isLast, autoFocus, selected, onCommit, onCommitTextLine, onMove, onDelete, onContextMenu, onRowMouseDown,
 }: {
-  chapter: BudgetingAccount; draftId: string; fmt: (n: number) => string; total: number; subtotalValue?: number; isFirst: boolean; isLast: boolean; autoFocus?: boolean;
+  chapter: BudgetingAccount; draftId: string; fmt: (n: number) => string; total: number; subtotalValue?: number; isFirst: boolean; isLast: boolean; autoFocus?: boolean; selected?: boolean;
   onCommit: (code: string, description: string) => void;
   onCommitTextLine: (patch: { description?: string; textBold?: boolean; textColor?: string }) => void;
-  onMove: (direction: "up" | "down") => void; onDelete: () => void; onContextMenu: (e: React.MouseEvent) => void;
+  onMove: (direction: "up" | "down") => void; onDelete: () => void; onContextMenu: (e: React.MouseEvent) => void; onRowMouseDown: (e: React.MouseEvent) => void;
 }) {
   const [code, setCode] = useState(chapter.code);
   const [description, setDescription] = useState(chapter.description);
@@ -72,7 +88,7 @@ function ChapterRow({
       if (e.key === "Escape") setDescription(chapter.description);
     };
     return (
-      <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group`} onContextMenu={onContextMenu}>
+      <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#C2652F]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
         <span />
         <input
           autoFocus={autoFocus}
@@ -151,6 +167,12 @@ export default function BudgetingTopPage() {
   // compartido no la conoce, solo hace falta para saber dónde insertar.
   const [chapterMenu, setChapterMenu] = useState<BudgetingRowContextMenuState | null>(null);
   const [chapterMenuCategory, setChapterMenuCategory] = useState<string | null>(null);
+  // Selección múltiple de Capítulos (mismo patrón que en Detalle): shift =
+  // rango desde la última ancla, cmd/ctrl = suelta una a una. La ancla
+  // guarda también la categoría, porque el rango solo tiene sentido dentro
+  // de la lista de esa categoría (o la lista plana si no hay categorías).
+  const [selectedChapterIds, setSelectedChapterIds] = useState<Set<string>>(new Set());
+  const [chapterSelectionAnchor, setChapterSelectionAnchor] = useState<{ id: string; category: string | null } | null>(null);
 
   // Enviar a proyecto
   const [showSendModal, setShowSendModal] = useState(false);
@@ -558,6 +580,191 @@ export default function BudgetingTopPage() {
     await touchDraft();
   };
 
+  // ── Copiar/cortar/pegar uno o varios Capítulos enteros, con sus Cuentas y
+  // líneas de Detalle (mismo árbol que handleDuplicateDraft, incluida la
+  // simplificación de no preservar `routedTo` entre líneas al copiar).
+  // Portapapeles compartido con Detalle: mismo mecanismo, "kind" distinto. ──
+  const chapterToClipboardData = (chapter: BudgetingAccount): ChapterClipboardData => ({
+    code: chapter.code, description: chapter.description,
+    isTextLine: chapter.isTextLine || false, isSubtotal: chapter.isSubtotal || false,
+    textBold: chapter.textBold || false, textColor: chapter.textColor || null,
+    subchapters: (subchaptersByChapter[chapter.id] || []).map((sub) => ({
+      code: sub.code, description: sub.description,
+      isTextLine: sub.isTextLine || false, isSubtotal: sub.isSubtotal || false,
+      textBold: sub.textBold || false, textColor: sub.textColor || null,
+      lines: (linesBySubchapter[sub.id] || []).map((line) => ({
+        code: line.code, description: line.description, units: line.units, unitsExpr: line.unitsExpr ?? null, unit: line.unit || "",
+        multiplier: line.multiplier, multiplierExpr: line.multiplierExpr ?? null, rate: line.rate, rateExpr: line.rateExpr ?? null, total: line.total,
+        notes: line.notes || "", tags: line.tags || [], fringeIds: line.fringeIds || [],
+        isTextLine: line.isTextLine || false, isSubtotal: line.isSubtotal || false, textBold: line.textBold || false, textColor: line.textColor || null,
+      })),
+    })),
+  });
+
+  const handleCopyChapters = (list: BudgetingAccount[]) => {
+    if (list.length === 0) return;
+    setBudgetingClipboard<ChapterClipboardData[]>({ kind: "chapter", mode: "copy", data: list.map(chapterToClipboardData) });
+  };
+
+  const handleCutChapters = async (list: BudgetingAccount[]) => {
+    if (list.length === 0) return;
+    setBudgetingClipboard<ChapterClipboardData[]>({ kind: "chapter", mode: "cut", data: list.map(chapterToClipboardData) });
+    setSaving(true);
+    try {
+      for (const chapter of list) {
+        const subs = subchaptersByChapter[chapter.id] || [];
+        for (const sub of subs) {
+          const lines = linesBySubchapter[sub.id] || [];
+          await Promise.all(lines.map((l) => deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${chapter.id}/subchapters/${sub.id}/detailLines`, l.id))));
+          await deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${chapter.id}/subchapters`, sub.id));
+        }
+        await deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts`, chapter.id));
+      }
+      await touchDraft();
+      setSelectedChapterIds(new Set());
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** Pega todos los Capítulos del portapapeles, con sus Cuentas y líneas, justo debajo de `afterId` (o al principio si es null), dentro de `category`. */
+  const handlePasteChapters = async (afterId: string | null, category: string | null) => {
+    const clip = getBudgetingClipboard<ChapterClipboardData[]>("chapter");
+    if (!clip || clip.data.length === 0) return;
+    setSaving(true);
+    try {
+      const cursor: { id: string; order?: number; createdAt?: Timestamp | null }[] =
+        sortByOrder(chaptersByCategory(category)).map((c) => ({ id: c.id, order: c.order, createdAt: c.createdAt }));
+      let anchorId = afterId;
+      let firstNewId: string | null = null;
+      for (const src of clip.data) {
+        const order = orderAfter(cursor, anchorId);
+        const chapterRef = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts`), {
+          code: src.code, description: src.description, category, order, createdAt: Timestamp.now(),
+          isTextLine: src.isTextLine, isSubtotal: src.isSubtotal, textBold: src.textBold, textColor: src.textColor,
+        });
+        for (const sub of src.subchapters) {
+          const subRef = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${chapterRef.id}/subchapters`), {
+            code: sub.code, description: sub.description, createdAt: Timestamp.now(),
+            isTextLine: sub.isTextLine, isSubtotal: sub.isSubtotal, textBold: sub.textBold, textColor: sub.textColor,
+          });
+          for (const line of sub.lines) {
+            await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${chapterRef.id}/subchapters/${subRef.id}/detailLines`), {
+              code: line.code, description: line.description, units: line.units, unitsExpr: line.unitsExpr, unit: line.unit,
+              multiplier: line.multiplier, multiplierExpr: line.multiplierExpr, rate: line.rate, rateExpr: line.rateExpr, total: line.total,
+              notes: line.notes, tags: line.tags, fringeIds: line.fringeIds,
+              isTextLine: line.isTextLine, isSubtotal: line.isSubtotal, textBold: line.textBold, textColor: line.textColor,
+              createdAt: Timestamp.now(),
+            });
+          }
+        }
+        cursor.splice(cursor.findIndex((c) => c.id === anchorId) + 1, 0, { id: chapterRef.id, order });
+        anchorId = chapterRef.id;
+        if (!firstNewId) firstNewId = chapterRef.id;
+      }
+      await touchDraft();
+      if (firstNewId) setJustAddedId(firstNewId);
+      setSelectedChapterIds(new Set());
+      if (clip.mode === "cut") clearBudgetingClipboard();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Selección múltiple sobre las filas visibles de una categoría (o la
+  // lista plana): shift extiende el rango desde la última ancla, cmd/ctrl
+  // suelta una a una, clic normal la limpia sin robar el foco. ─────────────
+  const handleChapterMouseDown = (chapter: BudgetingAccount, category: string | null, visible: BudgetingAccount[], e: React.MouseEvent) => {
+    // Solo el botón izquierdo: el derecho también dispara mousedown antes del
+    // contextmenu, y si no se ignora aquí, el clic derecho para copiar/cortar
+    // varios capítulos los deseleccionaba justo antes de abrir el menú.
+    if (e.button !== 0) return;
+    if (e.shiftKey) {
+      e.preventDefault();
+      (document.activeElement as HTMLElement | null)?.blur();
+      const anchor = chapterSelectionAnchor && chapterSelectionAnchor.category === category ? chapterSelectionAnchor.id : chapter.id;
+      const anchorIdx = visible.findIndex((c) => c.id === anchor);
+      const clickedIdx = visible.findIndex((c) => c.id === chapter.id);
+      if (anchorIdx < 0 || clickedIdx < 0) { setSelectedChapterIds(new Set([chapter.id])); setChapterSelectionAnchor({ id: chapter.id, category }); return; }
+      const [from, to] = anchorIdx < clickedIdx ? [anchorIdx, clickedIdx] : [clickedIdx, anchorIdx];
+      setSelectedChapterIds(new Set(visible.slice(from, to + 1).map((c) => c.id)));
+    } else if (e.metaKey || e.ctrlKey) {
+      e.preventDefault();
+      (document.activeElement as HTMLElement | null)?.blur();
+      setSelectedChapterIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(chapter.id)) next.delete(chapter.id); else next.add(chapter.id);
+        return next;
+      });
+      setChapterSelectionAnchor({ id: chapter.id, category });
+    } else {
+      // Clic normal: no roba el foco, pero recuerda esta fila como
+      // referencia para un Shift+clic posterior ("de la primera a la
+      // última" empezando con un clic normal en la primera).
+      setChapterSelectionAnchor({ id: chapter.id, category });
+      if (selectedChapterIds.size > 0) setSelectedChapterIds(new Set());
+    }
+  };
+
+  // Cmd/Ctrl+C/X/V sobre la selección múltiple, igual que en Detalle: se
+  // ignora si el foco está en un input/textarea.
+  useEffect(() => {
+    const isEditable = (el: Element | null) => !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && selectedChapterIds.size > 0 && !isEditable(document.activeElement)) {
+        setSelectedChapterIds(new Set());
+        setChapterSelectionAnchor(null);
+        return;
+      }
+      if (!(e.metaKey || e.ctrlKey) || isEditable(document.activeElement)) return;
+      const key = e.key.toLowerCase();
+      if ((key === "c" || key === "x") && selectedChapterIds.size === 0) return;
+      const category = chapterSelectionAnchor?.category ?? null;
+      const visible = chaptersByCategory(category);
+      if (key === "c") {
+        e.preventDefault();
+        handleCopyChapters(visible.filter((c) => selectedChapterIds.has(c.id)));
+      } else if (key === "x") {
+        e.preventDefault();
+        handleCutChapters(visible.filter((c) => selectedChapterIds.has(c.id)));
+      } else if (key === "v") {
+        const clip = getBudgetingClipboard<ChapterClipboardData[]>("chapter");
+        if (!clip) return;
+        e.preventDefault();
+        const selectedVisible = visible.filter((c) => selectedChapterIds.has(c.id));
+        const anchorId = selectedVisible.length > 0 ? selectedVisible[selectedVisible.length - 1].id : (visible.length > 0 ? visible[visible.length - 1].id : null);
+        handlePasteChapters(anchorId, category);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChapterIds, chapterSelectionAnchor, chapters]);
+
+  // Clic derecho sobre un capítulo que ya forma parte de la selección actúa
+  // sobre toda la selección; sobre uno suelto, solo sobre ese (igual que en
+  // Detalle/Finder/Sheets). Compartido por la vista categorizada y la plana.
+  const openChapterMenu = (chapter: BudgetingAccount, category: string | null, visible: BudgetingAccount[], e: React.MouseEvent) => {
+    e.preventDefault();
+    setChapterMenuCategory(category);
+    const targetChapters = selectedChapterIds.has(chapter.id) && selectedChapterIds.size > 1
+      ? visible.filter((c) => selectedChapterIds.has(c.id))
+      : [chapter];
+    const canPaste = !!getBudgetingClipboard<ChapterClipboardData[]>("chapter");
+    setChapterMenu({
+      x: e.clientX, y: e.clientY, rowId: chapter.id,
+      style: (targetChapters.length === 1 && (chapter.isTextLine || chapter.isSubtotal)) ? {
+        bold: !!chapter.textBold, color: chapter.textColor || DEFAULT_TEXT_LINE_COLOR,
+        onChangeBold: (v) => handleCommitTextChapter(chapter, { textBold: v }),
+        onChangeColor: (c) => handleCommitTextChapter(chapter, { textColor: c }),
+      } : undefined,
+      onDelete: () => setDeleteTarget({ chapterId: chapter.id, label: chapter.description }),
+      onCopy: () => handleCopyChapters(targetChapters),
+      onCut: () => handleCutChapters(targetChapters),
+      onPaste: canPaste ? () => handlePasteChapters(chapter.id, category) : undefined,
+    });
+  };
+
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
     setSaving(true);
@@ -877,23 +1084,13 @@ export default function BudgetingTopPage() {
                         isFirst={i === 0}
                         isLast={i === catChapters.length - 1}
                         autoFocus={chapter.id === justAddedId}
+                        selected={selectedChapterIds.has(chapter.id)}
                         onCommit={(code, description) => handleCommitChapter(chapter, code, description)}
                         onCommitTextLine={(patch) => handleCommitTextChapter(chapter, patch)}
                         onMove={(direction) => handleMoveChapter(chapter, direction)}
                         onDelete={() => setDeleteTarget({ chapterId: chapter.id, label: chapter.description })}
-                        onContextMenu={(e) => {
-                          e.preventDefault();
-                          setChapterMenuCategory(cat.id);
-                          setChapterMenu({
-                            x: e.clientX, y: e.clientY, rowId: chapter.id,
-                            style: (chapter.isTextLine || chapter.isSubtotal) ? {
-                              bold: !!chapter.textBold, color: chapter.textColor || DEFAULT_TEXT_LINE_COLOR,
-                              onChangeBold: (v) => handleCommitTextChapter(chapter, { textBold: v }),
-                              onChangeColor: (c) => handleCommitTextChapter(chapter, { textColor: c }),
-                            } : undefined,
-                            onDelete: () => setDeleteTarget({ chapterId: chapter.id, label: chapter.description }),
-                          });
-                        }}
+                        onContextMenu={(e) => openChapterMenu(chapter, cat.id, catChapters, e)}
+                        onRowMouseDown={(e) => handleChapterMouseDown(chapter, cat.id, catChapters, e)}
                       />
                     ))}
                     {catChapters.length === 0 && (
@@ -902,7 +1099,7 @@ export default function BudgetingTopPage() {
                         onContextMenu={(e) => {
                           e.preventDefault();
                           setChapterMenuCategory(cat.id);
-                          setChapterMenu({ x: e.clientX, y: e.clientY, rowId: null });
+                          setChapterMenu({ x: e.clientX, y: e.clientY, rowId: null, onPaste: getBudgetingClipboard<ChapterClipboardData[]>("chapter") ? () => handlePasteChapters(null, cat.id) : undefined });
                         }}
                       >
                         Clic derecho para añadir una línea
@@ -954,7 +1151,7 @@ export default function BudgetingTopPage() {
                       onContextMenu={(e) => {
                         e.preventDefault();
                         setChapterMenuCategory(null);
-                        setChapterMenu({ x: e.clientX, y: e.clientY, rowId: null });
+                        setChapterMenu({ x: e.clientX, y: e.clientY, rowId: null, onPaste: getBudgetingClipboard<ChapterClipboardData[]>("chapter") ? () => handlePasteChapters(null, null) : undefined });
                       }}
                     >
                       Clic derecho para añadir una línea
@@ -972,23 +1169,13 @@ export default function BudgetingTopPage() {
                     isFirst={i === 0}
                     isLast={i === flatSorted.length - 1}
                     autoFocus={chapter.id === justAddedId}
+                    selected={selectedChapterIds.has(chapter.id)}
                     onCommit={(code, description) => handleCommitChapter(chapter, code, description)}
                     onCommitTextLine={(patch) => handleCommitTextChapter(chapter, patch)}
                     onMove={(direction) => handleMoveChapter(chapter, direction)}
                     onDelete={() => setDeleteTarget({ chapterId: chapter.id, label: chapter.description })}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setChapterMenuCategory(null);
-                      setChapterMenu({
-                        x: e.clientX, y: e.clientY, rowId: chapter.id,
-                        style: (chapter.isTextLine || chapter.isSubtotal) ? {
-                          bold: !!chapter.textBold, color: chapter.textColor || DEFAULT_TEXT_LINE_COLOR,
-                          onChangeBold: (v) => handleCommitTextChapter(chapter, { textBold: v }),
-                          onChangeColor: (c) => handleCommitTextChapter(chapter, { textColor: c }),
-                        } : undefined,
-                        onDelete: () => setDeleteTarget({ chapterId: chapter.id, label: chapter.description }),
-                      });
-                    }}
+                    onContextMenu={(e) => openChapterMenu(chapter, null, flatSorted, e)}
+                    onRowMouseDown={(e) => handleChapterMouseDown(chapter, null, flatSorted, e)}
                   />
                 ));
               })()}

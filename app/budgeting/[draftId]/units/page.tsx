@@ -9,7 +9,7 @@ import { db } from "@/lib/firebase";
 import { doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { Pencil, Plus, Ruler, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
@@ -126,18 +126,6 @@ export default function BudgetingUnitsPage() {
 
   return (
     <div className="w-full px-10 py-8 max-w-2xl space-y-6">
-      <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#C2652F1a" }}>
-          <Ruler size={15} style={{ color: "#C2652F" }} />
-        </div>
-        <div>
-          <h1 className="text-sm font-semibold" style={{ color: "#1D201F" }}>Unidades</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Las opciones del campo "Unidad" de cada línea de Detalle. Si la Cantidad es 1 se muestra el singular; si es más de 1, el plural.
-          </p>
-        </div>
-      </div>
-
       <div className="border border-slate-200 rounded-2xl overflow-hidden">
         {units.length === 0 ? (
           <p className="text-xs text-slate-400 text-center py-8">Sin unidades todavía</p>

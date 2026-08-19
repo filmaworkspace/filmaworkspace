@@ -846,26 +846,36 @@ export default function BudgetingSubchapterPage() {
   // mousedown es lo que evita que el clic con modificador enfoque el input
   // de la fila en vez de seleccionarla. ──────────────────────────────────
   const handleRowMouseDown = (line: BudgetingDetailLine, visible: BudgetingDetailLine[], e: React.MouseEvent) => {
+    // Solo el botón izquierdo: el derecho también dispara mousedown antes del
+    // contextmenu, y si no se ignora aquí, el clic derecho para copiar/cortar
+    // varias líneas las deseleccionaba justo antes de abrir el menú.
+    if (e.button !== 0) return;
     if (e.shiftKey) {
       e.preventDefault();
+      (document.activeElement as HTMLElement | null)?.blur();
       const anchorId = selectionAnchorId || line.id;
       const anchorIdx = visible.findIndex((l) => l.id === anchorId);
       const clickedIdx = visible.findIndex((l) => l.id === line.id);
       if (anchorIdx < 0 || clickedIdx < 0) { setSelectedLineIds(new Set([line.id])); setSelectionAnchorId(line.id); return; }
       const [from, to] = anchorIdx < clickedIdx ? [anchorIdx, clickedIdx] : [clickedIdx, anchorIdx];
       setSelectedLineIds(new Set(visible.slice(from, to + 1).map((l) => l.id)));
-      if (!selectionAnchorId) setSelectionAnchorId(line.id);
     } else if (e.metaKey || e.ctrlKey) {
       e.preventDefault();
+      (document.activeElement as HTMLElement | null)?.blur();
       setSelectedLineIds((prev) => {
         const next = new Set(prev);
         if (next.has(line.id)) next.delete(line.id); else next.add(line.id);
         return next;
       });
       setSelectionAnchorId(line.id);
-    } else if (selectedLineIds.size > 0) {
-      setSelectedLineIds(new Set());
-      setSelectionAnchorId(null);
+    } else {
+      // Clic normal: no roba el foco (no preventDefault, se puede seguir
+      // editando la celda con normalidad), pero recuerda esta fila como
+      // referencia para un Shift+clic posterior — así "de la primera a la
+      // última" funciona empezando con un clic normal en la primera, sin
+      // tener que mantener pulsado Shift también en ese primer clic.
+      setSelectionAnchorId(line.id);
+      if (selectedLineIds.size > 0) setSelectedLineIds(new Set());
     }
   };
 
