@@ -8,7 +8,7 @@ import Link from "next/link";
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
 import {
-  addDoc, collection, deleteDoc, doc, increment, onSnapshot, serverTimestamp, Timestamp, updateDoc, writeBatch,
+  addDoc, collection, deleteDoc, doc, increment, onSnapshot, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch,
 } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -20,10 +20,10 @@ import {
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
-  BTN_LIGHT_ACTIVE, BudgetingAccount, BudgetingDetailColumnsConfig, BudgetingDetailLine, BudgetingDraft, BudgetingFringe, BudgetingFringeVisibility,
-  BudgetingLineRoute, BudgetingSubchapter, CELL_INPUT, DEFAULT_DETAIL_COLUMNS_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, DETAIL_STAT_COLUMN_PX, DetailStatColumnWidth,
-  UNIT_SUGGESTIONS, clearBudgetingClipboard, computeFringeExtras, computeLineTotal, computeReorder, evaluateFieldExpr,
-  fmtCurrency, fmtDecimal, getBudgetingClipboard, isPlainNumber, lineFringeBreakdown, nextOrderValue, orderAfter, resolveGlobals, setBudgetingClipboard, sortByOrder, subchapterTotal,
+  BTN_LIGHT_ACTIVE, BudgetingAccount, BudgetingDetailColumnsConfig, BudgetingDetailLine, BudgetingDraft, BudgetingFolder, BudgetingFringe, BudgetingFringeVisibility,
+  BudgetingLineRoute, BudgetingSubchapter, CELL_INPUT, DEFAULT_DETAIL_COLUMNS_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, DETAIL_STAT_COLUMN_PX, DetailStatColumnWidth, FringeGroupTarget,
+  BudgetingUnit, DEFAULT_UNITS, clearBudgetingClipboard, computeFringeExtras, computeLineTotal, computeReorder, evaluateFieldExpr,
+  fmtCurrency, fmtDecimal, getBudgetingClipboard, groupFringeSumsByFolder, isPlainNumber, lineFringeBreakdown, nextOrderValue, orderAfter, pluralizeUnit, resolveGlobals, setBudgetingClipboard, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import BudgetingFormulaInput from "@/components/BudgetingFormulaInput";
 import BudgetingRowContextMenu, { BudgetingRowContextMenuState } from "@/components/BudgetingRowContextMenu";
@@ -76,21 +76,21 @@ interface LineClipboardData {
 // Cant./Unidad/X/Tarifa en blanco), con su código y nombre editables, pero
 // el importe es de solo lectura porque sale calculado de las líneas. ───────
 function SubchapterFringeRow({
-  fringe, amount, draftId, template, columnsConfig, onCommit,
+  code: initialCode, label: initialLabel, amount, target, draftId, template, columnsConfig, onCommit,
 }: {
-  fringe: BudgetingFringe; amount: number; draftId: string; template: string; columnsConfig: BudgetingDetailColumnsConfig;
-  onCommit: (code: string, label: string) => void;
+  code: string; label: string; amount: number; target: FringeGroupTarget; draftId: string; template: string; columnsConfig: BudgetingDetailColumnsConfig;
+  onCommit: (target: FringeGroupTarget, code: string, label: string) => void;
 }) {
-  const [code, setCode] = useState(fringe.code);
-  const [label, setLabel] = useState(fringe.label);
+  const [code, setCode] = useState(initialCode);
+  const [label, setLabel] = useState(initialLabel);
 
   const commit = () => {
-    if (!code.trim() || !label.trim()) { setCode(fringe.code); setLabel(fringe.label); return; }
-    onCommit(code.trim(), label.trim());
+    if (!code.trim() || !label.trim()) { setCode(initialCode); setLabel(initialLabel); return; }
+    onCommit(target, code.trim(), label.trim());
   };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") e.currentTarget.blur();
-    if (e.key === "Escape") { setCode(fringe.code); setLabel(fringe.label); }
+    if (e.key === "Escape") { setCode(initialCode); setLabel(initialLabel); }
   };
 
   return (
@@ -244,7 +244,7 @@ function DetailSidebar({
                     <input
                       value={routeSearch}
                       onChange={(e) => setRouteSearch(e.target.value)}
-                      placeholder="Buscar cuenta destino..."
+                      placeholder="Buscar cuenta destino"
                       className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-[#C2652F] mb-2"
                     />
                     <div className="max-h-48 overflow-y-auto space-y-0.5">
@@ -317,14 +317,14 @@ function LineFieldsGrid({
 }
 
 function LineRow({
-  line, fringes, globals, globalValues, columnsConfig, template, isFirst, isLast, autoFocus, error, sidebarOpen,
-  onCommit, onDuplicate, onDelete, onMove, onOpenSidebar, onContextMenu,
+  line, fringes, globals, globalValues, columnsConfig, template, isFirst, isLast, autoFocus, error, sidebarOpen, selected,
+  onCommit, onDuplicate, onDelete, onMove, onOpenSidebar, onContextMenu, onRowMouseDown,
 }: {
   line: BudgetingDetailLine; fringes: BudgetingFringe[];
   globals: { code: string; label: string }[]; globalValues: Record<string, number>;
-  columnsConfig: BudgetingDetailColumnsConfig; template: string; isFirst: boolean; isLast: boolean; autoFocus?: boolean; error?: string; sidebarOpen: boolean;
+  columnsConfig: BudgetingDetailColumnsConfig; template: string; isFirst: boolean; isLast: boolean; autoFocus?: boolean; error?: string; sidebarOpen: boolean; selected?: boolean;
   onCommit: (fields: LineFields) => void; onDuplicate: () => void; onDelete: () => void; onMove: (direction: "up" | "down") => void; onOpenSidebar: () => void;
-  onContextMenu: (e: React.MouseEvent) => void;
+  onContextMenu: (e: React.MouseEvent) => void; onRowMouseDown: (e: React.MouseEvent) => void;
 }) {
   const [fields, setFields] = useState<LineFields>(() => toFields(line));
   const hasFormula = !!(line.unitsExpr || line.multiplierExpr || line.rateExpr);
@@ -337,7 +337,7 @@ function LineRow({
   );
 
   return (
-    <div className="group" onContextMenu={onContextMenu}>
+    <div className={`group ${selected ? "bg-[#C2652F]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
       <LineFieldsGrid
         fields={fields}
         onChange={(patch) => setFields((f) => ({ ...f, ...patch }))}
@@ -396,11 +396,11 @@ function LineRow({
 // acciones en su columna habitual, para que la fila siga alineada con las
 // demás pese al ancho de columnas dinámico. ────────────────────────────────
 function TextLineRow({
-  line, template, columnsConfig, isFirst, isLast, subtotalValue, autoFocus, onCommitTextLine, onMove, onDelete, onContextMenu,
+  line, template, columnsConfig, isFirst, isLast, subtotalValue, autoFocus, selected, onCommitTextLine, onMove, onDelete, onContextMenu, onRowMouseDown,
 }: {
-  line: BudgetingDetailLine; template: string; columnsConfig: BudgetingDetailColumnsConfig; isFirst: boolean; isLast: boolean; subtotalValue?: number; autoFocus?: boolean;
+  line: BudgetingDetailLine; template: string; columnsConfig: BudgetingDetailColumnsConfig; isFirst: boolean; isLast: boolean; subtotalValue?: number; autoFocus?: boolean; selected?: boolean;
   onCommitTextLine: (patch: { description?: string; textBold?: boolean; textColor?: string }) => void;
-  onMove: (direction: "up" | "down") => void; onDelete: () => void; onContextMenu: (e: React.MouseEvent) => void;
+  onMove: (direction: "up" | "down") => void; onDelete: () => void; onContextMenu: (e: React.MouseEvent) => void; onRowMouseDown: (e: React.MouseEvent) => void;
 }) {
   const isSubtotal = !!line.isSubtotal;
   const [description, setDescription] = useState(line.description);
@@ -417,14 +417,14 @@ function TextLineRow({
   if (columnsConfig.showTags) actionsCol++;
 
   return (
-    <div className="grid gap-0 divide-x divide-slate-200 px-4 group" style={{ gridTemplateColumns: template }} onContextMenu={onContextMenu}>
+    <div className={`grid gap-0 divide-x divide-slate-200 px-4 group ${selected ? "bg-[#C2652F]/[0.08]" : ""}`} style={{ gridTemplateColumns: template }} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
       <input
         autoFocus={autoFocus}
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         onBlur={commit}
         onKeyDown={handleKeyDown}
-        placeholder={isSubtotal ? "Subtotal" : "Texto..."}
+        placeholder={isSubtotal ? "Subtotal" : "Texto"}
         style={{ gridColumn: isSubtotal ? "1 / 7" : "1 / 8", color: line.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: line.textBold ? 700 : 400 }}
         className={`${CELL_INPUT} text-xs`}
       />
@@ -475,6 +475,11 @@ export default function BudgetingSubchapterPage() {
   const [saving, setSaving] = useState(false);
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
   const [lineMenu, setLineMenu] = useState<BudgetingRowContextMenuState | null>(null);
+  // Selección múltiple de líneas (para copiar/cortar/pegar varias a la vez):
+  // shift = rango desde la última tocada, cmd/ctrl = suelta una a una, igual
+  // que en Finder/Sheets.
+  const [selectedLineIds, setSelectedLineIds] = useState<Set<string>>(new Set());
+  const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "budgetingDrafts", draftId), (snap) => {
@@ -539,6 +544,8 @@ export default function BudgetingSubchapterPage() {
   const currency = draft?.currency || "EUR";
   const fmt = (n: number) => fmtCurrency(n, currency);
   const fringes = draft?.fringes || [];
+  const fringeFolders: BudgetingFolder[] = draft?.fringeFolders || [];
+  const units: BudgetingUnit[] = draft?.units ?? DEFAULT_UNITS;
   const globals = draft?.globals || [];
   const globalOptions = useMemo(() => globals.map((g) => ({ code: g.code, label: g.label })), [globals]);
   const globalResolution = useMemo(() => resolveGlobals(globals), [JSON.stringify(globals)]);
@@ -549,10 +556,10 @@ export default function BudgetingSubchapterPage() {
   const fringeExtras = computeFringeExtras(lines, fringes);
   const total = subchapter ? Math.round((subchapterTotal(subchapter, lines) + fringeExtras.subchapterScoped) * 100) / 100 : 0;
 
-  // Cargas sociales con alcance de este subcapítulo: desglosadas una a una
-  // (no en un único total agregado) porque cada una puede aparecer como su
-  // propia línea, con su propio código, si el toggle "Mostrar cargas
-  // sociales" está activado.
+  // Cargas sociales con alcance de este subcapítulo: agrupadas por carpeta en
+  // una sola línea de presupuesto (ver groupFringeSumsByFolder) si el toggle
+  // "Mostrar cargas sociales" está activado; las que no tienen carpeta
+  // siguen apareciendo cada una con su propio código.
   const subchapterFringeBreakdown = (() => {
     const sums = new Map<string, number>();
     for (const line of lines) {
@@ -561,9 +568,7 @@ export default function BudgetingSubchapterPage() {
         sums.set(fringe.id, (sums.get(fringe.id) || 0) + amount);
       }
     }
-    return fringes
-      .filter((f) => sums.has(f.id))
-      .map((f) => ({ fringe: f, amount: Math.round((sums.get(f.id) || 0) * 100) / 100 }));
+    return groupFringeSumsByFolder(sums, fringes, fringeFolders);
   })();
 
   const q = search.trim().toLowerCase();
@@ -588,13 +593,22 @@ export default function BudgetingSubchapterPage() {
     await touchDraft();
   };
 
-  // El código y el nombre de una fringe se pueden editar desde su propia
-  // línea aquí (misma fringe, no una copia): actualiza la entrada en
-  // draft.fringes. El importe de la fila no se toca, sale calculado.
-  const handleCommitFringe = async (fringe: BudgetingFringe, code: string, label: string) => {
-    if (code === fringe.code && label === fringe.label) return;
-    const next = fringes.map((f) => (f.id === fringe.id ? { ...f, code, label } : f));
-    await updateDoc(doc(db, "budgetingDrafts", draftId), { fringes: next, updatedAt: serverTimestamp() });
+  // El código y el nombre de una fila de fringes se editan desde su propia
+  // línea aquí: si la fila es una carpeta (varios fringes fundidos), edita
+  // esa carpeta; si es un fringe sin carpeta, edita ese fringe. El importe
+  // de la fila no se toca, sale calculado.
+  const handleCommitFringeGroup = async (target: FringeGroupTarget, code: string, label: string) => {
+    if (target.type === "folder") {
+      const folder = fringeFolders.find((fo) => fo.id === target.folderId);
+      if (folder && code === (folder.code || "") && label === folder.label) return;
+      const next = fringeFolders.map((fo) => (fo.id === target.folderId ? { ...fo, code, label } : fo));
+      await updateDoc(doc(db, "budgetingDrafts", draftId), { fringeFolders: next, updatedAt: serverTimestamp() });
+    } else {
+      const fringe = fringes.find((f) => f.id === target.fringeId);
+      if (fringe && code === fringe.code && label === fringe.label) return;
+      const next = fringes.map((f) => (f.id === target.fringeId ? { ...f, code, label } : f));
+      await updateDoc(doc(db, "budgetingDrafts", draftId), { fringes: next, updatedAt: serverTimestamp() });
+    }
     await touchDraft();
   };
 
@@ -717,10 +731,12 @@ export default function BudgetingSubchapterPage() {
     }
   };
 
-  // ── Copiar/cortar/pegar la línea entera (código, cantidades, notas,
-  // etiquetas, fringes, redirección...) desde el menú de clic derecho.
-  // Portapapeles en sessionStorage: sobrevive a navegar a otra Cuenta, así
-  // se puede copiar aquí y pegar en el subcapítulo de al lado. ──────────────
+  // ── Copiar/cortar/pegar una o varias líneas enteras (código, cantidades,
+  // notas, etiquetas, fringes, redirección...) desde el menú de clic derecho
+  // o con Cmd/Ctrl+C/X/V sobre la selección múltiple. Portapapeles en
+  // sessionStorage como un array (aunque sea de una sola línea): sobrevive a
+  // navegar a otra Cuenta, así se puede copiar aquí y pegar en el
+  // subcapítulo de al lado. ──────────────────────────────────────────────
   const lineToClipboardData = (line: BudgetingDetailLine): LineClipboardData => ({
     code: line.code, description: line.description, units: line.units, unitsExpr: line.unitsExpr ?? null, unit: line.unit || "",
     multiplier: line.multiplier, multiplierExpr: line.multiplierExpr ?? null, rate: line.rate, rateExpr: line.rateExpr ?? null, total: line.total,
@@ -728,73 +744,165 @@ export default function BudgetingSubchapterPage() {
     isTextLine: line.isTextLine || false, isSubtotal: line.isSubtotal || false, textBold: line.textBold || false, textColor: line.textColor || null,
   });
 
-  const handleCopyLine = (line: BudgetingDetailLine) => {
-    setBudgetingClipboard<LineClipboardData>({ kind: "line", mode: "copy", data: lineToClipboardData(line) });
+  const handleCopyLines = (linesToCopy: BudgetingDetailLine[]) => {
+    if (linesToCopy.length === 0) return;
+    setBudgetingClipboard<LineClipboardData[]>({ kind: "line", mode: "copy", data: linesToCopy.map(lineToClipboardData) });
   };
 
-  const handleCutLine = async (line: BudgetingDetailLine) => {
-    setBudgetingClipboard<LineClipboardData>({ kind: "line", mode: "cut", data: lineToClipboardData(line) });
+  const handleCutLines = async (linesToCut: BudgetingDetailLine[]) => {
+    if (linesToCut.length === 0) return;
+    setBudgetingClipboard<LineClipboardData[]>({ kind: "line", mode: "cut", data: linesToCut.map(lineToClipboardData) });
     setSaving(true);
     try {
-      if (line.routedTo) {
-        const batch = writeBatch(db);
+      const batch = writeBatch(db);
+      // Varias líneas cortadas pueden redirigir ("Sumar en") a la misma
+      // Cuenta destino: se agregan los decrementos por destino para no
+      // escribir dos veces sobre el mismo documento en el mismo batch.
+      const decrements = new Map<string, number>();
+      for (const line of linesToCut) {
         batch.delete(lineRef(line.id));
-        const targetRef = doc(db, `budgetingDrafts/${draftId}/accounts/${line.routedTo.chapterId}/subchapters`, line.routedTo.subchapterId);
-        batch.update(targetRef, { receivedTotal: increment(-(line.total || 0)) });
-        await batch.commit();
-      } else {
-        await deleteDoc(lineRef(line.id));
+        if (line.routedTo) {
+          const key = `${line.routedTo.chapterId}/${line.routedTo.subchapterId}`;
+          decrements.set(key, (decrements.get(key) || 0) + (line.total || 0));
+        }
       }
+      for (const [key, amount] of decrements) {
+        const [chapterId, subId] = key.split("/");
+        batch.update(doc(db, `budgetingDrafts/${draftId}/accounts/${chapterId}/subchapters`, subId), { receivedTotal: increment(-amount) });
+      }
+      await batch.commit();
       await touchDraft();
+      setSelectedLineIds(new Set());
     } finally {
       setSaving(false);
     }
   };
 
-  /** Pega la línea del portapapeles justo debajo de `afterId` (o al principio si es null), igual que "Insertar línea". */
-  const handlePasteLine = async (afterId: string | null) => {
-    const clip = getBudgetingClipboard<LineClipboardData>("line");
-    if (!clip) return;
-    const src = clip.data;
-    // El código solo se toca si ya existe en el subcapítulo de destino (al
-    // pegar en otra Cuenta distinta no hace falta renombrarlo).
-    let code = src.code || "";
-    if (code && isLineCodeTaken(code)) {
-      let candidate = `${code}-copia`;
-      let n = 2;
-      while (isLineCodeTaken(candidate)) { candidate = `${code}-copia${n}`; n++; }
-      code = candidate;
-    }
+  /** Pega todas las líneas del portapapeles, en orden, justo debajo de `afterId` (o al principio si es null), igual que "Insertar línea". */
+  const handlePasteLines = async (afterId: string | null) => {
+    const clip = getBudgetingClipboard<LineClipboardData[]>("line");
+    if (!clip || clip.data.length === 0) return;
     setSaving(true);
     try {
-      const order = orderAfter(sortByOrder(lines), afterId);
-      const payload = {
-        code, description: src.description, units: src.units, unitsExpr: src.unitsExpr, unit: src.unit,
-        multiplier: src.multiplier, multiplierExpr: src.multiplierExpr, rate: src.rate, rateExpr: src.rateExpr, total: src.total,
-        notes: src.notes, tags: src.tags, fringeIds: src.fringeIds, routedTo: src.routedTo,
-        isTextLine: src.isTextLine, isSubtotal: src.isSubtotal, textBold: src.textBold, textColor: src.textColor,
-        order, createdAt: Timestamp.now(),
-      };
-      let newId: string;
-      if (src.routedTo) {
+      // Cursor local con solo lo que orderAfter necesita: se va actualizando
+      // según se pega cada línea, para que la siguiente se encadene justo
+      // detrás sin esperar a que Firestore refresque `lines`.
+      const cursor: { id: string; order?: number; createdAt?: Timestamp | null }[] =
+        sortByOrder(lines).map((l) => ({ id: l.id, order: l.order, createdAt: l.createdAt }));
+      const usedCodes = new Set(lines.map((l) => l.code.trim().toLowerCase()).filter(Boolean));
+      const routedIncrements = new Map<string, number>();
+      let anchorId = afterId;
+      let firstNewId: string | null = null;
+      for (const src of clip.data) {
+        // El código solo se toca si ya está en uso (por una línea existente
+        // o por otra recién pegada en esta misma pasada).
+        let code = (src.code || "").trim();
+        if (code && usedCodes.has(code.toLowerCase())) {
+          let candidate = `${code}-copia`;
+          let n = 2;
+          while (usedCodes.has(candidate.toLowerCase())) { candidate = `${code}-copia${n}`; n++; }
+          code = candidate;
+        }
+        if (code) usedCodes.add(code.toLowerCase());
+        const order = orderAfter(cursor, anchorId);
         const newRef = doc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`));
+        const payload = {
+          code, description: src.description, units: src.units, unitsExpr: src.unitsExpr, unit: src.unit,
+          multiplier: src.multiplier, multiplierExpr: src.multiplierExpr, rate: src.rate, rateExpr: src.rateExpr, total: src.total,
+          notes: src.notes, tags: src.tags, fringeIds: src.fringeIds, routedTo: src.routedTo,
+          isTextLine: src.isTextLine, isSubtotal: src.isSubtotal, textBold: src.textBold, textColor: src.textColor,
+          order, createdAt: Timestamp.now(),
+        };
+        await setDoc(newRef, payload);
+        if (src.routedTo) {
+          const key = `${src.routedTo.chapterId}/${src.routedTo.subchapterId}`;
+          routedIncrements.set(key, (routedIncrements.get(key) || 0) + (src.total || 0));
+        }
+        cursor.splice(cursor.findIndex((c) => c.id === anchorId) + 1, 0, { id: newRef.id, order });
+        anchorId = newRef.id;
+        if (!firstNewId) firstNewId = newRef.id;
+      }
+      if (routedIncrements.size > 0) {
         const batch = writeBatch(db);
-        batch.set(newRef, payload);
-        const targetRef = doc(db, `budgetingDrafts/${draftId}/accounts/${src.routedTo.chapterId}/subchapters`, src.routedTo.subchapterId);
-        batch.update(targetRef, { receivedTotal: increment(src.total || 0) });
+        for (const [key, amount] of routedIncrements) {
+          const [chapterId, subId] = key.split("/");
+          batch.update(doc(db, `budgetingDrafts/${draftId}/accounts/${chapterId}/subchapters`, subId), { receivedTotal: increment(amount) });
+        }
         await batch.commit();
-        newId = newRef.id;
-      } else {
-        const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`), payload);
-        newId = ref.id;
       }
       await touchDraft();
-      setJustAddedId(newId);
+      if (firstNewId) setJustAddedId(firstNewId);
+      setSelectedLineIds(new Set());
       if (clip.mode === "cut") clearBudgetingClipboard();
     } finally {
       setSaving(false);
     }
   };
+
+  // ── Selección múltiple sobre las filas visibles (`visible`, ya ordenadas
+  // y filtradas por el buscador): shift extiende el rango desde la última
+  // ancla, cmd/ctrl suelta una a una, un clic normal la limpia (sin robarle
+  // el foco a la celda que se está editando). preventDefault en el
+  // mousedown es lo que evita que el clic con modificador enfoque el input
+  // de la fila en vez de seleccionarla. ──────────────────────────────────
+  const handleRowMouseDown = (line: BudgetingDetailLine, visible: BudgetingDetailLine[], e: React.MouseEvent) => {
+    if (e.shiftKey) {
+      e.preventDefault();
+      const anchorId = selectionAnchorId || line.id;
+      const anchorIdx = visible.findIndex((l) => l.id === anchorId);
+      const clickedIdx = visible.findIndex((l) => l.id === line.id);
+      if (anchorIdx < 0 || clickedIdx < 0) { setSelectedLineIds(new Set([line.id])); setSelectionAnchorId(line.id); return; }
+      const [from, to] = anchorIdx < clickedIdx ? [anchorIdx, clickedIdx] : [clickedIdx, anchorIdx];
+      setSelectedLineIds(new Set(visible.slice(from, to + 1).map((l) => l.id)));
+      if (!selectionAnchorId) setSelectionAnchorId(line.id);
+    } else if (e.metaKey || e.ctrlKey) {
+      e.preventDefault();
+      setSelectedLineIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(line.id)) next.delete(line.id); else next.add(line.id);
+        return next;
+      });
+      setSelectionAnchorId(line.id);
+    } else if (selectedLineIds.size > 0) {
+      setSelectedLineIds(new Set());
+      setSelectionAnchorId(null);
+    }
+  };
+
+  // ── Cmd/Ctrl+C/X/V sobre la selección múltiple, igual que en Finder/Sheets.
+  // Se ignora por completo si el foco está en un input/textarea (para no
+  // robarle el copiar/pegar de texto normal), y Copiar/Cortar solo actúan si
+  // hay algo seleccionado; Pegar funciona igual con o sin selección activa.
+  useEffect(() => {
+    const isEditable = (el: Element | null) => !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && selectedLineIds.size > 0 && !isEditable(document.activeElement)) {
+        setSelectedLineIds(new Set());
+        setSelectionAnchorId(null);
+        return;
+      }
+      if (!(e.metaKey || e.ctrlKey) || isEditable(document.activeElement)) return;
+      const key = e.key.toLowerCase();
+      const sortedNow = sortByOrder(lines);
+      if (key === "c" && selectedLineIds.size > 0) {
+        e.preventDefault();
+        handleCopyLines(sortedNow.filter((l) => selectedLineIds.has(l.id)));
+      } else if (key === "x" && selectedLineIds.size > 0) {
+        e.preventDefault();
+        handleCutLines(sortedNow.filter((l) => selectedLineIds.has(l.id)));
+      } else if (key === "v") {
+        const clip = getBudgetingClipboard<LineClipboardData[]>("line");
+        if (!clip) return;
+        e.preventDefault();
+        const selectedVisible = sortedNow.filter((l) => selectedLineIds.has(l.id));
+        const anchorId = selectedVisible.length > 0 ? selectedVisible[selectedVisible.length - 1].id : (sortedNow.length > 0 ? sortedNow[sortedNow.length - 1].id : null);
+        handlePasteLines(anchorId);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLineIds, lines]);
 
   const handleDeleteLine = async () => {
     if (!deleteTarget) return;
@@ -948,26 +1056,32 @@ export default function BudgetingSubchapterPage() {
             </span>
           </div>
           <datalist id="unit-suggestions">
-            {UNIT_SUGGESTIONS.map((u) => <option key={u} value={u} />)}
+            {units.map((u) => <option key={u.id} value={u.singular} />)}
           </datalist>
 
           <div className="divide-y divide-slate-100">
             {(() => {
               const sorted = sortByOrder(lines.filter(matchesSearch));
-              const canPaste = !!getBudgetingClipboard<LineClipboardData>("line");
+              const canPaste = !!getBudgetingClipboard<LineClipboardData[]>("line");
+              // Clic derecho sobre una fila que ya forma parte de la
+              // selección actúa sobre toda la selección; sobre una fila
+              // suelta, actúa solo sobre esa (igual que Finder/Sheets).
               const openLineMenu = (line: BudgetingDetailLine, e: React.MouseEvent) => {
                 e.preventDefault();
+                const targetLines = selectedLineIds.has(line.id) && selectedLineIds.size > 1
+                  ? sorted.filter((l) => selectedLineIds.has(l.id))
+                  : [line];
                 setLineMenu({
                   x: e.clientX, y: e.clientY, rowId: line.id,
-                  style: (line.isTextLine || line.isSubtotal) ? {
+                  style: (targetLines.length === 1 && (line.isTextLine || line.isSubtotal)) ? {
                     bold: !!line.textBold, color: line.textColor || DEFAULT_TEXT_LINE_COLOR,
                     onChangeBold: (v) => handleCommitTextLine(line, { textBold: v }),
                     onChangeColor: (c) => handleCommitTextLine(line, { textColor: c }),
                   } : undefined,
                   onDelete: () => setDeleteTarget(line),
-                  onCopy: () => handleCopyLine(line),
-                  onCut: () => handleCutLine(line),
-                  onPaste: canPaste ? () => handlePasteLine(line.id) : undefined,
+                  onCopy: () => handleCopyLines(targetLines),
+                  onCut: () => handleCutLines(targetLines),
+                  onPaste: canPaste ? () => handlePasteLines(line.id) : undefined,
                 });
               };
               if (sorted.length === 0) {
@@ -976,7 +1090,7 @@ export default function BudgetingSubchapterPage() {
                     className="px-4 py-3 text-[10px] text-slate-300 italic select-none"
                     onContextMenu={(e) => {
                       e.preventDefault();
-                      setLineMenu({ x: e.clientX, y: e.clientY, rowId: null, onPaste: canPaste ? () => handlePasteLine(null) : undefined });
+                      setLineMenu({ x: e.clientX, y: e.clientY, rowId: null, onPaste: canPaste ? () => handlePasteLines(null) : undefined });
                     }}
                   >
                     Clic derecho para añadir una línea
@@ -992,12 +1106,14 @@ export default function BudgetingSubchapterPage() {
                     columnsConfig={columnsConfig}
                     isFirst={i === 0}
                     isLast={i === sorted.length - 1}
-                    subtotalValue={line.isSubtotal ? lineSubtotalValue(line.id) : undefined}
                     autoFocus={line.id === justAddedId}
+                    selected={selectedLineIds.has(line.id)}
+                    subtotalValue={line.isSubtotal ? lineSubtotalValue(line.id) : undefined}
                     onCommitTextLine={(patch) => handleCommitTextLine(line, patch)}
                     onMove={(direction) => handleMoveLine(line, direction)}
                     onDelete={() => setDeleteTarget(line)}
                     onContextMenu={(e) => openLineMenu(line, e)}
+                    onRowMouseDown={(e) => handleRowMouseDown(line, sorted, e)}
                   />
                 ) : (
                   <LineRow
@@ -1012,6 +1128,7 @@ export default function BudgetingSubchapterPage() {
                     isFirst={i === 0}
                     isLast={i === sorted.length - 1}
                     autoFocus={line.id === justAddedId}
+                    selected={selectedLineIds.has(line.id)}
                     sidebarOpen={sidebarOpen && sidebarLineId === line.id}
                     onCommit={(fields) => handleCommitLine(line, fields)}
                     onDuplicate={() => handleDuplicateLine(line)}
@@ -1019,6 +1136,7 @@ export default function BudgetingSubchapterPage() {
                     onMove={(direction) => handleMoveLine(line, direction)}
                     onOpenSidebar={() => openSidebar(line.id)}
                     onContextMenu={(e) => openLineMenu(line, e)}
+                    onRowMouseDown={(e) => handleRowMouseDown(line, sorted, e)}
                   />
                 )
               );
@@ -1029,15 +1147,17 @@ export default function BudgetingSubchapterPage() {
             <div className="border-t border-slate-100">
               <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide px-4 pt-2 pb-1">Cargas sociales de este subcapítulo</p>
               <div className="divide-y divide-slate-100">
-                {subchapterFringeBreakdown.map(({ fringe, amount }) => (
+                {subchapterFringeBreakdown.map((row) => (
                   <SubchapterFringeRow
-                    key={fringe.id}
-                    fringe={fringe}
-                    amount={amount}
+                    key={row.target.type === "folder" ? `folder:${row.target.folderId}` : `fringe:${row.target.fringeId}`}
+                    code={row.code}
+                    label={row.label}
+                    amount={row.amount}
+                    target={row.target}
                     draftId={draftId}
                     template={template}
                     columnsConfig={columnsConfig}
-                    onCommit={(code, label) => handleCommitFringe(fringe, code, label)}
+                    onCommit={handleCommitFringeGroup}
                   />
                 ))}
               </div>

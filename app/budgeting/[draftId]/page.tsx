@@ -21,8 +21,8 @@ import {
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
-  BTN_LIGHT, BTN_LIGHT_ACTIVE, BudgetingDraft, BudgetingCategoryDef, BudgetingAccount, BudgetingSubchapter, BudgetingDetailLine, BudgetingExportConfig, BudgetingFringe, BudgetingFringeVisibility, BudgetingProjectInfo,
-  CELL_INPUT, DEFAULT_EXPORT_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, PDF_FONT_SIZE_LABELS, PdfFontSize, categoriesEnabled, computeLineTotalForScenario, computeReorder, effectiveLineUnits, orderAfter, resolveCategories, resolveGlobals, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
+  BTN_LIGHT, BTN_LIGHT_ACTIVE, BudgetingDraft, BudgetingCategoryDef, BudgetingAccount, BudgetingSubchapter, BudgetingDetailLine, BudgetingExportConfig, BudgetingFolder, BudgetingFringe, BudgetingFringeVisibility, BudgetingProjectInfo, FringeGroupTarget,
+  CELL_INPUT, DEFAULT_EXPORT_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, DEFAULT_UNITS, PDF_FONT_SIZE_LABELS, PdfFontSize, categoriesEnabled, computeLineTotalForScenario, computeReorder, effectiveLineUnits, groupFringeSumsByFolder, orderAfter, resolveCategories, resolveGlobals, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import { buildFwbFromDraft, downloadFwb } from "@/lib/budgetingExport";
 import { downloadBudgetExcel, downloadBudgetPdf } from "@/lib/budgetingReports";
@@ -80,7 +80,7 @@ function ChapterRow({
           onChange={(e) => setDescription(e.target.value)}
           onBlur={commitText}
           onKeyDown={handleTextKeyDown}
-          placeholder={isSubtotal ? "Subtotal" : "Texto..."}
+          placeholder={isSubtotal ? "Subtotal" : "Texto"}
           style={{ gridColumn: isSubtotal ? "2 / 4" : "2 / 5", color: chapter.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: chapter.textBold ? 700 : 400 }}
           className={`${CELL_INPUT} text-xs pl-2`}
         />
@@ -232,6 +232,7 @@ export default function BudgetingTopPage() {
   const catEnabled = categoriesEnabled(draft);
   const cats: BudgetingCategoryDef[] = catEnabled ? resolveCategories(draft) : [];
   const fringes: BudgetingFringe[] = draft?.fringes || [];
+  const fringeFolders: BudgetingFolder[] = draft?.fringeFolders || [];
   const fringeVisibility: BudgetingFringeVisibility = draft?.fringeVisibility || DEFAULT_FRINGE_VISIBILITY;
   const scenarios = draft?.scenarios || [];
 
@@ -277,9 +278,9 @@ export default function BudgetingTopPage() {
     }
     return sum;
   };
-  // Cargas sociales con alcance de todo el presupuesto: desglosadas una a una
-  // (no en un único total agregado) porque cada una aparece como su propia
-  // línea, con su propio código, en el Top Sheet.
+  // Cargas sociales con alcance de todo el presupuesto: agrupadas por
+  // carpeta en una sola línea de presupuesto (ver groupFringeSumsByFolder);
+  // las que no tienen carpeta siguen apareciendo cada una con su propio código.
   const topFringeBreakdown = (() => {
     const sums = new Map<string, number>();
     for (const sub of allSubchapters) {
@@ -291,9 +292,7 @@ export default function BudgetingTopPage() {
         }
       }
     }
-    return fringes
-      .filter((f) => sums.has(f.id))
-      .map((f) => ({ fringe: f, amount: Math.round((sums.get(f.id) || 0) * 100) / 100 }));
+    return groupFringeSumsByFolder(sums, fringes, fringeFolders);
   })();
 
   const chaptersByCategory = (categoryId: string | null) => sortByOrder(chapters.filter((c) => c.category === categoryId));
@@ -321,13 +320,22 @@ export default function BudgetingTopPage() {
     ]);
   };
 
-  // El código y el nombre de una fringe se pueden editar desde su propia
-  // línea en el Top Sheet (misma fringe, no una copia): actualiza la entrada
-  // en draft.fringes. El importe de la fila no se toca aquí, sale calculado.
-  const handleCommitFringe = async (fringe: BudgetingFringe, code: string, label: string) => {
-    if (code === fringe.code && label === fringe.label) return;
-    const next = fringes.map((f) => (f.id === fringe.id ? { ...f, code, label } : f));
-    await updateDoc(doc(db, "budgetingDrafts", draftId), { fringes: next, updatedAt: serverTimestamp() });
+  // El código y el nombre de una fila de fringes se editan desde su propia
+  // línea en el Top Sheet: si la fila es una carpeta (varios fringes
+  // fundidos), edita esa carpeta; si es un fringe sin carpeta, edita ese
+  // fringe. El importe de la fila no se toca aquí, sale calculado.
+  const handleCommitFringeGroup = async (target: FringeGroupTarget, code: string, label: string) => {
+    if (target.type === "folder") {
+      const folder = fringeFolders.find((fo) => fo.id === target.folderId);
+      if (folder && code === (folder.code || "") && label === folder.label) return;
+      const next = fringeFolders.map((fo) => (fo.id === target.folderId ? { ...fo, code, label } : fo));
+      await updateDoc(doc(db, "budgetingDrafts", draftId), { fringeFolders: next, updatedAt: serverTimestamp() });
+    } else {
+      const fringe = fringes.find((f) => f.id === target.fringeId);
+      if (fringe && code === fringe.code && label === fringe.label) return;
+      const next = fringes.map((f) => (f.id === target.fringeId ? { ...f, code, label } : f));
+      await updateDoc(doc(db, "budgetingDrafts", draftId), { fringes: next, updatedAt: serverTimestamp() });
+    }
     await touchDraft();
   };
 
@@ -414,6 +422,8 @@ export default function BudgetingTopPage() {
         isTextLine: l.isTextLine || false, isSubtotal: l.isSubtotal || false, textBold: l.textBold || false, textColor: l.textColor || null,
       }))])),
     fringes,
+    fringeFolders,
+    units: draft?.units ?? DEFAULT_UNITS,
     projectInfo: draft?.projectInfo,
     grandTotal,
     exportConfig: draft?.exportConfig,
@@ -907,16 +917,18 @@ export default function BudgetingTopPage() {
               <div className="border-t border-slate-200">
                 <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide px-4 pt-2 pb-1">Cargas sociales de todo el presupuesto</p>
                 <div className="divide-y divide-slate-100">
-                  {topFringeBreakdown.map(({ fringe, amount }) => (
+                  {topFringeBreakdown.map((row) => (
                     <BudgetingFringeLineRow
-                      key={fringe.id}
-                      fringe={fringe}
-                      amount={amount}
+                      key={row.target.type === "folder" ? `folder:${row.target.folderId}` : `fringe:${row.target.fringeId}`}
+                      code={row.code}
+                      label={row.label}
+                      amount={row.amount}
+                      target={row.target}
                       fmt={fmt}
                       draftId={draftId}
                       cols={cols}
                       tooltip="Carga social de todo el presupuesto"
-                      onCommit={(code, label) => handleCommitFringe(fringe, code, label)}
+                      onCommit={handleCommitFringeGroup}
                     />
                   ))}
                 </div>
@@ -985,16 +997,18 @@ export default function BudgetingTopPage() {
               <div className="border-t border-slate-200">
                 <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide px-4 pt-2 pb-1">Cargas sociales de todo el presupuesto</p>
                 <div className="divide-y divide-slate-100">
-                  {topFringeBreakdown.map(({ fringe, amount }) => (
+                  {topFringeBreakdown.map((row) => (
                     <BudgetingFringeLineRow
-                      key={fringe.id}
-                      fringe={fringe}
-                      amount={amount}
+                      key={row.target.type === "folder" ? `folder:${row.target.folderId}` : `fringe:${row.target.fringeId}`}
+                      code={row.code}
+                      label={row.label}
+                      amount={row.amount}
+                      target={row.target}
                       fmt={fmt}
                       draftId={draftId}
                       cols={cols}
                       tooltip="Carga social de todo el presupuesto"
-                      onCommit={(code, label) => handleCommitFringe(fringe, code, label)}
+                      onCommit={handleCommitFringeGroup}
                     />
                   ))}
                 </div>

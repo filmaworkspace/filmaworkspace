@@ -15,8 +15,8 @@ import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, Search, Trash2 } fro
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
-  BudgetingAccount, BudgetingDetailLine, BudgetingDraft, BudgetingFringe, BudgetingFringeVisibility, BudgetingSubchapter,
-  CELL_INPUT, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, computeReorder, fmtCurrency, orderAfter, sortByOrder, subchapterTotal,
+  BudgetingAccount, BudgetingDetailLine, BudgetingDraft, BudgetingFolder, BudgetingFringe, BudgetingFringeVisibility, BudgetingSubchapter, FringeGroupTarget,
+  CELL_INPUT, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, computeReorder, fmtCurrency, groupFringeSumsByFolder, orderAfter, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import BudgetingColumnsMenu from "@/components/BudgetingColumnsMenu";
 import BudgetingFringeLineRow from "@/components/BudgetingFringeLineRow";
@@ -70,7 +70,7 @@ function SubRow({
           onChange={(e) => setDescription(e.target.value)}
           onBlur={commitText}
           onKeyDown={handleTextKeyDown}
-          placeholder={isSubtotal ? "Subtotal" : "Texto..."}
+          placeholder={isSubtotal ? "Subtotal" : "Texto"}
           style={{ gridColumn: isSubtotal ? "2 / 4" : "2 / 5", color: sub.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: sub.textBold ? 700 : 400 }}
           className={`${CELL_INPUT} text-xs pl-2`}
         />
@@ -175,6 +175,7 @@ export default function BudgetingChapterPage() {
   const currency = draft?.currency || "EUR";
   const fmt = (n: number) => fmtCurrency(n, currency);
   const fringes = draft?.fringes || [];
+  const fringeFolders: BudgetingFolder[] = draft?.fringeFolders || [];
   const fringeVisibility: BudgetingFringeVisibility = draft?.fringeVisibility || DEFAULT_FRINGE_VISIBILITY;
 
   const subTotal = (sub: BudgetingSubchapter) => {
@@ -185,9 +186,10 @@ export default function BudgetingChapterPage() {
     }, 0);
     return Math.round((subchapterTotal(sub, lines) + subScoped) * 100) / 100;
   };
-  // Cargas sociales con alcance de capítulo: se desglosan una a una (no en un
-  // único total agregado) porque cada una aparece como su propia línea, con
-  // su propio código, debajo de los subcapítulos.
+  // Cargas sociales con alcance de capítulo: agrupadas por carpeta en una
+  // sola línea de presupuesto (ver groupFringeSumsByFolder), debajo de los
+  // subcapítulos; las que no tienen carpeta siguen apareciendo cada una con
+  // su propio código.
   const chapterFringeBreakdown = (() => {
     const sums = new Map<string, number>();
     for (const lines of Object.values(linesBySubchapter)) {
@@ -200,9 +202,7 @@ export default function BudgetingChapterPage() {
         }
       }
     }
-    return fringes
-      .filter((f) => sums.has(f.id))
-      .map((f) => ({ fringe: f, amount: Math.round((sums.get(f.id) || 0) * 100) / 100 }));
+    return groupFringeSumsByFolder(sums, fringes, fringeFolders);
   })();
   const chapterFringes = Math.round(chapterFringeBreakdown.reduce((s, b) => s + b.amount, 0) * 100) / 100;
   const chapterTotal = Math.round((subchapters.reduce((s, sub) => s + subTotal(sub), 0) + chapterFringes) * 100) / 100;
@@ -225,13 +225,22 @@ export default function BudgetingChapterPage() {
     await touchDraft();
   };
 
-  // El código y el nombre de una fringe se pueden editar desde aquí mismo
-  // (misma fringe, no una copia): actualiza la entrada en draft.fringes.
-  // El importe de la fila no se toca aquí, sale calculado de las líneas.
-  const handleCommitFringe = async (fringe: BudgetingFringe, code: string, label: string) => {
-    if (code === fringe.code && label === fringe.label) return;
-    const next = fringes.map((f) => (f.id === fringe.id ? { ...f, code, label } : f));
-    await updateDoc(doc(db, "budgetingDrafts", draftId), { fringes: next, updatedAt: serverTimestamp() });
+  // El código y el nombre de una fila de fringes se editan desde aquí mismo:
+  // si la fila es una carpeta (varios fringes fundidos), edita esa carpeta;
+  // si es un fringe sin carpeta, edita ese fringe. El importe de la fila no
+  // se toca aquí, sale calculado de las líneas.
+  const handleCommitFringeGroup = async (target: FringeGroupTarget, code: string, label: string) => {
+    if (target.type === "folder") {
+      const folder = fringeFolders.find((fo) => fo.id === target.folderId);
+      if (folder && code === (folder.code || "") && label === folder.label) return;
+      const next = fringeFolders.map((fo) => (fo.id === target.folderId ? { ...fo, code, label } : fo));
+      await updateDoc(doc(db, "budgetingDrafts", draftId), { fringeFolders: next, updatedAt: serverTimestamp() });
+    } else {
+      const fringe = fringes.find((f) => f.id === target.fringeId);
+      if (fringe && code === fringe.code && label === fringe.label) return;
+      const next = fringes.map((f) => (f.id === target.fringeId ? { ...f, code, label } : f));
+      await updateDoc(doc(db, "budgetingDrafts", draftId), { fringes: next, updatedAt: serverTimestamp() });
+    }
     await touchDraft();
   };
 
@@ -402,16 +411,18 @@ export default function BudgetingChapterPage() {
           <div className="border-t border-slate-200">
             <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide px-4 pt-2 pb-1">Cargas sociales de este capítulo</p>
             <div className="divide-y divide-slate-100">
-              {chapterFringeBreakdown.map(({ fringe, amount }) => (
+              {chapterFringeBreakdown.map((row) => (
                 <BudgetingFringeLineRow
-                  key={fringe.id}
-                  fringe={fringe}
-                  amount={amount}
+                  key={row.target.type === "folder" ? `folder:${row.target.folderId}` : `fringe:${row.target.fringeId}`}
+                  code={row.code}
+                  label={row.label}
+                  amount={row.amount}
+                  target={row.target}
                   fmt={fmt}
                   draftId={draftId}
                   cols={cols}
                   tooltip="Carga social de este capítulo"
-                  onCommit={(code, label) => handleCommitFringe(fringe, code, label)}
+                  onCommit={handleCommitFringeGroup}
                 />
               ))}
             </div>
