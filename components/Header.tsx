@@ -490,7 +490,7 @@ export default function Header() {
             <button
               onClick={openBudgeting}
               className="flex items-center justify-center h-8 px-2.5 rounded-lg shadow-sm hover:shadow-md hover:scale-105 transition-all"
-              style={{ background: "linear-gradient(135deg, #E2A077, #C2652F, #8B4620)" }}
+              style={{ background: "linear-gradient(135deg, #7B87B8, #414E82, #293258)" }}
               title="Budgeting"
             >
               <Image src="/logo-budgeting-white.svg" alt="Budgeting" width={26} height={8} className="h-2.5 w-auto" />
@@ -503,7 +503,7 @@ export default function Header() {
           {launchingBudgeting && (
             <div
               className="fixed inset-0 z-[100] flex items-center justify-center"
-              style={{ background: "linear-gradient(180deg, #C2652F1a, #ffffff 60%)" }}
+              style={{ background: "linear-gradient(180deg, #414E821a, #ffffff 60%)" }}
             >
               <Image
                 src="/logo-budgeting-text.svg"

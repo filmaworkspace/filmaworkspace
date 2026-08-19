@@ -85,7 +85,7 @@ export default function BudgetingDropdown({
               key={o.value}
               type="button"
               onClick={() => { onChange(o.value); setOpen(false); }}
-              className={`w-full flex items-center justify-between gap-3 px-3.5 py-2 text-sm text-left whitespace-nowrap hover:bg-slate-50 transition-colors ${o.value === value ? "font-medium text-[#C2652F]" : "text-slate-700"}`}
+              className={`w-full flex items-center justify-between gap-3 px-3.5 py-2 text-sm text-left whitespace-nowrap hover:bg-slate-50 transition-colors ${o.value === value ? "font-medium text-[#414E82]" : "text-slate-700"}`}
             >
               {o.label}
               {o.value === value && <Check size={13} className="flex-shrink-0" />}

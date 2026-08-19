@@ -17,7 +17,7 @@
 import { Timestamp } from "firebase/firestore";
 import type { FwbFile } from "./budgetingExport";
 
-export const BUDGETING_ACCENT = "#C2652F";
+export const BUDGETING_ACCENT = "#414E82";
 export const BUDGETING_TEXT = "#1D201F";
 /** Fondo tenue del acento, para chips/tints; nada de rellenos sólidos por defecto. */
 export const BUDGETING_TINT = `${BUDGETING_ACCENT}1a`;
@@ -265,7 +265,7 @@ export interface BudgetingTemplate {
  * un puñado de opciones fijas en vez de un selector de color libre, para no
  * complicar la UI. El primero es el color de texto por defecto del nivel.
  */
-export const TEXT_LINE_COLORS = ["#1D201F", "#C2652F", "#DC2626", "#059669", "#D97706", "#7C3AED"];
+export const TEXT_LINE_COLORS = ["#1D201F", "#414E82", "#DC2626", "#059669", "#D97706", "#7C3AED"];
 export const DEFAULT_TEXT_LINE_COLOR = TEXT_LINE_COLORS[0];
 
 export interface BudgetingAccount {
@@ -772,16 +772,16 @@ export function subchapterTotal(sub: { receivedTotal?: number }, lines: Budgetin
 // activo/seleccionado. Texto de énfasis en BUDGETING_TEXT, no slate-900. ────
 
 export const BTN_LIGHT =
-  "bg-white border border-slate-200 text-slate-700 hover:border-[#C2652F] hover:text-[#C2652F] hover:bg-[#C2652F]/[0.08] transition-colors";
+  "bg-white border border-slate-200 text-slate-700 hover:border-[#414E82] hover:text-[#414E82] hover:bg-[#414E82]/[0.08] transition-colors";
 
-export const BTN_LIGHT_ACTIVE = "border-[#C2652F] bg-[#C2652F]/[0.1] text-[#C2652F]";
+export const BTN_LIGHT_ACTIVE = "border-[#414E82] bg-[#414E82]/[0.1] text-[#414E82]";
 
 export const ICON_BTN_LIGHT =
-  "text-slate-400 hover:text-[#C2652F] hover:bg-[#C2652F]/[0.1] transition-colors";
+  "text-slate-400 hover:text-[#414E82] hover:bg-[#414E82]/[0.1] transition-colors";
 
 /** Input de fila (spreadsheet-like): caja real con borde, no solo una línea inferior. Para paneles secundarios (proveedor, comentario, etiquetas...), no para las columnas principales de una tabla. */
 export const ROW_INPUT =
-  "border border-slate-300 rounded-md bg-white focus:outline-none focus:border-[#C2652F] focus:ring-2 focus:ring-[#C2652F]/20 transition-colors";
+  "border border-slate-300 rounded-md bg-white focus:outline-none focus:border-[#414E82] focus:ring-2 focus:ring-[#414E82]/20 transition-colors";
 
 /**
  * Celda de tabla al estilo Excel: sin caja ni placeholder visible en reposo.
@@ -797,7 +797,7 @@ export const ROW_INPUT =
  * botón de confirmar.
  */
 export const CELL_INPUT =
-  "w-full h-full bg-transparent focus:outline-none focus:bg-slate-200/70 focus:ring-2 focus:ring-inset focus:ring-[#C2652F] px-1.5 py-2.5 transition-colors";
+  "w-full h-full bg-transparent focus:outline-none focus:bg-slate-200/70 focus:ring-2 focus:ring-inset focus:ring-[#414E82] px-1.5 py-2.5 transition-colors";
 
 // ─── Snapshots / versiones ──────────────────────────────────────────────────
 // budgetingDrafts/{draftId}/snapshots/{snapshotId}: una foto congelada del

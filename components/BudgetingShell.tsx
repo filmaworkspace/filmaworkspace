@@ -18,7 +18,7 @@ import { ArrowLeft } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 import { BudgetingDraft } from "@/lib/budgeting";
 
-const ACCENT = "#C2652F";
+const ACCENT = "#414E82";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sidebar de Budgeting: dos modos según la ruta.
@@ -105,7 +105,7 @@ export default function BudgetingShell({ children }: { children: React.ReactNode
               ) : (
                 <button
                   onClick={() => setEditingName(true)}
-                  className="text-sm font-semibold text-slate-900 hover:text-[#C2652F] transition-colors text-left truncate block w-full"
+                  className="text-sm font-semibold text-slate-900 hover:text-[#414E82] transition-colors text-left truncate block w-full"
                   title="Renombrar"
                 >
                   {draft?.name || ""}
