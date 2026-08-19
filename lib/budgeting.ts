@@ -873,7 +873,7 @@ export function diffSnapshotTrees(oldChapters: BudgetingSnapshotChapter[], newCh
 // no entre pestañas ni tras cerrar el navegador. `kind` evita pegar el
 // contenido de un nivel (línea/cuenta/capítulo) en otro que no encaja.
 
-export type BudgetingClipboardKind = "line";
+export type BudgetingClipboardKind = "chapter" | "subchapter" | "line";
 export interface BudgetingClipboardEntry<T> {
   kind: BudgetingClipboardKind;
   mode: "copy" | "cut";
