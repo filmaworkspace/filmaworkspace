@@ -25,6 +25,9 @@ import BudgetingRowContextMenu, { BudgetingRowContextMenuState } from "@/compone
 // ─────────────────────────────────────────────────────────────────────────────
 
 type DeleteTarget = { subchapterId: string; label: string };
+// Array siempre (aunque sea de una sola Cuenta), para poder borrar toda la
+// selección múltiple de una vez, igual que copiar/cortar.
+type DeleteTargets = DeleteTarget[];
 const cols = "grid-cols-[26px_100px_1fr_100px_58px]";
 
 /** Todo lo que hace falta para recrear una Cuenta entera al copiarla/cortarla: sus líneas de Detalle. */
@@ -107,7 +110,7 @@ function SubRow({
   }
 
   return (
-    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group`} onContextMenu={onContextMenu}>
+    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#C2652F]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
       <Link href={`/budgeting/${draftId}/accounts/${accountId}/subchapters/${sub.id}`} className="flex items-center justify-center" title="Entrar">
         <ChevronRight size={13} className="text-slate-300 group-hover:text-[#C2652F] group-hover:translate-x-0.5 transition-all" />
       </Link>
@@ -143,7 +146,7 @@ export default function BudgetingChapterPage() {
   const [notFound, setNotFound] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTargets | null>(null);
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
   const [subMenu, setSubMenu] = useState<BudgetingRowContextMenuState | null>(null);
   // Selección múltiple de Cuentas (mismo patrón que en Detalle/Top Sheet):
@@ -460,22 +463,33 @@ export default function BudgetingChapterPage() {
         onChangeBold: (v) => handleCommitTextSub(sub, { textBold: v }),
         onChangeColor: (c) => handleCommitTextSub(sub, { textColor: c }),
       } : undefined,
-      onDelete: () => setDeleteTarget({ subchapterId: sub.id, label: sub.description }),
+      onDelete: () => setDeleteTarget(targetSubs.map((s) => ({ subchapterId: s.id, label: s.description }))),
       onCopy: () => handleCopySubs(targetSubs),
       onCut: () => handleCutSubs(targetSubs),
       onPaste: canPaste ? () => handlePasteSubs(sub.id) : undefined,
     });
   };
 
+  // El icono de papelera de una fila: si esa fila forma parte de la
+  // selección múltiple activa, borra toda la selección; si no, solo esa.
+  const deleteTargetsFor = (sub: BudgetingSubchapter, visible: BudgetingSubchapter[]): DeleteTargets =>
+    (selectedSubIds.has(sub.id) && selectedSubIds.size > 1
+      ? visible.filter((s) => selectedSubIds.has(s.id))
+      : [sub]
+    ).map((s) => ({ subchapterId: s.id, label: s.description }));
+
   const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || deleteTarget.length === 0) return;
     setSaving(true);
     try {
-      const lines = linesBySubchapter[deleteTarget.subchapterId] || [];
-      await Promise.all(lines.map((l) => deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${deleteTarget.subchapterId}/detailLines`, l.id))));
-      await deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`, deleteTarget.subchapterId));
+      for (const target of deleteTarget) {
+        const lines = linesBySubchapter[target.subchapterId] || [];
+        await Promise.all(lines.map((l) => deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${target.subchapterId}/detailLines`, l.id))));
+        await deleteDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`, target.subchapterId));
+      }
       await touchDraft();
       setDeleteTarget(null);
+      setSelectedSubIds(new Set());
     } finally {
       setSaving(false);
     }
@@ -572,7 +586,7 @@ export default function BudgetingChapterPage() {
                 onCommit={(code, description) => handleCommitSub(sub, code, description)}
                 onCommitTextLine={(patch) => handleCommitTextSub(sub, patch)}
                 onMove={(direction) => handleMoveSub(sub, direction)}
-                onDelete={() => setDeleteTarget({ subchapterId: sub.id, label: sub.description })}
+                onDelete={() => setDeleteTarget(deleteTargetsFor(sub, sorted))}
                 onContextMenu={(e) => openSubMenu(sub, sorted, e)}
               />
             ));
@@ -624,7 +638,9 @@ export default function BudgetingChapterPage() {
       {deleteTarget && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
-            <h3 className="text-sm font-semibold text-slate-900 mb-1.5">Borrar subcapítulo "{deleteTarget.label}"</h3>
+            <h3 className="text-sm font-semibold text-slate-900 mb-1.5">
+              {deleteTarget.length === 1 ? `Borrar subcapítulo "${deleteTarget[0].label}"` : `Borrar ${deleteTarget.length} subcapítulos seleccionados`}
+            </h3>
             <p className="text-xs text-slate-500 mb-4">Se borrarán también todas sus líneas de detalle. Esta acción no se puede deshacer.</p>
             <div className="flex gap-2">
               <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">

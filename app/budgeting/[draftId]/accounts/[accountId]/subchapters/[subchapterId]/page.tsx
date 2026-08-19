@@ -471,7 +471,9 @@ export default function BudgetingSubchapterPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarLineId, setSidebarLineId] = useState<string | null>(null);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
-  const [deleteTarget, setDeleteTarget] = useState<BudgetingDetailLine | null>(null);
+  // Array siempre (aunque sea de una sola línea), para poder borrar toda la
+  // selección múltiple de una vez, igual que copiar/cortar.
+  const [deleteTarget, setDeleteTarget] = useState<BudgetingDetailLine[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
   const [lineMenu, setLineMenu] = useState<BudgetingRowContextMenuState | null>(null);
@@ -915,20 +917,30 @@ export default function BudgetingSubchapterPage() {
   }, [selectedLineIds, lines]);
 
   const handleDeleteLine = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || deleteTarget.length === 0) return;
     setSaving(true);
     try {
-      if (deleteTarget.routedTo) {
-        const batch = writeBatch(db);
-        batch.delete(lineRef(deleteTarget.id));
-        const targetRef = doc(db, `budgetingDrafts/${draftId}/accounts/${deleteTarget.routedTo.chapterId}/subchapters`, deleteTarget.routedTo.subchapterId);
-        batch.update(targetRef, { receivedTotal: increment(-(deleteTarget.total || 0)) });
-        await batch.commit();
-      } else {
-        await deleteDoc(lineRef(deleteTarget.id));
+      const batch = writeBatch(db);
+      // Varias líneas seleccionadas pueden redirigir al mismo subcapítulo: se
+      // acumula el decremento por destino para no tocar el mismo doc dos
+      // veces dentro de un mismo batch (Firestore no lo permite).
+      const decrements = new Map<string, number>();
+      for (const target of deleteTarget) {
+        batch.delete(lineRef(target.id));
+        if (target.routedTo) {
+          const key = `${target.routedTo.chapterId}/${target.routedTo.subchapterId}`;
+          decrements.set(key, (decrements.get(key) || 0) + (target.total || 0));
+        }
       }
+      for (const [key, amount] of decrements) {
+        const [chapterId, subchapterId] = key.split("/");
+        const targetRef = doc(db, `budgetingDrafts/${draftId}/accounts/${chapterId}/subchapters`, subchapterId);
+        batch.update(targetRef, { receivedTotal: increment(-amount) });
+      }
+      await batch.commit();
       await touchDraft();
       setDeleteTarget(null);
+      setSelectedLineIds(new Set());
     } finally {
       setSaving(false);
     }
@@ -1088,12 +1100,19 @@ export default function BudgetingSubchapterPage() {
                     onChangeBold: (v) => handleCommitTextLine(line, { textBold: v }),
                     onChangeColor: (c) => handleCommitTextLine(line, { textColor: c }),
                   } : undefined,
-                  onDelete: () => setDeleteTarget(line),
+                  onDelete: () => setDeleteTarget(targetLines),
                   onCopy: () => handleCopyLines(targetLines),
                   onCut: () => handleCutLines(targetLines),
                   onPaste: canPaste ? () => handlePasteLines(line.id) : undefined,
                 });
               };
+              // El icono de papelera de una fila: si esa fila forma parte de
+              // la selección múltiple activa, borra toda la selección; si
+              // no, solo esa fila (igual que el menú contextual).
+              const deleteTargetsFor = (ln: BudgetingDetailLine): BudgetingDetailLine[] =>
+                selectedLineIds.has(ln.id) && selectedLineIds.size > 1
+                  ? sorted.filter((l) => selectedLineIds.has(l.id))
+                  : [ln];
               if (sorted.length === 0) {
                 return !q ? (
                   <div
@@ -1121,7 +1140,7 @@ export default function BudgetingSubchapterPage() {
                     subtotalValue={line.isSubtotal ? lineSubtotalValue(line.id) : undefined}
                     onCommitTextLine={(patch) => handleCommitTextLine(line, patch)}
                     onMove={(direction) => handleMoveLine(line, direction)}
-                    onDelete={() => setDeleteTarget(line)}
+                    onDelete={() => setDeleteTarget(deleteTargetsFor(line))}
                     onContextMenu={(e) => openLineMenu(line, e)}
                     onRowMouseDown={(e) => handleRowMouseDown(line, sorted, e)}
                   />
@@ -1142,7 +1161,7 @@ export default function BudgetingSubchapterPage() {
                     sidebarOpen={sidebarOpen && sidebarLineId === line.id}
                     onCommit={(fields) => handleCommitLine(line, fields)}
                     onDuplicate={() => handleDuplicateLine(line)}
-                    onDelete={() => setDeleteTarget(line)}
+                    onDelete={() => setDeleteTarget(deleteTargetsFor(line))}
                     onMove={(direction) => handleMoveLine(line, direction)}
                     onOpenSidebar={() => openSidebar(line.id)}
                     onContextMenu={(e) => openLineMenu(line, e)}
@@ -1233,7 +1252,9 @@ export default function BudgetingSubchapterPage() {
       {deleteTarget && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
-            <h3 className="text-sm font-semibold text-slate-900 mb-1.5">Borrar línea "{deleteTarget.description}"</h3>
+            <h3 className="text-sm font-semibold text-slate-900 mb-1.5">
+              {deleteTarget.length === 1 ? `Borrar línea "${deleteTarget[0].description}"` : `Borrar ${deleteTarget.length} líneas seleccionadas`}
+            </h3>
             <p className="text-xs text-slate-500 mb-4">Esta acción no se puede deshacer.</p>
             <div className="flex gap-2">
               <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
