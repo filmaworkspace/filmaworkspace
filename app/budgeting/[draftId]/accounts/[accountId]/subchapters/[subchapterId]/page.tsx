@@ -21,7 +21,7 @@ import {
 import { useUser } from "@/contexts/UserContext";
 import {
   BTN_LIGHT_ACTIVE, BudgetingAccount, BudgetingDetailColumnsConfig, BudgetingDetailLine, BudgetingDraft, BudgetingFolder, BudgetingFringe, BudgetingFringeVisibility,
-  BudgetingLineRoute, BudgetingSubchapter, CELL_INPUT, DEFAULT_DETAIL_COLUMNS_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, DETAIL_STAT_COLUMN_PX, DetailStatColumnWidth, FringeGroupTarget,
+  BudgetingLineRoute, BudgetingSubchapter, CELL_INPUT, DEFAULT_DETAIL_COLUMNS_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_RECEIVED_LABEL, DEFAULT_TEXT_LINE_COLOR, DETAIL_STAT_COLUMN_PX, DetailStatColumnWidth, FringeGroupTarget,
   BudgetingUnit, DEFAULT_UNITS, clearBudgetingClipboard, computeFringeExtras, computeLineTotal, computeReorder, evaluateFieldExpr,
   fmtCurrency, fmtDecimal, getBudgetingClipboard, groupFringeSumsByFolder, isPlainNumber, lineFringeBreakdown, nextOrderValue, orderAfter, pluralizeUnit, resolveGlobals, setBudgetingClipboard, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
@@ -116,6 +116,49 @@ function SubchapterFringeRow({
         <Percent size={10} />
         <ArrowUpRight size={12} />
       </Link>
+    </div>
+  );
+}
+
+// ─── Fila que representa `receivedTotal`: lo que otras líneas han "sumado
+// aquí" (routedTo) desde otras Cuentas. Antes era un textito suelto; ahora
+// es una fila real de la tabla, como las de cargas sociales fundidas, con su
+// propio código/descripción editables (el "item" al que se refería el
+// usuario) aunque el importe no se edite aquí (es la suma de otras líneas). ──
+function ReceivedTotalRow({
+  code: initialCode, label: initialLabel, amount, template, columnsConfig, onCommit,
+}: {
+  code: string; label: string; amount: number; template: string; columnsConfig: BudgetingDetailColumnsConfig;
+  onCommit: (code: string, label: string) => void;
+}) {
+  const [code, setCode] = useState(initialCode);
+  const [label, setLabel] = useState(initialLabel);
+
+  const commit = () => {
+    if (!label.trim()) { setCode(initialCode); setLabel(initialLabel); return; }
+    onCommit(code.trim(), label.trim());
+  };
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") e.currentTarget.blur();
+    if (e.key === "Escape") { setCode(initialCode); setLabel(initialLabel); }
+  };
+
+  return (
+    <div className="grid gap-0 divide-x divide-slate-200 px-4 hover:bg-slate-50 group" style={{ gridTemplateColumns: template }}>
+      <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
+        className={`${CELL_INPUT} font-mono text-xs`} />
+      <input value={label} onChange={(e) => setLabel(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
+        className={`${CELL_INPUT} text-xs pl-2`} />
+      <span />
+      <span />
+      <span />
+      <span />
+      <span className="flex items-center justify-end text-xs font-semibold pl-2 pr-2 text-slate-500" title="Importe calculado a partir de líneas redirigidas desde otras cuentas: no se edita aquí">
+        {fmtDecimal(amount)}
+      </span>
+      {columnsConfig.showComment && <span />}
+      {columnsConfig.showTags && <span />}
+      <span />
     </div>
   );
 }
@@ -611,6 +654,14 @@ export default function BudgetingSubchapterPage() {
       const next = fringes.map((f) => (f.id === target.fringeId ? { ...f, code, label } : f));
       await updateDoc(doc(db, "budgetingDrafts", draftId), { fringes: next, updatedAt: serverTimestamp() });
     }
+    await touchDraft();
+  };
+
+  // Código/descripción de la fila que representa `receivedTotal` (ver ReceivedTotalRow).
+  const handleCommitReceived = async (code: string, label: string) => {
+    if (!subchapter) return;
+    if (code === (subchapter.receivedCode || "") && label === (subchapter.receivedLabel || DEFAULT_RECEIVED_LABEL)) return;
+    await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`, subchapterId), { receivedCode: code, receivedLabel: label });
     await touchDraft();
   };
 
@@ -1193,7 +1244,23 @@ export default function BudgetingSubchapterPage() {
             </div>
           )}
 
-          {(fringeExtras.subchapterScoped > 0 || fringeExtras.chapterScoped > 0 || fringeExtras.totalScoped > 0 || (subchapter.receivedTotal || 0) > 0) && (
+          {(subchapter.receivedTotal || 0) > 0 && (
+            <div className="border-t border-slate-100">
+              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide px-4 pt-2 pb-1">Redirigido desde otras cuentas</p>
+              <div className="divide-y divide-slate-100">
+                <ReceivedTotalRow
+                  code={subchapter.receivedCode || ""}
+                  label={subchapter.receivedLabel || DEFAULT_RECEIVED_LABEL}
+                  amount={subchapter.receivedTotal || 0}
+                  template={template}
+                  columnsConfig={columnsConfig}
+                  onCommit={handleCommitReceived}
+                />
+              </div>
+            </div>
+          )}
+
+          {(fringeExtras.subchapterScoped > 0 || fringeExtras.chapterScoped > 0 || fringeExtras.totalScoped > 0) && (
             <div className="px-4 py-1.5 border-t border-slate-100 space-y-0.5">
               {fringeExtras.subchapterScoped > 0 && !(fringeVisibility.detail && subchapterFringeBreakdown.length > 0) && (
                 <p className="text-[11px] text-slate-500 flex items-center justify-between">
@@ -1206,9 +1273,6 @@ export default function BudgetingSubchapterPage() {
               )}
               {fringeExtras.totalScoped > 0 && (
                 <p className="text-[10px] text-slate-400">+{fmt(fringeExtras.totalScoped)} en cargas sociales → total del presupuesto</p>
-              )}
-              {(subchapter.receivedTotal || 0) > 0 && (
-                <p className="text-[10px] text-slate-400">Incl. {fmt(subchapter.receivedTotal || 0)} redirigidos desde otras cuentas</p>
               )}
             </div>
           )}

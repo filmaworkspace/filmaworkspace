@@ -22,7 +22,7 @@ import {
 import { useUser } from "@/contexts/UserContext";
 import {
   BTN_LIGHT, BTN_LIGHT_ACTIVE, BudgetingDraft, BudgetingCategoryDef, BudgetingAccount, BudgetingSubchapter, BudgetingDetailLine, BudgetingExportConfig, BudgetingFolder, BudgetingFringe, BudgetingFringeVisibility, BudgetingProjectInfo, FringeGroupTarget,
-  CELL_INPUT, DEFAULT_EXPORT_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, DEFAULT_UNITS, PDF_FONT_SIZE_LABELS, PdfFontSize, categoriesEnabled, clearBudgetingClipboard, computeLineTotalForScenario, computeReorder, effectiveLineUnits, getBudgetingClipboard, groupFringeSumsByFolder, orderAfter, resolveCategories, resolveGlobals, setBudgetingClipboard, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
+  CELL_INPUT, DEFAULT_EXPORT_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_RECEIVED_LABEL, DEFAULT_TEXT_LINE_COLOR, DEFAULT_UNITS, PDF_FONT_SIZE_LABELS, PdfFontSize, categoriesEnabled, clearBudgetingClipboard, computeLineTotalForScenario, computeReorder, effectiveLineUnits, getBudgetingClipboard, groupFringeSumsByFolder, orderAfter, resolveCategories, resolveGlobals, setBudgetingClipboard, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import { buildFwbFromDraft, downloadFwb } from "@/lib/budgetingExport";
 import { downloadBudgetExcel, downloadBudgetPdf } from "@/lib/budgetingReports";
@@ -155,6 +155,9 @@ export default function BudgetingTopPage() {
 
   const [draft, setDraft] = useState<BudgetingDraft | null>(null);
   const [chapters, setChapters] = useState<BudgetingAccount[]>([]);
+  // Solo el recuento, para la "Versión #" de la portada del PDF: cuántas
+  // versiones guardadas hay ya (ver /versions) más esta, la que se exporta ahora.
+  const [snapshotCount, setSnapshotCount] = useState(0);
   const [subchaptersByChapter, setSubchaptersByChapter] = useState<Record<string, BudgetingSubchapter[]>>({});
   const [linesBySubchapter, setLinesBySubchapter] = useState<Record<string, BudgetingDetailLine[]>>({});
   const [loading, setLoading] = useState(true);
@@ -227,6 +230,13 @@ export default function BudgetingTopPage() {
   useEffect(() => {
     const unsub = onSnapshot(collection(db, `budgetingDrafts/${draftId}/accounts`), (snap) => {
       setChapters(snap.docs.map((d) => ({ id: d.id, ...d.data() } as BudgetingAccount)));
+    });
+    return () => unsub();
+  }, [draftId]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, `budgetingDrafts/${draftId}/snapshots`), (snap) => {
+      setSnapshotCount(snap.size);
     });
     return () => unsub();
   }, [draftId]);
@@ -437,7 +447,11 @@ export default function BudgetingTopPage() {
     // export sale con las filas descolocadas frente a lo que se ve.
     subchaptersByChapter: Object.fromEntries(Object.entries(subchaptersByChapter).map(([k, v]) => [k, sortByOrder(v)
       .filter((s) => includeTextLines || (!s.isTextLine && !s.isSubtotal))
-      .map((s) => ({ id: s.id, code: s.code, description: s.description, receivedTotal: s.receivedTotal || 0, isTextLine: s.isTextLine || false, isSubtotal: s.isSubtotal || false, textBold: s.textBold || false, textColor: s.textColor || null }))])),
+      .map((s) => ({
+        id: s.id, code: s.code, description: s.description, receivedTotal: s.receivedTotal || 0,
+        receivedCode: s.receivedCode || "", receivedLabel: s.receivedLabel || DEFAULT_RECEIVED_LABEL,
+        isTextLine: s.isTextLine || false, isSubtotal: s.isSubtotal || false, textBold: s.textBold || false, textColor: s.textColor || null,
+      }))])),
     linesBySubchapter: Object.fromEntries(Object.entries(linesBySubchapter).map(([k, v]) => [k, sortByOrder(v)
       .filter((l) => includeTextLines || (!l.isTextLine && !l.isSubtotal))
       .map((l) => ({
@@ -452,6 +466,7 @@ export default function BudgetingTopPage() {
     projectInfo: draft?.projectInfo,
     grandTotal,
     exportConfig: draft?.exportConfig,
+    versionNumber: snapshotCount + 1,
   });
   const reportParams = () => buildReportParams(false);
   const pdfReportParams = () => buildReportParams(true);
@@ -492,7 +507,7 @@ export default function BudgetingTopPage() {
   };
 
   const exportConfig: BudgetingExportConfig = draft?.exportConfig || DEFAULT_EXPORT_CONFIG;
-  const updateExportConfig = async (patch: { coverSheet?: boolean; pageBreakPerChapter?: boolean; pdfFontSize?: PdfFontSize; fields?: Partial<BudgetingExportConfig["fields"]> }) => {
+  const updateExportConfig = async (patch: { coverSheet?: boolean; pageBreakPerChapter?: boolean; pdfFontSize?: PdfFontSize; hideZeroTotalSubchapters?: boolean; fields?: Partial<BudgetingExportConfig["fields"]> }) => {
     const next: BudgetingExportConfig = { ...exportConfig, ...patch, fields: { ...exportConfig.fields, ...(patch.fields || {}) } };
     await updateDoc(doc(db, "budgetingDrafts", draftId), { exportConfig: next, updatedAt: serverTimestamp() });
   };
@@ -1012,6 +1027,10 @@ export default function BudgetingTopPage() {
                         ))}
                       </div>
                     </div>
+                    <label className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-slate-700">Ocultar Cuentas con total 0€</span>
+                      <input type="checkbox" checked={exportConfig.hideZeroTotalSubchapters} onChange={(e) => updateExportConfig({ hideZeroTotalSubchapters: e.target.checked })} className="accent-[#414E82]" />
+                    </label>
                     <button
                       onClick={() => { setExportPanelOpen(false); openProjectInfoModal(); }}
                       className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-slate-50 border border-slate-200"
