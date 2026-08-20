@@ -11,7 +11,7 @@
 
 import { strToU8, zipSync } from "fflate";
 import { FilmaPDF } from "./pdfBuilder";
-import { BudgetingCategoryDef, BudgetingExportConfig, BudgetingFolder, BudgetingFringe, BudgetingProjectInfo, BudgetingUnit, DEFAULT_EXPORT_CONFIG, DEFAULT_RECEIVED_LABEL, DEFAULT_TEXT_LINE_COLOR, PDF_FONT_SIZES, fmtCurrency, groupFringeSumsByFolder, pluralizeUnit } from "./budgeting";
+import { BudgetingCategoryDef, BudgetingExportConfig, BudgetingFolder, BudgetingFringe, BudgetingProjectInfo, BudgetingUnit, DEFAULT_EXPORT_CONFIG, DEFAULT_TEXT_LINE_COLOR, PDF_FONT_SIZES, PdfLanguage, fmtCurrency, groupFringeSumsByFolder, pluralizeUnit } from "./budgeting";
 
 // Las líneas de texto/subtotal (isTextLine/isSubtotal) son opcionales en las
 // tres interfaces: el Excel/.fwb las sigue excluyendo (reportParams las
@@ -46,8 +46,6 @@ export interface BudgetReportParams {
   projectInfo?: BudgetingProjectInfo;
   grandTotal: number;
   exportConfig?: BudgetingExportConfig;
-  /** Número de versión para la portada del PDF (nº de versiones guardadas + 1, ver "Guardar versión"). Si no se pasa, no se muestra. */
-  versionNumber?: number;
 }
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -176,6 +174,50 @@ const HEADER_BG: RGB = [241, 245, 249];  // slate-100: cabecera de columna clara
 const CATEGORY_BG: RGB = [227, 228, 236]; // tinte muy claro del acento, para las filas de categoría (ATL/BTL)
 const TOTAL_BG: RGB = [226, 232, 240];   // slate-200: filas de total (Top Sheet y Detalle), un poco más marcado
 
+// ─── Idioma del PDF: solo traduce los textos fijos (etiquetas, encabezados
+// de columna, "Total"...). Todo lo escrito en el presupuesto (nombres,
+// descripciones, notas, códigos...) sale siempre tal cual, sin tocar. ──────
+interface PdfI18n {
+  format: string; episodesUnit: string; perEpisode: string;
+  version: string; budgetDate: string; currency: string;
+  director: string; producer: string; preparedBy: string; notes: string;
+  issuedOn: (date: string, time: string) => string;
+  dateLocale: string;
+  total: string; grandTotal: string; subtotalFallback: string;
+  totalChapter: (code: string) => string;
+  detailHeaders: { code: string; desc: string; qty: string; unit: string; mult: string; rate: string; subtotal: string; total: string };
+  receivedDefaultLabel: string;
+}
+const PDF_I18N: Record<PdfLanguage, PdfI18n> = {
+  es: {
+    format: "Formato", episodesUnit: "capítulos", perEpisode: "por capítulo",
+    version: "Versión #", budgetDate: "Fecha presupuesto", currency: "Moneda",
+    director: "Dirección", producer: "Producción", preparedBy: "Preparado por", notes: "Notas",
+    issuedOn: (date, time) => `Emitido el ${date} a las ${time}`,
+    dateLocale: "es-ES",
+    total: "Total", grandTotal: "TOTAL PRESUPUESTO", subtotalFallback: "Subtotal",
+    totalChapter: (code) => `Total capítulo ${code}`,
+    detailHeaders: { code: "ACCT #", desc: "DESCRIPCIÓN", qty: "CANT.", unit: "UNIDAD", mult: "X", rate: "TARIFA", subtotal: "SUBTOTAL", total: "TOTAL" },
+    receivedDefaultLabel: "Redirigido desde otras cuentas",
+  },
+  en: {
+    format: "Format", episodesUnit: "episodes", perEpisode: "per episode",
+    version: "Version #", budgetDate: "Budget date", currency: "Currency",
+    director: "Director", producer: "Producer", preparedBy: "Prepared by", notes: "Notes",
+    issuedOn: (date, time) => `Issued on ${date} at ${time}`,
+    dateLocale: "en-US",
+    total: "Total", grandTotal: "TOTAL BUDGET", subtotalFallback: "Subtotal",
+    totalChapter: (code) => `Chapter ${code} total`,
+    detailHeaders: { code: "ACCT #", desc: "DESCRIPTION", qty: "QTY.", unit: "UNIT", mult: "X", rate: "RATE", subtotal: "SUBTOTAL", total: "TOTAL" },
+    receivedDefaultLabel: "Redirected from other accounts",
+  },
+};
+/** "Película"/"Serie" son valores de una lista fija (no texto libre), así que también se traducen; cualquier otro valor (datos antiguos) se deja tal cual. */
+const FORMAT_VALUE_I18N: Record<PdfLanguage, Record<string, string>> = {
+  es: { Película: "Película", Serie: "Serie" },
+  en: { Película: "Movie", Serie: "Series" },
+};
+
 interface GCol { x: number; width: number; align: "left" | "right"; }
 
 const hexToRgb = (hex: string): RGB => {
@@ -189,6 +231,7 @@ const hexToRgb = (hex: string): RGB => {
 export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   const cfg = p.exportConfig || DEFAULT_EXPORT_CONFIG;
   const F = PDF_FONT_SIZES[cfg.pdfFontSize || "normal"];
+  const t = PDF_I18N[cfg.pdfLanguage || "es"];
   const fringes = p.fringes || [];
   const fringeFolders = p.fringeFolders || [];
   const info = p.projectInfo || {};
@@ -346,28 +389,14 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
     });
   });
 
-  // Cositas para la portada: nº de capítulos/cuentas/líneas reales del
-  // presupuesto, aparte de fecha y moneda.
-  let chapterCount = 0;
-  let lineCount = 0;
-  cats.forEach((cat) => {
-    p.chaptersByCategory(p.categoriesEnabled ? cat.id : null).forEach((chapter) => {
-      if (chapter.isTextLine || chapter.isSubtotal) return;
-      chapterCount++;
-      (p.subchaptersByChapter[chapter.id] || []).forEach((sub) => {
-        if (sub.isTextLine || sub.isSubtotal) return;
-        lineCount += (p.linesBySubchapter[sub.id] || []).filter((l) => !l.isTextLine && !l.isSubtotal).length;
-      });
-    });
-  });
-  const subCount = allSubIds.length;
-
   // ─── Portada: solo los datos de producción, sin ninguna tabla ni total.
   // Diseño calcado del mockup del usuario: una sola columna, título y
-  // formato sueltos (sin etiqueta), luego créditos, y fecha/moneda/versión/
-  // recuento/preparado por como bloques con su propio hueco, cada línea de
-  // un bloque pegada a la siguiente. El resto del documento siempre arranca
-  // en una página nueva. ─────────────────────────────────────────────────
+  // formato sueltos (sin etiqueta salvo "Formato:"), luego versión/fecha/
+  // moneda, créditos, preparado por y notas como bloques con su propio
+  // hueco, cada línea de un bloque pegada a la siguiente. Al final del
+  // todo, pegado abajo, un sello con la fecha/hora reales de esta
+  // exportación (no la "Fecha presupuesto" editable de arriba). El resto
+  // del documento siempre arranca en una página nueva. ────────────────────
   const writeLine = (str: string, opts: { bold?: boolean; size?: number } = {}) => {
     const size = opts.size ?? F.body;
     breakIfNeeded(ptToMm(size) + 6);
@@ -380,28 +409,52 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   blockGap();
 
   if (info.format) {
-    writeLine(info.format);
+    const formatValue = FORMAT_VALUE_I18N[cfg.pdfLanguage || "es"][info.format] ?? info.format;
+    writeLine(`${t.format}: ${formatValue}`);
+    if (info.format === "Serie") {
+      const bits: string[] = [];
+      if (info.episodeCount) bits.push(`${info.episodeCount} ${t.episodesUnit}`);
+      if (info.episodeDuration) bits.push(`${info.episodeDuration} ${t.perEpisode}`);
+      if (bits.length > 0) writeLine(bits.join(" · "));
+    } else if (info.format === "Película" && info.filmDuration) {
+      writeLine(info.filmDuration);
+    }
     blockGap();
   }
 
+  if (info.version) writeLine(`${t.version}: ${info.version}`);
+  writeLine(`${t.budgetDate}: ${info.dateLabel || new Intl.DateTimeFormat(t.dateLocale, { day: "2-digit", month: "long", year: "numeric" }).format(new Date())}`);
+  writeLine(`${t.currency}: ${p.currency}`);
+  blockGap();
+
   const credits: [string, string][] = [];
-  if (info.productionCompany) credits.push(["Productora", info.productionCompany]);
-  if (info.director) credits.push(["Dirección", info.director]);
-  if (info.producer) credits.push(["Producción", info.producer]);
+  if (info.director) credits.push([t.director, info.director]);
+  if (info.producer) credits.push([t.producer, info.producer]);
   if (credits.length > 0) {
     credits.forEach(([label, value]) => writeLine(`${label}: ${value}`));
     blockGap();
   }
 
-  writeLine(`Fecha: ${info.dateLabel || new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "long", year: "numeric" }).format(new Date())}`);
-  writeLine(`Moneda: ${p.currency}`);
-  if (p.versionNumber) writeLine(`Versión: v${p.versionNumber}`);
-  writeLine(`Capítulos: ${chapterCount} · Cuentas: ${subCount} · Líneas: ${lineCount}`);
-
   if (info.preparedBy) {
+    writeLine(`${t.preparedBy}: ${info.preparedBy}`);
     blockGap();
-    writeLine(`Preparado por: ${info.preparedBy}`);
   }
+
+  if (info.notes) {
+    writeLine(`${t.notes}:`, { bold: true });
+    info.notes.split("\n").forEach((line) => writeLine(line || " "));
+    blockGap();
+  }
+
+  // Sello de emisión, anclado al fondo de la última página de la portada
+  // (si el contenido de arriba ya llega tan abajo, sigue justo debajo en
+  // vez de superponerse).
+  const now = new Date();
+  const issuedDate = new Intl.DateTimeFormat(t.dateLocale, { day: "2-digit", month: "long", year: "numeric" }).format(now);
+  const issuedTime = new Intl.DateTimeFormat(t.dateLocale, { hour: "2-digit", minute: "2-digit" }).format(now);
+  const issuedY = doc.pageH - 16;
+  doc.y = doc.y < issuedY ? issuedY : doc.y + 4;
+  text(t.issuedOn(issuedDate, issuedTime), left, { size: Math.max(6, F.body - 1), color: MUTED });
 
   startPage();
 
@@ -431,7 +484,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
         }
         if (chapter.isSubtotal) {
           const amt = subtotalSince(chapters, chapter.id, chapterTotalMap);
-          dataTextRow(topCols, chapter.description || "Subtotal", fmt(amt), { bold: true, size: F.body, color: hexToRgb(chapter.textColor || DEFAULT_TEXT_LINE_COLOR) });
+          dataTextRow(topCols, chapter.description || t.subtotalFallback, fmt(amt), { bold: true, size: F.body, color: hexToRgb(chapter.textColor || DEFAULT_TEXT_LINE_COLOR) });
           return;
         }
         const chapterSum = chapterTotalMap.get(chapter.id) || 0;
@@ -439,7 +492,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
         dataRow(topCols, [chapter.code, chapter.description, fmt(chapterSum)], { size: F.body });
       });
       if (p.categoriesEnabled) {
-        dataRow(topCols, ["", `Total ${cat.label}`, fmt(catSum)], { bold: true, size: F.body });
+        dataRow(topCols, ["", `${t.total} ${cat.label}`, fmt(catSum)], { bold: true, size: F.body });
       }
     });
 
@@ -451,7 +504,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
     doc.y += 1;
     breakIfNeeded(rowHeight(F.total) + 4);
     rule(INK, 0.5);
-    dataRow(topCols, ["", "TOTAL PRESUPUESTO", fmt(p.grandTotal)], { bold: true, size: F.total, fill: TOTAL_BG });
+    dataRow(topCols, ["", t.grandTotal, fmt(p.grandTotal)], { bold: true, size: F.total, fill: TOTAL_BG });
     doc.y += 4;
 
     startPage();
@@ -473,7 +526,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   })();
   const detailWidths: Record<DetailKey, number> = { code: 16, desc: 0, qty: 13, unit: 14, mult: 8, rate: 20, subtotal: 22, total: 22 };
   const detailAligns: Record<DetailKey, "left" | "right"> = { code: "left", desc: "left", qty: "right", unit: "left", mult: "right", rate: "right", subtotal: "right", total: "right" };
-  const detailLabels: Record<DetailKey, string> = { code: "ACCT #", desc: "DESCRIPCIÓN", qty: "CANT.", unit: "UNIDAD", mult: "X", rate: "TARIFA", subtotal: "SUBTOTAL", total: "TOTAL" };
+  const detailLabels: Record<DetailKey, string> = t.detailHeaders;
   const detailFixedWidth = detailKeys.filter((k) => k !== "desc").reduce((s, k) => s + detailWidths[k], 0);
   detailWidths.desc = (right - left) - detailFixedWidth;
   const detailCols: GCol[] = (() => {
@@ -552,7 +605,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
       }
       if (chapter.isSubtotal) {
         const amt = subtotalSince(chapters, chapter.id, chapterTotalMap);
-        detailDataTextRow(chapter.description || "Subtotal", fmt(amt), { bold: true, size: F.body, color: hexToRgb(chapter.textColor || DEFAULT_TEXT_LINE_COLOR) });
+        detailDataTextRow(chapter.description || t.subtotalFallback, fmt(amt), { bold: true, size: F.body, color: hexToRgb(chapter.textColor || DEFAULT_TEXT_LINE_COLOR) });
         return;
       }
       const subs = p.subchaptersByChapter[chapter.id] || [];
@@ -583,7 +636,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
         }
         if (sub.isSubtotal) {
           const amt = subtotalSince(subs, sub.id, subTotals);
-          detailDataTextRow(sub.description || "Subtotal", fmt(amt), { bold: true, size: F.body, color: hexToRgb(sub.textColor || DEFAULT_TEXT_LINE_COLOR) });
+          detailDataTextRow(sub.description || t.subtotalFallback, fmt(amt), { bold: true, size: F.body, color: hexToRgb(sub.textColor || DEFAULT_TEXT_LINE_COLOR) });
           return;
         }
         const allLines = p.linesBySubchapter[sub.id] || [];
@@ -610,7 +663,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
           }
           if (l.isSubtotal) {
             const amt = subtotalSince(allLines, l.id, lineTotals);
-            detailDataTextRow(l.description || "Subtotal", fmt(amt), { bold: true, size: F.body, color: hexToRgb(l.textColor || DEFAULT_TEXT_LINE_COLOR) });
+            detailDataTextRow(l.description || t.subtotalFallback, fmt(amt), { bold: true, size: F.body, color: hexToRgb(l.textColor || DEFAULT_TEXT_LINE_COLOR) });
             return;
           }
           lineTotals.set(l.id, l.total || 0);
@@ -624,11 +677,11 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
         });
         if ((sub.receivedTotal || 0) > 0) {
           const code = sub.receivedCode || "";
-          const label = sub.receivedLabel || DEFAULT_RECEIVED_LABEL;
+          const label = sub.receivedLabel || t.receivedDefaultLabel;
           detailDataRow(detailRowValues({ desc: code ? `${code} ${label}` : label, subtotal: fmt(sub.receivedTotal || 0) }), { size: F.body, color: MUTED });
         }
 
-        detailDataRow(detailRowValues({ desc: "TOTAL", total: fmt(subSum) }), { bold: true, size: F.body });
+        detailDataRow(detailRowValues({ desc: t.total.toUpperCase(), total: fmt(subSum) }), { bold: true, size: F.body });
       });
 
       const realSubs = subs.filter((s) => !s.isTextLine && !s.isSubtotal);
@@ -638,14 +691,14 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
       });
       chapterSum += chapterFringes.reduce((s, b) => s + b.amount, 0);
 
-      detailDataRow(detailRowValues({ desc: `Total capítulo ${chapter.code}`, total: fmt(chapterSum) }), { bold: true, size: F.body });
+      detailDataRow(detailRowValues({ desc: t.totalChapter(chapter.code), total: fmt(chapterSum) }), { bold: true, size: F.body });
     });
   });
 
   doc.y += 1;
   breakIfNeeded(rowHeight(F.total) + 4);
   rule(INK, 0.5);
-  detailDataRow(detailRowValues({ desc: "TOTAL PRESUPUESTO", total: fmt(p.grandTotal) }), { bold: true, size: F.total, fill: TOTAL_BG });
+  detailDataRow(detailRowValues({ desc: t.grandTotal, total: fmt(p.grandTotal) }), { bold: true, size: F.total, fill: TOTAL_BG });
 
   return doc;
 }

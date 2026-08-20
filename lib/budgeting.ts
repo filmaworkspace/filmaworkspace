@@ -133,12 +133,18 @@ export const PDF_FONT_SIZES: Record<PdfFontSize, { title: number; heading: numbe
   large: { title: 21, heading: 13.5, label: 8, body: 10, total: 14 },
 };
 
+/** Idioma de los textos fijos del PDF exportado (etiquetas, encabezados de columna, "Total"...); lo que se haya escrito en el presupuesto (nombres, descripciones, notas...) sale siempre tal cual, sin traducir. */
+export type PdfLanguage = "es" | "en";
+export const PDF_LANGUAGE_LABELS: Record<PdfLanguage, string> = { es: "Español", en: "English" };
+
 export interface BudgetingExportConfig {
   coverSheet: boolean;
   pageBreakPerChapter: boolean;
   pdfFontSize: PdfFontSize;
   /** Si es true, las Cuentas cuyo total sale en 0€ no se dibujan en el PDF (solo afecta a Cuentas, no a Capítulos ni a líneas sueltas). */
   hideZeroTotalSubchapters: boolean;
+  /** Idioma de los textos fijos del PDF (ver PdfLanguage): lo escrito en el presupuesto no se traduce. */
+  pdfLanguage: PdfLanguage;
   fields: {
     unit: boolean;
     notes: boolean;
@@ -151,6 +157,7 @@ export const DEFAULT_EXPORT_CONFIG: BudgetingExportConfig = {
   pageBreakPerChapter: false,
   pdfFontSize: "normal",
   hideZeroTotalSubchapters: false,
+  pdfLanguage: "es",
   fields: { unit: true, notes: false, tags: false },
 };
 
@@ -161,12 +168,21 @@ export const DEFAULT_EXPORT_CONFIG: BudgetingExportConfig = {
  */
 export interface BudgetingProjectInfo {
   title?: string;
-  productionCompany?: string;
+  /** "Película" | "Serie": según cuál, la portada muestra duración de la película o nº de capítulos + duración de cada uno. */
+  format?: string;
+  /** Solo si format === "Serie". */
+  episodeCount?: string;
+  episodeDuration?: string;
+  /** Solo si format === "Película". */
+  filmDuration?: string;
   director?: string;
   producer?: string;
-  format?: string;
   preparedBy?: string;
+  /** "Fecha presupuesto" en la portada: editable siempre, se usa la de hoy si se deja en blanco. */
   dateLabel?: string;
+  /** Versión del presupuesto que se muestra en la portada, editable a mano (p.ej. "v1", "Borrador 3"). */
+  version?: string;
+  notes?: string;
 }
 
 /** Ancho de las columnas numéricas (Cant./Unidad/X/Tarifa) del nivel de Detalle, en px, elegido por el usuario. */
