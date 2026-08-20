@@ -137,6 +137,8 @@ export interface BudgetingExportConfig {
   coverSheet: boolean;
   pageBreakPerChapter: boolean;
   pdfFontSize: PdfFontSize;
+  /** Si es true, las Cuentas cuyo total sale en 0€ no se dibujan en el PDF (solo afecta a Cuentas, no a Capítulos ni a líneas sueltas). */
+  hideZeroTotalSubchapters: boolean;
   fields: {
     unit: boolean;
     notes: boolean;
@@ -148,6 +150,7 @@ export const DEFAULT_EXPORT_CONFIG: BudgetingExportConfig = {
   coverSheet: true,
   pageBreakPerChapter: false,
   pdfFontSize: "normal",
+  hideZeroTotalSubchapters: false,
   fields: { unit: true, notes: false, tags: false },
 };
 
@@ -268,6 +271,9 @@ export interface BudgetingTemplate {
 export const TEXT_LINE_COLORS = ["#1D201F", "#414E82", "#DC2626", "#059669", "#D97706", "#7C3AED"];
 export const DEFAULT_TEXT_LINE_COLOR = TEXT_LINE_COLORS[0];
 
+/** Descripción por defecto de la línea que representa `BudgetingSubchapter.receivedTotal` cuando aún no se le ha puesto una propia. */
+export const DEFAULT_RECEIVED_LABEL = "Redirigido desde otras cuentas";
+
 export interface BudgetingAccount {
   id: string;
   code: string;
@@ -294,6 +300,9 @@ export interface BudgetingSubchapter {
   order?: number;
   /** Suma denormalizada de líneas de otros subcapítulos redirigidas aquí (ver BudgetingLineRoute). Mantenida con increment() al guardar/duplicar/borrar líneas. */
   receivedTotal?: number;
+  /** Código y descripción de la línea que representa `receivedTotal` en la tabla (editable ahí mismo, igual que una línea de cargas sociales fundida). */
+  receivedCode?: string;
+  receivedLabel?: string;
   /** Si es true, esta fila es solo una nota de texto (sin código ni importe): no suma, no se puede entrar dentro. */
   isTextLine?: boolean;
   /** Si es true, esta fila muestra la suma de las filas de arriba desde el subtotal anterior (o el principio): no editable, no cuenta como fila propia en el siguiente subtotal. */

@@ -11,14 +11,17 @@
 
 import { strToU8, zipSync } from "fflate";
 import { FilmaPDF } from "./pdfBuilder";
-import { BUDGETING_TEXT, BudgetingCategoryDef, BudgetingExportConfig, BudgetingFolder, BudgetingFringe, BudgetingProjectInfo, BudgetingUnit, DEFAULT_EXPORT_CONFIG, DEFAULT_TEXT_LINE_COLOR, PDF_FONT_SIZES, fmtCurrency, groupFringeSumsByFolder, pluralizeUnit } from "./budgeting";
+import { BudgetingCategoryDef, BudgetingExportConfig, BudgetingFolder, BudgetingFringe, BudgetingProjectInfo, BudgetingUnit, DEFAULT_EXPORT_CONFIG, DEFAULT_RECEIVED_LABEL, DEFAULT_TEXT_LINE_COLOR, PDF_FONT_SIZES, fmtCurrency, groupFringeSumsByFolder, pluralizeUnit } from "./budgeting";
 
 // Las líneas de texto/subtotal (isTextLine/isSubtotal) son opcionales en las
 // tres interfaces: el Excel/.fwb las sigue excluyendo (reportParams las
 // filtra antes de llegar aquí), pero el PDF las incluye y las pinta con su
 // negrita/color, igual que en pantalla.
 interface ReportChapter { id: string; code: string; description: string; isTextLine?: boolean; isSubtotal?: boolean; textBold?: boolean; textColor?: string | null; }
-interface ReportSubchapter { id: string; code: string; description: string; receivedTotal?: number; isTextLine?: boolean; isSubtotal?: boolean; textBold?: boolean; textColor?: string | null; }
+interface ReportSubchapter {
+  id: string; code: string; description: string; receivedTotal?: number; receivedCode?: string; receivedLabel?: string;
+  isTextLine?: boolean; isSubtotal?: boolean; textBold?: boolean; textColor?: string | null;
+}
 interface ReportLine {
   id: string; code: string; description: string; units: number; unit: string; multiplier: number; rate: number; total: number;
   notes?: string; tags?: string[]; fringeIds?: string[]; routedTo?: { subchapterCode: string } | null;
@@ -43,6 +46,8 @@ export interface BudgetReportParams {
   projectInfo?: BudgetingProjectInfo;
   grandTotal: number;
   exportConfig?: BudgetingExportConfig;
+  /** Número de versión para la portada del PDF (nº de versiones guardadas + 1, ver "Guardar versión"). Si no se pasa, no se muestra. */
+  versionNumber?: number;
 }
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -166,6 +171,10 @@ const INK: RGB = [15, 23, 42];       // slate-900
 const MUTED: RGB = [100, 116, 139];  // slate-500
 const RULE: RGB = [148, 163, 184];   // slate-400, borde de tabla
 const RULE_LIGHT: RGB = [203, 213, 225]; // slate-300, borde de fila
+const ACCENT: RGB = [65, 78, 130];   // #414E82, acento de Budgeting
+const HEADER_BG: RGB = [241, 245, 249];  // slate-100: cabecera de columna clara, no negra
+const CATEGORY_BG: RGB = [227, 228, 236]; // tinte muy claro del acento, para las filas de categoría (ATL/BTL)
+const TOTAL_BG: RGB = [226, 232, 240];   // slate-200: filas de total (Top Sheet y Detalle), un poco más marcado
 
 interface GCol { x: number; width: number; align: "left" | "right"; }
 
@@ -183,7 +192,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   const fringes = p.fringes || [];
   const fringeFolders = p.fringeFolders || [];
   const info = p.projectInfo || {};
-  const doc = new FilmaPDF({ accent: "budgeting", docRef: p.draftName, footerBrand: "Filma Workspace Budgeting · filmaworkspace.com" });
+  const doc = new FilmaPDF({ accent: "budgeting", docRef: info.title || p.draftName, footerBrand: "FWB" });
   doc.y = doc.margin;
 
   const left = doc.margin;
@@ -215,10 +224,15 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   // en milímetros: hay que convertir, si no la fila sale altísima y vacía. ──
   const ptToMm = (pt: number) => pt * 0.3528;
   const rowHeight = (size: number) => ptToMm(size) + 2.8;
-  const gridRow = (cols: GCol[], values: string[], opts: { bold?: boolean; size: number; color?: RGB }) => {
+  type RowOpts = { bold?: boolean; size: number; color?: RGB; fill?: RGB };
+  const gridRow = (cols: GCol[], values: string[], opts: RowOpts) => {
     const rh = rowHeight(opts.size);
     const y0 = doc.y;
     const y1 = y0 + rh;
+    if (opts.fill) {
+      doc.pdf.setFillColor(opts.fill[0], opts.fill[1], opts.fill[2]);
+      doc.pdf.rect(left, y0, right - left, rh, "F");
+    }
     doc.pdf.setFont("helvetica", opts.bold ? "bold" : "normal");
     doc.pdf.setFontSize(opts.size);
     const c = opts.color ?? INK;
@@ -264,7 +278,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   /** Nueva página que continúa la misma tabla: repone el borde superior, sin repetir ninguna cabecera. */
   const continueTable = () => { startPage(); tableTop(); };
   /** Fila de datos con salto de página automático. */
-  const dataRow = (cols: GCol[], values: string[], opts: { bold?: boolean; size: number; color?: RGB }) => {
+  const dataRow = (cols: GCol[], values: string[], opts: RowOpts) => {
     if (doc.y + rowHeight(opts.size) > doc.pageH - 22) continueTable();
     gridRow(cols, values, opts);
   };
@@ -332,12 +346,28 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
     });
   });
 
+  // Cositas para la portada: nº de capítulos/cuentas/líneas reales del
+  // presupuesto, aparte de fecha y moneda.
+  let chapterCount = 0;
+  let lineCount = 0;
+  cats.forEach((cat) => {
+    p.chaptersByCategory(p.categoriesEnabled ? cat.id : null).forEach((chapter) => {
+      if (chapter.isTextLine || chapter.isSubtotal) return;
+      chapterCount++;
+      (p.subchaptersByChapter[chapter.id] || []).forEach((sub) => {
+        if (sub.isTextLine || sub.isSubtotal) return;
+        lineCount += (p.linesBySubchapter[sub.id] || []).filter((l) => !l.isTextLine && !l.isSubtotal).length;
+      });
+    });
+  });
+  const subCount = allSubIds.length;
+
   // ─── Portada: solo los datos de producción, sin ninguna tabla ni total.
   // Diseño calcado del mockup del usuario: una sola columna, título y
-  // formato sueltos (sin etiqueta), luego créditos, "Datos del
-  // presupuesto" y fecha/moneda/preparado por como bloques con su propio
-  // hueco, cada línea de un bloque pegada a la siguiente. El resto del
-  // documento siempre arranca en una página nueva. ──────────────────────────
+  // formato sueltos (sin etiqueta), luego créditos, y fecha/moneda/versión/
+  // recuento/preparado por como bloques con su propio hueco, cada línea de
+  // un bloque pegada a la siguiente. El resto del documento siempre arranca
+  // en una página nueva. ─────────────────────────────────────────────────
   const writeLine = (str: string, opts: { bold?: boolean; size?: number } = {}) => {
     const size = opts.size ?? F.body;
     breakIfNeeded(ptToMm(size) + 6);
@@ -363,10 +393,10 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
     blockGap();
   }
 
-  writeLine("Datos del presupuesto", { bold: true });
-  doc.y += ptToMm(F.body) * 0.5;
   writeLine(`Fecha: ${info.dateLabel || new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "long", year: "numeric" }).format(new Date())}`);
   writeLine(`Moneda: ${p.currency}`);
+  if (p.versionNumber) writeLine(`Versión: v${p.versionNumber}`);
+  writeLine(`Capítulos: ${chapterCount} · Cuentas: ${subCount} · Líneas: ${lineCount}`);
 
   if (info.preparedBy) {
     blockGap();
@@ -392,7 +422,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
     cats.forEach((cat) => {
       const chapters = p.chaptersByCategory(p.categoriesEnabled ? cat.id : null);
       if (chapters.length === 0) return;
-      if (p.categoriesEnabled) dataRow(topCols, ["", cat.label.toUpperCase(), ""], { bold: true, size: F.body, color: MUTED });
+      if (p.categoriesEnabled) dataRow(topCols, ["", cat.label.toUpperCase(), ""], { bold: true, size: F.body, color: MUTED, fill: CATEGORY_BG });
       let catSum = 0;
       chapters.forEach((chapter) => {
         if (chapter.isTextLine) {
@@ -418,13 +448,11 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
       dataRow(topCols, [code, label, fmt(amount)], { size: F.body, color: MUTED });
     });
 
-    doc.y += 2;
-    breakIfNeeded(F.total + 8);
+    doc.y += 1;
+    breakIfNeeded(rowHeight(F.total) + 4);
     rule(INK, 0.5);
-    doc.y += F.total * 0.55 + 3;
-    text("TOTAL PRESUPUESTO", left, { bold: true, size: F.total });
-    text(fmt(p.grandTotal), right, { bold: true, size: F.total, align: "right" });
-    doc.y += 6;
+    dataRow(topCols, ["", "TOTAL PRESUPUESTO", fmt(p.grandTotal)], { bold: true, size: F.total, fill: TOTAL_BG });
+    doc.y += 4;
 
     startPage();
   }
@@ -458,27 +486,41 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   })();
   const detailRowValues = (row: Partial<Record<DetailKey, string>>) => detailKeys.map((k) => row[k] || "");
 
-  const HEADER_BG = hexToRgb(BUDGETING_TEXT);
-  /** Cabecera de columna con fondo oscuro (ACCT#/DESCRIPCIÓN/.../TOTAL), tal cual el mockup: se repite delante de cada capítulo. */
+  // Cabecera de columna clara (ACCT#/DESCRIPCIÓN/.../TOTAL), no sombreada en
+  // negro: aparece una sola vez por página (al empezar el Detalle, o al
+  // reabrirse la tabla tras un salto de página), no delante de cada
+  // capítulo — entre capítulos de una misma página va un separador fino
+  // (ver chapterSeparator), no la cabecera entera. Texto algo más pequeño
+  // que el resto de la tabla, para que pese menos visualmente.
+  const headerFontSize = Math.max(6, F.label - 1);
   const detailHeaderRow = () => {
-    const rh = rowHeight(F.label);
+    const rh = rowHeight(headerFontSize);
     breakIfNeeded(rh + rowHeight(F.body));
     const y0 = doc.y;
     const y1 = y0 + rh;
     doc.pdf.setFillColor(HEADER_BG[0], HEADER_BG[1], HEADER_BG[2]);
     doc.pdf.rect(left, y0, right - left, rh, "F");
     doc.pdf.setFont("helvetica", "bold");
-    doc.pdf.setFontSize(F.label);
-    doc.pdf.setTextColor(255, 255, 255);
+    doc.pdf.setFontSize(headerFontSize);
+    doc.pdf.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
     detailCols.forEach((col, i) => {
       const tx = col.align === "right" ? col.x + col.width - 2 : col.x + 2;
       doc.pdf.text(detailLabels[detailKeys[i]], tx, y1 - 1.8, { align: col.align });
     });
     doc.y = y1;
   };
-  /** Nueva página que continúa el Detalle: repone la cabecera de columna oscura, no solo el borde. */
+  /** Nueva página que continúa el Detalle: repone la cabecera de columna, no solo el borde. */
   const detailContinueTable = () => { startPage(); detailHeaderRow(); };
-  const detailDataRow = (values: string[], opts: { bold?: boolean; size: number; color?: RGB }) => {
+  /** Separador fino entre capítulos de una misma página, en vez de repetir la cabecera de columna entera. */
+  const chapterSeparator = () => {
+    breakIfNeeded(rowHeight(F.body) * 2);
+    doc.y += 2;
+    doc.pdf.setDrawColor(RULE[0], RULE[1], RULE[2]);
+    doc.pdf.setLineWidth(0.5);
+    doc.pdf.line(left, doc.y, right, doc.y);
+    doc.y += 2;
+  };
+  const detailDataRow = (values: string[], opts: RowOpts) => {
     if (doc.y + rowHeight(opts.size) > doc.pageH - 22) detailContinueTable();
     gridRow(detailCols, values, opts);
   };
@@ -487,14 +529,21 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
     textRow(detailCols, description, amountText, opts);
   };
 
+  // La cabecera de columna aparece una sola vez por página, no delante de
+  // cada capítulo: se dibuja al abrir la tabla (con la primera fila real,
+  // sea de categoría o de capítulo) y de nuevo solo cuando toca página
+  // nueva (salto automático por desbordar, o forzado por
+  // `pageBreakPerChapter`). Entre capítulos de una misma página va un
+  // separador fino (chapterSeparator), no la cabecera entera repetida.
+  let tableOpened = false;
   let firstRealChapter = true;
   cats.forEach((cat) => {
     const chapters = p.chaptersByCategory(p.categoriesEnabled ? cat.id : null);
     if (chapters.length === 0) return;
     if (p.categoriesEnabled) {
-      breakIfNeeded(rowHeight(F.body) + 6);
-      text(cat.label.toUpperCase(), left, { bold: true, size: F.body, color: MUTED });
-      doc.y += ptToMm(F.body) + 5;
+      if (!tableOpened) { detailHeaderRow(); tableOpened = true; }
+      else chapterSeparator();
+      detailDataRow(detailRowValues({ desc: cat.label.toUpperCase() }), { bold: true, size: F.body, color: MUTED, fill: CATEGORY_BG });
     }
     chapters.forEach((chapter) => {
       if (chapter.isTextLine) {
@@ -509,15 +558,19 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
       const subs = p.subchaptersByChapter[chapter.id] || [];
       if (subs.length === 0) return;
 
-      // La cabecera de columna se repite delante de cada capítulo (igual que
-      // el mockup), con salto de página forzado si está activado, o si no,
-      // simplemente un hueco antes del siguiente bloque en la misma página.
-      if (!firstRealChapter) {
-        if (cfg.pageBreakPerChapter) startPage();
-        else { doc.y += 5; breakIfNeeded(rowHeight(F.label) + rowHeight(F.body) * 2); }
+      if (!tableOpened) {
+        detailHeaderRow();
+        tableOpened = true;
+      } else if (firstRealChapter) {
+        // La tabla ya está abierta (p.ej. por la fila de categoría), pero
+        // este es el primer capítulo real: ni separador ni salto forzado.
+      } else if (cfg.pageBreakPerChapter) {
+        startPage();
+        detailHeaderRow();
+      } else {
+        chapterSeparator();
       }
       firstRealChapter = false;
-      detailHeaderRow();
 
       detailDataRow(detailRowValues({ code: chapter.code, desc: chapter.description }), { bold: true, size: F.body });
 
@@ -535,7 +588,17 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
         }
         const allLines = p.linesBySubchapter[sub.id] || [];
         const subFringes = fringeBreakdownFor([sub.id], "subchapter");
-        if (allLines.length === 0 && subFringes.length === 0) return;
+        if (allLines.length === 0 && subFringes.length === 0 && !(sub.receivedTotal || 0)) return;
+
+        // El total se calcula siempre (para que el subtotal del capítulo
+        // cuadre), pero solo se dibujan las filas de esta Cuenta si no está
+        // oculta por `hideZeroTotalSubchapters` (config de exportación).
+        const realLines = allLines.filter((l) => !l.isTextLine && !l.isSubtotal);
+        const subFringeSum = subFringes.reduce((s, b) => s + b.amount, 0);
+        const subSum = subTotal(sub, realLines, subFringeSum);
+        subTotals.set(sub.id, subSum);
+        chapterSum += subSum;
+        if (cfg.hideZeroTotalSubchapters && subSum === 0) return;
 
         detailDataRow(detailRowValues({ code: sub.code, desc: sub.description }), { bold: true, size: F.body });
 
@@ -559,12 +622,12 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
         subFringes.forEach(({ code, label, amount }) => {
           detailDataRow(detailRowValues({ desc: `${code} ${label}`, subtotal: fmt(amount) }), { size: F.body, color: MUTED });
         });
+        if ((sub.receivedTotal || 0) > 0) {
+          const code = sub.receivedCode || "";
+          const label = sub.receivedLabel || DEFAULT_RECEIVED_LABEL;
+          detailDataRow(detailRowValues({ desc: code ? `${code} ${label}` : label, subtotal: fmt(sub.receivedTotal || 0) }), { size: F.body, color: MUTED });
+        }
 
-        const realLines = allLines.filter((l) => !l.isTextLine && !l.isSubtotal);
-        const subFringeSum = subFringes.reduce((s, b) => s + b.amount, 0);
-        const subSum = subTotal(sub, realLines, subFringeSum);
-        subTotals.set(sub.id, subSum);
-        chapterSum += subSum;
         detailDataRow(detailRowValues({ desc: "TOTAL", total: fmt(subSum) }), { bold: true, size: F.body });
       });
 
@@ -579,12 +642,10 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
     });
   });
 
-  doc.y += 2;
-  breakIfNeeded(F.total + 8);
+  doc.y += 1;
+  breakIfNeeded(rowHeight(F.total) + 4);
   rule(INK, 0.5);
-  doc.y += F.total * 0.55 + 3;
-  text("TOTAL PRESUPUESTO", left, { bold: true, size: F.total });
-  text(fmt(p.grandTotal), right, { bold: true, size: F.total, align: "right" });
+  detailDataRow(detailRowValues({ desc: "TOTAL PRESUPUESTO", total: fmt(p.grandTotal) }), { bold: true, size: F.total, fill: TOTAL_BG });
 
   return doc;
 }
