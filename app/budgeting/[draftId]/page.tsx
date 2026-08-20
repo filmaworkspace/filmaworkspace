@@ -22,7 +22,7 @@ import {
 import { useUser } from "@/contexts/UserContext";
 import {
   BTN_LIGHT, BTN_LIGHT_ACTIVE, BudgetingDraft, BudgetingCategoryDef, BudgetingAccount, BudgetingSubchapter, BudgetingDetailLine, BudgetingExportConfig, BudgetingFolder, BudgetingFringe, BudgetingFringeVisibility, BudgetingProjectInfo, FringeGroupTarget,
-  CELL_INPUT, DEFAULT_EXPORT_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_RECEIVED_LABEL, DEFAULT_TEXT_LINE_COLOR, DEFAULT_UNITS, PDF_FONT_SIZE_LABELS, PdfFontSize, categoriesEnabled, clearBudgetingClipboard, computeLineTotalForScenario, computeReorder, effectiveLineUnits, getBudgetingClipboard, groupFringeSumsByFolder, orderAfter, resolveCategories, resolveGlobals, setBudgetingClipboard, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
+  CELL_INPUT, DEFAULT_EXPORT_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, DEFAULT_UNITS, PDF_FONT_SIZE_LABELS, PDF_LANGUAGE_LABELS, PdfFontSize, PdfLanguage, categoriesEnabled, clearBudgetingClipboard, computeLineTotalForScenario, computeReorder, effectiveLineUnits, getBudgetingClipboard, groupFringeSumsByFolder, orderAfter, resolveCategories, resolveGlobals, setBudgetingClipboard, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import { buildFwbFromDraft, downloadFwb } from "@/lib/budgetingExport";
 import { downloadBudgetExcel, downloadBudgetPdf } from "@/lib/budgetingReports";
@@ -155,9 +155,6 @@ export default function BudgetingTopPage() {
 
   const [draft, setDraft] = useState<BudgetingDraft | null>(null);
   const [chapters, setChapters] = useState<BudgetingAccount[]>([]);
-  // Solo el recuento, para la "Versión #" de la portada del PDF: cuántas
-  // versiones guardadas hay ya (ver /versions) más esta, la que se exporta ahora.
-  const [snapshotCount, setSnapshotCount] = useState(0);
   const [subchaptersByChapter, setSubchaptersByChapter] = useState<Record<string, BudgetingSubchapter[]>>({});
   const [linesBySubchapter, setLinesBySubchapter] = useState<Record<string, BudgetingDetailLine[]>>({});
   const [loading, setLoading] = useState(true);
@@ -234,12 +231,6 @@ export default function BudgetingTopPage() {
     return () => unsub();
   }, [draftId]);
 
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, `budgetingDrafts/${draftId}/snapshots`), (snap) => {
-      setSnapshotCount(snap.size);
-    });
-    return () => unsub();
-  }, [draftId]);
 
   useEffect(() => {
     const unsubs: Record<string, () => void> = {};
@@ -449,7 +440,9 @@ export default function BudgetingTopPage() {
       .filter((s) => includeTextLines || (!s.isTextLine && !s.isSubtotal))
       .map((s) => ({
         id: s.id, code: s.code, description: s.description, receivedTotal: s.receivedTotal || 0,
-        receivedCode: s.receivedCode || "", receivedLabel: s.receivedLabel || DEFAULT_RECEIVED_LABEL,
+        // Sin valor por defecto en español aquí: si no se ha puesto uno propio,
+        // el builder del PDF rellena el texto por defecto en el idioma elegido.
+        receivedCode: s.receivedCode || "", receivedLabel: s.receivedLabel || "",
         isTextLine: s.isTextLine || false, isSubtotal: s.isSubtotal || false, textBold: s.textBold || false, textColor: s.textColor || null,
       }))])),
     linesBySubchapter: Object.fromEntries(Object.entries(linesBySubchapter).map(([k, v]) => [k, sortByOrder(v)
@@ -466,7 +459,6 @@ export default function BudgetingTopPage() {
     projectInfo: draft?.projectInfo,
     grandTotal,
     exportConfig: draft?.exportConfig,
-    versionNumber: snapshotCount + 1,
   });
   const reportParams = () => buildReportParams(false);
   const pdfReportParams = () => buildReportParams(true);
@@ -507,7 +499,7 @@ export default function BudgetingTopPage() {
   };
 
   const exportConfig: BudgetingExportConfig = draft?.exportConfig || DEFAULT_EXPORT_CONFIG;
-  const updateExportConfig = async (patch: { coverSheet?: boolean; pageBreakPerChapter?: boolean; pdfFontSize?: PdfFontSize; hideZeroTotalSubchapters?: boolean; fields?: Partial<BudgetingExportConfig["fields"]> }) => {
+  const updateExportConfig = async (patch: { coverSheet?: boolean; pageBreakPerChapter?: boolean; pdfFontSize?: PdfFontSize; pdfLanguage?: PdfLanguage; hideZeroTotalSubchapters?: boolean; fields?: Partial<BudgetingExportConfig["fields"]> }) => {
     const next: BudgetingExportConfig = { ...exportConfig, ...patch, fields: { ...exportConfig.fields, ...(patch.fields || {}) } };
     await updateDoc(doc(db, "budgetingDrafts", draftId), { exportConfig: next, updatedAt: serverTimestamp() });
   };
@@ -1027,6 +1019,20 @@ export default function BudgetingTopPage() {
                         ))}
                       </div>
                     </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-slate-700">Idioma</span>
+                      <div className="flex items-center gap-0.5 p-0.5 border border-slate-200 rounded-lg bg-slate-50">
+                        {(["es", "en"] as PdfLanguage[]).map((lang) => (
+                          <button
+                            key={lang}
+                            onClick={() => updateExportConfig({ pdfLanguage: lang })}
+                            className={`px-2 py-1 rounded-md text-[10.5px] font-medium transition-colors ${exportConfig.pdfLanguage === lang ? BTN_LIGHT_ACTIVE : "text-slate-500 hover:text-slate-700"}`}
+                          >
+                            {PDF_LANGUAGE_LABELS[lang]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <label className="flex items-center justify-between gap-2">
                       <span className="text-xs text-slate-700">Ocultar Cuentas con total 0€</span>
                       <input type="checkbox" checked={exportConfig.hideZeroTotalSubchapters} onChange={(e) => updateExportConfig({ hideZeroTotalSubchapters: e.target.checked })} className="accent-[#414E82]" />
@@ -1364,14 +1370,62 @@ export default function BudgetingTopPage() {
             </div>
             <div className="px-5 py-4 space-y-3">
               <p className="text-xs text-slate-500">Aparecen en la portada del PDF exportado. Se quedan guardados en este presupuesto, no hace falta rellenarlos cada vez.</p>
+
+              <div>
+                <label className="text-xs font-medium text-slate-700 block mb-1.5">Título de producción</label>
+                <input
+                  value={projectInfoForm.title || ""}
+                  onChange={(e) => setProjectInfoForm((f) => ({ ...f, title: e.target.value }))}
+                  placeholder={draft.name}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-700 block mb-1.5">Formato</label>
+                <div className="flex items-center gap-0.5 p-0.5 border border-slate-200 rounded-lg bg-slate-50 w-fit">
+                  {(["Película", "Serie"] as const).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setProjectInfoForm((f) => ({ ...f, format: opt }))}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${projectInfoForm.format === opt ? BTN_LIGHT_ACTIVE : "text-slate-500 hover:text-slate-700"}`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+                {projectInfoForm.format === "Serie" ? (
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <input
+                      value={projectInfoForm.episodeCount || ""}
+                      onChange={(e) => setProjectInfoForm((f) => ({ ...f, episodeCount: e.target.value }))}
+                      placeholder="Nº de capítulos"
+                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
+                    />
+                    <input
+                      value={projectInfoForm.episodeDuration || ""}
+                      onChange={(e) => setProjectInfoForm((f) => ({ ...f, episodeDuration: e.target.value }))}
+                      placeholder="Duración de los capítulos"
+                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
+                    />
+                  </div>
+                ) : projectInfoForm.format === "Película" ? (
+                  <input
+                    value={projectInfoForm.filmDuration || ""}
+                    onChange={(e) => setProjectInfoForm((f) => ({ ...f, filmDuration: e.target.value }))}
+                    placeholder="Duración de la película"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 mt-2"
+                  />
+                ) : null}
+              </div>
+
               {([
-                ["title", "Título de producción", draft.name],
-                ["productionCompany", "Productora", ""],
-                ["format", "Formato", "Largometraje, Serie, Publicidad..."],
+                ["version", "Versión #", "v1"],
+                ["dateLabel", "Fecha presupuesto", "Se usa la de hoy si se deja en blanco"],
                 ["director", "Dirección", ""],
                 ["producer", "Producción", ""],
                 ["preparedBy", "Preparado por", ""],
-                ["dateLabel", "Fecha", "Se usa la de hoy si se deja en blanco"],
               ] as const).map(([key, label, placeholder]) => (
                 <div key={key}>
                   <label className="text-xs font-medium text-slate-700 block mb-1.5">{label}</label>
@@ -1383,6 +1437,17 @@ export default function BudgetingTopPage() {
                   />
                 </div>
               ))}
+
+              <div>
+                <label className="text-xs font-medium text-slate-700 block mb-1.5">Notas</label>
+                <textarea
+                  value={projectInfoForm.notes || ""}
+                  onChange={(e) => setProjectInfoForm((f) => ({ ...f, notes: e.target.value }))}
+                  placeholder="Cualquier otra información importante para la portada"
+                  rows={3}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 resize-none"
+                />
+              </div>
             </div>
             <div className="px-5 py-3 border-t border-slate-100 flex gap-2">
               <button onClick={() => setShowProjectInfoModal(false)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
