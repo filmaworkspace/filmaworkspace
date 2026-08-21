@@ -26,6 +26,7 @@ import {
   fmtCurrency, fmtDecimal, getBudgetingClipboard, groupFringeSumsByFolder, isPlainNumber, lineFringeBreakdown, nextOrderValue, orderAfter, pluralizeUnit, resolveGlobals, setBudgetingClipboard, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import BudgetingFormulaInput from "@/components/BudgetingFormulaInput";
+import BudgetingUnitInput from "@/components/BudgetingUnitInput";
 import BudgetingRowContextMenu, { BudgetingRowContextMenuState } from "@/components/BudgetingRowContextMenu";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -313,14 +314,29 @@ function DetailSidebar({
   );
 }
 
+/**
+ * Qué enseñar en un campo Cantidad/X/Tarifa: si se está editando ese campo
+ * ahora mismo, el texto tal cual (fórmula o código de Global incluido, para
+ * poder seguir tocándolo); si no, y es un número suelto, el número tal cual;
+ * si no, y es una fórmula/Global, el valor ya resuelto — nunca el ID del
+ * Global ni la fórmula en crudo fuera de edición.
+ */
+function displayFieldValue(raw: string, key: "units" | "multiplier" | "rate", focusedField: "units" | "multiplier" | "rate" | "unit" | null, globalValues: Record<string, number>): string {
+  if (focusedField === key) return raw;
+  if (isPlainNumber(raw)) return raw;
+  const evaluated = evaluateFieldExpr(raw, globalValues);
+  return evaluated.error ? raw : fmtDecimal(evaluated.value);
+}
+
 // ─── Fila de campos, estilo Excel: sin caja, sin placeholder, guarda sola al
 // perder el foco (sin botón de confirmar). Componente de módulo estable: no
 // se redefine entre renders, así los inputs no pierden el foco al escribir. ──
 function LineFieldsGrid({
-  fields, onChange, onBlurAny, onEnter, onEscape, globals, totalPreview, muted, template, showComment, showTags, autoFocus, indicators, actions,
+  fields, displayValues, onChange, onFocusField, onBlurAny, onEnter, onEscape, globals, units, totalPreview, muted, template, showComment, showTags, autoFocus, indicators, actions,
 }: {
-  fields: LineFields; onChange: (patch: Partial<LineFields>) => void; onBlurAny: () => void;
-  onEnter: () => void; onEscape: () => void; globals: { code: string; label: string }[];
+  fields: LineFields; displayValues: { units: string; multiplier: string; rate: string; unit: string };
+  onChange: (patch: Partial<LineFields>) => void; onFocusField: (key: "units" | "multiplier" | "rate" | "unit") => void; onBlurAny: () => void;
+  onEnter: () => void; onEscape: () => void; globals: { code: string; label: string }[]; units: { id: string; singular: string }[];
   totalPreview: number; muted: boolean; template: string; showComment: boolean; showTags: boolean; autoFocus?: boolean;
   indicators?: React.ReactNode; actions?: React.ReactNode;
 }) {
@@ -334,13 +350,13 @@ function LineFieldsGrid({
         className={`${CELL_INPUT} font-mono text-xs`} />
       <input value={fields.description} onChange={(e) => onChange({ description: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} text-xs pl-2`} />
-      <BudgetingFormulaInput value={fields.units} onChange={(v) => onChange({ units: v })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
+      <BudgetingFormulaInput value={displayValues.units} onChange={(v) => onChange({ units: v })} onFocus={() => onFocusField("units")} onBlur={onBlurAny} onKeyDown={handleKeyDown}
         globals={globals} title="Número o fórmula con Globales" className={`${CELL_INPUT} text-xs text-right pl-2`} />
-      <input list="unit-suggestions" value={fields.unit} onChange={(e) => onChange({ unit: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} text-[11px] pl-2`} />
-      <BudgetingFormulaInput value={fields.multiplier} onChange={(v) => onChange({ multiplier: v })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
+      <BudgetingUnitInput value={displayValues.unit} onChange={(v) => onChange({ unit: v })} onFocus={() => onFocusField("unit")} onBlur={onBlurAny} onKeyDown={handleKeyDown}
+        units={units} className={`${CELL_INPUT} text-[11px] pl-2`} />
+      <BudgetingFormulaInput value={displayValues.multiplier} onChange={(v) => onChange({ multiplier: v })} onFocus={() => onFocusField("multiplier")} onBlur={onBlurAny} onKeyDown={handleKeyDown}
         globals={globals} title="Número o fórmula con Globales" className={`${CELL_INPUT} text-[11px] text-right pl-2`} />
-      <BudgetingFormulaInput value={fields.rate} onChange={(v) => onChange({ rate: v })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
+      <BudgetingFormulaInput value={displayValues.rate} onChange={(v) => onChange({ rate: v })} onFocus={() => onFocusField("rate")} onBlur={onBlurAny} onKeyDown={handleKeyDown}
         globals={globals} title="Número o fórmula con Globales" className={`${CELL_INPUT} text-xs text-right pl-2`} />
       <span className={`flex items-center justify-end text-xs font-semibold pl-2 pr-2 ${muted ? "text-slate-400 italic" : "text-slate-900"}`}>{fmtDecimal(totalPreview)}</span>
       {showComment && (
@@ -360,16 +376,30 @@ function LineFieldsGrid({
 }
 
 function LineRow({
-  line, fringes, globals, globalValues, columnsConfig, template, isFirst, isLast, autoFocus, error, sidebarOpen, selected,
+  line, fringes, globals, globalValues, units, columnsConfig, template, isFirst, isLast, autoFocus, error, sidebarOpen, selected,
   onCommit, onDuplicate, onDelete, onMove, onOpenSidebar, onContextMenu, onRowMouseDown,
 }: {
   line: BudgetingDetailLine; fringes: BudgetingFringe[];
-  globals: { code: string; label: string }[]; globalValues: Record<string, number>;
+  globals: { code: string; label: string }[]; globalValues: Record<string, number>; units: BudgetingUnit[];
   columnsConfig: BudgetingDetailColumnsConfig; template: string; isFirst: boolean; isLast: boolean; autoFocus?: boolean; error?: string; sidebarOpen: boolean; selected?: boolean;
   onCommit: (fields: LineFields) => void; onDuplicate: () => void; onDelete: () => void; onMove: (direction: "up" | "down") => void; onOpenSidebar: () => void;
   onContextMenu: (e: React.MouseEvent) => void; onRowMouseDown: (e: React.MouseEvent) => void;
 }) {
   const [fields, setFields] = useState<LineFields>(() => toFields(line));
+  // Mientras se edita un campo con fórmula/Global, se ve y se toca el texto
+  // tal cual se escribió; en cuanto se sale de ahí, se enseña el número
+  // resuelto (no el ID del Global ni la fórmula en crudo) — igual que una
+  // celda de hoja de cálculo. La Unidad sigue el mismo patrón: en edición,
+  // el singular tal cual se escribió; fuera de edición, en plural si la
+  // Cantidad de la línea es más de 1 (ver pluralizeUnit).
+  const [focusedField, setFocusedField] = useState<"units" | "multiplier" | "rate" | "unit" | null>(null);
+  const currentUnitsQty = evaluateFieldExpr(fields.units, globalValues).value;
+  const displayValues = {
+    units: displayFieldValue(fields.units, "units", focusedField, globalValues),
+    multiplier: displayFieldValue(fields.multiplier, "multiplier", focusedField, globalValues),
+    rate: displayFieldValue(fields.rate, "rate", focusedField, globalValues),
+    unit: focusedField === "unit" ? fields.unit : pluralizeUnit(fields.unit, currentUnitsQty, units),
+  };
   const hasFormula = !!(line.unitsExpr || line.multiplierExpr || line.rateExpr);
   const hasHiddenComment = !columnsConfig.showComment && !!line.notes;
   const hasFringesOrRoute = (line.fringeIds?.length || 0) > 0 || !!line.routedTo;
@@ -383,11 +413,14 @@ function LineRow({
     <div className={`group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
       <LineFieldsGrid
         fields={fields}
+        displayValues={displayValues}
         onChange={(patch) => setFields((f) => ({ ...f, ...patch }))}
-        onBlurAny={() => onCommit(fields)}
+        onFocusField={setFocusedField}
+        onBlurAny={() => { setFocusedField(null); onCommit(fields); }}
         onEnter={() => onCommit(fields)}
         onEscape={() => setFields(toFields(line))}
         globals={globals}
+        units={units}
         totalPreview={preview}
         muted={!!line.routedTo}
         template={template}
@@ -1128,10 +1161,6 @@ export default function BudgetingSubchapterPage() {
               </button>
             </span>
           </div>
-          <datalist id="unit-suggestions">
-            {units.map((u) => <option key={u.id} value={u.singular} />)}
-          </datalist>
-
           <div className="divide-y divide-slate-100">
             {(() => {
               const sorted = sortByOrder(lines.filter(matchesSearch));
@@ -1202,6 +1231,7 @@ export default function BudgetingSubchapterPage() {
                     fringes={fringes}
                     globals={globalOptions}
                     globalValues={globalResolution.values}
+                    units={units}
                     columnsConfig={columnsConfig}
                     template={template}
                     error={rowErrors[line.id]}
