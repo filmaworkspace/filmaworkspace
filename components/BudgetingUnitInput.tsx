@@ -4,14 +4,14 @@
 import { useEffect, useRef, useState } from "react";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Input de texto con autocompletado de códigos de Globales: se usa en
-// cualquier campo que admite fórmulas (Valor de un Global, Cantidad/X/Tarifa
-// de una línea de Detalle). Mientras escribes, si el último token parece el
-// principio de un código, sugiere los Globales que empiezan por ahí; clic o
-// Tab lo completa. No es un <select>: sigue siendo texto libre.
+// Input de texto para el campo "Unidad" de una línea de Detalle, con
+// sugerencias de las Unidades del borrador (ver /units). A diferencia de un
+// <input list="..."> nativo (que enseña todas las opciones nada más hacer
+// clic), aquí el desplegable solo aparece al escribir al menos una letra,
+// filtrado a lo que coincida — sigue siendo texto libre, no un <select>.
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface GlobalOption { code: string; label: string; }
+interface UnitOption { id: string; singular: string; }
 
 interface Props {
   value: string;
@@ -19,13 +19,13 @@ interface Props {
   onFocus?: () => void;
   onBlur?: () => void;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
-  globals: GlobalOption[];
+  units: UnitOption[];
   className?: string;
   autoFocus?: boolean;
   title?: string;
 }
 
-export default function BudgetingFormulaInput({ value, onChange, onFocus, onBlur, onKeyDown, globals, className, autoFocus, title }: Props) {
+export default function BudgetingUnitInput({ value, onChange, onFocus, onBlur, onKeyDown, units, className, autoFocus, title }: Props) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -36,15 +36,13 @@ export default function BudgetingFormulaInput({ value, onChange, onFocus, onBlur
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  const match = /[A-Za-z_][A-Za-z0-9_]*$/.exec(value);
-  const token = match ? match[0] : "";
-  const suggestions = token
-    ? globals.filter((g) => g.code.toLowerCase().startsWith(token.toLowerCase()) && g.code.toLowerCase() !== token.toLowerCase()).slice(0, 6)
+  const trimmed = value.trim().toLowerCase();
+  const suggestions = trimmed
+    ? units.filter((u) => u.singular.toLowerCase().includes(trimmed) && u.singular.toLowerCase() !== trimmed).slice(0, 8)
     : [];
 
-  const insert = (code: string) => {
-    const next = match ? value.slice(0, match.index) + code : value + code;
-    onChange(next);
+  const select = (singular: string) => {
+    onChange(singular);
     setOpen(false);
     inputRef.current?.focus();
   };
@@ -57,27 +55,26 @@ export default function BudgetingFormulaInput({ value, onChange, onFocus, onBlur
         title={title}
         value={value}
         onChange={(e) => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => { setOpen(true); onFocus?.(); }}
+        onFocus={() => onFocus?.()}
         onBlur={onBlur}
         onKeyDown={(e) => {
-          if (e.key === "Tab" && open && suggestions.length > 0) { e.preventDefault(); insert(suggestions[0].code); return; }
+          if (e.key === "Tab" && open && suggestions.length > 0) { e.preventDefault(); select(suggestions[0].singular); return; }
           if (e.key === "Escape") setOpen(false);
           onKeyDown?.(e);
         }}
         className={className}
       />
       {open && suggestions.length > 0 && (
-        <div className="absolute z-30 top-full left-0 mt-0.5 w-52 bg-white border border-slate-200 rounded-lg shadow-lg py-1 max-h-40 overflow-y-auto">
-          {suggestions.map((g) => (
+        <div className="absolute z-30 top-full left-0 mt-0.5 w-40 bg-white border border-slate-200 rounded-lg shadow-lg py-1 max-h-40 overflow-y-auto">
+          {suggestions.map((u) => (
             <button
-              key={g.code}
+              key={u.id}
               type="button"
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => insert(g.code)}
-              className="w-full flex items-center justify-between gap-2 px-2.5 py-1 text-left hover:bg-slate-50"
+              onClick={() => select(u.singular)}
+              className="w-full px-2.5 py-1 text-left text-[11px] text-slate-700 hover:bg-slate-50"
             >
-              <span className="text-[11px] font-mono flex-shrink-0" style={{ color: "#414E82" }}>{g.code}</span>
-              <span className="text-[10px] text-slate-400 truncate">{g.label}</span>
+              {u.singular}
             </button>
           ))}
         </div>

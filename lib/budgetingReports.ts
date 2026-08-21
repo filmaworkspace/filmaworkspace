@@ -448,11 +448,13 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
 
   // Sello de emisión, anclado al fondo de la última página de la portada
   // (si el contenido de arriba ya llega tan abajo, sigue justo debajo en
-  // vez de superponerse).
+  // vez de superponerse). pageH-16 es justo la línea del pie de página
+  // compartido (ver FilmaPDF.finish()): hay que quedarse claramente por
+  // encima, no pegado a ella.
   const now = new Date();
   const issuedDate = new Intl.DateTimeFormat(t.dateLocale, { day: "2-digit", month: "long", year: "numeric" }).format(now);
   const issuedTime = new Intl.DateTimeFormat(t.dateLocale, { hour: "2-digit", minute: "2-digit" }).format(now);
-  const issuedY = doc.pageH - 16;
+  const issuedY = doc.pageH - 22;
   doc.y = doc.y < issuedY ? issuedY : doc.y + 4;
   text(t.issuedOn(issuedDate, issuedTime), left, { size: Math.max(6, F.body - 1), color: MUTED });
 
