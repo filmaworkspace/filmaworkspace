@@ -22,7 +22,7 @@ import {
 import { useUser } from "@/contexts/UserContext";
 import {
   BTN_LIGHT, BTN_LIGHT_ACTIVE, BudgetingDraft, BudgetingCategoryDef, BudgetingAccount, BudgetingSubchapter, BudgetingDetailLine, BudgetingExportConfig, BudgetingFolder, BudgetingFringe, BudgetingFringeVisibility, BudgetingProjectInfo, FringeGroupTarget,
-  CELL_INPUT, DEFAULT_EXPORT_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, DEFAULT_UNITS, PDF_FONT_SIZE_LABELS, PDF_LANGUAGE_LABELS, PdfFontSize, PdfLanguage, categoriesEnabled, clearBudgetingClipboard, computeLineTotalForScenario, computeReorder, effectiveLineUnits, getBudgetingClipboard, groupFringeSumsByFolder, orderAfter, resolveCategories, resolveGlobals, setBudgetingClipboard, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
+  CELL_INPUT, DEFAULT_EXPORT_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, DEFAULT_UNITS, PDF_FONT_SIZE_LABELS, PDF_LANGUAGE_LABELS, PdfFontSize, PdfLanguage, categoriesEnabled, clearBudgetingClipboard, computeLineTotalForScenario, computeReorder, effectiveLineUnits, focusBudgetingRowField, getBudgetingClipboard, groupFringeSumsByFolder, orderAfter, resolveCategories, resolveGlobals, setBudgetingClipboard, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import { buildFwbFromDraft, downloadFwb } from "@/lib/budgetingExport";
 import { downloadBudgetExcel, downloadBudgetPdf } from "@/lib/budgetingReports";
@@ -76,8 +76,10 @@ function ChapterRow({
   // se borraba solo al perder el foco.
   const commit = () => onCommit(code.trim(), description.trim());
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") e.currentTarget.blur();
-    if (e.key === "Escape") { setCode(chapter.code); setDescription(chapter.description); }
+    if (e.key === "Enter") { e.preventDefault(); if (!focusBudgetingRowField(e.currentTarget, "down")) e.currentTarget.blur(); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); focusBudgetingRowField(e.currentTarget, "down"); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); focusBudgetingRowField(e.currentTarget, "up"); }
+    else if (e.key === "Escape") { setCode(chapter.code); setDescription(chapter.description); }
   };
 
   if (chapter.isTextLine || chapter.isSubtotal) {
@@ -87,11 +89,13 @@ function ChapterRow({
       if (description.trim() !== chapter.description) onCommitTextLine({ description: description.trim() });
     };
     const handleTextKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Enter") e.currentTarget.blur();
-      if (e.key === "Escape") setDescription(chapter.description);
+      if (e.key === "Enter") { e.preventDefault(); if (!focusBudgetingRowField(e.currentTarget, "down")) e.currentTarget.blur(); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); focusBudgetingRowField(e.currentTarget, "down"); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); focusBudgetingRowField(e.currentTarget, "up"); }
+      else if (e.key === "Escape") setDescription(chapter.description);
     };
     return (
-      <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+      <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
         <span />
         <input
           autoFocus={autoFocus}
@@ -124,7 +128,7 @@ function ChapterRow({
   }
 
   return (
-    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+    <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
       <Link href={`/budgeting/${draftId}/accounts/${chapter.id}`} className="flex items-center justify-center" title="Entrar">
         <ChevronRight size={13} className="text-slate-300 group-hover:text-[#414E82] group-hover:translate-x-0.5 transition-all" />
       </Link>

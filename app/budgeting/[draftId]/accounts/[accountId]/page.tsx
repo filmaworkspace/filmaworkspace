@@ -16,7 +16,7 @@ import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, Search, Trash2 } fro
 import { useUser } from "@/contexts/UserContext";
 import {
   BudgetingAccount, BudgetingDetailLine, BudgetingDraft, BudgetingFolder, BudgetingFringe, BudgetingFringeVisibility, BudgetingSubchapter, FringeGroupTarget,
-  CELL_INPUT, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, clearBudgetingClipboard, computeReorder, fmtCurrency, getBudgetingClipboard, groupFringeSumsByFolder, orderAfter, setBudgetingClipboard, sortByOrder, subchapterTotal,
+  CELL_INPUT, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, clearBudgetingClipboard, computeReorder, fmtCurrency, focusBudgetingRowField, getBudgetingClipboard, groupFringeSumsByFolder, orderAfter, setBudgetingClipboard, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import BudgetingColumnsMenu from "@/components/BudgetingColumnsMenu";
 import BudgetingFringeLineRow from "@/components/BudgetingFringeLineRow";
@@ -62,8 +62,10 @@ function SubRow({
   // se borraba solo al perder el foco.
   const commit = () => onCommit(code.trim(), description.trim());
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") e.currentTarget.blur();
-    if (e.key === "Escape") { setCode(sub.code); setDescription(sub.description); }
+    if (e.key === "Enter") { e.preventDefault(); if (!focusBudgetingRowField(e.currentTarget, "down")) e.currentTarget.blur(); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); focusBudgetingRowField(e.currentTarget, "down"); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); focusBudgetingRowField(e.currentTarget, "up"); }
+    else if (e.key === "Escape") { setCode(sub.code); setDescription(sub.description); }
   };
 
   if (sub.isTextLine || sub.isSubtotal) {
@@ -73,11 +75,13 @@ function SubRow({
       if (description.trim() !== sub.description) onCommitTextLine({ description: description.trim() });
     };
     const handleTextKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Enter") e.currentTarget.blur();
-      if (e.key === "Escape") setDescription(sub.description);
+      if (e.key === "Enter") { e.preventDefault(); if (!focusBudgetingRowField(e.currentTarget, "down")) e.currentTarget.blur(); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); focusBudgetingRowField(e.currentTarget, "down"); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); focusBudgetingRowField(e.currentTarget, "up"); }
+      else if (e.key === "Escape") setDescription(sub.description);
     };
     return (
-      <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+      <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
         <span />
         <input
           autoFocus={autoFocus}
@@ -110,7 +114,7 @@ function SubRow({
   }
 
   return (
-    <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+    <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
       <Link href={`/budgeting/${draftId}/accounts/${accountId}/subchapters/${sub.id}`} className="flex items-center justify-center" title="Entrar">
         <ChevronRight size={13} className="text-slate-300 group-hover:text-[#414E82] group-hover:translate-x-0.5 transition-all" />
       </Link>

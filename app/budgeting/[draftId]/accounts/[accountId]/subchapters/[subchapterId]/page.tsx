@@ -23,7 +23,7 @@ import {
   BTN_LIGHT_ACTIVE, BudgetingAccount, BudgetingDetailColumnsConfig, BudgetingDetailLine, BudgetingDraft, BudgetingFolder, BudgetingFringe, BudgetingFringeVisibility,
   BudgetingLineRoute, BudgetingSubchapter, CELL_INPUT, DEFAULT_DETAIL_COLUMNS_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_RECEIVED_LABEL, DEFAULT_TEXT_LINE_COLOR, DETAIL_STAT_COLUMN_PX, DetailStatColumnWidth, FringeGroupTarget,
   BudgetingUnit, DEFAULT_UNITS, clearBudgetingClipboard, computeFringeExtras, computeLineTotal, computeReorder, evaluateFieldExpr,
-  fmtCurrency, fmtDecimal, getBudgetingClipboard, groupFringeSumsByFolder, isPlainNumber, lineFringeBreakdown, nextOrderValue, orderAfter, pluralizeUnit, resolveGlobals, setBudgetingClipboard, sortByOrder, subchapterTotal,
+  fmtCurrency, fmtDecimal, focusBudgetingRowField, getBudgetingClipboard, groupFringeSumsByFolder, isPlainNumber, lineFringeBreakdown, nextOrderValue, orderAfter, pluralizeUnit, resolveGlobals, setBudgetingClipboard, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import BudgetingFormulaInput from "@/components/BudgetingFormulaInput";
 import BudgetingUnitInput from "@/components/BudgetingUnitInput";
@@ -332,17 +332,30 @@ function displayFieldValue(raw: string, key: "units" | "multiplier" | "rate", fo
 // perder el foco (sin botón de confirmar). Componente de módulo estable: no
 // se redefine entre renders, así los inputs no pierden el foco al escribir. ──
 function LineFieldsGrid({
-  fields, displayValues, onChange, onFocusField, onBlurAny, onEnter, onEscape, globals, units, totalPreview, muted, template, showComment, showTags, autoFocus, indicators, actions,
+  fields, displayValues, onChange, onFocusField, onBlurAny, onEscape, globals, units, totalPreview, muted, template, showComment, showTags, autoFocus, indicators, actions,
 }: {
   fields: LineFields; displayValues: { units: string; multiplier: string; rate: string; unit: string };
   onChange: (patch: Partial<LineFields>) => void; onFocusField: (key: "units" | "multiplier" | "rate" | "unit") => void; onBlurAny: () => void;
-  onEnter: () => void; onEscape: () => void; globals: { code: string; label: string }[]; units: { id: string; singular: string }[];
+  onEscape: () => void; globals: { code: string; label: string }[]; units: { id: string; singular: string }[];
   totalPreview: number; muted: boolean; template: string; showComment: boolean; showTags: boolean; autoFocus?: boolean;
   indicators?: React.ReactNode; actions?: React.ReactNode;
 }) {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") { onEnter(); }
-    if (e.key === "Escape") { onEscape(); }
+    if (e.key === "Enter") {
+      // Mover el foco a la fila de abajo ya dispara el guardado solo (blur
+      // -> onBlurAny -> onCommit); si no hay fila siguiente, se guarda igual
+      // quitando el foco a mano, como antes.
+      e.preventDefault();
+      if (!focusBudgetingRowField(e.currentTarget, "down")) e.currentTarget.blur();
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      focusBudgetingRowField(e.currentTarget, "down");
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      focusBudgetingRowField(e.currentTarget, "up");
+    } else if (e.key === "Escape") {
+      onEscape();
+    }
   };
   return (
     <div className="grid gap-0 divide-x divide-slate-200 px-4" style={{ gridTemplateColumns: template }}>
@@ -410,14 +423,13 @@ function LineRow({
   );
 
   return (
-    <div className={`group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+    <div data-budget-row className={`group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
       <LineFieldsGrid
         fields={fields}
         displayValues={displayValues}
         onChange={(patch) => setFields((f) => ({ ...f, ...patch }))}
         onFocusField={setFocusedField}
         onBlurAny={() => { setFocusedField(null); onCommit(fields); }}
-        onEnter={() => onCommit(fields)}
         onEscape={() => setFields(toFields(line))}
         globals={globals}
         units={units}
@@ -485,15 +497,17 @@ function TextLineRow({
     if (description.trim() !== line.description) onCommitTextLine({ description: description.trim() });
   };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") e.currentTarget.blur();
-    if (e.key === "Escape") setDescription(line.description);
+    if (e.key === "Enter") { e.preventDefault(); if (!focusBudgetingRowField(e.currentTarget, "down")) e.currentTarget.blur(); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); focusBudgetingRowField(e.currentTarget, "down"); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); focusBudgetingRowField(e.currentTarget, "up"); }
+    else if (e.key === "Escape") setDescription(line.description);
   };
   let actionsCol = 8;
   if (columnsConfig.showComment) actionsCol++;
   if (columnsConfig.showTags) actionsCol++;
 
   return (
-    <div className={`grid gap-0 divide-x divide-slate-200 px-4 group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} style={{ gridTemplateColumns: template }} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+    <div data-budget-row className={`grid gap-0 divide-x divide-slate-200 px-4 group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} style={{ gridTemplateColumns: template }} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
       <input
         autoFocus={autoFocus}
         value={description}
