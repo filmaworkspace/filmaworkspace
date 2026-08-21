@@ -928,3 +928,34 @@ export function clearBudgetingClipboard() {
   if (typeof window === "undefined") return;
   window.sessionStorage.removeItem(BUDGETING_CLIPBOARD_KEY);
 }
+
+// ─── Navegación de teclado estilo hoja de cálculo, compartida por los 3
+// niveles de Budgeting (Top Sheet, Capítulo, Detalle): Intro o flecha abajo
+// baja a la misma columna de la fila siguiente; flecha arriba, a la
+// anterior. Cada fila editable lleva el atributo `data-budget-row` en su
+// div contenedor; las filas tienen que ser hermanas directas en el DOM
+// (mismo `divide-y`/lista) para que el orden visual coincida con el orden
+// de navegación. Devuelve si pudo mover el foco, para que quien la llama
+// decida qué hacer si no había fila siguiente/anterior (normalmente,
+// quitar el foco igualmente para que el valor se guarde). ─────────────────
+export type BudgetingNavDirection = "up" | "down";
+
+export function focusBudgetingRowField(current: HTMLElement, direction: BudgetingNavDirection): boolean {
+  const row = current.closest<HTMLElement>("[data-budget-row]");
+  if (!row || !row.parentElement) return false;
+  const rows = Array.from(row.parentElement.children).filter(
+    (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute("data-budget-row")
+  );
+  const idx = rows.indexOf(row);
+  const targetRow = direction === "down" ? rows[idx + 1] : rows[idx - 1];
+  if (!targetRow) return false;
+  const fieldsInRow = Array.from(row.querySelectorAll<HTMLElement>("input, textarea"));
+  const colIdx = fieldsInRow.indexOf(current);
+  if (colIdx < 0) return false;
+  const targetFields = Array.from(targetRow.querySelectorAll<HTMLElement>("input, textarea"));
+  const targetEl = targetFields[colIdx] ?? targetFields[targetFields.length - 1];
+  if (!targetEl) return false;
+  targetEl.focus();
+  if (targetEl instanceof HTMLInputElement || targetEl instanceof HTMLTextAreaElement) targetEl.select();
+  return true;
+}
