@@ -1,9 +1,17 @@
 import { doc, getDoc, type Firestore } from "firebase/firestore";
 
+/** Respuesta guardada de un clic para la cola de soporte: no se envía sola, el agente la elige a mano para lo que se repite (cómo resetear una contraseña, cómo pedir acceso a Budgeting...). */
+export interface SupportMacro {
+  id: string;
+  label: string;
+  text: string;
+}
+
 export interface AutomatedMessages {
   welcomeSales: string;
   welcomeTechnical: string;
   slowResponse: string;
+  macros: SupportMacro[];
 }
 
 export const DEFAULT_AUTOMATED_MESSAGES: AutomatedMessages = {
@@ -13,6 +21,11 @@ export const DEFAULT_AUTOMATED_MESSAGES: AutomatedMessages = {
     "Hola, {{nombre}} 👋 Un agente de soporte te atenderá enseguida. Mientras tanto, cuéntanos qué te trae por aquí.",
   slowResponse:
     "Estamos tardando en responder. Mientras tanto, escríbenos a ventas@filmaworkspace.com.",
+  macros: [
+    { id: "m1", label: "Restablecer contraseña", text: "Para restablecer tu contraseña, ve a la pantalla de inicio de sesión y pulsa \"¿Has olvidado tu contraseña?\". Te llegará un correo con el enlace." },
+    { id: "m2", label: "Pedir acceso a Budgeting", text: "El acceso a Budgeting lo activa un administrador desde tu cuenta. Dime el email con el que iniciaste sesión y te lo activo ahora mismo." },
+    { id: "m3", label: "Derivar a ventas", text: "Para hablar sobre planes y precios, un agente de ventas te atenderá enseguida — gracias por tu paciencia." },
+  ],
 };
 
 // Sustituye {{nombre}} (y variantes con espacios/mayúsculas) por el valor dado.

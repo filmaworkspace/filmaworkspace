@@ -672,6 +672,33 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Flags de función (ver "Ver como el usuario" / admindashboard, pestaña
+    // Sistema): generaliza lo que budgetingAccess ya hacía de forma binaria
+    // y de un solo uso, para poder probar la próxima función nueva con un
+    // grupo reducido de usuarios antes de abrirla a todos.
+    match /meta/featureFlags {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Registro de cada ejecución del cron de Horario (ver app/api/cron/horario):
+    // solo lo escribe el Admin SDK desde el propio cron (bypassa estas reglas),
+    // aquí solo se controla quién puede leerlo desde admindashboard.
+    match /meta/horarioCron/runs/{runId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Registro de auditoría: cada admin deja constancia de sus propios
+    // cambios sensibles (rol, borrados, mantenimiento, difusión...) desde
+    // admindashboard. Solo se puede crear (nunca editar ni borrar), y solo
+    // como uno mismo — así nadie puede escribir una entrada a nombre de otro.
+    match /adminAuditLog/{entryId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.adminId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
     match /guides/{guideId} {
       // Públicas si están publicadas (para el link que Soporte comparte);
       // admins y agentes de soporte ven también los borradores.
