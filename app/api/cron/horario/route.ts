@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 
 // Vercel cron hits this every 15 minutes.
 // It checks which projects have sendTime within the current 15-min window
@@ -78,6 +79,22 @@ export async function GET(req: NextRequest) {
     } catch (err: any) {
       errors.push(`${projectDoc.id}: ${err.message}`);
     }
+  }
+
+  // Deja rastro de cada ejecución para el monitor de admindashboard: sin esto,
+  // un envío que lleva días fallando en silencio solo se descubre cuando un
+  // usuario avisa de que no le llegó su horario.
+  try {
+    await db.collection("meta").doc("horarioCron").collection("runs").add({
+      runAt: FieldValue.serverTimestamp(),
+      date: todayStr,
+      window: windowTimes,
+      checked: activeProjects.length,
+      triggered,
+      errors,
+    });
+  } catch (err) {
+    console.error("[cron/horario] no se pudo guardar el registro de ejecución", err);
   }
 
   return NextResponse.json({ triggered, errors, window: windowTimes, date: todayStr });

@@ -7,8 +7,8 @@ import { useRouter } from "next/navigation";
 import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
-import { db } from "@/lib/firebase";
-import { collection, deleteDoc, doc, onSnapshot, orderBy, query, updateDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query, updateDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
@@ -20,6 +20,8 @@ import {
   Eye,
   EyeOff,
   FileText,
+  Loader2,
+  Megaphone,
   Plus,
   Search,
   Trash2,
@@ -46,6 +48,8 @@ export default function GuidesListPage() {
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Guide | null>(null);
+  const [announceTarget, setAnnounceTarget] = useState<Guide | null>(null);
+  const [announcing, setAnnouncing] = useState(false);
 
   const showToast = (type: "success" | "error", message: string) => {
     setToast({ type, message });
@@ -89,6 +93,33 @@ export default function GuidesListPage() {
     const url = `${window.location.origin}/guias/${guide.slug}`;
     navigator.clipboard.writeText(url);
     showToast("success", "Link copiado");
+  };
+
+  // No hay (todavía) un registro de quién ha visto cada guía, solo el
+  // contador agregado de `views` — así que el aviso va a todos los usuarios,
+  // no solo a quien no la haya abierto. Sigue siendo mucho mejor que
+  // publicar una guía nueva y que nadie se entere.
+  const handleAnnounceGuide = async (guide: Guide) => {
+    setAnnouncing(true);
+    try {
+      const usersSnap = await getDocs(collection(db, "users"));
+      const emails = usersSnap.docs.map((d) => d.data().email).filter((e): e is string => !!e);
+      const url = `${window.location.origin}/guias/${guide.slug}`;
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/send-broadcast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ to: emails, content: `Nueva guía disponible: "${guide.title}"\n\n${url}` }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "Error al enviar");
+      showToast("success", `Aviso enviado a ${body.sent ?? emails.length} usuarios`);
+      setAnnounceTarget(null);
+    } catch (err: any) {
+      showToast("error", err.message || "Error al enviar el aviso");
+    } finally {
+      setAnnouncing(false);
+    }
   };
 
   const doDelete = async (guide: Guide) => {
@@ -297,6 +328,15 @@ export default function GuidesListPage() {
                         <td className="px-4 py-3 font-mono text-[11px] text-slate-400 whitespace-nowrap">{formatDate(guide.updatedAt)}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-0.5">
+                            {guide.published && (
+                              <button
+                                onClick={() => setAnnounceTarget(guide)}
+                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                                title="Avisar a los usuarios por correo"
+                              >
+                                <Megaphone size={14} />
+                              </button>
+                            )}
                             <button
                               onClick={() => copyLink(guide)}
                               className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
@@ -344,6 +384,26 @@ export default function GuidesListPage() {
               </button>
               <button onClick={() => doDelete(confirmDelete)} className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium text-sm">
                 Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {announceTarget && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => !announcing && setAnnounceTarget(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-slate-900 mb-2">Avisar de &quot;{announceTarget.title}&quot;</h3>
+            <p className="text-sm text-slate-600 mb-6">
+              Se mandará un correo a todos los usuarios de la plataforma con un enlace a esta guía. No hay forma de saber quién ya la ha visto, así que va a todos por igual.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setAnnounceTarget(null)} disabled={announcing} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm disabled:opacity-50">
+                Cancelar
+              </button>
+              <button onClick={() => handleAnnounceGuide(announceTarget)} disabled={announcing} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-medium text-sm disabled:opacity-50">
+                {announcing && <Loader2 size={14} className="animate-spin" />}
+                {announcing ? "Enviando..." : "Enviar aviso"}
               </button>
             </div>
           </div>

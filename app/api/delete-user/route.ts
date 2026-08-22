@@ -45,6 +45,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 5b. Borrar su historial de soporte (supportChats/{uid} + mensajes) y
+    //     sus borradores de Budgeting (tanto el índice como el borrador
+    //     entero, con sus capítulos/cuentas/líneas/versiones) — antes esto
+    //     se quedaba huérfano: el usuario desaparecía pero su rastro seguía
+    //     ahí, sin nadie que lo viera ni pudiera limpiarlo.
+    try {
+      await db.recursiveDelete(db.collection("supportChats").doc(uid));
+    } catch (chatErr) {
+      console.warn("[delete-user] Support chat cleanup skipped:", chatErr);
+    }
+    try {
+      const draftsSnap = await db.collection("userBudgetingDrafts").doc(uid).collection("drafts").get();
+      await Promise.all(draftsSnap.docs.map((d) => db.recursiveDelete(db.collection("budgetingDrafts").doc(d.id))));
+      await db.recursiveDelete(db.collection("userBudgetingDrafts").doc(uid));
+      await db.recursiveDelete(db.collection("userBudgetingTemplates").doc(uid));
+    } catch (draftErr) {
+      console.warn("[delete-user] Budgeting drafts cleanup skipped:", draftErr);
+    }
+
     // 6. Borrar archivos de Storage bajo users/{uid}/ si existen
     try {
       const storage = getStorage();

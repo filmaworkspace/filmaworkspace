@@ -14,6 +14,7 @@ import {
   doc,
   getDocs,
   getDoc,
+  limit,
   onSnapshot,
   orderBy,
   query,
@@ -84,6 +85,7 @@ import {
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import { AutomatedMessages, DEFAULT_AUTOMATED_MESSAGES, fetchAutomatedMessages } from "@/lib/automatedMessages";
+import { FeatureFlags, fetchFeatureFlags } from "@/lib/featureFlags";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -124,6 +126,16 @@ interface Project {
   memberCount: number;
   members?: Member[];
   stats?: { poCount: number; invoiceCount: number; budgetTotal: number };
+  /** Fecha del último evento en `logs` de este proyecto (ver "Cuentas en riesgo"): null si nunca hubo actividad registrada. */
+  lastActivityAt?: Timestamp | null;
+}
+
+interface PendingInvitation {
+  id: string;
+  email: string;
+  projectId: string;
+  projectName: string;
+  createdAt: Timestamp | null;
 }
 
 interface Member {
@@ -143,6 +155,7 @@ interface User {
   supportSpecialty?: "sales" | "technical" | "both";
   isDemo?: boolean;
   budgetingAccess?: boolean;
+  createdAt?: Timestamp | null;
   projectCount: number;
   projects: UserProject[];
 }
@@ -186,6 +199,22 @@ const SPECIALTY_LABEL: Record<string, string> = {
   sales: "Ventas",
   technical: "Soporte técnico",
   both: "Ventas + Soporte",
+};
+
+const AUDIT_ACTION_LABEL: Record<string, string> = {
+  maintenance_enabled: "activó el modo mantenimiento",
+  maintenance_disabled: "desactivó el modo mantenimiento",
+  project_deleted: "eliminó un proyecto",
+  producer_deleted: "eliminó una productora",
+  user_role_changed: "cambió el rol de un usuario",
+  user_deleted: "eliminó un usuario",
+  budgeting_access_granted: "concedió acceso a Budgeting",
+  budgeting_access_revoked: "retiró el acceso a Budgeting",
+  broadcast_sent: "mandó un mensaje masivo",
+  feature_flag_created: "creó un flag de función",
+  feature_flag_enabled_globally: "activó un flag para todos",
+  feature_flag_disabled_globally: "desactivó un flag para todos",
+  feature_flag_deleted: "eliminó un flag",
 };
 
 interface SupportMessage {
@@ -234,11 +263,12 @@ function StatTile({
   );
 }
 
-const NAV_SECTIONS: { id: "projects" | "users" | "producers" | "support"; label: string; icon: React.ElementType }[] = [
+const NAV_SECTIONS: { id: "projects" | "users" | "producers" | "support" | "system"; label: string; icon: React.ElementType }[] = [
   { id: "projects", label: "Proyectos", icon: Briefcase },
   { id: "users", label: "Usuarios", icon: Users },
   { id: "producers", label: "Productoras", icon: Building2 },
   { id: "support", label: "Soporte", icon: HeadphonesIcon },
+  { id: "system", label: "Sistema", icon: Activity },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -249,7 +279,7 @@ export default function AdminDashboard() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"projects" | "users" | "producers" | "support">("projects");
+  const [activeTab, setActiveTab] = useState<"projects" | "users" | "producers" | "support" | "system">("projects");
 
   // Support
   const [supportChats,      setSupportChats]      = useState<SupportChat[]>([]);
@@ -262,6 +292,7 @@ export default function AdminDashboard() {
   const [publishedGuides, setPublishedGuides] = useState<{ id: string; title: string; slug: string; category: string }[]>([]);
   const [showAutomatedMessagesModal, setShowAutomatedMessagesModal] = useState(false);
   const [automatedMessagesForm, setAutomatedMessagesForm] = useState<AutomatedMessages>(DEFAULT_AUTOMATED_MESSAGES);
+  const [automatedMessages, setAutomatedMessages] = useState<AutomatedMessages>(DEFAULT_AUTOMATED_MESSAGES);
   const [automatedMessagesLoading, setAutomatedMessagesLoading] = useState(false);
   const [automatedMessagesSaving, setAutomatedMessagesSaving] = useState(false);
   const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
@@ -272,6 +303,9 @@ export default function AdminDashboard() {
   const [showTransferMenu, setShowTransferMenu] = useState<string | null>(null);
   const [showGuidePicker, setShowGuidePicker] = useState<string | null>(null);
   const [guidePickerSearch, setGuidePickerSearch] = useState("");
+  const [showMacroPicker, setShowMacroPicker] = useState(false);
+  const macroPickerRef = useRef<HTMLDivElement>(null);
+  const flagUserPickerRef = useRef<HTMLDivElement>(null);
   const transferMenuRef = useRef<HTMLDivElement>(null);
   const guidePickerRef = useRef<HTMLDivElement>(null);
   const supportMsgsRef = useRef<HTMLDivElement>(null);
@@ -279,6 +313,21 @@ export default function AdminDashboard() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [producers, setProducers] = useState<Producer[]>([]);
+  const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([]);
+  const [showAtRisk, setShowAtRisk] = useState<"stale" | "invites" | "producers" | null>(null);
+
+  // Pestaña "Sistema": monitor del cron de Horario + registro de auditoría
+  // (que también sirve de historial de difusión, filtrando por acción) +
+  // flags de función.
+  const [systemSubTab, setSystemSubTab] = useState<"cron" | "audit" | "broadcast" | "flags">("cron");
+  const [cronRuns, setCronRuns] = useState<{ id: string; runAt: Timestamp | null; date: string; checked: number; triggered: string[]; errors: string[] }[]>([]);
+  const [auditLog, setAuditLog] = useState<{ id: string; action: string; details: string; adminName: string; createdAt: Timestamp | null }[]>([]);
+  const [systemDataLoading, setSystemDataLoading] = useState(false);
+  const [systemDataLoaded, setSystemDataLoaded] = useState(false);
+  const [featureFlags, setFeatureFlags] = useState<FeatureFlags>({});
+  const [newFlagForm, setNewFlagForm] = useState({ label: "", description: "" });
+  const [flagUserPickerFor, setFlagUserPickerFor] = useState<string | null>(null);
+  const [flagUserPickerSearch, setFlagUserPickerSearch] = useState("");
 
   const [projectSearch, setProjectSearch] = useState("");
   const [projectPhaseFilter, setProjectPhaseFilter] = useState("all");
@@ -288,6 +337,13 @@ export default function AdminDashboard() {
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [producerSearch, setProducerSearch] = useState("");
   const [producerModalSearch, setProducerModalSearch] = useState("");
+
+  // Buscador único: busca a la vez en proyectos/usuarios/productoras desde
+  // cualquier pestaña, en vez de tener que adivinar antes cuál de los tres
+  // buscadores aislados usar.
+  const [globalSearch, setGlobalSearch] = useState("");
+  const [showGlobalSearchResults, setShowGlobalSearchResults] = useState(false);
+  const globalSearchRef = useRef<HTMLDivElement>(null);
 
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [showCreateProducer, setShowCreateProducer] = useState(false);
@@ -320,9 +376,10 @@ export default function AdminDashboard() {
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [messageForm, setMessageForm] = useState({
     content: "",
-    recipientMode: "all" as "all" | "projects" | "users",
+    recipientMode: "all" as "all" | "projects" | "users" | "segment",
     selectedProjects: [] as string[],
     selectedUsers: [] as string[],
+    selectedSegment: null as string | null,
     duration: "indefinite" as "24h" | "7d" | "30d" | "indefinite",
     sendByEmail: false,
   });
@@ -391,6 +448,15 @@ export default function AdminDashboard() {
       if (roleMenuRef.current && !roleMenuRef.current.contains(e.target as Node)) {
         setShowRoleMenuFor(null);
       }
+      if (globalSearchRef.current && !globalSearchRef.current.contains(e.target as Node)) {
+        setShowGlobalSearchResults(false);
+      }
+      if (macroPickerRef.current && !macroPickerRef.current.contains(e.target as Node)) {
+        setShowMacroPicker(false);
+      }
+      if (flagUserPickerRef.current && !flagUserPickerRef.current.contains(e.target as Node)) {
+        setFlagUserPickerFor(null);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -399,6 +465,20 @@ export default function AdminDashboard() {
   const showToast = (type: "success" | "error", message: string) => {
     setToast({ type, message });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  // Registro de auditoría: quién hizo qué cambio sensible y cuándo, en vez de
+  // que solo quede constancia (si acaso) en el `logs` del proyecto afectado.
+  // Fire-and-forget a propósito — un fallo al escribir el registro no debe
+  // bloquear la acción real que el admin ya pidió.
+  const logAdminAction = (action: string, details: string) => {
+    addDoc(collection(db, "adminAuditLog"), {
+      action,
+      details,
+      adminId: contextUser?.uid || "",
+      adminName: contextUser?.name || contextUser?.email || "Admin",
+      createdAt: serverTimestamp(),
+    }).catch((err) => console.error("[adminAuditLog]", err));
   };
 
   const loadData = async () => {
@@ -426,6 +506,11 @@ export default function AdminDashboard() {
             role: m.data().role,
             position: m.data().position,
           }));
+          // Solo el último evento de logs: para "Cuentas en riesgo" (ver más abajo)
+          // no hace falta el historial entero, solo saber si sigue vivo.
+          const lastLogSnap = await getDocs(
+            query(collection(db, `projects/${projectDoc.id}/logs`), orderBy("createdAt", "desc"), limit(1))
+          );
           return {
             id: projectDoc.id,
             name: data.name,
@@ -436,6 +521,7 @@ export default function AdminDashboard() {
             createdAt: data.createdAt,
             memberCount: membersSnap.size,
             members,
+            lastActivityAt: lastLogSnap.empty ? null : (lastLogSnap.docs[0].data().createdAt as Timestamp),
           };
         })
       );
@@ -444,6 +530,23 @@ export default function AdminDashboard() {
         p.projectCount = projectsData.filter((pr) => pr.producers?.includes(p.id)).length;
       });
       setProjects(projectsData);
+
+      // Invitaciones pendientes de todos los proyectos, para "Cuentas en riesgo":
+      // una invitación mandada y nunca aceptada es una señal de que alguien se
+      // quedó fuera sin que nadie se diera cuenta.
+      const pendingInvitesSnap = await getDocs(query(collection(db, "invitations"), where("status", "==", "pending")));
+      setPendingInvitations(
+        pendingInvitesSnap.docs.map((d) => {
+          const invData = d.data();
+          return {
+            id: d.id,
+            email: invData.email || invData.invitedEmail || "",
+            projectId: invData.projectId || "",
+            projectName: projectsData.find((p) => p.id === invData.projectId)?.name || "Proyecto eliminado",
+            createdAt: invData.createdAt || null,
+          };
+        })
+      );
 
       const usersSnap = await getDocs(collection(db, "users"));
       const usersData: User[] = await Promise.all(
@@ -471,6 +574,7 @@ export default function AdminDashboard() {
             supportSpecialty: data.supportSpecialty || undefined,
             isDemo: data.isDemo || false,
             budgetingAccess: data.budgetingAccess || false,
+            createdAt: data.createdAt || null,
             projectCount: userProjectsSnap.size,
             projects: userProjects,
           };
@@ -502,6 +606,38 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (contextUser?.uid && isAdmin) loadData();
   }, [contextUser?.uid, isAdmin]);
+
+  // Cargadas aparte del modal de "Mensajes automáticos" (que solo pide los
+  // datos al abrirse): así las respuestas rápidas están disponibles en la
+  // cola de soporte desde el primer momento, sin tener que abrir ese modal antes.
+  useEffect(() => {
+    if (!contextUser?.uid) return;
+    fetchAutomatedMessages(db).then(setAutomatedMessages);
+  }, [contextUser?.uid]);
+
+  // Datos de la pestaña "Sistema": se cargan solo la primera vez que se
+  // entra ahí, no en el arranque general (nadie los necesita en cada visita).
+  useEffect(() => {
+    if (activeTab !== "system" || systemDataLoaded || !isAdmin) return;
+    setSystemDataLoading(true);
+    (async () => {
+      try {
+        const [cronSnap, auditSnap, flags] = await Promise.all([
+          getDocs(query(collection(db, "meta/horarioCron/runs"), orderBy("runAt", "desc"), limit(20))),
+          getDocs(query(collection(db, "adminAuditLog"), orderBy("createdAt", "desc"), limit(60))),
+          fetchFeatureFlags(db),
+        ]);
+        setCronRuns(cronSnap.docs.map((d) => ({ id: d.id, ...d.data() } as any)));
+        setAuditLog(auditSnap.docs.map((d) => ({ id: d.id, ...d.data() } as any)));
+        setFeatureFlags(flags);
+        setSystemDataLoaded(true);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setSystemDataLoading(false);
+      }
+    })();
+  }, [activeTab, systemDataLoaded, isAdmin]);
 
   // Real-time support chats listener
   useEffect(() => {
@@ -676,6 +812,7 @@ export default function AdminDashboard() {
         updatedAt: serverTimestamp(),
         updatedBy: contextUser?.name || contextUser?.email || "Admin",
       });
+      setAutomatedMessages(automatedMessagesForm);
       showToast("success", "Mensajes automáticos actualizados");
       setShowAutomatedMessagesModal(false);
     } catch (error) {
@@ -697,6 +834,7 @@ export default function AdminDashboard() {
         activatedBy: contextUser?.uid || "",
         activatedByName: contextUser?.name || contextUser?.email || "Admin",
       });
+      logAdminAction("maintenance_enabled", maintenanceMinutes === 0 ? "Activado de inmediato" : `Programado en ${maintenanceMinutes} min — "${maintenanceMessage.trim()}"`);
       showToast("success", maintenanceMinutes === 0 ? "Mantenimiento activado" : `Mantenimiento programado en ${maintenanceMinutes} min`);
       setShowMaintenanceModal(false);
     } catch (error) {
@@ -715,6 +853,7 @@ export default function AdminDashboard() {
         deactivatedAt: serverTimestamp(),
         deactivatedBy: contextUser?.uid || "",
       }, { merge: true });
+      logAdminAction("maintenance_disabled", "");
       showToast("success", "Mantenimiento desactivado");
       setShowMaintenanceModal(false);
     } catch (error) {
@@ -848,6 +987,7 @@ export default function AdminDashboard() {
   const _doDeleteProject = async (projectId: string) => {
     setSaving(true);
     try {
+      const projectName = projects.find((p) => p.id === projectId)?.name || projectId;
       const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch("/api/delete-project", {
         method: "POST",
@@ -856,6 +996,7 @@ export default function AdminDashboard() {
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Error al eliminar");
+      logAdminAction("project_deleted", projectName);
       showToast("success", "Proyecto eliminado completamente");
       setActiveMenu(null);
       setConfirmDialog(null);
@@ -921,6 +1062,7 @@ export default function AdminDashboard() {
     setSaving(true);
     try {
       await deleteDoc(doc(db, "producers", producerId));
+      logAdminAction("producer_deleted", producer.name);
       showToast("success", "Productora eliminada");
       setConfirmDialog(null);
       await loadData();
@@ -979,10 +1121,12 @@ export default function AdminDashboard() {
   const _doChangeUserRole = async (odId: string, newRole: string, specialty?: string) => {
     setSaving(true);
     try {
+      const target = users.find((u) => u.id === odId);
       await updateDoc(doc(db, "users", odId), {
         role: newRole,
         supportSpecialty: newRole === "support_agent" ? specialty || "both" : null,
       });
+      logAdminAction("user_role_changed", `${target?.name || odId}: ${target?.role || "user"} → ${newRole}${specialty ? ` (${SPECIALTY_LABEL[specialty]})` : ""}`);
       showToast("success", "Rol actualizado");
       setConfirmDialog(null);
       setShowRoleMenuFor(null);
@@ -1044,6 +1188,7 @@ export default function AdminDashboard() {
   const _doDeleteUser = async (userId: string) => {
     setSaving(true);
     try {
+      const target = users.find((u) => u.id === userId);
       const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch("/api/delete-user", {
         method: "POST",
@@ -1052,6 +1197,7 @@ export default function AdminDashboard() {
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Error al eliminar");
+      logAdminAction("user_deleted", `${target?.name || userId} (${target?.email || ""})`);
       showToast("success", "Usuario eliminado completamente");
       setConfirmDialog(null);
       setShowUserDetails(null);
@@ -1102,12 +1248,84 @@ export default function AdminDashboard() {
   const handleToggleBudgetingAccess = async (odId: string, next: boolean) => {
     setSaving(true);
     try {
+      const target = users.find((u) => u.id === odId);
       await updateDoc(doc(db, "users", odId), { budgetingAccess: next });
       setUsers((prev) => prev.map((u) => u.id === odId ? { ...u, budgetingAccess: next } : u));
+      logAdminAction(next ? "budgeting_access_granted" : "budgeting_access_revoked", target?.name || odId);
       showToast("success", next ? "Acceso a Budgeting concedido" : "Acceso a Budgeting retirado");
     } catch (error) {
       console.error(error);
       showToast("error", "Error al actualizar el acceso a Budgeting");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Flags de función: crear, activar globalmente, activar para un usuario
+  // concreto, o borrar. Se guardan todos en un único doc (meta/featureFlags). ─
+  const saveFeatureFlags = async (next: FeatureFlags) => {
+    await setDoc(doc(db, "meta", "featureFlags"), next);
+    setFeatureFlags(next);
+  };
+  const handleCreateFlag = async () => {
+    if (!newFlagForm.label.trim()) { showToast("error", "Ponle un nombre al flag"); return; }
+    const id = newFlagForm.label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || `flag_${Date.now()}`;
+    if (featureFlags[id]) { showToast("error", "Ya existe un flag con ese nombre"); return; }
+    setSaving(true);
+    try {
+      await saveFeatureFlags({
+        ...featureFlags,
+        [id]: { id, label: newFlagForm.label.trim(), description: newFlagForm.description.trim(), enabledGlobally: false, enabledUserIds: [] },
+      });
+      logAdminAction("feature_flag_created", newFlagForm.label.trim());
+      setNewFlagForm({ label: "", description: "" });
+      showToast("success", "Flag creado");
+    } catch (error) {
+      console.error(error);
+      showToast("error", "Error al crear el flag");
+    } finally {
+      setSaving(false);
+    }
+  };
+  const handleToggleFlagGlobal = async (flagId: string, next: boolean) => {
+    const flag = featureFlags[flagId];
+    if (!flag) return;
+    setSaving(true);
+    try {
+      await saveFeatureFlags({ ...featureFlags, [flagId]: { ...flag, enabledGlobally: next } });
+      logAdminAction(next ? "feature_flag_enabled_globally" : "feature_flag_disabled_globally", flag.label);
+      showToast("success", next ? `"${flag.label}" activado para todos` : `"${flag.label}" desactivado para todos`);
+    } catch (error) {
+      console.error(error);
+      showToast("error", "Error al actualizar el flag");
+    } finally {
+      setSaving(false);
+    }
+  };
+  const handleToggleFlagUser = async (flagId: string, userId: string) => {
+    const flag = featureFlags[flagId];
+    if (!flag) return;
+    const has = flag.enabledUserIds.includes(userId);
+    const enabledUserIds = has ? flag.enabledUserIds.filter((id) => id !== userId) : [...flag.enabledUserIds, userId];
+    try {
+      await saveFeatureFlags({ ...featureFlags, [flagId]: { ...flag, enabledUserIds } });
+    } catch (error) {
+      console.error(error);
+      showToast("error", "Error al actualizar el flag");
+    }
+  };
+  const handleDeleteFlag = async (flagId: string) => {
+    const flag = featureFlags[flagId];
+    if (!flag) return;
+    setSaving(true);
+    try {
+      const { [flagId]: _, ...rest } = featureFlags;
+      await saveFeatureFlags(rest);
+      logAdminAction("feature_flag_deleted", flag.label);
+      showToast("success", "Flag eliminado");
+    } catch (error) {
+      console.error(error);
+      showToast("error", "Error al eliminar el flag");
     } finally {
       setSaving(false);
     }
@@ -1127,6 +1345,10 @@ export default function AdminDashboard() {
       showToast("error", "Selecciona al menos un usuario");
       return;
     }
+    if (messageForm.recipientMode === "segment" && !messageForm.selectedSegment) {
+      showToast("error", "Selecciona un segmento");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -1142,6 +1364,8 @@ export default function AdminDashboard() {
           project.members?.forEach((member) => { userIdSet.add(member.odId); });
         });
         targetUserIds = Array.from(userIdSet);
+      } else if (messageForm.recipientMode === "segment") {
+        targetUserIds = SEGMENT_PRESETS.find((s) => s.id === messageForm.selectedSegment)?.userIds || [];
       } else {
         targetUserIds = messageForm.selectedUsers;
       }
@@ -1184,6 +1408,18 @@ export default function AdminDashboard() {
         }).catch(console.error);
       }
 
+      // Deja rastro en el mismo registro de auditoría, para el historial de
+      // difusión de la pestaña Sistema: quién mandó qué, a cuántos y cuándo.
+      const recipientModeLabel =
+        messageForm.recipientMode === "all" ? "todos" :
+        messageForm.recipientMode === "projects" ? "por proyecto" :
+        messageForm.recipientMode === "segment" ? `segmento "${SEGMENT_PRESETS.find((s) => s.id === messageForm.selectedSegment)?.label}"` :
+        "usuarios concretos";
+      logAdminAction(
+        "broadcast_sent",
+        `"${messageForm.content.trim().slice(0, 140)}" → ${targetUserIds.length} usuario${targetUserIds.length !== 1 ? "s" : ""} (${recipientModeLabel})${messageForm.sendByEmail ? " + email" : ""}`
+      );
+
       // Reset form and close modal
       setEmailConfirmStep(false);
       setMessageForm({
@@ -1191,6 +1427,7 @@ export default function AdminDashboard() {
         recipientMode: "all",
         selectedProjects: [],
         selectedUsers: [],
+        selectedSegment: null,
         duration: "indefinite",
         sendByEmail: false,
       });
@@ -1281,6 +1518,35 @@ export default function AdminDashboard() {
     }));
   };
 
+  // Stats
+  const activeProjects = projects.filter((p) => p.phase !== "Finalizado").length;
+  const adminUsers = users.filter((u) => u.role === "admin").length;
+  const totalAssignments = projects.reduce((acc, p) => acc + p.memberCount, 0);
+  const demoUsersCount = users.filter((u) => u.isDemo).length;
+  const budgetingUsersCount = users.filter((u) => u.budgetingAccess).length;
+  const budgetingAdoptionPct = users.length > 0 ? Math.round((budgetingUsersCount / users.length) * 100) : 0;
+  const newUsersThisWeek = users.filter((u) => {
+    const ms = u.createdAt?.toMillis?.();
+    return typeof ms === "number" && Date.now() - ms <= 7 * 24 * 60 * 60 * 1000;
+  }).length;
+
+  // ── Cuentas en riesgo: tres señales baratas de calcular a partir de datos
+  // que ya se cargan, ninguna requiere infraestructura nueva. ────────────────
+  const STALE_PROJECT_DAYS = 30;
+  const STALE_INVITE_DAYS = 14;
+  const staleProjects = projects.filter((p) => {
+    if (p.phase === "Finalizado") return false; // un proyecto acabado se queda quieto a propósito
+    const refMs = p.lastActivityAt?.toMillis?.() ?? p.createdAt?.toMillis?.();
+    if (!refMs) return true; // sin ninguna fecha de referencia: se trata como riesgo
+    return Date.now() - refMs > STALE_PROJECT_DAYS * 24 * 60 * 60 * 1000;
+  });
+  const staleInvitations = pendingInvitations.filter((inv) => {
+    const ms = inv.createdAt?.toMillis?.();
+    return typeof ms === "number" && Date.now() - ms > STALE_INVITE_DAYS * 24 * 60 * 60 * 1000;
+  });
+  const emptyProducers = producers.filter((p) => !p.users || p.users.length === 0);
+  const atRiskCount = staleProjects.length + staleInvitations.length + emptyProducers.length;
+
   const filteredProjectsForMessage = projects.filter((p) =>
     p.name.toLowerCase().includes(projectSearchInMessage.toLowerCase())
   );
@@ -1290,9 +1556,21 @@ export default function AdminDashboard() {
     u.email.toLowerCase().includes(userSearchInMessage.toLowerCase())
   );
 
+  // ── Segmentos guardados para la difusión: listas que se recalculan solas
+  // a partir de datos que ya se cargan, en vez de tener que reconstruir a
+  // mano la lista de emails cada vez. ─────────────────────────────────────
+  const staleProjectMemberIds = new Set(staleProjects.flatMap((p) => (p.members || []).map((m) => m.odId)));
+  const SEGMENT_PRESETS: { id: string; label: string; sub: string; userIds: string[] }[] = [
+    { id: "budgeting", label: "Con acceso a Budgeting", sub: `${budgetingUsersCount} usuarios`, userIds: users.filter((u) => u.budgetingAccess).map((u) => u.id) },
+    { id: "demo", label: "Usuarios demo", sub: `${demoUsersCount} usuarios`, userIds: users.filter((u) => u.isDemo).map((u) => u.id) },
+    { id: "admins", label: "Administradores", sub: `${adminUsers} usuarios`, userIds: users.filter((u) => u.role === "admin").map((u) => u.id) },
+    { id: "stale", label: "De proyectos callados", sub: `${staleProjectMemberIds.size} usuarios · ${staleProjects.length} proyectos sin actividad`, userIds: users.filter((u) => staleProjectMemberIds.has(u.id)).map((u) => u.id) },
+  ];
+
   const recipientCount = (() => {
     if (messageForm.recipientMode === "all") return users.length;
     if (messageForm.recipientMode === "users") return messageForm.selectedUsers.length;
+    if (messageForm.recipientMode === "segment") return SEGMENT_PRESETS.find((s) => s.id === messageForm.selectedSegment)?.userIds.length || 0;
     const userIdSet = new Set<string>();
     projects.filter((p) => messageForm.selectedProjects.includes(p.id)).forEach((project) => {
       project.members?.forEach((member) => userIdSet.add(member.odId));
@@ -1315,11 +1593,14 @@ export default function AdminDashboard() {
 
   const filteredProducers = producers.filter((p) => p.name.toLowerCase().includes(producerSearch.toLowerCase()));
 
-  // Stats
-  const activeProjects = projects.filter((p) => p.phase !== "Finalizado").length;
-  const adminUsers = users.filter((u) => u.role === "admin").length;
-  const totalAssignments = projects.reduce((acc, p) => acc + p.memberCount, 0);
-  const demoUsersCount = users.filter((u) => u.isDemo).length;
+  // ── Buscador único: mismo texto, tres colecciones a la vez. ────────────────
+  const globalSearchQuery = globalSearch.trim().toLowerCase();
+  const globalSearchResults = globalSearchQuery.length < 2 ? { projects: [], users: [], producers: [] } : {
+    projects: projects.filter((p) => p.name.toLowerCase().includes(globalSearchQuery) || p.id.toLowerCase().includes(globalSearchQuery)).slice(0, 5),
+    users: users.filter((u) => u.name.toLowerCase().includes(globalSearchQuery) || u.email.toLowerCase().includes(globalSearchQuery)).slice(0, 5),
+    producers: producers.filter((p) => p.name.toLowerCase().includes(globalSearchQuery)).slice(0, 5),
+  };
+  const globalSearchHasResults = globalSearchResults.projects.length + globalSearchResults.users.length + globalSearchResults.producers.length > 0;
   const openSupportChats = supportChats.filter((c) => c.status === "open").length;
   const unassignedSupportChats = supportChats.filter((c) => c.status === "open" && !c.assignedTo).length;
   const myOpenSupportChats = supportChats.filter((c) => c.status === "open" && c.assignedTo === contextUser?.uid).length;
@@ -1333,6 +1614,18 @@ export default function AdminDashboard() {
     ts && typeof (ts as any).toDate === "function"
       ? ts.toDate().toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })
       : "—";
+
+  // Para el aviso de "lleva X sin respuesta" en la cola de soporte.
+  const timeSince = (ts?: Timestamp | null): string => {
+    const ms = ts?.toMillis?.();
+    if (!ms) return "";
+    const diffMin = Math.floor((Date.now() - ms) / 60000);
+    if (diffMin < 1) return "ahora mismo";
+    if (diffMin < 60) return `${diffMin} min`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `${diffH} h`;
+    return `${Math.floor(diffH / 24)} d`;
+  };
 
   // Loading
   if (loading || userLoading) {
@@ -1375,13 +1668,88 @@ export default function AdminDashboard() {
             <p className="font-mono text-[10px] text-slate-500 mt-1">filma-workspace / root</p>
           </div>
 
+          {isAdmin && (
+            <div className="px-3 pt-3 relative" ref={globalSearchRef}>
+              <div className="relative">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-600" />
+                <input
+                  type="text"
+                  value={globalSearch}
+                  onChange={(e) => { setGlobalSearch(e.target.value); setShowGlobalSearchResults(true); }}
+                  onFocus={() => setShowGlobalSearchResults(true)}
+                  placeholder="Buscar en todo"
+                  className="w-full pl-8 pr-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-slate-600"
+                />
+              </div>
+              {showGlobalSearchResults && globalSearchQuery.length >= 2 && (
+                <div className="absolute left-3 right-3 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 py-1.5 max-h-96 overflow-y-auto">
+                  {!globalSearchHasResults ? (
+                    <p className="px-3 py-3 text-xs text-slate-400 text-center">Sin resultados para "{globalSearch}"</p>
+                  ) : (
+                    <>
+                      {globalSearchResults.projects.length > 0 && (
+                        <div className="mb-1">
+                          <p className="px-3 pt-1 pb-1 text-[9.5px] font-semibold text-slate-400 uppercase tracking-wide">Proyectos</p>
+                          {globalSearchResults.projects.map((p) => (
+                            <Link
+                              key={p.id}
+                              href={`/admindashboard/project/${p.id}`}
+                              onClick={() => { setShowGlobalSearchResults(false); setGlobalSearch(""); }}
+                              className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 text-xs text-slate-700"
+                            >
+                              <Briefcase size={12} className="text-slate-400 flex-shrink-0" />
+                              <span className="truncate font-medium">{p.name}</span>
+                              <span className="ml-auto text-[10px] text-slate-400 flex-shrink-0">{p.phase}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                      {globalSearchResults.users.length > 0 && (
+                        <div className="mb-1 border-t border-slate-100 pt-1">
+                          <p className="px-3 pt-1 pb-1 text-[9.5px] font-semibold text-slate-400 uppercase tracking-wide">Usuarios</p>
+                          {globalSearchResults.users.map((u) => (
+                            <button
+                              key={u.id}
+                              onClick={() => { setActiveTab("users"); setShowUserDetails(u.id); setShowGlobalSearchResults(false); setGlobalSearch(""); }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 text-xs text-slate-700 text-left"
+                            >
+                              <Users size={12} className="text-slate-400 flex-shrink-0" />
+                              <span className="truncate font-medium">{u.name}</span>
+                              <span className="ml-auto text-[10px] text-slate-400 truncate flex-shrink-0 max-w-[110px]">{u.email}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {globalSearchResults.producers.length > 0 && (
+                        <div className="border-t border-slate-100 pt-1">
+                          <p className="px-3 pt-1 pb-1 text-[9.5px] font-semibold text-slate-400 uppercase tracking-wide">Productoras</p>
+                          {globalSearchResults.producers.map((p) => (
+                            <button
+                              key={p.id}
+                              onClick={() => { setActiveTab("producers"); setProducerSearch(p.name); setShowGlobalSearchResults(false); setGlobalSearch(""); }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 text-xs text-slate-700 text-left"
+                            >
+                              <Building2 size={12} className="text-slate-400 flex-shrink-0" />
+                              <span className="truncate font-medium">{p.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <nav className="flex-1 px-2.5 py-4 space-y-0.5 overflow-y-auto">
             {NAV_SECTIONS.filter((s) => isAdmin || s.id === "support").map((item) => {
               const count =
                 item.id === "projects" ? projects.length :
                 item.id === "users" ? users.length :
                 item.id === "producers" ? producers.length :
-                totalUnreadSupport;
+                item.id === "support" ? totalUnreadSupport :
+                0;
               const alert = item.id === "support" && totalUnreadSupport > 0;
               const active = activeTab === item.id;
               return (
@@ -1479,9 +1847,11 @@ export default function AdminDashboard() {
           {/* Stat strip */}
           <div className="px-8 py-5 bg-white border-b border-slate-200">
             {isAdmin ? (
-              <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(6, minmax(0,1fr))" }}>
+              <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(8, minmax(0,1fr))" }}>
                 <StatTile icon={Briefcase} label="Proyectos" value={projects.length} sub={`${activeProjects} activos`} accent="blue" />
                 <StatTile icon={Users} label="Usuarios" value={users.length} sub={`${adminUsers} admin · ${demoUsersCount} demo`} accent="violet" />
+                <StatTile icon={UserPlus} label="Nuevos (7d)" value={newUsersThisWeek} sub="últimos 7 días" accent={newUsersThisWeek > 0 ? "emerald" : "slate"} />
+                <StatTile icon={Calculator} label="Budgeting" value={budgetingUsersCount} sub={`${budgetingAdoptionPct}% de adopción`} accent="violet" />
                 <StatTile icon={Building2} label="Productoras" value={producers.length} accent="amber" />
                 <StatTile icon={CheckSquare} label="Asignaciones" value={totalAssignments} sub="miembros × proyecto" accent="emerald" />
                 <StatTile
@@ -1520,6 +1890,86 @@ export default function AdminDashboard() {
         {/* ==================== PROJECTS TAB ==================== */}
         {activeTab === "projects" && (
           <div>
+            {/* Cuentas en riesgo: tres señales calculadas de datos que ya se cargan (sin actividad reciente, invitación olvidada, productora sin usuarios) — clic para ver la lista de cada una. */}
+            {atRiskCount > 0 && (
+              <div className="mb-6 border border-amber-200 bg-amber-50/50 rounded-xl overflow-hidden">
+                <div className="grid grid-cols-3 divide-x divide-amber-200">
+                  {([
+                    { key: "stale" as const, label: "Proyectos callados", value: staleProjects.length, sub: `${STALE_PROJECT_DAYS}+ días sin actividad` },
+                    { key: "invites" as const, label: "Invitaciones olvidadas", value: staleInvitations.length, sub: `${STALE_INVITE_DAYS}+ días sin aceptar` },
+                    { key: "producers" as const, label: "Productoras vacías", value: emptyProducers.length, sub: "sin usuarios asignados" },
+                  ]).map((item) => (
+                    <button
+                      key={item.key}
+                      onClick={() => item.value > 0 && setShowAtRisk(showAtRisk === item.key ? null : item.key)}
+                      disabled={item.value === 0}
+                      className={`px-4 py-3 text-left transition-colors disabled:opacity-40 disabled:cursor-default ${
+                        showAtRisk === item.key ? "bg-amber-100" : item.value > 0 ? "hover:bg-amber-100/70" : ""
+                      }`}
+                    >
+                      <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wide">{item.label}</p>
+                      <p className="text-xl font-bold text-amber-900 font-mono tabular-nums leading-tight">{item.value}</p>
+                      <p className="text-[10px] text-amber-600">{item.sub}</p>
+                    </button>
+                  ))}
+                </div>
+                {showAtRisk && (
+                  <div className="border-t border-amber-200 bg-white px-4 py-3 max-h-56 overflow-y-auto">
+                    {showAtRisk === "stale" && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setMessageForm({
+                              content: `Hola 👋 Hemos visto que hace tiempo que no tocas tu proyecto en Filma Workspace. Si necesitas ayuda para retomarlo, escríbenos — estamos aquí para lo que haga falta.`,
+                              recipientMode: "segment",
+                              selectedProjects: [],
+                              selectedUsers: [],
+                              selectedSegment: "stale",
+                              duration: "indefinite",
+                              sendByEmail: true,
+                            });
+                            setShowMessageModal(true);
+                          }}
+                          className="flex items-center gap-1.5 text-[11px] font-medium text-blue-600 hover:text-blue-800 mb-2"
+                        >
+                          <Send size={11} />
+                          Avisar a estos proyectos
+                        </button>
+                        <ul className="space-y-1.5">
+                          {staleProjects.map((p) => (
+                            <li key={p.id} className="flex items-center justify-between gap-3 text-xs">
+                              <Link href={`/admindashboard/project/${p.id}`} className="text-slate-700 hover:underline font-medium truncate">{p.name}</Link>
+                              <span className="text-slate-400 font-mono flex-shrink-0">{p.lastActivityAt ? formatDate(p.lastActivityAt) : "sin actividad registrada"}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                    {showAtRisk === "invites" && (
+                      <ul className="space-y-1.5">
+                        {staleInvitations.map((inv) => (
+                          <li key={inv.id} className="flex items-center justify-between gap-3 text-xs">
+                            <span className="text-slate-700 truncate">{inv.email}</span>
+                            <span className="text-slate-400 truncate flex-shrink-0">{inv.projectName}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {showAtRisk === "producers" && (
+                      <ul className="space-y-1.5">
+                        {emptyProducers.map((p) => (
+                          <li key={p.id} className="flex items-center justify-between gap-3 text-xs">
+                            <span className="text-slate-700 font-medium truncate">{p.name}</span>
+                            <button onClick={() => { setActiveTab("producers"); setShowAssignCompanyUser(p.id); }} className="text-slate-500 hover:text-slate-900 hover:underline flex-shrink-0">Asignar usuario</button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Toolbar */}
             <div className="flex flex-row gap-3 items-center justify-between mb-6">
               <div className="flex flex-row gap-3 flex-1 w-auto">
@@ -2124,6 +2574,9 @@ export default function AdminDashboard() {
                             <p className="text-[10px] mt-1 font-medium text-amber-600">Sin asignar</p>
                           )
                         )}
+                        {chat.status === "open" && chat.unreadAdmin > 0 && chat.lastMessageAt && (
+                          <p className="text-[10px] mt-0.5 font-medium text-red-500">Esperando desde hace {timeSince(chat.lastMessageAt)}</p>
+                        )}
                       </div>
                       {chat.unreadAdmin > 0 && (
                         <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />
@@ -2358,7 +2811,34 @@ export default function AdminDashboard() {
                   {/* Reply input */}
                   {activeChat.status === "open" ? (
                     canReply ? (
-                      <div className="px-4 py-3.5 border-t border-slate-100 bg-white flex items-end gap-3 rounded-b-2xl">
+                      <div className="px-4 py-3.5 border-t border-slate-100 bg-white flex items-end gap-2 rounded-b-2xl">
+                        <div className="relative flex-shrink-0" ref={macroPickerRef}>
+                          <button
+                            onClick={() => setShowMacroPicker((v) => !v)}
+                            disabled={automatedMessages.macros.length === 0}
+                            title="Respuestas rápidas"
+                            className="p-2.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl disabled:opacity-30 disabled:hover:bg-transparent"
+                          >
+                            <MessageSquare size={16} />
+                          </button>
+                          {showMacroPicker && (
+                            <div className="absolute bottom-full left-0 mb-1.5 w-64 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1.5 max-h-56 overflow-y-auto">
+                              {automatedMessages.macros.map((macro) => (
+                                <button
+                                  key={macro.id}
+                                  onClick={() => {
+                                    setSupportInput((prev) => (prev.trim() ? `${prev}\n${macro.text}` : macro.text));
+                                    setShowMacroPicker(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-slate-50"
+                                >
+                                  <p className="text-xs font-medium text-slate-800">{macro.label}</p>
+                                  <p className="text-[10.5px] text-slate-400 truncate">{macro.text}</p>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                         <textarea
                           rows={1}
                           value={supportInput}
@@ -2371,7 +2851,7 @@ export default function AdminDashboard() {
                         <button
                           onClick={handleSupportReply}
                           disabled={!supportInput.trim() || supportSending}
-                          className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium flex items-center gap-2 transition-colors"
+                          className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium flex items-center gap-2 transition-colors flex-shrink-0"
                         >
                           {supportSending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                           Enviar
@@ -2401,6 +2881,236 @@ export default function AdminDashboard() {
           </div>
           );
         })()}
+
+        {activeTab === "system" && (
+          <div>
+            <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1 mb-6 w-fit">
+              {([
+                { id: "cron" as const, label: "Cron de Horario" },
+                { id: "audit" as const, label: "Registro de auditoría" },
+                { id: "broadcast" as const, label: "Difusión" },
+                { id: "flags" as const, label: "Flags de función" },
+              ]).map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setSystemSubTab(t.id)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${systemSubTab === t.id ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {systemDataLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 size={20} className="animate-spin text-slate-400" />
+              </div>
+            ) : systemSubTab === "cron" ? (
+              cronRuns.length === 0 ? (
+                <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
+                  <Clock size={28} className="text-slate-300 mx-auto mb-3" />
+                  <h3 className="font-semibold text-slate-900">Sin ejecuciones todavía</h3>
+                  <p className="text-xs text-slate-400 mt-1">El cron corre cada 15 min; vuelve en un rato.</p>
+                </div>
+              ) : (
+                <div className="bg-white border border-slate-200 rounded-xl">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 border-b border-slate-200">
+                      <tr>
+                        <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider rounded-tl-xl">Ejecutado</th>
+                        <th className="text-center px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Proyectos revisados</th>
+                        <th className="text-center px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Enviados</th>
+                        <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider rounded-tr-xl">Errores</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {cronRuns.map((run) => (
+                        <tr key={run.id} className={run.errors.length > 0 ? "bg-red-50/40" : ""}>
+                          <td className="px-4 py-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                            {run.runAt ? `${run.runAt.toDate().toLocaleDateString("es-ES", { day: "2-digit", month: "short" })} · ${run.runAt.toDate().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}` : "—"}
+                          </td>
+                          <td className="px-4 py-3 text-center font-mono text-xs text-slate-700">{run.checked}</td>
+                          <td className="px-4 py-3 text-center font-mono text-xs text-slate-700">{run.triggered.length}</td>
+                          <td className="px-4 py-3">
+                            {run.errors.length === 0 ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 font-medium"><CheckCircle size={11} />OK</span>
+                            ) : (
+                              <div className="space-y-0.5">
+                                {run.errors.map((e, i) => (
+                                  <p key={i} className="text-[11px] text-red-600 font-mono truncate max-w-md">{e}</p>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            ) : systemSubTab === "audit" ? (
+              auditLog.length === 0 ? (
+                <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
+                  <Shield size={28} className="text-slate-300 mx-auto mb-3" />
+                  <h3 className="font-semibold text-slate-900">Sin acciones registradas todavía</h3>
+                </div>
+              ) : (
+                <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+                  {auditLog.map((entry) => (
+                    <div key={entry.id} className="px-4 py-3 flex items-start gap-3">
+                      <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Shield size={12} className="text-slate-500" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-slate-700"><span className="font-semibold text-slate-900">{entry.adminName}</span> · {AUDIT_ACTION_LABEL[entry.action] || entry.action}</p>
+                        {entry.details && <p className="text-[11px] text-slate-500 mt-0.5 truncate">{entry.details}</p>}
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono flex-shrink-0 whitespace-nowrap">
+                        {entry.createdAt ? `${entry.createdAt.toDate().toLocaleDateString("es-ES", { day: "2-digit", month: "short" })} · ${entry.createdAt.toDate().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}` : "—"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : systemSubTab === "broadcast" ? (
+              (() => {
+                const broadcasts = auditLog.filter((e) => e.action === "broadcast_sent");
+                return broadcasts.length === 0 ? (
+                  <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
+                    <Send size={28} className="text-slate-300 mx-auto mb-3" />
+                    <h3 className="font-semibold text-slate-900">Sin envíos todavía</h3>
+                    <p className="text-xs text-slate-400 mt-1">Usa "Emitir mensaje" en el menú lateral para mandar el primero.</p>
+                  </div>
+                ) : (
+                  <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+                    {broadcasts.map((entry) => (
+                      <div key={entry.id} className="px-4 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs font-medium text-slate-900">{entry.adminName}</p>
+                          <span className="text-[10px] text-slate-400 font-mono flex-shrink-0">
+                            {entry.createdAt ? formatDate(entry.createdAt) : "—"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 mt-1">{entry.details}</p>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()
+            ) : (
+              <div className="max-w-2xl space-y-6">
+                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Crear flag</p>
+                  <div className="flex gap-2">
+                    <input
+                      value={newFlagForm.label}
+                      onChange={(e) => setNewFlagForm({ ...newFlagForm, label: e.target.value })}
+                      placeholder="Nombre (p. ej. Escenas beta)"
+                      className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-900 outline-none"
+                    />
+                    <button onClick={handleCreateFlag} disabled={saving} className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50 flex-shrink-0">
+                      Crear
+                    </button>
+                  </div>
+                  <input
+                    value={newFlagForm.description}
+                    onChange={(e) => setNewFlagForm({ ...newFlagForm, description: e.target.value })}
+                    placeholder="Para qué sirve (opcional)"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-900 outline-none"
+                  />
+                </div>
+
+                {Object.keys(featureFlags).length === 0 ? (
+                  <div className="border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
+                    <Sparkles size={24} className="text-slate-300 mx-auto mb-2" />
+                    <p className="text-sm text-slate-500">Sin flags todavía</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {Object.values(featureFlags).map((flag) => {
+                      const enabledUsers = users.filter((u) => flag.enabledUserIds.includes(u.id));
+                      const pickerUsers = users.filter((u) =>
+                        !flag.enabledUserIds.includes(u.id) &&
+                        (u.name.toLowerCase().includes(flagUserPickerSearch.toLowerCase()) || u.email.toLowerCase().includes(flagUserPickerSearch.toLowerCase()))
+                      ).slice(0, 6);
+                      return (
+                        <div key={flag.id} className="bg-white border border-slate-200 rounded-xl p-4">
+                          <div className="flex items-start justify-between gap-3 mb-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-slate-900">{flag.label}</p>
+                              {flag.description && <p className="text-xs text-slate-500 mt-0.5">{flag.description}</p>}
+                            </div>
+                            <button onClick={() => handleDeleteFlag(flag.id)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg flex-shrink-0" title="Eliminar flag">
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between gap-3 py-2 border-t border-slate-100">
+                            <p className="text-xs font-medium text-slate-700">Activado para todos</p>
+                            <button
+                              onClick={() => handleToggleFlagGlobal(flag.id, !flag.enabledGlobally)}
+                              disabled={saving}
+                              className="w-10 h-6 rounded-full transition-colors relative flex-shrink-0 disabled:opacity-50"
+                              style={{ background: flag.enabledGlobally ? "#0f172a" : "#e2e8f0" }}
+                            >
+                              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${flag.enabledGlobally ? "left-5" : "left-1"}`} />
+                            </button>
+                          </div>
+                          {!flag.enabledGlobally && (
+                            <div className="pt-2 border-t border-slate-100">
+                              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Activado para usuarios concretos ({enabledUsers.length})</p>
+                              {enabledUsers.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mb-2">
+                                  {enabledUsers.map((u) => (
+                                    <span key={u.id} className="flex items-center gap-1 pl-2 pr-1 py-1 bg-slate-100 rounded-lg text-[11px] text-slate-700">
+                                      {u.name}
+                                      <button onClick={() => handleToggleFlagUser(flag.id, u.id)} className="p-0.5 text-slate-400 hover:text-red-500"><X size={10} /></button>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              <div className="relative" ref={flagUserPickerFor === flag.id ? flagUserPickerRef : null}>
+                                <button
+                                  onClick={() => { setFlagUserPickerFor(flagUserPickerFor === flag.id ? null : flag.id); setFlagUserPickerSearch(""); }}
+                                  className="text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center gap-1"
+                                >
+                                  <Plus size={12} />
+                                  Añadir usuario
+                                </button>
+                                {flagUserPickerFor === flag.id && (
+                                  <div className="absolute left-0 top-full mt-1.5 w-64 bg-white border border-slate-200 rounded-xl shadow-lg z-20 p-2">
+                                    <input
+                                      autoFocus
+                                      value={flagUserPickerSearch}
+                                      onChange={(e) => setFlagUserPickerSearch(e.target.value)}
+                                      placeholder="Buscar usuario"
+                                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs mb-1.5 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                                    />
+                                    <div className="max-h-40 overflow-y-auto">
+                                      {pickerUsers.map((u) => (
+                                        <button
+                                          key={u.id}
+                                          onClick={() => { handleToggleFlagUser(flag.id, u.id); setFlagUserPickerSearch(""); }}
+                                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-50 text-xs text-slate-700"
+                                        >
+                                          {u.name}
+                                        </button>
+                                      ))}
+                                      {pickerUsers.length === 0 && <p className="text-[11px] text-slate-400 text-center py-2">Sin resultados</p>}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
           </main>
         </div>
       </div>
@@ -2924,6 +3634,13 @@ export default function AdminDashboard() {
                   >
                     Cerrar
                   </button>
+                  <Link
+                    href={`/admindashboard/users/${user.id}`}
+                    className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"
+                  >
+                    <Eye size={14} />
+                    Ver como
+                  </Link>
                   <button
                     onClick={() => { setShowUserDetails(null); handleDeleteUser(user.id); }}
                     disabled={saving}
@@ -2943,7 +3660,8 @@ export default function AdminDashboard() {
         const canSend = messageForm.content.trim() &&
           (messageForm.recipientMode === "all" ||
           (messageForm.recipientMode === "projects" && messageForm.selectedProjects.length > 0) ||
-          (messageForm.recipientMode === "users" && messageForm.selectedUsers.length > 0));
+          (messageForm.recipientMode === "users" && messageForm.selectedUsers.length > 0) ||
+          (messageForm.recipientMode === "segment" && !!messageForm.selectedSegment));
 
         return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -2963,7 +3681,7 @@ export default function AdminDashboard() {
                 onClick={() => {
                   setShowMessageModal(false);
                   setEmailConfirmStep(false);
-                  setMessageForm({ content: "", recipientMode: "all", selectedProjects: [], selectedUsers: [], duration: "indefinite", sendByEmail: false });
+                  setMessageForm({ content: "", recipientMode: "all", selectedProjects: [], selectedUsers: [], selectedSegment: null, duration: "indefinite", sendByEmail: false });
                   setProjectSearchInMessage("");
                   setUserSearchInMessage("");
                 }}
@@ -2994,18 +3712,19 @@ export default function AdminDashboard() {
                 {/* Recipients */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Destinatarios</label>
-                  <div className="grid grid-cols-3 gap-2 mb-3">
+                  <div className="grid grid-cols-4 gap-2 mb-3">
                     {[
                       { mode: "all", label: "Todos", sublabel: `${users.length} usuarios`, icon: Users },
                       { mode: "projects", label: "Por proyecto", sublabel: "Uno o varios", icon: Briefcase },
                       { mode: "users", label: "Usuarios", sublabel: "Específicos", icon: UserPlus },
+                      { mode: "segment", label: "Segmento", sublabel: "Guardado", icon: Activity },
                     ].map((opt) => {
                       const Icon = opt.icon;
                       const active = messageForm.recipientMode === opt.mode;
                       return (
                         <button
                           key={opt.mode}
-                          onClick={() => setMessageForm({ ...messageForm, recipientMode: opt.mode as typeof messageForm.recipientMode, selectedProjects: [], selectedUsers: [] })}
+                          onClick={() => setMessageForm({ ...messageForm, recipientMode: opt.mode as typeof messageForm.recipientMode, selectedProjects: [], selectedUsers: [], selectedSegment: null })}
                           className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all ${active ? "bg-slate-900 border-slate-900 text-white" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
                         >
                           <Icon size={16} className={active ? "text-white" : "text-slate-400"} />
@@ -3017,6 +3736,28 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Project picker */}
+                  {messageForm.recipientMode === "segment" && (
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                      {SEGMENT_PRESETS.map((seg) => {
+                        const active = messageForm.selectedSegment === seg.id;
+                        return (
+                          <button
+                            key={seg.id}
+                            onClick={() => setMessageForm({ ...messageForm, selectedSegment: seg.id })}
+                            disabled={seg.userIds.length === 0}
+                            className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${active ? "bg-slate-900 text-white" : "bg-white border border-slate-200 hover:bg-slate-100 text-slate-700"}`}
+                          >
+                            <div>
+                              <p className="text-xs font-semibold">{seg.label}</p>
+                              <p className={`text-[10px] ${active ? "text-slate-300" : "text-slate-400"}`}>{seg.sub}</p>
+                            </div>
+                            {active ? <CheckSquare size={14} /> : <Square size={14} className="text-slate-300 flex-shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   {messageForm.recipientMode === "projects" && (
                     <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
                       <div className="relative">
@@ -3193,6 +3934,9 @@ export default function AdminDashboard() {
                   {messageForm.recipientMode === "projects" && messageForm.selectedProjects.length > 0 && (
                     <p className="text-[11px] text-slate-400">De {messageForm.selectedProjects.length} proyecto{messageForm.selectedProjects.length !== 1 ? "s" : ""}</p>
                   )}
+                  {messageForm.recipientMode === "segment" && messageForm.selectedSegment && (
+                    <p className="text-[11px] text-slate-400">Segmento "{SEGMENT_PRESETS.find((s) => s.id === messageForm.selectedSegment)?.label}"</p>
+                  )}
                   {messageForm.sendByEmail && (
                     <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100">
                       <Mail size={11} className="text-amber-500" />
@@ -3243,7 +3987,7 @@ export default function AdminDashboard() {
                   onClick={() => {
                     setShowMessageModal(false);
                     setEmailConfirmStep(false);
-                    setMessageForm({ content: "", recipientMode: "all", selectedProjects: [], selectedUsers: [], duration: "indefinite", sendByEmail: false });
+                    setMessageForm({ content: "", recipientMode: "all", selectedProjects: [], selectedUsers: [], selectedSegment: null, duration: "indefinite", sendByEmail: false });
                     setProjectSearchInMessage("");
                     setUserSearchInMessage("");
                   }}
@@ -3320,6 +4064,55 @@ export default function AdminDashboard() {
                     className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm resize-none"
                   />
                   <p className="text-[11px] text-slate-400 mt-1">Aparece en el chat de la home si nadie responde en 3 minutos.</p>
+                </div>
+
+                <div className="pt-1 border-t border-slate-100">
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 pt-4">Respuestas rápidas</label>
+                  <p className="text-[11px] text-slate-400 mb-3">No se envían solas: aparecen como atajo al responder un ticket, para lo que se repite.</p>
+                  <div className="space-y-2">
+                    {automatedMessagesForm.macros.map((macro, i) => (
+                      <div key={macro.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <input
+                            value={macro.label}
+                            onChange={(e) => {
+                              const macros = [...automatedMessagesForm.macros];
+                              macros[i] = { ...macro, label: e.target.value };
+                              setAutomatedMessagesForm({ ...automatedMessagesForm, macros });
+                            }}
+                            placeholder="Nombre corto"
+                            className="flex-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-slate-900 outline-none"
+                          />
+                          <button
+                            onClick={() => setAutomatedMessagesForm({ ...automatedMessagesForm, macros: automatedMessagesForm.macros.filter((m) => m.id !== macro.id) })}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg flex-shrink-0"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                        <textarea
+                          value={macro.text}
+                          onChange={(e) => {
+                            const macros = [...automatedMessagesForm.macros];
+                            macros[i] = { ...macro, text: e.target.value };
+                            setAutomatedMessagesForm({ ...automatedMessagesForm, macros });
+                          }}
+                          rows={2}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-slate-900 outline-none resize-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setAutomatedMessagesForm({
+                      ...automatedMessagesForm,
+                      macros: [...automatedMessagesForm.macros, { id: `m${Date.now()}`, label: "", text: "" }],
+                    })}
+                    className="mt-2 flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900"
+                  >
+                    <Plus size={13} />
+                    Añadir respuesta rápida
+                  </button>
                 </div>
               </div>
             )}
