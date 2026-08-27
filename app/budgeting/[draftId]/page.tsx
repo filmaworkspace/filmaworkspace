@@ -15,7 +15,7 @@ import {
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
   AlertCircle, Building2, BookmarkPlus, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Download, FileDown, FileSpreadsheet,
-  FileText, FolderOutput, History, Search, Trash2, X,
+  FileText, FolderOutput, History, MoreHorizontal, Search, Trash2, X,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
@@ -95,7 +95,7 @@ function ChapterRow({
       else if (e.key === "Escape") setDescription(chapter.description);
     };
     return (
-      <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+      <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#A855F7]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
         <span />
         <input
           autoFocus={autoFocus}
@@ -113,10 +113,10 @@ function ChapterRow({
           </span>
         )}
         <span className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#414E82] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+          <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#A855F7] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
             <ChevronUp size={11} />
           </button>
-          <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#414E82] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+          <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#A855F7] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
             <ChevronDown size={11} />
           </button>
           <button onClick={onDelete} className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar línea">
@@ -128,9 +128,9 @@ function ChapterRow({
   }
 
   return (
-    <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#414E82]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+    <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#A855F7]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
       <Link href={`/budgeting/${draftId}/accounts/${chapter.id}`} className="flex items-center justify-center" title="Entrar">
-        <ChevronRight size={13} className="text-slate-300 group-hover:text-[#414E82] group-hover:translate-x-0.5 transition-all" />
+        <ChevronRight size={13} className="text-slate-300 group-hover:text-[#A855F7] group-hover:translate-x-0.5 transition-all" />
       </Link>
       <input autoFocus={autoFocus} value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} font-mono text-xs pl-2`} />
@@ -138,10 +138,10 @@ function ChapterRow({
         className={`${CELL_INPUT} text-xs pl-2`} />
       <span className="flex items-center justify-end text-xs font-medium text-slate-700 pr-2">{fmt(total)}</span>
       <span className="flex items-center justify-end gap-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#414E82] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#A855F7] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
           <ChevronUp size={11} />
         </button>
-        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#414E82] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#A855F7] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
           <ChevronDown size={11} />
         </button>
         <button onClick={onDelete} className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar capítulo">
@@ -205,6 +205,18 @@ export default function BudgetingTopPage() {
   const exportPanelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onClick = (e: MouseEvent) => { if (exportPanelRef.current && !exportPanelRef.current.contains(e.target as Node)) setExportPanelOpen(false); };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  // "···" Más acciones: agrupa lo que antes eran 5 iconos sueltos (plantilla,
+  // versiones, guardar versión, duplicar) para no saturar la barra superior;
+  // "Enviar a proyecto" se queda fuera, como botón propio, por ser la acción
+  // principal de cierre de un presupuesto.
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => { if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) setMoreMenuOpen(false); };
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
@@ -962,10 +974,6 @@ export default function BudgetingTopPage() {
           )}
 
           <div className="flex items-center gap-1 flex-shrink-0">
-            <button onClick={() => { setTemplateError(""); setShowTemplateModal(true); }} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Guardar como plantilla">
-              <BookmarkPlus size={14} />
-            </button>
-
             {/* Exportar: un solo botón, el desplegable trae las descargas y su configuración */}
             <div ref={exportPanelRef} className="relative">
               <button onClick={() => setExportPanelOpen((o) => !o)} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Exportar">
@@ -989,11 +997,11 @@ export default function BudgetingTopPage() {
                     <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mb-1.5">Configuración Excel / PDF</p>
                     <label className="flex items-center justify-between gap-2 mb-1.5">
                       <span className="text-xs text-slate-700">Top Sheet (portada)</span>
-                      <input type="checkbox" checked={exportConfig.coverSheet} onChange={(e) => updateExportConfig({ coverSheet: e.target.checked })} className="accent-[#414E82]" />
+                      <input type="checkbox" checked={exportConfig.coverSheet} onChange={(e) => updateExportConfig({ coverSheet: e.target.checked })} className="accent-[#A855F7]" />
                     </label>
                     <label className="flex items-center justify-between gap-2">
                       <span className="text-xs text-slate-700">Salto de página por capítulo</span>
-                      <input type="checkbox" checked={exportConfig.pageBreakPerChapter} onChange={(e) => updateExportConfig({ pageBreakPerChapter: e.target.checked })} className="accent-[#414E82]" />
+                      <input type="checkbox" checked={exportConfig.pageBreakPerChapter} onChange={(e) => updateExportConfig({ pageBreakPerChapter: e.target.checked })} className="accent-[#A855F7]" />
                     </label>
                   </div>
                   <div className="border-t border-slate-100 pt-2.5">
@@ -1002,7 +1010,7 @@ export default function BudgetingTopPage() {
                       {([["unit", "Unidad"], ["notes", "Comentario"], ["tags", "Etiquetas"]] as const).map(([key, label]) => (
                         <label key={key} className="flex items-center justify-between gap-2">
                           <span className="text-xs text-slate-700">{label}</span>
-                          <input type="checkbox" checked={exportConfig.fields[key]} onChange={(e) => updateExportConfig({ fields: { [key]: e.target.checked } as Partial<BudgetingExportConfig["fields"]> })} className="accent-[#414E82]" />
+                          <input type="checkbox" checked={exportConfig.fields[key]} onChange={(e) => updateExportConfig({ fields: { [key]: e.target.checked } as Partial<BudgetingExportConfig["fields"]> })} className="accent-[#A855F7]" />
                         </label>
                       ))}
                     </div>
@@ -1039,7 +1047,7 @@ export default function BudgetingTopPage() {
                     </div>
                     <label className="flex items-center justify-between gap-2">
                       <span className="text-xs text-slate-700">Ocultar Cuentas con total 0€</span>
-                      <input type="checkbox" checked={exportConfig.hideZeroTotalSubchapters} onChange={(e) => updateExportConfig({ hideZeroTotalSubchapters: e.target.checked })} className="accent-[#414E82]" />
+                      <input type="checkbox" checked={exportConfig.hideZeroTotalSubchapters} onChange={(e) => updateExportConfig({ hideZeroTotalSubchapters: e.target.checked })} className="accent-[#A855F7]" />
                     </label>
                     <button
                       onClick={() => { setExportPanelOpen(false); openProjectInfoModal(); }}
@@ -1052,18 +1060,49 @@ export default function BudgetingTopPage() {
               )}
             </div>
 
-            <Link href={`/budgeting/${draftId}/versions`} className={`p-1.5 rounded-lg inline-flex ${ICON_BTN_LIGHT}`} title="Versiones">
-              <History size={14} />
-            </Link>
-            <button onClick={() => setShowSnapshotModal(true)} className={`text-[11px] font-medium px-2.5 py-1.5 rounded-lg ${BTN_LIGHT}`} title="Guardar una foto del presupuesto actual">
-              Guardar versión
-            </button>
-            <button onClick={handleDuplicateDraft} disabled={duplicating} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT} disabled:opacity-50`} title="Duplicar presupuesto">
-              <Copy size={14} />
-            </button>
-            {/* Icono propio (no el de enviar mensaje): esto manda el presupuesto a un proyecto, no a una persona */}
-            <button onClick={openSendModal} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Enviar a proyecto">
-              <FolderOutput size={14} />
+            {/* "···" Más acciones: Guardar como plantilla, Versiones, Guardar versión, Duplicar */}
+            <div ref={moreMenuRef} className="relative">
+              <button onClick={() => setMoreMenuOpen((o) => !o)} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Más acciones">
+                <MoreHorizontal size={14} />
+              </button>
+              {moreMenuOpen && (
+                <div className="absolute z-30 top-full right-0 mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5">
+                  <button
+                    onClick={() => { setMoreMenuOpen(false); setTemplateError(""); setShowTemplateModal(true); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
+                  >
+                    <BookmarkPlus size={13} className="text-slate-400" /> Guardar como plantilla
+                  </button>
+                  <Link
+                    href="?library=versions"
+                    onClick={() => setMoreMenuOpen(false)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
+                  >
+                    <History size={13} className="text-slate-400" /> Versiones
+                  </Link>
+                  <button
+                    onClick={() => { setMoreMenuOpen(false); setShowSnapshotModal(true); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
+                  >
+                    <Check size={13} className="text-slate-400" /> Guardar versión
+                  </button>
+                  <div className="border-t border-slate-100 my-1" />
+                  <button
+                    onClick={() => { setMoreMenuOpen(false); handleDuplicateDraft(); }}
+                    disabled={duplicating}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    <Copy size={13} className="text-slate-400" /> {duplicating ? "Duplicando..." : "Duplicar presupuesto"}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Botón propio (no el de enviar mensaje): esto manda el presupuesto a un proyecto, no a una persona.
+                Se queda fuera del "···" a propósito: es la acción principal de cierre de un presupuesto. */}
+            <button onClick={openSendModal} className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg ${BTN_LIGHT}`} title="Enviar a proyecto">
+              <FolderOutput size={13} />
+              Enviar
             </button>
           </div>
 
@@ -1080,8 +1119,8 @@ export default function BudgetingTopPage() {
       </div>
 
       {activeScenarioId && (
-        <div className="flex items-center gap-1.5 mb-3 text-[11px] font-medium" style={{ color: "#414E82" }}>
-          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#414E82" }} />
+        <div className="flex items-center gap-1.5 mb-3 text-[11px] font-medium" style={{ color: "#A855F7" }}>
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#A855F7" }} />
           Previsualizando "{scenarios.find((s) => s.id === activeScenarioId)?.label}": los totales de abajo son una simulación, no se ha guardado nada.
         </div>
       )}
@@ -1097,7 +1136,7 @@ export default function BudgetingTopPage() {
             <BudgetingColumnsMenu title="Columnas">
               <label className="flex items-center justify-between gap-2">
                 <span className="text-xs text-slate-700">Mostrar cargas sociales</span>
-                <input type="checkbox" checked={fringeVisibility.topSheet} onChange={(e) => updateFringeVisibility({ topSheet: e.target.checked })} className="accent-[#414E82]" />
+                <input type="checkbox" checked={fringeVisibility.topSheet} onChange={(e) => updateFringeVisibility({ topSheet: e.target.checked })} className="accent-[#A855F7]" />
               </label>
             </BudgetingColumnsMenu>
           </span>
@@ -1496,7 +1535,7 @@ export default function BudgetingTopPage() {
                           key={p.id}
                           onClick={() => handlePickProject(p)}
                           disabled={status === "checking"}
-                          className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 border border-slate-200 rounded-xl text-left hover:border-[#414E82] transition-colors disabled:opacity-60"
+                          className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 border border-slate-200 rounded-xl text-left hover:border-[#A855F7] transition-colors disabled:opacity-60"
                         >
                           <span className="text-sm text-slate-800 truncate">{p.name}</span>
                           {status === "checking" && <span className="text-[11px] text-slate-400 flex-shrink-0">Comprobando...</span>}

@@ -203,8 +203,8 @@ export default function ViewAsUserPage() {
 
         <div className="grid grid-cols-2 gap-3 mb-8">
           <div className="border border-slate-200 rounded-xl px-4 py-3 bg-white flex items-center gap-3">
-            <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#414E821a" }}>
-              <Calculator size={15} style={{ color: "#414E82" }} />
+            <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#A855F71a" }}>
+              <Calculator size={15} style={{ color: "#A855F7" }} />
             </span>
             <div>
               <p className="text-sm font-medium text-slate-900">{viewedUser.budgetingAccess ? "Tiene acceso" : "Sin acceso"}</p>
