@@ -2,7 +2,7 @@
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { inter } from "@/lib/fonts";
@@ -12,26 +12,36 @@ import { db } from "@/lib/firebase";
 import { doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, LibraryBig } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
-import { BudgetingDraft } from "@/lib/budgeting";
+import { BTN_LIGHT, BudgetingDraft } from "@/lib/budgeting";
+import BudgetingLibraryModal, { BudgetingLibraryTab } from "@/components/BudgetingLibraryModal";
 
-const ACCENT = "#414E82";
+const ACCENT = "#A855F7";
+const LIBRARY_TABS: BudgetingLibraryTab[] = ["categories", "phases", "fringes", "globals", "units", "versions"];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sidebar de Budgeting: dos modos según la ruta.
-//  · /budgeting               → solo el logo y el pie (la lista de
-//    presupuestos vive en el propio contenido, como una grid de tarjetas).
-//  · /budgeting/{draftId}/... → nav propia del borrador (Top Sheet,
-//    Categorías, Globales, Seguridad Social, Fases) y el nombre del
-//    borrador, editable aquí; ya no se repite en el contenido.
+// Shell de Budgeting: dos modos según la ruta.
+//  · /budgeting               → sin borrador abierto, no hay nada que
+//    navegar (la lista de presupuestos vive en el propio contenido, como una
+//    grid de tarjetas), así que en vez de un sidebar se muestra solo una
+//    barra superior fina con el logo y la vuelta a Dashboard.
+//  · /budgeting/{draftId}/... → misma barra fina (ya no un sidebar ancho que
+//    le robaba sitio a la tabla del presupuesto), con el nombre del borrador
+//    editable aquí, y un botón "Librería" que abre en un modal grande todo
+//    lo que antes eran rutas propias (Categorías, Fases, Cargas sociales,
+//    Globales, Unidades, Versiones) — ver BudgetingLibraryModal. Un enlace
+//    profundo puede abrirlo directo en una pestaña con ?library=<tab> (lo
+//    consume este componente y limpia la URL al abrir).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function BudgetingShell({ children }: { children: React.ReactNode }) {
   const { user } = useUser();
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const segments = pathname.split("/").filter(Boolean);
   const draftId = segments[0] === "budgeting" && segments[1] ? segments[1] : null;
@@ -63,103 +73,90 @@ export default function BudgetingShell({ children }: { children: React.ReactNode
     ]);
   };
 
-  const navItems = draftId ? [
-    { href: `/budgeting/${draftId}`, label: "Presupuesto", exact: true },
-    { href: `/budgeting/${draftId}/categories`, label: "Categorías", exact: false },
-    { href: `/budgeting/${draftId}/phases`, label: "Fases", exact: false },
-    { href: `/budgeting/${draftId}/fringes`, label: "Cargas sociales", exact: false },
-    { href: `/budgeting/${draftId}/globals`, label: "Globales", exact: false },
-    { href: `/budgeting/${draftId}/units`, label: "Unidades", exact: false },
-    { href: `/budgeting/${draftId}/versions`, label: "Versiones", exact: false },
-  ] : [];
+  // ── Modal de Librería: abre por botón, o por enlace profundo ?library=tab
+  // (p.ej. desde "Cargas sociales" en una línea de Detalle). Al consumirlo
+  // se limpia el parámetro, para que no se reabra solo con back/refresh. ──
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryTab, setLibraryTab] = useState<BudgetingLibraryTab>("categories");
+
+  useEffect(() => {
+    const requested = searchParams.get("library");
+    if (requested && (LIBRARY_TABS as string[]).includes(requested)) {
+      setLibraryTab(requested as BudgetingLibraryTab);
+      setLibraryOpen(true);
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete("library");
+      const qs = next.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, pathname]);
+
+  const openLibrary = (tab: BudgetingLibraryTab = "categories") => { setLibraryTab(tab); setLibraryOpen(true); };
 
   return (
-    <div className={`min-h-screen flex bg-white ${inter.className}`}>
-      <aside className="w-60 flex-shrink-0 border-r border-slate-100 flex flex-col h-screen sticky top-0">
-        <div className="px-5 pt-6 pb-5 flex justify-center border-b border-slate-100">
-          <Link href="/budgeting">
-            <Image src="/logo-budgeting.svg" alt="Budgeting" width={82} height={24} className="h-6 w-auto" priority />
-          </Link>
-        </div>
+    <div className={`min-h-screen bg-white ${inter.className}`}>
+      <header className="h-14 flex-shrink-0 border-b border-slate-100 flex items-center gap-4 px-5 sticky top-0 bg-white z-20">
+        <Link href="/budgeting" className="flex-shrink-0">
+          <Image src="/logo-budgeting.svg" alt="Budgeting" width={82} height={24} className="h-5 w-auto" priority />
+        </Link>
 
-        {draftId ? (
+        {draftId && (
           <>
-            <div className="px-5 py-4 border-b border-slate-100">
-              <Link href="/budgeting" className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 transition-colors mb-3">
-                <ArrowLeft size={12} />
-                Presupuestos
-              </Link>
-              {editingName ? (
-                <input
-                  autoFocus
-                  value={nameInput}
-                  onChange={(e) => setNameInput(e.target.value)}
-                  onBlur={handleRenameDraft}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                    if (e.key === "Escape" && draft) { setNameInput(draft.name); setEditingName(false); }
-                  }}
-                  className="text-sm font-semibold text-slate-900 border-b-2 focus:outline-none bg-transparent px-0 py-0.5 w-full"
-                  style={{ borderColor: ACCENT }}
-                />
-              ) : (
-                <button
-                  onClick={() => setEditingName(true)}
-                  className="text-sm font-semibold text-slate-900 hover:text-[#414E82] transition-colors text-left truncate block w-full"
-                  title="Renombrar"
-                >
-                  {draft?.name || ""}
-                </button>
-              )}
-            </div>
-
-            <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
-              {navItems.map((item) => {
-                const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`block px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? "" : "text-slate-600 hover:bg-slate-50"}`}
-                    style={isActive ? { background: `${ACCENT}1a`, color: ACCENT, fontWeight: 500 } : undefined}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-          </>
-        ) : (
-          <nav className="flex-1 px-3 py-3">
-            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider px-3 mb-1.5">Budgeting</p>
-            <Link
-              href="/budgeting"
-              className="block px-3 py-2 rounded-lg text-sm"
-              style={{ background: `${ACCENT}1a`, color: ACCENT, fontWeight: 500 }}
-            >
-              Presupuestos
+            <div className="w-px h-5 bg-slate-200 flex-shrink-0" />
+            <Link href="/budgeting" className="flex items-center text-slate-400 hover:text-slate-700 transition-colors flex-shrink-0" title="Presupuestos">
+              <ArrowLeft size={14} />
             </Link>
-          </nav>
+            {editingName ? (
+              <input
+                autoFocus
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                onBlur={handleRenameDraft}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                  if (e.key === "Escape" && draft) { setNameInput(draft.name); setEditingName(false); }
+                }}
+                className="text-sm font-semibold text-slate-900 border-b-2 focus:outline-none bg-transparent px-0 py-0.5 min-w-0 max-w-xs"
+                style={{ borderColor: ACCENT }}
+              />
+            ) : (
+              <button
+                onClick={() => setEditingName(true)}
+                className="text-sm font-semibold text-slate-900 hover:text-[#A855F7] transition-colors text-left truncate max-w-xs min-w-0"
+                title="Renombrar"
+              >
+                {draft?.name || ""}
+              </button>
+            )}
+          </>
         )}
 
-        <div className="px-3 py-3 border-t border-slate-100 space-y-2">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors"
-          >
-            <ArrowLeft size={13} />
-            Volver a Dashboard
-          </Link>
-          <div className="flex items-center gap-2 px-2">
-            <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center text-[10px] font-semibold text-white flex-shrink-0">
-              {user?.name?.charAt(0).toUpperCase() || "?"}
-            </div>
-            <span className="text-xs text-slate-500 truncate">{user?.name}</span>
-          </div>
-        </div>
-      </aside>
+        <div className="flex-1" />
 
-      <main className="flex-1 min-w-0 overflow-y-auto">{children}</main>
+        {draftId && (
+          <button onClick={() => openLibrary("categories")} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium flex-shrink-0 ${BTN_LIGHT}`}>
+            <LibraryBig size={13} />
+            Librería
+          </button>
+        )}
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors flex-shrink-0"
+        >
+          <ArrowLeft size={13} />
+          Volver a Dashboard
+        </Link>
+        <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center text-[10px] font-semibold text-white flex-shrink-0" title={user?.name}>
+          {user?.name?.charAt(0).toUpperCase() || "?"}
+        </div>
+      </header>
+
+      <main>{children}</main>
+
+      {draftId && (
+        <BudgetingLibraryModal draftId={draftId} open={libraryOpen} initialTab={libraryTab} onClose={() => setLibraryOpen(false)} />
+      )}
     </div>
   );
 }

@@ -107,14 +107,14 @@ export default function BudgetingSettingsList({ draftId, arrayField, fields, emp
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+      <div className="flex items-center justify-center py-24">
+        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="w-full px-10 py-8 max-w-2xl">
+    <div>
       <div className="border border-slate-200 rounded-2xl overflow-hidden">
         {items.length === 0 ? (
           <p className="text-xs text-slate-400 text-center py-8">{emptyLabel}</p>
@@ -151,7 +151,7 @@ export default function BudgetingSettingsList({ draftId, arrayField, fields, emp
 
       {/* ── Item modal ───────────────────────────────────────────────────── */}
       {modalItem !== undefined && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
               <h3 className="text-sm font-semibold text-slate-900">{modalItem ? "Editar" : "Añadir"}</h3>
@@ -194,7 +194,7 @@ export default function BudgetingSettingsList({ draftId, arrayField, fields, emp
 
       {/* ── Delete confirm ───────────────────────────────────────────────── */}
       {deleteTarget && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
             <h3 className="text-sm font-semibold text-slate-900 mb-1.5">Borrar "{deleteTarget[fields[0].key]}"</h3>
             <p className="text-xs text-slate-500 mb-4">Esta acción no se puede deshacer.</p>

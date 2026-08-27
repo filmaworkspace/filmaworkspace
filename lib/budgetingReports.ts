@@ -169,9 +169,9 @@ const INK: RGB = [15, 23, 42];       // slate-900
 const MUTED: RGB = [100, 116, 139];  // slate-500
 const RULE: RGB = [148, 163, 184];   // slate-400, borde de tabla
 const RULE_LIGHT: RGB = [203, 213, 225]; // slate-300, borde de fila
-const ACCENT: RGB = [65, 78, 130];   // #414E82, acento de Budgeting
+const ACCENT: RGB = [168, 85, 247];   // #A855F7, acento de Budgeting
 const HEADER_BG: RGB = [241, 245, 249];  // slate-100: cabecera de columna clara, no negra
-const CATEGORY_BG: RGB = [227, 228, 236]; // tinte muy claro del acento, para las filas de categoría (ATL/BTL)
+const CATEGORY_BG: RGB = [242, 230, 254]; // tinte muy claro del acento, para las filas de categoría (ATL/BTL)
 const TOTAL_BG: RGB = [226, 232, 240];   // slate-200: filas de total (Top Sheet y Detalle), un poco más marcado
 
 // ─── Idioma del PDF: solo traduce los textos fijos (etiquetas, encabezados
