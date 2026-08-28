@@ -78,7 +78,7 @@ export default function BudgetingFolderPicker({ folders, value, onChange, onCrea
           <button
             onClick={() => { onChange(null); setOpen(false); }}
             className={`w-full text-left px-3.5 py-1.5 text-sm hover:bg-slate-50 ${!value ? "font-medium" : "text-slate-600"}`}
-            style={!value ? { color: "#A855F7" } : undefined}
+            style={!value ? { color: "#6D5A88" } : undefined}
           >
             Sin carpeta
           </button>
@@ -87,7 +87,7 @@ export default function BudgetingFolderPicker({ folders, value, onChange, onCrea
               key={f.id}
               onClick={() => { onChange(f.id); setOpen(false); }}
               className={`w-full text-left px-3.5 py-1.5 text-sm hover:bg-slate-50 truncate ${value === f.id ? "font-medium" : "text-slate-600"}`}
-              style={value === f.id ? { color: "#A855F7" } : undefined}
+              style={value === f.id ? { color: "#6D5A88" } : undefined}
             >
               {f.label}
             </button>
@@ -98,12 +98,12 @@ export default function BudgetingFolderPicker({ folders, value, onChange, onCrea
               onChange={(e) => setNewLabel(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && newLabel.trim()) { onCreateFolder(newLabel.trim()); setNewLabel(""); } }}
               placeholder="Nueva carpeta"
-              className="flex-1 min-w-0 text-xs px-2 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-[#A855F7]"
+              className="flex-1 min-w-0 text-xs px-2 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D5A88]"
             />
             <button
               onClick={() => { if (newLabel.trim()) { onCreateFolder(newLabel.trim()); setNewLabel(""); } }}
               className="p-1.5 rounded-lg text-white flex-shrink-0"
-              style={{ background: "#A855F7" }}
+              style={{ background: "#6D5A88" }}
             >
               <Plus size={12} />
             </button>

@@ -14,7 +14,7 @@ import BudgetingSettingsList from "@/components/BudgetingSettingsList";
 import BudgetingUnitsPanel from "@/components/BudgetingUnitsPanel";
 import BudgetingVersionsPanel from "@/components/BudgetingVersionsPanel";
 
-const ACCENT = "#A855F7";
+const ACCENT = "#6D5A88";
 
 export type BudgetingLibraryTab = "categories" | "phases" | "fringes" | "globals" | "units" | "versions";
 

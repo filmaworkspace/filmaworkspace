@@ -76,7 +76,7 @@ export default function BudgetingFormulaInput({ value, onChange, onFocus, onBlur
               onClick={() => insert(g.code)}
               className="w-full flex items-center justify-between gap-2 px-2.5 py-1 text-left hover:bg-slate-50"
             >
-              <span className="text-[11px] font-mono flex-shrink-0" style={{ color: "#A855F7" }}>{g.code}</span>
+              <span className="text-[11px] font-mono flex-shrink-0" style={{ color: "#6D5A88" }}>{g.code}</span>
               <span className="text-[10px] text-slate-400 truncate">{g.label}</span>
             </button>
           ))}

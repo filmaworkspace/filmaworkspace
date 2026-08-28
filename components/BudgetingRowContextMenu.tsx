@@ -104,7 +104,7 @@ export default function BudgetingRowContextMenu({
             <span className="text-xs text-slate-700">Negrita</span>
             <button
               onClick={() => state.style!.onChangeBold(!state.style!.bold)}
-              className={`p-1 rounded transition-colors ${state.style!.bold ? "text-[#A855F7] bg-[#A855F7]/[0.1]" : "text-slate-300 hover:text-slate-500"}`}
+              className={`p-1 rounded transition-colors ${state.style!.bold ? "text-[#6D5A88] bg-[#6D5A88]/[0.1]" : "text-slate-300 hover:text-slate-500"}`}
             >
               <Bold size={12} />
             </button>

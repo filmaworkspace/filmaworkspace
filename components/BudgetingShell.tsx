@@ -19,7 +19,7 @@ import { useUser } from "@/contexts/UserContext";
 import { BTN_LIGHT, BudgetingDraft } from "@/lib/budgeting";
 import BudgetingLibraryModal, { BudgetingLibraryTab } from "@/components/BudgetingLibraryModal";
 
-const ACCENT = "#A855F7";
+const ACCENT = "#6D5A88";
 const LIBRARY_TABS: BudgetingLibraryTab[] = ["categories", "phases", "fringes", "globals", "units", "versions"];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -123,7 +123,7 @@ export default function BudgetingShell({ children }: { children: React.ReactNode
             ) : (
               <button
                 onClick={() => setEditingName(true)}
-                className="text-sm font-semibold text-slate-900 hover:text-[#A855F7] transition-colors text-left truncate max-w-xs min-w-0"
+                className="text-sm font-semibold text-slate-900 hover:text-[#6D5A88] transition-colors text-left truncate max-w-xs min-w-0"
                 title="Renombrar"
               >
                 {draft?.name || ""}

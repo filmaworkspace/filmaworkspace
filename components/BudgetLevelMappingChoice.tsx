@@ -37,13 +37,13 @@ export default function BudgetLevelMappingChoice({
           key={opt.value}
           onClick={() => onChange(opt.value)}
           className={`w-full text-left px-3.5 py-3 rounded-xl border transition-colors ${
-            value === opt.value ? "border-[#A855F7] bg-[#A855F7]/[0.06]" : "border-slate-200 hover:border-slate-300"
+            value === opt.value ? "border-[#6D5A88] bg-[#6D5A88]/[0.06]" : "border-slate-200 hover:border-slate-300"
           }`}
         >
           <div className="flex items-center gap-2">
             <span
               className={`w-3.5 h-3.5 rounded-full border flex-shrink-0 ${
-                value === opt.value ? "border-[#A855F7] bg-[#A855F7]" : "border-slate-300"
+                value === opt.value ? "border-[#6D5A88] bg-[#6D5A88]" : "border-slate-300"
               }`}
             />
             <span className="text-sm font-medium text-slate-900">{opt.title}</span>
