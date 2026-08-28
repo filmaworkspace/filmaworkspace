@@ -235,7 +235,7 @@ export default function BudgetingHomePage() {
   };
 
   return (
-    <div className="min-h-screen px-10 py-8" style={{ background: "linear-gradient(180deg, #A855F714, #ffffff 55%)" }}>
+    <div className="min-h-screen px-10 py-8" style={{ background: "linear-gradient(180deg, #6D5A8814, #ffffff 55%)" }}>
       <h1 className="text-2xl font-bold mb-6" style={{ color: "#1D201F" }}>Presupuestos</h1>
 
       <div className="flex items-center gap-2 mb-8 flex-wrap">
@@ -325,7 +325,7 @@ export default function BudgetingHomePage() {
             <div key={d.id} className="group">
               <Link
                 href={`/budgeting/${d.id}`}
-                className="relative block h-28 rounded-2xl border border-slate-200 bg-white/70 hover:border-[#A855F7] transition-colors flex items-center justify-center px-4 overflow-hidden"
+                className="relative block h-28 rounded-2xl border border-slate-200 bg-white/70 hover:border-[#6D5A88] transition-colors flex items-center justify-center px-4 overflow-hidden"
               >
                 {d.status === "sent" && (
                   <span className="absolute top-2.5 right-2.5 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[10px] font-medium">
