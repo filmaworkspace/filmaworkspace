@@ -21,6 +21,7 @@ import {
 import BudgetingColumnsMenu from "@/components/BudgetingColumnsMenu";
 import BudgetingFringeLineRow from "@/components/BudgetingFringeLineRow";
 import BudgetingRowContextMenu, { BudgetingRowContextMenuState } from "@/components/BudgetingRowContextMenu";
+import BudgetingPhantomRow from "@/components/BudgetingPhantomRow";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -81,7 +82,7 @@ function SubRow({
       else if (e.key === "Escape") setDescription(sub.description);
     };
     return (
-      <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#6D5A88]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+      <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#E86F4A]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
         <span />
         <input
           autoFocus={autoFocus}
@@ -99,10 +100,10 @@ function SubRow({
           </span>
         )}
         <span className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#6D5A88] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+          <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
             <ChevronUp size={11} />
           </button>
-          <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#6D5A88] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+          <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
             <ChevronDown size={11} />
           </button>
           <button onClick={onDelete} className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar línea">
@@ -114,9 +115,9 @@ function SubRow({
   }
 
   return (
-    <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#6D5A88]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+    <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#E86F4A]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
       <Link href={`/budgeting/${draftId}/accounts/${accountId}/subchapters/${sub.id}`} className="flex items-center justify-center" title="Entrar">
-        <ChevronRight size={13} className="text-slate-300 group-hover:text-[#6D5A88] group-hover:translate-x-0.5 transition-all" />
+        <ChevronRight size={13} className="text-slate-300 group-hover:text-[#E86F4A] group-hover:translate-x-0.5 transition-all" />
       </Link>
       <input autoFocus={autoFocus} value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} font-mono text-xs pl-2`} />
@@ -124,10 +125,10 @@ function SubRow({
         className={`${CELL_INPUT} text-xs pl-2`} />
       <span className="flex items-center justify-end text-xs font-medium text-slate-700 pr-2">{fmt(total)}</span>
       <span className="flex items-center justify-end gap-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#6D5A88] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
           <ChevronUp size={11} />
         </button>
-        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#6D5A88] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
           <ChevronDown size={11} />
         </button>
         <button onClick={onDelete} className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar subcapítulo">
@@ -282,6 +283,12 @@ export default function BudgetingChapterPage() {
     if (kind === "text") Object.assign(base, { isTextLine: true, textBold: false, textColor: DEFAULT_TEXT_LINE_COLOR });
     if (kind === "subtotal") Object.assign(base, { description: "Subtotal", isSubtotal: true, textBold: true, textColor: DEFAULT_TEXT_LINE_COLOR });
     const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`), base);
+    await touchDraft();
+    setJustAddedId(ref.id);
+  };
+  /** Primera Cuenta de un Capítulo vacío: se crea de verdad en cuanto se escribe algo, no antes (ver BudgetingPhantomRow). */
+  const handleCreateSubFromPhantom = async (code: string, description: string) => {
+    const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`), { order: orderAfter([], null), createdAt: Timestamp.now(), code, description });
     await touchDraft();
     setJustAddedId(ref.id);
   };
@@ -520,7 +527,7 @@ export default function BudgetingChapterPage() {
     <div className="w-full px-10 py-6">
       {/* Breadcrumb: solo navegación de entrar/volver, sin categorías ni desplegables */}
       <div className="flex items-center gap-1.5 mb-4">
-        <Link href={`/budgeting/${draftId}`} className="text-xs text-slate-400 hover:text-[#6D5A88] transition-colors">{draft?.name}</Link>
+        <Link href={`/budgeting/${draftId}`} className="text-xs text-slate-400 hover:text-[#E86F4A] transition-colors">{draft?.name}</Link>
         <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
         <span className="text-xs font-semibold text-slate-900">{chapter.code} {chapter.description}</span>
       </div>
@@ -550,7 +557,7 @@ export default function BudgetingChapterPage() {
             <BudgetingColumnsMenu title="Columnas">
               <label className="flex items-center justify-between gap-2">
                 <span className="text-xs text-slate-700">Mostrar cargas sociales</span>
-                <input type="checkbox" checked={fringeVisibility.chapter} onChange={(e) => updateFringeVisibility({ chapter: e.target.checked })} className="accent-[#6D5A88]" />
+                <input type="checkbox" checked={fringeVisibility.chapter} onChange={(e) => updateFringeVisibility({ chapter: e.target.checked })} className="accent-[#E86F4A]" />
               </label>
             </BudgetingColumnsMenu>
           </span>
@@ -561,16 +568,15 @@ export default function BudgetingChapterPage() {
             const sorted = sortByOrder(subchapters.filter(matchesSearch));
             if (sorted.length === 0) {
               return !q ? (
-                <div
-                  className="px-3 py-3 text-[10px] text-slate-300 italic select-none"
+                <BudgetingPhantomRow
+                  cols={cols}
+                  onCreate={handleCreateSubFromPhantom}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     const canPaste = !!getBudgetingClipboard<SubClipboardData[]>("subchapter");
                     setSubMenu({ x: e.clientX, y: e.clientY, rowId: null, onPaste: canPaste ? () => handlePasteSubs(null) : undefined });
                   }}
-                >
-                  Clic derecho para añadir una línea
-                </div>
+                />
               ) : null;
             }
             return sorted.map((sub, i) => (

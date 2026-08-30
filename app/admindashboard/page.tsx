@@ -3579,7 +3579,7 @@ export default function AdminDashboard() {
                   {/* Budgeting access */}
                   <div className="flex items-center justify-between gap-3 mb-6 pb-6 border-b border-slate-200">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#6D5A88" }}>
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, #ED8C6E, #E86F4A)", border: "1px solid rgba(255,255,255,0.25)" }}>
                         <Calculator size={15} className="text-white" />
                       </div>
                       <p className="text-sm font-medium text-slate-900">Acceso a Budgeting</p>
@@ -3588,7 +3588,7 @@ export default function AdminDashboard() {
                       onClick={() => handleToggleBudgetingAccess(user.id, !user.budgetingAccess)}
                       disabled={saving}
                       className="w-10 h-6 rounded-full transition-colors relative flex-shrink-0 disabled:opacity-50"
-                      style={{ background: user.budgetingAccess ? "#6D5A88" : "#e2e8f0" }}
+                      style={{ background: user.budgetingAccess ? "#E86F4A" : "#e2e8f0" }}
                     >
                       <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${user.budgetingAccess ? "left-5" : "left-1"}`} />
                     </button>

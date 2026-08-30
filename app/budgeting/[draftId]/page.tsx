@@ -15,7 +15,7 @@ import {
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
   AlertCircle, Building2, BookmarkPlus, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Download, FileDown, FileSpreadsheet,
-  FileText, FolderOutput, History, MoreHorizontal, Search, Trash2, X,
+  FileText, FolderOutput, History, MoreHorizontal, Search, Share2, Trash2, X,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
@@ -30,6 +30,8 @@ import BudgetingColumnsMenu from "@/components/BudgetingColumnsMenu";
 import BudgetingFringeLineRow from "@/components/BudgetingFringeLineRow";
 import BudgetingRowContextMenu, { BudgetingRowContextMenuState } from "@/components/BudgetingRowContextMenu";
 import BudgetLevelMappingChoice, { BudgetSubaccountLevel } from "@/components/BudgetLevelMappingChoice";
+import BudgetingShareModal from "@/components/BudgetingShareModal";
+import BudgetingPhantomRow from "@/components/BudgetingPhantomRow";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -95,7 +97,7 @@ function ChapterRow({
       else if (e.key === "Escape") setDescription(chapter.description);
     };
     return (
-      <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#6D5A88]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+      <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#E86F4A]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
         <span />
         <input
           autoFocus={autoFocus}
@@ -113,10 +115,10 @@ function ChapterRow({
           </span>
         )}
         <span className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#6D5A88] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+          <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
             <ChevronUp size={11} />
           </button>
-          <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#6D5A88] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+          <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
             <ChevronDown size={11} />
           </button>
           <button onClick={onDelete} className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar línea">
@@ -128,9 +130,9 @@ function ChapterRow({
   }
 
   return (
-    <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#6D5A88]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+    <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#E86F4A]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
       <Link href={`/budgeting/${draftId}/accounts/${chapter.id}`} className="flex items-center justify-center" title="Entrar">
-        <ChevronRight size={13} className="text-slate-300 group-hover:text-[#6D5A88] group-hover:translate-x-0.5 transition-all" />
+        <ChevronRight size={13} className="text-slate-300 group-hover:text-[#E86F4A] group-hover:translate-x-0.5 transition-all" />
       </Link>
       <input autoFocus={autoFocus} value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} font-mono text-xs pl-2`} />
@@ -138,10 +140,10 @@ function ChapterRow({
         className={`${CELL_INPUT} text-xs pl-2`} />
       <span className="flex items-center justify-end text-xs font-medium text-slate-700 pr-2">{fmt(total)}</span>
       <span className="flex items-center justify-end gap-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#6D5A88] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
           <ChevronUp size={11} />
         </button>
-        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#6D5A88] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
           <ChevronDown size={11} />
         </button>
         <button onClick={onDelete} className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar capítulo">
@@ -220,6 +222,10 @@ export default function BudgetingTopPage() {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
+
+  // Compartir: envía una copia completa e independiente a otro usuario (ver
+  // BudgetingShareModal y app/api/budgeting/share/route.ts) — no es un link en vivo.
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // Guardar como plantilla: estructura reutilizable para arrancar otro borrador
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -577,6 +583,12 @@ export default function BudgetingTopPage() {
     if (kind === "text") Object.assign(base, { isTextLine: true, textBold: false, textColor: DEFAULT_TEXT_LINE_COLOR });
     if (kind === "subtotal") Object.assign(base, { description: "Subtotal", isSubtotal: true, textBold: true, textColor: DEFAULT_TEXT_LINE_COLOR });
     const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts`), base);
+    await touchDraft();
+    setJustAddedId(ref.id);
+  };
+  /** Primera fila de una categoría (o de la lista plana) vacía: se crea de verdad en cuanto se escribe algo, no antes (ver BudgetingPhantomRow). */
+  const handleCreateChapterFromPhantom = async (category: string | null, code: string, description: string) => {
+    const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts`), { category, order: orderAfter([], null), createdAt: Timestamp.now(), code, description });
     await touchDraft();
     setJustAddedId(ref.id);
   };
@@ -997,11 +1009,11 @@ export default function BudgetingTopPage() {
                     <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mb-1.5">Configuración Excel / PDF</p>
                     <label className="flex items-center justify-between gap-2 mb-1.5">
                       <span className="text-xs text-slate-700">Top Sheet (portada)</span>
-                      <input type="checkbox" checked={exportConfig.coverSheet} onChange={(e) => updateExportConfig({ coverSheet: e.target.checked })} className="accent-[#6D5A88]" />
+                      <input type="checkbox" checked={exportConfig.coverSheet} onChange={(e) => updateExportConfig({ coverSheet: e.target.checked })} className="accent-[#E86F4A]" />
                     </label>
                     <label className="flex items-center justify-between gap-2">
                       <span className="text-xs text-slate-700">Salto de página por capítulo</span>
-                      <input type="checkbox" checked={exportConfig.pageBreakPerChapter} onChange={(e) => updateExportConfig({ pageBreakPerChapter: e.target.checked })} className="accent-[#6D5A88]" />
+                      <input type="checkbox" checked={exportConfig.pageBreakPerChapter} onChange={(e) => updateExportConfig({ pageBreakPerChapter: e.target.checked })} className="accent-[#E86F4A]" />
                     </label>
                   </div>
                   <div className="border-t border-slate-100 pt-2.5">
@@ -1010,7 +1022,7 @@ export default function BudgetingTopPage() {
                       {([["unit", "Unidad"], ["notes", "Comentario"], ["tags", "Etiquetas"]] as const).map(([key, label]) => (
                         <label key={key} className="flex items-center justify-between gap-2">
                           <span className="text-xs text-slate-700">{label}</span>
-                          <input type="checkbox" checked={exportConfig.fields[key]} onChange={(e) => updateExportConfig({ fields: { [key]: e.target.checked } as Partial<BudgetingExportConfig["fields"]> })} className="accent-[#6D5A88]" />
+                          <input type="checkbox" checked={exportConfig.fields[key]} onChange={(e) => updateExportConfig({ fields: { [key]: e.target.checked } as Partial<BudgetingExportConfig["fields"]> })} className="accent-[#E86F4A]" />
                         </label>
                       ))}
                     </div>
@@ -1047,7 +1059,7 @@ export default function BudgetingTopPage() {
                     </div>
                     <label className="flex items-center justify-between gap-2">
                       <span className="text-xs text-slate-700">Ocultar Cuentas con total 0€</span>
-                      <input type="checkbox" checked={exportConfig.hideZeroTotalSubchapters} onChange={(e) => updateExportConfig({ hideZeroTotalSubchapters: e.target.checked })} className="accent-[#6D5A88]" />
+                      <input type="checkbox" checked={exportConfig.hideZeroTotalSubchapters} onChange={(e) => updateExportConfig({ hideZeroTotalSubchapters: e.target.checked })} className="accent-[#E86F4A]" />
                     </label>
                     <button
                       onClick={() => { setExportPanelOpen(false); openProjectInfoModal(); }}
@@ -1098,6 +1110,12 @@ export default function BudgetingTopPage() {
               )}
             </div>
 
+            {/* Compartir: copia independiente a otro usuario, distinto de "Enviar a proyecto" */}
+            <button onClick={() => setShowShareModal(true)} className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg ${BTN_LIGHT}`} title="Compartir con otro usuario">
+              <Share2 size={13} />
+              Compartir
+            </button>
+
             {/* Botón propio (no el de enviar mensaje): esto manda el presupuesto a un proyecto, no a una persona.
                 Se queda fuera del "···" a propósito: es la acción principal de cierre de un presupuesto. */}
             <button onClick={openSendModal} className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg ${BTN_LIGHT}`} title="Enviar a proyecto">
@@ -1119,8 +1137,8 @@ export default function BudgetingTopPage() {
       </div>
 
       {activeScenarioId && (
-        <div className="flex items-center gap-1.5 mb-3 text-[11px] font-medium" style={{ color: "#6D5A88" }}>
-          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#6D5A88" }} />
+        <div className="flex items-center gap-1.5 mb-3 text-[11px] font-medium" style={{ color: "#E86F4A" }}>
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#E86F4A" }} />
           Previsualizando "{scenarios.find((s) => s.id === activeScenarioId)?.label}": los totales de abajo son una simulación, no se ha guardado nada.
         </div>
       )}
@@ -1136,7 +1154,7 @@ export default function BudgetingTopPage() {
             <BudgetingColumnsMenu title="Columnas">
               <label className="flex items-center justify-between gap-2">
                 <span className="text-xs text-slate-700">Mostrar cargas sociales</span>
-                <input type="checkbox" checked={fringeVisibility.topSheet} onChange={(e) => updateFringeVisibility({ topSheet: e.target.checked })} className="accent-[#6D5A88]" />
+                <input type="checkbox" checked={fringeVisibility.topSheet} onChange={(e) => updateFringeVisibility({ topSheet: e.target.checked })} className="accent-[#E86F4A]" />
               </label>
             </BudgetingColumnsMenu>
           </span>
@@ -1176,16 +1194,19 @@ export default function BudgetingTopPage() {
                       />
                     ))}
                     {catChapters.length === 0 && (
-                      <div
-                        className="px-3 py-3 text-[10px] text-slate-300 italic select-none"
-                        onContextMenu={(e) => {
-                          e.preventDefault();
-                          setChapterMenuCategory(cat.id);
-                          setChapterMenu({ x: e.clientX, y: e.clientY, rowId: null, onPaste: getBudgetingClipboard<ChapterClipboardData[]>("chapter") ? () => handlePasteChapters(null, cat.id) : undefined });
-                        }}
-                      >
-                        Clic derecho para añadir una línea
-                      </div>
+                      q ? (
+                        <div className="px-3 py-3 text-[10px] text-slate-300 italic select-none">Sin resultados</div>
+                      ) : (
+                        <BudgetingPhantomRow
+                          cols={cols}
+                          onCreate={(code, description) => handleCreateChapterFromPhantom(cat.id, code, description)}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            setChapterMenuCategory(cat.id);
+                            setChapterMenu({ x: e.clientX, y: e.clientY, rowId: null, onPaste: getBudgetingClipboard<ChapterClipboardData[]>("chapter") ? () => handlePasteChapters(null, cat.id) : undefined });
+                          }}
+                        />
+                      )
                     )}
                   </div>
                 </div>
@@ -1227,17 +1248,18 @@ export default function BudgetingTopPage() {
               {(() => {
                 const flatSorted = sortByOrder(chapters.filter(matchesSearch));
                 if (flatSorted.length === 0) {
-                  return (
-                    <div
-                      className="px-3 py-3 text-[10px] text-slate-300 italic select-none"
+                  return q ? (
+                    <div className="px-3 py-3 text-[10px] text-slate-300 italic select-none">Sin resultados</div>
+                  ) : (
+                    <BudgetingPhantomRow
+                      cols={cols}
+                      onCreate={(code, description) => handleCreateChapterFromPhantom(null, code, description)}
                       onContextMenu={(e) => {
                         e.preventDefault();
                         setChapterMenuCategory(null);
                         setChapterMenu({ x: e.clientX, y: e.clientY, rowId: null, onPaste: getBudgetingClipboard<ChapterClipboardData[]>("chapter") ? () => handlePasteChapters(null, null) : undefined });
                       }}
-                    >
-                      Clic derecho para añadir una línea
-                    </div>
+                    />
                   );
                 }
                 return flatSorted.map((chapter, i) => (
@@ -1362,6 +1384,13 @@ export default function BudgetingTopPage() {
       )}
 
       {/* ── Guardar como plantilla ───────────────────────────────────────── */}
+      <BudgetingShareModal
+        draftId={draftId}
+        sharedWith={draft.sharedWith || []}
+        open={showShareModal}
+        onClose={() => setShowShareModal(false)}
+      />
+
       {showTemplateModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
@@ -1535,7 +1564,7 @@ export default function BudgetingTopPage() {
                           key={p.id}
                           onClick={() => handlePickProject(p)}
                           disabled={status === "checking"}
-                          className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 border border-slate-200 rounded-xl text-left hover:border-[#6D5A88] transition-colors disabled:opacity-60"
+                          className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 border border-slate-200 rounded-xl text-left hover:border-[#E86F4A] transition-colors disabled:opacity-60"
                         >
                           <span className="text-sm text-slate-800 truncate">{p.name}</span>
                           {status === "checking" && <span className="text-[11px] text-slate-400 flex-shrink-0">Comprobando...</span>}

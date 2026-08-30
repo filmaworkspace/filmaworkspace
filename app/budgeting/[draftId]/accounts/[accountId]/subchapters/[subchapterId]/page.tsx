@@ -62,6 +62,48 @@ function colTemplate(cfg: BudgetingDetailColumnsConfig): string {
   return parts.join(" ");
 }
 
+/**
+ * Primera línea de un Detalle vacío: Código/Descripción ya editables, sin
+ * tener que crearla antes con el menú contextual (ver BudgetingPhantomRow,
+ * la versión compartida de Capítulo/Cuenta; esta va aparte porque su grid
+ * tiene más columnas y anchos dinámicos vía `template`). No existe en
+ * Firestore hasta que se escribe algo y se sale de la celda.
+ */
+function PhantomLineRow({
+  template, columnsConfig, onCreate, onContextMenu,
+}: {
+  template: string; columnsConfig: BudgetingDetailColumnsConfig;
+  onCreate: (code: string, description: string) => void; onContextMenu: (e: React.MouseEvent) => void;
+}) {
+  const [code, setCode] = useState("");
+  const [description, setDescription] = useState("");
+  const commit = () => {
+    if (!code.trim() && !description.trim()) return;
+    onCreate(code.trim(), description.trim());
+    setCode("");
+    setDescription("");
+  };
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
+  };
+  return (
+    <div className="grid gap-0 divide-x divide-slate-200 px-4" style={{ gridTemplateColumns: template }} onContextMenu={onContextMenu}>
+      <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
+        placeholder="Código" className={`${CELL_INPUT} font-mono text-xs placeholder:text-slate-300`} />
+      <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
+        placeholder="Descripción — clic derecho para más opciones" className={`${CELL_INPUT} text-xs pl-2 placeholder:text-slate-300`} />
+      <span className="flex items-center justify-end text-xs text-slate-300 pr-2">—</span>
+      <span />
+      <span className="flex items-center justify-end text-xs text-slate-300 pr-2">—</span>
+      <span className="flex items-center justify-end text-xs text-slate-300 pr-2">—</span>
+      <span />
+      {columnsConfig.showComment && <span />}
+      {columnsConfig.showTags && <span />}
+      <div />
+    </div>
+  );
+}
+
 interface RouteTarget { chapterId: string; chapterCode: string; chapterDescription: string; sub: BudgetingSubchapter; }
 
 /** Todo lo que hace falta para recrear una línea entera al pegarla (copiar/cortar), sin id/order/createdAt. */
@@ -111,7 +153,7 @@ function SubchapterFringeRow({
       {columnsConfig.showTags && <span />}
       <Link
         href="?library=fringes"
-        className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-[#6D5A88]"
+        className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-[#E86F4A]"
         title="Ver en Cargas sociales"
       >
         <Percent size={10} />
@@ -185,9 +227,9 @@ const FIXED_DETAIL_FIELDS = [
 function OptionalFieldRow({ icon: Icon, label, visible, onToggle }: { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; visible: boolean; onToggle: () => void }) {
   return (
     <button onClick={onToggle} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors">
-      <Icon size={13} className={visible ? "text-[#6D5A88] flex-shrink-0" : "text-slate-300 flex-shrink-0"} />
+      <Icon size={13} className={visible ? "text-[#E86F4A] flex-shrink-0" : "text-slate-300 flex-shrink-0"} />
       <span className={`text-xs flex-1 text-left ${visible ? "text-slate-900 font-medium" : "text-slate-400"}`}>{label}</span>
-      {visible ? <Eye size={13} className="text-[#6D5A88] flex-shrink-0" /> : <EyeOff size={13} className="text-slate-300 flex-shrink-0" />}
+      {visible ? <Eye size={13} className="text-[#E86F4A] flex-shrink-0" /> : <EyeOff size={13} className="text-slate-300 flex-shrink-0" />}
     </button>
   );
 }
@@ -292,12 +334,12 @@ function DetailSidebar({
                         <button
                           key={f.id}
                           onClick={() => onToggleFringe(f.id)}
-                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border transition-colors ${checked ? "border-[#6D5A88] bg-[#6D5A88]/[0.06]" : "border-slate-200 hover:border-slate-300"}`}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border transition-colors ${checked ? "border-[#E86F4A] bg-[#E86F4A]/[0.06]" : "border-slate-200 hover:border-slate-300"}`}
                         >
                           <span className="text-xs text-slate-700 truncate">{f.label}</span>
                           <span className="flex items-center gap-2 flex-shrink-0">
                             {checked && amount != null && <span className="text-xs font-medium text-slate-600">{fmtDecimal(amount)}</span>}
-                            <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${checked ? "border-[#6D5A88]" : "border-slate-300"}`} style={{ background: checked ? "#6D5A88" : "transparent" }}>
+                            <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${checked ? "border-[#E86F4A]" : "border-slate-300"}`} style={{ background: checked ? "#E86F4A" : "transparent" }}>
                               {checked && <Check size={9} className="text-white" />}
                             </span>
                           </span>
@@ -313,7 +355,7 @@ function DetailSidebar({
                     <Link
                       href={`/budgeting/${draftId}/accounts/${line.routedTo.chapterId}/subchapters/${line.routedTo.subchapterId}`}
                       className="text-xs hover:underline flex items-center gap-1"
-                      style={{ color: "#6D5A88" }}
+                      style={{ color: "#E86F4A" }}
                     >
                       {line.routedTo.chapterCode} · {line.routedTo.subchapterCode} {line.routedTo.subchapterDescription}
                       <ArrowUpRight size={11} />
@@ -326,7 +368,7 @@ function DetailSidebar({
                       value={routeSearch}
                       onChange={(e) => setRouteSearch(e.target.value)}
                       placeholder="Buscar cuenta destino"
-                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D5A88] mb-2"
+                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-[#E86F4A] mb-2"
                     />
                     <div className="max-h-48 overflow-y-auto space-y-0.5">
                       {filtered.length === 0 ? (
@@ -460,7 +502,7 @@ function LineRow({
   );
 
   return (
-    <div data-budget-row className={`group ${selected ? "bg-[#6D5A88]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+    <div data-budget-row className={`group ${selected ? "bg-[#E86F4A]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
       <LineFieldsGrid
         fields={fields}
         displayValues={displayValues}
@@ -479,24 +521,24 @@ function LineRow({
         indicators={
           (hasFormula || hasHiddenComment) && (
             <span className="flex items-center gap-1">
-              {hasFormula && <span title="Contiene fórmula"><Sigma size={10} className="text-[#6D5A88]" /></span>}
+              {hasFormula && <span title="Contiene fórmula"><Sigma size={10} className="text-[#E86F4A]" /></span>}
               {hasHiddenComment && <span title={line.notes} className="text-[10px]">💬</span>}
             </span>
           )
         }
         actions={
           <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#6D5A88] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+            <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
               <ChevronUp size={11} />
             </button>
-            <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#6D5A88] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+            <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
               <ChevronDown size={11} />
             </button>
-            <button onClick={onOpenSidebar} className={`relative p-1 rounded transition-colors ${sidebarOpen ? "text-[#6D5A88] bg-[#6D5A88]/[0.1]" : "text-slate-400 hover:text-[#6D5A88] hover:bg-[#6D5A88]/[0.1]"}`} title="Cargas sociales y Sumar en">
+            <button onClick={onOpenSidebar} className={`relative p-1 rounded transition-colors ${sidebarOpen ? "text-[#E86F4A] bg-[#E86F4A]/[0.1]" : "text-slate-400 hover:text-[#E86F4A] hover:bg-[#E86F4A]/[0.1]"}`} title="Cargas sociales y Sumar en">
               <SlidersHorizontal size={11} />
-              {hasFringesOrRoute && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full" style={{ background: "#6D5A88" }} />}
+              {hasFringesOrRoute && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full" style={{ background: "#E86F4A" }} />}
             </button>
-            <button onClick={onDuplicate} className="p-1 rounded text-slate-400 hover:text-[#6D5A88] hover:bg-[#6D5A88]/[0.1] transition-colors" title="Duplicar línea">
+            <button onClick={onDuplicate} className="p-1 rounded text-slate-400 hover:text-[#E86F4A] hover:bg-[#E86F4A]/[0.1] transition-colors" title="Duplicar línea">
               <Copy size={11} />
             </button>
             <button onClick={onDelete} className="p-1 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar línea">
@@ -544,7 +586,7 @@ function TextLineRow({
   if (columnsConfig.showTags) actionsCol++;
 
   return (
-    <div data-budget-row className={`grid gap-0 divide-x divide-slate-200 px-4 group ${selected ? "bg-[#6D5A88]/[0.08]" : ""}`} style={{ gridTemplateColumns: template }} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+    <div data-budget-row className={`grid gap-0 divide-x divide-slate-200 px-4 group ${selected ? "bg-[#E86F4A]/[0.08]" : ""}`} style={{ gridTemplateColumns: template }} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
       <input
         autoFocus={autoFocus}
         value={description}
@@ -567,10 +609,10 @@ function TextLineRow({
         className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity"
         style={{ gridColumn: `${actionsCol} / ${actionsCol + 1}` }}
       >
-        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#6D5A88] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
+        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
           <ChevronUp size={11} />
         </button>
-        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#6D5A88] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
+        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
           <ChevronDown size={11} />
         </button>
         <button onClick={onDelete} className="p-1 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar línea">
@@ -813,6 +855,15 @@ export default function BudgetingSubchapterPage() {
     if (kind === "text") Object.assign(base, { isTextLine: true, textBold: false, textColor: DEFAULT_TEXT_LINE_COLOR });
     if (kind === "subtotal") Object.assign(base, { description: "Subtotal", isSubtotal: true, textBold: true, textColor: DEFAULT_TEXT_LINE_COLOR });
     const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`), base);
+    await touchDraft();
+    setJustAddedId(ref.id);
+  };
+  /** Primera línea de un Detalle vacío: se crea de verdad en cuanto se escribe algo, no antes (ver PhantomLineRow). */
+  const handleCreateLineFromPhantom = async (code: string, description: string) => {
+    const ref = await addDoc(collection(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters/${subchapterId}/detailLines`), {
+      code, description, units: 0, unit: "", multiplier: 1, rate: 0, total: 0,
+      notes: "", tags: [], fringeIds: [], routedTo: null, order: orderAfter([], null), createdAt: Timestamp.now(),
+    });
     await touchDraft();
     setJustAddedId(ref.id);
   };
@@ -1132,9 +1183,9 @@ export default function BudgetingSubchapterPage() {
           derecha, un navegador para saltar directamente a otra Cuenta del presupuesto. */}
       <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <Link href={`/budgeting/${draftId}`} className="text-xs text-slate-400 hover:text-[#6D5A88] transition-colors">{draft?.name}</Link>
+          <Link href={`/budgeting/${draftId}`} className="text-xs text-slate-400 hover:text-[#E86F4A] transition-colors">{draft?.name}</Link>
           <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
-          <Link href={`/budgeting/${draftId}/accounts/${accountId}`} className="text-xs font-medium text-slate-600 hover:text-[#6D5A88] transition-colors">{chapter.code} {chapter.description}</Link>
+          <Link href={`/budgeting/${draftId}/accounts/${accountId}`} className="text-xs font-medium text-slate-600 hover:text-[#E86F4A] transition-colors">{chapter.code} {chapter.description}</Link>
           <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
           <span className="text-xs font-semibold text-slate-900">{subchapter.code} {subchapter.description}</span>
         </div>
@@ -1144,7 +1195,7 @@ export default function BudgetingSubchapterPage() {
             <button
               onClick={() => accountNavIndex > 0 && goToAccount(allSubchapters[accountNavIndex - 1])}
               disabled={accountNavIndex <= 0}
-              className="p-1 rounded text-slate-400 hover:text-[#6D5A88] hover:bg-[#6D5A88]/[0.1] transition-colors disabled:opacity-20 disabled:pointer-events-none"
+              className="p-1 rounded text-slate-400 hover:text-[#E86F4A] hover:bg-[#E86F4A]/[0.1] transition-colors disabled:opacity-20 disabled:pointer-events-none"
               title="Cuenta anterior"
             >
               <ChevronLeft size={13} />
@@ -1165,7 +1216,7 @@ export default function BudgetingSubchapterPage() {
             <button
               onClick={() => accountNavIndex >= 0 && accountNavIndex < allSubchapters.length - 1 && goToAccount(allSubchapters[accountNavIndex + 1])}
               disabled={accountNavIndex < 0 || accountNavIndex >= allSubchapters.length - 1}
-              className="p-1 rounded text-slate-400 hover:text-[#6D5A88] hover:bg-[#6D5A88]/[0.1] transition-colors disabled:opacity-20 disabled:pointer-events-none"
+              className="p-1 rounded text-slate-400 hover:text-[#E86F4A] hover:bg-[#E86F4A]/[0.1] transition-colors disabled:opacity-20 disabled:pointer-events-none"
               title="Cuenta siguiente"
             >
               <ChevronRight size={13} />
@@ -1183,7 +1234,7 @@ export default function BudgetingSubchapterPage() {
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar"
               className="w-full pl-7 pr-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300" />
           </div>
-          <button onClick={() => openSidebar(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-[#6D5A88] hover:bg-[#6D5A88]/[0.1] transition-colors" title="Ajustes del detalle">
+          <button onClick={() => openSidebar(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-[#E86F4A] hover:bg-[#E86F4A]/[0.1] transition-colors" title="Ajustes del detalle">
             <Settings2 size={14} />
           </button>
         </div>
@@ -1205,7 +1256,7 @@ export default function BudgetingSubchapterPage() {
             <span className="flex items-center justify-end pl-2">
               <button
                 onClick={() => openSidebar(null)}
-                className="p-1 rounded text-slate-400 hover:text-[#6D5A88] hover:bg-[#6D5A88]/[0.1] transition-colors normal-case"
+                className="p-1 rounded text-slate-400 hover:text-[#E86F4A] hover:bg-[#E86F4A]/[0.1] transition-colors normal-case"
                 title="Mostrar/ocultar columnas"
               >
                 <MoreVertical size={13} />
@@ -1246,15 +1297,15 @@ export default function BudgetingSubchapterPage() {
                   : [ln];
               if (sorted.length === 0) {
                 return !q ? (
-                  <div
-                    className="px-4 py-3 text-[10px] text-slate-300 italic select-none"
+                  <PhantomLineRow
+                    template={template}
+                    columnsConfig={columnsConfig}
+                    onCreate={handleCreateLineFromPhantom}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       setLineMenu({ x: e.clientX, y: e.clientY, rowId: null, onPaste: canPaste ? () => handlePasteLines(null) : undefined });
                     }}
-                  >
-                    Clic derecho para añadir una línea
-                  </div>
+                  />
                 ) : null;
               }
               return sorted.map((line, i) =>

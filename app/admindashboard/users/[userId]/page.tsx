@@ -203,7 +203,7 @@ export default function ViewAsUserPage() {
 
         <div className="grid grid-cols-2 gap-3 mb-8">
           <div className="border border-slate-200 rounded-xl px-4 py-3 bg-white flex items-center gap-3">
-            <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#6D5A88" }}>
+            <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, #ED8C6E, #E86F4A)", border: "1px solid rgba(255,255,255,0.25)" }}>
               <Calculator size={15} className="text-white" />
             </span>
             <div>

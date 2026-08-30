@@ -17,7 +17,7 @@ import { Check, FileUp, LayoutTemplate, Plus, Search, Trash2, X } from "lucide-r
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
-import { BTN_LIGHT, BudgetingDraftIndex, BudgetingTemplate, CURRENCIES, DEFAULT_CATEGORIES } from "@/lib/budgeting";
+import { BTN_LIGHT, BTN_LIGHT_ACTIVE, BudgetingDraftIndex, BudgetingTemplate, CURRENCIES, DEFAULT_CATEGORIES } from "@/lib/budgeting";
 import { FwbFile, parseFwbText } from "@/lib/budgetingExport";
 import BudgetingDropdown from "@/components/BudgetingDropdown";
 
@@ -43,6 +43,10 @@ export default function BudgetingHomePage() {
 
   const [drafts, setDrafts] = useState<BudgetingDraftIndex[]>([]);
   const [search, setSearch] = useState("");
+  // "Compartido conmigo": copias que otros usuarios te han enviado (ver
+  // BudgetingShareModal) — mismo índice userBudgetingDrafts, filtrado por el
+  // flag `shared` que pone app/api/budgeting/share/route.ts al crearlas.
+  const [view, setView] = useState<"mine" | "shared">("mine");
   const [showNewDraft, setShowNewDraft] = useState(false);
   const [newDraftName, setNewDraftName] = useState("");
   const [newDraftCurrency, setNewDraftCurrency] = useState("EUR");
@@ -84,7 +88,10 @@ export default function BudgetingHomePage() {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  const filteredDrafts = drafts.filter((d) => d.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const myDrafts = drafts.filter((d) => !d.shared);
+  const sharedDrafts = drafts.filter((d) => d.shared);
+  const visibleDrafts = view === "mine" ? myDrafts : sharedDrafts;
+  const filteredDrafts = visibleDrafts.filter((d) => d.name.toLowerCase().includes(search.trim().toLowerCase()));
 
   const handleCreateDraft = async () => {
     if (!newDraftName.trim() || !user) return;
@@ -235,8 +242,17 @@ export default function BudgetingHomePage() {
   };
 
   return (
-    <div className="min-h-screen px-10 py-8" style={{ background: "linear-gradient(180deg, #6D5A8814, #ffffff 55%)" }}>
-      <h1 className="text-2xl font-bold mb-6" style={{ color: "#1D201F" }}>Presupuestos</h1>
+    <div className="min-h-screen px-10 py-8" style={{ background: "linear-gradient(180deg, #E86F4A14, #ffffff 55%)" }}>
+      <h1 className="text-2xl font-bold mb-4" style={{ color: "#1D201F" }}>Presupuestos</h1>
+
+      <div className="flex items-center gap-1 p-0.5 border border-slate-200 rounded-lg bg-slate-50 w-fit mb-5">
+        <button onClick={() => setView("mine")} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${view === "mine" ? BTN_LIGHT_ACTIVE : "text-slate-500 hover:text-slate-700"}`}>
+          Mis presupuestos {myDrafts.length > 0 && `(${myDrafts.length})`}
+        </button>
+        <button onClick={() => setView("shared")} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${view === "shared" ? BTN_LIGHT_ACTIVE : "text-slate-500 hover:text-slate-700"}`}>
+          Compartido conmigo {sharedDrafts.length > 0 && `(${sharedDrafts.length})`}
+        </button>
+      </div>
 
       <div className="flex items-center gap-2 mb-8 flex-wrap">
         <button onClick={() => setShowNewDraft(true)} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${BTN_LIGHT}`}>
@@ -317,7 +333,11 @@ export default function BudgetingHomePage() {
 
       {filteredDrafts.length === 0 ? (
         <p className="text-sm text-slate-400">
-          {drafts.length === 0 ? "Sin presupuestos todavía." : "Sin resultados."}
+          {visibleDrafts.length > 0
+            ? "Sin resultados."
+            : view === "shared"
+              ? "Nadie te ha compartido presupuestos todavía."
+              : "Sin presupuestos todavía."}
         </p>
       ) : (
         <div className="grid gap-5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
@@ -325,7 +345,7 @@ export default function BudgetingHomePage() {
             <div key={d.id} className="group">
               <Link
                 href={`/budgeting/${d.id}`}
-                className="relative block h-28 rounded-2xl border border-slate-200 bg-white/70 hover:border-[#6D5A88] transition-colors flex items-center justify-center px-4 overflow-hidden"
+                className="relative block h-28 rounded-2xl border border-slate-200 bg-white/70 hover:border-[#E86F4A] transition-colors flex items-center justify-center px-4 overflow-hidden"
               >
                 {d.status === "sent" && (
                   <span className="absolute top-2.5 right-2.5 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[10px] font-medium">
@@ -336,7 +356,11 @@ export default function BudgetingHomePage() {
               </Link>
               <div className="flex items-center justify-between mt-2 px-0.5">
                 <p className="text-xs text-slate-400 truncate">
-                  {d.status === "sent" && d.sentToProjectName ? `Enviado a ${d.sentToProjectName}` : `Editado ${relativeTime(d.updatedAt)}`}
+                  {d.shared && d.sharedByName
+                    ? `Recibido de ${d.sharedByName}`
+                    : d.status === "sent" && d.sentToProjectName
+                      ? `Enviado a ${d.sentToProjectName}`
+                      : `Editado ${relativeTime(d.updatedAt)}`}
                 </p>
                 <button
                   onClick={() => setDeleteTarget(d)}
