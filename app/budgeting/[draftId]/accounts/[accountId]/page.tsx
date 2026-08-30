@@ -571,6 +571,8 @@ export default function BudgetingChapterPage() {
                 <BudgetingPhantomRow
                   cols={cols}
                   onCreate={handleCreateSubFromPhantom}
+                  onCreateText={() => handleInsertSub(null, "text")}
+                  onCreateSubtotal={() => handleInsertSub(null, "subtotal")}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     const canPaste = !!getBudgetingClipboard<SubClipboardData[]>("subchapter");

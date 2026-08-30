@@ -26,8 +26,8 @@ export default function BudgetingLayout({ children }: { children: React.ReactNod
   }, [isLoading, user, router]);
 
   if (isLoading || !user || !user.budgetingAccess) {
-    // Mismo logo que la transición del badge en Header.tsx: si se viene de ahí,
-    // esta pantalla continúa la animación en vez de cortar a un spinner suelto.
+    // Pantalla de carga mientras se comprueba el acceso a Budgeting del
+    // usuario (o mientras UserContext resuelve la sesión).
     return (
       <div
         className={`min-h-screen flex items-center justify-center ${inter.className}`}

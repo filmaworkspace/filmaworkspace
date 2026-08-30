@@ -242,7 +242,7 @@ export default function BudgetingHomePage() {
   };
 
   return (
-    <div className="min-h-screen px-10 py-8" style={{ background: "linear-gradient(180deg, #E86F4A14, #ffffff 55%)" }}>
+    <div className="min-h-screen px-10 py-8 bg-white">
       <h1 className="text-2xl font-bold mb-4" style={{ color: "#1D201F" }}>Presupuestos</h1>
 
       <div className="flex items-center gap-1 p-0.5 border border-slate-200 rounded-lg bg-slate-50 w-fit mb-5">

@@ -62,36 +62,79 @@ function colTemplate(cfg: BudgetingDetailColumnsConfig): string {
   return parts.join(" ");
 }
 
+/** Comandos "/" en Descripción de la fila fantasma: mismo mini-menú que BudgetingPhantomRow (ver ahí el porqué). */
+interface PhantomCommand { cmd: string; label: string; hint: string }
+const PHANTOM_COMMANDS: PhantomCommand[] = [
+  { cmd: "texto", label: "Texto", hint: "Nota o separador, sin código ni importe" },
+  { cmd: "subtotal", label: "Subtotal", hint: "Suma las líneas de arriba hasta el subtotal anterior" },
+];
+
 /**
  * Primera línea de un Detalle vacío: Código/Descripción ya editables, sin
  * tener que crearla antes con el menú contextual (ver BudgetingPhantomRow,
  * la versión compartida de Capítulo/Cuenta; esta va aparte porque su grid
  * tiene más columnas y anchos dinámicos vía `template`). No existe en
- * Firestore hasta que se escribe algo y se sale de la celda.
+ * Firestore hasta que se escribe algo y se sale de la celda. Escribir "/" en
+ * Descripción abre los mismos comandos rápidos (texto/subtotal).
  */
 function PhantomLineRow({
-  template, columnsConfig, onCreate, onContextMenu,
+  template, columnsConfig, onCreate, onCreateText, onCreateSubtotal, onContextMenu,
 }: {
   template: string; columnsConfig: BudgetingDetailColumnsConfig;
-  onCreate: (code: string, description: string) => void; onContextMenu: (e: React.MouseEvent) => void;
+  onCreate: (code: string, description: string) => void; onCreateText: () => void; onCreateSubtotal: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
 }) {
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
+
+  const isCommand = description.startsWith("/");
+  const commandQuery = isCommand ? description.slice(1).toLowerCase() : "";
+  const matches = isCommand ? PHANTOM_COMMANDS.filter((c) => c.cmd.startsWith(commandQuery)) : [];
+  const runCommand = (cmd: string) => {
+    setDescription("");
+    if (cmd === "texto") onCreateText();
+    else if (cmd === "subtotal") onCreateSubtotal();
+  };
+
   const commit = () => {
+    if (isCommand) { setDescription(""); return; }
     if (!code.trim() && !description.trim()) return;
     onCreate(code.trim(), description.trim());
     setCode("");
     setDescription("");
   };
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleCodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
+  };
+  const handleDescriptionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if ((e.key === "Enter" || e.key === "Tab") && isCommand && matches.length > 0) { e.preventDefault(); runCommand(matches[0].cmd); return; }
+    if (e.key === "Escape" && isCommand) { setDescription(""); return; }
     if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
   };
   return (
-    <div className="grid gap-0 divide-x divide-slate-200 px-4" style={{ gridTemplateColumns: template }} onContextMenu={onContextMenu}>
-      <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
+    <div className="grid gap-0 divide-x divide-slate-200 px-4 bg-white" style={{ gridTemplateColumns: template }} onContextMenu={onContextMenu}>
+      <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleCodeKeyDown}
         placeholder="Código" className={`${CELL_INPUT} font-mono text-xs placeholder:text-slate-300`} />
-      <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        placeholder="Descripción — clic derecho para más opciones" className={`${CELL_INPUT} text-xs pl-2 placeholder:text-slate-300`} />
+      <div className="relative h-full">
+        <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleDescriptionKeyDown}
+          placeholder="Descripción, o / para texto y subtotal" className={`${CELL_INPUT} text-xs pl-2 placeholder:text-slate-300`} />
+        {isCommand && matches.length > 0 && (
+          <div className="absolute z-30 top-full left-0 mt-0.5 w-56 bg-white border border-slate-200 rounded-lg shadow-lg py-1">
+            {matches.map((c) => (
+              <button
+                key={c.cmd}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => runCommand(c.cmd)}
+                className="w-full flex flex-col items-start px-2.5 py-1.5 text-left hover:bg-slate-50"
+              >
+                <span className="text-xs font-medium" style={{ color: "#E86F4A" }}>/{c.cmd}</span>
+                <span className="text-[10px] text-slate-400">{c.hint}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       <span className="flex items-center justify-end text-xs text-slate-300 pr-2">—</span>
       <span />
       <span className="flex items-center justify-end text-xs text-slate-300 pr-2">—</span>
@@ -1301,6 +1344,8 @@ export default function BudgetingSubchapterPage() {
                     template={template}
                     columnsConfig={columnsConfig}
                     onCreate={handleCreateLineFromPhantom}
+                    onCreateText={() => handleInsertLine(null, "text")}
+                    onCreateSubtotal={() => handleInsertLine(null, "subtotal")}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       setLineMenu({ x: e.clientX, y: e.clientY, rowId: null, onPaste: canPaste ? () => handlePasteLines(null) : undefined });

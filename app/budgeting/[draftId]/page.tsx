@@ -1200,6 +1200,8 @@ export default function BudgetingTopPage() {
                         <BudgetingPhantomRow
                           cols={cols}
                           onCreate={(code, description) => handleCreateChapterFromPhantom(cat.id, code, description)}
+                          onCreateText={() => handleInsertChapter(null, cat.id, "text")}
+                          onCreateSubtotal={() => handleInsertChapter(null, cat.id, "subtotal")}
                           onContextMenu={(e) => {
                             e.preventDefault();
                             setChapterMenuCategory(cat.id);
@@ -1254,6 +1256,8 @@ export default function BudgetingTopPage() {
                     <BudgetingPhantomRow
                       cols={cols}
                       onCreate={(code, description) => handleCreateChapterFromPhantom(null, code, description)}
+                      onCreateText={() => handleInsertChapter(null, null, "text")}
+                      onCreateSubtotal={() => handleInsertChapter(null, null, "subtotal")}
                       onContextMenu={(e) => {
                         e.preventDefault();
                         setChapterMenuCategory(null);
@@ -1495,8 +1499,43 @@ export default function BudgetingTopPage() {
               {([
                 ["version", "Versión #", "v1"],
                 ["dateLabel", "Fecha presupuesto", "Se usa la de hoy si se deja en blanco"],
+                ["scriptDate", "Guion fechado", "p.ej. 3ª versión, 12/03"],
                 ["director", "Dirección", ""],
                 ["producer", "Producción", ""],
+              ] as const).map(([key, label, placeholder]) => (
+                <div key={key}>
+                  <label className="text-xs font-medium text-slate-700 block mb-1.5">{label}</label>
+                  <input
+                    value={projectInfoForm[key] || ""}
+                    onChange={(e) => setProjectInfoForm((f) => ({ ...f, [key]: e.target.value }))}
+                    placeholder={placeholder}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
+                  />
+                </div>
+              ))}
+
+              {/* Fechas de rodaje: texto libre igual que el resto (rara vez es una fecha exacta sola) */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1.5">Inicio rodaje</label>
+                  <input
+                    value={projectInfoForm.startDate || ""}
+                    onChange={(e) => setProjectInfoForm((f) => ({ ...f, startDate: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1.5">Fin rodaje</label>
+                  <input
+                    value={projectInfoForm.endDate || ""}
+                    onChange={(e) => setProjectInfoForm((f) => ({ ...f, endDate: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
+                  />
+                </div>
+              </div>
+
+              {([
+                ["post", "Postproducción", ""],
                 ["preparedBy", "Preparado por", ""],
               ] as const).map(([key, label, placeholder]) => (
                 <div key={key}>
