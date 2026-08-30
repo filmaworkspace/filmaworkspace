@@ -27,7 +27,7 @@ export default function BudgetingColumnsMenu({ children, title = "Columnas" }: {
     <div ref={ref} className="relative inline-flex">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="p-1 rounded text-slate-400 hover:text-[#6D5A88] hover:bg-[#6D5A88]/[0.1] transition-colors normal-case"
+        className="p-1 rounded text-slate-400 hover:text-[#E86F4A] hover:bg-[#E86F4A]/[0.1] transition-colors normal-case"
         title={title}
       >
         <MoreVertical size={13} />

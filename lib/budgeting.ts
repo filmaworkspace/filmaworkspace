@@ -17,7 +17,7 @@
 import { Timestamp } from "firebase/firestore";
 import type { FwbFile } from "./budgetingExport";
 
-export const BUDGETING_ACCENT = "#6D5A88";
+export const BUDGETING_ACCENT = "#E86F4A";
 export const BUDGETING_TEXT = "#1D201F";
 /** Fondo tenue del acento, para chips/tints; nada de rellenos sólidos por defecto. */
 export const BUDGETING_TINT = `${BUDGETING_ACCENT}1a`;
@@ -252,6 +252,17 @@ export interface BudgetingDraft {
   detailColumnsConfig?: BudgetingDetailColumnsConfig;
   fringeVisibility?: BudgetingFringeVisibility;
   projectInfo?: BudgetingProjectInfo;
+  /** A quién se ha enviado una copia de este borrador (ver "Compartir"): solo informativo, no crea ningún vínculo en vivo con esas copias. */
+  sharedWith?: BudgetingSharedWithEntry[];
+  /** Si este borrador ES una copia recibida de otro usuario: de quién y cuándo. La copia es independiente desde que se crea, no se sincroniza con el original. */
+  receivedFrom?: { uid: string; name: string } | null;
+  receivedAt?: Timestamp | null;
+}
+
+export interface BudgetingSharedWithEntry {
+  uid: string;
+  name: string;
+  sharedAt: Timestamp | null;
 }
 
 /** Doc índice en userBudgetingDrafts/{uid}/drafts/{draftId}, para listar rápido en el sidebar sin leer cada borrador entero. */
@@ -261,6 +272,9 @@ export interface BudgetingDraftIndex {
   updatedAt: Timestamp | null;
   status: "draft" | "sent";
   sentToProjectName: string | null;
+  /** true si este índice es una copia recibida vía "Compartir" (ver BudgetingLibraryModal/página de Presupuestos, pestaña "Compartido conmigo"), no un borrador propio creado por el usuario. */
+  shared?: boolean;
+  sharedByName?: string | null;
 }
 
 /**
@@ -284,7 +298,7 @@ export interface BudgetingTemplate {
  * un puñado de opciones fijas en vez de un selector de color libre, para no
  * complicar la UI. El primero es el color de texto por defecto del nivel.
  */
-export const TEXT_LINE_COLORS = ["#1D201F", "#6D5A88", "#DC2626", "#059669", "#D97706", "#7C3AED"];
+export const TEXT_LINE_COLORS = ["#1D201F", "#E86F4A", "#DC2626", "#059669", "#D97706", "#7C3AED"];
 export const DEFAULT_TEXT_LINE_COLOR = TEXT_LINE_COLORS[0];
 
 /** Descripción por defecto de la línea que representa `BudgetingSubchapter.receivedTotal` cuando aún no se le ha puesto una propia. */
@@ -797,16 +811,16 @@ export function subchapterTotal(sub: { receivedTotal?: number }, lines: Budgetin
 // activo/seleccionado. Texto de énfasis en BUDGETING_TEXT, no slate-900. ────
 
 export const BTN_LIGHT =
-  "bg-white border border-slate-200 text-slate-700 hover:border-[#6D5A88] hover:text-[#6D5A88] hover:bg-[#6D5A88]/[0.08] transition-colors";
+  "bg-white border border-slate-200 text-slate-700 hover:border-[#E86F4A] hover:text-[#E86F4A] hover:bg-[#E86F4A]/[0.08] transition-colors";
 
-export const BTN_LIGHT_ACTIVE = "border-[#6D5A88] bg-[#6D5A88]/[0.1] text-[#6D5A88]";
+export const BTN_LIGHT_ACTIVE = "border-[#E86F4A] bg-[#E86F4A]/[0.1] text-[#E86F4A]";
 
 export const ICON_BTN_LIGHT =
-  "text-slate-400 hover:text-[#6D5A88] hover:bg-[#6D5A88]/[0.1] transition-colors";
+  "text-slate-400 hover:text-[#E86F4A] hover:bg-[#E86F4A]/[0.1] transition-colors";
 
 /** Input de fila (spreadsheet-like): caja real con borde, no solo una línea inferior. Para paneles secundarios (proveedor, comentario, etiquetas...), no para las columnas principales de una tabla. */
 export const ROW_INPUT =
-  "border border-slate-300 rounded-md bg-white focus:outline-none focus:border-[#6D5A88] focus:ring-2 focus:ring-[#6D5A88]/20 transition-colors";
+  "border border-slate-300 rounded-md bg-white focus:outline-none focus:border-[#E86F4A] focus:ring-2 focus:ring-[#E86F4A]/20 transition-colors";
 
 /**
  * Celda de tabla al estilo Excel: sin caja ni placeholder visible en reposo.
@@ -822,7 +836,7 @@ export const ROW_INPUT =
  * botón de confirmar.
  */
 export const CELL_INPUT =
-  "w-full h-full bg-transparent focus:outline-none focus:bg-slate-200/70 focus:ring-2 focus:ring-inset focus:ring-[#6D5A88] px-1.5 py-2.5 transition-colors";
+  "w-full h-full bg-transparent focus:outline-none focus:bg-slate-200/70 focus:ring-2 focus:ring-inset focus:ring-[#E86F4A] px-1.5 py-2.5 transition-colors";
 
 // ─── Snapshots / versiones ──────────────────────────────────────────────────
 // budgetingDrafts/{draftId}/snapshots/{snapshotId}: una foto congelada del

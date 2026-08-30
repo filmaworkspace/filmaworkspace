@@ -15,7 +15,7 @@ const ACCENTS: Record<PdfAccent, RGB> = {
   accounting: [47, 82, 224],   // #2F52E0
   team: [107, 163, 25],        // #6BA319
   config: [71, 85, 105],       // slate-600
-  budgeting: [109, 90, 136],  // #6D5A88
+  budgeting: [232, 111, 74],  // #E86F4A
   neutral: [15, 23, 42],       // slate-900
 };
 
