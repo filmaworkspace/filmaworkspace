@@ -182,6 +182,13 @@ export interface BudgetingProjectInfo {
   dateLabel?: string;
   /** Versión del presupuesto que se muestra en la portada, editable a mano (p.ej. "v1", "Borrador 3"). */
   version?: string;
+  /** Fecha del guión sobre el que se ha presupuestado (texto libre, no un date picker: en producción rara vez es una fecha exacta sola, p.ej. "3ª versión, 12/03"). */
+  scriptDate?: string;
+  /** Fechas de rodaje (texto libre, por el mismo motivo que scriptDate). */
+  startDate?: string;
+  endDate?: string;
+  /** Postproducción: fecha, duración o lo que se quiera anotar ahí. */
+  post?: string;
   notes?: string;
 }
 
@@ -549,11 +556,17 @@ export function fmtCurrency(n: number, currency: string): string {
 // Evaluador propio (sin eval/Function) para: valores de Global que referencian
 // otros Globales por su `code`, y campos Cantidad/X/Tarifa de una línea de
 // Detalle que referencian Globales. Soporta +, -, *, /, (), decimales y
-// nombres de variable tipo CODE_123. Nada más: no hay funciones ni
-// condicionales, a propósito, para que quede predecible.
+// nombres de variable tipo CODE_123, con un "@" opcional delante (p.ej.
+// "@DIAS_RODAJE * 120"): es la forma de mencionar un Global, un poco a lo
+// Notion/Slack, y el sello propio de Budgeting frente a un buscador de
+// fórmulas genérico. El "@" es puro azúcar sintáctico para quien lo escribe
+// —BudgetingFormulaInput lo inserta al elegir una sugerencia— y se descarta
+// al resolver el código, así que las fórmulas ya guardadas sin "@" siguen
+// funcionando exactamente igual. Nada de funciones ni condicionales, a
+// propósito, para que quede predecible.
 
 function tokenizeExpr(expr: string): string[] {
-  const re = /\s*([A-Za-z_][A-Za-z0-9_]*|[0-9]+\.?[0-9]*|\.[0-9]+|[+\-*/()])\s*/g;
+  const re = /\s*(@?[A-Za-z_][A-Za-z0-9_]*|[0-9]+\.?[0-9]*|\.[0-9]+|[+\-*/()])\s*/g;
   const tokens: string[] = [];
   let m: RegExpExecArray | null;
   let lastIndex = 0;
@@ -612,7 +625,10 @@ export function evaluateExpr(expr: string, lookup: (code: string) => number): nu
       if (Number.isNaN(n)) throw new Error(`Número inválido: "${t}"`);
       return n;
     }
-    return lookup(t);
+    // El "@" delante de un código es solo notación (ver cabecera de esta
+    // sección): se quita antes de buscarlo, "@DIAS_RODAJE" y "DIAS_RODAJE"
+    // resuelven al mismo Global.
+    return lookup(t.startsWith("@") ? t.slice(1) : t);
   }
 
   const result = parseExpr();

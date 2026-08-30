@@ -181,6 +181,7 @@ interface PdfI18n {
   format: string; episodesUnit: string; perEpisode: string;
   version: string; budgetDate: string; currency: string;
   director: string; producer: string; preparedBy: string; notes: string;
+  scriptDate: string; startDate: string; endDate: string; post: string;
   issuedOn: (date: string, time: string) => string;
   dateLocale: string;
   total: string; grandTotal: string; subtotalFallback: string;
@@ -193,6 +194,7 @@ const PDF_I18N: Record<PdfLanguage, PdfI18n> = {
     format: "Formato", episodesUnit: "capítulos", perEpisode: "por capítulo",
     version: "Versión #", budgetDate: "Fecha presupuesto", currency: "Moneda",
     director: "Dirección", producer: "Producción", preparedBy: "Preparado por", notes: "Notas",
+    scriptDate: "Guion fechado", startDate: "Inicio rodaje", endDate: "Fin rodaje", post: "Postproducción",
     issuedOn: (date, time) => `Emitido el ${date} a las ${time}`,
     dateLocale: "es-ES",
     total: "Total", grandTotal: "TOTAL PRESUPUESTO", subtotalFallback: "Subtotal",
@@ -204,6 +206,7 @@ const PDF_I18N: Record<PdfLanguage, PdfI18n> = {
     format: "Format", episodesUnit: "episodes", perEpisode: "per episode",
     version: "Version #", budgetDate: "Budget date", currency: "Currency",
     director: "Director", producer: "Producer", preparedBy: "Prepared by", notes: "Notes",
+    scriptDate: "Script dated", startDate: "Start date", endDate: "End date", post: "Post",
     issuedOn: (date, time) => `Issued on ${date} at ${time}`,
     dateLocale: "en-US",
     total: "Total", grandTotal: "TOTAL BUDGET", subtotalFallback: "Subtotal",
@@ -389,14 +392,14 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
     });
   });
 
-  // ─── Portada: solo los datos de producción, sin ninguna tabla ni total.
-  // Diseño calcado del mockup del usuario: una sola columna, título y
-  // formato sueltos (sin etiqueta salvo "Formato:"), luego versión/fecha/
-  // moneda, créditos, preparado por y notas como bloques con su propio
-  // hueco, cada línea de un bloque pegada a la siguiente. Al final del
-  // todo, pegado abajo, un sello con la fecha/hora reales de esta
-  // exportación (no la "Fecha presupuesto" editable de arriba). El resto
-  // del documento siempre arranca en una página nueva. ────────────────────
+  // ─── Portada: título como "pastilla" de acento y datos de producción en
+  // dos columnas —Producción/Dirección/Guion fechado/Fecha presupuesto a la
+  // izquierda, Inicio/Fin de rodaje/Postproducción a la derecha, con la
+  // fecha de presupuesto resaltada como otra pastilla— inspirado en el
+  // mockup de referencia (etiquetas en mayúscula, fecha destacada), con el
+  // acento propio de Budgeting en vez de azul. El resto —formato/duración,
+  // versión, moneda, preparado por, notas— va debajo, en bloques de
+  // siempre. El resto del documento siempre arranca en una página nueva. ──
   const writeLine = (str: string, opts: { bold?: boolean; size?: number } = {}) => {
     const size = opts.size ?? F.body;
     breakIfNeeded(ptToMm(size) + 6);
@@ -405,7 +408,71 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   };
   const blockGap = () => { doc.y += ptToMm(F.body) * 1.6; };
 
-  writeLine(info.title || p.draftName, { bold: true, size: F.title });
+  // Tinte muy claro del acento para el fondo de las pastillas, calculado
+  // aquí en RGB (mismo criterio que BUDGETING_TINT en pantalla, que es CSS).
+  const accent = doc.accentColor;
+  const accentTint: RGB = [
+    Math.round(accent[0] * 0.14 + 255 * 0.86),
+    Math.round(accent[1] * 0.14 + 255 * 0.86),
+    Math.round(accent[2] * 0.14 + 255 * 0.86),
+  ];
+  /** "Pastilla" de acento con texto (título, o un valor destacado como la fecha de presupuesto). `y` es la línea base del texto, igual que `text()`. Devuelve su ancho. */
+  const pill = (str: string, x: number, y: number, size: number): number => {
+    doc.pdf.setFont("helvetica", "bold");
+    doc.pdf.setFontSize(size);
+    const padX = 2.6, padY = 1.4;
+    const w = doc.pdf.getTextWidth(str) + padX * 2;
+    const h = ptToMm(size) + padY * 2;
+    doc.pdf.setFillColor(accentTint[0], accentTint[1], accentTint[2]);
+    doc.pdf.roundedRect(x, y - ptToMm(size) - padY + 0.3, w, h, h / 2, h / 2, "F");
+    doc.pdf.setTextColor(accent[0], accent[1], accent[2]);
+    doc.pdf.text(str, x + padX, y);
+    return w;
+  };
+
+  const titleSize = F.title * 0.55;
+  breakIfNeeded(ptToMm(titleSize) + 10);
+  doc.y += ptToMm(titleSize);
+  pill(info.title || p.draftName, left, doc.y, titleSize);
+  doc.y += ptToMm(F.label) * 2.4;
+
+  // Dos columnas: cada fila es "ETIQUETA: valor", con la fecha de
+  // presupuesto en la izquierda como pastilla; huecos en blanco si un campo
+  // no se ha rellenado (igual que en el mockup de referencia).
+  const budgetDateValue = info.dateLabel || new Intl.DateTimeFormat(t.dateLocale, { day: "2-digit", month: "long", year: "numeric" }).format(new Date());
+  const leftFieldRows: { label: string; value: string; highlight?: boolean }[] = [
+    { label: t.producer, value: info.producer || "" },
+    { label: t.director, value: info.director || "" },
+    { label: t.scriptDate, value: info.scriptDate || "" },
+    { label: t.budgetDate, value: budgetDateValue, highlight: true },
+  ];
+  const rightFieldRows: { label: string; value: string }[] = [
+    { label: t.startDate, value: info.startDate || "" },
+    { label: t.endDate, value: info.endDate || "" },
+    { label: t.post, value: info.post || "" },
+  ];
+  const fieldColumn = (x: number, rows: { label: string; value: string; highlight?: boolean }[]) => {
+    const rh = ptToMm(F.label) + 4.4;
+    let y = doc.y;
+    rows.forEach((row) => {
+      doc.y = y;
+      text(`${row.label.toUpperCase()}:`, x, { bold: true, size: F.label });
+      doc.pdf.setFont("helvetica", "bold");
+      doc.pdf.setFontSize(F.label);
+      const labelW = doc.pdf.getTextWidth(`${row.label.toUpperCase()}: `);
+      if (row.value) {
+        if (row.highlight) pill(row.value, x + labelW, y, F.label);
+        else text(row.value, x + labelW, { size: F.label });
+      }
+      y += rh;
+    });
+    return y;
+  };
+  const colGap = 10;
+  const colWidth = (right - left - colGap) / 2;
+  const yAfterLeft = fieldColumn(left, leftFieldRows);
+  const yAfterRight = fieldColumn(left + colWidth + colGap, rightFieldRows);
+  doc.y = Math.max(yAfterLeft, yAfterRight);
   blockGap();
 
   if (info.format) {
@@ -423,17 +490,8 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   }
 
   if (info.version) writeLine(`${t.version}: ${info.version}`);
-  writeLine(`${t.budgetDate}: ${info.dateLabel || new Intl.DateTimeFormat(t.dateLocale, { day: "2-digit", month: "long", year: "numeric" }).format(new Date())}`);
   writeLine(`${t.currency}: ${p.currency}`);
   blockGap();
-
-  const credits: [string, string][] = [];
-  if (info.director) credits.push([t.director, info.director]);
-  if (info.producer) credits.push([t.producer, info.producer]);
-  if (credits.length > 0) {
-    credits.forEach(([label, value]) => writeLine(`${label}: ${value}`));
-    blockGap();
-  }
 
   if (info.preparedBy) {
     writeLine(`${t.preparedBy}: ${info.preparedBy}`);

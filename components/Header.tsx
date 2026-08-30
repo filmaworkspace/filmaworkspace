@@ -81,14 +81,7 @@ export default function Header() {
   const userInitial = userName.charAt(0).toUpperCase();
   const isAdmin     = user?.role === "admin";
 
-  // ── Transición al abrir Budgeting: el logo entra a pantalla completa antes
-  // de navegar, y el gate de app/budgeting/layout.tsx recoge el mismo logo
-  // mientras carga, para que se sienta como una sola animación continua. ──
-  const [launchingBudgeting, setLaunchingBudgeting] = useState(false);
-  const openBudgeting = () => {
-    setLaunchingBudgeting(true);
-    setTimeout(() => router.push("/budgeting"), 750);
-  };
+  const openBudgeting = () => router.push("/budgeting");
 
   // ── Detect accounts section ──────────────────────────────────────────────
   const accountsMatch = pathname.match(
@@ -495,25 +488,6 @@ export default function Header() {
             >
               <Image src="/logo-budgeting-white.svg" alt="Budgeting" width={26} height={8} className="h-2.5 w-auto" />
             </button>
-          )}
-
-          {/* Transición de entrada: el logo completo aparece a pantalla completa
-              antes de navegar a /budgeting (ver app/budgeting/layout.tsx, que
-              recoge el mismo logo mientras carga el acceso del usuario). */}
-          {launchingBudgeting && (
-            <div
-              className="fixed inset-0 z-[100] flex items-center justify-center"
-              style={{ background: "linear-gradient(180deg, #E86F4A1a, #ffffff 60%)" }}
-            >
-              <Image
-                src="/logo-budgeting-text.svg"
-                alt="Budgeting"
-                width={368}
-                height={48}
-                className="w-64 h-auto animate-budgetingLogoIn"
-                priority
-              />
-            </div>
           )}
 
           {/* Profile Avatar */}
