@@ -192,6 +192,7 @@ interface PdfI18n {
   totalChapter: (code: string) => string;
   detailHeaders: { code: string; desc: string; qty: string; unit: string; mult: string; rate: string; subtotal: string; total: string };
   receivedDefaultLabel: string;
+  topSheetTitle: string;
 }
 const PDF_I18N: Record<PdfLanguage, PdfI18n> = {
   es: {
@@ -207,6 +208,7 @@ const PDF_I18N: Record<PdfLanguage, PdfI18n> = {
     totalChapter: (code) => `Total capítulo ${code}`,
     detailHeaders: { code: "ACCT #", desc: "DESCRIPCIÓN", qty: "CANT.", unit: "UNIDAD", mult: "X", rate: "TARIFA", subtotal: "SUBTOTAL", total: "TOTAL" },
     receivedDefaultLabel: "Redirigido desde otras cuentas",
+    topSheetTitle: "Top Sheet",
   },
   en: {
     format: "Format", episodesUnit: "episodes", perEpisode: "per episode",
@@ -221,6 +223,7 @@ const PDF_I18N: Record<PdfLanguage, PdfI18n> = {
     totalChapter: (code) => `Chapter ${code} total`,
     detailHeaders: { code: "ACCT #", desc: "DESCRIPTION", qty: "QTY.", unit: "UNIT", mult: "X", rate: "RATE", subtotal: "SUBTOTAL", total: "TOTAL" },
     receivedDefaultLabel: "Redirected from other accounts",
+    topSheetTitle: "Top Sheet",
   },
 };
 /** "Película"/"Serie" son valores de una lista fija (no texto libre), así que también se traducen; cualquier otro valor (datos antiguos) se deja tal cual. */
@@ -553,6 +556,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   // columna. Reporte independiente de la Portada (ver BudgetingReportsModal). ──
   if (cfg.includeTopSheet) {
     openSection(true);
+    writeLine(t.topSheetTitle, { bold: true, size: F.label });
     const topCols: GCol[] = (() => {
       const codeW = 24, amtW = 42;
       return [
@@ -734,11 +738,13 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
         }
         const allLines = p.linesBySubchapter[sub.id] || [];
         const subFringes = fringeBreakdownFor([sub.id], "subchapter");
-        if (allLines.length === 0 && subFringes.length === 0 && !(sub.receivedTotal || 0)) return;
 
         // El total se calcula siempre (para que el subtotal del capítulo
-        // cuadre), pero solo se dibujan las filas de esta Cuenta si no está
-        // oculta por `hideZeroTotalSubchapters` (config de exportación).
+        // cuadre), pero solo se dibuja la fila de esta Cuenta si no está
+        // oculta por `hideZeroTotalSubchapters` (config de exportación): con
+        // el ajuste desactivado se dibujan TODAS las Cuentas, incluidas las
+        // que todavía no tienen ninguna línea (antes se ocultaban siempre,
+        // sin mirar el ajuste — ese era el bug).
         const realLines = allLines.filter((l) => !l.isTextLine && !l.isSubtotal);
         const subFringeSum = subFringes.reduce((s, b) => s + b.amount, 0);
         const subSum = subTotal(sub, realLines, subFringeSum);
