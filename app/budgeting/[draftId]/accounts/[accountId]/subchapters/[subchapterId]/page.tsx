@@ -66,9 +66,6 @@ function colTemplate(cfg: BudgetingDetailColumnsConfig): string {
   return parts.join(" ");
 }
 
-/** Borde que marca dónde caería la fila arrastrada al soltar (ver useRowDrag). */
-const dragIndicator = (pos: "before" | "after" | null) =>
-  pos === "before" ? "border-t-2 border-[#E86F4A]" : pos === "after" ? "border-b-2 border-[#E86F4A]" : "";
 
 /** Comandos "/" en Descripción de la fila fantasma: mismo mini-menú que BudgetingPhantomRow (ver ahí el porqué). */
 /**
@@ -559,13 +556,12 @@ function LineFieldsGrid({
 }
 
 function LineRow({
-  line, fringes, globals, globalValues, units, columnsConfig, template, autoFocus, error, sidebarOpen, selected, dragOver,
+  line, fringes, globals, globalValues, units, columnsConfig, template, autoFocus, error, sidebarOpen, selected,
   onCommit, onDuplicate, onDelete, onOpenSidebar, onContextMenu, onRowMouseDown, onHandleMouseDown, onCreateTextAfter, onCreateSubtotalAfter,
 }: {
   line: BudgetingDetailLine; fringes: BudgetingFringe[];
   globals: { code: string; label: string }[]; globalValues: Record<string, number>; units: BudgetingUnit[];
   columnsConfig: BudgetingDetailColumnsConfig; template: string; autoFocus?: boolean; error?: string; sidebarOpen: boolean; selected?: boolean;
-  dragOver: "before" | "after" | null;
   onCommit: (fields: LineFields) => void; onDuplicate: () => void; onDelete: () => void; onOpenSidebar: () => void;
   onContextMenu: (e: React.MouseEvent) => void; onRowMouseDown: (e: React.MouseEvent) => void;
   onHandleMouseDown: (e: React.MouseEvent) => void;
@@ -599,7 +595,7 @@ function LineRow({
     <div
       data-budget-row
       data-drag-row-id={line.id}
-      className={`group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`}
+      className={`group ${selected ? "bg-[#E86F4A]/[0.08]" : ""}`}
       onContextMenu={onContextMenu}
       onMouseDown={onRowMouseDown}
     >
@@ -660,9 +656,9 @@ function LineRow({
 // acciones en su columna habitual, para que la fila siga alineada con las
 // demás pese al ancho de columnas dinámico. ────────────────────────────────
 function TextLineRow({
-  line, template, columnsConfig, dragOver, subtotalValue, autoFocus, selected, onCommitTextLine, onDelete, onContextMenu, onRowMouseDown, onHandleMouseDown,
+  line, template, columnsConfig, subtotalValue, autoFocus, selected, onCommitTextLine, onDelete, onContextMenu, onRowMouseDown, onHandleMouseDown,
 }: {
-  line: BudgetingDetailLine; template: string; columnsConfig: BudgetingDetailColumnsConfig; dragOver: "before" | "after" | null; subtotalValue?: number; autoFocus?: boolean; selected?: boolean;
+  line: BudgetingDetailLine; template: string; columnsConfig: BudgetingDetailColumnsConfig; subtotalValue?: number; autoFocus?: boolean; selected?: boolean;
   onCommitTextLine: (patch: { description?: string; textBold?: boolean; textColor?: string }) => void;
   onDelete: () => void; onContextMenu: (e: React.MouseEvent) => void; onRowMouseDown: (e: React.MouseEvent) => void;
   onHandleMouseDown: (e: React.MouseEvent) => void;
@@ -687,7 +683,7 @@ function TextLineRow({
     <div
       data-budget-row
       data-drag-row-id={line.id}
-      className={`grid gap-0 divide-x divide-slate-200 px-4 group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`}
+      className={`grid gap-0 divide-x divide-slate-200 px-4 group ${selected ? "bg-[#E86F4A]/[0.08]" : ""}`}
       style={{ gridTemplateColumns: template }}
       onContextMenu={onContextMenu}
       onMouseDown={onRowMouseDown}
@@ -1420,7 +1416,6 @@ export default function BudgetingSubchapterPage() {
                     line={line}
                     template={template}
                     columnsConfig={columnsConfig}
-                    dragOver={lineDrag.dragOver?.id === line.id ? lineDrag.dragOver.position : null}
                     autoFocus={line.id === justAddedId}
                     selected={selectedLineIds.has(line.id)}
                     subtotalValue={line.isSubtotal ? lineSubtotalValue(line.id) : undefined}
@@ -1441,7 +1436,6 @@ export default function BudgetingSubchapterPage() {
                     columnsConfig={columnsConfig}
                     template={template}
                     error={rowErrors[line.id]}
-                    dragOver={lineDrag.dragOver?.id === line.id ? lineDrag.dragOver.position : null}
                     autoFocus={line.id === justAddedId}
                     selected={selectedLineIds.has(line.id)}
                     sidebarOpen={sidebarOpen && sidebarLineId === line.id}

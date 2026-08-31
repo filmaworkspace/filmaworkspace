@@ -46,9 +46,6 @@ type DeleteTarget = { chapterId: string; label: string };
 type DeleteTargets = DeleteTarget[];
 type EligibleProject = { id: string; name: string };
 const cols = "grid-cols-[20px_26px_100px_1fr_100px_40px]";
-/** Línea de acento arriba/abajo de una fila, cuando el arrastre está encima de ella (ver hooks/useRowDrag.ts): indica si soltar aquí la coloca antes o después. */
-const dragIndicator = (pos: "before" | "after" | null) =>
-  pos === "before" ? "border-t-2 border-[#E86F4A]" : pos === "after" ? "border-b-2 border-[#E86F4A]" : "";
 
 /** Todo lo que hace falta para recrear un Capítulo entero al copiarlo/cortarlo: sus Cuentas y las líneas de Detalle de cada una. */
 interface ChapterLineClipboardData {
@@ -70,11 +67,10 @@ interface ChapterClipboardData {
 // placeholder, guarda sola al perder el foco. Componentes de módulo
 // estables: no se redefinen entre renders, así los inputs no pierden el foco. ──
 function ChapterRow({
-  chapter, draftId, fmt, total, subtotalValue, autoFocus, selected, dragOver,
+  chapter, draftId, fmt, total, subtotalValue, autoFocus, selected,
   onCommit, onCommitTextLine, onHandleMouseDown, onDelete, onCreateTextAfter, onCreateSubtotalAfter, onContextMenu, onRowMouseDown,
 }: {
   chapter: BudgetingAccount; draftId: string; fmt: (n: number) => string; total: number; subtotalValue?: number; autoFocus?: boolean; selected?: boolean;
-  dragOver: "before" | "after" | null;
   onCommit: (code: string, description: string) => void;
   onCommitTextLine: (patch: { description?: string; textBold?: boolean; textColor?: string }) => void;
   onHandleMouseDown: (e: React.MouseEvent) => void;
@@ -131,7 +127,7 @@ function ChapterRow({
       else if (e.key === "Escape") setDescription(chapter.description);
     };
     return (
-      <div data-budget-row data-drag-row-id={chapter.id} className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+      <div data-budget-row data-drag-row-id={chapter.id} className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#E86F4A]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
         <BudgetingDragHandle onMouseDown={onHandleMouseDown} />
         <span className="!border-l-0" />
         <input
@@ -159,7 +155,7 @@ function ChapterRow({
   }
 
   return (
-    <div data-budget-row data-drag-row-id={chapter.id} className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+    <div data-budget-row data-drag-row-id={chapter.id} className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#E86F4A]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
       <BudgetingDragHandle onMouseDown={onHandleMouseDown} />
       <Link href={`/budgeting/${draftId}/accounts/${chapter.id}`} className="flex items-center justify-center !border-l-0" title="Entrar">
         <ChevronRight size={13} className="text-slate-300 group-hover:text-[#E86F4A] group-hover:translate-x-0.5 transition-all" />
@@ -1147,7 +1143,6 @@ export default function BudgetingTopPage() {
                         subtotalValue={chapter.isSubtotal ? chapterSubtotalValue(cat.id, chapter.id) : undefined}
                         autoFocus={chapter.id === justAddedId}
                         selected={selectedChapterIds.has(chapter.id)}
-                        dragOver={chapterDrag.dragOver?.id === chapter.id ? chapterDrag.dragOver.position : null}
                         onCommit={(code, description) => handleCommitChapter(chapter, code, description)}
                         onCommitTextLine={(patch) => handleCommitTextChapter(chapter, patch)}
                         onHandleMouseDown={chapterDrag.onHandleMouseDown(chapter.id)}
@@ -1244,7 +1239,6 @@ export default function BudgetingTopPage() {
                     subtotalValue={chapter.isSubtotal ? chapterSubtotalValue(null, chapter.id) : undefined}
                     autoFocus={chapter.id === justAddedId}
                     selected={selectedChapterIds.has(chapter.id)}
-                    dragOver={chapterDrag.dragOver?.id === chapter.id ? chapterDrag.dragOver.position : null}
                     onCommit={(code, description) => handleCommitChapter(chapter, code, description)}
                     onCommitTextLine={(patch) => handleCommitTextChapter(chapter, patch)}
                     onHandleMouseDown={chapterDrag.onHandleMouseDown(chapter.id)}
