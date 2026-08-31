@@ -12,7 +12,7 @@ import { db } from "@/lib/firebase";
 import { doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { ArrowLeft, LibraryBig } from "lucide-react";
+import { ArrowLeft, FileDown, LibraryBig } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
@@ -135,10 +135,22 @@ export default function BudgetingShell({ children }: { children: React.ReactNode
         <div className="flex-1" />
 
         {draftId && (
-          <button onClick={() => openLibrary("categories")} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium flex-shrink-0 ${BTN_LIGHT}`}>
-            <LibraryBig size={13} />
-            Librería
-          </button>
+          <>
+            <button onClick={() => openLibrary("categories")} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium flex-shrink-0 ${BTN_LIGHT}`}>
+              <LibraryBig size={13} />
+              Librería
+            </button>
+            {/* El modal en sí vive en la página del Top Sheet (necesita todo el árbol
+                del presupuesto ya calculado): este enlace navega ahí con ?reports=1,
+                que esa página recoge para abrirlo, igual que ?library= aquí arriba. */}
+            <Link
+              href={`/budgeting/${draftId}?reports=1`}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium flex-shrink-0 ${BTN_LIGHT}`}
+            >
+              <FileDown size={13} />
+              Reportes
+            </Link>
+          </>
         )}
         <Link
           href="/dashboard"
@@ -147,9 +159,6 @@ export default function BudgetingShell({ children }: { children: React.ReactNode
           <ArrowLeft size={13} />
           Volver a Dashboard
         </Link>
-        <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center text-[10px] font-semibold text-white flex-shrink-0" title={user?.name}>
-          {user?.name?.charAt(0).toUpperCase() || "?"}
-        </div>
       </header>
 
       <main>{children}</main>

@@ -1,10 +1,12 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { CELL_INPUT } from "@/lib/budgeting";
+import { useSlashCommands } from "@/hooks/useSlashCommands";
+import BudgetingFloatingMenu from "@/components/BudgetingFloatingMenu";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fila "fantasma": se muestra en vez del "Clic derecho para añadir una
@@ -23,16 +25,11 @@ import { CELL_INPUT } from "@/lib/budgeting";
 // normal al salir del campo: hay que elegir un comando o borrar la "/".
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface PhantomCommand { cmd: string; label: string; hint: string }
-const PHANTOM_COMMANDS: PhantomCommand[] = [
-  { cmd: "texto", label: "Texto", hint: "Nota o separador, sin código ni importe" },
-  { cmd: "subtotal", label: "Subtotal", hint: "Suma las líneas de arriba hasta el subtotal anterior" },
-];
-
 export default function BudgetingPhantomRow({
-  cols, onCreate, onCreateText, onCreateSubtotal, onContextMenu,
+  cols, fmt, onCreate, onCreateText, onCreateSubtotal, onContextMenu,
 }: {
   cols: string;
+  fmt: (n: number) => string;
   onCreate: (code: string, description: string) => void;
   onCreateText: () => void;
   onCreateSubtotal: () => void;
@@ -40,10 +37,9 @@ export default function BudgetingPhantomRow({
 }) {
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
+  const descWrapRef = useRef<HTMLDivElement>(null);
 
-  const isCommand = description.startsWith("/");
-  const commandQuery = isCommand ? description.slice(1).toLowerCase() : "";
-  const matches = isCommand ? PHANTOM_COMMANDS.filter((c) => c.cmd.startsWith(commandQuery)) : [];
+  const { isCommand, matches } = useSlashCommands(description);
 
   const runCommand = (cmd: string) => {
     setDescription("");
@@ -75,25 +71,24 @@ export default function BudgetingPhantomRow({
   return (
     <div className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 bg-white group`} onContextMenu={onContextMenu}>
       <span />
+      <span />
       <input
         value={code}
         onChange={(e) => setCode(e.target.value)}
         onBlur={commit}
         onKeyDown={handleCodeKeyDown}
-        placeholder="Código"
-        className={`${CELL_INPUT} font-mono text-xs pl-2 placeholder:text-slate-300`}
+        className={`${CELL_INPUT} font-mono text-xs pl-2`}
       />
-      <div className="relative h-full">
+      <div ref={descWrapRef} className="relative h-full">
         <input
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           onBlur={commit}
           onKeyDown={handleDescriptionKeyDown}
-          placeholder="Descripción, o / para texto y subtotal"
-          className={`${CELL_INPUT} text-xs pl-2 placeholder:text-slate-300`}
+          className={`${CELL_INPUT} text-xs pl-2`}
         />
         {isCommand && matches.length > 0 && (
-          <div className="absolute z-30 top-full left-0 mt-0.5 w-56 bg-white border border-slate-200 rounded-lg shadow-lg py-1">
+          <BudgetingFloatingMenu anchorRef={descWrapRef} className="w-56 bg-white border border-slate-200 rounded-lg shadow-lg py-1">
             {matches.map((c) => (
               <button
                 key={c.cmd}
@@ -106,10 +101,10 @@ export default function BudgetingPhantomRow({
                 <span className="text-[10px] text-slate-400">{c.hint}</span>
               </button>
             ))}
-          </div>
+          </BudgetingFloatingMenu>
         )}
       </div>
-      <span className="flex items-center justify-end text-xs text-slate-300 pr-2">—</span>
+      <span className="flex items-center justify-end text-xs font-medium text-slate-700 pr-2">{fmt(0)}</span>
       <span />
     </div>
   );

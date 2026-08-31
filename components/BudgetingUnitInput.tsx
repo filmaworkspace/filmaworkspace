@@ -3,6 +3,9 @@
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from "react";
 
+// ─── Internal ────────────────────────────────────────────────────────────────
+import BudgetingFloatingMenu from "@/components/BudgetingFloatingMenu";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Input de texto para el campo "Unidad" de una línea de Detalle, con
 // sugerencias de las Unidades del borrador (ver /units). A diferencia de un
@@ -65,7 +68,7 @@ export default function BudgetingUnitInput({ value, onChange, onFocus, onBlur, o
         className={className}
       />
       {open && suggestions.length > 0 && (
-        <div className="absolute z-30 top-full left-0 mt-0.5 w-40 bg-white border border-slate-200 rounded-lg shadow-lg py-1 max-h-40 overflow-y-auto">
+        <BudgetingFloatingMenu anchorRef={wrapRef} className="w-40 bg-white border border-slate-200 rounded-lg shadow-lg py-1 max-h-40 overflow-y-auto">
           {suggestions.map((u) => (
             <button
               key={u.id}
@@ -77,7 +80,7 @@ export default function BudgetingUnitInput({ value, onChange, onFocus, onBlur, o
               {u.singular}
             </button>
           ))}
-        </div>
+        </BudgetingFloatingMenu>
       )}
     </div>
   );

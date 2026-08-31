@@ -162,7 +162,10 @@ export default function BudgetingReportsModal({
   ].filter(Boolean) as string[];
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl h-[85vh] flex overflow-hidden">
         <aside className="w-48 flex-shrink-0 border-r border-slate-100 py-4 px-2.5 space-y-0.5 overflow-y-auto">
           <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider px-2.5 mb-1.5">Reportes</p>

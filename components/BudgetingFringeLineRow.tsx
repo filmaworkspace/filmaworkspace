@@ -43,6 +43,7 @@ export default function BudgetingFringeLineRow({
 
   return (
     <div className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group`}>
+      <span />
       <span className="flex items-center justify-center text-slate-300" title={tooltip}>
         <Percent size={11} />
       </span>

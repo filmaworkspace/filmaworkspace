@@ -6,6 +6,9 @@ import { useEffect, useRef, useState } from "react";
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import { MoreVertical } from "lucide-react";
 
+// ─── Internal ────────────────────────────────────────────────────────────────
+import BudgetingFloatingMenu from "@/components/BudgetingFloatingMenu";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Kebab (⋮) genérico para la cabecera de una tabla: se usa en Top Sheet,
 // Capítulo y Detalle para activar/desactivar columnas y, en los tres, para
@@ -33,9 +36,9 @@ export default function BudgetingColumnsMenu({ children, title = "Columnas" }: {
         <MoreVertical size={13} />
       </button>
       {open && (
-        <div className="absolute z-30 top-full right-0 mt-1 w-60 bg-white border border-slate-200 rounded-xl shadow-lg p-3 space-y-2 normal-case">
+        <BudgetingFloatingMenu anchorRef={ref} align="right" className="w-60 bg-white border border-slate-200 rounded-xl shadow-lg p-3 space-y-2 normal-case">
           {children}
-        </div>
+        </BudgetingFloatingMenu>
       )}
     </div>
   );

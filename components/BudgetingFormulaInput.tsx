@@ -3,6 +3,9 @@
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from "react";
 
+// ─── Internal ────────────────────────────────────────────────────────────────
+import BudgetingFloatingMenu from "@/components/BudgetingFloatingMenu";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Input de texto con menciones de Globales al estilo "@": se usa en
 // cualquier campo que admite fórmulas (Valor de un Global, Cantidad/X/Tarifa
@@ -120,7 +123,7 @@ export default function BudgetingFormulaInput({ value, onChange, onFocus, onBlur
         style={{ color: "transparent", caretColor: "#1D201F" }}
       />
       {open && suggestions.length > 0 && (
-        <div className="absolute z-30 top-full left-0 mt-0.5 w-52 bg-white border border-slate-200 rounded-lg shadow-lg py-1 max-h-40 overflow-y-auto">
+        <BudgetingFloatingMenu anchorRef={wrapRef} className="w-52 bg-white border border-slate-200 rounded-lg shadow-lg py-1 max-h-40 overflow-y-auto">
           {suggestions.map((g) => (
             <button
               key={g.code}
@@ -133,7 +136,7 @@ export default function BudgetingFormulaInput({ value, onChange, onFocus, onBlur
               <span className="text-[10px] text-slate-400 truncate">{g.label}</span>
             </button>
           ))}
-        </div>
+        </BudgetingFloatingMenu>
       )}
     </div>
   );
