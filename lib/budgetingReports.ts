@@ -46,6 +46,8 @@ export interface BudgetReportParams {
   projectInfo?: BudgetingProjectInfo;
   grandTotal: number;
   exportConfig?: BudgetingExportConfig;
+  /** Texto de marca de agua ya resuelto (personalizada de un solo uso, o "BORRADOR"/"DRAFT" si el ajuste guardado está activo): quien llama decide cuál gana, aquí solo se dibuja si viene algo. */
+  watermark?: string;
 }
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -181,7 +183,8 @@ interface PdfI18n {
   format: string; episodesUnit: string; perEpisode: string;
   version: string; budgetDate: string; currency: string;
   director: string; producer: string; preparedBy: string; notes: string;
-  scriptDate: string; startDate: string; endDate: string; post: string; productionCompany: string;
+  scriptDate: string; startDate: string; endDate: string; productionCompany: string;
+  writer: string; lineProducer: string; shootDays: string; prepDays: string; postDays: string;
   issuedOn: (date: string, time: string) => string;
   pageOf: (current: number, total: number) => string;
   dateLocale: string;
@@ -195,7 +198,8 @@ const PDF_I18N: Record<PdfLanguage, PdfI18n> = {
     format: "Formato", episodesUnit: "capítulos", perEpisode: "por capítulo",
     version: "Versión #", budgetDate: "Fecha presupuesto", currency: "Moneda",
     director: "Dirección", producer: "Producción", preparedBy: "Preparado por", notes: "Notas",
-    scriptDate: "Guion fechado", startDate: "Inicio rodaje", endDate: "Fin rodaje", post: "Postproducción", productionCompany: "Productora",
+    scriptDate: "Guion fechado", startDate: "Inicio rodaje", endDate: "Fin rodaje", productionCompany: "Productora",
+    writer: "Guion", lineProducer: "Jefe de producción", shootDays: "Días de rodaje", prepDays: "Días de preparación", postDays: "Días de postproducción",
     issuedOn: (date, time) => `Emitido el ${date} a las ${time}`,
     pageOf: (current, total) => `Página ${current} de ${total}`,
     dateLocale: "es-ES",
@@ -206,9 +210,10 @@ const PDF_I18N: Record<PdfLanguage, PdfI18n> = {
   },
   en: {
     format: "Format", episodesUnit: "episodes", perEpisode: "per episode",
-    version: "Version #", budgetDate: "Budget date", currency: "Currency",
-    director: "Director", producer: "Producer", preparedBy: "Prepared by", notes: "Notes",
-    scriptDate: "Script dated", startDate: "Start date", endDate: "End date", post: "Post", productionCompany: "Production Company",
+    version: "Version #", budgetDate: "Budget Date", currency: "Currency",
+    director: "Director", producer: "Producer", preparedBy: "Prepared By", notes: "Notes",
+    scriptDate: "Script Dated", startDate: "Start Date", endDate: "End Date", productionCompany: "Production Company",
+    writer: "Writer", lineProducer: "Line Producer", shootDays: "Shoot Days", prepDays: "Prep Days", postDays: "Post Days",
     issuedOn: (date, time) => `Issued on ${date} at ${time}`,
     pageOf: (current, total) => `Page ${current} of ${total}`,
     dateLocale: "en-US",
@@ -241,7 +246,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   const fringes = p.fringes || [];
   const fringeFolders = p.fringeFolders || [];
   const info = p.projectInfo || {};
-  const doc = new FilmaPDF({ accent: "budgeting", docRef: info.title || p.draftName, footerBrand: "FW Budgeting", footerPageLabel: t.pageOf });
+  const doc = new FilmaPDF({ accent: "budgeting", docRef: info.title || p.draftName, footerBrand: "FW Budgeting", footerPageLabel: t.pageOf, watermark: p.watermark });
   doc.y = doc.margin;
 
   const left = doc.margin;
@@ -468,13 +473,17 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   const leftFieldRows: { label: string; value: string }[] = [
     { label: t.productionCompany, value: info.productionCompany || "" },
     { label: t.director, value: info.director || "" },
+    { label: t.writer, value: info.writer || "" },
+    { label: t.lineProducer, value: info.lineProducer || "" },
     { label: t.scriptDate, value: info.scriptDate || "" },
     { label: t.budgetDate, value: budgetDateValue },
   ];
   const rightFieldRows: { label: string; value: string }[] = [
     { label: t.startDate, value: info.startDate || "" },
     { label: t.endDate, value: info.endDate || "" },
-    { label: t.post, value: info.post || "" },
+    { label: t.shootDays, value: info.shootDays || "" },
+    { label: t.prepDays, value: info.prepDays || "" },
+    { label: t.postDays, value: info.postDays || "" },
   ];
   const fieldColumn = (x: number, rows: { label: string; value: string }[]) => {
     const rh = ptToMm(F.label) + 4.4;

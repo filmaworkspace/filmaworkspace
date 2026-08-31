@@ -38,7 +38,7 @@ interface Props {
   onUpdateExportConfig: (patch: ExportConfigPatch) => void;
   projectInfo: BudgetingProjectInfo;
   onSaveProjectInfo: (info: BudgetingProjectInfo) => Promise<void>;
-  onDownloadPdf: () => void;
+  onDownloadPdf: (watermark?: string) => void;
   onDownloadExcel: () => void;
   onDownloadFwb: () => void;
 }
@@ -122,6 +122,10 @@ export default function BudgetingReportsModal({
   const [form, setForm] = useState<BudgetingProjectInfo>(projectInfo);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  // Marca de agua personalizada: de un solo uso, no se guarda en el borrador
+  // (a diferencia de "BORRADOR", que es un ajuste persistente) — se borra
+  // sola en cuanto se descarga, para que no se cuele en la próxima.
+  const [customWatermark, setCustomWatermark] = useState("");
 
   useBodyScrollLock(open);
 
@@ -131,7 +135,7 @@ export default function BudgetingReportsModal({
   // el borrador) — si `projectInfo` estuviera en las dependencias, cada cambio
   // reiniciaba el formulario a medio escribir y saltaba de vuelta a "Portada".
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (open) { setForm(projectInfo); setTab("cover"); setSaved(false); } }, [open]);
+  useEffect(() => { if (open) { setForm(projectInfo); setTab("cover"); setSaved(false); setCustomWatermark(""); } }, [open]);
 
   if (!open) return null;
 
@@ -145,6 +149,14 @@ export default function BudgetingReportsModal({
     } finally {
       setSaving(false);
     }
+  };
+
+  // La personalizada gana si hay algo escrito; si no, "BORRADOR" si ese
+  // ajuste está activo; si tampoco, sin marca de agua.
+  const handleDownloadPdf = () => {
+    const watermark = customWatermark.trim() || (exportConfig.watermarkDraft ? "BORRADOR" : undefined);
+    onDownloadPdf(watermark);
+    setCustomWatermark("");
   };
 
   const includedCount = [exportConfig.includeCoverSheet, exportConfig.includeTopSheet, exportConfig.includeDetail].filter(Boolean).length;
@@ -203,13 +215,19 @@ export default function BudgetingReportsModal({
                     ) : null}
                   </div>
                   <Field label="Dirección" value={form.director || ""} onChange={(v) => set({ director: v })} />
+                  <Field label="Guion" value={form.writer || ""} onChange={(v) => set({ writer: v })} placeholder="Escrito por" />
+                  <Field label="Jefe de producción" value={form.lineProducer || ""} onChange={(v) => set({ lineProducer: v })} />
                   <Field label="Guion fechado" value={form.scriptDate || ""} onChange={(v) => set({ scriptDate: v })} placeholder="p.ej. 3ª versión, 12/03" />
                   <Field label="Fecha presupuesto" value={form.dateLabel || ""} onChange={(v) => set({ dateLabel: v })} placeholder="Se usa la de hoy si se deja en blanco" />
                   <div className="grid grid-cols-2 gap-2">
                     <Field label="Inicio rodaje" value={form.startDate || ""} onChange={(v) => set({ startDate: v })} />
                     <Field label="Fin rodaje" value={form.endDate || ""} onChange={(v) => set({ endDate: v })} />
                   </div>
-                  <Field label="Postproducción" value={form.post || ""} onChange={(v) => set({ post: v })} />
+                  <Field label="Días de rodaje" value={form.shootDays || ""} onChange={(v) => set({ shootDays: v })} placeholder="p.ej. 24, o 24 + 3 viaje" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field label="Días de preparación" value={form.prepDays || ""} onChange={(v) => set({ prepDays: v })} />
+                    <Field label="Días de postproducción" value={form.postDays || ""} onChange={(v) => set({ postDays: v })} />
+                  </div>
                   <Field label="Versión #" value={form.version || ""} onChange={(v) => set({ version: v })} placeholder="v1" />
                   <Field label="Preparado por" value={form.preparedBy || ""} onChange={(v) => set({ preparedBy: v })} />
                   <div>
@@ -223,7 +241,7 @@ export default function BudgetingReportsModal({
                     />
                   </div>
                   <button onClick={handleSaveInfo} disabled={saving} className={`w-full py-2.5 rounded-xl text-sm font-medium disabled:opacity-40 ${BTN_LIGHT}`}>
-                    {saving ? "Guardando..." : saved ? "Guardado ✓" : "Guardar datos de producción"}
+                    {saving ? "Guardando..." : saved ? "Guardado" : "Guardar datos de producción"}
                   </button>
                 </div>
               </>
@@ -282,6 +300,17 @@ export default function BudgetingReportsModal({
                   <p className="text-xs font-medium text-slate-700 mb-1.5">Idioma</p>
                   <Segmented options={(["es", "en"] as PdfLanguage[]).map((v) => ({ value: v, label: PDF_LANGUAGE_LABELS[v] }))} value={exportConfig.pdfLanguage} onChange={(v) => onUpdateExportConfig({ pdfLanguage: v })} />
                 </div>
+                <ToggleRow
+                  label='Marca de agua "BORRADOR"'
+                  checked={exportConfig.watermarkDraft}
+                  onChange={(v) => onUpdateExportConfig({ watermarkDraft: v })}
+                />
+                <Field
+                  label="Marca de agua personalizada (solo esta descarga)"
+                  value={customWatermark}
+                  onChange={setCustomWatermark}
+                  placeholder='Ej. "CONFIDENCIAL" — no se guarda, gana a "BORRADOR" si escribes algo'
+                />
               </>
             )}
           </div>
@@ -304,7 +333,7 @@ export default function BudgetingReportsModal({
                 <FileSpreadsheet size={13} /> Excel
               </button>
               <button
-                onClick={onDownloadPdf}
+                onClick={handleDownloadPdf}
                 disabled={includedCount === 0}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-40 transition-colors"
                 style={{ background: ACCENT }}

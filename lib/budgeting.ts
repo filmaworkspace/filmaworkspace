@@ -148,6 +148,8 @@ export interface BudgetingExportConfig {
   hideZeroTotalSubchapters: boolean;
   /** Idioma de los textos fijos del PDF (ver PdfLanguage): lo escrito en el presupuesto no se traduce. */
   pdfLanguage: PdfLanguage;
+  /** Marca de agua "BORRADOR"/"DRAFT" en todas las páginas: ajuste guardado, a diferencia de la marca de agua personalizada (esa es de un solo uso, se pide al descargar y no se guarda). */
+  watermarkDraft: boolean;
   fields: {
     unit: boolean;
     notes: boolean;
@@ -163,6 +165,7 @@ export const DEFAULT_EXPORT_CONFIG: BudgetingExportConfig = {
   pdfFontSize: "normal",
   hideZeroTotalSubchapters: false,
   pdfLanguage: "es",
+  watermarkDraft: false,
   fields: { unit: true, notes: false, tags: false },
 };
 
@@ -184,6 +187,7 @@ export function normalizeExportConfig(raw: (Partial<BudgetingExportConfig> & { c
     pdfFontSize: raw.pdfFontSize ?? DEFAULT_EXPORT_CONFIG.pdfFontSize,
     hideZeroTotalSubchapters: raw.hideZeroTotalSubchapters ?? DEFAULT_EXPORT_CONFIG.hideZeroTotalSubchapters,
     pdfLanguage: raw.pdfLanguage ?? DEFAULT_EXPORT_CONFIG.pdfLanguage,
+    watermarkDraft: raw.watermarkDraft ?? DEFAULT_EXPORT_CONFIG.watermarkDraft,
     fields: { ...DEFAULT_EXPORT_CONFIG.fields, ...(raw.fields || {}) },
   };
 }
@@ -206,6 +210,10 @@ export interface BudgetingProjectInfo {
   producer?: string;
   /** Empresa productora (distinta del/de la Producer: aquí va la razón social, no una persona). */
   productionCompany?: string;
+  /** Guionista / escrito por. */
+  writer?: string;
+  /** Jefe de producción (Line Producer / UPM). */
+  lineProducer?: string;
   preparedBy?: string;
   /** "Fecha presupuesto" en la portada: editable siempre, se usa la de hoy si se deja en blanco. */
   dateLabel?: string;
@@ -216,8 +224,11 @@ export interface BudgetingProjectInfo {
   /** Fechas de rodaje (texto libre, por el mismo motivo que scriptDate). */
   startDate?: string;
   endDate?: string;
-  /** Postproducción: fecha, duración o lo que se quiera anotar ahí. */
-  post?: string;
+  /** Nº de días de rodaje (texto libre: a veces se anota "24 + 3 viaje", no siempre un número solo). */
+  shootDays?: string;
+  /** Días de preparación y de postproducción, por separado (antes un único campo "Postproducción"). */
+  prepDays?: string;
+  postDays?: string;
   notes?: string;
 }
 

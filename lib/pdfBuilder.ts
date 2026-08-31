@@ -55,6 +55,8 @@ export interface FilmaPdfOptions {
   footerBrand?: string;
   /** Texto "Página X de Y" del centro del pie; por defecto en español. Cada módulo con idioma propio (ver Budgeting) pasa aquí su traducción. */
   footerPageLabel?: (current: number, total: number) => string;
+  /** Marca de agua diagonal, gris claro, repetida en todas las páginas (p.ej. "BORRADOR" o un texto suelto). Sin ella, no se dibuja nada. */
+  watermark?: string;
 }
 
 /**
@@ -80,6 +82,7 @@ export class FilmaPDF {
   private docRef?: string;
   private footerBrand: string;
   private footerPageLabel: (current: number, total: number) => string;
+  private watermark?: string;
 
   constructor(opts: FilmaPdfOptions = {}) {
     this.pdf = new jsPDF(opts.orientation || "p", "mm", "a4");
@@ -90,6 +93,7 @@ export class FilmaPDF {
     this.docRef = opts.docRef;
     this.footerBrand = opts.footerBrand || "Hecho con Filma Workspace";
     this.footerPageLabel = opts.footerPageLabel || ((current, total) => `Página ${current} de ${total}`);
+    this.watermark = opts.watermark?.trim() || undefined;
     this.y = this.margin;
   }
 
@@ -250,11 +254,26 @@ export class FilmaPDF {
     this.y += 4;
   }
 
-  /** Pie de página en todas las páginas — se llama automáticamente desde save(). */
+  /** Marca de agua diagonal centrada, muy suave, por encima del contenido ya dibujado de esa página (se llama una vez por página desde finish()). Con opacidad si el plugin GState está disponible en esta build de jsPDF; si no, cae a un gris muy claro sin transparencia real — se ve igual de discreto. */
+  private drawWatermark(text: string) {
+    const cx = this.pageW / 2;
+    const cy = this.pageH / 2;
+    const anyPdf = this.pdf as any;
+    const gStateApi = typeof anyPdf.GState === "function" && typeof anyPdf.setGState === "function";
+    if (gStateApi) anyPdf.setGState(new anyPdf.GState({ opacity: 0.14 }));
+    this.text(gStateApi ? SLATE[900] : SLATE[200]);
+    this.pdf.setFont("helvetica", "bold");
+    this.pdf.setFontSize(72);
+    this.pdf.text(text.toUpperCase(), cx, cy, { align: "center", angle: 45 });
+    if (gStateApi) anyPdf.setGState(new anyPdf.GState({ opacity: 1 }));
+  }
+
+  /** Pie de página (y marca de agua, si la hay) en todas las páginas — se llama automáticamente desde save(). */
   private finish() {
     const pageCount = this.pdf.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       this.pdf.setPage(i);
+      if (this.watermark) this.drawWatermark(this.watermark);
       this.draw(SLATE[200]);
       this.pdf.setLineWidth(0.2);
       this.pdf.line(this.margin, this.pageH - 16, this.pageW - this.margin, this.pageH - 16);
