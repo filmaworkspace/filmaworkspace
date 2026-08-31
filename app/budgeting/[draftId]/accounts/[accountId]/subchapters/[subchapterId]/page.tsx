@@ -119,7 +119,7 @@ function PhantomLineRow({
     <div className="grid gap-0 divide-x divide-slate-200 px-4 bg-white" style={{ gridTemplateColumns: template }} onContextMenu={onContextMenu}>
       <span />
       <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleCodeKeyDown}
-        className={`${CELL_INPUT} font-mono text-xs`} />
+        className={`${CELL_INPUT} font-mono text-xs !border-l-0`} />
       <div ref={descWrapRef} className="relative h-full">
         <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleDescriptionKeyDown}
           className={`${CELL_INPUT} text-xs pl-2`} />
@@ -188,7 +188,7 @@ function SubchapterFringeRow({
     <div className="grid gap-0 divide-x divide-slate-200 px-4 hover:bg-slate-50 group" style={{ gridTemplateColumns: template }}>
       <span />
       <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} font-mono text-xs`} />
+        className={`${CELL_INPUT} font-mono text-xs !border-l-0`} />
       <input value={label} onChange={(e) => setLabel(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} text-xs pl-2`} />
       <span />
@@ -238,7 +238,7 @@ function ReceivedTotalRow({
     <div className="grid gap-0 divide-x divide-slate-200 px-4 hover:bg-slate-50 group" style={{ gridTemplateColumns: template }}>
       <span />
       <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} font-mono text-xs`} />
+        className={`${CELL_INPUT} font-mono text-xs !border-l-0`} />
       <input value={label} onChange={(e) => setLabel(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} text-xs pl-2`} />
       <span />
@@ -512,7 +512,7 @@ function LineFieldsGrid({
     <div className="grid gap-0 divide-x divide-slate-200 px-4" style={{ gridTemplateColumns: template }}>
       <BudgetingDragHandle onDragStart={onDragStart} onDragEnd={onDragEnd} />
       <input autoFocus={autoFocus} value={fields.code} onChange={(e) => onChange({ code: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} font-mono text-xs`} />
+        className={`${CELL_INPUT} font-mono text-xs !border-l-0`} />
       <div ref={descWrapRef} className="relative h-full">
         <input value={fields.description} onChange={(e) => onChange({ description: e.target.value })} onBlur={handleDescriptionBlur} onKeyDown={handleDescriptionKeyDown}
           className={`${CELL_INPUT} text-xs pl-2`} />
@@ -706,7 +706,7 @@ function TextLineRow({
         onKeyDown={handleKeyDown}
         placeholder={isSubtotal ? "Subtotal" : "Texto"}
         style={{ gridColumn: isSubtotal ? "2 / 8" : "2 / 9", color: line.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: line.textBold ? 700 : 400 }}
-        className={`${CELL_INPUT} text-xs`}
+        className={`${CELL_INPUT} text-xs !border-l-0`}
       />
       {isSubtotal && (
         <span
@@ -1351,7 +1351,7 @@ export default function BudgetingSubchapterPage() {
         <div className="min-w-[720px]">
           <div className="grid gap-0 divide-x divide-slate-200 px-4 border-b border-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60" style={{ gridTemplateColumns: template }}>
             <span />
-            <span className="flex items-center py-2" title="Referencial: el código que se asigna en PO/facturas de Accounting es el del subcapítulo">ID</span>
+            <span className="flex items-center py-2 !border-l-0" title="Referencial: el código que se asigna en PO/facturas de Accounting es el del subcapítulo">ID</span>
             <span className="flex items-center py-2 pl-2">Descripción</span>
             <span className="flex items-center justify-center py-2 pl-2">Cant.</span>
             <span className="flex items-center justify-center py-2 pl-2">Unidad</span>
@@ -1437,7 +1437,7 @@ export default function BudgetingSubchapterPage() {
                     onDrop={(e) => {
                       e.preventDefault();
                       if (lineDrag.draggedId && lineDrag.draggedId !== line.id) {
-                        handleReorderLine(lineDrag.draggedId, resolveDragAfterId(sorted, lineDrag.dragOver));
+                        handleReorderLine(lineDrag.draggedId, resolveDragAfterId(sorted, lineDrag.draggedId, lineDrag.dragOver));
                       }
                       lineDrag.reset();
                     }}
@@ -1471,7 +1471,7 @@ export default function BudgetingSubchapterPage() {
                     onDrop={(e) => {
                       e.preventDefault();
                       if (lineDrag.draggedId && lineDrag.draggedId !== line.id) {
-                        handleReorderLine(lineDrag.draggedId, resolveDragAfterId(sorted, lineDrag.dragOver));
+                        handleReorderLine(lineDrag.draggedId, resolveDragAfterId(sorted, lineDrag.draggedId, lineDrag.dragOver));
                       }
                       lineDrag.reset();
                     }}

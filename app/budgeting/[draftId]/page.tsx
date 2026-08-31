@@ -133,7 +133,7 @@ function ChapterRow({
     return (
       <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown} onDragOver={onDragOverRow} onDrop={onDrop}>
         <BudgetingDragHandle onDragStart={onDragStart} onDragEnd={onDragEnd} />
-        <span />
+        <span className="!border-l-0" />
         <input
           autoFocus={autoFocus}
           value={description}
@@ -161,7 +161,7 @@ function ChapterRow({
   return (
     <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown} onDragOver={onDragOverRow} onDrop={onDrop}>
       <BudgetingDragHandle onDragStart={onDragStart} onDragEnd={onDragEnd} />
-      <Link href={`/budgeting/${draftId}/accounts/${chapter.id}`} className="flex items-center justify-center" title="Entrar">
+      <Link href={`/budgeting/${draftId}/accounts/${chapter.id}`} className="flex items-center justify-center !border-l-0" title="Entrar">
         <ChevronRight size={13} className="text-slate-300 group-hover:text-[#E86F4A] group-hover:translate-x-0.5 transition-all" />
       </Link>
       <input autoFocus={autoFocus} value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
@@ -1103,7 +1103,7 @@ export default function BudgetingTopPage() {
       <div className="border border-slate-200 rounded-2xl overflow-hidden">
         <div className={`grid ${cols} gap-0 pl-3 pr-3 border-b border-slate-200 divide-x divide-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
           <span></span>
-          <span></span>
+          <span className="!border-l-0"></span>
           <span className="flex items-center py-2 pl-2">Código</span>
           <span className="flex items-center py-2 pl-2">Descripción</span>
           <span className="flex items-center justify-end py-2 pr-2">Total</span>
@@ -1148,7 +1148,7 @@ export default function BudgetingTopPage() {
                         onDrop={(e) => {
                           e.preventDefault();
                           if (chapterDrag.draggedId && chapterDrag.draggedId !== chapter.id) {
-                            handleReorderChapter(chapterDrag.draggedId, cat.id, resolveDragAfterId(catChapters, chapterDrag.dragOver));
+                            handleReorderChapter(chapterDrag.draggedId, cat.id, resolveDragAfterId(catChapters, chapterDrag.draggedId, chapterDrag.dragOver));
                           }
                           chapterDrag.reset();
                         }}
@@ -1254,7 +1254,7 @@ export default function BudgetingTopPage() {
                     onDrop={(e) => {
                       e.preventDefault();
                       if (chapterDrag.draggedId && chapterDrag.draggedId !== chapter.id) {
-                        handleReorderChapter(chapterDrag.draggedId, null, resolveDragAfterId(flatSorted, chapterDrag.dragOver));
+                        handleReorderChapter(chapterDrag.draggedId, null, resolveDragAfterId(flatSorted, chapterDrag.draggedId, chapterDrag.dragOver));
                       }
                       chapterDrag.reset();
                     }}

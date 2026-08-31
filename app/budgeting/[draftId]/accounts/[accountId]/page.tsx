@@ -115,7 +115,7 @@ function SubRow({
     return (
       <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown} onDragOver={onDragOverRow} onDrop={onDrop}>
         <BudgetingDragHandle onDragStart={onDragStart} onDragEnd={onDragEnd} />
-        <span />
+        <span className="!border-l-0" />
         <input
           autoFocus={autoFocus}
           value={description}
@@ -143,7 +143,7 @@ function SubRow({
   return (
     <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown} onDragOver={onDragOverRow} onDrop={onDrop}>
       <BudgetingDragHandle onDragStart={onDragStart} onDragEnd={onDragEnd} />
-      <Link href={`/budgeting/${draftId}/accounts/${accountId}/subchapters/${sub.id}`} className="flex items-center justify-center" title="Entrar">
+      <Link href={`/budgeting/${draftId}/accounts/${accountId}/subchapters/${sub.id}`} className="flex items-center justify-center !border-l-0" title="Entrar">
         <ChevronRight size={13} className="text-slate-300 group-hover:text-[#E86F4A] group-hover:translate-x-0.5 transition-all" />
       </Link>
       <input autoFocus={autoFocus} value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
@@ -590,7 +590,7 @@ export default function BudgetingChapterPage() {
       <div className="border border-slate-200 rounded-2xl overflow-hidden">
         <div className={`grid ${cols} gap-0 px-3 border-b border-slate-200 divide-x divide-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
           <span></span>
-          <span></span>
+          <span className="!border-l-0"></span>
           <span className="flex items-center py-2 pl-2">Código</span>
           <span className="flex items-center py-2 pl-2">Descripción</span>
           <span className="flex items-center justify-end py-2 pr-2">Total</span>
@@ -643,7 +643,7 @@ export default function BudgetingChapterPage() {
                 onDrop={(e) => {
                   e.preventDefault();
                   if (subDrag.draggedId && subDrag.draggedId !== sub.id) {
-                    handleReorderSub(subDrag.draggedId, resolveDragAfterId(sorted, subDrag.dragOver));
+                    handleReorderSub(subDrag.draggedId, resolveDragAfterId(sorted, subDrag.draggedId, subDrag.dragOver));
                   }
                   subDrag.reset();
                 }}
