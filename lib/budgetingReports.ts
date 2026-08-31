@@ -171,7 +171,7 @@ const RULE: RGB = [148, 163, 184];   // slate-400, borde de tabla
 const RULE_LIGHT: RGB = [203, 213, 225]; // slate-300, borde de fila
 const ACCENT: RGB = [232, 111, 74];   // #E86F4A, acento de Budgeting
 const HEADER_BG: RGB = [241, 245, 249];  // slate-100: cabecera de columna clara, no negra
-const CATEGORY_BG: RGB = [252, 233, 228]; // tinte muy claro del acento, para las filas de categoría (ATL/BTL)
+const CATEGORY_BG: RGB = [229, 231, 235]; // gris neutro (no el acento), para las filas de categoría (ATL/BTL)
 const TOTAL_BG: RGB = [226, 232, 240];   // slate-200: filas de total (Top Sheet y Detalle), un poco más marcado
 
 // ─── Idioma del PDF: solo traduce los textos fijos (etiquetas, encabezados
@@ -181,7 +181,7 @@ interface PdfI18n {
   format: string; episodesUnit: string; perEpisode: string;
   version: string; budgetDate: string; currency: string;
   director: string; producer: string; preparedBy: string; notes: string;
-  scriptDate: string; startDate: string; endDate: string; post: string;
+  scriptDate: string; startDate: string; endDate: string; post: string; productionCompany: string;
   issuedOn: (date: string, time: string) => string;
   dateLocale: string;
   total: string; grandTotal: string; subtotalFallback: string;
@@ -194,7 +194,7 @@ const PDF_I18N: Record<PdfLanguage, PdfI18n> = {
     format: "Formato", episodesUnit: "capítulos", perEpisode: "por capítulo",
     version: "Versión #", budgetDate: "Fecha presupuesto", currency: "Moneda",
     director: "Dirección", producer: "Producción", preparedBy: "Preparado por", notes: "Notas",
-    scriptDate: "Guion fechado", startDate: "Inicio rodaje", endDate: "Fin rodaje", post: "Postproducción",
+    scriptDate: "Guion fechado", startDate: "Inicio rodaje", endDate: "Fin rodaje", post: "Postproducción", productionCompany: "Productora",
     issuedOn: (date, time) => `Emitido el ${date} a las ${time}`,
     dateLocale: "es-ES",
     total: "Total", grandTotal: "TOTAL PRESUPUESTO", subtotalFallback: "Subtotal",
@@ -206,7 +206,7 @@ const PDF_I18N: Record<PdfLanguage, PdfI18n> = {
     format: "Format", episodesUnit: "episodes", perEpisode: "per episode",
     version: "Version #", budgetDate: "Budget date", currency: "Currency",
     director: "Director", producer: "Producer", preparedBy: "Prepared by", notes: "Notes",
-    scriptDate: "Script dated", startDate: "Start date", endDate: "End date", post: "Post",
+    scriptDate: "Script dated", startDate: "Start date", endDate: "End date", post: "Post", productionCompany: "Production Company",
     issuedOn: (date, time) => `Issued on ${date} at ${time}`,
     dateLocale: "en-US",
     total: "Total", grandTotal: "TOTAL BUDGET", subtotalFallback: "Subtotal",
@@ -238,7 +238,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   const fringes = p.fringes || [];
   const fringeFolders = p.fringeFolders || [];
   const info = p.projectInfo || {};
-  const doc = new FilmaPDF({ accent: "budgeting", docRef: info.title || p.draftName, footerBrand: "FWB" });
+  const doc = new FilmaPDF({ accent: "budgeting", docRef: info.title || p.draftName, footerBrand: "FW Budgeting" });
   doc.y = doc.margin;
 
   const left = doc.margin;
@@ -437,17 +437,33 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
     doc.y += ptToMm(F.label) + 4.5;
   };
 
-  const titleSize = F.title * 0.55;
-  breakIfNeeded(ptToMm(titleSize) + 10);
-  doc.y += ptToMm(titleSize);
-  pill(info.title || p.draftName, left, doc.y, titleSize);
-  doc.y += ptToMm(F.label) * 4.2;
+  // Portada, Top Sheet y Detalle son tres "reportes" independientes (ver
+  // BudgetingReportsModal): cada uno se incluye o no en el PDF por
+  // separado. `openSection` decide si la página 1 (que jsPDF ya crea sola)
+  // vale para el primer reporte que toque, o si hace falta saltar de
+  // página — y si a ese reporte le toca el título grande de portada (solo
+  // el primero, y solo si es la propia Portada) o la pastilla en miniatura
+  // repetida (Top Sheet/Detalle, y cualquiera que no sea el primero).
+  let started = false;
+  const openSection = (needsMiniTitle: boolean) => {
+    if (started) { startPage(); if (needsMiniTitle) pageTitle(); }
+    else { started = true; if (needsMiniTitle) pageTitle(); }
+  };
 
-  // Dos columnas: cada fila es "Etiqueta: valor" (sin mayúsculas forzadas,
-  // tal cual vienen los textos del idioma elegido); huecos en blanco si un
-  // campo no se ha rellenado (igual que en el mockup de referencia).
+  if (cfg.includeCoverSheet) {
+    openSection(false);
+    const titleSize = F.title * 0.55;
+    breakIfNeeded(ptToMm(titleSize) + 10);
+    doc.y += ptToMm(titleSize);
+    pill(info.title || p.draftName, left, doc.y, titleSize);
+    doc.y += ptToMm(F.label) * 4.2;
+
+    // Dos columnas: cada fila es "Etiqueta: valor" (sin mayúsculas forzadas,
+  // tal cual vienen los textos del idioma elegido); los campos sin rellenar
+  // no salen (ni la etiqueta), para no dejar huecos vacíos en la portada.
   const budgetDateValue = info.dateLabel || new Intl.DateTimeFormat(t.dateLocale, { day: "2-digit", month: "long", year: "numeric" }).format(new Date());
   const leftFieldRows: { label: string; value: string }[] = [
+    { label: t.productionCompany, value: info.productionCompany || "" },
     { label: t.director, value: info.director || "" },
     { label: t.scriptDate, value: info.scriptDate || "" },
     { label: t.budgetDate, value: budgetDateValue },
@@ -460,13 +476,13 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   const fieldColumn = (x: number, rows: { label: string; value: string }[]) => {
     const rh = ptToMm(F.label) + 4.4;
     let y = doc.y;
-    rows.forEach((row) => {
+    rows.filter((row) => row.value).forEach((row) => {
       doc.y = y;
       text(`${row.label}:`, x, { bold: true, size: F.label });
       doc.pdf.setFont("helvetica", "bold");
       doc.pdf.setFontSize(F.label);
       const labelW = doc.pdf.getTextWidth(`${row.label}: `);
-      if (row.value) text(row.value, x + labelW, { size: F.label });
+      text(row.value, x + labelW, { size: F.label });
       y += rh;
     });
     return y;
@@ -502,7 +518,6 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   }
 
   if (info.notes) {
-    writeLine(`${t.notes}:`, { bold: true });
     info.notes.split("\n").forEach((line) => writeLine(line || " "));
     blockGap();
   }
@@ -518,14 +533,12 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   const issuedY = doc.pageH - 22;
   doc.y = doc.y < issuedY ? issuedY : doc.y + 4;
   text(t.issuedOn(issuedDate, issuedTime), left, { size: Math.max(6, F.body - 1), color: MUTED });
-
-  startPage();
-  pageTitle();
+  }
 
   // ─── Top Sheet: tabla única (capítulos por categoría), sin cabecera de
-  // columna. Opcional: toggle "Top Sheet (portada)" de la configuración de
-  // exportación. ─────────────────────────────────────────────────────────────
-  if (cfg.coverSheet) {
+  // columna. Reporte independiente de la Portada (ver BudgetingReportsModal). ──
+  if (cfg.includeTopSheet) {
+    openSection(true);
     const topCols: GCol[] = (() => {
       const codeW = 24, amtW = 42;
       return [
@@ -570,9 +583,6 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
     rule(INK, 0.5);
     dataRow(topCols, ["", t.grandTotal, fmt(p.grandTotal)], { bold: true, size: F.total, fill: TOTAL_BG });
     doc.y += 4;
-
-    startPage();
-    pageTitle();
   }
 
   // ─── Detalle: al estilo Movie Magic Budgeting (ver mockup del usuario) —
@@ -581,7 +591,10 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   // vez para toda la tabla). El valor de cada línea va en "Subtotal"; la
   // columna "Total" solo se rellena en las filas de cierre (TOTAL de la
   // Cuenta, Total del capítulo). Capítulos y Cuentas son filas en negrita
-  // dentro de la propia tabla, no títulos aparte. ───────────────────────────
+  // dentro de la propia tabla, no títulos aparte. Reporte independiente de
+  // la Portada y el Top Sheet (ver BudgetingReportsModal). ──────────────────
+  if (cfg.includeDetail) {
+  openSection(true);
   type DetailKey = "code" | "desc" | "qty" | "unit" | "mult" | "rate" | "subtotal" | "total";
   const detailKeys: DetailKey[] = (() => {
     const list: DetailKey[] = ["code", "desc", "qty"];
@@ -765,6 +778,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   breakIfNeeded(rowHeight(F.total) + 4);
   rule(INK, 0.5);
   detailDataRow(detailRowValues({ desc: t.grandTotal, total: fmt(p.grandTotal) }), { bold: true, size: F.total, fill: TOTAL_BG });
+  }
 
   return doc;
 }

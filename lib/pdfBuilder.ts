@@ -257,8 +257,9 @@ export class FilmaPDF {
       this.text(SLATE[400]);
       this.pdf.setFont("helvetica", "normal");
       this.pdf.setFontSize(7.5);
-      this.pdf.text(this.docRef ? `${this.footerBrand} · ${this.docRef}` : this.footerBrand, this.margin, this.pageH - 10);
-      this.pdf.text(`Página ${i} de ${pageCount}`, this.pageW - this.margin, this.pageH - 10, { align: "right" });
+      if (this.docRef) this.pdf.text(this.docRef, this.margin, this.pageH - 10);
+      this.pdf.text(`Página ${i} de ${pageCount}`, this.pageW / 2, this.pageH - 10, { align: "center" });
+      this.pdf.text(this.footerBrand, this.pageW - this.margin, this.pageH - 10, { align: "right" });
     }
   }
 

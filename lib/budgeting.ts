@@ -138,7 +138,10 @@ export type PdfLanguage = "es" | "en";
 export const PDF_LANGUAGE_LABELS: Record<PdfLanguage, string> = { es: "Español", en: "English" };
 
 export interface BudgetingExportConfig {
-  coverSheet: boolean;
+  /** Los tres "reportes" del PDF, cada uno se puede incluir o no por separado (ver componente Reportes). */
+  includeCoverSheet: boolean;
+  includeTopSheet: boolean;
+  includeDetail: boolean;
   pageBreakPerChapter: boolean;
   pdfFontSize: PdfFontSize;
   /** Si es true, las Cuentas cuyo total sale en 0€ no se dibujan en el PDF (solo afecta a Cuentas, no a Capítulos ni a líneas sueltas). */
@@ -153,13 +156,37 @@ export interface BudgetingExportConfig {
 }
 
 export const DEFAULT_EXPORT_CONFIG: BudgetingExportConfig = {
-  coverSheet: true,
+  includeCoverSheet: true,
+  includeTopSheet: true,
+  includeDetail: true,
   pageBreakPerChapter: false,
   pdfFontSize: "normal",
   hideZeroTotalSubchapters: false,
   pdfLanguage: "es",
   fields: { unit: true, notes: false, tags: false },
 };
+
+/**
+ * Normaliza `draft.exportConfig` tal cual viene de Firestore: rellena los
+ * campos que falten con su valor por defecto, y migra el `coverSheet`
+ * antiguo (un único interruptor que mezclaba Portada y Top Sheet a la vez)
+ * a los dos nuevos `includeCoverSheet`/`includeTopSheet` independientes, sin
+ * que un borrador ya exportado antes cambie de comportamiento.
+ */
+export function normalizeExportConfig(raw: (Partial<BudgetingExportConfig> & { coverSheet?: boolean }) | null | undefined): BudgetingExportConfig {
+  if (!raw) return DEFAULT_EXPORT_CONFIG;
+  const legacyCover = raw.coverSheet;
+  return {
+    includeCoverSheet: raw.includeCoverSheet ?? legacyCover ?? DEFAULT_EXPORT_CONFIG.includeCoverSheet,
+    includeTopSheet: raw.includeTopSheet ?? legacyCover ?? DEFAULT_EXPORT_CONFIG.includeTopSheet,
+    includeDetail: raw.includeDetail ?? DEFAULT_EXPORT_CONFIG.includeDetail,
+    pageBreakPerChapter: raw.pageBreakPerChapter ?? DEFAULT_EXPORT_CONFIG.pageBreakPerChapter,
+    pdfFontSize: raw.pdfFontSize ?? DEFAULT_EXPORT_CONFIG.pdfFontSize,
+    hideZeroTotalSubchapters: raw.hideZeroTotalSubchapters ?? DEFAULT_EXPORT_CONFIG.hideZeroTotalSubchapters,
+    pdfLanguage: raw.pdfLanguage ?? DEFAULT_EXPORT_CONFIG.pdfLanguage,
+    fields: { ...DEFAULT_EXPORT_CONFIG.fields, ...(raw.fields || {}) },
+  };
+}
 
 /**
  * Datos de producción para la portada del PDF exportado (estilo Top Sheet de
@@ -177,6 +204,8 @@ export interface BudgetingProjectInfo {
   filmDuration?: string;
   director?: string;
   producer?: string;
+  /** Empresa productora (distinta del/de la Producer: aquí va la razón social, no una persona). */
+  productionCompany?: string;
   preparedBy?: string;
   /** "Fecha presupuesto" en la portada: editable siempre, se usa la de hoy si se deja en blanco. */
   dateLabel?: string;
