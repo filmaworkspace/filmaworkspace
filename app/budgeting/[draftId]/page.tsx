@@ -1501,7 +1501,6 @@ export default function BudgetingTopPage() {
                 ["dateLabel", "Fecha presupuesto", "Se usa la de hoy si se deja en blanco"],
                 ["scriptDate", "Guion fechado", "p.ej. 3ª versión, 12/03"],
                 ["director", "Dirección", ""],
-                ["producer", "Producción", ""],
               ] as const).map(([key, label, placeholder]) => (
                 <div key={key}>
                   <label className="text-xs font-medium text-slate-700 block mb-1.5">{label}</label>
