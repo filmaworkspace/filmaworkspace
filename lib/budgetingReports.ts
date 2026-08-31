@@ -322,7 +322,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
     doc.pdf.line(left, doc.y, right, doc.y);
   };
   /** Nueva página que continúa la misma tabla: repone el borde superior, sin repetir ninguna cabecera. */
-  const continueTable = () => { startPage(); tableTop(); };
+  const continueTable = () => { startPage(); pageTitle(); tableTop(); };
   /** Fila de datos con salto de página automático. */
   const dataRow = (cols: GCol[], values: string[], opts: RowOpts) => {
     if (doc.y + rowHeight(opts.size) > doc.pageH - 22) continueTable();
@@ -425,45 +425,48 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
     const h = ptToMm(size) + padY * 2;
     doc.pdf.setFillColor(accentTint[0], accentTint[1], accentTint[2]);
     doc.pdf.roundedRect(x, y - ptToMm(size) - padY + 0.3, w, h, h / 2, h / 2, "F");
-    doc.pdf.setTextColor(accent[0], accent[1], accent[2]);
+    doc.pdf.setTextColor(INK[0], INK[1], INK[2]);
     doc.pdf.text(str, x + padX, y);
     return w;
+  };
+
+  /** Misma pastilla del título, en miniatura, repetida al principio de cada página que no es la portada (Top Sheet, Detalle, y cada salto de página dentro de ambos). */
+  const pageTitle = () => {
+    doc.y = doc.margin + ptToMm(F.label);
+    pill(info.title || p.draftName, left, doc.y, F.label);
+    doc.y += ptToMm(F.label) + 4.5;
   };
 
   const titleSize = F.title * 0.55;
   breakIfNeeded(ptToMm(titleSize) + 10);
   doc.y += ptToMm(titleSize);
   pill(info.title || p.draftName, left, doc.y, titleSize);
-  doc.y += ptToMm(F.label) * 2.4;
+  doc.y += ptToMm(F.label) * 4.2;
 
-  // Dos columnas: cada fila es "ETIQUETA: valor", con la fecha de
-  // presupuesto en la izquierda como pastilla; huecos en blanco si un campo
-  // no se ha rellenado (igual que en el mockup de referencia).
+  // Dos columnas: cada fila es "Etiqueta: valor" (sin mayúsculas forzadas,
+  // tal cual vienen los textos del idioma elegido); huecos en blanco si un
+  // campo no se ha rellenado (igual que en el mockup de referencia).
   const budgetDateValue = info.dateLabel || new Intl.DateTimeFormat(t.dateLocale, { day: "2-digit", month: "long", year: "numeric" }).format(new Date());
-  const leftFieldRows: { label: string; value: string; highlight?: boolean }[] = [
-    { label: t.producer, value: info.producer || "" },
+  const leftFieldRows: { label: string; value: string }[] = [
     { label: t.director, value: info.director || "" },
     { label: t.scriptDate, value: info.scriptDate || "" },
-    { label: t.budgetDate, value: budgetDateValue, highlight: true },
+    { label: t.budgetDate, value: budgetDateValue },
   ];
   const rightFieldRows: { label: string; value: string }[] = [
     { label: t.startDate, value: info.startDate || "" },
     { label: t.endDate, value: info.endDate || "" },
     { label: t.post, value: info.post || "" },
   ];
-  const fieldColumn = (x: number, rows: { label: string; value: string; highlight?: boolean }[]) => {
+  const fieldColumn = (x: number, rows: { label: string; value: string }[]) => {
     const rh = ptToMm(F.label) + 4.4;
     let y = doc.y;
     rows.forEach((row) => {
       doc.y = y;
-      text(`${row.label.toUpperCase()}:`, x, { bold: true, size: F.label });
+      text(`${row.label}:`, x, { bold: true, size: F.label });
       doc.pdf.setFont("helvetica", "bold");
       doc.pdf.setFontSize(F.label);
-      const labelW = doc.pdf.getTextWidth(`${row.label.toUpperCase()}: `);
-      if (row.value) {
-        if (row.highlight) pill(row.value, x + labelW, y, F.label);
-        else text(row.value, x + labelW, { size: F.label });
-      }
+      const labelW = doc.pdf.getTextWidth(`${row.label}: `);
+      if (row.value) text(row.value, x + labelW, { size: F.label });
       y += rh;
     });
     return y;
@@ -517,6 +520,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   text(t.issuedOn(issuedDate, issuedTime), left, { size: Math.max(6, F.body - 1), color: MUTED });
 
   startPage();
+  pageTitle();
 
   // ─── Top Sheet: tabla única (capítulos por categoría), sin cabecera de
   // columna. Opcional: toggle "Top Sheet (portada)" de la configuración de
@@ -568,6 +572,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
     doc.y += 4;
 
     startPage();
+    pageTitle();
   }
 
   // ─── Detalle: al estilo Movie Magic Budgeting (ver mockup del usuario) —
@@ -623,7 +628,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
     doc.y = y1;
   };
   /** Nueva página que continúa el Detalle: repone la cabecera de columna, no solo el borde. */
-  const detailContinueTable = () => { startPage(); detailHeaderRow(); };
+  const detailContinueTable = () => { startPage(); pageTitle(); detailHeaderRow(); };
   /** Separador fino entre capítulos de una misma página, en vez de repetir la cabecera de columna entera. */
   const chapterSeparator = () => {
     breakIfNeeded(rowHeight(F.body) * 2);
@@ -679,6 +684,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
         // este es el primer capítulo real: ni separador ni salto forzado.
       } else if (cfg.pageBreakPerChapter) {
         startPage();
+        pageTitle();
         detailHeaderRow();
       } else {
         chapterSeparator();

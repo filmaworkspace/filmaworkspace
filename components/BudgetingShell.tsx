@@ -98,11 +98,7 @@ export default function BudgetingShell({ children }: { children: React.ReactNode
     <div className={`min-h-screen bg-white ${inter.className}`}>
       <header className="h-14 flex-shrink-0 border-b border-slate-100 flex items-center gap-4 px-5 sticky top-0 bg-white z-20">
         <Link href="/budgeting" className="flex-shrink-0">
-          {draftId ? (
-            <Image src="/logo-budgeting.svg" alt="Budgeting" width={82} height={24} className="h-5 w-auto" priority />
-          ) : (
-            <Image src="/logo-budgeting-text.svg" alt="Budgeting" width={368} height={48} className="h-6 w-auto" priority />
-          )}
+          <Image src="/logo-budgeting.svg" alt="Budgeting" width={82} height={24} className="h-5 w-auto" priority />
         </Link>
 
         {draftId && (
