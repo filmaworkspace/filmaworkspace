@@ -70,14 +70,13 @@ function ToggleRow({ label, checked, onChange }: { label: string; checked: boole
   );
 }
 
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div>
       <label className="text-xs font-medium text-slate-700 block mb-1.5">{label}</label>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
         className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
       />
     </div>
@@ -122,8 +121,7 @@ export default function BudgetingReportsModal({
   const [form, setForm] = useState<BudgetingProjectInfo>(projectInfo);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  // Marca de agua personalizada: de un solo uso, no se guarda en el borrador
-  // (a diferencia de "BORRADOR", que es un ajuste persistente) — se borra
+  // Marca de agua: de un solo uso, no se guarda en el borrador — se borra
   // sola en cuanto se descarga, para que no se cuele en la próxima.
   const [customWatermark, setCustomWatermark] = useState("");
 
@@ -151,11 +149,8 @@ export default function BudgetingReportsModal({
     }
   };
 
-  // La personalizada gana si hay algo escrito; si no, "BORRADOR" si ese
-  // ajuste está activo; si tampoco, sin marca de agua.
   const handleDownloadPdf = () => {
-    const watermark = customWatermark.trim() || (exportConfig.watermarkDraft ? "BORRADOR" : undefined);
-    onDownloadPdf(watermark);
+    onDownloadPdf(customWatermark.trim() || undefined);
     setCustomWatermark("");
   };
 
@@ -207,35 +202,36 @@ export default function BudgetingReportsModal({
                     <Segmented options={[{ value: "Película", label: "Película" }, { value: "Serie", label: "Serie" }]} value={(form.format as "Película" | "Serie") || "Película"} onChange={(v) => set({ format: v })} />
                     {form.format === "Serie" ? (
                       <div className="grid grid-cols-2 gap-2 mt-2">
-                        <input value={form.episodeCount || ""} onChange={(e) => set({ episodeCount: e.target.value })} placeholder="Nº de capítulos" className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2" />
-                        <input value={form.episodeDuration || ""} onChange={(e) => set({ episodeDuration: e.target.value })} placeholder="Duración de los capítulos" className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2" />
+                        <input value={form.episodeCount || ""} onChange={(e) => set({ episodeCount: e.target.value })} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2" />
+                        <input value={form.episodeDuration || ""} onChange={(e) => set({ episodeDuration: e.target.value })} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2" />
                       </div>
                     ) : form.format === "Película" ? (
-                      <input value={form.filmDuration || ""} onChange={(e) => set({ filmDuration: e.target.value })} placeholder="Duración de la película" className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 mt-2" />
+                      <input value={form.filmDuration || ""} onChange={(e) => set({ filmDuration: e.target.value })} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 mt-2" />
                     ) : null}
                   </div>
                   <Field label="Dirección" value={form.director || ""} onChange={(v) => set({ director: v })} />
-                  <Field label="Guion" value={form.writer || ""} onChange={(v) => set({ writer: v })} placeholder="Escrito por" />
-                  <Field label="Jefe de producción" value={form.lineProducer || ""} onChange={(v) => set({ lineProducer: v })} />
-                  <Field label="Guion fechado" value={form.scriptDate || ""} onChange={(v) => set({ scriptDate: v })} placeholder="p.ej. 3ª versión, 12/03" />
-                  <Field label="Fecha presupuesto" value={form.dateLabel || ""} onChange={(v) => set({ dateLabel: v })} placeholder="Se usa la de hoy si se deja en blanco" />
+                  <Field label="Guion" value={form.writer || ""} onChange={(v) => set({ writer: v })} />
+                  <Field label="Productor" value={form.producer || ""} onChange={(v) => set({ producer: v })} />
+                  <Field label="Productor ejecutivo" value={form.executiveProducer || ""} onChange={(v) => set({ executiveProducer: v })} />
+                  <Field label="Director de producción" value={form.lineProducer || ""} onChange={(v) => set({ lineProducer: v })} />
+                  <Field label="Guion fechado" value={form.scriptDate || ""} onChange={(v) => set({ scriptDate: v })} />
+                  <Field label="Fecha presupuesto" value={form.dateLabel || ""} onChange={(v) => set({ dateLabel: v })} />
                   <div className="grid grid-cols-2 gap-2">
                     <Field label="Inicio rodaje" value={form.startDate || ""} onChange={(v) => set({ startDate: v })} />
                     <Field label="Fin rodaje" value={form.endDate || ""} onChange={(v) => set({ endDate: v })} />
                   </div>
-                  <Field label="Días de rodaje" value={form.shootDays || ""} onChange={(v) => set({ shootDays: v })} placeholder="p.ej. 24, o 24 + 3 viaje" />
+                  <Field label="Días de rodaje" value={form.shootDays || ""} onChange={(v) => set({ shootDays: v })} />
                   <div className="grid grid-cols-2 gap-2">
-                    <Field label="Días de preparación" value={form.prepDays || ""} onChange={(v) => set({ prepDays: v })} />
-                    <Field label="Días de postproducción" value={form.postDays || ""} onChange={(v) => set({ postDays: v })} />
+                    <Field label="Inicio preproducción" value={form.prepStartDate || ""} onChange={(v) => set({ prepStartDate: v })} />
+                    <Field label="Inicio postproducción" value={form.postStartDate || ""} onChange={(v) => set({ postStartDate: v })} />
                   </div>
-                  <Field label="Versión #" value={form.version || ""} onChange={(v) => set({ version: v })} placeholder="v1" />
+                  <Field label="Versión #" value={form.version || ""} onChange={(v) => set({ version: v })} />
                   <Field label="Preparado por" value={form.preparedBy || ""} onChange={(v) => set({ preparedBy: v })} />
                   <div>
                     <label className="text-xs font-medium text-slate-700 block mb-1.5">Notas</label>
                     <textarea
                       value={form.notes || ""}
                       onChange={(e) => set({ notes: e.target.value })}
-                      placeholder="Cualquier otra información importante para la portada"
                       rows={3}
                       className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 resize-none"
                     />
@@ -300,16 +296,10 @@ export default function BudgetingReportsModal({
                   <p className="text-xs font-medium text-slate-700 mb-1.5">Idioma</p>
                   <Segmented options={(["es", "en"] as PdfLanguage[]).map((v) => ({ value: v, label: PDF_LANGUAGE_LABELS[v] }))} value={exportConfig.pdfLanguage} onChange={(v) => onUpdateExportConfig({ pdfLanguage: v })} />
                 </div>
-                <ToggleRow
-                  label='Marca de agua "BORRADOR"'
-                  checked={exportConfig.watermarkDraft}
-                  onChange={(v) => onUpdateExportConfig({ watermarkDraft: v })}
-                />
                 <Field
-                  label="Marca de agua personalizada (solo esta descarga)"
+                  label="Marca de agua"
                   value={customWatermark}
                   onChange={setCustomWatermark}
-                  placeholder='Ej. "CONFIDENCIAL" — no se guarda, gana a "BORRADOR" si escribes algo'
                 />
               </>
             )}

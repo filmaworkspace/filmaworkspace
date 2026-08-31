@@ -182,9 +182,9 @@ const TOTAL_BG: RGB = [226, 232, 240];   // slate-200: filas de total (Top Sheet
 interface PdfI18n {
   format: string; episodesUnit: string; perEpisode: string;
   version: string; budgetDate: string; currency: string;
-  director: string; producer: string; preparedBy: string; notes: string;
+  director: string; producer: string; executiveProducer: string; preparedBy: string; notes: string;
   scriptDate: string; startDate: string; endDate: string; productionCompany: string;
-  writer: string; lineProducer: string; shootDays: string; prepDays: string; postDays: string;
+  writer: string; lineProducer: string; shootDays: string; prepStartDate: string; postStartDate: string;
   issuedOn: (date: string, time: string) => string;
   pageOf: (current: number, total: number) => string;
   dateLocale: string;
@@ -197,9 +197,9 @@ const PDF_I18N: Record<PdfLanguage, PdfI18n> = {
   es: {
     format: "Formato", episodesUnit: "capítulos", perEpisode: "por capítulo",
     version: "Versión #", budgetDate: "Fecha presupuesto", currency: "Moneda",
-    director: "Dirección", producer: "Producción", preparedBy: "Preparado por", notes: "Notas",
+    director: "Dirección", producer: "Productor", executiveProducer: "Productor ejecutivo", preparedBy: "Preparado por", notes: "Notas",
     scriptDate: "Guion fechado", startDate: "Inicio rodaje", endDate: "Fin rodaje", productionCompany: "Productora",
-    writer: "Guion", lineProducer: "Jefe de producción", shootDays: "Días de rodaje", prepDays: "Días de preparación", postDays: "Días de postproducción",
+    writer: "Guion", lineProducer: "Director de producción", shootDays: "Días de rodaje", prepStartDate: "Inicio preproducción", postStartDate: "Inicio postproducción",
     issuedOn: (date, time) => `Emitido el ${date} a las ${time}`,
     pageOf: (current, total) => `Página ${current} de ${total}`,
     dateLocale: "es-ES",
@@ -211,9 +211,9 @@ const PDF_I18N: Record<PdfLanguage, PdfI18n> = {
   en: {
     format: "Format", episodesUnit: "episodes", perEpisode: "per episode",
     version: "Version #", budgetDate: "Budget Date", currency: "Currency",
-    director: "Director", producer: "Producer", preparedBy: "Prepared By", notes: "Notes",
+    director: "Director", producer: "Producer", executiveProducer: "Executive Producer", preparedBy: "Prepared By", notes: "Notes",
     scriptDate: "Script Dated", startDate: "Start Date", endDate: "End Date", productionCompany: "Production Company",
-    writer: "Writer", lineProducer: "Line Producer", shootDays: "Shoot Days", prepDays: "Prep Days", postDays: "Post Days",
+    writer: "Writer", lineProducer: "Line Producer", shootDays: "Shoot Days", prepStartDate: "Preproduction Start", postStartDate: "Postproduction Start",
     issuedOn: (date, time) => `Issued on ${date} at ${time}`,
     pageOf: (current, total) => `Page ${current} of ${total}`,
     dateLocale: "en-US",
@@ -474,6 +474,8 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
     { label: t.productionCompany, value: info.productionCompany || "" },
     { label: t.director, value: info.director || "" },
     { label: t.writer, value: info.writer || "" },
+    { label: t.producer, value: info.producer || "" },
+    { label: t.executiveProducer, value: info.executiveProducer || "" },
     { label: t.lineProducer, value: info.lineProducer || "" },
     { label: t.scriptDate, value: info.scriptDate || "" },
     { label: t.budgetDate, value: budgetDateValue },
@@ -482,8 +484,8 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
     { label: t.startDate, value: info.startDate || "" },
     { label: t.endDate, value: info.endDate || "" },
     { label: t.shootDays, value: info.shootDays || "" },
-    { label: t.prepDays, value: info.prepDays || "" },
-    { label: t.postDays, value: info.postDays || "" },
+    { label: t.prepStartDate, value: info.prepStartDate || "" },
+    { label: t.postStartDate, value: info.postStartDate || "" },
   ];
   const fieldColumn = (x: number, rows: { label: string; value: string }[]) => {
     const rh = ptToMm(F.label) + 4.4;

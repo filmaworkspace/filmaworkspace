@@ -260,7 +260,7 @@ export class FilmaPDF {
     const cy = this.pageH / 2;
     const anyPdf = this.pdf as any;
     const gStateApi = typeof anyPdf.GState === "function" && typeof anyPdf.setGState === "function";
-    if (gStateApi) anyPdf.setGState(new anyPdf.GState({ opacity: 0.14 }));
+    if (gStateApi) anyPdf.setGState(new anyPdf.GState({ opacity: 0.07 }));
     this.text(gStateApi ? SLATE[900] : SLATE[200]);
     this.pdf.setFont("helvetica", "bold");
     this.pdf.setFontSize(72);
