@@ -1,7 +1,7 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -13,7 +13,7 @@ import {
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  AlertCircle, AlignLeft, Asterisk, ArrowUpRight, Box, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy,
+  AlertCircle, AlignLeft, Asterisk, ArrowUpRight, Box, Check, ChevronLeft, ChevronRight, Copy,
   DollarSign, Equal, Eye, EyeOff, Hash, Lock, MessageSquare, MoreVertical, Percent, Ruler, Search, Settings2, Sigma, SlidersHorizontal, Tag, Trash2, X,
 } from "lucide-react";
 
@@ -22,12 +22,16 @@ import { useUser } from "@/contexts/UserContext";
 import {
   BTN_LIGHT_ACTIVE, BudgetingAccount, BudgetingDetailColumnsConfig, BudgetingDetailLine, BudgetingDraft, BudgetingFolder, BudgetingFringe, BudgetingFringeVisibility,
   BudgetingLineRoute, BudgetingSubchapter, CELL_INPUT, DEFAULT_DETAIL_COLUMNS_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_RECEIVED_LABEL, DEFAULT_TEXT_LINE_COLOR, DETAIL_STAT_COLUMN_PX, DetailStatColumnWidth, FringeGroupTarget,
-  BudgetingUnit, DEFAULT_UNITS, clearBudgetingClipboard, computeFringeExtras, computeLineTotal, computeReorder, evaluateFieldExpr,
+  BudgetingUnit, DEFAULT_UNITS, clearBudgetingClipboard, computeFringeExtras, computeLineTotal, evaluateFieldExpr,
   fmtCurrency, fmtDecimal, focusBudgetingRowField, getBudgetingClipboard, groupFringeSumsByFolder, isPlainNumber, lineFringeBreakdown, nextOrderValue, orderAfter, pluralizeUnit, resolveGlobals, setBudgetingClipboard, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import BudgetingFormulaInput from "@/components/BudgetingFormulaInput";
 import BudgetingUnitInput from "@/components/BudgetingUnitInput";
 import BudgetingRowContextMenu, { BudgetingRowContextMenuState } from "@/components/BudgetingRowContextMenu";
+import BudgetingDragHandle from "@/components/BudgetingDragHandle";
+import BudgetingFloatingMenu from "@/components/BudgetingFloatingMenu";
+import { useRowDrag, resolveDragAfterId } from "@/hooks/useRowDrag";
+import { useSlashCommands } from "@/hooks/useSlashCommands";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -55,27 +59,28 @@ function colTemplate(cfg: BudgetingDetailColumnsConfig): string {
   // Tarifa y Total llevan importes con decimales: van un poco más anchas que
   // Cant./Unidad/X, y del mismo ancho entre sí.
   const wide = w + 24;
-  const parts = ["90px", "1fr", `${w}px`, `${w}px`, `${w}px`, `${wide}px`, `${wide}px`];
+  const parts = ["20px", "90px", "1fr", `${w}px`, `${w}px`, `${w}px`, `${wide}px`, `${wide}px`];
   if (cfg.showComment) parts.push("160px");
   if (cfg.showTags) parts.push("160px");
   parts.push("120px");
   return parts.join(" ");
 }
 
-/** Comandos "/" en Descripción de la fila fantasma: mismo mini-menú que BudgetingPhantomRow (ver ahí el porqué). */
-interface PhantomCommand { cmd: string; label: string; hint: string }
-const PHANTOM_COMMANDS: PhantomCommand[] = [
-  { cmd: "texto", label: "Texto", hint: "Nota o separador, sin código ni importe" },
-  { cmd: "subtotal", label: "Subtotal", hint: "Suma las líneas de arriba hasta el subtotal anterior" },
-];
+/** Borde que marca dónde caería la fila arrastrada al soltar (ver useRowDrag). */
+const dragIndicator = (pos: "before" | "after" | null) =>
+  pos === "before" ? "border-t-2 border-[#E86F4A]" : pos === "after" ? "border-b-2 border-[#E86F4A]" : "";
 
+/** Comandos "/" en Descripción de la fila fantasma: mismo mini-menú que BudgetingPhantomRow (ver ahí el porqué). */
 /**
  * Primera línea de un Detalle vacío: Código/Descripción ya editables, sin
  * tener que crearla antes con el menú contextual (ver BudgetingPhantomRow,
  * la versión compartida de Capítulo/Cuenta; esta va aparte porque su grid
  * tiene más columnas y anchos dinámicos vía `template`). No existe en
  * Firestore hasta que se escribe algo y se sale de la celda. Escribir "/" en
- * Descripción abre los mismos comandos rápidos (texto/subtotal).
+ * Descripción abre los mismos comandos rápidos (texto/subtotal). El resto de
+ * columnas enseña ya los valores por defecto de una línea real recién creada
+ * (Cant. 0, X 1, Tarifa 0, Total 0,00): así no se distingue de una añadida
+ * con "Añadir línea" hasta que se empieza a escribir.
  */
 function PhantomLineRow({
   template, columnsConfig, onCreate, onCreateText, onCreateSubtotal, onContextMenu,
@@ -86,10 +91,9 @@ function PhantomLineRow({
 }) {
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
+  const descWrapRef = useRef<HTMLDivElement>(null);
 
-  const isCommand = description.startsWith("/");
-  const commandQuery = isCommand ? description.slice(1).toLowerCase() : "";
-  const matches = isCommand ? PHANTOM_COMMANDS.filter((c) => c.cmd.startsWith(commandQuery)) : [];
+  const { isCommand, matches } = useSlashCommands(description);
   const runCommand = (cmd: string) => {
     setDescription("");
     if (cmd === "texto") onCreateText();
@@ -113,13 +117,14 @@ function PhantomLineRow({
   };
   return (
     <div className="grid gap-0 divide-x divide-slate-200 px-4 bg-white" style={{ gridTemplateColumns: template }} onContextMenu={onContextMenu}>
+      <span />
       <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleCodeKeyDown}
-        placeholder="Código" className={`${CELL_INPUT} font-mono text-xs placeholder:text-slate-300`} />
-      <div className="relative h-full">
+        className={`${CELL_INPUT} font-mono text-xs`} />
+      <div ref={descWrapRef} className="relative h-full">
         <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleDescriptionKeyDown}
-          placeholder="Descripción, o / para texto y subtotal" className={`${CELL_INPUT} text-xs pl-2 placeholder:text-slate-300`} />
+          className={`${CELL_INPUT} text-xs pl-2`} />
         {isCommand && matches.length > 0 && (
-          <div className="absolute z-30 top-full left-0 mt-0.5 w-56 bg-white border border-slate-200 rounded-lg shadow-lg py-1">
+          <BudgetingFloatingMenu anchorRef={descWrapRef} className="w-56 bg-white border border-slate-200 rounded-lg shadow-lg py-1">
             {matches.map((c) => (
               <button
                 key={c.cmd}
@@ -132,14 +137,14 @@ function PhantomLineRow({
                 <span className="text-[10px] text-slate-400">{c.hint}</span>
               </button>
             ))}
-          </div>
+          </BudgetingFloatingMenu>
         )}
       </div>
-      <span className="flex items-center justify-end text-xs text-slate-300 pr-2">—</span>
+      <span className="flex items-center justify-end text-xs pl-2 pr-2">0</span>
       <span />
-      <span className="flex items-center justify-end text-xs text-slate-300 pr-2">—</span>
-      <span className="flex items-center justify-end text-xs text-slate-300 pr-2">—</span>
-      <span />
+      <span className="flex items-center justify-end text-[11px] pl-2 pr-2">1</span>
+      <span className="flex items-center justify-end text-xs pl-2 pr-2">0</span>
+      <span className="flex items-center justify-end text-xs font-semibold pl-2 pr-2">{fmtDecimal(0)}</span>
       {columnsConfig.showComment && <span />}
       {columnsConfig.showTags && <span />}
       <div />
@@ -181,11 +186,11 @@ function SubchapterFringeRow({
 
   return (
     <div className="grid gap-0 divide-x divide-slate-200 px-4 hover:bg-slate-50 group" style={{ gridTemplateColumns: template }}>
+      <span />
       <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} font-mono text-xs`} />
       <input value={label} onChange={(e) => setLabel(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} text-xs pl-2`} />
-      <span />
       <span />
       <span />
       <span />
@@ -231,11 +236,11 @@ function ReceivedTotalRow({
 
   return (
     <div className="grid gap-0 divide-x divide-slate-200 px-4 hover:bg-slate-50 group" style={{ gridTemplateColumns: template }}>
+      <span />
       <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} font-mono text-xs`} />
       <input value={label} onChange={(e) => setLabel(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} text-xs pl-2`} />
-      <span />
       <span />
       <span />
       <span />
@@ -454,14 +459,23 @@ function displayFieldValue(raw: string, key: "units" | "multiplier" | "rate", fo
 // perder el foco (sin botón de confirmar). Componente de módulo estable: no
 // se redefine entre renders, así los inputs no pierden el foco al escribir. ──
 function LineFieldsGrid({
-  fields, displayValues, onChange, onFocusField, onBlurAny, onEscape, globals, units, totalPreview, muted, template, showComment, showTags, autoFocus, indicators, actions,
+  fields, displayValues, onChange, onFocusField, onBlurAny, onEscape, globals, units, totalPreview, muted, template, showComment, showTags, autoFocus, indicators, actions, onDragStart, onDragEnd, onCreateTextAfter, onCreateSubtotalAfter,
 }: {
   fields: LineFields; displayValues: { units: string; multiplier: string; rate: string; unit: string };
   onChange: (patch: Partial<LineFields>) => void; onFocusField: (key: "units" | "multiplier" | "rate" | "unit") => void; onBlurAny: () => void;
   onEscape: () => void; globals: { code: string; label: string }[]; units: { id: string; singular: string }[];
   totalPreview: number; muted: boolean; template: string; showComment: boolean; showTags: boolean; autoFocus?: boolean;
   indicators?: React.ReactNode; actions?: React.ReactNode;
+  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void; onDragEnd: () => void;
+  onCreateTextAfter: () => void; onCreateSubtotalAfter: () => void;
 }) {
+  const descWrapRef = useRef<HTMLDivElement>(null);
+  const { isCommand, matches } = useSlashCommands(fields.description);
+  const runSlashCommand = (cmd: string) => {
+    onChange({ description: "" });
+    if (cmd === "texto") onCreateTextAfter();
+    else if (cmd === "subtotal") onCreateSubtotalAfter();
+  };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       // Mover el foco a la fila de abajo ya dispara el guardado solo (blur
@@ -479,12 +493,46 @@ function LineFieldsGrid({
       onEscape();
     }
   };
+  const handleDescriptionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if ((e.key === "Enter" || e.key === "Tab") && isCommand && matches.length > 0) { e.preventDefault(); runSlashCommand(matches[0].cmd); return; }
+    // Escape con "/" a medio escribir: mismo revert completo que un Escape
+    // normal (onEscape ya deshace todos los campos, no solo la descripción),
+    // así una descripción real que ya hubiera antes de escribir "/" no se
+    // pierde por el camino.
+    handleKeyDown(e);
+  };
+  // Con "/" a medio escribir no se guarda eso como descripción al perder el
+  // foco: o se elige un comando de la lista, o se borra la "/" (igual que en
+  // BudgetingPhantomRow/PhantomLineRow).
+  const handleDescriptionBlur = () => {
+    if (isCommand) { onEscape(); return; }
+    onBlurAny();
+  };
   return (
     <div className="grid gap-0 divide-x divide-slate-200 px-4" style={{ gridTemplateColumns: template }}>
+      <BudgetingDragHandle onDragStart={onDragStart} onDragEnd={onDragEnd} />
       <input autoFocus={autoFocus} value={fields.code} onChange={(e) => onChange({ code: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} font-mono text-xs`} />
-      <input value={fields.description} onChange={(e) => onChange({ description: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} text-xs pl-2`} />
+      <div ref={descWrapRef} className="relative h-full">
+        <input value={fields.description} onChange={(e) => onChange({ description: e.target.value })} onBlur={handleDescriptionBlur} onKeyDown={handleDescriptionKeyDown}
+          className={`${CELL_INPUT} text-xs pl-2`} />
+        {isCommand && matches.length > 0 && (
+          <BudgetingFloatingMenu anchorRef={descWrapRef} className="w-56 bg-white border border-slate-200 rounded-lg shadow-lg py-1">
+            {matches.map((c) => (
+              <button
+                key={c.cmd}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => runSlashCommand(c.cmd)}
+                className="w-full flex flex-col items-start px-2.5 py-1.5 text-left hover:bg-slate-50"
+              >
+                <span className="text-xs font-medium" style={{ color: "#E86F4A" }}>/{c.cmd}</span>
+                <span className="text-[10px] text-slate-400">{c.hint}</span>
+              </button>
+            ))}
+          </BudgetingFloatingMenu>
+        )}
+      </div>
       <BudgetingFormulaInput value={displayValues.units} onChange={(v) => onChange({ units: v })} onFocus={() => onFocusField("units")} onBlur={onBlurAny} onKeyDown={handleKeyDown}
         globals={globals} title="Número o fórmula con Globales" className={`${CELL_INPUT} text-xs text-right pl-2`} />
       <BudgetingUnitInput value={displayValues.unit} onChange={(v) => onChange({ unit: v })} onFocus={() => onFocusField("unit")} onBlur={onBlurAny} onKeyDown={handleKeyDown}
@@ -511,14 +559,18 @@ function LineFieldsGrid({
 }
 
 function LineRow({
-  line, fringes, globals, globalValues, units, columnsConfig, template, isFirst, isLast, autoFocus, error, sidebarOpen, selected,
-  onCommit, onDuplicate, onDelete, onMove, onOpenSidebar, onContextMenu, onRowMouseDown,
+  line, fringes, globals, globalValues, units, columnsConfig, template, autoFocus, error, sidebarOpen, selected, dragOver,
+  onCommit, onDuplicate, onDelete, onOpenSidebar, onContextMenu, onRowMouseDown, onDragStart, onDragOverRow, onDrop, onDragEnd, onCreateTextAfter, onCreateSubtotalAfter,
 }: {
   line: BudgetingDetailLine; fringes: BudgetingFringe[];
   globals: { code: string; label: string }[]; globalValues: Record<string, number>; units: BudgetingUnit[];
-  columnsConfig: BudgetingDetailColumnsConfig; template: string; isFirst: boolean; isLast: boolean; autoFocus?: boolean; error?: string; sidebarOpen: boolean; selected?: boolean;
-  onCommit: (fields: LineFields) => void; onDuplicate: () => void; onDelete: () => void; onMove: (direction: "up" | "down") => void; onOpenSidebar: () => void;
+  columnsConfig: BudgetingDetailColumnsConfig; template: string; autoFocus?: boolean; error?: string; sidebarOpen: boolean; selected?: boolean;
+  dragOver: "before" | "after" | null;
+  onCommit: (fields: LineFields) => void; onDuplicate: () => void; onDelete: () => void; onOpenSidebar: () => void;
   onContextMenu: (e: React.MouseEvent) => void; onRowMouseDown: (e: React.MouseEvent) => void;
+  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void; onDragOverRow: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDrop: (e: React.DragEvent<HTMLDivElement>) => void; onDragEnd: () => void;
+  onCreateTextAfter: () => void; onCreateSubtotalAfter: () => void;
 }) {
   const [fields, setFields] = useState<LineFields>(() => toFields(line));
   // Mientras se edita un campo con fórmula/Global, se ve y se toca el texto
@@ -545,7 +597,14 @@ function LineRow({
   );
 
   return (
-    <div data-budget-row className={`group ${selected ? "bg-[#E86F4A]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+    <div
+      data-budget-row
+      className={`group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`}
+      onContextMenu={onContextMenu}
+      onMouseDown={onRowMouseDown}
+      onDragOver={onDragOverRow}
+      onDrop={onDrop}
+    >
       <LineFieldsGrid
         fields={fields}
         displayValues={displayValues}
@@ -561,6 +620,10 @@ function LineRow({
         showComment={columnsConfig.showComment}
         showTags={columnsConfig.showTags}
         autoFocus={autoFocus}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onCreateTextAfter={onCreateTextAfter}
+        onCreateSubtotalAfter={onCreateSubtotalAfter}
         indicators={
           (hasFormula || hasHiddenComment) && (
             <span className="flex items-center gap-1">
@@ -571,12 +634,6 @@ function LineRow({
         }
         actions={
           <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
-              <ChevronUp size={11} />
-            </button>
-            <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
-              <ChevronDown size={11} />
-            </button>
             <button onClick={onOpenSidebar} className={`relative p-1 rounded transition-colors ${sidebarOpen ? "text-[#E86F4A] bg-[#E86F4A]/[0.1]" : "text-slate-400 hover:text-[#E86F4A] hover:bg-[#E86F4A]/[0.1]"}`} title="Cargas sociales y Sumar en">
               <SlidersHorizontal size={11} />
               {hasFringesOrRoute && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full" style={{ background: "#E86F4A" }} />}
@@ -606,11 +663,13 @@ function LineRow({
 // acciones en su columna habitual, para que la fila siga alineada con las
 // demás pese al ancho de columnas dinámico. ────────────────────────────────
 function TextLineRow({
-  line, template, columnsConfig, isFirst, isLast, subtotalValue, autoFocus, selected, onCommitTextLine, onMove, onDelete, onContextMenu, onRowMouseDown,
+  line, template, columnsConfig, dragOver, subtotalValue, autoFocus, selected, onCommitTextLine, onDelete, onContextMenu, onRowMouseDown, onDragStart, onDragOverRow, onDrop, onDragEnd,
 }: {
-  line: BudgetingDetailLine; template: string; columnsConfig: BudgetingDetailColumnsConfig; isFirst: boolean; isLast: boolean; subtotalValue?: number; autoFocus?: boolean; selected?: boolean;
+  line: BudgetingDetailLine; template: string; columnsConfig: BudgetingDetailColumnsConfig; dragOver: "before" | "after" | null; subtotalValue?: number; autoFocus?: boolean; selected?: boolean;
   onCommitTextLine: (patch: { description?: string; textBold?: boolean; textColor?: string }) => void;
-  onMove: (direction: "up" | "down") => void; onDelete: () => void; onContextMenu: (e: React.MouseEvent) => void; onRowMouseDown: (e: React.MouseEvent) => void;
+  onDelete: () => void; onContextMenu: (e: React.MouseEvent) => void; onRowMouseDown: (e: React.MouseEvent) => void;
+  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void; onDragOverRow: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDrop: (e: React.DragEvent<HTMLDivElement>) => void; onDragEnd: () => void;
 }) {
   const isSubtotal = !!line.isSubtotal;
   const [description, setDescription] = useState(line.description);
@@ -624,12 +683,21 @@ function TextLineRow({
     else if (e.key === "ArrowUp") { e.preventDefault(); focusBudgetingRowField(e.currentTarget, "up"); }
     else if (e.key === "Escape") setDescription(line.description);
   };
-  let actionsCol = 8;
+  let actionsCol = 9;
   if (columnsConfig.showComment) actionsCol++;
   if (columnsConfig.showTags) actionsCol++;
 
   return (
-    <div data-budget-row className={`grid gap-0 divide-x divide-slate-200 px-4 group ${selected ? "bg-[#E86F4A]/[0.08]" : ""}`} style={{ gridTemplateColumns: template }} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+    <div
+      data-budget-row
+      className={`grid gap-0 divide-x divide-slate-200 px-4 group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`}
+      style={{ gridTemplateColumns: template }}
+      onContextMenu={onContextMenu}
+      onMouseDown={onRowMouseDown}
+      onDragOver={onDragOverRow}
+      onDrop={onDrop}
+    >
+      <BudgetingDragHandle onDragStart={onDragStart} onDragEnd={onDragEnd} />
       <input
         autoFocus={autoFocus}
         value={description}
@@ -637,13 +705,13 @@ function TextLineRow({
         onBlur={commit}
         onKeyDown={handleKeyDown}
         placeholder={isSubtotal ? "Subtotal" : "Texto"}
-        style={{ gridColumn: isSubtotal ? "1 / 7" : "1 / 8", color: line.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: line.textBold ? 700 : 400 }}
+        style={{ gridColumn: isSubtotal ? "2 / 8" : "2 / 9", color: line.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: line.textBold ? 700 : 400 }}
         className={`${CELL_INPUT} text-xs`}
       />
       {isSubtotal && (
         <span
           className="flex items-center justify-end text-xs pl-2 pr-2"
-          style={{ gridColumn: "7 / 8", color: line.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: line.textBold ? 700 : 400 }}
+          style={{ gridColumn: "8 / 9", color: line.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: line.textBold ? 700 : 400 }}
         >
           {fmtDecimal(subtotalValue || 0)}
         </span>
@@ -652,12 +720,6 @@ function TextLineRow({
         className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity"
         style={{ gridColumn: `${actionsCol} / ${actionsCol + 1}` }}
       >
-        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
-          <ChevronUp size={11} />
-        </button>
-        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
-          <ChevronDown size={11} />
-        </button>
         <button onClick={onDelete} className="p-1 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar línea">
           <Trash2 size={11} />
         </button>
@@ -928,10 +990,11 @@ export default function BudgetingSubchapterPage() {
     return Math.round(sum * 100) / 100;
   };
 
-  const handleMoveLine = async (line: BudgetingDetailLine, direction: "up" | "down") => {
-    const swaps = computeReorder(lines, line.id, direction);
-    if (!swaps) return;
-    await Promise.all(swaps.map((s) => updateDoc(lineRef(s.id), { order: s.order })));
+  const lineDrag = useRowDrag();
+  const handleReorderLine = async (lineId: string, afterId: string | null) => {
+    const siblings = sortByOrder(lines.filter((l) => l.id !== lineId));
+    const order = orderAfter(siblings, afterId);
+    await updateDoc(lineRef(lineId), { order });
     await touchDraft();
   };
 
@@ -1287,6 +1350,7 @@ export default function BudgetingSubchapterPage() {
       <div className="border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">
         <div className="min-w-[720px]">
           <div className="grid gap-0 divide-x divide-slate-200 px-4 border-b border-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60" style={{ gridTemplateColumns: template }}>
+            <span />
             <span className="flex items-center py-2" title="Referencial: el código que se asigna en PO/facturas de Accounting es el del subcapítulo">ID</span>
             <span className="flex items-center py-2 pl-2">Descripción</span>
             <span className="flex items-center justify-center py-2 pl-2">Cant.</span>
@@ -1360,16 +1424,24 @@ export default function BudgetingSubchapterPage() {
                     line={line}
                     template={template}
                     columnsConfig={columnsConfig}
-                    isFirst={i === 0}
-                    isLast={i === sorted.length - 1}
+                    dragOver={lineDrag.dragOver?.id === line.id ? lineDrag.dragOver.position : null}
                     autoFocus={line.id === justAddedId}
                     selected={selectedLineIds.has(line.id)}
                     subtotalValue={line.isSubtotal ? lineSubtotalValue(line.id) : undefined}
                     onCommitTextLine={(patch) => handleCommitTextLine(line, patch)}
-                    onMove={(direction) => handleMoveLine(line, direction)}
                     onDelete={() => setDeleteTarget(deleteTargetsFor(line))}
                     onContextMenu={(e) => openLineMenu(line, e)}
                     onRowMouseDown={(e) => handleRowMouseDown(line, sorted, e)}
+                    onDragStart={lineDrag.onDragStart(line.id)}
+                    onDragOverRow={lineDrag.onDragOverRow(line.id)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (lineDrag.draggedId && lineDrag.draggedId !== line.id) {
+                        handleReorderLine(lineDrag.draggedId, resolveDragAfterId(sorted, lineDrag.dragOver));
+                      }
+                      lineDrag.reset();
+                    }}
+                    onDragEnd={lineDrag.reset}
                   />
                 ) : (
                   <LineRow
@@ -1382,18 +1454,28 @@ export default function BudgetingSubchapterPage() {
                     columnsConfig={columnsConfig}
                     template={template}
                     error={rowErrors[line.id]}
-                    isFirst={i === 0}
-                    isLast={i === sorted.length - 1}
+                    dragOver={lineDrag.dragOver?.id === line.id ? lineDrag.dragOver.position : null}
                     autoFocus={line.id === justAddedId}
                     selected={selectedLineIds.has(line.id)}
                     sidebarOpen={sidebarOpen && sidebarLineId === line.id}
                     onCommit={(fields) => handleCommitLine(line, fields)}
                     onDuplicate={() => handleDuplicateLine(line)}
                     onDelete={() => setDeleteTarget(deleteTargetsFor(line))}
-                    onMove={(direction) => handleMoveLine(line, direction)}
+                    onCreateTextAfter={() => handleInsertLine(line.id, "text")}
+                    onCreateSubtotalAfter={() => handleInsertLine(line.id, "subtotal")}
                     onOpenSidebar={() => openSidebar(line.id)}
                     onContextMenu={(e) => openLineMenu(line, e)}
                     onRowMouseDown={(e) => handleRowMouseDown(line, sorted, e)}
+                    onDragStart={lineDrag.onDragStart(line.id)}
+                    onDragOverRow={lineDrag.onDragOverRow(line.id)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (lineDrag.draggedId && lineDrag.draggedId !== line.id) {
+                        handleReorderLine(lineDrag.draggedId, resolveDragAfterId(sorted, lineDrag.dragOver));
+                      }
+                      lineDrag.reset();
+                    }}
+                    onDragEnd={lineDrag.reset}
                   />
                 )
               );

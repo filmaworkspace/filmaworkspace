@@ -1,7 +1,7 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -10,18 +10,22 @@ import { db } from "@/lib/firebase";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp, updateDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, Search, Trash2 } from "lucide-react";
+import { AlertCircle, ChevronRight, Search, Trash2 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
   BudgetingAccount, BudgetingDetailLine, BudgetingDraft, BudgetingFolder, BudgetingFringe, BudgetingFringeVisibility, BudgetingSubchapter, FringeGroupTarget,
-  CELL_INPUT, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, clearBudgetingClipboard, computeReorder, fmtCurrency, focusBudgetingRowField, getBudgetingClipboard, groupFringeSumsByFolder, orderAfter, setBudgetingClipboard, sortByOrder, subchapterTotal,
+  CELL_INPUT, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, clearBudgetingClipboard, fmtCurrency, focusBudgetingRowField, getBudgetingClipboard, groupFringeSumsByFolder, orderAfter, setBudgetingClipboard, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import BudgetingColumnsMenu from "@/components/BudgetingColumnsMenu";
 import BudgetingFringeLineRow from "@/components/BudgetingFringeLineRow";
 import BudgetingRowContextMenu, { BudgetingRowContextMenuState } from "@/components/BudgetingRowContextMenu";
 import BudgetingPhantomRow from "@/components/BudgetingPhantomRow";
+import BudgetingDragHandle from "@/components/BudgetingDragHandle";
+import BudgetingFloatingMenu from "@/components/BudgetingFloatingMenu";
+import { useRowDrag, resolveDragAfterId } from "@/hooks/useRowDrag";
+import { useSlashCommands } from "@/hooks/useSlashCommands";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -29,7 +33,9 @@ type DeleteTarget = { subchapterId: string; label: string };
 // Array siempre (aunque sea de una sola Cuenta), para poder borrar toda la
 // selección múltiple de una vez, igual que copiar/cortar.
 type DeleteTargets = DeleteTarget[];
-const cols = "grid-cols-[26px_100px_1fr_100px_58px]";
+const cols = "grid-cols-[20px_26px_100px_1fr_100px_40px]";
+const dragIndicator = (pos: "before" | "after" | null) =>
+  pos === "before" ? "border-t-2 border-[#E86F4A]" : pos === "after" ? "border-b-2 border-[#E86F4A]" : "";
 
 /** Todo lo que hace falta para recrear una Cuenta entera al copiarla/cortarla: sus líneas de Detalle. */
 interface SubLineClipboardData {
@@ -47,15 +53,20 @@ interface SubClipboardData {
 // sin placeholder, guarda sola al perder el foco. Componente de módulo
 // estable: no se redefine entre renders, así los inputs no pierden el foco. ──
 function SubRow({
-  sub, draftId, accountId, fmt, total, subtotalValue, isFirst, isLast, autoFocus, selected, onCommit, onCommitTextLine, onMove, onDelete, onContextMenu, onRowMouseDown,
+  sub, draftId, accountId, fmt, total, subtotalValue, autoFocus, selected, dragOver,
+  onCommit, onCommitTextLine, onDragStart, onDragOverRow, onDrop, onDragEnd, onDelete, onCreateTextAfter, onCreateSubtotalAfter, onContextMenu, onRowMouseDown,
 }: {
-  sub: BudgetingSubchapter; draftId: string; accountId: string; fmt: (n: number) => string; total: number; subtotalValue?: number; isFirst: boolean; isLast: boolean; autoFocus?: boolean; selected?: boolean;
+  sub: BudgetingSubchapter; draftId: string; accountId: string; fmt: (n: number) => string; total: number; subtotalValue?: number; autoFocus?: boolean; selected?: boolean;
+  dragOver: "before" | "after" | null;
   onCommit: (code: string, description: string) => void;
   onCommitTextLine: (patch: { description?: string; textBold?: boolean; textColor?: string }) => void;
-  onMove: (direction: "up" | "down") => void; onDelete: () => void; onContextMenu: (e: React.MouseEvent) => void; onRowMouseDown: (e: React.MouseEvent) => void;
+  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void; onDragOverRow: (e: React.DragEvent<HTMLDivElement>) => void; onDrop: (e: React.DragEvent<HTMLDivElement>) => void; onDragEnd: () => void;
+  onDelete: () => void; onCreateTextAfter: () => void; onCreateSubtotalAfter: () => void;
+  onContextMenu: (e: React.MouseEvent) => void; onRowMouseDown: (e: React.MouseEvent) => void;
 }) {
   const [code, setCode] = useState(sub.code);
   const [description, setDescription] = useState(sub.description);
+  const descWrapRef = useRef<HTMLDivElement>(null);
 
   // Las filas ya existen desde que se crean (botón "+ Añadir línea" o clic
   // derecho), así que cada campo se guarda por su cuenta al salir de la
@@ -67,6 +78,26 @@ function SubRow({
     else if (e.key === "ArrowDown") { e.preventDefault(); focusBudgetingRowField(e.currentTarget, "down"); }
     else if (e.key === "ArrowUp") { e.preventDefault(); focusBudgetingRowField(e.currentTarget, "up"); }
     else if (e.key === "Escape") { setCode(sub.code); setDescription(sub.description); }
+  };
+
+  // Comandos "/" en Descripción: solo se disparan cuando "/" es lo primero
+  // que hay en el campo (ver useSlashCommands).
+  const { isCommand, matches } = useSlashCommands(description);
+  const runSlashCommand = (cmd: string) => {
+    setDescription("");
+    if (cmd === "texto") onCreateTextAfter();
+    else if (cmd === "subtotal") onCreateSubtotalAfter();
+  };
+  const handleDescriptionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if ((e.key === "Enter" || e.key === "Tab") && isCommand && matches.length > 0) { e.preventDefault(); runSlashCommand(matches[0].cmd); return; }
+    // Escape con "/" a medio escribir: mismo revert completo que un Escape
+    // normal, así una descripción real que ya hubiera antes de escribir "/"
+    // no se pierde por el camino.
+    handleKeyDown(e);
+  };
+  const handleDescriptionBlur = () => {
+    if (isCommand) { setDescription(sub.description); return; }
+    commit();
   };
 
   if (sub.isTextLine || sub.isSubtotal) {
@@ -82,7 +113,8 @@ function SubRow({
       else if (e.key === "Escape") setDescription(sub.description);
     };
     return (
-      <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#E86F4A]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+      <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown} onDragOver={onDragOverRow} onDrop={onDrop}>
+        <BudgetingDragHandle onDragStart={onDragStart} onDragEnd={onDragEnd} />
         <span />
         <input
           autoFocus={autoFocus}
@@ -91,7 +123,7 @@ function SubRow({
           onBlur={commitText}
           onKeyDown={handleTextKeyDown}
           placeholder={isSubtotal ? "Subtotal" : "Texto"}
-          style={{ gridColumn: isSubtotal ? "2 / 4" : "2 / 5", color: sub.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: sub.textBold ? 700 : 400 }}
+          style={{ gridColumn: isSubtotal ? "3 / 5" : "3 / 6", color: sub.textColor || DEFAULT_TEXT_LINE_COLOR, fontWeight: sub.textBold ? 700 : 400 }}
           className={`${CELL_INPUT} text-xs pl-2`}
         />
         {isSubtotal && (
@@ -99,13 +131,7 @@ function SubRow({
             {fmt(subtotalValue || 0)}
           </span>
         )}
-        <span className="flex items-center justify-end gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
-            <ChevronUp size={11} />
-          </button>
-          <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
-            <ChevronDown size={11} />
-          </button>
+        <span className="flex items-center justify-end pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <button onClick={onDelete} className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar línea">
             <Trash2 size={11} />
           </button>
@@ -115,22 +141,35 @@ function SubRow({
   }
 
   return (
-    <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#E86F4A]/[0.08]" : ""}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+    <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown} onDragOver={onDragOverRow} onDrop={onDrop}>
+      <BudgetingDragHandle onDragStart={onDragStart} onDragEnd={onDragEnd} />
       <Link href={`/budgeting/${draftId}/accounts/${accountId}/subchapters/${sub.id}`} className="flex items-center justify-center" title="Entrar">
         <ChevronRight size={13} className="text-slate-300 group-hover:text-[#E86F4A] group-hover:translate-x-0.5 transition-all" />
       </Link>
       <input autoFocus={autoFocus} value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} font-mono text-xs pl-2`} />
-      <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} text-xs pl-2`} />
+      <div ref={descWrapRef} className="relative h-full">
+        <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={handleDescriptionBlur} onKeyDown={handleDescriptionKeyDown}
+          className={`${CELL_INPUT} text-xs pl-2`} />
+        {isCommand && matches.length > 0 && (
+          <BudgetingFloatingMenu anchorRef={descWrapRef} className="w-56 bg-white border border-slate-200 rounded-lg shadow-lg py-1">
+            {matches.map((c) => (
+              <button
+                key={c.cmd}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => runSlashCommand(c.cmd)}
+                className="w-full flex flex-col items-start px-2.5 py-1.5 text-left hover:bg-slate-50"
+              >
+                <span className="text-xs font-medium" style={{ color: "#E86F4A" }}>/{c.cmd}</span>
+                <span className="text-[10px] text-slate-400">{c.hint}</span>
+              </button>
+            ))}
+          </BudgetingFloatingMenu>
+        )}
+      </div>
       <span className="flex items-center justify-end text-xs font-medium text-slate-700 pr-2">{fmt(total)}</span>
-      <span className="flex items-center justify-end gap-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Subir">
-          <ChevronUp size={11} />
-        </button>
-        <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 text-slate-300 hover:text-[#E86F4A] rounded transition-colors disabled:opacity-20 disabled:pointer-events-none" title="Bajar">
-          <ChevronDown size={11} />
-        </button>
+      <span className="flex items-center justify-end pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
         <button onClick={onDelete} className="p-0.5 text-slate-300 hover:text-red-500 rounded transition-colors" title="Borrar subcapítulo">
           <Trash2 size={11} />
         </button>
@@ -310,10 +349,11 @@ export default function BudgetingChapterPage() {
     return Math.round(sum * 100) / 100;
   };
 
-  const handleMoveSub = async (sub: BudgetingSubchapter, direction: "up" | "down") => {
-    const swaps = computeReorder(subchapters, sub.id, direction);
-    if (!swaps) return;
-    await Promise.all(swaps.map((s) => updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`, s.id), { order: s.order })));
+  const subDrag = useRowDrag();
+  const handleReorderSub = async (subId: string, afterId: string | null) => {
+    const siblings = subchapters.filter((s) => s.id !== subId);
+    const order = orderAfter(siblings, afterId);
+    await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`, subId), { order });
     await touchDraft();
   };
 
@@ -550,6 +590,7 @@ export default function BudgetingChapterPage() {
       <div className="border border-slate-200 rounded-2xl overflow-hidden">
         <div className={`grid ${cols} gap-0 px-3 border-b border-slate-200 divide-x divide-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
           <span></span>
+          <span></span>
           <span className="flex items-center py-2 pl-2">Código</span>
           <span className="flex items-center py-2 pl-2">Descripción</span>
           <span className="flex items-center justify-end py-2 pr-2">Total</span>
@@ -570,6 +611,7 @@ export default function BudgetingChapterPage() {
               return !q ? (
                 <BudgetingPhantomRow
                   cols={cols}
+                  fmt={fmt}
                   onCreate={handleCreateSubFromPhantom}
                   onCreateText={() => handleInsertSub(null, "text")}
                   onCreateSubtotal={() => handleInsertSub(null, "subtotal")}
@@ -581,7 +623,7 @@ export default function BudgetingChapterPage() {
                 />
               ) : null;
             }
-            return sorted.map((sub, i) => (
+            return sorted.map((sub) => (
               <SubRow
                 key={sub.id}
                 sub={sub}
@@ -590,15 +632,25 @@ export default function BudgetingChapterPage() {
                 fmt={fmt}
                 total={subTotal(sub)}
                 subtotalValue={sub.isSubtotal ? subSubtotalValue(sub.id) : undefined}
-                isFirst={i === 0}
-                isLast={i === sorted.length - 1}
                 autoFocus={sub.id === justAddedId}
                 selected={selectedSubIds.has(sub.id)}
+                dragOver={subDrag.dragOver?.id === sub.id ? subDrag.dragOver.position : null}
                 onRowMouseDown={(e) => handleSubMouseDown(sub, sorted, e)}
                 onCommit={(code, description) => handleCommitSub(sub, code, description)}
                 onCommitTextLine={(patch) => handleCommitTextSub(sub, patch)}
-                onMove={(direction) => handleMoveSub(sub, direction)}
+                onDragStart={subDrag.onDragStart(sub.id)}
+                onDragOverRow={subDrag.onDragOverRow(sub.id)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (subDrag.draggedId && subDrag.draggedId !== sub.id) {
+                    handleReorderSub(subDrag.draggedId, resolveDragAfterId(sorted, subDrag.dragOver));
+                  }
+                  subDrag.reset();
+                }}
+                onDragEnd={subDrag.reset}
                 onDelete={() => setDeleteTarget(deleteTargetsFor(sub, sorted))}
+                onCreateTextAfter={() => handleInsertSub(sub.id, "text")}
+                onCreateSubtotalAfter={() => handleInsertSub(sub.id, "subtotal")}
                 onContextMenu={(e) => openSubMenu(sub, sorted, e)}
               />
             ));
@@ -628,6 +680,7 @@ export default function BudgetingChapterPage() {
         )}
 
         <div className={`grid ${cols} gap-1 items-center px-3 py-2.5 border-t border-slate-200 bg-slate-50/70`}>
+          <span />
           <span />
           <span />
           <span className="text-xs font-bold pl-2" style={{ color: "#1D201F" }}>Total</span>
