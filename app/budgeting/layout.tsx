@@ -35,11 +35,11 @@ export default function BudgetingLayout({ children }: { children: React.ReactNod
       >
         {(isLoading || !user) && (
           <Image
-            src="/logo-budgeting-text.svg"
+            src="/logo-budgeting.svg"
             alt="Budgeting"
-            width={368}
-            height={48}
-            className="w-64 h-auto animate-budgetingLogoIn"
+            width={82}
+            height={24}
+            className="h-6 w-auto"
             priority
           />
         )}

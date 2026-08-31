@@ -1103,6 +1103,7 @@ export default function BudgetingTopPage() {
       )}
 
       {/* Budget */}
+      <h2 className="text-sm font-semibold mb-2" style={{ color: "#1D201F" }}>Top Sheet</h2>
       <div className="border border-slate-200 rounded-2xl overflow-hidden">
         <div className={`grid ${cols} gap-0 pl-3 pr-3 border-b border-slate-200 divide-x divide-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50/60`}>
           <span></span>
