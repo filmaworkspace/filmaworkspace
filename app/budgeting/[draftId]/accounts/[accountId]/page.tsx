@@ -54,13 +54,13 @@ interface SubClipboardData {
 // estable: no se redefine entre renders, así los inputs no pierden el foco. ──
 function SubRow({
   sub, draftId, accountId, fmt, total, subtotalValue, autoFocus, selected, dragOver,
-  onCommit, onCommitTextLine, onDragStart, onDragOverRow, onDrop, onDragEnd, onDelete, onCreateTextAfter, onCreateSubtotalAfter, onContextMenu, onRowMouseDown,
+  onCommit, onCommitTextLine, onHandleMouseDown, onDelete, onCreateTextAfter, onCreateSubtotalAfter, onContextMenu, onRowMouseDown,
 }: {
   sub: BudgetingSubchapter; draftId: string; accountId: string; fmt: (n: number) => string; total: number; subtotalValue?: number; autoFocus?: boolean; selected?: boolean;
   dragOver: "before" | "after" | null;
   onCommit: (code: string, description: string) => void;
   onCommitTextLine: (patch: { description?: string; textBold?: boolean; textColor?: string }) => void;
-  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void; onDragOverRow: (e: React.DragEvent<HTMLDivElement>) => void; onDrop: (e: React.DragEvent<HTMLDivElement>) => void; onDragEnd: () => void;
+  onHandleMouseDown: (e: React.MouseEvent) => void;
   onDelete: () => void; onCreateTextAfter: () => void; onCreateSubtotalAfter: () => void;
   onContextMenu: (e: React.MouseEvent) => void; onRowMouseDown: (e: React.MouseEvent) => void;
 }) {
@@ -113,8 +113,8 @@ function SubRow({
       else if (e.key === "Escape") setDescription(sub.description);
     };
     return (
-      <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown} onDragOver={onDragOverRow} onDrop={onDrop}>
-        <BudgetingDragHandle onDragStart={onDragStart} onDragEnd={onDragEnd} />
+      <div data-budget-row data-drag-row-id={sub.id} className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+        <BudgetingDragHandle onMouseDown={onHandleMouseDown} />
         <span className="!border-l-0" />
         <input
           autoFocus={autoFocus}
@@ -141,8 +141,8 @@ function SubRow({
   }
 
   return (
-    <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown} onDragOver={onDragOverRow} onDrop={onDrop}>
-      <BudgetingDragHandle onDragStart={onDragStart} onDragEnd={onDragEnd} />
+    <div data-budget-row data-drag-row-id={sub.id} className={`grid ${cols} gap-0 divide-x divide-slate-200 px-3 hover:bg-slate-50 group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+      <BudgetingDragHandle onMouseDown={onHandleMouseDown} />
       <Link href={`/budgeting/${draftId}/accounts/${accountId}/subchapters/${sub.id}`} className="flex items-center justify-center !border-l-0" title="Entrar">
         <ChevronRight size={13} className="text-slate-300 group-hover:text-[#E86F4A] group-hover:translate-x-0.5 transition-all" />
       </Link>
@@ -349,13 +349,14 @@ export default function BudgetingChapterPage() {
     return Math.round(sum * 100) / 100;
   };
 
-  const subDrag = useRowDrag();
-  const handleReorderSub = async (subId: string, afterId: string | null) => {
-    const siblings = subchapters.filter((s) => s.id !== subId);
+  const subDrag = useRowDrag(async (subId, dragOver) => {
+    if (!dragOver) return;
+    const siblings = sortByOrder(subchapters.filter((s) => s.id !== subId));
+    const afterId = resolveDragAfterId(siblings, subId, dragOver);
     const order = orderAfter(siblings, afterId);
     await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts/${accountId}/subchapters`, subId), { order });
     await touchDraft();
-  };
+  });
 
   // ── Copiar/cortar/pegar una o varias Cuentas enteras, con sus líneas de
   // Detalle (misma simplificación que Capítulos: no se preserva `routedTo`
@@ -638,16 +639,7 @@ export default function BudgetingChapterPage() {
                 onRowMouseDown={(e) => handleSubMouseDown(sub, sorted, e)}
                 onCommit={(code, description) => handleCommitSub(sub, code, description)}
                 onCommitTextLine={(patch) => handleCommitTextSub(sub, patch)}
-                onDragStart={subDrag.onDragStart(sub.id)}
-                onDragOverRow={subDrag.onDragOverRow(sub.id)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (subDrag.draggedId && subDrag.draggedId !== sub.id) {
-                    handleReorderSub(subDrag.draggedId, resolveDragAfterId(sorted, subDrag.draggedId, subDrag.dragOver));
-                  }
-                  subDrag.reset();
-                }}
-                onDragEnd={subDrag.reset}
+                onHandleMouseDown={subDrag.onHandleMouseDown(sub.id)}
                 onDelete={() => setDeleteTarget(deleteTargetsFor(sub, sorted))}
                 onCreateTextAfter={() => handleInsertSub(sub.id, "text")}
                 onCreateSubtotalAfter={() => handleInsertSub(sub.id, "subtotal")}

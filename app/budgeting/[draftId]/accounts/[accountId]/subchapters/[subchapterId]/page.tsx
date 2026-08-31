@@ -459,14 +459,14 @@ function displayFieldValue(raw: string, key: "units" | "multiplier" | "rate", fo
 // perder el foco (sin botón de confirmar). Componente de módulo estable: no
 // se redefine entre renders, así los inputs no pierden el foco al escribir. ──
 function LineFieldsGrid({
-  fields, displayValues, onChange, onFocusField, onBlurAny, onEscape, globals, units, totalPreview, muted, template, showComment, showTags, autoFocus, indicators, actions, onDragStart, onDragEnd, onCreateTextAfter, onCreateSubtotalAfter,
+  fields, displayValues, onChange, onFocusField, onBlurAny, onEscape, globals, units, totalPreview, muted, template, showComment, showTags, autoFocus, indicators, actions, onHandleMouseDown, onCreateTextAfter, onCreateSubtotalAfter,
 }: {
   fields: LineFields; displayValues: { units: string; multiplier: string; rate: string; unit: string };
   onChange: (patch: Partial<LineFields>) => void; onFocusField: (key: "units" | "multiplier" | "rate" | "unit") => void; onBlurAny: () => void;
   onEscape: () => void; globals: { code: string; label: string }[]; units: { id: string; singular: string }[];
   totalPreview: number; muted: boolean; template: string; showComment: boolean; showTags: boolean; autoFocus?: boolean;
   indicators?: React.ReactNode; actions?: React.ReactNode;
-  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void; onDragEnd: () => void;
+  onHandleMouseDown: (e: React.MouseEvent) => void;
   onCreateTextAfter: () => void; onCreateSubtotalAfter: () => void;
 }) {
   const descWrapRef = useRef<HTMLDivElement>(null);
@@ -510,7 +510,7 @@ function LineFieldsGrid({
   };
   return (
     <div className="grid gap-0 divide-x divide-slate-200 px-4" style={{ gridTemplateColumns: template }}>
-      <BudgetingDragHandle onDragStart={onDragStart} onDragEnd={onDragEnd} />
+      <BudgetingDragHandle onMouseDown={onHandleMouseDown} />
       <input autoFocus={autoFocus} value={fields.code} onChange={(e) => onChange({ code: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} font-mono text-xs !border-l-0`} />
       <div ref={descWrapRef} className="relative h-full">
@@ -560,7 +560,7 @@ function LineFieldsGrid({
 
 function LineRow({
   line, fringes, globals, globalValues, units, columnsConfig, template, autoFocus, error, sidebarOpen, selected, dragOver,
-  onCommit, onDuplicate, onDelete, onOpenSidebar, onContextMenu, onRowMouseDown, onDragStart, onDragOverRow, onDrop, onDragEnd, onCreateTextAfter, onCreateSubtotalAfter,
+  onCommit, onDuplicate, onDelete, onOpenSidebar, onContextMenu, onRowMouseDown, onHandleMouseDown, onCreateTextAfter, onCreateSubtotalAfter,
 }: {
   line: BudgetingDetailLine; fringes: BudgetingFringe[];
   globals: { code: string; label: string }[]; globalValues: Record<string, number>; units: BudgetingUnit[];
@@ -568,8 +568,7 @@ function LineRow({
   dragOver: "before" | "after" | null;
   onCommit: (fields: LineFields) => void; onDuplicate: () => void; onDelete: () => void; onOpenSidebar: () => void;
   onContextMenu: (e: React.MouseEvent) => void; onRowMouseDown: (e: React.MouseEvent) => void;
-  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void; onDragOverRow: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDrop: (e: React.DragEvent<HTMLDivElement>) => void; onDragEnd: () => void;
+  onHandleMouseDown: (e: React.MouseEvent) => void;
   onCreateTextAfter: () => void; onCreateSubtotalAfter: () => void;
 }) {
   const [fields, setFields] = useState<LineFields>(() => toFields(line));
@@ -599,11 +598,10 @@ function LineRow({
   return (
     <div
       data-budget-row
+      data-drag-row-id={line.id}
       className={`group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`}
       onContextMenu={onContextMenu}
       onMouseDown={onRowMouseDown}
-      onDragOver={onDragOverRow}
-      onDrop={onDrop}
     >
       <LineFieldsGrid
         fields={fields}
@@ -620,8 +618,7 @@ function LineRow({
         showComment={columnsConfig.showComment}
         showTags={columnsConfig.showTags}
         autoFocus={autoFocus}
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
+        onHandleMouseDown={onHandleMouseDown}
         onCreateTextAfter={onCreateTextAfter}
         onCreateSubtotalAfter={onCreateSubtotalAfter}
         indicators={
@@ -663,13 +660,12 @@ function LineRow({
 // acciones en su columna habitual, para que la fila siga alineada con las
 // demás pese al ancho de columnas dinámico. ────────────────────────────────
 function TextLineRow({
-  line, template, columnsConfig, dragOver, subtotalValue, autoFocus, selected, onCommitTextLine, onDelete, onContextMenu, onRowMouseDown, onDragStart, onDragOverRow, onDrop, onDragEnd,
+  line, template, columnsConfig, dragOver, subtotalValue, autoFocus, selected, onCommitTextLine, onDelete, onContextMenu, onRowMouseDown, onHandleMouseDown,
 }: {
   line: BudgetingDetailLine; template: string; columnsConfig: BudgetingDetailColumnsConfig; dragOver: "before" | "after" | null; subtotalValue?: number; autoFocus?: boolean; selected?: boolean;
   onCommitTextLine: (patch: { description?: string; textBold?: boolean; textColor?: string }) => void;
   onDelete: () => void; onContextMenu: (e: React.MouseEvent) => void; onRowMouseDown: (e: React.MouseEvent) => void;
-  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void; onDragOverRow: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDrop: (e: React.DragEvent<HTMLDivElement>) => void; onDragEnd: () => void;
+  onHandleMouseDown: (e: React.MouseEvent) => void;
 }) {
   const isSubtotal = !!line.isSubtotal;
   const [description, setDescription] = useState(line.description);
@@ -690,14 +686,13 @@ function TextLineRow({
   return (
     <div
       data-budget-row
+      data-drag-row-id={line.id}
       className={`grid gap-0 divide-x divide-slate-200 px-4 group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`}
       style={{ gridTemplateColumns: template }}
       onContextMenu={onContextMenu}
       onMouseDown={onRowMouseDown}
-      onDragOver={onDragOverRow}
-      onDrop={onDrop}
     >
-      <BudgetingDragHandle onDragStart={onDragStart} onDragEnd={onDragEnd} />
+      <BudgetingDragHandle onMouseDown={onHandleMouseDown} />
       <input
         autoFocus={autoFocus}
         value={description}
@@ -990,13 +985,14 @@ export default function BudgetingSubchapterPage() {
     return Math.round(sum * 100) / 100;
   };
 
-  const lineDrag = useRowDrag();
-  const handleReorderLine = async (lineId: string, afterId: string | null) => {
+  const lineDrag = useRowDrag(async (lineId, dragOver) => {
+    if (!dragOver) return;
     const siblings = sortByOrder(lines.filter((l) => l.id !== lineId));
+    const afterId = resolveDragAfterId(siblings, lineId, dragOver);
     const order = orderAfter(siblings, afterId);
     await updateDoc(lineRef(lineId), { order });
     await touchDraft();
-  };
+  });
 
   const handleDuplicateLine = async (line: BudgetingDetailLine) => {
     setSaving(true);
@@ -1432,16 +1428,7 @@ export default function BudgetingSubchapterPage() {
                     onDelete={() => setDeleteTarget(deleteTargetsFor(line))}
                     onContextMenu={(e) => openLineMenu(line, e)}
                     onRowMouseDown={(e) => handleRowMouseDown(line, sorted, e)}
-                    onDragStart={lineDrag.onDragStart(line.id)}
-                    onDragOverRow={lineDrag.onDragOverRow(line.id)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      if (lineDrag.draggedId && lineDrag.draggedId !== line.id) {
-                        handleReorderLine(lineDrag.draggedId, resolveDragAfterId(sorted, lineDrag.draggedId, lineDrag.dragOver));
-                      }
-                      lineDrag.reset();
-                    }}
-                    onDragEnd={lineDrag.reset}
+                    onHandleMouseDown={lineDrag.onHandleMouseDown(line.id)}
                   />
                 ) : (
                   <LineRow
@@ -1466,16 +1453,7 @@ export default function BudgetingSubchapterPage() {
                     onOpenSidebar={() => openSidebar(line.id)}
                     onContextMenu={(e) => openLineMenu(line, e)}
                     onRowMouseDown={(e) => handleRowMouseDown(line, sorted, e)}
-                    onDragStart={lineDrag.onDragStart(line.id)}
-                    onDragOverRow={lineDrag.onDragOverRow(line.id)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      if (lineDrag.draggedId && lineDrag.draggedId !== line.id) {
-                        handleReorderLine(lineDrag.draggedId, resolveDragAfterId(sorted, lineDrag.draggedId, lineDrag.dragOver));
-                      }
-                      lineDrag.reset();
-                    }}
-                    onDragEnd={lineDrag.reset}
+                    onHandleMouseDown={lineDrag.onHandleMouseDown(line.id)}
                   />
                 )
               );

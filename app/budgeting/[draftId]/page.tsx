@@ -71,13 +71,13 @@ interface ChapterClipboardData {
 // estables: no se redefinen entre renders, así los inputs no pierden el foco. ──
 function ChapterRow({
   chapter, draftId, fmt, total, subtotalValue, autoFocus, selected, dragOver,
-  onCommit, onCommitTextLine, onDragStart, onDragOverRow, onDrop, onDragEnd, onDelete, onCreateTextAfter, onCreateSubtotalAfter, onContextMenu, onRowMouseDown,
+  onCommit, onCommitTextLine, onHandleMouseDown, onDelete, onCreateTextAfter, onCreateSubtotalAfter, onContextMenu, onRowMouseDown,
 }: {
   chapter: BudgetingAccount; draftId: string; fmt: (n: number) => string; total: number; subtotalValue?: number; autoFocus?: boolean; selected?: boolean;
   dragOver: "before" | "after" | null;
   onCommit: (code: string, description: string) => void;
   onCommitTextLine: (patch: { description?: string; textBold?: boolean; textColor?: string }) => void;
-  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void; onDragOverRow: (e: React.DragEvent<HTMLDivElement>) => void; onDrop: (e: React.DragEvent<HTMLDivElement>) => void; onDragEnd: () => void;
+  onHandleMouseDown: (e: React.MouseEvent) => void;
   onDelete: () => void; onCreateTextAfter: () => void; onCreateSubtotalAfter: () => void;
   onContextMenu: (e: React.MouseEvent) => void; onRowMouseDown: (e: React.MouseEvent) => void;
 }) {
@@ -131,8 +131,8 @@ function ChapterRow({
       else if (e.key === "Escape") setDescription(chapter.description);
     };
     return (
-      <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown} onDragOver={onDragOverRow} onDrop={onDrop}>
-        <BudgetingDragHandle onDragStart={onDragStart} onDragEnd={onDragEnd} />
+      <div data-budget-row data-drag-row-id={chapter.id} className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+        <BudgetingDragHandle onMouseDown={onHandleMouseDown} />
         <span className="!border-l-0" />
         <input
           autoFocus={autoFocus}
@@ -159,8 +159,8 @@ function ChapterRow({
   }
 
   return (
-    <div data-budget-row className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown} onDragOver={onDragOverRow} onDrop={onDrop}>
-      <BudgetingDragHandle onDragStart={onDragStart} onDragEnd={onDragEnd} />
+    <div data-budget-row data-drag-row-id={chapter.id} className={`grid ${cols} gap-0 divide-x divide-slate-200 pl-3 pr-3 hover:bg-white group ${selected ? "bg-[#E86F4A]/[0.08]" : ""} ${dragIndicator(dragOver)}`} onContextMenu={onContextMenu} onMouseDown={onRowMouseDown}>
+      <BudgetingDragHandle onMouseDown={onHandleMouseDown} />
       <Link href={`/budgeting/${draftId}/accounts/${chapter.id}`} className="flex items-center justify-center !border-l-0" title="Entrar">
         <ChevronRight size={13} className="text-slate-300 group-hover:text-[#E86F4A] group-hover:translate-x-0.5 transition-all" />
       </Link>
@@ -651,14 +651,21 @@ export default function BudgetingTopPage() {
 
   // Arrastrar y soltar (ver hooks/useRowDrag.ts): solo hay que tocar el
   // documento arrastrado, `orderAfter` calcula un hueco entre sus nuevos
-  // vecinos sin reescribir el `order` de nadie más.
-  const chapterDrag = useRowDrag();
-  const handleReorderChapter = async (chapterId: string, category: string | null, afterId: string | null) => {
+  // vecinos sin reescribir el `order` de nadie más. Un único callback para
+  // toda la página (no uno por categoría) porque el hook ya no necesita que
+  // cada fila traiga su propio onDrop: la categoría del capítulo arrastrado
+  // se mira aquí mismo a partir de su id.
+  const chapterDrag = useRowDrag(async (chapterId, dragOver) => {
+    if (!dragOver) return;
+    const chapter = chapters.find((c) => c.id === chapterId);
+    if (!chapter) return;
+    const category = chapter.category;
     const siblings = chaptersByCategory(category).filter((c) => c.id !== chapterId);
+    const afterId = resolveDragAfterId(siblings, chapterId, dragOver);
     const order = orderAfter(siblings, afterId);
     await updateDoc(doc(db, `budgetingDrafts/${draftId}/accounts`, chapterId), { order });
     await touchDraft();
-  };
+  });
 
   // ── Copiar/cortar/pegar uno o varios Capítulos enteros, con sus Cuentas y
   // líneas de Detalle (mismo árbol que handleDuplicateDraft, incluida la
@@ -1143,16 +1150,7 @@ export default function BudgetingTopPage() {
                         dragOver={chapterDrag.dragOver?.id === chapter.id ? chapterDrag.dragOver.position : null}
                         onCommit={(code, description) => handleCommitChapter(chapter, code, description)}
                         onCommitTextLine={(patch) => handleCommitTextChapter(chapter, patch)}
-                        onDragStart={chapterDrag.onDragStart(chapter.id)}
-                        onDragOverRow={chapterDrag.onDragOverRow(chapter.id)}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          if (chapterDrag.draggedId && chapterDrag.draggedId !== chapter.id) {
-                            handleReorderChapter(chapterDrag.draggedId, cat.id, resolveDragAfterId(catChapters, chapterDrag.draggedId, chapterDrag.dragOver));
-                          }
-                          chapterDrag.reset();
-                        }}
-                        onDragEnd={chapterDrag.reset}
+                        onHandleMouseDown={chapterDrag.onHandleMouseDown(chapter.id)}
                         onDelete={() => setDeleteTarget(deleteTargetsFor(chapter, catChapters))}
                         onCreateTextAfter={() => handleInsertChapter(chapter.id, cat.id, "text")}
                         onCreateSubtotalAfter={() => handleInsertChapter(chapter.id, cat.id, "subtotal")}
@@ -1249,16 +1247,7 @@ export default function BudgetingTopPage() {
                     dragOver={chapterDrag.dragOver?.id === chapter.id ? chapterDrag.dragOver.position : null}
                     onCommit={(code, description) => handleCommitChapter(chapter, code, description)}
                     onCommitTextLine={(patch) => handleCommitTextChapter(chapter, patch)}
-                    onDragStart={chapterDrag.onDragStart(chapter.id)}
-                    onDragOverRow={chapterDrag.onDragOverRow(chapter.id)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      if (chapterDrag.draggedId && chapterDrag.draggedId !== chapter.id) {
-                        handleReorderChapter(chapterDrag.draggedId, null, resolveDragAfterId(flatSorted, chapterDrag.draggedId, chapterDrag.dragOver));
-                      }
-                      chapterDrag.reset();
-                    }}
-                    onDragEnd={chapterDrag.reset}
+                    onHandleMouseDown={chapterDrag.onHandleMouseDown(chapter.id)}
                     onDelete={() => setDeleteTarget(deleteTargetsFor(chapter, flatSorted))}
                     onCreateTextAfter={() => handleInsertChapter(chapter.id, null, "text")}
                     onCreateSubtotalAfter={() => handleInsertChapter(chapter.id, null, "subtotal")}
