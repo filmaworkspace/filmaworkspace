@@ -14,15 +14,15 @@ import {
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  AlertCircle, Building2, BookmarkPlus, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Download, FileDown, FileSpreadsheet,
-  FileText, FolderOutput, History, MoreHorizontal, Search, Share2, Trash2, X,
+  AlertCircle, BookmarkPlus, Check, ChevronDown, ChevronRight, ChevronUp, Copy, FileDown,
+  FolderOutput, History, MoreHorizontal, Search, Share2, Trash2, X,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import {
   BTN_LIGHT, BTN_LIGHT_ACTIVE, BudgetingDraft, BudgetingCategoryDef, BudgetingAccount, BudgetingSubchapter, BudgetingDetailLine, BudgetingExportConfig, BudgetingFolder, BudgetingFringe, BudgetingFringeVisibility, BudgetingProjectInfo, FringeGroupTarget,
-  CELL_INPUT, DEFAULT_EXPORT_CONFIG, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, DEFAULT_UNITS, PDF_FONT_SIZE_LABELS, PDF_LANGUAGE_LABELS, PdfFontSize, PdfLanguage, categoriesEnabled, clearBudgetingClipboard, computeLineTotalForScenario, computeReorder, effectiveLineUnits, focusBudgetingRowField, getBudgetingClipboard, groupFringeSumsByFolder, orderAfter, resolveCategories, resolveGlobals, setBudgetingClipboard, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
+  CELL_INPUT, DEFAULT_FRINGE_VISIBILITY, DEFAULT_TEXT_LINE_COLOR, DEFAULT_UNITS, normalizeExportConfig, categoriesEnabled, clearBudgetingClipboard, computeLineTotalForScenario, computeReorder, effectiveLineUnits, focusBudgetingRowField, getBudgetingClipboard, groupFringeSumsByFolder, orderAfter, resolveCategories, resolveGlobals, setBudgetingClipboard, fmtCurrency, ICON_BTN_LIGHT, sortByOrder, subchapterTotal,
 } from "@/lib/budgeting";
 import { buildFwbFromDraft, downloadFwb } from "@/lib/budgetingExport";
 import { downloadBudgetExcel, downloadBudgetPdf } from "@/lib/budgetingReports";
@@ -32,6 +32,7 @@ import BudgetingRowContextMenu, { BudgetingRowContextMenuState } from "@/compone
 import BudgetLevelMappingChoice, { BudgetSubaccountLevel } from "@/components/BudgetLevelMappingChoice";
 import BudgetingShareModal from "@/components/BudgetingShareModal";
 import BudgetingPhantomRow from "@/components/BudgetingPhantomRow";
+import BudgetingReportsModal from "@/components/BudgetingReportsModal";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -201,15 +202,10 @@ export default function BudgetingTopPage() {
   const [snapshotLabel, setSnapshotLabel] = useState("");
   const [savingSnapshot, setSavingSnapshot] = useState(false);
 
-  // Exportar: un solo botón desplegable con las descargas (.fwb/Excel/PDF) y,
-  // debajo, la configuración (portada, paginación, campos) de ese mismo menú.
-  const [exportPanelOpen, setExportPanelOpen] = useState(false);
-  const exportPanelRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => { if (exportPanelRef.current && !exportPanelRef.current.contains(e.target as Node)) setExportPanelOpen(false); };
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, []);
+  // Reportes: modal único para configurar y descargar Portada/Top
+  // Sheet/Detalle (PDF), Excel y .fwb — reemplaza el desplegable "Exportar"
+  // de siempre, que apretaba toda esa configuración en un popover pequeño.
+  const [showReportsModal, setShowReportsModal] = useState(false);
 
   // "···" Más acciones: agrupa lo que antes eran 5 iconos sueltos (plantilla,
   // versiones, guardar versión, duplicar) para no saturar la barra superior;
@@ -520,26 +516,17 @@ export default function BudgetingTopPage() {
     }
   };
 
-  const exportConfig: BudgetingExportConfig = draft?.exportConfig || DEFAULT_EXPORT_CONFIG;
-  const updateExportConfig = async (patch: { coverSheet?: boolean; pageBreakPerChapter?: boolean; pdfFontSize?: PdfFontSize; pdfLanguage?: PdfLanguage; hideZeroTotalSubchapters?: boolean; fields?: Partial<BudgetingExportConfig["fields"]> }) => {
+  const exportConfig: BudgetingExportConfig = normalizeExportConfig(draft?.exportConfig);
+  const updateExportConfig = async (patch: Partial<Omit<BudgetingExportConfig, "fields">> & { fields?: Partial<BudgetingExportConfig["fields"]> }) => {
     const next: BudgetingExportConfig = { ...exportConfig, ...patch, fields: { ...exportConfig.fields, ...(patch.fields || {}) } };
     await updateDoc(doc(db, "budgetingDrafts", draftId), { exportConfig: next, updatedAt: serverTimestamp() });
   };
 
-  // ── Datos de producción para la portada del PDF (ver lib/budgetingReports.ts) ──
+  // ── Datos de producción para la portada del PDF (ver lib/budgetingReports.ts
+  // y BudgetingReportsModal, que trae su propio formulario/estado local). ──
   const projectInfo: BudgetingProjectInfo = draft?.projectInfo || {};
-  const [showProjectInfoModal, setShowProjectInfoModal] = useState(false);
-  const [projectInfoForm, setProjectInfoForm] = useState<BudgetingProjectInfo>({});
-  const openProjectInfoModal = () => { setProjectInfoForm(projectInfo); setShowProjectInfoModal(true); };
-  const [savingProjectInfo, setSavingProjectInfo] = useState(false);
-  const handleSaveProjectInfo = async () => {
-    setSavingProjectInfo(true);
-    try {
-      await updateDoc(doc(db, "budgetingDrafts", draftId), { projectInfo: projectInfoForm, updatedAt: serverTimestamp() });
-      setShowProjectInfoModal(false);
-    } finally {
-      setSavingProjectInfo(false);
-    }
+  const handleSaveProjectInfo = async (info: BudgetingProjectInfo) => {
+    await updateDoc(doc(db, "budgetingDrafts", draftId), { projectInfo: info, updatedAt: serverTimestamp() });
   };
 
   // ── Snapshots / versiones: foto congelada del árbol, sin duplicar el borrador ──
@@ -986,91 +973,11 @@ export default function BudgetingTopPage() {
           )}
 
           <div className="flex items-center gap-1 flex-shrink-0">
-            {/* Exportar: un solo botón, el desplegable trae las descargas y su configuración */}
-            <div ref={exportPanelRef} className="relative">
-              <button onClick={() => setExportPanelOpen((o) => !o)} className={`p-1.5 rounded-lg ${ICON_BTN_LIGHT}`} title="Exportar">
-                <FileDown size={14} />
-              </button>
-              {exportPanelOpen && (
-                <div className="absolute z-30 top-full right-0 mt-1 w-64 bg-white border border-slate-200 rounded-xl shadow-lg p-3.5 space-y-3">
-                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Descargar</p>
-                  <div className="space-y-0.5">
-                    <button onClick={handleExportPdf} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-slate-50">
-                      <FileText size={13} className="text-slate-400" /> PDF
-                    </button>
-                    <button onClick={handleExportExcel} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-slate-50">
-                      <FileSpreadsheet size={13} className="text-slate-400" /> Excel
-                    </button>
-                    <button onClick={handleExportFwb} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-slate-50">
-                      <Download size={13} className="text-slate-400" /> Archivo .fwb
-                    </button>
-                  </div>
-                  <div className="border-t border-slate-100 pt-2.5">
-                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mb-1.5">Configuración Excel / PDF</p>
-                    <label className="flex items-center justify-between gap-2 mb-1.5">
-                      <span className="text-xs text-slate-700">Top Sheet (portada)</span>
-                      <input type="checkbox" checked={exportConfig.coverSheet} onChange={(e) => updateExportConfig({ coverSheet: e.target.checked })} className="accent-[#E86F4A]" />
-                    </label>
-                    <label className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-slate-700">Salto de página por capítulo</span>
-                      <input type="checkbox" checked={exportConfig.pageBreakPerChapter} onChange={(e) => updateExportConfig({ pageBreakPerChapter: e.target.checked })} className="accent-[#E86F4A]" />
-                    </label>
-                  </div>
-                  <div className="border-t border-slate-100 pt-2.5">
-                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mb-1.5">Campos visibles</p>
-                    <div className="space-y-1.5">
-                      {([["unit", "Unidad"], ["notes", "Comentario"], ["tags", "Etiquetas"]] as const).map(([key, label]) => (
-                        <label key={key} className="flex items-center justify-between gap-2">
-                          <span className="text-xs text-slate-700">{label}</span>
-                          <input type="checkbox" checked={exportConfig.fields[key]} onChange={(e) => updateExportConfig({ fields: { [key]: e.target.checked } as Partial<BudgetingExportConfig["fields"]> })} className="accent-[#E86F4A]" />
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="border-t border-slate-100 pt-2.5 space-y-2">
-                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">PDF</p>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-slate-700">Tamaño de letra</span>
-                      <div className="flex items-center gap-0.5 p-0.5 border border-slate-200 rounded-lg bg-slate-50">
-                        {(["small", "normal", "large"] as PdfFontSize[]).map((size) => (
-                          <button
-                            key={size}
-                            onClick={() => updateExportConfig({ pdfFontSize: size })}
-                            className={`px-2 py-1 rounded-md text-[10.5px] font-medium transition-colors ${exportConfig.pdfFontSize === size ? BTN_LIGHT_ACTIVE : "text-slate-500 hover:text-slate-700"}`}
-                          >
-                            {PDF_FONT_SIZE_LABELS[size]}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-slate-700">Idioma</span>
-                      <div className="flex items-center gap-0.5 p-0.5 border border-slate-200 rounded-lg bg-slate-50">
-                        {(["es", "en"] as PdfLanguage[]).map((lang) => (
-                          <button
-                            key={lang}
-                            onClick={() => updateExportConfig({ pdfLanguage: lang })}
-                            className={`px-2 py-1 rounded-md text-[10.5px] font-medium transition-colors ${exportConfig.pdfLanguage === lang ? BTN_LIGHT_ACTIVE : "text-slate-500 hover:text-slate-700"}`}
-                          >
-                            {PDF_LANGUAGE_LABELS[lang]}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <label className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-slate-700">Ocultar Cuentas con total 0€</span>
-                      <input type="checkbox" checked={exportConfig.hideZeroTotalSubchapters} onChange={(e) => updateExportConfig({ hideZeroTotalSubchapters: e.target.checked })} className="accent-[#E86F4A]" />
-                    </label>
-                    <button
-                      onClick={() => { setExportPanelOpen(false); openProjectInfoModal(); }}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-slate-50 border border-slate-200"
-                    >
-                      <Building2 size={13} className="text-slate-400" /> Datos de producción
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* Reportes: configurar y descargar Portada/Top Sheet/Detalle (PDF), Excel y .fwb */}
+            <button onClick={() => setShowReportsModal(true)} className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg ${BTN_LIGHT}`} title="Reportes">
+              <FileDown size={13} />
+              Reportes
+            </button>
 
             {/* "···" Más acciones: Guardar como plantilla, Versiones, Guardar versión, Duplicar */}
             <div ref={moreMenuRef} className="relative">
@@ -1434,142 +1341,19 @@ export default function BudgetingTopPage() {
         </div>
       )}
 
-      {/* ── Datos de producción (portada del PDF) ────────────────────────── */}
-      {showProjectInfoModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-semibold text-slate-900">Datos de producción</h3>
-              <button onClick={() => setShowProjectInfoModal(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
-                <X size={15} />
-              </button>
-            </div>
-            <div className="px-5 py-4 space-y-3">
-              <p className="text-xs text-slate-500">Aparecen en la portada del PDF exportado. Se quedan guardados en este presupuesto, no hace falta rellenarlos cada vez.</p>
-
-              <div>
-                <label className="text-xs font-medium text-slate-700 block mb-1.5">Título de producción</label>
-                <input
-                  value={projectInfoForm.title || ""}
-                  onChange={(e) => setProjectInfoForm((f) => ({ ...f, title: e.target.value }))}
-                  placeholder={draft.name}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-slate-700 block mb-1.5">Formato</label>
-                <div className="flex items-center gap-0.5 p-0.5 border border-slate-200 rounded-lg bg-slate-50 w-fit">
-                  {(["Película", "Serie"] as const).map((opt) => (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => setProjectInfoForm((f) => ({ ...f, format: opt }))}
-                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${projectInfoForm.format === opt ? BTN_LIGHT_ACTIVE : "text-slate-500 hover:text-slate-700"}`}
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-                {projectInfoForm.format === "Serie" ? (
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    <input
-                      value={projectInfoForm.episodeCount || ""}
-                      onChange={(e) => setProjectInfoForm((f) => ({ ...f, episodeCount: e.target.value }))}
-                      placeholder="Nº de capítulos"
-                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
-                    />
-                    <input
-                      value={projectInfoForm.episodeDuration || ""}
-                      onChange={(e) => setProjectInfoForm((f) => ({ ...f, episodeDuration: e.target.value }))}
-                      placeholder="Duración de los capítulos"
-                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
-                    />
-                  </div>
-                ) : projectInfoForm.format === "Película" ? (
-                  <input
-                    value={projectInfoForm.filmDuration || ""}
-                    onChange={(e) => setProjectInfoForm((f) => ({ ...f, filmDuration: e.target.value }))}
-                    placeholder="Duración de la película"
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 mt-2"
-                  />
-                ) : null}
-              </div>
-
-              {([
-                ["version", "Versión #", "v1"],
-                ["dateLabel", "Fecha presupuesto", "Se usa la de hoy si se deja en blanco"],
-                ["scriptDate", "Guion fechado", "p.ej. 3ª versión, 12/03"],
-                ["director", "Dirección", ""],
-              ] as const).map(([key, label, placeholder]) => (
-                <div key={key}>
-                  <label className="text-xs font-medium text-slate-700 block mb-1.5">{label}</label>
-                  <input
-                    value={projectInfoForm[key] || ""}
-                    onChange={(e) => setProjectInfoForm((f) => ({ ...f, [key]: e.target.value }))}
-                    placeholder={placeholder}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
-                  />
-                </div>
-              ))}
-
-              {/* Fechas de rodaje: texto libre igual que el resto (rara vez es una fecha exacta sola) */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1.5">Inicio rodaje</label>
-                  <input
-                    value={projectInfoForm.startDate || ""}
-                    onChange={(e) => setProjectInfoForm((f) => ({ ...f, startDate: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1.5">Fin rodaje</label>
-                  <input
-                    value={projectInfoForm.endDate || ""}
-                    onChange={(e) => setProjectInfoForm((f) => ({ ...f, endDate: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
-                  />
-                </div>
-              </div>
-
-              {([
-                ["post", "Postproducción", ""],
-                ["preparedBy", "Preparado por", ""],
-              ] as const).map(([key, label, placeholder]) => (
-                <div key={key}>
-                  <label className="text-xs font-medium text-slate-700 block mb-1.5">{label}</label>
-                  <input
-                    value={projectInfoForm[key] || ""}
-                    onChange={(e) => setProjectInfoForm((f) => ({ ...f, [key]: e.target.value }))}
-                    placeholder={placeholder}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
-                  />
-                </div>
-              ))}
-
-              <div>
-                <label className="text-xs font-medium text-slate-700 block mb-1.5">Notas</label>
-                <textarea
-                  value={projectInfoForm.notes || ""}
-                  onChange={(e) => setProjectInfoForm((f) => ({ ...f, notes: e.target.value }))}
-                  placeholder="Cualquier otra información importante para la portada"
-                  rows={3}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 resize-none"
-                />
-              </div>
-            </div>
-            <div className="px-5 py-3 border-t border-slate-100 flex gap-2">
-              <button onClick={() => setShowProjectInfoModal(false)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
-                Cancelar
-              </button>
-              <button onClick={handleSaveProjectInfo} disabled={savingProjectInfo} className={`flex-1 py-2.5 rounded-xl text-sm font-medium disabled:opacity-40 ${BTN_LIGHT}`}>
-                {savingProjectInfo ? "Guardando..." : "Guardar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <BudgetingReportsModal
+        open={showReportsModal}
+        onClose={() => setShowReportsModal(false)}
+        draftName={draft.name}
+        currency={currency}
+        exportConfig={exportConfig}
+        onUpdateExportConfig={updateExportConfig}
+        projectInfo={projectInfo}
+        onSaveProjectInfo={handleSaveProjectInfo}
+        onDownloadPdf={handleExportPdf}
+        onDownloadExcel={handleExportExcel}
+        onDownloadFwb={handleExportFwb}
+      />
 
       {/* ── Send to project modal ────────────────────────────────────────── */}
       {showSendModal && (
