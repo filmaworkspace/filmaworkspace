@@ -39,11 +39,22 @@ export function useRowDrag() {
   return { draggedId, dragOver, onDragStart, onDragOverRow, reset };
 }
 
-/** A partir de dónde se soltó (antes/después de qué fila) y la lista ya ordenada, calcula el id tras el que debe quedar la fila arrastrada (null = al principio). */
-export function resolveDragAfterId(sortedSiblings: { id: string }[], dragOver: DragOverState): string | null {
+/**
+ * A partir de dónde se soltó (antes/después de qué fila) y la lista ya
+ * ordenada, calcula el id tras el que debe quedar la fila arrastrada (null =
+ * al principio). `sortedSiblings` puede venir con la propia fila arrastrada
+ * todavía dentro (así lo pasan las páginas, es la misma lista que ya usan
+ * para renderizar) — se filtra aquí antes de calcular el índice: si no, al
+ * soltar "antes" de la fila que ya está justo después de la arrastrada, el
+ * índice anterior caía sobre la propia fila arrastrada (que `orderAfter` no
+ * encuentra porque `handleReorder*` sí la excluye de sus `siblings`), y el
+ * reordenamiento se iba a cualquier otro sitio en vez de al de al lado.
+ */
+export function resolveDragAfterId(sortedSiblings: { id: string }[], draggedId: string | null, dragOver: DragOverState): string | null {
   if (!dragOver) return null;
   if (dragOver.position === "after") return dragOver.id;
-  const idx = sortedSiblings.findIndex((s) => s.id === dragOver.id);
+  const siblings = draggedId ? sortedSiblings.filter((s) => s.id !== draggedId) : sortedSiblings;
+  const idx = siblings.findIndex((s) => s.id === dragOver.id);
   if (idx <= 0) return null;
-  return sortedSiblings[idx - 1].id;
+  return siblings[idx - 1].id;
 }
