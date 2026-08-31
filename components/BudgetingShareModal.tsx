@@ -13,6 +13,7 @@ import { AlertCircle, Check, Search, Share2, X } from "lucide-react";
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import { BTN_LIGHT, BudgetingSharedWithEntry } from "@/lib/budgeting";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Compartir un presupuesto con otro usuario de Filma Workspace: envía una
@@ -36,6 +37,8 @@ export default function BudgetingShareModal({
   const [sendingUid, setSendingUid] = useState<string | null>(null);
   const [sentUids, setSentUids] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
+
+  useBodyScrollLock(open);
 
   useEffect(() => {
     if (!open || !user) return;

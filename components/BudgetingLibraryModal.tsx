@@ -13,6 +13,7 @@ import BudgetingGlobalsPanel from "@/components/BudgetingGlobalsPanel";
 import BudgetingSettingsList from "@/components/BudgetingSettingsList";
 import BudgetingUnitsPanel from "@/components/BudgetingUnitsPanel";
 import BudgetingVersionsPanel from "@/components/BudgetingVersionsPanel";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 const ACCENT = "#E86F4A";
 
@@ -43,6 +44,8 @@ export default function BudgetingLibraryModal({
   draftId: string; open: boolean; initialTab?: BudgetingLibraryTab; onClose: () => void;
 }) {
   const [tab, setTab] = useState<BudgetingLibraryTab>(initialTab);
+
+  useBodyScrollLock(open);
 
   useEffect(() => { if (open) setTab(initialTab); }, [open, initialTab]);
 

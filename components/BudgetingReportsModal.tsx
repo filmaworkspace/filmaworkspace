@@ -13,6 +13,7 @@ import {
   BTN_LIGHT, BTN_LIGHT_ACTIVE, BudgetingExportConfig, BudgetingProjectInfo,
   PDF_FONT_SIZE_LABELS, PDF_LANGUAGE_LABELS, PdfFontSize, PdfLanguage,
 } from "@/lib/budgeting";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 const ACCENT = "#E86F4A";
 
@@ -54,13 +55,10 @@ interface Props {
 // guardada en el borrador: no hay que rehacerla cada vez que se exporta.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ToggleRow({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
+function ToggleRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <div className="flex items-center justify-between gap-4 border border-slate-200 rounded-2xl px-5 py-3.5">
-      <div>
-        <p className="text-sm font-medium text-slate-900">{label}</p>
-        {hint && <p className="text-xs text-slate-400 mt-0.5">{hint}</p>}
-      </div>
+      <p className="text-sm font-medium text-slate-900">{label}</p>
       <button
         onClick={() => onChange(!checked)}
         className="w-9 h-5 rounded-full transition-colors relative flex-shrink-0"
@@ -125,7 +123,15 @@ export default function BudgetingReportsModal({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => { if (open) { setForm(projectInfo); setTab("cover"); setSaved(false); } }, [open, projectInfo]);
+  useBodyScrollLock(open);
+
+  // Solo al ABRIR el modal, no en cada re-render mientras está abierto: `projectInfo`
+  // llega como objeto nuevo cada vez que se refresca `draft` (p.ej. al tocar
+  // cualquier ajuste, incluidos los de este mismo modal, que también escriben en
+  // el borrador) — si `projectInfo` estuviera en las dependencias, cada cambio
+  // reiniciaba el formulario a medio escribir y saltaba de vuelta a "Portada".
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (open) { setForm(projectInfo); setTab("cover"); setSaved(false); } }, [open]);
 
   if (!open) return null;
 
@@ -179,12 +185,10 @@ export default function BudgetingReportsModal({
               <>
                 <ToggleRow
                   label="Incluir Portada en el PDF"
-                  hint="Título, datos de producción y notas, en su propia página."
                   checked={exportConfig.includeCoverSheet}
                   onChange={(v) => onUpdateExportConfig({ includeCoverSheet: v })}
                 />
                 <div className="space-y-3.5">
-                  <p className="text-xs text-slate-400">Se quedan guardados en este presupuesto — no hace falta rellenarlos cada vez que se exporta.</p>
                   <Field label="Productora" value={form.productionCompany || ""} onChange={(v) => set({ productionCompany: v })} />
                   <div>
                     <label className="text-xs font-medium text-slate-700 block mb-1.5">Formato</label>
@@ -229,13 +233,9 @@ export default function BudgetingReportsModal({
               <>
                 <ToggleRow
                   label="Incluir Top Sheet en el PDF"
-                  hint="Resumen de capítulos con su total, agrupados por categoría."
                   checked={exportConfig.includeTopSheet}
                   onChange={(v) => onUpdateExportConfig({ includeTopSheet: v })}
                 />
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Es la vista de una página del presupuesto entero: cada capítulo con su total, sin bajar a Cuentas ni líneas de Detalle. Para eso está la pestaña Detalle.
-                </p>
               </>
             )}
 
@@ -243,19 +243,16 @@ export default function BudgetingReportsModal({
               <>
                 <ToggleRow
                   label="Incluir Detalle en el PDF"
-                  hint="Desglose completo: Capítulo → Cuenta → línea, con Cantidad/Unidad/X/Tarifa."
                   checked={exportConfig.includeDetail}
                   onChange={(v) => onUpdateExportConfig({ includeDetail: v })}
                 />
                 <ToggleRow
                   label="Salto de página por capítulo"
-                  hint="Cada capítulo empieza en una página nueva, en vez de seguir corrido."
                   checked={exportConfig.pageBreakPerChapter}
                   onChange={(v) => onUpdateExportConfig({ pageBreakPerChapter: v })}
                 />
                 <ToggleRow
                   label="Ocultar Cuentas con total 0€"
-                  hint="No dibuja las Cuentas vacías; los Capítulos y líneas sueltas no se ven afectados."
                   checked={exportConfig.hideZeroTotalSubchapters}
                   onChange={(v) => onUpdateExportConfig({ hideZeroTotalSubchapters: v })}
                 />
@@ -268,9 +265,6 @@ export default function BudgetingReportsModal({
 
             {tab === "excel" && (
               <>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  El Excel siempre sale a nivel de línea de Detalle (una fila por línea), con Categoría/Capítulo/Cuenta como columnas propias. No lleva Portada ni Top Sheet — para eso está el PDF.
-                </p>
                 <div>
                   <p className="text-xs font-medium text-slate-400 mb-2">Campos visibles</p>
                   <FieldsChecklist fields={exportConfig.fields} onChange={(patch) => onUpdateExportConfig({ fields: patch })} />
@@ -282,12 +276,10 @@ export default function BudgetingReportsModal({
               <>
                 <div>
                   <p className="text-xs font-medium text-slate-700 mb-1.5">Tamaño de letra</p>
-                  <p className="text-xs text-slate-400 mb-2">Solo afecta al PDF: escala portada, tablas y totales juntos.</p>
                   <Segmented options={(["small", "normal", "large"] as PdfFontSize[]).map((v) => ({ value: v, label: PDF_FONT_SIZE_LABELS[v] }))} value={exportConfig.pdfFontSize} onChange={(v) => onUpdateExportConfig({ pdfFontSize: v })} />
                 </div>
                 <div>
                   <p className="text-xs font-medium text-slate-700 mb-1.5">Idioma</p>
-                  <p className="text-xs text-slate-400 mb-2">Traduce las etiquetas fijas del PDF (encabezados, "Total"...); lo escrito en el presupuesto no se traduce.</p>
                   <Segmented options={(["es", "en"] as PdfLanguage[]).map((v) => ({ value: v, label: PDF_LANGUAGE_LABELS[v] }))} value={exportConfig.pdfLanguage} onChange={(v) => onUpdateExportConfig({ pdfLanguage: v })} />
                 </div>
               </>

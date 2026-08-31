@@ -183,6 +183,7 @@ interface PdfI18n {
   director: string; producer: string; preparedBy: string; notes: string;
   scriptDate: string; startDate: string; endDate: string; post: string; productionCompany: string;
   issuedOn: (date: string, time: string) => string;
+  pageOf: (current: number, total: number) => string;
   dateLocale: string;
   total: string; grandTotal: string; subtotalFallback: string;
   totalChapter: (code: string) => string;
@@ -196,6 +197,7 @@ const PDF_I18N: Record<PdfLanguage, PdfI18n> = {
     director: "Dirección", producer: "Producción", preparedBy: "Preparado por", notes: "Notas",
     scriptDate: "Guion fechado", startDate: "Inicio rodaje", endDate: "Fin rodaje", post: "Postproducción", productionCompany: "Productora",
     issuedOn: (date, time) => `Emitido el ${date} a las ${time}`,
+    pageOf: (current, total) => `Página ${current} de ${total}`,
     dateLocale: "es-ES",
     total: "Total", grandTotal: "TOTAL PRESUPUESTO", subtotalFallback: "Subtotal",
     totalChapter: (code) => `Total capítulo ${code}`,
@@ -208,6 +210,7 @@ const PDF_I18N: Record<PdfLanguage, PdfI18n> = {
     director: "Director", producer: "Producer", preparedBy: "Prepared by", notes: "Notes",
     scriptDate: "Script dated", startDate: "Start date", endDate: "End date", post: "Post", productionCompany: "Production Company",
     issuedOn: (date, time) => `Issued on ${date} at ${time}`,
+    pageOf: (current, total) => `Page ${current} of ${total}`,
     dateLocale: "en-US",
     total: "Total", grandTotal: "TOTAL BUDGET", subtotalFallback: "Subtotal",
     totalChapter: (code) => `Chapter ${code} total`,
@@ -238,7 +241,7 @@ export function buildBudgetPdf(p: BudgetReportParams): FilmaPDF {
   const fringes = p.fringes || [];
   const fringeFolders = p.fringeFolders || [];
   const info = p.projectInfo || {};
-  const doc = new FilmaPDF({ accent: "budgeting", docRef: info.title || p.draftName, footerBrand: "FW Budgeting" });
+  const doc = new FilmaPDF({ accent: "budgeting", docRef: info.title || p.draftName, footerBrand: "FW Budgeting", footerPageLabel: t.pageOf });
   doc.y = doc.margin;
 
   const left = doc.margin;

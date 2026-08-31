@@ -53,6 +53,8 @@ export interface FilmaPdfOptions {
   docRef?: string;
   /** Marca del pie de página; por defecto "Hecho con Filma Workspace". Cada módulo puede pasar la suya. */
   footerBrand?: string;
+  /** Texto "Página X de Y" del centro del pie; por defecto en español. Cada módulo con idioma propio (ver Budgeting) pasa aquí su traducción. */
+  footerPageLabel?: (current: number, total: number) => string;
 }
 
 /**
@@ -77,6 +79,7 @@ export class FilmaPDF {
   accentColor: RGB;
   private docRef?: string;
   private footerBrand: string;
+  private footerPageLabel: (current: number, total: number) => string;
 
   constructor(opts: FilmaPdfOptions = {}) {
     this.pdf = new jsPDF(opts.orientation || "p", "mm", "a4");
@@ -86,6 +89,7 @@ export class FilmaPDF {
     this.accentColor = ACCENTS[opts.accent || "neutral"];
     this.docRef = opts.docRef;
     this.footerBrand = opts.footerBrand || "Hecho con Filma Workspace";
+    this.footerPageLabel = opts.footerPageLabel || ((current, total) => `Página ${current} de ${total}`);
     this.y = this.margin;
   }
 
@@ -258,7 +262,7 @@ export class FilmaPDF {
       this.pdf.setFont("helvetica", "normal");
       this.pdf.setFontSize(7.5);
       if (this.docRef) this.pdf.text(this.docRef, this.margin, this.pageH - 10);
-      this.pdf.text(`Página ${i} de ${pageCount}`, this.pageW / 2, this.pageH - 10, { align: "center" });
+      this.pdf.text(this.footerPageLabel(i, pageCount), this.pageW / 2, this.pageH - 10, { align: "center" });
       this.pdf.text(this.footerBrand, this.pageW - this.margin, this.pageH - 10, { align: "right" });
     }
   }
