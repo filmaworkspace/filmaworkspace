@@ -10,44 +10,62 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // El nativo (draggable + dragstart/dragover/drop) resultó poco fiable en la
 // práctica: a veces no arrancaba, el indicador de posición no siempre
 // aparecía, y mover varias filas hacia abajo fallaba más que hacia arriba.
-// Depende del algoritmo de arrastre del propio navegador —hay que llamar a
-// `preventDefault()` en cada tick de `dragover` para que cuente como zona de
-// suelta válida, Firefox exige `dataTransfer.setData()` para arrancar
-// siquiera, y toda la operación se cancela en silencio si el nodo de origen
-// se re-renderiza en el momento equivocado— y esas piezas fallaban de forma
-// intermitente y difícil de depurar sin poder reproducir en un navegador
-// real con sesión.
+// Depende del algoritmo de arrastre del propio navegador y se cancela en
+// silencio si el nodo de origen se re-renderiza en el momento equivocado.
 //
-// Con ratón normal el comportamiento es determinista y no depende de nada
-// del navegador salvo eventos de ratón corrientes: en cada `mousemove`, con
-// el ratón ya pulsado, se busca con `elementFromPoint` + `closest()` sobre
-// qué fila cae el cursor (identificadas por el atributo `data-drag-row-id`,
-// puesto en el contenedor de cada fila) y se calcula con
-// `getBoundingClientRect()` si toca antes o después de esa fila. Al soltar
-// (`mouseup`), se llama al callback que cada página registra con el `order`
-// final ya resuelto por ella (conoce el grupo exacto de hermanos —p.ej. la
-// categoría de un Capítulo— que el hook no tiene por qué conocer).
+// La primera versión con ratón normal seguía guardando "sobre qué fila estoy"
+// en estado de React (`dragOver`), y por tanto cada `mousemove` volvía a
+// renderizar TODA la página (recalculando listas ordenadas, totales, etc. de
+// cada fila) solo para mover un borde de sitio — con presupuestos grandes eso
+// se queda corto de fotogramas y el indicador se ve tarde, a saltos, o
+// directamente no da tiempo a verlo antes de soltar (justo lo que se
+// reportó: "a veces no se pone naranjita", "más abajo falla más" — cuantas
+// más filas de por medio, más caro el re-render). Ahora el indicador se
+// pinta directamente en el DOM (con `element.style`, sin pasar por React en
+// absoluto) en cada `mousemove`: no hay re-render de por medio, así que
+// nunca se queda atrás por mucha lista que haya. React solo vuelve a
+// renderizar dos veces por arrastre (al empezar y al soltar), no en cada
+// píxel de movimiento.
+//
+// Qué fila está bajo el cursor se resuelve con `elementFromPoint` +
+// `closest()` sobre el atributo `data-drag-row-id` (puesto en el contenedor
+// de cada fila), y `getBoundingClientRect()` decide si toca antes o después.
+// Al soltar (`mouseup`), se llama al callback que cada página registra con
+// el resultado final ya resuelto por ella (conoce el grupo exacto de
+// hermanos —p.ej. la categoría de un Capítulo— que el hook no tiene por qué
+// conocer).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type DragOverState = { id: string; position: "before" | "after" } | null;
 
+const INDICATOR_COLOR = "#E86F4A";
+// `box-shadow` en vez de `border`: se pinta encima sin ocupar espacio propio,
+// así la fila no da un salto de layout de 2px al aparecer/desaparecer el
+// indicador (un `border` sí lo haría, al no tener borde previo que sustituir).
+const SHADOW_BEFORE = `inset 0 2px 0 0 ${INDICATOR_COLOR}`;
+const SHADOW_AFTER = `inset 0 -2px 0 0 ${INDICATOR_COLOR}`;
+
 export function useRowDrag(onDrop: (draggedId: string, dragOver: DragOverState) => void) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState<DragOverState>(null);
 
-  // Refs para que los listeners de document (montados una sola vez por
-  // arrastre) siempre vean el valor más reciente, sin tener que
-  // desmontar/remontar el listener en cada mousemove.
   const draggedIdRef = useRef<string | null>(null);
   const dragOverRef = useRef<DragOverState>(null);
+  const highlightedElRef = useRef<HTMLElement | null>(null);
   const onDropRef = useRef(onDrop);
   onDropRef.current = onDrop;
 
+  const clearHighlight = () => {
+    if (highlightedElRef.current) {
+      highlightedElRef.current.style.boxShadow = "";
+      highlightedElRef.current = null;
+    }
+  };
+
   const reset = useCallback(() => {
+    clearHighlight();
     draggedIdRef.current = null;
     dragOverRef.current = null;
     setDraggedId(null);
-    setDragOver(null);
   }, []);
 
   /** Se pasa como onMouseDown del icono de agarre (BudgetingDragHandle). */
@@ -66,16 +84,17 @@ export function useRowDrag(onDrop: (draggedId: string, dragOver: DragOverState) 
       const row = target ? (target.closest("[data-drag-row-id]") as HTMLElement | null) : null;
       const id = row?.getAttribute("data-drag-row-id") || null;
       if (!id || id === draggedIdRef.current) {
-        if (dragOverRef.current !== null) { dragOverRef.current = null; setDragOver(null); }
+        if (dragOverRef.current !== null) { dragOverRef.current = null; clearHighlight(); }
         return;
       }
       const rect = row!.getBoundingClientRect();
       const position: "before" | "after" = e.clientY - rect.top < rect.height / 2 ? "before" : "after";
       const prev = dragOverRef.current;
       if (prev && prev.id === id && prev.position === position) return;
-      const next = { id, position };
-      dragOverRef.current = next;
-      setDragOver(next);
+      dragOverRef.current = { id, position };
+      if (highlightedElRef.current !== row) clearHighlight();
+      row!.style.boxShadow = position === "before" ? SHADOW_BEFORE : SHADOW_AFTER;
+      highlightedElRef.current = row;
     };
 
     const onMouseUp = () => {
@@ -96,10 +115,11 @@ export function useRowDrag(onDrop: (draggedId: string, dragOver: DragOverState) 
       document.removeEventListener("mouseup", onMouseUp);
       document.body.style.cursor = prevCursor;
       document.body.style.userSelect = prevUserSelect;
+      clearHighlight();
     };
   }, [draggedId, reset]);
 
-  return { draggedId, dragOver, onHandleMouseDown, reset };
+  return { draggedId, onHandleMouseDown, reset };
 }
 
 /**
