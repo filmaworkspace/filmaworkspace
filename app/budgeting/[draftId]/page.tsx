@@ -488,7 +488,7 @@ export default function BudgetingTopPage() {
     downloadFwb(fwb, draft.name.replace(/[^\w\-]+/g, "_"));
   };
   const handleExportExcel = () => downloadBudgetExcel(reportParams());
-  const handleExportPdf = () => downloadBudgetPdf(pdfReportParams());
+  const handleExportPdf = (watermark?: string) => downloadBudgetPdf({ ...pdfReportParams(), watermark });
 
   // ── Guardar como plantilla: misma estructura que un .fwb, pero se queda
   // guardada en la cuenta del usuario para arrancar otro borrador desde ahí. ──
