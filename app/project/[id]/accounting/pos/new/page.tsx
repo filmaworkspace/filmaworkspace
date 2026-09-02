@@ -1256,61 +1256,41 @@ export default function NewPOPage() {
               <div className="p-6 space-y-5">
                 {/* Proveedor */}
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-slate-700">Proveedor {!noSupplier && "*"}</label>
-                    <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={noSupplier}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setNoSupplier(checked);
-                          if (checked) {
-                            setFormData((prev) => ({ ...prev, supplier: "", supplierName: "" }));
-                            setErrors((prev) => { const { supplier, ...rest } = prev; return rest; });
-                          }
-                        }}
-                        className="rounded border-slate-300"
-                      />
-                      Sin proveedor (se asignará más adelante)
-                    </label>
-                  </div>
-                  {noSupplier ? (
-                    <div className="w-full px-4 py-2.5 border border-dashed border-slate-300 rounded-xl bg-slate-50 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100">
-                        <Building2 size={16} className="text-slate-400" />
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Proveedor {!noSupplier && "*"}</label>
+                  <button
+                    onClick={() => setShowSupplierModal(true)}
+                    onBlur={() => handleBlur("supplier")}
+                    className={cx(
+                      "w-full px-4 py-2.5 border rounded-xl hover:border-slate-300 transition-colors text-left flex items-center justify-between bg-white",
+                      noSupplier
+                        ? "border-dashed border-slate-300 bg-slate-50"
+                        : hasError("supplier") ? "border-red-300 bg-red-50" : isValid("supplier") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"
+                    )}
+                  >
+                    {formData.supplierName ? (
+                      <div className="flex items-center gap-3">
+                        <div className={cx("w-8 h-8 rounded-lg flex items-center justify-center", isValid("supplier") ? "bg-emerald-100" : "bg-slate-100")}>
+                          {isValid("supplier") ? <CheckCircle2 size={16} className="text-emerald-600" /> : <Building2 size={16} className="text-slate-500" />}
+                        </div>
+                        <span className="font-medium text-slate-900">{formData.supplierName}</span>
                       </div>
-                      <span className="text-slate-500 text-sm">Sin proveedor asignado — se completará más adelante</span>
-                    </div>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => setShowSupplierModal(true)}
-                        onBlur={() => handleBlur("supplier")}
-                        className={cx(
-                          "w-full px-4 py-2.5 border rounded-xl hover:border-slate-300 transition-colors text-left flex items-center justify-between bg-white",
-                          hasError("supplier") ? "border-red-300 bg-red-50" : isValid("supplier") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"
-                        )}
-                      >
-                        {formData.supplierName ? (
-                          <div className="flex items-center gap-3">
-                            <div className={cx("w-8 h-8 rounded-lg flex items-center justify-center", isValid("supplier") ? "bg-emerald-100" : "bg-slate-100")}>
-                              {isValid("supplier") ? <CheckCircle2 size={16} className="text-emerald-600" /> : <Building2 size={16} className="text-slate-500" />}
-                            </div>
-                            <span className="font-medium text-slate-900">{formData.supplierName}</span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">Seleccionar proveedor</span>
-                        )}
-                        <Search size={16} className="text-slate-400" />
-                      </button>
-                      {hasError("supplier") && (
-                        <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1">
-                          <AlertCircle size={12} />
-                          {errors.supplier}
-                        </p>
-                      )}
-                    </>
+                    ) : noSupplier ? (
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100">
+                          <Building2 size={16} className="text-slate-400" />
+                        </div>
+                        <span className="text-slate-500 text-sm">Sin proveedor asignado. Se completará más adelante</span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400">Seleccionar proveedor</span>
+                    )}
+                    <Search size={16} className="text-slate-400" />
+                  </button>
+                  {hasError("supplier") && !noSupplier && (
+                    <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1">
+                      <AlertCircle size={12} />
+                      {errors.supplier}
+                    </p>
                   )}
                 </div>
 
@@ -2118,6 +2098,24 @@ export default function NewPOPage() {
                 )}
               </div>
             </div>
+
+            {/* Discreta a propósito: no es la opción recomendada, así que va
+                al fondo del modal, en texto pequeño y apagado, no como un
+                botón o checkbox a la vista en el formulario principal. */}
+            <div className="px-6 py-3 border-t border-slate-100 text-center">
+              <button
+                onClick={() => {
+                  setNoSupplier(true);
+                  setFormData((prev) => ({ ...prev, supplier: "", supplierName: "" }));
+                  setErrors((prev) => { const { supplier, ...rest } = prev; return rest; });
+                  setShowSupplierModal(false);
+                  setSupplierSearch("");
+                }}
+                className="text-xs text-slate-400 hover:text-slate-600 hover:underline"
+              >
+                Continuar sin proveedor (se asignará más adelante)
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2213,7 +2211,7 @@ export default function NewPOPage() {
                 />
               </div>
 
-              <div className="max-h-80 overflow-y-auto space-y-2">
+              <div className="max-h-80 overflow-y-auto space-y-2 pr-2">
                 {filteredSubAccounts.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3">
