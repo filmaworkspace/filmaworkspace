@@ -7,7 +7,7 @@ import Image from "next/image";
 import { inter } from "@/lib/fonts";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { BarChart3, Mail, Users } from "lucide-react";
+import { BarChart3, Calculator, Mail, Users } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import SalesContactModal from "@/components/SalesContactModal";
@@ -20,6 +20,12 @@ const FEATURES = [
     color: "#2F52E0",
     title: "Contabilidad de producción",
     description: "Órdenes de compra, facturas, proveedores y presupuesto controlados en tiempo real.",
+  },
+  {
+    icon: Calculator,
+    color: "#E86F4A",
+    title: "Presupuestos",
+    description: "De capítulo a línea, con cargas sociales, control de cambios y reportes en PDF listos para producción.",
   },
   {
     icon: Users,
@@ -39,7 +45,7 @@ export default function HomePage() {
       {/* ── Nav ── */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
         <div className="max-w-6xl mx-auto px-6 py-3 sm:py-0 sm:h-16 flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-2.5 sm:gap-0">
-          <Image src="/logodark.svg" alt="Filma Workspace" width={120} height={28} priority />
+          <Image src="/logo-text.svg" alt="Filma Workspace" width={265} height={28} priority />
 
           <div className="flex items-center justify-center gap-2 sm:gap-3">
             <Link
@@ -88,7 +94,7 @@ export default function HomePage() {
         </section>
 
         {/* ── Feature grid ── */}
-        <section className="max-w-3xl mx-auto px-6 py-20 sm:py-28 grid sm:grid-cols-2 gap-12">
+        <section className="max-w-4xl mx-auto px-6 py-20 sm:py-28 grid sm:grid-cols-3 gap-12">
           {FEATURES.map((f) => (
             <div key={f.title} className="text-center flex flex-col items-center">
               <f.icon size={30} style={{ color: f.color }} className="mb-4" />
