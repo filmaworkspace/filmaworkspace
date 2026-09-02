@@ -23,7 +23,7 @@ import {
 import { DEFAULT_AUTOMATED_MESSAGES, fetchAutomatedMessages, fillTemplate } from "@/lib/automatedMessages";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { AlertCircle, ArrowLeft, ArrowRight, BookOpen, CheckCheck, ExternalLink, Loader2, Mail, MessageCircle, Send, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, BookOpen, CheckCheck, ExternalLink, Loader2, Mail, MessageCircle, Send } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -222,29 +222,30 @@ export default function SalesContactModal({ open, onClose }: { open: boolean; on
         style={screen === "chat" ? { height: "min(460px, 82vh)" } : { maxHeight: "85vh" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Barra mínima: volver (si aplica) + estado + cerrar */}
-        <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100 flex-shrink-0">
-          <div className="flex items-center gap-2">
-            {screen === "form" && (
-              <button onClick={() => setScreen("choose")} className="p-1.5 -ml-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
-                <ArrowLeft size={16} />
-              </button>
-            )}
+        {/* Barra mínima: solo lo imprescindible por pantalla (volver en el
+            formulario, estado en el chat) — sin título "Contacto" ni botón
+            de cerrar, ya de sobra con hacer click fuera del modal. En la
+            pantalla inicial ("choose") no hace falta barra en absoluto: así
+            el contenido queda centrado desde arriba. */}
+        {screen === "form" && (
+          <div className="flex items-center px-4 py-3.5 border-b border-slate-100 flex-shrink-0">
+            <button onClick={() => setScreen("choose")} className="p-1.5 -ml-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+              <ArrowLeft size={16} />
+            </button>
+          </div>
+        )}
+        {screen === "chat" && (
+          <div className="flex items-center px-4 py-3.5 border-b border-slate-100 flex-shrink-0">
             <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
-              {screen === "chat" && (
-                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${resolved ? "bg-slate-300" : "bg-emerald-500 animate-pulse"}`} />
-              )}
-              {screen === "chat" ? (resolved ? "Conversación cerrada" : "Chat abierto") : "Contacto"}
+              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${resolved ? "bg-slate-300" : "bg-emerald-500 animate-pulse"}`} />
+              {resolved ? "Conversación cerrada" : "Chat abierto"}
             </span>
           </div>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
-            <X size={16} />
-          </button>
-        </div>
+        )}
 
         {/* Choose */}
         {screen === "choose" && (
-          <div className="flex flex-col px-6 pb-7 pt-6 gap-4 overflow-y-auto">
+          <div className="flex flex-col px-6 pb-7 pt-7 gap-4 overflow-y-auto">
             <p className="text-sm font-semibold text-slate-900 text-center">¿Cómo prefieres hablar con nosotros?</p>
 
             <a
