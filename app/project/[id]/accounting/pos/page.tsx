@@ -1018,7 +1018,7 @@ export default function POsPage() {
 
       {/* Quick Preview Modal */}
       {previewPO && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setPreviewPO(null)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setPreviewPO(null)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className={`bg-gradient-to-r ${STATUS_CONFIG[previewPO.status].gradient} px-5 py-4 flex-shrink-0`}>
               <div className="flex items-center justify-between">
@@ -1116,7 +1116,7 @@ export default function POsPage() {
 
       {/* Close PO Modal */}
       {showCloseModal && selectedPO && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowCloseModal(false); resetModalState(); }}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => { setShowCloseModal(false); resetModalState(); }}>
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
               <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
@@ -1176,7 +1176,7 @@ export default function POsPage() {
 
       {/* Reopen PO Modal */}
       {showReopenModal && selectedPO && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowReopenModal(false); resetModalState(); }}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => { setShowReopenModal(false); resetModalState(); }}>
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
               <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
@@ -1228,7 +1228,7 @@ export default function POsPage() {
 
       {/* Cancel PO Modal */}
       {showCancelModal && selectedPO && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowCancelModal(false); resetModalState(); }}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => { setShowCancelModal(false); resetModalState(); }}>
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
               <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
@@ -1291,7 +1291,7 @@ export default function POsPage() {
 
       {/* Modify Modal */}
       {showModifyModal && selectedPO && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowModifyModal(false); resetModalState(); }}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => { setShowModifyModal(false); resetModalState(); }}>
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
               <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">

@@ -1237,7 +1237,7 @@ export default function BudgetPage() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => { setShowModal(false); resetForm(); }}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4" onClick={() => { setShowModal(false); resetForm(); }}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-slate-900">
@@ -1285,7 +1285,7 @@ export default function BudgetPage() {
 
       {/* Import Modal - Super Guay */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeImportModal}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4" onClick={closeImportModal}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
@@ -1602,7 +1602,7 @@ export default function BudgetPage() {
 
       {/* Confirm Dialog */}
       {confirmDialog && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
             <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
@@ -1626,7 +1626,7 @@ export default function BudgetPage() {
 
       {/* .fwb: elegir qué nivel de Budgeting se queda como código operativo antes de aplanarlo */}
       {showFwbMappingModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowFwbMappingModal(false); setPendingFwbBytes(null); }}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => { setShowFwbMappingModal(false); setPendingFwbBytes(null); }}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">Cuentas y subcuentas</h3>

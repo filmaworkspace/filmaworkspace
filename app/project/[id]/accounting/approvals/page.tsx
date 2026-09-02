@@ -1203,7 +1203,7 @@ export default function ApprovalsPage() {
 
       {/* Modal de confirmación de aprobación */}
       {showApprovalModal && selectedApproval && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowApprovalModal(false); setSelectedApproval(null); }}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => { setShowApprovalModal(false); setSelectedApproval(null); }}>
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200">
               <h3 className="text-lg font-semibold text-slate-900">Confirmar aprobación</h3>
@@ -1244,7 +1244,7 @@ export default function ApprovalsPage() {
       )}
 
       {showRejectionModal && selectedApproval && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowRejectionModal(false); setRejectionReason(""); setSelectedApproval(null); }}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => { setShowRejectionModal(false); setRejectionReason(""); setSelectedApproval(null); }}>
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200"><h3 className="text-lg font-semibold text-slate-900">Rechazar documento</h3><p className="text-sm text-slate-500">{selectedApproval.displayNumber}</p></div>
             <div className="p-6"><label className="block text-sm font-medium text-slate-700 mb-2">Motivo del rechazo *</label><textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Explica el motivo del rechazo" rows={4} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none text-sm" /><div className="flex gap-3 mt-6"><button onClick={() => { setShowRejectionModal(false); setRejectionReason(""); setSelectedApproval(null); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">Cancelar</button><button onClick={handleReject} disabled={processing || !rejectionReason.trim()} className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">{processing ? "Rechazando..." : "Confirmar rechazo"}</button></div></div>
@@ -1253,7 +1253,7 @@ export default function ApprovalsPage() {
       )}
 
       {showInfoRequestModal && selectedApproval && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowInfoRequestModal(false); setInfoRequestMessage(""); setSelectedApproval(null); }}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => { setShowInfoRequestModal(false); setInfoRequestMessage(""); setSelectedApproval(null); }}>
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200"><h3 className="text-lg font-semibold text-slate-900">Solicitar información</h3><p className="text-sm text-slate-500">{selectedApproval.displayNumber}</p></div>
             <div className="p-6"><label className="block text-sm font-medium text-slate-700 mb-2">¿Qué información necesitas?</label><textarea value={infoRequestMessage} onChange={(e) => setInfoRequestMessage(e.target.value)} placeholder="Describe qué información adicional necesitas" rows={4} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none text-sm" /><div className="flex gap-3 mt-6"><button onClick={() => { setShowInfoRequestModal(false); setInfoRequestMessage(""); setSelectedApproval(null); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">Cancelar</button><button onClick={handleRequestInfo} disabled={processing || !infoRequestMessage.trim()} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-medium disabled:opacity-50"><Send size={16} />{processing ? "Enviando..." : "Enviar solicitud"}</button></div></div>

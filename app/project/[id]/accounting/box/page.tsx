@@ -3297,7 +3297,7 @@ export default function BoxesPage() {
 
       {/* Create Box Modal */}
       {showCreateBoxModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
           onClick={() => setShowCreateBoxModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
@@ -3365,7 +3365,7 @@ export default function BoxesPage() {
 
       {/* Edit Box Modal */}
       {showEditBoxModal && selectedBox && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
           onClick={() => setShowEditBoxModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
@@ -3414,7 +3414,7 @@ export default function BoxesPage() {
 
       {/* Delete Box Confirm */}
       {showDeleteBoxModal && selectedBox && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
           onClick={() => setShowDeleteBoxModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <div className="p-6">
@@ -3434,7 +3434,7 @@ export default function BoxesPage() {
 
       {/* Create Envelope Modal */}
       {showCreateEnvelopeModal && selectedBox && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
           onClick={() => setShowCreateEnvelopeModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
@@ -3457,7 +3457,7 @@ export default function BoxesPage() {
 
       {/* Delete Envelope Confirm */}
       {showDeleteEnvelopeModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
           onClick={() => setShowDeleteEnvelopeModal(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <div className="p-6">
@@ -3477,7 +3477,7 @@ export default function BoxesPage() {
 
       {/* Manual Expense Modal */}
       {showManualExpenseModal && selectedEnvelope && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
           onClick={() => setShowManualExpenseModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
@@ -3646,7 +3646,7 @@ export default function BoxesPage() {
 
       {/* Import Excel Modal */}
       {showImportModal && selectedEnvelope && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
           onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
@@ -3789,7 +3789,7 @@ export default function BoxesPage() {
         const coveredIds = new Set(fileMatches.filter(m => m.expense).map(m => m.expense!.id));
         const missingDocs = envelopeExps.filter(e => !e.documentUrl && !coveredIds.has(e.id));
         return (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
             onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }}>
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 flex-shrink-0">
@@ -3855,7 +3855,7 @@ export default function BoxesPage() {
 
       {/* Create Transfer Envelope Modal */}
       {showCreateTransferEnvelopeModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
           onClick={() => setShowCreateTransferEnvelopeModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-visible" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
@@ -3917,7 +3917,7 @@ export default function BoxesPage() {
 
       {/* Delete Transfer Envelope Confirm */}
       {showDeleteTransferEnvelopeModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
           onClick={() => setShowDeleteTransferEnvelopeModal(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <div className="p-6">
@@ -3937,7 +3937,7 @@ export default function BoxesPage() {
 
       {/* Add Transfer Expense Modal */}
       {showAddExpenseModal && selectedTransferEnvelope && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
           onClick={() => setShowAddExpenseModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
@@ -4122,7 +4122,7 @@ export default function BoxesPage() {
       {showSettleModal && selectedTransferEnvelope && (() => {
         const preview = getSettlementPreview(selectedTransferEnvelope);
         return (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
             onClick={() => setShowSettleModal(false)}>
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
               <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
@@ -4174,7 +4174,7 @@ export default function BoxesPage() {
 
       {/* Add Advance Modal */}
       {showAddAdvanceModal && selectedTransferEnvelope && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
           onClick={() => setShowAddAdvanceModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
@@ -4334,7 +4334,7 @@ export default function BoxesPage() {
 
       {/* ── Send Box Form Modal ────────────────────────────────────────────── */}
       {showSendBoxFormModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => { setShowSendBoxFormModal(false); setGeneratedBoxResult(null); }}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => { setShowSendBoxFormModal(false); setGeneratedBoxResult(null); }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100">
               <h3 className="text-base font-semibold text-slate-900">Enviar solicitud de caja</h3>
@@ -4430,7 +4430,7 @@ export default function BoxesPage() {
         const IRPF_RATES = [0, 7, 15, 19];
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
             onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); setShowVolcarSupplierDropdown(null); }}>
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
 
@@ -4705,7 +4705,7 @@ export default function BoxesPage() {
 
       {/* ── Configurar exportación (DEMO / vista previa) ──────────────────── */}
       {showExportConfigModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowExportConfigModal(false)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4" onClick={() => setShowExportConfigModal(false)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto border border-slate-200" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3">

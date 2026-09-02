@@ -2259,7 +2259,7 @@ export default function AccountingConfigPage() {
 
       {/* Modal para cuenta bancaria */}
       {showBankAccountModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowBankAccountModal(false)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setShowBankAccountModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -2376,7 +2376,7 @@ export default function AccountingConfigPage() {
 
       {/* Confirm Dialog */}
       {confirmDialog && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
             <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>

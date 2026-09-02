@@ -939,7 +939,7 @@ export default function PaymentPayPage() {
 
       {/* SEPA Modal */}
       {showSepaModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowSepaModal(false)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setShowSepaModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3"><Landmark size={24} className="text-slate-400" /><div><h3 className="text-lg font-semibold text-slate-900">Generar SEPA</h3><p className="text-xs text-slate-500">XML pain.001.001.03</p></div></div>
