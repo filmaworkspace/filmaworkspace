@@ -225,9 +225,16 @@ export default function NewPOPage() {
     savedAt: string;
     formData: any;
     items: POItem[];
+    noSupplier?: boolean;
+    /** true = autoguardado (ver más abajo), no uno creado a mano con "Guardar borrador". */
+    auto?: boolean;
   }
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [showDraftsPanel, setShowDraftsPanel] = useState(false);
+  // Una vez la PO se crea de verdad (o se descarta a propósito), el
+  // autoguardado deja de tener sentido: esta ref lo corta sin esperar al
+  // debounce, para no resucitar un borrador fantasma de una PO que ya existe.
+  const stopAutoSaveRef = useRef(false);
 
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -374,10 +381,12 @@ export default function NewPOPage() {
   }, [id]);
 
   // Funciones de borradores
+  const hasDraftableContent = () =>
+    !!(formData.supplier || formData.supplierName || noSupplier || formData.generalDescription.trim() ||
+       items.some((item) => item.description.trim() || item.unitPrice > 0));
+
   const saveDraft = () => {
-    const hasContent = formData.supplier || formData.generalDescription || 
-                       items.some(item => item.description || item.unitPrice > 0);
-    if (!hasContent) {
+    if (!hasDraftableContent()) {
       setErrorMessage("No hay contenido para guardar");
       setTimeout(() => setErrorMessage(""), 2000);
       return;
@@ -389,8 +398,9 @@ export default function NewPOPage() {
       savedAt: new Date().toISOString(),
       formData,
       items,
+      noSupplier,
     };
-    
+
     const updatedDrafts = [...drafts, newDraft];
     setDrafts(updatedDrafts);
     localStorage.setItem(`po_drafts_${id}`, JSON.stringify(updatedDrafts));
@@ -402,6 +412,7 @@ export default function NewPOPage() {
   const loadDraft = (draft: Draft) => {
     setFormData(draft.formData);
     setItems(draft.items);
+    setNoSupplier(!!draft.noSupplier);
     setShowDraftsPanel(false);
     setSuccessMessage("Borrador cargado");
     setTimeout(() => setSuccessMessage(""), 2000);
@@ -412,6 +423,57 @@ export default function NewPOPage() {
     setDrafts(updatedDrafts);
     localStorage.setItem(`po_drafts_${id}`, JSON.stringify(updatedDrafts));
   };
+
+  // ─── Autoguardado ────────────────────────────────────────────────────────
+  // Mantiene un borrador especial ("autosave", uno solo, se sobrescribe en
+  // vez de acumularse) al día mientras se escribe, en vez de depender de
+  // detectar el cierre del navegador o el cambio de página — Next.js (App
+  // Router) no tiene forma fiable de interceptar toda navegación dentro de
+  // la app (un Link del header, un botón "Volver"...), así que la única
+  // manera robusta de no perder el trabajo es no depender de detectar la
+  // salida en absoluto: guardar solo local (localStorage), con un pequeño
+  // debounce para no escribir en cada tecla. `beforeunload` es un cinturón
+  // extra para el cierre real del navegador/pestaña (ahí si hace falta ser
+  // síncrono, por si el debounce no llegó a completarse a tiempo).
+  const AUTO_DRAFT_ID = "autosave";
+  const buildAutoDraft = (): Draft => ({
+    id: AUTO_DRAFT_ID,
+    name: formData.supplierName || formData.generalDescription || "Autoguardado",
+    savedAt: new Date().toISOString(),
+    formData,
+    items,
+    noSupplier,
+    auto: true,
+  });
+  const persistAutoDraft = () => {
+    if (stopAutoSaveRef.current || !id) return;
+    setDrafts((prev) => {
+      const withoutAuto = prev.filter((d) => d.id !== AUTO_DRAFT_ID);
+      const next = hasDraftableContent() ? [...withoutAuto, buildAutoDraft()] : withoutAuto;
+      localStorage.setItem(`po_drafts_${id}`, JSON.stringify(next));
+      return next;
+    });
+  };
+  const clearAutoDraft = () => {
+    stopAutoSaveRef.current = true;
+    if (!id) return;
+    setDrafts((prev) => {
+      const next = prev.filter((d) => d.id !== AUTO_DRAFT_ID);
+      localStorage.setItem(`po_drafts_${id}`, JSON.stringify(next));
+      return next;
+    });
+  };
+  useEffect(() => {
+    const timer = setTimeout(persistAutoDraft, 1500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData, items, noSupplier, id]);
+  useEffect(() => {
+    const handleBeforeUnload = () => persistAutoDraft();
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData, items, noSupplier, id]);
 
   useEffect(() => {
     if (Object.keys(touched).length > 0) {
@@ -1017,6 +1079,8 @@ export default function NewPOPage() {
 
       const cleanPoData = removeUndefined(poData);
       await addDoc(collection(db, "projects/" + id + "/pos"), cleanPoData);
+      // La PO ya existe de verdad: el autoguardado local deja de tener sentido.
+      clearAutoDraft();
 
       // Comprometer según la configuración
       const finalStatus = poData.status;
@@ -1185,7 +1249,12 @@ export default function NewPOPage() {
                             <div key={draft.id} className="p-3 border-b border-slate-100 hover:bg-slate-50 group">
                               <div className="flex items-center justify-between">
                                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => loadDraft(draft)}>
-                                  <p className="text-sm font-medium text-slate-900 truncate">{draft.name}</p>
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="text-sm font-medium text-slate-900 truncate">{draft.name}</p>
+                                    {draft.auto && (
+                                      <span className="flex-shrink-0 text-[9px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Auto</span>
+                                    )}
+                                  </div>
                                   <p className="text-xs text-slate-400">
                                     {new Date(draft.savedAt).toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                                   </p>
