@@ -98,8 +98,7 @@ export default function HomePage() {
           {FEATURES.map((f) => (
             <div key={f.title} className="text-center flex flex-col items-center">
               <f.icon size={30} style={{ color: f.color }} className="mb-4" />
-              <h3 className="text-base font-semibold text-slate-900 mb-1.5">{f.title}</h3>
-              <p className="text-sm text-slate-500 leading-relaxed max-w-xs">{f.description}</p>
+              <h3 className="text-base font-semibold text-slate-900">{f.title}</h3>
             </div>
           ))}
         </section>
