@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Antes en styles/animations.css, importado con @import: ese archivo existe
+   en este export local pero no llegó a subirse al repo de GitHub (Vercel
+   construye desde ahí), así que el build fallaba con "Module not found:
+   Can't resolve '../styles/animations.css'". Se traen las reglas aquí
+   mismo para no depender de un import relativo a otra carpeta. */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
