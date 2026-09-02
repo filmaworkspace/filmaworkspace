@@ -45,7 +45,7 @@ export default function HomePage() {
       {/* ── Nav ── */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
         <div className="max-w-6xl mx-auto px-6 py-3 sm:py-0 sm:h-16 flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-2.5 sm:gap-0">
-          <Image src="/logo-text.svg" alt="Filma Workspace" width={265} height={28} priority />
+          <Image src="/logodark.svg" alt="Filma Workspace" width={120} height={28} priority />
 
           <div className="flex items-center justify-center gap-2 sm:gap-3">
             <Link
