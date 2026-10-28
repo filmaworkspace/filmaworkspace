@@ -24,12 +24,7 @@ import {
   EyeOff,
 } from "lucide-react";
 
-// ─── Tokens ──────────────────────────────────────────────────────────────────
-const BRAND = "#2F52E0";
-const TEXT = "#111318";
-const TEXT_LABEL = "#1F2329";
-const TEXT_MUTED = "#575C66"; // ≥ 4.5:1 sobre blanco
-
+// ─── Decoration ──────────────────────────────────────────────────────────────
 // Opacidades del mosaico decorativo del panel izquierdo
 const POSTERS = [0.07, 0.14, 0.09, 0.16, 0.12, 0.06, 0.15, 0.08, 0.1, 0.13, 0.07, 0.11];
 
@@ -42,7 +37,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
-  const [capsLock, setCapsLock] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -92,10 +86,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleCapsLock = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    setCapsLock(e.getModifierState("CapsLock"));
-  };
-
   return (
     <div className={`min-h-screen flex flex-col lg:flex-row ${inter.className}`}>
 
@@ -124,21 +114,21 @@ export default function LoginPage() {
         <div className="relative z-10">
           <Image
             src="/logo.svg"
-            alt="Filmoi"
+            alt="Logo"
             width={180}
             height={48}
-            className="w-[120px] lg:w-[180px] h-auto"
+            className="w-[120px] lg:w-[180px] h-auto opacity-95"
             priority
           />
         </div>
       </div>
 
       {/* ── Right Side – Form ── */}
-      <div className="w-full flex-1 lg:w-1/2 flex lg:items-center justify-center px-6 py-8 lg:p-8" style={{ backgroundColor: "#FFFFFF" }}>
-        <div className="w-full max-w-[380px]">
+      <div className="w-full flex-1 lg:w-1/2 flex items-center justify-center p-8" style={{ backgroundColor: "#FFFFFF" }}>
+        <div className="w-full max-w-xs">
 
-          {/* Heading */}
-          <h1 className="mb-8 text-[26px] lg:text-[30px] font-bold tracking-tight" style={{ color: TEXT }}>
+          {/* Title */}
+          <h1 className="mb-8 text-2xl font-semibold tracking-tight" style={{ color: "#363636" }}>
             Inicia sesión
           </h1>
 
@@ -146,106 +136,101 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
 
             {/* Email */}
-            <div className="space-y-1.5">
-              <label htmlFor="email" className="block text-sm font-medium" style={{ color: TEXT_LABEL }}>
-                Email
-              </label>
+            <div>
               <input
-                id="email"
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="tu@email.com"
+                placeholder="Email"
                 disabled={loading}
                 autoComplete="email"
-                aria-invalid={!!error}
-                className="w-full h-12 px-3.5 border rounded-[10px] border-[#C4C8CF] text-base lg:text-[15px] placeholder:text-[#6B7280] focus:outline-none focus:border-[#2F52E0] focus:ring-4 focus:ring-[#2F52E0]/15 transition-all disabled:opacity-50"
-                style={{ color: TEXT, backgroundColor: "#FFFFFF" }}
+                className="w-full px-3.5 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50"
+                style={{ color: "#363636", backgroundColor: "#FFFFFF", borderColor: "rgba(54, 54, 54, 0.2)" }}
               />
             </div>
 
             {/* Password */}
-            <div className="space-y-1.5">
-              <div className="flex items-baseline justify-between">
-                <label htmlFor="password" className="block text-sm font-medium" style={{ color: TEXT_LABEL }}>
-                  Contraseña
-                </label>
-                <Link
-                  href="/forgot-password"
-                  className="text-sm font-medium transition-colors hover:opacity-80"
-                  style={{ color: BRAND }}
-                >
-                  ¿La olvidaste?
-                </Link>
-              </div>
-              <div className="relative">
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyUp={handleCapsLock}
-                  onKeyDown={handleCapsLock}
-                  onBlur={() => setCapsLock(false)}
-                  placeholder="Introduce tu contraseña"
-                  disabled={loading}
-                  autoComplete="current-password"
-                  aria-invalid={!!error}
-                  aria-describedby={capsLock ? "caps-lock-hint" : undefined}
-                  className="w-full h-12 pl-3.5 pr-12 border rounded-[10px] border-[#C4C8CF] text-base lg:text-[15px] placeholder:text-[#6B7280] focus:outline-none focus:border-[#2F52E0] focus:ring-4 focus:ring-[#2F52E0]/15 transition-all disabled:opacity-50"
-                  style={{ color: TEXT, backgroundColor: "#FFFFFF" }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  disabled={loading}
-                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                  aria-pressed={showPassword}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-10 rounded-lg flex items-center justify-center transition-colors hover:bg-gray-50 disabled:opacity-50"
-                  style={{ color: TEXT_MUTED }}
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
-              {capsLock && (
-                <p id="caps-lock-hint" className="text-[13px]" style={{ color: TEXT_MUTED }}>
-                  Bloq Mayús está activado
-                </p>
-              )}
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Contraseña"
+                disabled={loading}
+                autoComplete="current-password"
+                className="w-full px-3.5 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50 pr-10"
+                style={{ color: "#363636", backgroundColor: "#FFFFFF", borderColor: "rgba(54, 54, 54, 0.2)" }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={loading}
+                className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors disabled:opacity-50"
+                style={{ color: "rgba(54, 54, 54, 0.4)" }}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
 
-            {/* Remember me */}
-            <label className="flex items-center gap-2.5 cursor-pointer min-h-6">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                disabled={loading}
-                className="w-[18px] h-[18px] m-0 cursor-pointer"
-                style={{ accentColor: BRAND }}
-              />
-              <span className="text-sm" style={{ color: "#3B404A" }}>Recordarme en este dispositivo</span>
-            </label>
+            {/* Remember me + forgot password */}
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    disabled={loading}
+                    className="sr-only peer"
+                  />
+                  <div
+                    className="w-4 h-4 border rounded transition-all"
+                    style={{
+                      borderColor: rememberMe ? "#363636" : "rgba(54, 54, 54, 0.3)",
+                      backgroundColor: rememberMe ? "#363636" : "transparent",
+                    }}
+                  />
+                  <svg
+                    className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 transition-opacity ${rememberMe ? "opacity-100" : "opacity-0"}`}
+                    style={{ color: "#FFFFFF" }}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={3}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <span className="text-xs" style={{ color: "rgba(54, 54, 54, 0.6)" }}>Recordarme</span>
+              </label>
+
+              <Link
+                href="/forgot-password"
+                className="text-xs transition-colors hover:opacity-80"
+                style={{ color: "rgba(54, 54, 54, 0.5)" }}
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
 
             {/* Error */}
             {error && (
-              <div role="alert" className="flex items-center gap-2 p-3 bg-red-50 rounded-[10px]">
-                <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
-                <span className="text-sm text-red-700">{error}</span>
+              <div className="flex items-center gap-2 p-2.5 bg-red-50 rounded-xl">
+                <AlertCircle size={14} className="text-red-500 flex-shrink-0" />
+                <span className="text-xs text-red-600">{error}</span>
               </div>
             )}
 
             {/* Submit */}
             <div className="flex items-center justify-between pt-2">
-              <span className="text-lg font-semibold" style={{ color: TEXT }}>Acceder</span>
+              <span className="text-lg font-semibold" style={{ color: "#363636" }}>Acceder</span>
               <button
                 type="submit"
                 disabled={loading}
-                aria-label={loading ? "Accediendo…" : "Acceder"}
-                className="w-11 h-11 rounded-xl flex items-center justify-center transition-all disabled:opacity-60 disabled:cursor-not-allowed hover:brightness-110 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#2F52E0]/30"
-                style={{ backgroundColor: BRAND }}
+                className="w-10 h-10 rounded-xl flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
+                style={{ backgroundColor: "#363636" }}
               >
                 {loading ? (
                   <div
@@ -260,12 +245,12 @@ export default function LoginPage() {
           </form>
 
           {/* Register link */}
-          <p className="mt-6 text-center text-sm" style={{ color: TEXT_MUTED }}>
+          <p className="mt-6 text-center text-xs" style={{ color: "rgba(54, 54, 54, 0.5)" }}>
             ¿No tienes cuenta?{" "}
             <Link
               href="/register"
-              className="font-semibold underline underline-offset-[3px] transition-colors hover:opacity-80"
-              style={{ color: BRAND }}
+              className="font-medium transition-colors hover:opacity-80"
+              style={{ color: "#363636" }}
             >
               Crear cuenta
             </Link>
