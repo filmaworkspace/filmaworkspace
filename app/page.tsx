@@ -35,6 +35,13 @@ const FEATURES = [
   },
 ];
 
+// Opacidades del mosaico de pósters (mismo recurso que el panel del login)
+const POSTERS = [
+  0.07, 0.14, 0.09, 0.16, 0.12, 0.06,
+  0.15, 0.08, 0.1, 0.13, 0.07, 0.11,
+  0.09, 0.16, 0.06, 0.12, 0.14, 0.08,
+];
+
 export default function HomePage() {
   const [showContact, setShowContact] = useState(false);
   const year = new Date().getFullYear();
@@ -78,18 +85,25 @@ export default function HomePage() {
         {/* ── Visual showcase — mismo lenguaje que el panel izquierdo del login ── */}
         <section className="max-w-6xl mx-auto px-6">
           <div
-            className="relative overflow-hidden rounded-[2rem] h-[240px] sm:h-[420px] flex items-center justify-center"
+            className="relative overflow-hidden rounded-[2rem] h-[240px] sm:h-[420px] flex items-end justify-start p-6 sm:p-12"
             style={{ background: "linear-gradient(135deg, #1a3a9e 0%, #2F52E0 50%, #4F6FE8 100%)" }}
           >
+            {/* Mosaico decorativo de pósters */}
             <div
-              className="absolute top-0 right-0 w-96 h-96 rounded-full opacity-20 blur-3xl"
-              style={{ backgroundColor: "#4F6FE8", transform: "translate(30%, -30%)" }}
-            />
-            <div
-              className="absolute bottom-0 left-0 w-80 h-80 rounded-full opacity-15 blur-3xl"
-              style={{ backgroundColor: "#1a3a9e", transform: "translate(-20%, 20%)" }}
-            />
-            <Image src="/logo.svg" alt="Filma Workspace" width={240} height={76} className="relative z-10 opacity-95 w-[160px] sm:w-[240px] h-auto" />
+              aria-hidden="true"
+              className="absolute grid grid-cols-4 gap-2.5 w-[300px] -top-20 -right-10 sm:grid-cols-6 sm:gap-4 sm:w-[760px] sm:-top-40 sm:-right-16"
+              style={{ transform: "rotate(-10deg)" }}
+            >
+              {POSTERS.map((opacity, i) => (
+                <div
+                  key={i}
+                  className={`aspect-[2/3] rounded-lg sm:rounded-xl ${i % 2 === 1 ? "mt-8 sm:mt-16" : ""} ${i >= 8 ? "hidden sm:block" : ""}`}
+                  style={{ backgroundColor: `rgba(255, 255, 255, ${opacity})` }}
+                />
+              ))}
+            </div>
+
+            <Image src="/logo.svg" alt="Filma Workspace" width={240} height={76} className="relative z-10 opacity-95 w-[140px] sm:w-[200px] h-auto" />
           </div>
         </section>
 
