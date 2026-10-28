@@ -128,7 +128,7 @@ export default function LoginPage() {
         <div className="w-full max-w-xs">
 
           {/* Title */}
-          <h1 className="mb-8 text-2xl font-semibold tracking-tight" style={{ color: "#363636" }}>
+          <h1 className="mb-8 text-2xl font-semibold tracking-tight text-center" style={{ color: "#363636" }}>
             Inicia sesión
           </h1>
 
