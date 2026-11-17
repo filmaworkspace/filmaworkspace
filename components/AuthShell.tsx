@@ -16,7 +16,7 @@ const HEADLINE = (
   <>
     Toda la producción,
     <br />
-    en una única plataforma.
+    en un solo lugar.
   </>
 );
 
