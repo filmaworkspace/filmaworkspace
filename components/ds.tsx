@@ -16,12 +16,15 @@
 //   <Table>, <Th>, <Td>, <Tr>
 //   <DataList>        pares etiqueta/valor (vista de solo lectura)
 //   <Modal>           diálogo pequeño
-//   <Menu>            menú desplegable con cierre al hacer clic fuera / Escape
+//   <Menu>, <Select>  desplegables: se pintan en una capa por encima de todo
+//                     (también de los modales), nunca se cortan y se abren
+//                     hacia arriba si no caben abajo
 //   <EmptyState>
 //   useToast()        avisos breves abajo a la izquierda
 
-import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { Children, forwardRef, isValidElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Check, Loader2, X } from "lucide-react";
 import { inter } from "@/lib/fonts";
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
@@ -149,18 +152,107 @@ export const Textarea = forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttrib
   return <textarea ref={ref} className={cx(CONTROL, "resize-none px-2.5 py-2 leading-relaxed", className)} {...rest} />;
 });
 
-export const Select = forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, children, ...rest }, ref) {
+type SelectOption = { value: string; label: React.ReactNode; disabled?: boolean };
+
+/**
+ * Selector con el estilo de la app. Misma forma de uso que un <select>:
+ *   <Select value={v} onChange={(e) => set(e.target.value)}>
+ *     <option value="" disabled>Seleccionar</option>
+ *     <option value="a">A</option>
+ *   </Select>
+ * La lista se pinta en la capa flotante, así que no se corta dentro de modales.
+ */
+export function Select({ value, onChange, children, disabled, className }: {
+  value?: string;
+  onChange?: (e: { target: { value: string } }) => void;
+  children: React.ReactNode;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const options: SelectOption[] = [];
+  Children.forEach(children, (child) => {
+    if (isValidElement<{ value?: string; children?: React.ReactNode; disabled?: boolean }>(child) && child.type === "option") {
+      options.push({ value: String(child.props.value ?? ""), label: child.props.children, disabled: child.props.disabled });
+    }
+  });
+  const selected = options.find((o) => o.value === (value ?? ""));
+  const placeholder = options.find((o) => o.disabled && o.value === "");
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(open, close, [triggerRef, panelRef]);
+  const pos = useFloating(open, triggerRef, panelRef, "left", true);
+
+  const choose = (v: string) => { onChange?.({ target: { value: v } }); setOpen(false); triggerRef.current?.focus(); };
+  const onListKey = (e: React.KeyboardEvent) => {
+    const items = Array.from(panelRef.current?.querySelectorAll<HTMLButtonElement>("button:not([disabled])") || []);
+    const i = items.indexOf(document.activeElement as HTMLButtonElement);
+    if (e.key === "ArrowDown") { e.preventDefault(); items[Math.min(i + 1, items.length - 1)]?.focus(); }
+    if (e.key === "ArrowUp") { e.preventDefault(); items[Math.max(i - 1, 0)]?.focus(); }
+  };
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => {
+      const el = panelRef.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]') || panelRef.current?.querySelector<HTMLButtonElement>("button:not([disabled])");
+      el?.focus();
+    }, 0);
+    return () => clearTimeout(t);
+  }, [open]);
+
   return (
-    <div className="relative">
-      <select ref={ref} className={cx(CONTROL, "h-8 appearance-none pl-2.5 pr-8", className)} {...rest}>
-        {children}
-      </select>
-      <svg aria-hidden="true" viewBox="0 0 16 16" className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400">
-        <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </div>
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => { if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); setOpen(true); } }}
+        className={cx(CONTROL, "flex h-8 items-center justify-between gap-2 pl-2.5 pr-2 text-left", className)}
+      >
+        <span className={cx("truncate", (!selected || selected.disabled) && "text-slate-400")}>
+          {selected && !selected.disabled ? selected.label : placeholder?.label ?? "Seleccionar"}
+        </span>
+        <svg aria-hidden="true" viewBox="0 0 16 16" className={cx("h-3.5 w-3.5 flex-shrink-0 text-slate-400 transition-transform", open && "rotate-180")}>
+          <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && <FloatingLayer>
+        <div
+          ref={panelRef}
+          role="listbox"
+          onKeyDown={onListKey}
+          style={pos}
+          className={cx("fixed z-[80] max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg", inter.className)}
+        >
+          {options.filter((o) => !(o.disabled && o.value === "")).map((o) => {
+            const isSel = o.value === (value ?? "");
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="option"
+                aria-selected={isSel}
+                disabled={o.disabled}
+                onClick={() => choose(o.value)}
+                className={cx(
+                  "flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-1.5 text-left text-[13px] outline-none transition-colors",
+                  "hover:bg-[#F4F4F5] focus:bg-[#F4F4F5] disabled:opacity-40",
+                  isSel ? "font-medium text-slate-900" : "text-slate-700",
+                )}
+              >
+                <span className="truncate">{o.label}</span>
+                {isSel && <Check size={13} className="flex-shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      </FloatingLayer>}
+    </>
   );
-});
+}
 
 /** Grupo de opciones excluyentes (p. ej. Película / Serie). */
 export function Segmented<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
@@ -274,15 +366,77 @@ export function PageLoading() {
 }
 
 // ─── Capas: modal y menú ─────────────────────────────────────────────────────
-function useDismiss(open: boolean, onClose: () => void, ref: React.RefObject<HTMLElement | null>) {
+function useDismiss(open: boolean, onClose: () => void, refs: React.RefObject<HTMLElement | null> | React.RefObject<HTMLElement | null>[]) {
   useEffect(() => {
     if (!open) return;
-    const onPointer = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const list = Array.isArray(refs) ? refs : [refs];
+    const onPointer = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (list.some((r) => r.current?.contains(t))) return;
+      // Un clic dentro de otra capa flotante (p. ej. un menú abierto desde un
+      // modal) no cierra el modal.
+      if ((t as HTMLElement).closest?.("[data-floating-layer]")) return;
+      onClose();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // Con un desplegable abierto, Escape cierra primero el desplegable.
+      const inLayer = list.some((r) => r.current?.closest("[data-floating-layer]"));
+      if (!inLayer && document.querySelector("[data-floating-layer]")) return;
+      onClose();
+    };
     document.addEventListener("mousedown", onPointer);
     document.addEventListener("keydown", onKey);
     return () => { document.removeEventListener("mousedown", onPointer); document.removeEventListener("keydown", onKey); };
-  }, [open, onClose, ref]);
+  }, [open, onClose, refs]);
+}
+
+/** Pinta su contenido directamente en <body>: no lo recorta ningún overflow. */
+function FloatingLayer({ children }: { children: React.ReactNode }) {
+  // Solo se pinta tras una interacción (nunca en el render del servidor).
+  if (typeof document === "undefined") return null;
+  return createPortal(<div data-floating-layer="">{children}</div>, document.body);
+}
+
+/**
+ * Posición fija de un panel flotante junto a su disparador: debajo si cabe, si
+ * no encima; alineado a la izquierda o a la derecha; siempre dentro de la
+ * ventana. Se recalcula al hacer scroll o cambiar el tamaño.
+ */
+function useFloating(
+  open: boolean,
+  triggerRef: React.RefObject<HTMLElement | null>,
+  panelRef: React.RefObject<HTMLElement | null>,
+  align: "left" | "right",
+  matchWidth = false,
+): React.CSSProperties {
+  const [style, setStyle] = useState<React.CSSProperties>({ top: -9999, left: -9999 });
+  useEffect(() => { if (!open) setStyle({ top: -9999, left: -9999 }); }, [open]);
+  const update = useCallback(() => {
+    const t = triggerRef.current?.getBoundingClientRect();
+    const p = panelRef.current;
+    if (!t || !p) return;
+    const gap = 4, margin = 8;
+    const width = Math.max(p.offsetWidth, matchWidth ? t.width : 0);
+    const height = p.offsetHeight;
+    const below = window.innerHeight - t.bottom - margin;
+    const above = t.top - margin;
+    const top = height + gap <= below || below >= above ? t.bottom + gap : t.top - gap - height;
+    let left = align === "right" ? t.right - width : t.left;
+    left = Math.min(Math.max(margin, left), window.innerWidth - width - margin);
+    const next = { top: Math.round(Math.max(margin, top)), left: Math.round(left), ...(matchWidth ? { minWidth: Math.round(t.width) } : {}) };
+    setStyle((prev) => (prev.top === next.top && prev.left === next.left && prev.minWidth === (next as { minWidth?: number }).minWidth ? prev : next));
+  }, [triggerRef, panelRef, align, matchWidth]);
+  // Tras cada render con el panel abierto (el panel ya existe en la página).
+  useLayoutEffect(() => { if (open) update(); });
+  useLayoutEffect(() => {
+    if (!open) return;
+    const raf = requestAnimationFrame(update);
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("scroll", update, true); window.removeEventListener("resize", update); };
+  }, [open, update]);
+  return style;
 }
 
 export function Modal({
@@ -312,18 +466,22 @@ export function Menu({ trigger, children, align = "right" }: {
   align?: "left" | "right";
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLSpanElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
-  useDismiss(open, close, ref);
+  useDismiss(open, close, [triggerRef, panelRef]);
+  const pos = useFloating(open, triggerRef, panelRef, align);
   return (
-    <div ref={ref} className="relative inline-block">
-      {trigger(() => setOpen((o) => !o), open)}
+    <>
+      <span ref={triggerRef} className="inline-flex">{trigger(() => setOpen((o) => !o), open)}</span>
       {open && (
-        <div className={cx("absolute top-full z-50 mt-1 min-w-[180px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg", align === "right" ? "right-0" : "left-0")}>
-          {children(close)}
-        </div>
+        <FloatingLayer>
+          <div ref={panelRef} role="menu" style={pos} className={cx("fixed z-[80] min-w-[180px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg", inter.className)}>
+            {children(close)}
+          </div>
+        </FloatingLayer>
       )}
-    </div>
+    </>
   );
 }
 

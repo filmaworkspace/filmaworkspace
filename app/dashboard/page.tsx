@@ -428,6 +428,7 @@ export default function Dashboard() {
         <div className="mb-8 flex items-center justify-between gap-4">
           <div className="flex items-baseline gap-3">
             <h1 className="text-[1.75rem] font-semibold tracking-tight text-slate-900">Proyectos</h1>
+            {activeProjectsCount > 0 && <span className="text-sm text-slate-400">{activeProjectsCount}</span>}
           </div>
         </div>
 

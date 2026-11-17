@@ -357,7 +357,7 @@ export default function ProfilePage() {
         <div className={`${ui.tabs} mt-10`}>
           <button onClick={() => setActiveTab("account")} className={ui.tab(activeTab === "account")}>Mi cuenta</button>
           <button onClick={() => setActiveTab("projects")} className={ui.tab(activeTab === "projects")}>
-            Mis proyectos
+            Mis proyectos <span className="text-xs font-normal text-slate-400">{activeProjects}</span>
           </button>
         </div>
 
@@ -430,6 +430,7 @@ export default function ProfilePage() {
                   }`}
                 >
                   {f.label}
+                  {f.count > 0 && <span className="text-xs font-normal text-slate-400">{f.count}</span>}
                 </button>
               ))}
             </div>

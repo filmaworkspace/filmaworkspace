@@ -359,7 +359,10 @@ export default function ProjectOverviewPage() {
         {/* Equipo del proyecto */}
         <section className="mt-12">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className={ui.sectionTitle}>Equipo</h2>
+            <h2 className={ui.sectionTitle}>
+              Equipo · {visibleMembers.length}
+              {!canViewAllMembers && members.length > visibleMembers.length ? ` de ${members.length}` : ""}
+            </h2>
             {userPermissions.config && (
               <Link href={`/project/${id}/config/users`} className="flex items-center gap-0.5 text-[13px] text-slate-500 hover:text-slate-900">
                 Gestionar <ChevronRight size={14} />
@@ -379,6 +382,7 @@ export default function ProjectOverviewPage() {
                 <div className={ui.card}>
                   <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
                     <h3 className="text-[13px] font-medium text-slate-900">Producción</h3>
+                    <span className="text-xs text-slate-400">{projectRoleMembers.length}</span>
                   </div>
                   <div className="divide-y divide-slate-100">
                     {projectRoleMembers.map((m) => <MemberRow key={m.userId} member={m} badge={m.role} />)}
@@ -389,6 +393,7 @@ export default function ProjectOverviewPage() {
                 <div className={ui.card}>
                   <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
                     <h3 className="text-[13px] font-medium text-slate-900">Departamentos</h3>
+                    <span className="text-xs text-slate-400">{departmentMembers.length}</span>
                   </div>
                   <div className="divide-y divide-slate-100">
                     {departmentMembers.map((m) => (
