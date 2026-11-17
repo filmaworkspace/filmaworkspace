@@ -8,7 +8,10 @@ import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
-import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import {
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+} from "firebase/auth";
 import {
   arrayUnion,
   collection,
@@ -19,7 +22,6 @@ import {
   query,
   Timestamp,
   updateDoc,
-  where,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
@@ -40,26 +42,18 @@ import {
   CreditCard,
   Download,
   Edit,
-  Euro,
   ExternalLink,
-  Eye,
-  EyeOff,
   FileCheck,
   FileText,
   FileUp,
   Glasses,
-  Hash,
   KeyRound,
   Layers,
   Link as LinkIcon,
   Lock,
   MoreHorizontal,
-  Percent,
   Plus,
-  Receipt,
   RefreshCw,
-  RotateCw,
-  Save,
   Search,
   ShieldAlert,
   Trash2,
@@ -1332,7 +1326,7 @@ export default function InvoiceDetailPage() {
                 </div>
                 <div className="col-span-2">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={codingForm.isAsset} onChange={(e) => setCodingForm({ ...codingForm, isAsset: e.target.checked })} className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                    <input type="checkbox" checked={codingForm.isAsset} onChange={(e) => setCodingForm({ ...codingForm, isAsset: e.target.checked })} className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500 text-[13px]" />
                     <span className="text-[13px] text-slate-700">Es un activo / inventario</span>
                   </label>
                 </div>

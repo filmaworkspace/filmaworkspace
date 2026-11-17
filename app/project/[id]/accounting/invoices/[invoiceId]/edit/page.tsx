@@ -29,26 +29,21 @@ import {
   AlertTriangle,
   ArrowLeft,
   Building2,
-  Calendar,
   CheckCircle,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   Circle,
   Clock,
-  Euro,
   Eye,
   FileCheck,
   FileText,
   Hash,
-  Info,
   Layers,
   Lock,
   Package,
-  Percent,
   Plus,
   Receipt,
-  RefreshCw,
   Save,
   Search,
   Send,
@@ -56,7 +51,6 @@ import {
   ShieldAlert,
   Trash2,
   Upload,
-  Users,
   X,
 } from "lucide-react";
 
@@ -923,7 +917,7 @@ export default function EditInvoicePage() {
     <div className={cx("min-h-screen bg-white", inter.className)}>
       {/* Header */}
       <div className="mt-[53px]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
+        <div className="px-6 pt-8 sm:px-10">
           <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3 flex-wrap justify-center">
@@ -975,7 +969,7 @@ export default function EditInvoicePage() {
       </div>
 
       {/* Main Content */}
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+      <main className="px-6 sm:px-10 py-8">
         {successMessage && (
           <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-3">
             <CheckCircle size={18} className="text-emerald-600" />
@@ -1268,7 +1262,7 @@ export default function EditInvoicePage() {
                         { id: "2", date: d2.toISOString().split("T")[0], type: "percentage", percentage: 50, amount: totals.totalAmount * 0.5 },
                       ]);
                     }
-                  }} className="w-4 h-4 rounded" />
+                  }} className="w-4 h-4 rounded text-[13px]" />
                 </label>
               </div>
 
@@ -1545,7 +1539,7 @@ export default function EditInvoicePage() {
                   const selected = tempEpisodeDistribution.find(e => e.episode === ep);
                   return (
                     <div key={ep} className={cx("flex items-center gap-3 p-3 rounded-lg border", selected ? "border-slate-300 bg-slate-50" : "border-slate-200")}>
-                      <input type="checkbox" checked={!!selected} onChange={() => toggleEpisodeInDistribution(ep)} className="w-4 h-4" />
+                      <input type="checkbox" checked={!!selected} onChange={() => toggleEpisodeInDistribution(ep)} className="w-4 h-4 text-[13px]" />
                       <span className="font-medium">Ep. {ep}</span>
                       {selected && episodeDistributionMode === "amount" && (
                         <input type="number" value={selected.amount || ""} onChange={e => updateEpisodeAmount(ep, parseFloat(e.target.value) || 0)} placeholder="0.00" className="ml-auto w-24 px-2 py-1 border border-slate-200 rounded text-[13px] text-right" />

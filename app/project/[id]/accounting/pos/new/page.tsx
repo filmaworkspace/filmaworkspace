@@ -17,14 +17,12 @@ import {
   orderBy,
   query,
   Timestamp,
-  updateDoc,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
   AlertCircle,
-  AlertTriangle,
   ArrowLeft,
   Building2,
   CheckCircle,
@@ -34,17 +32,13 @@ import {
   Circle,
   Clock,
   FileBox,
-  FileText,
   FileUp,
   Hash,
   Info,
   Layers,
   Lock,
   Package,
-  Percent,
   Plus,
-  RotateCcw,
-  Save,
   Search,
   Send,
   Shield,
@@ -1449,7 +1443,7 @@ export default function NewPOPage() {
                   <div className="relative" ref={currencyDropdownRef}>
                     <button
                       onClick={() => setShowCurrencyDropdown(!showCurrencyDropdown)}
-                      className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between bg-white hover:border-slate-300 transition-colors"
+                      className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between bg-white hover:border-slate-300 transition-colors text-[13px]"
                     >
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-slate-900">{CURRENCIES.find((c) => c.value === formData.currency)?.symbol}</span>

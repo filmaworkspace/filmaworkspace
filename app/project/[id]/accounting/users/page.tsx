@@ -9,7 +9,9 @@ import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import {
+  onAuthStateChanged,
+} from "firebase/auth";
 import {
   collection,
   deleteDoc,
@@ -34,7 +36,6 @@ import {
   Info,
   Package,
   Search,
-  Shield,
   Trash2,
   UserCheck,
   UserCog,
@@ -650,7 +651,7 @@ export default function AccountingUsersPage() {
                           checked={editingMember.accountingAccessLevel === key}
                           disabled={isDisabled}
                           onChange={(e) => !isDisabled && setEditingMember({ ...editingMember, accountingAccessLevel: e.target.value as any })}
-                          className="mt-1"
+                          className="mt-1 text-[13px]"
                         />
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
@@ -674,7 +675,7 @@ export default function AccountingUsersPage() {
                       type="checkbox"
                       checked={editingMember.boxAccess || false}
                       onChange={(e) => setEditingMember({ ...editingMember, boxAccess: e.target.checked })}
-                      className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 text-[13px]"
                     />
                     <div className="flex-1">
                       <p className="text-[13px] font-semibold text-slate-900">Acceso a BOX</p>
@@ -704,14 +705,14 @@ export default function AccountingUsersPage() {
                 <div className="flex gap-3">
                   <button
                     onClick={() => { setShowEditAccessModal(false); setEditingMember(null); }}
-                    className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 font-medium"
+                    className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 font-medium text-[13px]"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={handleUpdateAccessLevel}
                     disabled={saving}
-                    className={`flex-1 px-4 py-1.5 rounded-md font-medium disabled:opacity-50 text-white ${isDowngrade ? "bg-amber-600 hover:bg-amber-700" : "bg-slate-900 hover:bg-slate-800"}`}
+                    className={`flex-1 px-4 py-1.5 rounded-md font-medium disabled:opacity-50 text-white ${isDowngrade ? "bg-amber-600 hover:bg-amber-700" : "bg-slate-900 hover:bg-slate-800"} text-[13px]`}
                   >
                     {saving ? "Guardando..." : isDowngrade ? "Confirmar y bajar acceso" : "Guardar"}
                   </button>
@@ -737,20 +738,20 @@ export default function AccountingUsersPage() {
               <div className="space-y-4">
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-slate-600">Email del usuario</label>
-                  <input type="email" value={inviteForm.email} onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })} placeholder="usuario@ejemplo.com" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-slate-50" />
+                  <input type="email" value={inviteForm.email} onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })} placeholder="usuario@ejemplo.com" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-slate-50 text-[13px]" />
                   {userExists === true && foundUser && (<div className="mt-2 p-3 bg-emerald-50 border border-emerald-200 rounded-md flex items-start gap-2"><UserCheck size={18} className="text-emerald-600 mt-0.5" /><div><p className="text-[13px] font-medium text-emerald-900">Usuario registrado</p><p className="text-xs text-emerald-700">{foundUser.name}</p></div></div>)}
                   {userExists === false && inviteForm.email.length > 3 && (<div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-md flex items-start gap-2"><UserX size={18} className="text-amber-600 mt-0.5" /><div><p className="text-[13px] font-medium text-amber-900">Usuario no registrado</p><p className="text-xs text-amber-700">Se enviará invitación</p></div></div>)}
                 </div>
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre</label>
-                  <input type="text" value={inviteForm.name} onChange={(e) => setInviteForm({ ...inviteForm, name: e.target.value })} placeholder="Nombre completo" disabled={userExists === true} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-slate-50 disabled:bg-slate-100" />
+                  <input type="text" value={inviteForm.name} onChange={(e) => setInviteForm({ ...inviteForm, name: e.target.value })} placeholder="Nombre completo" disabled={userExists === true} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-slate-50 disabled:bg-slate-100 text-[13px]" />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-slate-600">Nivel de acceso</label>
                   <div className="space-y-2">
                     {Object.entries(ACCOUNTING_ACCESS_LEVELS).map(([key, value]) => (
                       <label key={key} className={`flex items-start gap-3 p-3 border rounded-md cursor-pointer transition-all ${inviteForm.accountingAccessLevel === key ? "border-slate-900 bg-slate-50" : "border-slate-200 hover:border-slate-300"}`}>
-                        <input type="radio" name="accountingAccessLevel" value={key} checked={inviteForm.accountingAccessLevel === key} onChange={(e) => setInviteForm({ ...inviteForm, accountingAccessLevel: e.target.value as any })} className="mt-1" />
+                        <input type="radio" name="accountingAccessLevel" value={key} checked={inviteForm.accountingAccessLevel === key} onChange={(e) => setInviteForm({ ...inviteForm, accountingAccessLevel: e.target.value as any })} className="mt-1 text-[13px]" />
                         <div className="flex-1">
                           <p className="text-[13px] font-semibold text-slate-900">{value.label}</p>
                         </div>
@@ -764,7 +765,7 @@ export default function AccountingUsersPage() {
                       type="checkbox"
                       checked={inviteForm.boxAccess}
                       onChange={(e) => setInviteForm({ ...inviteForm, boxAccess: e.target.checked })}
-                      className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 text-[13px]"
                     />
                     <div className="flex-1">
                       <p className="text-[13px] font-semibold text-slate-900">Acceso a BOX</p>
@@ -776,7 +777,7 @@ export default function AccountingUsersPage() {
                   <button
                     type="button"
                     onClick={() => openInviteDropdown(roleTypeDropdownRef, setShowRoleTypeDropdown, showRoleTypeDropdown)}
-                    className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between bg-slate-50 hover:border-slate-300 transition-colors"
+                    className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between bg-slate-50 hover:border-slate-300 transition-colors text-[13px]"
                   >
                     <span className="text-slate-900">{inviteForm.roleType === "project" ? "Rol de proyecto" : "Rol de departamento"}</span>
                     <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showRoleTypeDropdown ? "rotate-180" : "")} />
@@ -795,7 +796,7 @@ export default function AccountingUsersPage() {
                     <button
                       type="button"
                       onClick={() => openInviteDropdown(roleDropdownRef, setShowRoleDropdown, showRoleDropdown)}
-                      className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between bg-slate-50 hover:border-slate-300 transition-colors"
+                      className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between bg-slate-50 hover:border-slate-300 transition-colors text-[13px]"
                     >
                       <span className={inviteForm.role ? "text-slate-900" : "text-slate-400"}>{inviteForm.role || "Seleccionar"}</span>
                       <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showRoleDropdown ? "rotate-180" : "")} />
@@ -816,7 +817,7 @@ export default function AccountingUsersPage() {
                       <button
                         type="button"
                         onClick={() => openInviteDropdown(departmentDropdownRef, setShowDepartmentDropdown, showDepartmentDropdown)}
-                        className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between bg-slate-50 hover:border-slate-300 transition-colors"
+                        className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between bg-slate-50 hover:border-slate-300 transition-colors text-[13px]"
                       >
                         <span className={inviteForm.department ? "text-slate-900" : "text-slate-400"}>{inviteForm.department || "Seleccionar"}</span>
                         <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showDepartmentDropdown ? "rotate-180" : "")} />
@@ -835,7 +836,7 @@ export default function AccountingUsersPage() {
                       <button
                         type="button"
                         onClick={() => openInviteDropdown(positionDropdownRef, setShowPositionDropdown, showPositionDropdown)}
-                        className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between bg-slate-50 hover:border-slate-300 transition-colors"
+                        className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between bg-slate-50 hover:border-slate-300 transition-colors text-[13px]"
                       >
                         <span className={inviteForm.position ? "text-slate-900" : "text-slate-400"}>{inviteForm.position || "Seleccionar"}</span>
                         <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showPositionDropdown ? "rotate-180" : "")} />
@@ -851,7 +852,7 @@ export default function AccountingUsersPage() {
                     </div>
                   </>
                 )}
-                <button onClick={handleSendInvitation} disabled={saving} className="w-full mt-4 px-4 py-1.5 rounded-md font-medium disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">{saving ? "Enviando..." : "Dar acceso a contabilidad"}</button>
+                <button onClick={handleSendInvitation} disabled={saving} className="w-full mt-4 px-4 py-1.5 rounded-md font-medium disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] text-[13px]">{saving ? "Enviando..." : "Dar acceso a contabilidad"}</button>
               </div>
             </div>
           </div>

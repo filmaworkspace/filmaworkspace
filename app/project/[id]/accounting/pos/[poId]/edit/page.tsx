@@ -924,7 +924,7 @@ export default function EditPOPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[53px]">
-        <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
+        <div className="px-6 pt-8 sm:px-10">
           <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3 flex-wrap justify-center">
@@ -969,7 +969,7 @@ export default function EditPOPage() {
         </div>
       </div>
 
-      <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
+      <main className="px-6 sm:px-10 py-8">
         {successMessage && (
           <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-3">
             <CheckCircle size={18} className="text-emerald-600" />
@@ -1000,7 +1000,7 @@ export default function EditPOPage() {
                     onClick={() => canEdit() && setShowSupplierModal(true)}
                     disabled={!canEdit()}
                     onBlur={() => handleBlur("supplier")}
-                    className={`w-full px-4 py-2 border ${noSupplier ? "border-dashed border-slate-300 bg-slate-50" : hasError("supplier") ? "border-red-300 bg-red-50" : isValid("supplier") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"} rounded-md hover:border-slate-300 transition-colors text-left flex items-center justify-between bg-white disabled:bg-slate-50 disabled:cursor-not-allowed`}
+                    className={`w-full px-4 py-2 border ${noSupplier ? "border-dashed border-slate-300 bg-slate-50" : hasError("supplier") ? "border-red-300 bg-red-50" : isValid("supplier") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"} rounded-md hover:border-slate-300 transition-colors text-left flex items-center justify-between bg-white disabled:bg-slate-50 disabled:cursor-not-allowed text-[13px]`}
                   >
                     {formData.supplierName ? (
                       <div className="flex items-center gap-3">

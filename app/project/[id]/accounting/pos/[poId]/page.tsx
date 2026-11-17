@@ -8,7 +8,10 @@ import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
-import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import {
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+} from "firebase/auth";
 import {
   arrayUnion,
   collection,
@@ -44,7 +47,6 @@ import {
   Edit,
   ExternalLink,
   FileEdit,
-  FileText,
   FileUp,
   Glasses,
   Hash,
@@ -52,10 +54,7 @@ import {
   KeyRound,
   Layers,
   Lock,
-  MessageSquare,
   MoreHorizontal,
-  PenLine,
-  Receipt,
   ShieldAlert,
   Trash2,
   Unlock,

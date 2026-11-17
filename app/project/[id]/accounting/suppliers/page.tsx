@@ -26,7 +26,6 @@ import {
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
   AlertCircle,
-  ArrowLeft,
   Building2,
   CheckCircle,
   ChevronDown,
@@ -39,8 +38,6 @@ import {
   FileText,
   FileX,
   Filter,
-  Globe,
-  Hash,
   Lock,
   Mail,
   MapPin,
@@ -826,12 +823,12 @@ export default function SuppliersPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre fiscal *</label>
-                      <input type="text" value={formData.fiscalName} onChange={(e) => setFormData({ ...formData, fiscalName: e.target.value })} onBlur={handleFiscalNameBlur} placeholder="Razón social" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                      <input type="text" value={formData.fiscalName} onChange={(e) => setFormData({ ...formData, fiscalName: e.target.value })} onBlur={handleFiscalNameBlur} placeholder="Razón social" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
                       <p className="text-xs text-slate-500 mt-1">Se formateará automáticamente</p>
                     </div>
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre comercial</label>
-                      <input type="text" value={formData.commercialName} onChange={(e) => setFormData({ ...formData, commercialName: e.target.value })} onBlur={handleCommercialNameBlur} placeholder="Nombre comercial" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                      <input type="text" value={formData.commercialName} onChange={(e) => setFormData({ ...formData, commercialName: e.target.value })} onBlur={handleCommercialNameBlur} placeholder="Nombre comercial" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
                     </div>
                     <div ref={countryDropdownRef} className="relative">
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">País</label>
@@ -844,7 +841,7 @@ export default function SuppliersPage() {
                           }
                           setShowCountryDropdown(!showCountryDropdown); setCountrySearch("");
                         }}
-                        className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between hover:border-slate-300 transition-colors"
+                        className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between hover:border-slate-300 transition-colors text-[13px]"
                       >
                         <span className="text-slate-900">{getCountryInfo(formData.country).name}</span>
                         <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showCountryDropdown ? "rotate-180" : "")} />
@@ -883,7 +880,7 @@ export default function SuppliersPage() {
                     </div>
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">NIF/CIF *</label>
-                      <input type="text" value={formData.taxId} onChange={(e) => handleTaxIdChange(e.target.value)} placeholder={formData.country === "ES" ? "B12345678" : "ID fiscal"} className={`w-full px-2.5 py-1.5 border rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 font-mono uppercase ${taxIdError ? "border-red-300 bg-red-50" : "border-slate-200"}`} />
+                      <input type="text" value={formData.taxId} onChange={(e) => handleTaxIdChange(e.target.value)} placeholder={formData.country === "ES" ? "B12345678" : "ID fiscal"} className={`w-full px-2.5 py-1.5 border rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 font-mono uppercase ${taxIdError ? "border-red-300 bg-red-50" : "border-slate-200"} text-[13px]`} />
                       {taxIdError && <p className="text-xs text-red-600 mt-1 flex items-center gap-1"><AlertCircle size={12} />{taxIdError}</p>}
                     </div>
                   </div>
@@ -897,21 +894,21 @@ export default function SuppliersPage() {
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre</label>
                       <div className="relative">
                         <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input type="text" value={formData.contact.name} onChange={(e) => setFormData({ ...formData, contact: { ...formData.contact, name: e.target.value } })} placeholder="Nombre del contacto" className="w-full pl-10 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                        <input type="text" value={formData.contact.name} onChange={(e) => setFormData({ ...formData, contact: { ...formData.contact, name: e.target.value } })} placeholder="Nombre del contacto" className="w-full pl-10 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
                       </div>
                     </div>
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Email</label>
                       <div className="relative">
                         <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input type="email" value={formData.contact.email} onChange={(e) => setFormData({ ...formData, contact: { ...formData.contact, email: e.target.value } })} placeholder="email@ejemplo.com" className="w-full pl-10 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                        <input type="email" value={formData.contact.email} onChange={(e) => setFormData({ ...formData, contact: { ...formData.contact, email: e.target.value } })} placeholder="email@ejemplo.com" className="w-full pl-10 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
                       </div>
                     </div>
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Teléfono</label>
                       <div className="relative">
                         <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input type="tel" value={formData.contact.phone} onChange={(e) => setFormData({ ...formData, contact: { ...formData.contact, phone: e.target.value } })} placeholder="+34 600 000 000" className="w-full pl-10 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                        <input type="tel" value={formData.contact.phone} onChange={(e) => setFormData({ ...formData, contact: { ...formData.contact, phone: e.target.value } })} placeholder="+34 600 000 000" className="w-full pl-10 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
                       </div>
                     </div>
                   </div>
@@ -923,23 +920,23 @@ export default function SuppliersPage() {
                   <div className="grid grid-cols-3 gap-4">
                     <div className="col-span-2">
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Calle</label>
-                      <input type="text" value={formData.address.street} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, street: e.target.value } })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                      <input type="text" value={formData.address.street} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, street: e.target.value } })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
                     </div>
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Número</label>
-                      <input type="text" value={formData.address.number} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, number: e.target.value } })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                      <input type="text" value={formData.address.number} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, number: e.target.value } })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
                     </div>
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Población</label>
-                      <input type="text" value={formData.address.city} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, city: e.target.value } })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                      <input type="text" value={formData.address.city} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, city: e.target.value } })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
                     </div>
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Provincia</label>
-                      <input type="text" value={formData.address.province} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, province: e.target.value } })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                      <input type="text" value={formData.address.province} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, province: e.target.value } })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
                     </div>
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Código postal</label>
-                      <input type="text" value={formData.address.postalCode} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, postalCode: e.target.value } })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                      <input type="text" value={formData.address.postalCode} onChange={(e) => setFormData({ ...formData, address: { ...formData.address, postalCode: e.target.value } })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
                     </div>
                   </div>
                 </div>
@@ -959,7 +956,7 @@ export default function SuppliersPage() {
                           }
                           setShowPaymentMethodDropdown(!showPaymentMethodDropdown);
                         }}
-                        className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between hover:border-slate-300 transition-colors"
+                        className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between hover:border-slate-300 transition-colors text-[13px]"
                       >
                         <span className="text-slate-900">{PAYMENT_METHODS.find(m => m.value === formData.paymentMethod)?.label}</span>
                         <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showPaymentMethodDropdown ? "rotate-180" : "")} />
@@ -987,8 +984,8 @@ export default function SuppliersPage() {
                         bic={formData.bic}
                         onIBANChange={(v) => setFormData({ ...formData, bankAccount: v })}
                         onBICChange={(v) => setFormData({ ...formData, bic: v })}
-                        ibanClassName="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
-                        bicClassName="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
+                        ibanClassName="w-full px-2.5 py-1.5 text-[13px] border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
+                        bicClassName="w-full px-2.5 py-1.5 text-[13px] border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
                         ibanPlaceholder="Pega 20 dígitos o IBAN completo"
                         bicPlaceholder="BIC/SWIFT (opcional)"
                       />
@@ -1006,7 +1003,7 @@ export default function SuppliersPage() {
                         <h4 className="font-medium text-slate-900">Certificado de titularidad bancaria</h4>
                         {canVerifyCertificates ? (
                           <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={certificates.bankOwnership.verified} onChange={(e) => setCertificates({ ...certificates, bankOwnership: { ...certificates.bankOwnership, verified: e.target.checked } })} className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                            <input type="checkbox" checked={certificates.bankOwnership.verified} onChange={(e) => setCertificates({ ...certificates, bankOwnership: { ...certificates.bankOwnership, verified: e.target.checked } })} className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 text-[13px]" />
                             <span className="text-[13px] text-slate-600 flex items-center gap-1"><ShieldCheck size={14} className="text-emerald-600" />Verificado</span>
                           </label>
                         ) : (
@@ -1040,7 +1037,7 @@ export default function SuppliersPage() {
                         <h4 className="font-medium text-slate-900">Certificado de contratistas</h4>
                         {canVerifyCertificates ? (
                           <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={certificates.contractorsCertificate.verified} onChange={(e) => setCertificates({ ...certificates, contractorsCertificate: { ...certificates.contractorsCertificate, verified: e.target.checked } })} className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                            <input type="checkbox" checked={certificates.contractorsCertificate.verified} onChange={(e) => setCertificates({ ...certificates, contractorsCertificate: { ...certificates.contractorsCertificate, verified: e.target.checked } })} className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 text-[13px]" />
                             <span className="text-[13px] text-slate-600 flex items-center gap-1"><ShieldCheck size={14} className="text-emerald-600" />Verificado</span>
                           </label>
                         ) : (
@@ -1068,8 +1065,8 @@ export default function SuppliersPage() {
 
             {/* Actions */}
             <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 bg-slate-50">
-              <button onClick={() => { setShowModal(false); resetForm(); }} className="px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-white font-medium transition-colors">Cancelar</button>
-              <button onClick={modalMode === "create" ? handleCreateSupplier : handleUpdateSupplier} disabled={saving} className="px-4 py-1.5 rounded-md font-medium transition-colors disabled:opacity-50 flex items-center gap-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
+              <button onClick={() => { setShowModal(false); resetForm(); }} className="px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-white font-medium transition-colors text-[13px]">Cancelar</button>
+              <button onClick={modalMode === "create" ? handleCreateSupplier : handleUpdateSupplier} disabled={saving} className="px-4 py-1.5 rounded-md font-medium transition-colors disabled:opacity-50 flex items-center gap-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] text-[13px]">
                 {saving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                 {modalMode === "create" ? "Crear proveedor" : "Guardar cambios"}
               </button>

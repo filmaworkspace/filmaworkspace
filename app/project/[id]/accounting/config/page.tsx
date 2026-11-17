@@ -9,7 +9,9 @@ import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import {
+  onAuthStateChanged,
+} from "firebase/auth";
 import {
   addDoc,
   collection,
@@ -39,15 +41,12 @@ import {
   Edit2,
   FileCheck,
   FileText,
-  Film,
-  Info,
   Landmark,
   Layers,
   Package,
   Plus,
   Receipt,
   Save,
-  Settings,
   Shield,
   Star,
   Trash2,
@@ -1008,7 +1007,7 @@ export default function AccountingConfigPage() {
                   type="checkbox"
                   checked={step.hasAmountThreshold}
                   onChange={(e) => updateStep(type, step.id, "hasAmountThreshold", e.target.checked)}
-                  className="w-4 h-4 mt-0.5 text-amber-600 border-slate-300 rounded focus:ring-amber-500"
+                  className="w-4 h-4 mt-0.5 text-amber-600 border-slate-300 rounded focus:ring-amber-500 text-[13px]"
                 />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
@@ -1187,7 +1186,7 @@ export default function AccountingConfigPage() {
                           type="checkbox"
                           checked={step.roles?.includes(role) || false}
                           onChange={() => toggleRole(type, step.id, role)}
-                          className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
+                          className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500 text-[13px]"
                         />
                         <div>
                           <p className="text-[13px] font-medium text-slate-900">{role}</p>
@@ -1242,7 +1241,7 @@ export default function AccountingConfigPage() {
                           type="checkbox"
                           checked={step.approvers?.includes(m.userId) || false}
                           onChange={() => toggleApprover(type, step.id, m.userId)}
-                          className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
+                          className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500 text-[13px]"
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] font-medium text-slate-900 truncate">{m.name}</p>
@@ -1309,7 +1308,7 @@ export default function AccountingConfigPage() {
                   type="checkbox"
                   checked={step.requireAll}
                   onChange={(e) => updateStep(type, step.id, "requireAll", e.target.checked)}
-                  className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
+                  className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500 text-[13px]"
                 />
                 <div>
                   <p className="text-[13px] font-medium text-slate-900">Requiere aprobación de todos</p>
@@ -1595,7 +1594,7 @@ export default function AccountingConfigPage() {
                     checked={isSelected}
                     disabled={isDisabled}
                     onChange={(e) => !isDisabled && setCostSettings({ ...costSettings, poCommitmentTrigger: e.target.value as any })}
-                    className="mt-1 w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-500"
+                    className="mt-1 w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-500 text-[13px]"
                   />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
@@ -1647,7 +1646,7 @@ export default function AccountingConfigPage() {
                     checked={isSelected}
                     disabled={isDisabled}
                     onChange={(e) => !isDisabled && setCostSettings({ ...costSettings, invoiceActualTrigger: e.target.value as any })}
-                    className="mt-1 w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-500"
+                    className="mt-1 w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-500 text-[13px]"
                   />
                   <div className="flex-1">
                     <p className={`font-medium ${isDisabled ? "text-slate-400" : "text-slate-900"}`}>{trigger.label}</p>
@@ -1688,7 +1687,7 @@ export default function AccountingConfigPage() {
                     checked={isSelected}
                     disabled={isDisabled}
                     onChange={(e) => !isDisabled && setCostSettings({ ...costSettings, boxActualTrigger: e.target.value as any })}
-                    className="mt-1 w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-500"
+                    className="mt-1 w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-500 text-[13px]"
                   />
                   <div className="flex-1">
                     <p className={`font-medium ${isDisabled ? "text-slate-400" : "text-slate-900"}`}>{trigger.label}</p>
@@ -1720,7 +1719,7 @@ export default function AccountingConfigPage() {
                 type="checkbox"
                 checked={projectSettings.enableEpisodes}
                 onChange={(e) => setProjectSettings({ ...projectSettings, enableEpisodes: e.target.checked })}
-                className="w-5 h-5 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
+                className="w-5 h-5 text-slate-900 border-slate-300 rounded focus:ring-slate-500 text-[13px]"
               />
             </label>
             
@@ -1734,7 +1733,7 @@ export default function AccountingConfigPage() {
                   type="checkbox"
                   checked={projectSettings.requireEpisodeAssignment}
                   onChange={(e) => setProjectSettings({ ...projectSettings, requireEpisodeAssignment: e.target.checked })}
-                  className="w-5 h-5 text-amber-600 border-amber-300 rounded focus:ring-amber-500"
+                  className="w-5 h-5 text-amber-600 border-amber-300 rounded focus:ring-amber-500 text-[13px]"
                 />
               </label>
             )}
@@ -2048,7 +2047,7 @@ export default function AccountingConfigPage() {
                             type="checkbox"
                             checked={setting.users.includes(m.userId)}
                             onChange={() => togglePermissionUser(config.id, m.userId)}
-                            className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
+                            className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500 text-[13px]"
                           />
                           <div className="flex-1 min-w-0">
                             <p className="text-[13px] font-medium text-slate-900 truncate">{m.name}</p>
@@ -2206,7 +2205,7 @@ export default function AccountingConfigPage() {
                         isActive
                           ? "bg-[#F1F1F3] text-slate-900"
                           : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                      }`}
+                      } text-[13px]`}
                     >
                       <Icon size={16} className={isActive ? "text-slate-900" : "text-slate-400"} />
                       <span className={`text-[13px] font-medium ${isActive ? "text-slate-900" : ""}`}>{section.label}</span>
@@ -2336,7 +2335,7 @@ export default function AccountingConfigPage() {
                   type="checkbox"
                   checked={bankAccountForm.isDefault || false}
                   onChange={(e) => setBankAccountForm({ ...bankAccountForm, isDefault: e.target.checked })}
-                  className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                  className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 text-[13px]"
                 />
                 <div>
                   <p className="text-[13px] font-medium text-slate-700 flex items-center gap-2">

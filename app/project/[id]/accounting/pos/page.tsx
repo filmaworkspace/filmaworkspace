@@ -8,7 +8,10 @@ import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
-import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import {
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+} from "firebase/auth";
 import {
   collection,
   doc,
@@ -28,7 +31,6 @@ import {
   ArrowUpDown,
   Ban,
   Building2,
-  Calendar,
   CheckCircle2,
   ChevronDown,
   Clock,
@@ -38,7 +40,6 @@ import {
   Eye,
   FileEdit,
   FileText,
-  Hash,
   KeyRound,
   Lock,
   MoreHorizontal,
@@ -773,7 +774,7 @@ export default function POsPage() {
               <button
                 key={status}
                 onClick={() => setStatusFilter(isActive ? "all" : status)}
-                className={`relative rounded-lg border px-4 py-3 text-left transition-colors ${isActive ? "border-slate-900 bg-white" : "border-slate-200 bg-white hover:border-slate-300"}`}
+                className={`relative rounded-lg border px-4 py-3 text-left transition-colors ${isActive ? "border-slate-900 bg-white" : "border-slate-200 bg-white hover:border-slate-300"} text-[13px]`}
               >
                 <p className="flex items-center gap-1.5 text-xs text-slate-500">
                   <span className={`h-1.5 w-1.5 rounded-full bg-current ${config.text}`} />

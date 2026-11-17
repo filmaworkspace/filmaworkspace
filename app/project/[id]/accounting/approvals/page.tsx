@@ -9,7 +9,9 @@ import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import {
+  onAuthStateChanged,
+} from "firebase/auth";
 import {
   collection,
   doc,
@@ -26,7 +28,6 @@ import {
   AlertCircle,
   AlertTriangle,
   Award,
-  Banknote,
   Building2,
   Calendar,
   Check,
@@ -35,10 +36,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
-  ClipboardCheck,
   Clock,
-  CreditCard,
-  DollarSign,
   ExternalLink,
   Eye,
   FileCheck,
@@ -56,11 +54,9 @@ import {
   Send,
   Shield,
   Target,
-  TrendingUp,
   User,
   X,
   XCircle,
-  Zap,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────

@@ -28,13 +28,10 @@ import {
 import {
   AlertCircle,
   ArrowLeft,
-  Building2,
-  Calendar,
   CheckCircle,
   ChevronDown,
   ChevronRight,
   Copy,
-  CreditCard,
   Download,
   Edit,
   ExternalLink,
@@ -43,8 +40,6 @@ import {
   FileText,
   Lock,
   Mail,
-  MapPin,
-  Package,
   Phone,
   Receipt,
   RotateCcw,
@@ -1392,8 +1387,8 @@ export default function SupplierDetailPage() {
                           bic={editForm.bic}
                           onIBANChange={(v) => setEditForm({ ...editForm, bankAccount: v })}
                           onBICChange={(v) => setEditForm({ ...editForm, bic: v })}
-                          ibanClassName="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                          bicClassName="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                          ibanClassName="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
+                          bicClassName="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
                           ibanPlaceholder="Pega 20 dígitos o IBAN completo"
                           bicPlaceholder="BIC/SWIFT"
                         />

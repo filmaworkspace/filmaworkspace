@@ -8,7 +8,12 @@ import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  orderBy,
+  query,
+} from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
@@ -23,7 +28,6 @@ import {
   FileCheck,
   FileImage,
   FileText,
-  FolderDown,
   Paperclip,
   Receipt,
   Search,

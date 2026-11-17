@@ -52,7 +52,6 @@ import {
   Shield,
   ShieldAlert,
   Trash2,
-  Upload,
   Wallet,
   X,
 } from "lucide-react";
@@ -1085,11 +1084,11 @@ export default function PaymentsPage() {
             <div className="p-6 space-y-4">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre de la previsión</label>
-                <input type="text" value={newForecast.name} onChange={(e) => setNewForecast({ ...newForecast, name: e.target.value })} placeholder="Nombre de la remesa" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                <input type="text" value={newForecast.name} onChange={(e) => setNewForecast({ ...newForecast, name: e.target.value })} placeholder="Nombre de la remesa" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">Fecha de pago</label>
-                <input type="date" value={newForecast.paymentDate} onChange={(e) => setNewForecast({ ...newForecast, paymentDate: e.target.value })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                <input type="date" value={newForecast.paymentDate} onChange={(e) => setNewForecast({ ...newForecast, paymentDate: e.target.value })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">Tipo de pago</label>
@@ -1106,7 +1105,7 @@ export default function PaymentsPage() {
                   </button>
                 </div>
               </div>
-              <button onClick={handleCreateForecast} disabled={!newForecast.name.trim() || !newForecast.paymentDate} className="w-full mt-4 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md font-medium transition-opacity disabled:opacity-50">Crear previsión</button>
+              <button onClick={handleCreateForecast} disabled={!newForecast.name.trim() || !newForecast.paymentDate} className="w-full mt-4 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md font-medium transition-opacity disabled:opacity-50 text-[13px]">Crear previsión</button>
             </div>
           </div>
         </div>
@@ -1183,26 +1182,26 @@ export default function PaymentsPage() {
               {newPayment.type === "partial" && newPayment.invoiceId && (
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-slate-600">Importe parcial (de {formatCurrency(newPayment.amount)} €)</label>
-                  <input type="number" value={newPayment.partialAmount || ""} onChange={(e) => setNewPayment({ ...newPayment, partialAmount: parseFloat(e.target.value) || 0 })} placeholder="0.00" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                  <input type="number" value={newPayment.partialAmount || ""} onChange={(e) => setNewPayment({ ...newPayment, partialAmount: parseFloat(e.target.value) || 0 })} placeholder="0.00" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
                 </div>
               )}
               {newPayment.type !== "invoice" && newPayment.type !== "partial" && (
                 <>
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-slate-600">Proveedor</label>
-                    <input type="text" value={newPayment.supplier} onChange={(e) => setNewPayment({ ...newPayment, supplier: e.target.value })} placeholder="Nombre del proveedor" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                    <input type="text" value={newPayment.supplier} onChange={(e) => setNewPayment({ ...newPayment, supplier: e.target.value })} placeholder="Nombre del proveedor" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
                   </div>
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-slate-600">Descripción</label>
-                    <input type="text" value={newPayment.description} onChange={(e) => setNewPayment({ ...newPayment, description: e.target.value })} placeholder="Concepto del pago" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                    <input type="text" value={newPayment.description} onChange={(e) => setNewPayment({ ...newPayment, description: e.target.value })} placeholder="Concepto del pago" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
                   </div>
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-slate-600">Importe</label>
-                    <input type="number" value={newPayment.amount || ""} onChange={(e) => setNewPayment({ ...newPayment, amount: parseFloat(e.target.value) || 0 })} placeholder="0.00" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                    <input type="number" value={newPayment.amount || ""} onChange={(e) => setNewPayment({ ...newPayment, amount: parseFloat(e.target.value) || 0 })} placeholder="0.00" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
                   </div>
                 </>
               )}
-              <button onClick={() => handleAddPaymentToForecast(selectedForecastId)} disabled={(newPayment.type === "invoice" && !newPayment.invoiceId) || (newPayment.type === "partial" && (!newPayment.invoiceId || !newPayment.partialAmount)) || (newPayment.type !== "invoice" && newPayment.type !== "partial" && (!newPayment.supplier || !newPayment.amount))} className="w-full mt-4 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md font-medium transition-opacity disabled:opacity-50">Añadir pago</button>
+              <button onClick={() => handleAddPaymentToForecast(selectedForecastId)} disabled={(newPayment.type === "invoice" && !newPayment.invoiceId) || (newPayment.type === "partial" && (!newPayment.invoiceId || !newPayment.partialAmount)) || (newPayment.type !== "invoice" && newPayment.type !== "partial" && (!newPayment.supplier || !newPayment.amount))} className="w-full mt-4 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md font-medium transition-opacity disabled:opacity-50 text-[13px]">Añadir pago</button>
             </div>
           </div>
         </div>

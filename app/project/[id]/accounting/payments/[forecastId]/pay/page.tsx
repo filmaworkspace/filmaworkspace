@@ -28,10 +28,8 @@ import {
   CheckCircle,
   CheckCircle2,
   ChevronDown,
-  ChevronUp,
   CircleDollarSign,
   Clock,
-  CreditCard,
   Download,
   Euro,
   ExternalLink,
@@ -40,7 +38,6 @@ import {
   FileUp,
   Info,
   Landmark,
-  MoreHorizontal,
   PiggyBank,
   Receipt,
   Shield,
@@ -599,21 +596,20 @@ export default function PaymentPayPage() {
       {toast && <div className="fixed bottom-4 left-4 z-[60]"><div className={`flex items-center gap-2 px-4 py-3 rounded-md shadow-lg text-white text-[13px] font-medium ${toast.type === "success" ? "bg-emerald-600" : toast.type === "error" ? "bg-red-600" : "bg-amber-500"}`}>{toast.type === "success" ? <CheckCircle2 size={16} /> : toast.type === "error" ? <AlertCircle size={16} /> : <AlertTriangle size={16} />}{toast.message}</div></div>}
 
       {/* Header */}
-      <div className="bg-emerald-600 text-white px-6 py-3 flex items-center justify-between fixed top-0 left-0 right-0 z-50">
+      <div className="bg-white border-b border-slate-200 text-slate-900 px-5 h-[53px] flex items-center justify-between fixed top-0 left-0 right-0 z-50">
         <div className="flex items-center gap-4">
-          <button onClick={() => router.push(`/project/${id}/accounting/payments`)} className="p-2 hover:bg-emerald-700 rounded-lg"><X size={20} /></button>
+          <button onClick={() => router.push(`/project/${id}/accounting/payments`)} className="p-1.5 text-slate-400 hover:bg-[#F4F4F5] hover:text-slate-900 rounded-md" title="Salir"><X size={18} /></button>
           <div className="flex items-center gap-3">
-            <CreditCard size={20} />
-            <span className="font-semibold">Pagar remesa</span>
-            <span className="bg-emerald-500 px-2 py-0.5 rounded text-[13px]">{forecast.name}</span>
+            <span className="text-[15px] font-semibold tracking-tight">Pagar remesa</span>
+            <span className="rounded border border-slate-200 bg-[#F7F7F8] px-1.5 py-0.5 text-[11px] font-medium text-slate-600">{forecast.name}</span>
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-6 text-emerald-100 text-[13px]">
-            <span>Pendiente: <span className="font-bold text-white">{formatCurrency(totalPending)} €</span></span>
-            <span>Completado: <span className="font-bold text-white">{formatCurrency(totalCompleted)} €</span></span>
+          <div className="flex items-center gap-5 text-slate-500 text-[13px]">
+            <span>Pendiente: <span className="font-medium text-slate-900 tabular-nums">{formatCurrency(totalPending)} €</span></span>
+            <span>Completado: <span className="font-medium text-slate-900 tabular-nums">{formatCurrency(totalCompleted)} €</span></span>
           </div>
-          <button onClick={() => setShowSepaModal(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-700 text-white rounded-md text-[13px] font-medium hover:bg-emerald-800">
+          <button onClick={() => setShowSepaModal(true)} className="flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium">
             <Download size={16} />SEPA XML
           </button>
         </div>
@@ -952,7 +948,7 @@ export default function PaymentPayPage() {
                   <div className="space-y-2">
                     {bankAccounts.map((acc) => (
                       <label key={acc.id} className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer ${selectedBankAccount?.id === acc.id ? "border-emerald-500 bg-emerald-50" : "border-slate-200 hover:border-slate-300"}`}>
-                        <input type="radio" name="bankAccount" checked={selectedBankAccount?.id === acc.id} onChange={() => setSelectedBankAccount(acc)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
+                        <input type="radio" name="bankAccount" checked={selectedBankAccount?.id === acc.id} onChange={() => setSelectedBankAccount(acc)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 text-[13px]" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2"><p className="text-[13px] font-medium text-slate-900">{acc.alias}</p>{acc.isDefault && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Principal</span>}</div>
                           <p className="text-xs font-mono text-slate-400 mt-0.5">{acc.iban.replace(/(.{4})/g, "$1 ").trim()}</p>

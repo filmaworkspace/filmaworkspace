@@ -52,7 +52,6 @@ import {
   Layers,
   Lock,
   Maximize2,
-  Package,
   PanelRightOpen,
   Paperclip,
   Plus,
@@ -69,11 +68,7 @@ import {
   SplitSquareHorizontal,
   Trash2,
   Upload,
-  UserCircle,
-  Users,
   X,
-  ZoomIn,
-  ZoomOut,
 } from "lucide-react";
 
 // ─── Libraries ───────────────────────────────────────────────────────────────
@@ -3287,7 +3282,7 @@ export default function BoxesPage() {
                 <input type="text" value={boxForm.name}
                   onChange={e => { const name = e.target.value; setBoxForm({ ...boxForm, name, code: boxForm.code || generateCode(name) }); }}
                   placeholder="Nombre del titular"
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">Código *</label>
@@ -3298,7 +3293,7 @@ export default function BoxesPage() {
                       <input type="text" value={boxForm.code}
                         onChange={e => setBoxForm({ ...boxForm, code: e.target.value.toUpperCase().slice(0, 3) })}
                         placeholder="LG" maxLength={3}
-                        className={`w-full px-2.5 py-1.5 border rounded-md focus:outline-none focus:ring-4 font-mono uppercase transition-colors ${isDuplicate ? "border-red-400 bg-red-50 focus:ring-red-400" : "border-slate-200 focus:ring-slate-900/10 focus:border-slate-900"}`} />
+                        className={`w-full px-2.5 py-1.5 border rounded-md focus:outline-none focus:ring-4 font-mono uppercase transition-colors ${isDuplicate ? "border-red-400 bg-red-50 focus:ring-red-400" : "border-slate-200 focus:ring-slate-900/10 focus:border-slate-900"} text-[13px]`} />
                       {isDuplicate && (
                         <p className="flex items-center gap-1.5 mt-1.5 text-xs text-red-600 font-medium">
                           <AlertCircle size={12} />
@@ -3312,7 +3307,7 @@ export default function BoxesPage() {
               <div ref={departmentDropdownRef} className="relative">
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">Departamento</label>
                 <button type="button" onClick={() => setShowDepartmentDropdown(!showDepartmentDropdown)}
-                  className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between">
+                  className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between text-[13px]">
                   <span className={boxForm.department ? "text-slate-900" : "text-slate-400"}>{boxForm.department || "Seleccionar"}</span>
                   <ChevronDown size={16} className="text-slate-400" />
                 </button>
@@ -3354,7 +3349,7 @@ export default function BoxesPage() {
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre *</label>
                 <input type="text" value={editBoxForm.name}
                   onChange={e => setEditBoxForm({ ...editBoxForm, name: e.target.value })}
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">Código *</label>
@@ -3366,7 +3361,7 @@ export default function BoxesPage() {
                       <input type="text" value={editBoxForm.code}
                         onChange={e => setEditBoxForm({ ...editBoxForm, code: e.target.value.toUpperCase().slice(0, 3) })}
                         maxLength={3}
-                        className={`w-full px-2.5 py-1.5 border rounded-md focus:outline-none focus:ring-4 font-mono uppercase transition-colors ${isDuplicate ? "border-red-400 bg-red-50 focus:ring-red-400" : "border-slate-200 focus:ring-slate-900/10 focus:border-slate-900"}`} />
+                        className={`w-full px-2.5 py-1.5 border rounded-md focus:outline-none focus:ring-4 font-mono uppercase transition-colors ${isDuplicate ? "border-red-400 bg-red-50 focus:ring-red-400" : "border-slate-200 focus:ring-slate-900/10 focus:border-slate-900"} text-[13px]`} />
                       {isDuplicate && (
                         <p className="flex items-center gap-1.5 mt-1.5 text-xs text-red-600 font-medium">
                           <AlertCircle size={12} />
@@ -3851,12 +3846,12 @@ export default function BoxesPage() {
                   <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre *</label>
                   <input type="text" value={transferEnvelopeForm.personName}
                     onChange={e => setTransferEnvelopeForm({ ...transferEnvelopeForm, personName: e.target.value })}
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]" />
                 </div>
                 <div ref={expenseDepartmentDropdownRef} className="relative">
                   <label className="mb-1.5 block text-xs font-medium text-slate-600">Departamento</label>
                   <button type="button" onClick={() => setShowExpenseDepartmentDropdown(!showExpenseDepartmentDropdown)}
-                    className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between bg-white hover:border-slate-300">
+                    className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between bg-white hover:border-slate-300 text-[13px]">
                     <span className={transferEnvelopeForm.personDepartment ? "text-slate-900" : "text-slate-400"}>{transferEnvelopeForm.personDepartment || "Seleccionar"}</span>
                     <ChevronDown size={16} className="text-slate-400" />
                   </button>
@@ -3878,7 +3873,7 @@ export default function BoxesPage() {
                 <textarea value={transferEnvelopeForm.notes}
                   onChange={e => setTransferEnvelopeForm({ ...transferEnvelopeForm, notes: e.target.value })}
                   rows={2} placeholder="Observaciones"
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 resize-none" />
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 resize-none text-[13px]" />
               </div>
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 flex-shrink-0">
@@ -4131,7 +4126,7 @@ export default function BoxesPage() {
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Referencia (opcional)</label>
                       <input type="text" value={settleForm.reference} onChange={e => setSettleForm({ ...settleForm, reference: e.target.value })} placeholder="2024-PC-001"
-                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 font-mono" />
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 font-mono text-[13px]" />
                     </div>
                   </>
                 )}
@@ -4171,7 +4166,7 @@ export default function BoxesPage() {
                   <input type="number" min="0" step="0.01" value={advanceForm.amount}
                     onChange={e => setAdvanceForm({ ...advanceForm, amount: e.target.value })}
                     placeholder="500,00"
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 font-mono" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 font-mono text-[13px]" />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-slate-600">Método</label>
@@ -4187,7 +4182,7 @@ export default function BoxesPage() {
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">Fecha</label>
                 <input type="date" value={advanceForm.date}
                   onChange={e => setAdvanceForm({ ...advanceForm, date: e.target.value })}
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
               </div>
               {advanceForm.method === "bank" && (
                 <div>
@@ -4431,7 +4426,7 @@ export default function BoxesPage() {
                   ) : (
                     <div className="relative">
                       <button type="button" onClick={() => setShowVolcarEnvDropdown(!showVolcarEnvDropdown)}
-                        className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white">
+                        className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white text-[13px]">
                         <span className={selectedEnv ? "text-slate-900 text-sm" : "text-slate-400 text-sm"}>
                           {selectedEnv ? `${selectedEnv.displayNumber}${selectedEnv.paymentDate ? ` · ${selectedEnv.paymentDate}` : ""}` : "Seleccionar sobre"}
                         </span>
@@ -4789,7 +4784,7 @@ export default function BoxesPage() {
                       type="checkbox"
                       checked={exportConfig.mapCategories}
                       onChange={(e) => setExportConfig({ ...exportConfig, mapCategories: e.target.checked })}
-                      className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+                      className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500 text-[13px]"
                     />
                     <span className="text-[13px] text-slate-700">Mapeo de departamentos y cuentas presupuestarias</span>
                   </label>
@@ -4798,7 +4793,7 @@ export default function BoxesPage() {
                       type="checkbox"
                       checked={exportConfig.mapReceipts}
                       onChange={(e) => setExportConfig({ ...exportConfig, mapReceipts: e.target.checked })}
-                      className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+                      className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500 text-[13px]"
                     />
                     <span className="text-[13px] text-slate-700">Adjuntar justificantes y tickets</span>
                   </label>

@@ -29,7 +29,6 @@ import {
   ChevronDown,
   CreditCard,
   Download,
-  FileSpreadsheet,
   FileText,
   Film,
   GripVertical,
