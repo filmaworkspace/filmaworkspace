@@ -3,12 +3,16 @@
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import { inter } from "@/lib/fonts";
+import {
+  Button, EmptyState, Field, IconButton, Input, Menu, MenuItem, Modal,
+  NoAccess, Page, PageHeader, PageLoading, Table, Td, Th, Tr, useToast,
+} from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import {
+  onAuthStateChanged,
+} from "firebase/auth";
 import {
   arrayRemove,
   arrayUnion,
@@ -21,16 +25,7 @@ import {
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  AlertCircle,
-  ArrowLeft,
-  Briefcase,
-  CheckCircle,
-  ChevronDown,
   MoreHorizontal,
-  Plus,
-  Trash2,
-  Users,
-  X,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -67,14 +62,10 @@ export default function ConfigDepartments() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newDepartment, setNewDepartment] = useState("");
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
-  const showToast = (type: "success" | "error", message: string) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 3000);
-  };
+  const [toastNode, showToast] = useToast();
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -135,201 +126,100 @@ export default function ConfigDepartments() {
     } catch { showToast("error", "Error"); } finally { setSaving(false); setConfirmDelete(null); setActiveMenu(null); }
   };
 
-  if (loading) return (
-    <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-      <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
-    </div>
-  );
+  if (loading) return <PageLoading />;
+  if (!hasConfigAccess) return <NoAccess />;
 
-  if (!hasConfigAccess) return (
-    <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-      <div className="text-center max-w-md">
-        <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <AlertCircle size={28} className="text-slate-400" />
-        </div>
-        <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
-        <p className="text-slate-500 mb-6">No tienes acceso a esta configuración</p>
-        <Link href="/dashboard" className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors">
-          <ArrowLeft size={16} />
-          Volver a Proyectos
-        </Link>
-      </div>
-    </div>
-  );
+  const unassigned = members.filter((m) => m.department && !departments.includes(m.department)).length;
 
   return (
-    <div className={`min-h-screen bg-white ${inter.className}`}>
-      {toast && (
-        <div className={`fixed bottom-4 left-4 z-50 px-4 py-3 rounded-2xl text-sm font-medium shadow-lg flex items-center gap-2 ${toast.type === "success" ? "bg-slate-900 text-white" : "bg-red-600 text-white"}`}>
-          {toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-          {toast.message}
-        </div>
-      )}
+    <Page>
+      {toastNode}
 
-      {/* Delete Modal */}
-      {confirmDelete && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-sm w-full shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">¿Eliminar departamento?</h3>
-              <button onClick={() => setConfirmDelete(null)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="p-6">
-              <p className="text-sm text-slate-500 mb-6">Se eliminará &quot;<span className="font-medium text-slate-700">{confirmDelete}</span>&quot; del proyecto.</p>
-              <div className="flex gap-3">
-                <button onClick={() => setConfirmDelete(null)} className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">
-                  Cancelar
-                </button>
-                <button onClick={() => handleRemoveDepartment(confirmDelete)} disabled={saving} className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50">
-                  Eliminar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <PageHeader
+        title="Departamentos"
+        meta={`${departments.length} ${departments.length === 1 ? "departamento" : "departamentos"}`}
+        actions={<Button variant="primary" onClick={() => setShowAddForm(true)}>Nuevo departamento</Button>}
+      />
 
-      {/* Header */}
-      <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
-          <div className="relative flex items-center justify-center">
-            <div className="flex items-center gap-4">
-              <Briefcase size={22} className="text-slate-900" />
-              <h1 className="text-3xl font-bold text-slate-900 text-center">Departamentos del proyecto</h1>
-            </div>
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="absolute right-0 flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors bg-slate-900"
-            >
-              <Plus size={16} strokeWidth={2.5} />
-              Nuevo
-            </button>
-          </div>
-        </div>
+      <div className="mt-6">
+        {departmentsData.length === 0 ? (
+          <EmptyState
+            title="Aún no hay departamentos"
+            action={<Button size="sm" onClick={() => setShowAddForm(true)}>Crear el primero</Button>}
+          />
+        ) : (
+          <Table>
+            <thead>
+              <tr><Th>Departamento</Th><Th align="right" className="w-24">Miembros</Th><Th>Personas</Th><Th className="w-10" /></tr>
+            </thead>
+            <tbody>
+              {departmentsData.map((dept) => (
+                <Tr key={dept.name}>
+                  <Td className="font-medium text-slate-900">{dept.name}</Td>
+                  <Td align="right" className="tabular-nums">{dept.members.length}</Td>
+                  <Td className="max-w-0 w-full">
+                    <p className="truncate text-slate-500">
+                      {dept.members.length
+                        ? dept.members.map((m) => (m.position ? `${m.name} (${m.position})` : m.name)).join(", ")
+                        : <span className="text-slate-300">—</span>}
+                    </p>
+                  </Td>
+                  <Td align="right">
+                    <Menu trigger={(toggle) => <IconButton label="Acciones" onClick={toggle}><MoreHorizontal size={15} /></IconButton>}>
+                      {(close) => (
+                        <MenuItem danger onClick={() => { close(); setConfirmDelete(dept.name); }}>Eliminar</MenuItem>
+                      )}
+                    </Menu>
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+        {unassigned > 0 && (
+          <p className="mt-3 text-xs text-slate-400">
+            {unassigned} {unassigned === 1 ? "miembro tiene" : "miembros tienen"} un departamento que ya no existe.
+          </p>
+        )}
       </div>
 
-      <main className="px-24 py-8 space-y-6">
-        {/* Add Form */}
-        {showAddForm && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6">
-            <div className="flex gap-3">
-              <input
-                type="text"
-                value={newDepartment}
-                onChange={(e) => setNewDepartment(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAddDepartment()}
-                placeholder="Nombre del departamento"
-                autoFocus
-                className="flex-1 px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
-              />
-              <button onClick={handleAddDepartment} disabled={saving || !newDepartment.trim()} className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50">
-                Crear
-              </button>
-              <button onClick={() => { setShowAddForm(false); setNewDepartment(""); }} className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-sm font-medium transition-colors border border-slate-200">
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
+      {/* ── Nuevo ── */}
+      <Modal
+        open={showAddForm}
+        onClose={() => { setShowAddForm(false); setNewDepartment(""); }}
+        title="Nuevo departamento"
+        width="max-w-sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => { setShowAddForm(false); setNewDepartment(""); }}>Cancelar</Button>
+            <Button variant="primary" loading={saving} disabled={!newDepartment.trim()} onClick={handleAddDepartment}>Crear</Button>
+          </>
+        }
+      >
+        <form onSubmit={(e) => { e.preventDefault(); handleAddDepartment(); }}>
+          <Field label="Nombre">
+            <Input autoFocus value={newDepartment} onChange={(e) => setNewDepartment(e.target.value)} placeholder="Fotografía" />
+          </Field>
+        </form>
+      </Modal>
 
-        {/* Departments List */}
-        {departmentsData.length > 0 ? (
-          <div className="space-y-3">
-            {departmentsData.map((dept) => {
-              const isExpanded = expandedDept === dept.name;
-              return (
-                <div key={dept.name} className="bg-white rounded-2xl border border-slate-200">
-                  <div
-                    className={`flex items-center justify-between px-6 py-4 hover:bg-slate-50/50 transition-colors cursor-pointer group ${isExpanded ? "rounded-t-2xl" : "rounded-2xl"}`}
-                    onClick={() => setExpandedDept(isExpanded ? null : dept.name)}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
-                        <Briefcase size={18} className="text-slate-500" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-slate-900">{dept.name}</p>
-                        <p className="text-sm text-slate-500">{dept.members.length} miembro{dept.members.length !== 1 ? "s" : ""}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="relative">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === dept.name ? null : dept.name); }}
-                          className="p-2 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors opacity-0 group-hover:opacity-100"
-                        >
-                          <MoreHorizontal size={16} />
-                        </button>
-                        {activeMenu === dept.name && (
-                          <>
-                            <div className="fixed inset-0 z-10" onClick={() => setActiveMenu(null)} />
-                            <div className="absolute right-0 top-full mt-2 w-40 bg-white border border-slate-200 rounded-2xl shadow-xl py-1.5 z-20">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveMenu(null);
-                                  if (dept.members.length > 0) showToast("error", "Tiene miembros asignados");
-                                  else setConfirmDelete(dept.name);
-                                }}
-                                className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                              >
-                                <Trash2 size={14} />
-                                Eliminar
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                      <ChevronDown size={18} className={`text-slate-400 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                    </div>
-                  </div>
-
-                  {isExpanded && (
-                    <div className="px-6 pb-5 pt-2 border-t border-slate-100 bg-slate-50/30 rounded-b-2xl">
-                      {dept.members.length > 0 ? (
-                        <div className="grid grid-cols-4 gap-2">
-                          {dept.members.map((m) => (
-                            <div key={m.userId} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100">
-                              <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-semibold text-sm flex-shrink-0">
-                                {m.name?.[0]?.toUpperCase()}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="font-medium text-slate-900 text-sm truncate">{m.name}</p>
-                                {m.position && <p className="text-xs text-slate-500 truncate">{m.position}</p>}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-6 bg-white rounded-xl border border-dashed border-slate-200">
-                          <Users size={18} className="text-slate-300 mx-auto mb-2" />
-                          <p className="text-sm text-slate-400">Sin miembros</p>
-                          <Link href={`/project/${id}/config/users`} className="text-xs text-slate-600 hover:text-slate-900 underline mt-1 inline-block">
-                            Asignar desde Usuarios
-                          </Link>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
-            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Briefcase size={28} className="text-slate-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">Sin departamentos</h3>
-            <button onClick={() => setShowAddForm(true)} className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors">
-              <Plus size={16} />
-              Crear departamento
-            </button>
-          </div>
-        )}
-      </main>
-    </div>
+      {/* ── Eliminar ── */}
+      <Modal
+        open={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        title="Eliminar departamento"
+        width="max-w-sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmDelete(null)}>Cancelar</Button>
+            <Button variant="danger" loading={saving} onClick={() => confirmDelete && handleRemoveDepartment(confirmDelete)}>Eliminar</Button>
+          </>
+        }
+      >
+        <p className="text-[13px] text-slate-600">
+          Se eliminará <span className="font-medium text-slate-900">{confirmDelete}</span>. Solo se puede eliminar si no tiene miembros.
+        </p>
+      </Modal>
+    </Page>
   );
 }

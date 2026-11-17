@@ -3,12 +3,16 @@
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import { inter } from "@/lib/fonts";
+import {
+  Badge, Button, Checkbox, EmptyState, Field, IconButton, Input, Menu, MenuItem, MenuSeparator, Modal,
+  NoAccess, Page, PageHeader, PageLoading, Segmented, Select, Table, Td, Th, Tr, tokens, useToast,
+} from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import {
+  onAuthStateChanged,
+} from "firebase/auth";
 import {
   collection,
   deleteDoc,
@@ -23,22 +27,7 @@ import {
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  AlertCircle,
-  ArrowLeft,
-  Briefcase,
-  CheckCircle,
-  ChevronDown,
-  Clock,
-  Edit,
-  Mail,
   MoreHorizontal,
-  Search,
-  Settings,
-  Shield,
-  Trash2,
-  UserCog,
-  UserPlus,
-  X,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -92,7 +81,6 @@ export default function ConfigUsers() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [userExists, setUserExists] = useState<boolean | null>(null);
   const [foundUser, setFoundUser] = useState<{ name: string; email: string } | null>(null);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -122,10 +110,7 @@ export default function ConfigUsers() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const showToast = (type: "success" | "error", message: string) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 3000);
-  };
+  const [toastNode, showToast] = useToast();
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -315,509 +300,202 @@ export default function ConfigUsers() {
     setUserExists(null); setFoundUser(null);
   };
 
-  const filteredMembers = members.filter((m) => m.name.toLowerCase().includes(searchTerm.toLowerCase()) || m.email.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredMembers = members.filter((m) => (m.name || "").toLowerCase().includes(searchTerm.toLowerCase()) || (m.email || "").toLowerCase().includes(searchTerm.toLowerCase()));
   const projectMembers = filteredMembers.filter((m) => PROJECT_ROLES.includes(m.role || ""));
   const deptMembers = filteredMembers.filter((m) => !PROJECT_ROLES.includes(m.role || "") && m.department);
 
-  if (loading) return (
-    <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-      <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+  const [confirmRemove, setConfirmRemove] = useState<Member | null>(null);
+
+  if (loading) return <PageLoading />;
+  if (!hasConfigAccess) return <NoAccess />;
+
+  const roleLabel = (m: { role?: string; position?: string; department?: string }) =>
+    PROJECT_ROLES.includes(m.role || "") ? m.role : [m.position, m.department].filter(Boolean).join(" · ") || m.role || "—";
+
+  const accessBadges = (perm: Member["permissions"]) => (
+    <div className="flex flex-wrap gap-1">
+      {perm.config && <Badge>Configuración</Badge>}
+      {perm.accounting && <Badge dot={tokens.module.accounting}>Contabilidad</Badge>}
+      {perm.team && <Badge dot={tokens.module.team}>Equipo</Badge>}
+      {!perm.config && !perm.accounting && !perm.team && <span className="text-slate-300">—</span>}
     </div>
   );
 
-  if (!hasConfigAccess) return (
-    <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-      <div className="text-center max-w-md">
-        <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <AlertCircle size={28} className="text-slate-400" />
-        </div>
-        <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
-        <p className="text-slate-500 mb-6">No tienes acceso a esta configuración</p>
-        <Link href="/dashboard" className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors">
-          <ArrowLeft size={16} />
-          Volver a Proyectos
-        </Link>
-      </div>
-    </div>
-  );
+  const sortedMembers = [...filteredMembers].sort((a, b) => {
+    const ap = PROJECT_ROLES.includes(a.role || "") ? 0 : 1;
+    const bp = PROJECT_ROLES.includes(b.role || "") ? 0 : 1;
+    return ap - bp || (a.name || "").localeCompare(b.name || "");
+  });
 
   return (
-    <div className={`min-h-screen bg-white ${inter.className}`}>
-      {/* Toast - bottom right */}
-      {toast && (
-        <div className={`fixed bottom-4 left-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 ${toast.type === "success" ? "bg-slate-900 text-white" : "bg-red-600 text-white"}`}>
-          {toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-          {toast.message}
-        </div>
-      )}
+    <Page>
+      {toastNode}
 
-      {/* Header */}
-      <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
-          <div className="relative flex items-center justify-center">
-            <div className="flex items-center gap-4">
-              <UserCog size={22} className="text-slate-900" />
-              <h1 className="text-3xl font-bold text-slate-900 text-center">Usuarios del proyecto</h1>
-            </div>
+      <PageHeader
+        title="Usuarios"
+        meta={`${members.length} ${members.length === 1 ? "miembro" : "miembros"}${pendingInvitations.length ? ` · ${pendingInvitations.length} ${pendingInvitations.length === 1 ? "invitación pendiente" : "invitaciones pendientes"}` : ""}`}
+        actions={<Button variant="primary" onClick={() => setShowInviteModal(true)}>Invitar</Button>}
+      />
 
-            <button
-              onClick={() => setShowInviteModal(true)}
-              className="absolute right-0 flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors bg-slate-900"
-            >
-              <UserPlus size={16} strokeWidth={2.5} />
-              Invitar
-            </button>
-          </div>
-        </div>
+      <div className="mb-3 mt-6 flex items-center justify-between gap-3">
+        <h2 className="text-[13px] font-semibold text-slate-900">Miembros</h2>
+        <Input placeholder="Buscar" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="!w-56" />
       </div>
-      
-      <main className="px-24 py-8 space-y-6">
-        {/* Pending Invitations */}
-        {pendingInvitations.length > 0 && (
-          <div className="rounded-2xl p-6" style={{ background: 'linear-gradient(to right, #0f172a, #334155)' }}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                <Mail size={18} className="text-white" />
-              </div>
-              <h2 className="text-base font-semibold text-white">
-                {pendingInvitations.length} invitación{pendingInvitations.length !== 1 ? "es" : ""} pendiente{pendingInvitations.length !== 1 ? "s" : ""}
-              </h2>
-            </div>
-            <div className="grid gap-3 grid-cols-3">
-              {pendingInvitations.map((inv) => (
-                <div key={inv.id} className="flex items-center justify-between bg-white rounded-2xl p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-semibold text-sm">
-                      {inv.invitedName?.[0]?.toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">{inv.invitedName}</p>
-                      <p className="text-xs text-slate-500">{inv.roleType === "project" ? inv.role : `${inv.position} · ${inv.department}`}</p>
-                    </div>
-                  </div>
-                  <button onClick={() => handleCancelInvitation(inv.id)} className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors border border-slate-200">
-                    Cancelar
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
-        {/* Search */}
-        {members.length > 0 && (
-          <div className="relative">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar usuario"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
-            />
-          </div>
-        )}
-
-        <div className="flex flex-row gap-6 items-start">
-          {/* Project Roles */}
-          {projectMembers.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-visible flex-1 max-w-[50%]">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-                <Shield size={18} className="text-slate-400" />
-                <h3 className="font-semibold text-slate-900">Roles de proyecto</h3>
-                <span className="ml-auto text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">{projectMembers.length}</span>
-              </div>
-              <div className="divide-y divide-slate-100">
-                {projectMembers.map((m) => {
-                  return (
-                    <div key={m.userId} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/50 transition-colors group">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-semibold text-sm">
-                          {m.name?.[0]?.toUpperCase()}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-slate-900">{m.name}</p>
-                            <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600">
-                              {m.role}
-                            </span>
-                            {m.userId === userId && <span className="text-xs text-slate-400">(tú)</span>}
-                          </div>
-                          <p className="text-sm text-slate-500">{m.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex gap-1">
-                          {m.permissions.config && (
-                            <span className="px-2 py-1 text-[10px] font-bold rounded-lg bg-slate-100 text-slate-600">
-                              CFG
-                            </span>
-                          )}
-                          {m.permissions.accounting && (
-                            <span 
-                              className="px-2 py-1 text-[10px] font-bold rounded-lg border"
-                              style={{ backgroundColor: 'rgba(47, 82, 224, 0.1)', color: '#2F52E0', borderColor: 'rgba(47, 82, 224, 0.2)' }}
-                            >
-                              ACC
-                            </span>
-                          )}
-                          {m.permissions.team && (
-                            <span 
-                              className="px-2 py-1 text-[10px] font-bold rounded-lg border"
-                              style={{ backgroundColor: 'rgba(137, 211, 34, 0.15)', color: '#6BA319', borderColor: 'rgba(137, 211, 34, 0.3)' }}
-                            >
-                              TEAM
-                            </span>
-                          )}
-                        </div>
+      {sortedMembers.length === 0 ? (
+        <EmptyState title={searchTerm ? "Ningún usuario coincide con la búsqueda" : "Aún no hay usuarios en el proyecto"} />
+      ) : (
+        <Table>
+          <thead>
+            <tr><Th>Nombre</Th><Th>Rol</Th><Th>Accesos</Th><Th className="w-10" /></tr>
+          </thead>
+          <tbody>
+            {sortedMembers.map((m) => (
+              <Tr key={m.userId}>
+                <Td>
+                  <p className="font-medium text-slate-900">{m.name}{m.userId === userId && <span className="ml-1.5 text-[11px] font-normal text-slate-400">Tú</span>}</p>
+                  <p className="text-xs text-slate-500">{m.email}</p>
+                </Td>
+                <Td className="whitespace-nowrap">{roleLabel(m)}</Td>
+                <Td>{accessBadges(m.permissions)}</Td>
+                <Td align="right">
+                  <Menu trigger={(toggle) => <IconButton label="Acciones" onClick={toggle}><MoreHorizontal size={15} /></IconButton>}>
+                    {(close) => (
+                      <>
+                        <MenuItem onClick={() => { close(); openEditPermissions(m); }}>Editar accesos</MenuItem>
                         {m.userId !== userId && (
-                          <div className="relative">
-                            <button onClick={() => setActiveMenu(activeMenu === m.userId ? null : m.userId)} className="p-2 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors opacity-0 group-hover:opacity-100">
-                              <MoreHorizontal size={16} />
-                            </button>
-                            {activeMenu === m.userId && (
-                              <>
-                                <div className="fixed inset-0 z-10" onClick={() => setActiveMenu(null)} />
-                                <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-2xl shadow-xl py-1.5 z-20">
-                                  <button onClick={() => openEditPermissions(m)} className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
-                                    <Settings size={14} />
-                                    Editar permisos
-                                  </button>
-                                  <div className="border-t border-slate-100 my-1" />
-                                  <button onClick={() => handleRemoveMember(m.userId)} className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
-                                    <Trash2 size={14} />
-                                    Eliminar
-                                  </button>
-                                </div>
-                              </>
-                            )}
-                          </div>
+                          <>
+                            <MenuSeparator />
+                            <MenuItem danger onClick={() => { close(); setConfirmRemove(m); }}>Quitar del proyecto</MenuItem>
+                          </>
                         )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Department Members */}
-          {deptMembers.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-visible flex-1 max-w-[50%]">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-                <Briefcase size={18} className="text-slate-400" />
-                <h3 className="font-semibold text-slate-900">Departamentos</h3>
-                <span className="ml-auto text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">{deptMembers.length}</span>
-              </div>
-              <div className="divide-y divide-slate-100">
-                {deptMembers.map((m) => (
-                  <div key={m.userId} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/50 transition-colors group">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-semibold text-sm">
-                        {m.name?.[0]?.toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-slate-900">{m.name}</p>
-                          <span className="px-2 py-0.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-600">
-                            {m.position}
-                          </span>
-                          <span className="text-xs text-slate-400">{m.department}</span>
-                          {m.userId === userId && <span className="text-xs text-slate-400">(tú)</span>}
-                        </div>
-                        <p className="text-sm text-slate-500">{m.email}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex gap-1.5">
-                        {m.permissions.config && (
-                          <span className="px-2 py-1 text-[10px] font-bold rounded-lg bg-slate-100 text-slate-600">
-                            CFG
-                          </span>
-                        )}
-                        {m.permissions.accounting && (
-                          <span 
-                            className="px-2 py-1 text-[10px] font-bold rounded-lg border"
-                            style={{ backgroundColor: 'rgba(47, 82, 224, 0.1)', color: '#2F52E0', borderColor: 'rgba(47, 82, 224, 0.2)' }}
-                          >
-                            ACC
-                          </span>
-                        )}
-                        {m.permissions.team && (
-                          <span 
-                            className="px-2 py-1 text-[10px] font-bold rounded-lg border"
-                            style={{ backgroundColor: 'rgba(137, 211, 34, 0.15)', color: '#6BA319', borderColor: 'rgba(137, 211, 34, 0.3)' }}
-                          >
-                            TEAM
-                          </span>
-                        )}
-                      </div>
-                      {m.userId !== userId && (
-                        <div className="relative">
-                          <button onClick={() => setActiveMenu(activeMenu === m.userId ? null : m.userId)} className="p-2 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors opacity-0 group-hover:opacity-100">
-                            <MoreHorizontal size={16} />
-                          </button>
-                          {activeMenu === m.userId && (
-                            <>
-                              <div className="fixed inset-0 z-10" onClick={() => setActiveMenu(null)} />
-                              <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-2xl shadow-xl py-1.5 z-20">
-                                <button onClick={() => openEditPermissions(m)} className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
-                                  <Settings size={14} />
-                                  Editar permisos
-                                </button>
-                                <div className="border-t border-slate-100 my-1" />
-                                <button onClick={() => handleRemoveMember(m.userId)} className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
-                                  <Trash2 size={14} />
-                                  Eliminar
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Empty State */}
-        {filteredMembers.length === 0 && (
-          <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
-            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <UserCog size={28} className="text-slate-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">{searchTerm ? "Sin resultados" : "Sin usuarios"}</h3>
-            {searchTerm && <p className="text-slate-500 text-sm">Prueba con otro término</p>}
-          </div>
-        )}
-      </main>
-
-      {/* Invite Modal */}
-      {showInviteModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-semibold text-slate-900">Invitar usuario</h3>
-              <button onClick={closeModal} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="p-6 space-y-5 max-h-[60vh] overflow-y-auto">
-              <div>
-                <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Email</label>
-                <input
-                  type="email"
-                  value={inviteForm.email}
-                  onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
-                />
-                {userExists === true && <p className="mt-2 text-xs text-emerald-600 flex items-center gap-1"><CheckCircle size={12} />Usuario registrado</p>}
-                {userExists === false && inviteForm.email.length > 3 && <p className="mt-2 text-xs text-amber-600 flex items-center gap-1"><Clock size={12} />Se enviará invitación para registrarse</p>}
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Nombre</label>
-                <input
-                  type="text"
-                  value={inviteForm.name}
-                  onChange={(e) => setInviteForm({ ...inviteForm, name: e.target.value })}
-                  disabled={userExists === true}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm disabled:bg-slate-100 disabled:text-slate-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Tipo</label>
-                <div className="flex gap-2">
-                  <button onClick={() => setInviteForm({ ...inviteForm, roleType: "project", department: "", position: "" })} className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-all ${inviteForm.roleType === "project" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
-                    Proyecto
-                  </button>
-                  <button onClick={() => setInviteForm({ ...inviteForm, roleType: "department", role: "" })} className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-all ${inviteForm.roleType === "department" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
-                    Departamento
-                  </button>
-                </div>
-              </div>
-              {inviteForm.roleType === "project" && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Rol</label>
-                  <div className="flex gap-2">
-                    {PROJECT_ROLES.map((r) => {
-                      const isSelected = inviteForm.role === r;
-                      return (
-                        <button key={r} onClick={() => setInviteForm({ ...inviteForm, role: r })} className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all ${isSelected ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
-                          {r}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              {inviteForm.roleType === "department" && (
-                <>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Departamento</label>
-                    <div className="relative" ref={departmentDropdownRef}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!departmentDropdownOpen && departmentDropdownRef.current) {
-                            const rect = departmentDropdownRef.current.getBoundingClientRect();
-                            setDepartmentDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
-                          }
-                          setDepartmentDropdownOpen(!departmentDropdownOpen);
-                        }}
-                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 transition-colors"
-                      >
-                        <span className={inviteForm.department ? "text-slate-900" : "text-slate-400"}>
-                          {inviteForm.department || "Seleccionar"}
-                        </span>
-                        <ChevronDown size={16} className={`text-slate-400 transition-transform ${departmentDropdownOpen ? "rotate-180" : ""}`} />
-                      </button>
-                      {departmentDropdownOpen && departmentDropdownPos && (
-                        <div className="fixed z-20 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto"
-                          style={{ top: departmentDropdownPos.top, left: departmentDropdownPos.left, width: departmentDropdownPos.width }}>
-                          {departments.length > 0 ? (
-                            departments.map((d) => (
-                              <button
-                                key={d.name}
-                                type="button"
-                                onClick={() => {
-                                  setInviteForm({ ...inviteForm, department: d.name });
-                                  setDepartmentDropdownOpen(false);
-                                }}
-                                className={`w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 transition-colors ${inviteForm.department === d.name ? "bg-slate-50 text-slate-900 font-medium" : "text-slate-600"}`}
-                              >
-                                {d.name}
-                              </button>
-                            ))
-                          ) : (
-                            <div className="px-4 py-3 text-sm text-slate-400 text-center">Sin departamentos</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Posición</label>
-                    <div className="flex gap-2">
-                      {DEPARTMENT_POSITIONS.map((p) => (
-                        <button key={p} onClick={() => setInviteForm({ ...inviteForm, position: p })} className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all ${inviteForm.position === p ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
-                          {p}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-              <div>
-                <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Permisos</label>
-                <div className="flex gap-2">
-                  <label 
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border cursor-pointer transition-all ${inviteForm.permissions.config ? "border-slate-400 bg-slate-100" : "border-slate-200 hover:border-slate-300"}`}
-                  >
-                    <input type="checkbox" checked={inviteForm.permissions.config} onChange={(e) => setInviteForm({ ...inviteForm, permissions: { ...inviteForm.permissions, config: e.target.checked } })} className="sr-only" />
-                    <Shield size={14} className={inviteForm.permissions.config ? "text-slate-600" : "text-slate-400"} />
-                    <span className={`text-sm font-medium ${inviteForm.permissions.config ? "text-slate-700" : "text-slate-500"}`}>Config</span>
-                  </label>
-                  <label 
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border cursor-pointer transition-all ${inviteForm.permissions.accounting ? "border-[#2F52E0]/40 bg-[#2F52E0]/10" : "border-slate-200 hover:border-slate-300"}`}
-                  >
-                    <input type="checkbox" checked={inviteForm.permissions.accounting} onChange={(e) => setInviteForm({ ...inviteForm, permissions: { ...inviteForm.permissions, accounting: e.target.checked } })} className="sr-only" />
-                    <span className={`text-sm font-medium ${inviteForm.permissions.accounting ? "text-[#2F52E0]" : "text-slate-500"}`}>Accounting</span>
-                  </label>
-                  <label 
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border cursor-pointer transition-all ${inviteForm.permissions.team ? "border-[#6BA319]/40 bg-[#6BA319]/10" : "border-slate-200 hover:border-slate-300"}`}
-                  >
-                    <input type="checkbox" checked={inviteForm.permissions.team} onChange={(e) => setInviteForm({ ...inviteForm, permissions: { ...inviteForm.permissions, team: e.target.checked } })} className="sr-only" />
-                    <span className={`text-sm font-medium ${inviteForm.permissions.team ? "text-[#6BA319]" : "text-slate-500"}`}>Team</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-slate-100 flex gap-3 bg-slate-50">
-              <button onClick={closeModal} className="flex-1 py-2.5 text-slate-600 hover:bg-slate-200 rounded-xl text-sm font-medium transition-colors border border-slate-200">
-                Cancelar
-              </button>
-              <button onClick={handleSendInvitation} disabled={saving} className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">
-                {saving ? "Enviando..." : "Enviar invitación"}
-              </button>
-            </div>
-          </div>
-        </div>
+                      </>
+                    )}
+                  </Menu>
+                </Td>
+              </Tr>
+            ))}
+          </tbody>
+        </Table>
       )}
 
-      {/* Edit Permissions Modal */}
-      {editingMember && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">Editar permisos</h3>
-                <p className="text-sm text-slate-500">{editingMember.name}</p>
-              </div>
-              <button onClick={() => setEditingMember(null)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
-                <X size={20} />
-              </button>
+      {pendingInvitations.length > 0 && (
+        <>
+          <h2 className="mb-3 mt-10 text-[13px] font-semibold text-slate-900">Invitaciones pendientes</h2>
+          <Table>
+            <thead>
+              <tr><Th>Invitado</Th><Th>Rol</Th><Th>Estado</Th><Th className="w-24" /></tr>
+            </thead>
+            <tbody>
+              {pendingInvitations.map((inv) => (
+                <Tr key={inv.id}>
+                  <Td>
+                    <p className="font-medium text-slate-900">{inv.invitedName}</p>
+                    <p className="text-xs text-slate-500">{inv.invitedEmail}</p>
+                  </Td>
+                  <Td className="whitespace-nowrap">{inv.roleType === "project" ? inv.role : [inv.position, inv.department].filter(Boolean).join(" · ")}</Td>
+                  <Td><Badge tone="warning">Pendiente</Badge></Td>
+                  <Td align="right"><Button size="sm" variant="ghost" onClick={() => handleCancelInvitation(inv.id)}>Cancelar</Button></Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </>
+      )}
+
+      {/* ── Invitar ── */}
+      <Modal
+        open={showInviteModal}
+        onClose={closeModal}
+        title="Invitar al proyecto"
+        footer={
+          <>
+            <Button variant="ghost" onClick={closeModal}>Cancelar</Button>
+            <Button variant="primary" loading={saving} disabled={!inviteForm.email.trim() || !inviteForm.name.trim()} onClick={handleSendInvitation}>Enviar invitación</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Field label="Email" hint={userExists === true ? "Ya tiene cuenta en Filma" : userExists === false ? "Recibirá un email para crear su cuenta" : undefined}>
+            <Input type="email" autoFocus value={inviteForm.email} onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })} placeholder="nombre@productora.com" />
+          </Field>
+          <Field label="Nombre">
+            <Input value={inviteForm.name} disabled={!!foundUser} onChange={(e) => setInviteForm({ ...inviteForm, name: e.target.value })} />
+          </Field>
+          <Field label="Tipo">
+            <div>
+              <Segmented
+                value={inviteForm.roleType}
+                onChange={(v) => setInviteForm({ ...inviteForm, roleType: v, role: "", department: "", position: "" })}
+                options={[{ value: "project", label: "Rol de proyecto" }, { value: "department", label: "Departamento" }]}
+              />
             </div>
-            <div className="p-6">
-              <p className="text-sm text-slate-600 mb-4">Selecciona los permisos para este usuario:</p>
-              <div className="space-y-3">
-                <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${editPermissions.config ? "bg-slate-100 border-slate-300" : "bg-white border-slate-200 hover:bg-slate-50"}`}>
-                  <input 
-                    type="checkbox" 
-                    checked={editPermissions.config} 
-                    onChange={(e) => setEditPermissions({ ...editPermissions, config: e.target.checked })} 
-                    className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                  />
-                  <div className="flex-1">
-                    <p className="font-medium text-slate-900">Config</p>
-                    <p className="text-xs text-slate-500">Configuración del proyecto</p>
-                  </div>
-                </label>
-                <label 
-                  className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all`}
-                  style={editPermissions.accounting ? { backgroundColor: 'rgba(47, 82, 224, 0.1)', borderColor: 'rgba(47, 82, 224, 0.3)' } : {}}
-                >
-                  <input 
-                    type="checkbox" 
-                    checked={editPermissions.accounting} 
-                    onChange={(e) => setEditPermissions({ ...editPermissions, accounting: e.target.checked })} 
-                    className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                  />
-                  <div className="flex-1">
-                    <p className="font-medium" style={editPermissions.accounting ? { color: '#2F52E0' } : { color: '#0f172a' }}>Accounting</p>
-                    <p className="text-xs text-slate-500">Acceso a contabilidad</p>
-                  </div>
-                </label>
-                <label 
-                  className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all`}
-                  style={editPermissions.team ? { backgroundColor: 'rgba(137, 211, 34, 0.15)', borderColor: 'rgba(137, 211, 34, 0.4)' } : {}}
-                >
-                  <input 
-                    type="checkbox" 
-                    checked={editPermissions.team} 
-                    onChange={(e) => setEditPermissions({ ...editPermissions, team: e.target.checked })} 
-                    className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                  />
-                  <div className="flex-1">
-                    <p className="font-medium" style={editPermissions.team ? { color: '#6BA319' } : { color: '#0f172a' }}>Team</p>
-                    <p className="text-xs text-slate-500">Gestión del equipo</p>
-                  </div>
-                </label>
-              </div>
+          </Field>
+          {inviteForm.roleType === "project" ? (
+            <Field label="Rol">
+              <Select value={inviteForm.role} onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })}>
+                <option value="" disabled>Seleccionar</option>
+                {PROJECT_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+              </Select>
+            </Field>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Departamento" hint={departments.length === 0 ? "Crea departamentos en Configuración › Departamentos" : undefined}>
+                <Select value={inviteForm.department} onChange={(e) => setInviteForm({ ...inviteForm, department: e.target.value })}>
+                  <option value="" disabled>Seleccionar</option>
+                  {departments.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
+                </Select>
+              </Field>
+              <Field label="Posición">
+                <Select value={inviteForm.position} onChange={(e) => setInviteForm({ ...inviteForm, position: e.target.value })}>
+                  <option value="" disabled>Seleccionar</option>
+                  {DEPARTMENT_POSITIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+                </Select>
+              </Field>
             </div>
-            <div className="px-6 py-4 border-t border-slate-100 flex gap-3 bg-slate-50">
-              <button onClick={() => setEditingMember(null)} className="flex-1 py-2.5 text-slate-600 hover:bg-slate-200 rounded-xl text-sm font-medium transition-colors border border-slate-200">
-                Cancelar
-              </button>
-              <button onClick={handleUpdatePermissions} disabled={saving} className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">
-                {saving ? "Guardando..." : "Guardar"}
-              </button>
-            </div>
+          )}
+          <div>
+            <span className="mb-1 block text-xs font-medium text-slate-600">Accesos</span>
+            <Checkbox label="Configuración" checked={inviteForm.permissions.config} onChange={(v) => setInviteForm({ ...inviteForm, permissions: { ...inviteForm.permissions, config: v } })} />
+            <Checkbox label="Contabilidad" checked={inviteForm.permissions.accounting} onChange={(v) => setInviteForm({ ...inviteForm, permissions: { ...inviteForm.permissions, accounting: v } })} />
+            <Checkbox label="Equipo" checked={inviteForm.permissions.team} onChange={(v) => setInviteForm({ ...inviteForm, permissions: { ...inviteForm.permissions, team: v } })} />
           </div>
         </div>
-      )}
-    </div>
+      </Modal>
+
+      {/* ── Editar accesos ── */}
+      <Modal
+        open={!!editingMember}
+        onClose={() => setEditingMember(null)}
+        title={editingMember ? `Accesos de ${editingMember.name}` : "Accesos"}
+        width="max-w-sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setEditingMember(null)}>Cancelar</Button>
+            <Button variant="primary" loading={saving} onClick={handleUpdatePermissions}>Guardar</Button>
+          </>
+        }
+      >
+        <Checkbox label="Configuración" hint="Datos del proyecto, usuarios y departamentos" checked={editPermissions.config} onChange={(v) => setEditPermissions({ ...editPermissions, config: v })} />
+        <Checkbox label="Contabilidad" hint="Órdenes de compra, facturas, pagos y presupuesto" checked={editPermissions.accounting} onChange={(v) => setEditPermissions({ ...editPermissions, accounting: v })} />
+        <Checkbox label="Equipo" hint="Crew, calendario, nóminas y control horario" checked={editPermissions.team} onChange={(v) => setEditPermissions({ ...editPermissions, team: v })} />
+      </Modal>
+
+      {/* ── Quitar del proyecto ── */}
+      <Modal
+        open={!!confirmRemove}
+        onClose={() => setConfirmRemove(null)}
+        title="Quitar del proyecto"
+        width="max-w-sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmRemove(null)}>Cancelar</Button>
+            <Button variant="danger" loading={saving} onClick={async () => { if (confirmRemove) await handleRemoveMember(confirmRemove.userId); setConfirmRemove(null); }}>Quitar</Button>
+          </>
+        }
+      >
+        <p className="text-[13px] text-slate-600"><span className="font-medium text-slate-900">{confirmRemove?.name}</span> dejará de tener acceso al proyecto.</p>
+      </Modal>
+    </Page>
   );
 }
