@@ -1,7 +1,7 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -72,6 +72,32 @@ export default function Header() {
   });
   const router   = useRouter();
   const pathname = usePathname();
+
+  // Cerrar los menús al hacer clic en cualquier parte fuera de ellos (o con
+  // Escape). No se usa una capa "fixed inset-0": dentro del header, el
+  // backdrop-blur la limitaría al propio header.
+  const profileRef = useRef<HTMLDivElement>(null);
+  const envRef     = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!profileOpen && !envSwitcherOpen) return;
+    const onPointer = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (profileOpen && !profileRef.current?.contains(target)) setProfileOpen(false);
+      if (envSwitcherOpen && !envRef.current?.contains(target)) setEnvSwitcherOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setProfileOpen(false); setEnvSwitcherOpen(false); }
+    };
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [profileOpen, envSwitcherOpen]);
+
+  // Al cambiar de página, menús cerrados
+  useEffect(() => { setProfileOpen(false); setEnvSwitcherOpen(false); }, [pathname]);
 
   const { user, isLoading } = useUser();
   const userName    = user?.name || "Usuario";
@@ -240,13 +266,14 @@ export default function Header() {
   const NavLink = ({ href, isActive, children }: { href: string; isActive: boolean; children: React.ReactNode }) => (
     <Link
       href={href}
-      className={`flex h-8 items-center gap-1.5 rounded-lg px-3 text-[13px] transition-colors ${
-        isActive
-          ? "bg-[#F1F1F3] font-medium text-slate-900"
-          : "text-slate-500 hover:bg-[#F7F7F8] hover:text-slate-900"
+      aria-current={isActive ? "page" : undefined}
+      className={`relative flex h-8 items-center gap-1.5 px-2.5 text-[12.5px] transition-colors ${
+        isActive ? "font-medium text-slate-900" : "text-slate-500 hover:text-slate-900"
       }`}
     >
       {children}
+      {/* Marca fina de página activa, a ras del borde inferior del header */}
+      {isActive && <span className="absolute inset-x-2.5 -bottom-[10px] h-[1.5px] rounded-full bg-slate-900" />}
     </Link>
   );
 
@@ -262,7 +289,7 @@ export default function Header() {
   const Breadcrumb = () => {
     if (isAccountsSection && accountsProjectName) {
       return (
-        <div className="flex min-w-0 items-center gap-2.5 text-[13px]">
+        <div className="flex min-w-0 items-center gap-2.5 text-[12.5px]">
           <Separator />
           <span className="truncate font-medium text-slate-900">{accountsProjectName}</span>
           <Separator />
@@ -273,7 +300,7 @@ export default function Header() {
     if (!isInProjectSection || !projectId || !projectName) return null;
     const section = currentSection ? SECTIONS[currentSection] : null;
     return (
-      <div className="flex min-w-0 items-center gap-2.5 text-[13px]">
+      <div className="flex min-w-0 items-center gap-2.5 text-[12.5px]">
         <Separator />
         <Link href={`/project/${projectId}`} className="flex min-w-0 items-center gap-2 text-slate-900 hover:opacity-75">
           <span
@@ -311,7 +338,7 @@ export default function Header() {
         </div>
 
         {/* Centro: navegación de la sección */}
-        <nav className="absolute left-1/2 flex -translate-x-1/2 items-center gap-0.5">
+        <nav className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1">
           {isAccountsSection && accountsProjectId && ACCOUNTS_NAV.map((n) => {
             const href = `/companydashboard/${accountsProducerId}/accounts/${accountsProjectId}${n.path ? `/${n.path}` : ""}`;
             return <NavLink key={n.id} href={href} isActive={activeAccountsTab === n.id}>{n.label}</NavLink>;
@@ -320,11 +347,11 @@ export default function Header() {
           {!isAccountsSection && !isAdminSection && !isInProjectSection && (
             <>
               <NavLink href="/dashboard" isActive={pathname === "/dashboard"}>
-                <Folder size={15} /> Proyectos
+                <Folder size={14} /> Proyectos
               </NavLink>
               {isAdmin && (
                 <NavLink href="/admindashboard" isActive={false}>
-                  <Shield size={15} /> Admin
+                  <Shield size={14} /> Admin
                 </NavLink>
               )}
             </>
@@ -332,35 +359,35 @@ export default function Header() {
 
           {isAdminSection && (
             <NavLink href="/admindashboard" isActive={true}>
-              <Shield size={15} /> Administración
+              <Shield size={14} /> Administración
             </NavLink>
           )}
 
           {isConfigSection && projectId && (
             <>
-              <NavLink href={`/project/${projectId}/config`} isActive={configTab === "general"}><Info size={15} /> General</NavLink>
-              <NavLink href={`/project/${projectId}/config/users`} isActive={configTab === "users"}><UserCog size={15} /> Usuarios</NavLink>
-              <NavLink href={`/project/${projectId}/config/departments`} isActive={configTab === "departments"}><Briefcase size={15} /> Departamentos</NavLink>
+              <NavLink href={`/project/${projectId}/config`} isActive={configTab === "general"}><Info size={14} /> General</NavLink>
+              <NavLink href={`/project/${projectId}/config/users`} isActive={configTab === "users"}><UserCog size={14} /> Usuarios</NavLink>
+              <NavLink href={`/project/${projectId}/config/departments`} isActive={configTab === "departments"}><Briefcase size={14} /> Departamentos</NavLink>
             </>
           )}
 
           {isAccountingSection && projectId && (
             <>
-              {accountingAccess.panel     && <NavLink href={`/project/${projectId}/accounting`} isActive={accountingPage === "panel"}><LayoutDashboard size={15} /> Panel</NavLink>}
-              {accountingAccess.suppliers && <NavLink href={`/project/${projectId}/accounting/suppliers`} isActive={accountingPage === "suppliers"}><Building2 size={15} /> Proveedores</NavLink>}
-              {accountingAccess.budget    && <NavLink href={`/project/${projectId}/accounting/budget`} isActive={accountingPage === "budget"}><Wallet size={15} /> Presupuesto</NavLink>}
-              {accountingAccess.users     && <NavLink href={`/project/${projectId}/accounting/users`} isActive={accountingPage === "users"}><Users size={15} /> Usuarios</NavLink>}
-              {accountingAccess.reports   && <NavLink href={`/project/${projectId}/accounting/reports`} isActive={accountingPage === "reports"}><FileSpreadsheet size={15} /> Informes</NavLink>}
+              {accountingAccess.panel     && <NavLink href={`/project/${projectId}/accounting`} isActive={accountingPage === "panel"}><LayoutDashboard size={14} /> Panel</NavLink>}
+              {accountingAccess.suppliers && <NavLink href={`/project/${projectId}/accounting/suppliers`} isActive={accountingPage === "suppliers"}><Building2 size={14} /> Proveedores</NavLink>}
+              {accountingAccess.budget    && <NavLink href={`/project/${projectId}/accounting/budget`} isActive={accountingPage === "budget"}><Wallet size={14} /> Presupuesto</NavLink>}
+              {accountingAccess.users     && <NavLink href={`/project/${projectId}/accounting/users`} isActive={accountingPage === "users"}><Users size={14} /> Usuarios</NavLink>}
+              {accountingAccess.reports   && <NavLink href={`/project/${projectId}/accounting/reports`} isActive={accountingPage === "reports"}><FileSpreadsheet size={14} /> Informes</NavLink>}
             </>
           )}
 
           {isTeamSection && projectId && (
             <>
-              <NavLink href={`/project/${projectId}/team`} isActive={teamPage === "panel"}><LayoutDashboard size={15} /> Panel</NavLink>
-              <NavLink href={`/project/${projectId}/team/crew`} isActive={teamPage === "crew"}><Users size={15} /> Crew</NavLink>
-              <NavLink href={`/project/${projectId}/team/calendar`} isActive={teamPage === "calendar"}><Calendar size={15} /> Calendario</NavLink>
-              <NavLink href={`/project/${projectId}/team/payroll`} isActive={teamPage === "payroll"}><Banknote size={15} /> Nóminas</NavLink>
-              <NavLink href={`/project/${projectId}/team/timesheet`} isActive={teamPage === "timesheet"}><Clock size={15} /> Control horario</NavLink>
+              <NavLink href={`/project/${projectId}/team`} isActive={teamPage === "panel"}><LayoutDashboard size={14} /> Panel</NavLink>
+              <NavLink href={`/project/${projectId}/team/crew`} isActive={teamPage === "crew"}><Users size={14} /> Crew</NavLink>
+              <NavLink href={`/project/${projectId}/team/calendar`} isActive={teamPage === "calendar"}><Calendar size={14} /> Calendario</NavLink>
+              <NavLink href={`/project/${projectId}/team/payroll`} isActive={teamPage === "payroll"}><Banknote size={14} /> Nóminas</NavLink>
+              <NavLink href={`/project/${projectId}/team/timesheet`} isActive={teamPage === "timesheet"}><Clock size={14} /> Control horario</NavLink>
             </>
           )}
         </nav>
@@ -384,11 +411,10 @@ export default function Header() {
             const otherEnvs = envs.filter((env) => env.key !== currentSection);
             if (envs.length <= 1 || otherEnvs.length === 0) return null;
             return (
-              <div className="relative">
+              <div className="relative" ref={envRef}>
                 <button onClick={() => setEnvSwitcherOpen(!envSwitcherOpen)} className={iconButton} title="Cambiar de módulo">
                   <ArrowLeftRight size={16} />
                 </button>
-                {envSwitcherOpen && <div className="fixed inset-0 z-40" onClick={() => setEnvSwitcherOpen(false)} />}
                 {envSwitcherOpen && (
                   <div className="animate-fadeIn absolute right-0 top-full z-50 mt-2 w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
                     {otherEnvs.map((env) => {
@@ -420,35 +446,36 @@ export default function Header() {
           )}
 
           {/* Perfil */}
-          <button
-            onClick={() => setProfileOpen(!profileOpen)}
-            className="ml-1 flex h-8 w-8 items-center justify-center rounded-full border border-[#E4E4E7] bg-[#F1F1F3] text-xs font-semibold text-slate-700 transition-colors hover:bg-[#E8E8EB]"
-            aria-label="Menú de usuario"
-          >
-            {userInitial}
-          </button>
-          {profileOpen && <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />}
-          {profileOpen && (
-            <div className="animate-fadeIn absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
-              <div className="px-2.5 pb-2 pt-1.5">
-                <p className="truncate text-[13px] font-medium text-slate-900">{userName}</p>
-                {user?.email && <p className="truncate text-xs text-slate-500">{user.email}</p>}
-              </div>
-              <div className="my-1 border-t border-slate-100" />
-              {isAdmin && (
-                <Link href="/admindashboard" className={menuItem} onClick={() => setProfileOpen(false)}>
-                  <Shield size={15} /> Administración
+          <div className="relative" ref={profileRef}>
+            <button
+              onClick={() => setProfileOpen(!profileOpen)}
+              className="ml-1 flex h-8 w-8 items-center justify-center rounded-full border border-[#E4E4E7] bg-[#F1F1F3] text-xs font-semibold text-slate-700 transition-colors hover:bg-[#E8E8EB]"
+              aria-label="Menú de usuario"
+            >
+              {userInitial}
+            </button>
+            {profileOpen && (
+              <div className="animate-fadeIn absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
+                <div className="px-2.5 pb-2 pt-1.5">
+                  <p className="truncate text-[13px] font-medium text-slate-900">{userName}</p>
+                  {user?.email && <p className="truncate text-xs text-slate-500">{user.email}</p>}
+                </div>
+                <div className="my-1 border-t border-slate-100" />
+                {isAdmin && (
+                  <Link href="/admindashboard" className={menuItem} onClick={() => setProfileOpen(false)}>
+                    <Shield size={15} /> Administración
+                  </Link>
+                )}
+                <Link href="/profile" className={menuItem} onClick={() => setProfileOpen(false)}>
+                  <User size={15} /> Mi cuenta
                 </Link>
-              )}
-              <Link href="/profile" className={menuItem} onClick={() => setProfileOpen(false)}>
-                <User size={15} /> Mi cuenta
-              </Link>
-              <div className="my-1 border-t border-slate-100" />
-              <button onClick={handleLogout} className={`${menuItem} hover:!bg-red-50 hover:!text-red-600`}>
-                <LogOut size={15} /> Cerrar sesión
-              </button>
-            </div>
-          )}
+                <div className="my-1 border-t border-slate-100" />
+                <button onClick={handleLogout} className={`${menuItem} hover:!bg-red-50 hover:!text-red-600`}>
+                  <LogOut size={15} /> Cerrar sesión
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
