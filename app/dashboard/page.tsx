@@ -422,13 +422,12 @@ export default function Dashboard() {
 
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
-      <main className="mx-auto max-w-[1440px] px-6 pb-20 pt-[85px] sm:px-10">
+      <main className="px-6 pb-20 pt-[85px] sm:px-10">
 
         {/* Cabecera de la página */}
         <div className="mb-8 flex items-center justify-between gap-4">
           <div className="flex items-baseline gap-3">
             <h1 className="text-[1.75rem] font-semibold tracking-tight text-slate-900">Proyectos</h1>
-            {activeProjectsCount > 0 && <span className="text-sm text-slate-400">{activeProjectsCount}</span>}
           </div>
         </div>
 
@@ -573,7 +572,7 @@ export default function Dashboard() {
                   </button>
                 </div>
               ) : (
-                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 min-[1280px]:grid-cols-4">
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 min-[1280px]:grid-cols-4 min-[1680px]:grid-cols-5">
                   {filteredProjects.map((project) => renderProjectCard(project))}
                 </div>
               )
@@ -583,7 +582,7 @@ export default function Dashboard() {
             {archivedProjects.length > 0 && (showArchived || activeProjectsCount === 0) && (
               <section className="mt-12">
                 <h2 className="mb-4 text-[13px] font-medium text-slate-500">Archivados</h2>
-                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 min-[1280px]:grid-cols-4">
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 min-[1280px]:grid-cols-4 min-[1680px]:grid-cols-5">
                   {archivedProjects.map((project) => renderProjectCard(project, true))}
                 </div>
               </section>

@@ -7,7 +7,7 @@
 // a Contabilidad y Equipo.
 //
 //   <Page>            contenedor (deja sitio al header fijo)
-//   <PageHeader>      título + acciones
+//   <PageHeader>      título + acciones (sin subtítulo)
 //   <Section>         bloque con título a la izquierda y contenido a la derecha
 //   <Button>          primary | secondary | ghost | danger, tamaños sm | md
 //   <IconButton>      botón de solo icono
@@ -37,7 +37,7 @@ export const tokens = {
 } as const;
 
 // ─── Página ──────────────────────────────────────────────────────────────────
-export function Page({ children, width = "max-w-[1100px]" }: { children: React.ReactNode; width?: string }) {
+export function Page({ children, width = "" }: { children: React.ReactNode; width?: string }) {
   return (
     <div className={cx("min-h-screen bg-white", inter.className)}>
       <main className={cx("mx-auto px-6 pb-24 pt-[85px] sm:px-10", width)}>{children}</main>
@@ -45,13 +45,10 @@ export function Page({ children, width = "max-w-[1100px]" }: { children: React.R
   );
 }
 
-export function PageHeader({ title, meta, actions }: { title: React.ReactNode; meta?: React.ReactNode; actions?: React.ReactNode }) {
+export function PageHeader({ title, actions }: { title: React.ReactNode; actions?: React.ReactNode }) {
   return (
-    <div className="mb-2 flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5">
-      <div className="min-w-0">
-        <h1 className="text-xl font-semibold tracking-tight text-slate-900">{title}</h1>
-        {meta && <div className="mt-1 text-[13px] text-slate-500">{meta}</div>}
-      </div>
+    <div className="mb-2 flex min-h-[44px] flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
+      <h1 className="flex min-w-0 items-center gap-2 text-xl font-semibold tracking-tight text-slate-900">{title}</h1>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </div>
   );

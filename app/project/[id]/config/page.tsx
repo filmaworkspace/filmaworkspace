@@ -295,8 +295,7 @@ export default function ConfigGeneral() {
       {toastNode}
 
       <PageHeader
-        title="General"
-        meta={<>{project?.name}{project?.archived && <> · <span className="text-amber-600">Archivado</span></>}</>}
+        title={<>General{project?.archived && <Badge tone="warning">Archivado</Badge>}</>}
         actions={
           <Menu
             trigger={(toggle) => (

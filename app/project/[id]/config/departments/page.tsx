@@ -137,7 +137,6 @@ export default function ConfigDepartments() {
 
       <PageHeader
         title="Departamentos"
-        meta={`${departments.length} ${departments.length === 1 ? "departamento" : "departamentos"}`}
         actions={<Button variant="primary" onClick={() => setShowAddForm(true)}>Nuevo departamento</Button>}
       />
 

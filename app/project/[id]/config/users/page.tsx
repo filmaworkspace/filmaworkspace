@@ -333,7 +333,6 @@ export default function ConfigUsers() {
 
       <PageHeader
         title="Usuarios"
-        meta={`${members.length} ${members.length === 1 ? "miembro" : "miembros"}${pendingInvitations.length ? ` · ${pendingInvitations.length} ${pendingInvitations.length === 1 ? "invitación pendiente" : "invitaciones pendientes"}` : ""}`}
         actions={<Button variant="primary" onClick={() => setShowInviteModal(true)}>Invitar</Button>}
       />
 

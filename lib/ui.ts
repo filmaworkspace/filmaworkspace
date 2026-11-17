@@ -5,7 +5,7 @@
 
 export const ui = {
   /** Contenedor de página (deja sitio al header fijo de 53 px). */
-  page: "mx-auto px-6 pb-20 pt-[85px] sm:px-10",
+  page: "px-6 pb-20 pt-[85px] sm:px-10",
   /** Título de página. */
   title: "text-[1.75rem] font-semibold tracking-tight text-slate-900",
   /** Encabezado de sección pequeño. */
