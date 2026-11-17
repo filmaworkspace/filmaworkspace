@@ -37,7 +37,6 @@ import {
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
-import { coverGradient } from "@/lib/projectCover";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -56,7 +55,6 @@ export default function Header() {
   const [envSwitcherOpen, setEnvSwitcherOpen] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>("");
-  const [projectCover, setProjectCover] = useState<string | null>(null);
   const [permissions, setPermissions] = useState({
     config: false,
     accounting: false,
@@ -139,12 +137,11 @@ export default function Header() {
 
   useEffect(() => {
     const loadProjectName = async () => {
-      if (!projectId) { setProjectName(""); setProjectCover(null); return; }
+      if (!projectId) { setProjectName(""); return; }
       try {
         const projectDoc = await getDoc(doc(db, "projects", projectId));
         if (projectDoc.exists()) {
           setProjectName(projectDoc.data().name || "Proyecto");
-          setProjectCover(projectDoc.data().coverUrl || null);
         }
       } catch (error) {
         console.error("Error cargando nombre del proyecto:", error);
@@ -301,10 +298,6 @@ export default function Header() {
       <div className="flex min-w-0 items-center gap-2.5 text-[12.5px]">
         <Separator />
         <Link href={`/project/${projectId}`} className="flex min-w-0 items-center gap-2 text-slate-900 hover:opacity-75">
-          <span
-            className="h-5 w-5 flex-shrink-0 rounded-md bg-cover bg-center ring-1 ring-black/5"
-            style={projectCover ? { backgroundImage: `url("${projectCover}")` } : { background: coverGradient(projectId) }}
-          />
           <span className="max-w-[220px] truncate font-medium">{projectName}</span>
         </Link>
         {section && (
