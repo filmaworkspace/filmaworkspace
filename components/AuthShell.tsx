@@ -28,8 +28,8 @@ export const authStyles = {
   iconButton:
     "absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50",
   primaryButton:
-    "group flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-slate-900 text-sm font-medium text-white transition " +
-    "hover:bg-slate-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-900/20 disabled:cursor-not-allowed disabled:opacity-60",
+    "group flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-[#E4E4E7] bg-[#F1F1F3] text-sm font-medium text-slate-900 transition " +
+    "hover:bg-[#E8E8EB] focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-900/10 disabled:cursor-not-allowed disabled:opacity-60",
   link: "font-medium text-slate-900 underline-offset-2 hover:underline",
   title: "text-[1.75rem] font-semibold tracking-tight text-slate-900",
   footer: "mt-6 text-center text-sm text-slate-500",
@@ -45,7 +45,7 @@ export function AuthError({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Spinner({ dark = false }: { dark?: boolean }) {
+export function Spinner({ dark = true }: { dark?: boolean }) {
   return (
     <span
       className={`h-4 w-4 animate-spin rounded-full border-2 ${
@@ -134,7 +134,7 @@ function PlatformPreview() {
 // ─── Layout ──────────────────────────────────────────────────────────────────
 export default function AuthShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`min-h-screen flex bg-[#FAFAFA] ${inter.className}`}>
+    <div className={`min-h-screen flex bg-white ${inter.className}`}>
 
       {/* Formulario */}
       <main className="flex flex-1 flex-col px-6 py-7 sm:px-10 lg:w-1/2 lg:flex-none">
