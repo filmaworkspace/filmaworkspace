@@ -1,6 +1,6 @@
 // ─── Pantallas de acceso (login, registro, recuperar contraseña) ─────────────
-// Formulario a la izquierda sobre fondo claro y panel visual a la derecha con
-// una vista ilustrativa de la plataforma. Estilos comunes de los campos, para
+// Formulario a la izquierda sobre fondo blanco y panel visual a la derecha con
+// un titular. Estilos comunes de los campos, para
 // que las tres pantallas se vean igual.
 
 import Image from "next/image";
@@ -14,6 +14,9 @@ const MODULES = [
   { icon: Users, title: "Equipo" },
   { icon: Calculator, title: "Presupuesto" },
 ];
+
+// Titular del panel derecho.
+const HEADLINE = "Esto es cine.";
 
 // ─── Estilos compartidos ─────────────────────────────────────────────────────
 const FIELD =
@@ -55,82 +58,6 @@ export function Spinner({ dark = true }: { dark?: boolean }) {
   );
 }
 
-// ─── Vista ilustrativa de la plataforma (no son datos reales) ────────────────
-const PREVIEW_ROWS: { desc: string; supplier: string; dot: string; status: "Aprobada" | "Pendiente" | "Pagada"; amount: string; account: string; tint: string }[] = [
-  { desc: "Alquiler de cámara y ópticas", supplier: "Rental Norte", dot: "#22D3EE", status: "Aprobada", amount: "4.850,00", account: "04.01", tint: "#38BDF8" },
-  { desc: "Localización: nave industrial", supplier: "Espacios BCN", dot: "#F472B6", status: "Pendiente", amount: "2.300,00", account: "06.02", tint: "#F472B6" },
-  { desc: "Catering rodaje semana 2", supplier: "Cocina Móvil", dot: "#FB923C", status: "Pagada", amount: "1.920,50", account: "08.03", tint: "#FB923C" },
-  { desc: "Iluminación: grupo electrógeno", supplier: "Luz y Grúas", dot: "#A78BFA", status: "Aprobada", amount: "3.410,00", account: "04.03", tint: "#A78BFA" },
-  { desc: "Transporte de equipo", supplier: "Furgo Pro", dot: "#34D399", status: "Pendiente", amount: "780,00", account: "09.01", tint: "#34D399" },
-  { desc: "Vestuario y arreglos", supplier: "Taller Sastre", dot: "#F472B6", status: "Pagada", amount: "1.150,00", account: "05.02", tint: "#F472B6" },
-  { desc: "Seguro de producción", supplier: "Aseguradora", dot: "#22D3EE", status: "Aprobada", amount: "2.640,00", account: "12.01", tint: "#38BDF8" },
-  { desc: "Postproducción: etalonaje", supplier: "Color Lab", dot: "#FBBF24", status: "Pendiente", amount: "5.200,00", account: "10.04", tint: "#FBBF24" },
-  { desc: "Maquillaje y peluquería", supplier: "Studio MUA", dot: "#A78BFA", status: "Pagada", amount: "960,00", account: "05.03", tint: "#A78BFA" },
-  { desc: "Dietas equipo técnico", supplier: "Varios", dot: "#34D399", status: "Aprobada", amount: "1.380,00", account: "08.01", tint: "#34D399" },
-];
-
-const STATUS_COLOR = { Aprobada: "#60A5FA", Pendiente: "#FBBF24", Pagada: "#34D399" };
-
-function PlatformPreview() {
-  return (
-    <div
-      aria-hidden="true"
-      className="w-full overflow-hidden rounded-xl border border-white/10 bg-[#0D1117] shadow-[0_30px_80px_-20px_rgba(8,15,35,0.65)] select-none"
-    >
-      {/* Barra superior */}
-      <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-2">
-        <div className="flex items-center gap-1.5 text-[9px] text-white/40">
-          <span className="text-white/60">Proyecto</span>
-          <span>›</span>
-          <span className="text-white/80">Órdenes de compra</span>
-        </div>
-        <div className="flex gap-1">
-          <span className="h-3 w-10 rounded bg-white/[0.06]" />
-          <span className="h-3 w-3 rounded bg-white/[0.06]" />
-          <span className="h-3 w-3 rounded bg-white/[0.06]" />
-        </div>
-      </div>
-
-      <div className="flex">
-        {/* Barra lateral */}
-        <div className="flex w-7 flex-col items-center gap-2 border-r border-white/[0.06] py-2">
-          {Array.from({ length: 7 }).map((_, i) => (
-            <span key={i} className={`h-2.5 w-2.5 rounded-sm ${i === 1 ? "bg-[#6C8BFF]" : "bg-white/10"}`} />
-          ))}
-        </div>
-
-        {/* Tabla */}
-        <div className="min-w-0 flex-1 text-[8.5px] leading-none">
-          <div className="grid grid-cols-[1fr_0.7fr_0.5fr_0.5fr_0.4fr] gap-2 border-b border-white/[0.06] px-3 py-2 text-white/35">
-            <span>Descripción</span><span>Proveedor</span><span>Estado</span><span className="text-right">Importe</span><span>Cuenta</span>
-          </div>
-          {PREVIEW_ROWS.map((r, i) => (
-            <div
-              key={i}
-              className={`grid grid-cols-[1fr_0.7fr_0.5fr_0.5fr_0.4fr] items-center gap-2 border-b border-white/[0.04] px-3 py-[7px] ${i === 1 ? "bg-white/[0.04]" : ""}`}
-            >
-              <span className="truncate text-white/80">{r.desc}</span>
-              <span className="flex min-w-0 items-center gap-1.5 text-white/55">
-                <span className="h-2 w-2 flex-shrink-0 rounded-full" style={{ backgroundColor: r.dot }} />
-                <span className="truncate">{r.supplier}</span>
-              </span>
-              <span className="flex items-center gap-1" style={{ color: STATUS_COLOR[r.status] }}>
-                <span className="h-1 w-1 rounded-full" style={{ backgroundColor: STATUS_COLOR[r.status] }} />
-                {r.status}
-              </span>
-              <span className="text-right tabular-nums text-white/70">{r.amount} €</span>
-              <span>
-                <span className="rounded px-1 py-0.5 tabular-nums" style={{ color: r.tint, backgroundColor: `${r.tint}22` }}>{r.account}</span>
-              </span>
-            </div>
-          ))}
-          <div className="flex justify-end px-3 py-2 tabular-nums text-white/45">Total 24.590,50 €</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Layout ──────────────────────────────────────────────────────────────────
 export default function AuthShell({ children }: { children: React.ReactNode }) {
   return (
@@ -167,9 +94,11 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
           style={{ background: "rgba(170,205,225,0.35)" }}
         />
 
-        {/* Vista de la plataforma, centrada */}
+        {/* Titular */}
         <div className="relative z-10 flex w-full max-w-[600px] flex-1 items-center">
-          <PlatformPreview />
+          <h2 className="text-5xl font-semibold leading-[1.05] tracking-tight text-white xl:text-6xl">
+            {HEADLINE}
+          </h2>
         </div>
 
         {/* Módulos, abajo y separados por una línea */}
