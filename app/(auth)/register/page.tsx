@@ -2,23 +2,17 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { inter } from "@/lib/fonts";
 
 import { auth, db } from "@/lib/firebase";
 import { browserLocalPersistence, createUserWithEmailAndPassword, setPersistence, updateProfile } from "firebase/auth";
 import { doc, setDoc, Timestamp } from "firebase/firestore";
 
-import { AlertCircle, ArrowLeft, ArrowRight, ChevronDown, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
+
+import AuthShell, { AuthError, BRAND, Spinner, authStyles as ui } from "@/components/AuthShell";
 
 // ─────────────────────────────────────────────────────────────────────────────
-
-const INPUT_STYLE = {
-  color: "#363636",
-  backgroundColor: "#FFFFFF",
-  borderColor: "rgba(54, 54, 54, 0.2)",
-};
 
 const COUNTRIES = [
   { code: "ES", dial: "+34", flag: "🇪🇸", name: "España",         digits: 9,  placeholder: "612 345 678" },
@@ -195,226 +189,186 @@ export default function RegisterPage() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className={`min-h-screen flex ${inter.className}`}>
+    <AuthShell>
 
-      {/* Left — brand */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden"
-        style={{ background: "linear-gradient(135deg, #1a3a9e 0%, #2F52E0 50%, #4F6FE8 100%)" }}>
-        <div className="absolute top-0 right-0 w-96 h-96 rounded-full opacity-20 blur-3xl"
-          style={{ backgroundColor: "#4F6FE8", transform: "translate(30%, -30%)" }} />
-        <div className="absolute bottom-0 left-0 w-80 h-80 rounded-full opacity-15 blur-3xl"
-          style={{ backgroundColor: "#1a3a9e", transform: "translate(-20%, 20%)" }} />
-        <div className="relative z-10 flex items-center justify-center w-full">
-          <Image src="/logo.svg" alt="Logo" width={220} height={70} className="opacity-95" priority />
-        </div>
-      </div>
+      {/* ── PASO 1: datos ── */}
+      {step === 1 && (
+        <>
+          <h1 className={ui.title}>Crea tu cuenta</h1>
 
-      {/* Right — form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8" style={{ backgroundColor: "#FFFFFF" }}>
-        <div className="w-full max-w-xs">
+          <form onSubmit={handleSendCode} className="mt-8 space-y-5">
+            <div>
+              <label htmlFor="name" className={ui.label}>Nombre completo</label>
+              <div className="relative">
+                <User size={16} className={ui.fieldIcon} />
+                <input id="name" type="text" required value={name} onChange={e => setName(e.target.value)}
+                  placeholder="Nombre y apellidos" disabled={loading} autoComplete="name"
+                  className={ui.inputWithIcon} />
+              </div>
+            </div>
 
-          {/* Mobile logo */}
-          <div className="lg:hidden flex items-center justify-center mb-12">
-            <Image src="/logodark.svg" alt="Logo" width={140} height={45} priority />
+            {/* Teléfono con prefijo */}
+            <div>
+              <label htmlFor="phone" className={ui.label}>Teléfono</label>
+              <div className={`flex h-11 rounded-lg border shadow-sm transition focus-within:ring-4 ${
+                phoneError
+                  ? "border-red-300 bg-red-50 focus-within:ring-red-500/15"
+                  : "border-slate-300 bg-white focus-within:border-[#2F52E0] focus-within:ring-[#2F52E0]/15"
+              }`}>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowCountry(v => !v)}
+                    disabled={loading}
+                    aria-label="Prefijo del país"
+                    className="flex h-full min-w-[84px] items-center gap-1.5 rounded-l-lg border-r border-slate-200 px-3 text-sm transition-colors hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    <span className="text-base leading-none">{country.flag}</span>
+                    <span className="text-slate-600">{country.dial}</span>
+                    <ChevronDown size={13} className={`text-slate-400 transition-transform ${showCountry ? "rotate-180" : ""}`} />
+                  </button>
+
+                  {showCountry && (
+                    <div className="absolute left-0 top-full z-30 mt-1.5 min-w-[220px] overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+                      {COUNTRIES.map(c => (
+                        <button
+                          key={c.code}
+                          type="button"
+                          onClick={() => { setCountry(c); setShowCountry(false); setPhoneRaw(""); setPhoneDisplay(""); }}
+                          className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-slate-50 ${
+                            c.code === country.code ? "font-medium text-slate-900" : "text-slate-600"
+                          }`}
+                        >
+                          <span className="text-base">{c.flag}</span>
+                          <span className="flex-1 truncate">{c.name}</span>
+                          <span className="text-xs text-slate-400">{c.dial}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <input
+                  id="phone"
+                  type="tel"
+                  required
+                  value={phoneDisplay}
+                  onChange={handlePhoneChange}
+                  placeholder={country.placeholder}
+                  disabled={loading}
+                  autoComplete="tel"
+                  inputMode="numeric"
+                  className={`min-w-0 flex-1 rounded-r-lg bg-transparent px-3.5 text-sm placeholder:text-slate-400 focus:outline-none disabled:opacity-60 ${
+                    phoneError ? "text-red-600" : "text-slate-900"
+                  }`}
+                />
+              </div>
+              {phoneError && <p className="mt-1.5 text-xs text-red-600">{phoneError}</p>}
+            </div>
+
+            <div>
+              <label htmlFor="email" className={ui.label}>Email</label>
+              <div className="relative">
+                <Mail size={16} className={ui.fieldIcon} />
+                <input id="email" type="email" required value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="nombre@productora.com" disabled={loading} autoComplete="email"
+                  className={ui.inputWithIcon} />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="password" className={ui.label}>Contraseña</label>
+              <div className="relative">
+                <Lock size={16} className={ui.fieldIcon} />
+                <input id="password" type={showPassword ? "text" : "password"} required value={password}
+                  onChange={e => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres"
+                  disabled={loading} autoComplete="new-password" minLength={6}
+                  className={`${ui.inputWithIcon} pr-11`} />
+                <button type="button" onClick={() => setShowPassword(v => !v)} disabled={loading}
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  className={ui.iconButton}>
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            {error && <AuthError>{error}</AuthError>}
+
+            <button type="submit" disabled={loading} className={ui.primaryButton} style={ui.primaryButtonStyle}>
+              {loading ? (
+                <><Spinner /> Enviando código…</>
+              ) : (
+                <>Crear cuenta <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" /></>
+              )}
+            </button>
+          </form>
+
+          <p className={ui.footer}>
+            ¿Ya tienes cuenta?{" "}
+            <Link href="/login" className={ui.link} style={{ color: BRAND }}>Inicia sesión</Link>
+          </p>
+        </>
+      )}
+
+      {/* ── PASO 2: código de verificación ── */}
+      {step === 2 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => { setStep(1); setCodeError(""); }}
+            className="mb-6 inline-flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-800"
+          >
+            <ArrowLeft size={15} /> Volver
+          </button>
+
+          <h1 className={ui.title}>Revisa tu email</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            Código enviado a <span className="font-medium text-slate-800">{email}</span>
+          </p>
+
+          <div className="mt-8 flex justify-between gap-2" onPaste={handleDigitPaste}>
+            {digits.map((d, i) => (
+              <input
+                key={i}
+                ref={digitRefs[i]}
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
+                value={d}
+                onChange={e => handleDigit(i, e.target.value)}
+                onKeyDown={e => handleDigitKey(i, e)}
+                disabled={loading}
+                aria-label={`Dígito ${i + 1}`}
+                className={`h-14 w-12 rounded-lg border text-center text-xl font-semibold shadow-sm transition focus:outline-none focus:ring-4 disabled:opacity-60 ${
+                  codeError
+                    ? "border-red-300 bg-red-50 text-red-600 focus:ring-red-500/15"
+                    : d
+                      ? "border-slate-400 bg-white text-slate-900 focus:border-[#2F52E0] focus:ring-[#2F52E0]/15"
+                      : "border-slate-300 bg-white text-slate-900 focus:border-[#2F52E0] focus:ring-[#2F52E0]/15"
+                }`}
+              />
+            ))}
           </div>
 
-          {/* ── STEP 1: form ── */}
-          {step === 1 && (
-            <form onSubmit={handleSendCode} className="space-y-4">
-              <div>
-                <input type="text" required value={name} onChange={e => setName(e.target.value)}
-                  placeholder="Nombre completo" disabled={loading} autoComplete="name"
-                  className="w-full px-3.5 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50"
-                  style={INPUT_STYLE} />
-              </div>
+          {codeError && <div className="mt-5"><AuthError>{codeError}</AuthError></div>}
 
-              {/* Phone with prefix selector */}
-              <div>
-                <div className={`flex border rounded-xl overflow-hidden transition-all focus-within:ring-2 focus-within:border-transparent ${phoneError ? "border-red-300 bg-red-50" : ""}`}
-                  style={phoneError ? {} : { borderColor: "rgba(54,54,54,0.2)", backgroundColor: "#fff" }}>
-
-                  {/* Country selector */}
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setShowCountry(v => !v)}
-                      disabled={loading}
-                      className="flex items-center gap-1.5 px-3 py-2.5 h-full border-r text-sm font-medium disabled:opacity-50 hover:bg-gray-50 transition-colors"
-                      style={{ borderColor: "rgba(54,54,54,0.2)", color: "#363636", minWidth: "80px" }}
-                    >
-                      <span className="text-base leading-none">{country.flag}</span>
-                      <span className="text-xs" style={{ color: "rgba(54,54,54,0.6)" }}>{country.dial}</span>
-                      <ChevronDown size={12} style={{ color: "rgba(54,54,54,0.4)" }} className={`transition-transform ${showCountry ? "rotate-180" : ""}`} />
-                    </button>
-
-                    {showCountry && (
-                      <div className="absolute left-0 top-full mt-1 z-30 bg-white border rounded-xl shadow-lg overflow-hidden"
-                        style={{ borderColor: "rgba(54,54,54,0.15)", minWidth: "200px" }}>
-                        {COUNTRIES.map(c => (
-                          <button
-                            key={c.code}
-                            type="button"
-                            onClick={() => { setCountry(c); setShowCountry(false); setPhoneRaw(""); setPhoneDisplay(""); }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors"
-                            style={{ color: c.code === country.code ? "#363636" : "rgba(54,54,54,0.7)", fontWeight: c.code === country.code ? 600 : 400 }}
-                          >
-                            <span className="text-base">{c.flag}</span>
-                            <span className="flex-1 truncate">{c.name}</span>
-                            <span className="text-xs" style={{ color: "rgba(54,54,54,0.4)" }}>{c.dial}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Number input */}
-                  <input
-                    type="tel"
-                    required
-                    value={phoneDisplay}
-                    onChange={handlePhoneChange}
-                    placeholder={country.placeholder}
-                    disabled={loading}
-                    autoComplete="tel"
-                    inputMode="numeric"
-                    className="flex-1 px-3 py-2.5 text-sm focus:outline-none disabled:opacity-50 bg-transparent"
-                    style={{ color: phoneError ? "#dc2626" : "#363636" }}
-                  />
-                </div>
-                {phoneError && (
-                  <p className="text-[11px] text-red-500 mt-1 ml-1">{phoneError}</p>
-                )}
-              </div>
-
-              <div>
-                <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
-                  placeholder="Email" disabled={loading} autoComplete="email"
-                  className="w-full px-3.5 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50"
-                  style={INPUT_STYLE} />
-              </div>
-
-              <div>
-                <div className="relative">
-                  <input type={showPassword ? "text" : "password"} required value={password}
-                    onChange={e => setPassword(e.target.value)} placeholder="Contraseña"
-                    disabled={loading} autoComplete="new-password"
-                    className="w-full px-3.5 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50 pr-10"
-                    style={INPUT_STYLE} />
-                  <button type="button" onClick={() => setShowPassword(v => !v)} disabled={loading}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors disabled:opacity-50"
-                    style={{ color: "rgba(54,54,54,0.4)" }}>
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-                <p className="text-[10px] mt-1.5 ml-1" style={{ color: "rgba(54,54,54,0.5)" }}>
-                  Mínimo 6 caracteres
-                </p>
-              </div>
-
-              {error && (
-                <div className="flex items-center gap-2 p-2.5 bg-red-50 rounded-xl">
-                  <AlertCircle size={14} className="text-red-500 flex-shrink-0" />
-                  <span className="text-xs text-red-600">{error}</span>
-                </div>
-              )}
-
-              <div className="flex items-center justify-between pt-2">
-                <span className="text-lg font-semibold" style={{ color: "#363636" }}>Crear cuenta</span>
-                <button type="submit" disabled={loading}
-                  className="w-10 h-10 rounded-xl flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
-                  style={{ backgroundColor: "#363636" }}>
-                  {loading
-                    ? <div className="w-4 h-4 border-2 rounded-full animate-spin"
-                        style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
-                    : <ArrowRight size={18} style={{ color: "#fff" }} />}
-                </button>
-              </div>
-            </form>
+          {loading && (
+            <div className="mt-6 flex justify-center"><Spinner dark /></div>
           )}
 
-          {/* ── STEP 2: code verification ── */}
-          {step === 2 && (
-            <div>
-              <button onClick={() => { setStep(1); setCodeError(""); }}
-                className="inline-flex items-center gap-1.5 text-xs mb-6 transition-colors hover:opacity-70"
-                style={{ color: "rgba(54,54,54,0.5)" }}>
-                <ArrowLeft size={14} /> Volver
-              </button>
-
-              <p className="text-lg font-semibold mb-1" style={{ color: "#363636" }}>
-                Revisa tu email
-              </p>
-              <p className="text-xs mb-8" style={{ color: "rgba(54,54,54,0.5)" }}>
-                Hemos enviado un código de 6 dígitos a{" "}
-                <span className="font-medium" style={{ color: "#363636" }}>{email}</span>
-              </p>
-
-              {/* 6-digit input */}
-              <div className="flex gap-2 justify-center mb-6" onPaste={handleDigitPaste}>
-                {digits.map((d, i) => (
-                  <input
-                    key={i}
-                    ref={digitRefs[i]}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={d}
-                    onChange={e => handleDigit(i, e.target.value)}
-                    onKeyDown={e => handleDigitKey(i, e)}
-                    disabled={loading}
-                    className="w-10 h-12 text-center text-lg font-bold border rounded-xl focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50"
-                    style={{
-                      color: codeError ? "#dc2626" : "#363636",
-                      borderColor: codeError ? "#fca5a5" : d ? "#363636" : "rgba(54,54,54,0.2)",
-                      backgroundColor: codeError ? "#fff1f2" : "#fff",
-                    }}
-                  />
-                ))}
-              </div>
-
-              {codeError && (
-                <div className="flex items-center gap-2 p-2.5 bg-red-50 rounded-xl mb-4">
-                  <AlertCircle size={14} className="text-red-500 flex-shrink-0" />
-                  <span className="text-xs text-red-600">{codeError}</span>
-                </div>
-              )}
-
-              {loading && (
-                <div className="flex justify-center">
-                  <div className="w-5 h-5 border-2 rounded-full animate-spin"
-                    style={{ borderColor: "rgba(54,54,54,0.2)", borderTopColor: "#363636" }} />
-                </div>
-              )}
-
-              <p className="mt-6 text-center text-xs" style={{ color: "rgba(54,54,54,0.5)" }}>
-                ¿No recibiste el código?{" "}
-                <button onClick={handleSendCode as any}
-                  className="font-medium hover:opacity-70 transition-colors"
-                  style={{ color: "#363636" }}>
-                  Reenviar
-                </button>
-              </p>
-            </div>
-          )}
-
-          {/* Login link (step 1 only) */}
-          {step === 1 && (
-            <p className="mt-6 text-center text-xs" style={{ color: "rgba(54,54,54,0.5)" }}>
-              ¿Ya tienes cuenta?{" "}
-              <Link href="/login" className="font-medium transition-colors hover:opacity-80"
-                style={{ color: "#363636" }}>
-                Acceder
-              </Link>
-            </p>
-          )}
-
+          <p className={ui.footer}>
+            ¿No te ha llegado?{" "}
+            <button type="button" onClick={handleSendCode as any} className={ui.link} style={{ color: BRAND }}>
+              Reenviar
+            </button>
+          </p>
         </div>
-      </div>
+      )}
 
-      {/* Click-outside to close dropdown */}
+      {/* Click fuera para cerrar el selector de país */}
       {showCountry && (
         <div className="fixed inset-0 z-20" onClick={() => setShowCountry(false)} />
       )}
-    </div>
+    </AuthShell>
   );
 }
