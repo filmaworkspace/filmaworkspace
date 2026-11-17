@@ -1016,15 +1016,14 @@ export default function BudgetPage() {
     return (
       <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="hidden">
             <ShieldAlert size={28} className="text-red-500" />
           </div>
-          <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
+          <h2 className="text-[14px] font-semibold text-slate-900 mb-2">Acceso denegado</h2>
           <p className="text-slate-500 mb-6">{accessError || "No tienes permisos para acceder a esta página"}</p>
           <Link
             href={`/project/${id}/accounting`}
-            className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90"
-            style={{ backgroundColor: "#2F52E0" }}
+            className="inline-flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium"
           >
             <ArrowLeft size={16} />
             Volver al panel
@@ -1038,19 +1037,18 @@ export default function BudgetPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
+        <div className="px-6 pt-8 sm:px-10">
           {/* Page header */}
-          <div className="relative flex items-center justify-center">
+          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
             <div className="flex items-center gap-4">
-              <Wallet size={22} style={{ color: '#2F52E0' }} />
-              <h1 className="text-3xl font-bold text-slate-900 text-center">Presupuesto</h1>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Presupuesto</h1>
             </div>
 
             <div className="absolute right-0 flex items-center gap-2">
-              <button onClick={() => setShowImportModal(true)} className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+              <button onClick={() => setShowImportModal(true)} className="flex items-center gap-2 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50 transition-colors">
                 <Upload size={16} />Importar
               </button>
-              <button onClick={openCreateAccountModal} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity" style={{ backgroundColor: '#2F52E0' }}>
+              <button onClick={openCreateAccountModal} className="flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity">
                 <Plus size={16} strokeWidth={2.5} />Nueva cuenta
               </button>
             </div>
@@ -1058,23 +1056,23 @@ export default function BudgetPage() {
 
           {/* Summary Stats - Compacto */}
           <div className="grid grid-cols-5 gap-3 mt-6">
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+            <div className="bg-slate-50 rounded-md p-3 border border-slate-200">
               <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Presupuestado</p>
               <p className="text-base font-bold text-slate-900 tabular-nums">{formatCurrency(summary.totalBudgeted)} €</p>
             </div>
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+            <div className="bg-slate-50 rounded-md p-3 border border-slate-200">
               <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Comprometido</p>
               <p className="text-base font-bold text-slate-900 tabular-nums">{formatCurrency(summary.totalCommitted)} €</p>
             </div>
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+            <div className="bg-slate-50 rounded-md p-3 border border-slate-200">
               <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Realizado</p>
               <p className="text-base font-bold text-slate-900 tabular-nums">{formatCurrency(summary.totalActual)} €</p>
             </div>
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+            <div className="bg-slate-50 rounded-md p-3 border border-slate-200">
               <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Disponible</p>
               <p className={`text-base font-bold tabular-nums ${summary.totalAvailable < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{formatCurrency(summary.totalAvailable)} €</p>
             </div>
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+            <div className="bg-slate-50 rounded-md p-3 border border-slate-200">
               <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">% Ejecución</p>
               <div className="flex items-center gap-2">
                 <p className={`text-base font-bold tabular-nums ${totalExecutionPercent > 100 ? 'text-red-600' : totalExecutionPercent > 90 ? 'text-amber-600' : 'text-slate-900'}`}>{totalExecutionPercent.toFixed(1)}%</p>
@@ -1087,40 +1085,40 @@ export default function BudgetPage() {
         </div>
       </div>
 
-      <main className="px-24 py-6">
+      <main className="px-6 sm:px-10 py-6">
         {/* Filters */}
         <div className="flex flex-row gap-3 items-center mb-4">
           <div className="flex-1 relative">
             <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-            <input type="text" placeholder="Buscar cuentas" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm" />
+            <input type="text" placeholder="Buscar cuentas" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]" />
           </div>
           <div className="flex gap-2 flex-shrink-0">
-            <button onClick={expandAll} className="px-3 py-2.5 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1.5 text-xs font-medium"><Eye size={14} />Expandir</button>
-            <button onClick={collapseAll} className="px-3 py-2.5 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1.5 text-xs font-medium"><EyeOff size={14} />Colapsar</button>
+            <button onClick={expandAll} className="px-3 py-1.5 border border-slate-200 text-slate-600 rounded-md hover:bg-slate-50 transition-colors flex items-center gap-1.5 text-xs font-medium"><Eye size={14} />Expandir</button>
+            <button onClick={collapseAll} className="px-3 py-1.5 border border-slate-200 text-slate-600 rounded-md hover:bg-slate-50 transition-colors flex items-center gap-1.5 text-xs font-medium"><EyeOff size={14} />Colapsar</button>
           </div>
         </div>
 
         {/* Budget Table */}
         {filteredAccounts.length === 0 ? (
-          <div className="border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
+          <div className="border-2 border-dashed border-slate-200 rounded-lg p-12 text-center">
             <FileSpreadsheet size={32} className="text-slate-300 mx-auto mb-3" />
             <h3 className="text-lg font-semibold text-slate-900 mb-1">{searchTerm ? "No se encontraron cuentas" : "No hay cuentas presupuestarias"}</h3>
-            {searchTerm && <p className="text-slate-500 text-sm">Intenta ajustar la búsqueda</p>}
+            {searchTerm && <p className="text-slate-500 text-[13px]">Intenta ajustar la búsqueda</p>}
           </div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden overflow-x-auto">
+            <table className="w-full text-[13px]">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="text-left pl-4 pr-2 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider w-8"></th>
-                  <th className="text-left px-2 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider min-w-[80px]">Código</th>
-                  <th className="text-left px-2 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider min-w-[200px]">Descripción</th>
-                  <th className="text-right px-2 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider min-w-[100px]">Presupuesto</th>
-                  <th className="text-right px-2 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider min-w-[100px]">Comprometido</th>
-                  <th className="text-right px-2 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider min-w-[100px]">Realizado</th>
-                  <th className="text-right px-2 py-2.5 text-[10px] font-semibold text-amber-600 uppercase tracking-wider min-w-[80px]">Box</th>
-                  <th className="text-right px-2 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider min-w-[100px]">Disponible</th>
-                  <th className="text-center px-2 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider min-w-[80px]">% Ejec.</th>
+                  <th className="text-left pl-4 pr-2 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider w-8"></th>
+                  <th className="text-left px-2 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider min-w-[80px]">Código</th>
+                  <th className="text-left px-2 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider min-w-[200px]">Descripción</th>
+                  <th className="text-right px-2 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider min-w-[100px]">Presupuesto</th>
+                  <th className="text-right px-2 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider min-w-[100px]">Comprometido</th>
+                  <th className="text-right px-2 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider min-w-[100px]">Realizado</th>
+                  <th className="text-right px-2 py-2.5 text-[10px] font-medium text-amber-600 uppercase tracking-wider min-w-[80px]">Box</th>
+                  <th className="text-right px-2 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider min-w-[100px]">Disponible</th>
+                  <th className="text-center px-2 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider min-w-[80px]">% Ejec.</th>
                   <th className="text-right px-4 py-2.5 min-w-[90px]"></th>
                 </tr>
               </thead>
@@ -1218,7 +1216,7 @@ export default function BudgetPage() {
                 })}
 
                 {/* Total Row */}
-                <tr className="bg-slate-900 text-white">
+                <tr className="bg-[#F1F1F3] text-slate-900">
                   <td className="pl-4 pr-2 py-3"></td>
                   <td className="px-2 py-3 font-bold text-xs" colSpan={2}>TOTAL PRESUPUESTO</td>
                   <td className="px-2 py-3 text-right font-bold tabular-nums text-xs">{formatCurrency(summary.totalBudgeted)}</td>
@@ -1237,10 +1235,10 @@ export default function BudgetPage() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4" onClick={() => { setShowModal(false); resetForm(); }}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4" onClick={() => { setShowModal(false); resetForm(); }}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+              <h2 className="text-[14px] font-semibold text-slate-900">
                 {modalMode === "account" ? (editMode ? "Editar cuenta" : "Nueva cuenta") : (editMode ? "Editar subcuenta" : "Nueva subcuenta")}
               </h2>
               <button onClick={() => { setShowModal(false); resetForm(); }} className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
@@ -1248,32 +1246,32 @@ export default function BudgetPage() {
 
             <div className="p-6">
               {modalMode === "subaccount" && selectedAccount && (
-                <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-md">
                   <p className="text-xs text-slate-500">Cuenta padre</p>
-                  <p className="text-sm font-medium text-slate-900">{selectedAccount.code} - {selectedAccount.description}</p>
+                  <p className="text-[13px] font-medium text-slate-900">{selectedAccount.code} - {selectedAccount.description}</p>
                 </div>
               )}
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Código</label>
-                  <input type="text" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} placeholder="Código" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 " />
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Código</label>
+                  <input type="text" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} placeholder="Código" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Descripción</label>
-                  <input type="text" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Nombre de la cuenta o subcuenta" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Descripción</label>
+                  <input type="text" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Nombre de la cuenta o subcuenta" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                 </div>
                 {modalMode === "subaccount" && (
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Presupuesto (€)</label>
-                    <input type="number" value={formData.budgeted} onChange={(e) => setFormData({ ...formData, budgeted: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 " min="0" step="0.01" />
+                    <label className="mb-1.5 block text-xs font-medium text-slate-600">Presupuesto (€)</label>
+                    <input type="number" value={formData.budgeted} onChange={(e) => setFormData({ ...formData, budgeted: parseFloat(e.target.value) || 0 })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" min="0" step="0.01" />
                   </div>
                 )}
               </div>
 
               <div className="mt-6 flex justify-end gap-3 pt-6 border-t border-slate-200">
-                <button onClick={() => { setShowModal(false); resetForm(); }} className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium">Cancelar</button>
-                <button onClick={modalMode === "account" ? (editMode ? handleUpdateAccount : handleCreateAccount) : (editMode ? handleUpdateSubAccount : handleCreateSubAccount)} disabled={saving} className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-medium disabled:opacity-50 flex items-center gap-2">
+                <button onClick={() => { setShowModal(false); resetForm(); }} className="px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 font-medium">Cancelar</button>
+                <button onClick={modalMode === "account" ? (editMode ? handleUpdateAccount : handleCreateAccount) : (editMode ? handleUpdateSubAccount : handleCreateSubAccount)} disabled={saving} className="px-4 py-1.5 rounded-md font-medium disabled:opacity-50 flex items-center gap-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                   {saving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                   {editMode ? "Guardar cambios" : (modalMode === "account" ? "Crear cuenta" : "Crear subcuenta")}
                 </button>
@@ -1285,16 +1283,16 @@ export default function BudgetPage() {
 
       {/* Import Modal - Super Guay */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4" onClick={closeImportModal}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4" onClick={closeImportModal}>
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-md bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
                   <Upload size={20} className="text-white" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Importar presupuesto</h2>
+                  <h2 className="text-[14px] font-semibold text-slate-900">Importar presupuesto</h2>
                   <p className="text-xs text-slate-500">
                     {importStep === "upload" && "Sube un archivo Excel (.xlsx) con tu presupuesto"}
                     {importStep === "preview" && `${importData.length} filas encontradas`}
@@ -1318,7 +1316,7 @@ export default function BudgetPage() {
                   { step: "done", label: "Listo" },
                 ].map((s, index) => (
                   <React.Fragment key={s.step}>
-                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
                       importStep === s.step 
                         ? "bg-emerald-100 text-emerald-700" 
                         : ["preview", "importing", "done"].indexOf(importStep) >= ["preview", "importing", "done"].indexOf(s.step as any)
@@ -1348,13 +1346,13 @@ export default function BudgetPage() {
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
-                    className={`relative border-2 border-dashed rounded-2xl p-10 text-center transition-all ${
+                    className={`relative border-2 border-dashed rounded-lg p-10 text-center transition-all ${
                       isDragging 
                         ? "border-emerald-500 bg-emerald-50" 
                         : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
                     }`}
                   >
-                    <div className={`w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center transition-colors ${
+                    <div className={`w-16 h-16 rounded-lg mx-auto mb-4 flex items-center justify-center transition-colors ${
                       isDragging ? "bg-emerald-100" : "bg-slate-100"
                     }`}>
                       <FileSpreadsheet size={32} className={isDragging ? "text-emerald-600" : "text-slate-400"} />
@@ -1362,9 +1360,9 @@ export default function BudgetPage() {
                     <p className="text-lg font-medium text-slate-900 mb-1">
                       {isDragging ? "¡Suelta el archivo aquí!" : "Arrastra tu archivo aquí"}
                     </p>
-                    <p className="text-sm text-slate-500 mb-4">o haz clic para seleccionar · .xlsx o .fwb (Budgeting)</p>
+                    <p className="text-[13px] text-slate-500 mb-4">o haz clic para seleccionar · .xlsx o .fwb (Budgeting)</p>
                     <label className="cursor-pointer">
-                      <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors">
+                      <span className="inline-flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-colors">
                         <Upload size={16} />
                         Seleccionar archivo
                       </span>
@@ -1373,19 +1371,19 @@ export default function BudgetPage() {
                   </div>
 
                   {/* Template Download */}
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-5">
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-5">
                     <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <div className="w-12 h-12 rounded-md bg-blue-100 flex items-center justify-center flex-shrink-0">
                         <Download size={24} className="text-blue-600" />
                       </div>
                       <div className="flex-1">
                         <h3 className="font-semibold text-slate-900 mb-1">¿Primera vez importando?</h3>
-                        <p className="text-sm text-slate-600 mb-3">
+                        <p className="text-[13px] text-slate-600 mb-3">
                           Descarga nuestra plantilla con el formato correcto y ejemplos incluidos.
                         </p>
                         <button
                           onClick={downloadTemplate}
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-[13px] font-medium hover:bg-blue-700 transition-colors"
                         >
                           <Download size={14} />
                           Descargar plantilla Excel
@@ -1395,8 +1393,8 @@ export default function BudgetPage() {
                   </div>
 
                   {/* Format Info */}
-                  <div className="bg-slate-50 rounded-xl p-4">
-                    <h4 className="font-medium text-slate-900 mb-2 text-sm">Formato de la plantilla:</h4>
+                  <div className="bg-slate-50 rounded-md p-4">
+                    <h4 className="font-medium text-slate-900 mb-2 text-[13px]">Formato de la plantilla:</h4>
                     <div className="font-mono text-xs bg-white border border-slate-200 rounded-lg p-3 overflow-x-auto">
                       <div className="grid grid-cols-4 gap-2 text-slate-400 mb-1 border-b border-slate-100 pb-1">
                         <span>CUENTA</span><span>SUBCUENTA</span><span>DESCRIPCIÓN</span><span>PRESUPUESTO</span>
@@ -1415,7 +1413,7 @@ export default function BudgetPage() {
                   </div>
 
                   {/* .fwb info */}
-                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                  <div className="bg-amber-50 border border-amber-100 rounded-md p-4">
                     <p className="text-xs text-amber-800">
                       <span className="font-medium">¿Vienes de Budgeting?</span> Puedes subir directamente el archivo <span className="font-mono">.fwb</span> que hayas descargado de tu borrador — se importan las cuentas y los códigos de detalle igual que con el Excel.
                     </p>
@@ -1431,25 +1429,25 @@ export default function BudgetPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <FileSpreadsheet size={15} className="text-slate-400" />
-                      <span className="font-medium text-slate-900 text-sm">{importFileName}</span>
+                      <span className="font-medium text-slate-900 text-[13px]">{importFileName}</span>
                     </div>
                     <button onClick={resetImport} className="text-xs text-slate-400 hover:text-slate-600">Cambiar archivo</button>
                   </div>
 
                   {/* Estadísticas rápidas */}
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-center">
                       <p className="text-xl font-bold text-blue-700">{importData.filter(d => d.type === "CUENTA").length}</p>
                       <p className="text-[10px] text-blue-600">Cuentas</p>
                     </div>
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-md p-3 text-center">
                       <p className="text-xl font-bold text-emerald-700">{importData.filter(d => d.type === "SUBCUENTA").length}</p>
                       <p className="text-[10px] text-emerald-600">Subcuentas</p>
                     </div>
                   </div>
 
                   {/* Vista previa agrupada — expandida por defecto */}
-                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="border border-slate-200 rounded-md overflow-hidden">
                     <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex items-center justify-between">
                       <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Vista previa</span>
                       <button
@@ -1475,11 +1473,11 @@ export default function BudgetPage() {
                                 n.has(account.code) ? n.delete(account.code) : n.add(account.code);
                                 return n;
                               })}
-                              className="w-full flex items-center gap-2 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-left"
+                              className="w-full flex items-center gap-2 px-4 py-1.5 bg-slate-50 hover:bg-slate-100 text-left"
                             >
                               <ChevronRight size={13} className={`text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? "rotate-90" : ""}`} />
                               <span className="font-mono text-xs font-bold text-slate-500 w-10 flex-shrink-0">{account.code}</span>
-                              <span className="text-sm font-semibold text-slate-800 flex-1 truncate">{account.description}</span>
+                              <span className="text-[13px] font-semibold text-slate-800 flex-1 truncate">{account.description}</span>
                               <span className="text-[10px] text-slate-400 mr-2">{subs.length} subcuentas</span>
                               {accountTotal > 0 && (
                                 <span className="text-xs font-medium text-slate-600 tabular-nums">{formatCurrency(accountTotal)} €</span>
@@ -1506,7 +1504,7 @@ export default function BudgetPage() {
               {/* Step 3: Importing */}
               {importStep === "importing" && (
                 <div className="p-12 text-center">
-                  <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6 relative">
+                  <div className="hidden">
                     <div className="absolute inset-0 rounded-full border-4 border-emerald-200">
                       <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
                         <circle
@@ -1521,33 +1519,33 @@ export default function BudgetPage() {
                     </div>
                     <span className="text-2xl font-bold text-emerald-700">{importProgress}%</span>
                   </div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">Importando datos...</h3>
-                  <p className="text-sm text-slate-500">Por favor, no cierres esta ventana</p>
+                  <h3 className="text-[14px] font-semibold text-slate-900 mb-2">Importando datos...</h3>
+                  <p className="text-[13px] text-slate-500">Por favor, no cierres esta ventana</p>
                 </div>
               )}
 
               {/* Step 4: Done */}
               {importStep === "done" && (
                 <div className="p-12 text-center">
-                  <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6">
+                  <div className="hidden">
                     <CheckCircle size={40} className="text-emerald-600" />
                   </div>
                   <h3 className="text-xl font-semibold text-slate-900 mb-2">¡Importación completada!</h3>
                   <p className="text-slate-500 mb-6">Tu presupuesto ha sido importado correctamente</p>
                   
                   <div className="flex items-center justify-center gap-4">
-                    <div className="text-center px-6 py-4 bg-blue-50 rounded-xl">
+                    <div className="text-center px-6 py-4 bg-blue-50 rounded-md">
                       <p className="text-3xl font-bold text-blue-700">{importResults.accounts}</p>
-                      <p className="text-sm text-blue-600">Cuentas creadas</p>
+                      <p className="text-[13px] text-blue-600">Cuentas creadas</p>
                     </div>
-                    <div className="text-center px-6 py-4 bg-emerald-50 rounded-xl">
+                    <div className="text-center px-6 py-4 bg-emerald-50 rounded-md">
                       <p className="text-3xl font-bold text-emerald-700">{importResults.subaccounts}</p>
-                      <p className="text-sm text-emerald-600">Subcuentas creadas</p>
+                      <p className="text-[13px] text-emerald-600">Subcuentas creadas</p>
                     </div>
                     {importResults.errors > 0 && (
-                      <div className="text-center px-6 py-4 bg-red-50 rounded-xl">
+                      <div className="text-center px-6 py-4 bg-red-50 rounded-md">
                         <p className="text-3xl font-bold text-red-700">{importResults.errors}</p>
-                        <p className="text-sm text-red-600">Errores</p>
+                        <p className="text-[13px] text-red-600">Errores</p>
                       </div>
                     )}
                   </div>
@@ -1558,7 +1556,7 @@ export default function BudgetPage() {
             {/* Footer */}
             <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between flex-shrink-0 bg-slate-50">
               {importStep === "upload" && (
-                <button onClick={closeImportModal} className="px-4 py-2.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                <button onClick={closeImportModal} className="px-4 py-1.5 text-slate-600 hover:text-slate-900 text-[13px] font-medium">
                   Cancelar
                 </button>
               )}
@@ -1568,13 +1566,13 @@ export default function BudgetPage() {
                 const total = accounts + subs;
                 return (
                   <>
-                    <button onClick={resetImport} className="px-4 py-2.5 text-slate-600 hover:text-slate-900 text-sm font-medium">
+                    <button onClick={resetImport} className="px-4 py-1.5 text-slate-600 hover:text-slate-900 text-[13px] font-medium">
                       ← Volver
                     </button>
                     <button
                       onClick={executeImport}
                       disabled={total === 0}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-md text-[13px] font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Upload size={16} />
                       Importar {total} elementos ({accounts} cuentas · {subs} subcuentas)
@@ -1583,14 +1581,14 @@ export default function BudgetPage() {
                 );
               })()}
               {importStep === "importing" && (
-                <div className="w-full text-center text-sm text-slate-500">
+                <div className="w-full text-center text-[13px] text-slate-500">
                   Procesando...
                 </div>
               )}
               {importStep === "done" && (
                 <button
                   onClick={closeImportModal}
-                  className="w-full px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors"
+                  className="w-full px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
                 >
                   Cerrar
                 </button>
@@ -1602,20 +1600,20 @@ export default function BudgetPage() {
 
       {/* Confirm Dialog */}
       {confirmDialog && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
-            <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[14px] font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
+            <p className="text-[13px] text-slate-600 mb-6">{confirmDialog.message}</p>
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmDialog(null)}
-                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm"
+                className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 font-medium text-[13px]"
               >
                 Cancelar
               </button>
               <button
                 onClick={confirmDialog.onConfirm}
-                className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-sm text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
+                className={`flex-1 px-4 py-1.5 rounded-md font-medium text-[13px] text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
               >
                 {confirmDialog.confirmLabel || "Confirmar"}
               </button>
@@ -1626,33 +1624,33 @@ export default function BudgetPage() {
 
       {/* .fwb: elegir qué nivel de Budgeting se queda como código operativo antes de aplanarlo */}
       {showFwbMappingModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => { setShowFwbMappingModal(false); setPendingFwbBytes(null); }}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">Cuentas y subcuentas</h3>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowFwbMappingModal(false); setPendingFwbBytes(null); }}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-[14px] font-semibold text-slate-900">Cuentas y subcuentas</h3>
               <button
                 onClick={() => { setShowFwbMappingModal(false); setPendingFwbBytes(null); }}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md"
               >
                 <X size={20} />
               </button>
             </div>
             <div className="p-6 space-y-3">
-              <p className="text-sm text-slate-500">
+              <p className="text-[13px] text-slate-500">
                 Accounting solo tiene dos niveles (Cuenta y Subcuenta), Budgeting tiene tres. Elige qué código quieres que se pueda asignar en PO, facturas y cajas.
               </p>
               <BudgetLevelMappingChoice value={fwbSubaccountLevel} onChange={setFwbSubaccountLevel} />
             </div>
-            <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
+            <div className="px-5 py-3 border-t border-slate-100 flex justify-end gap-2">
               <button
                 onClick={() => { setShowFwbMappingModal(false); setPendingFwbBytes(null); }}
-                className="flex-1 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"
+                className="flex-1 px-4 py-1.5 border border-slate-200 bg-white text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50"
               >
                 Cancelar
               </button>
               <button
                 onClick={confirmFwbMapping}
-                className="flex-1 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium"
+                className="flex-1 px-4 py-1.5 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
               >
                 Continuar
               </button>
@@ -1663,13 +1661,13 @@ export default function BudgetPage() {
 
       {/* Toast notifications */}
       {successMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
+        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
           <CheckCircle size={16} />
           {successMessage}
         </div>
       )}
       {errorMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
+        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
           <AlertCircle size={16} />
           {errorMessage}
           <button onClick={() => setErrorMessage("")} className="ml-2 hover:bg-white/20 rounded p-0.5">

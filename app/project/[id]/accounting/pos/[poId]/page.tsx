@@ -787,12 +787,12 @@ export default function PODetailPage() {
     return (
       <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="hidden">
             <ShieldAlert size={28} className="text-red-500" />
           </div>
-          <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
+          <h2 className="text-[14px] font-semibold text-slate-900 mb-2">Acceso denegado</h2>
           <p className="text-slate-500 mb-6">{permissionsError || "No tienes permisos para ver esta orden de compra"}</p>
-          <Link href={`/project/${projectId}/accounting/pos`} className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800">
+          <Link href={`/project/${projectId}/accounting/pos`} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
             <ArrowLeft size={16} />
             Volver a POs
           </Link>
@@ -812,14 +812,13 @@ export default function PODetailPage() {
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
       <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
-          <div className="relative flex items-center justify-center">
+        <div className="px-6 pt-8 sm:px-10">
+          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
             <div className="flex items-center gap-4">
-              <FileText size={22} className="text-slate-400" />
               <div className="text-center">
                 <div className="flex items-center justify-center gap-3">
-                  <h1 className="text-3xl font-bold text-slate-900 text-center">Orden de compra</h1>
-                  <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm font-mono font-medium">
+                  <h1 className="text-xl font-semibold tracking-tight text-slate-900">Orden de compra</h1>
+                  <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[13px] font-mono font-medium">
                     PO-{po.number}
                   </span>
                   {po.version > 1 && (
@@ -827,15 +826,11 @@ export default function PODetailPage() {
                       V{String(po.version).padStart(2, "0")}
                     </span>
                   )}
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium text-sm ${config.bg} ${config.text}`}>
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium text-[13px] ${config.bg} ${config.text}`}>
                     <Icon size={14} />
                     {config.label}
                   </span>
                 </div>
-                <p className="text-slate-500 text-sm mt-1">
-                  {po.supplier ? po.supplier : <span className="italic text-slate-400">Sin proveedor asignado</span>}
-                  {po.department && <span className="ml-2 text-slate-400">· {po.department}</span>}
-                </p>
               </div>
             </div>
 
@@ -853,19 +848,19 @@ export default function PODetailPage() {
 
               {/* Botón principal según estado */}
               {po.status === "draft" && poPerms.canEdit && (
-                <Link href={`/project/${projectId}/accounting/pos/${po.id}/edit`} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium">
+                <Link href={`/project/${projectId}/accounting/pos/${po.id}/edit`} className="flex items-center gap-2 px-4 py-1.5 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                   <Edit size={16} />
                   Editar
                 </Link>
               )}
               {po.status === "approved" && (
-                <Link href={`/project/${projectId}/accounting/invoices/new?poId=${po.id}`} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium">
+                <Link href={`/project/${projectId}/accounting/invoices/new?poId=${po.id}`} className="flex items-center gap-2 px-4 py-1.5 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                   <Upload size={16} />
                   Subir factura
                 </Link>
               )}
               {po.status === "closed" && poPerms.canReopen && (
-                <button onClick={() => { resetModals(); setShowReopenModal(true); }} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium">
+                <button onClick={() => { resetModals(); setShowReopenModal(true); }} className="flex items-center gap-2 px-4 py-1.5 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                   <Unlock size={16} />
                   Reabrir
                 </button>
@@ -875,7 +870,7 @@ export default function PODetailPage() {
               <div className="relative">
                 <button 
                   onClick={() => setShowActionsMenu(!showActionsMenu)} 
-                  className="flex items-center gap-2 px-3 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"
+                  className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium"
                 >
                   <MoreHorizontal size={18} />
                 </button>
@@ -883,11 +878,11 @@ export default function PODetailPage() {
                 {showActionsMenu && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowActionsMenu(false)} />
-                    <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 animate-fadeIn">
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-md shadow-xl z-50 py-1 animate-fadeIn">
                       {/* Descargar PDF - Siempre visible */}
                       <button 
                         onClick={() => { generatePDF(); setShowActionsMenu(false); }} 
-                        className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3"
+                        className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3"
                       >
                         <Download size={16} className="text-slate-400" />
                         Descargar PDF
@@ -898,7 +893,7 @@ export default function PODetailPage() {
                         <button 
                           onClick={() => { fileInputRef.current?.click(); setShowActionsMenu(false); }} 
                           disabled={replacingDocument}
-                          className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3 disabled:opacity-50"
+                          className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3 disabled:opacity-50"
                         >
                           <Upload size={16} className="text-slate-400" />
                           {replacingDocument ? "Subiendo..." : "Reemplazar documento"}
@@ -911,7 +906,7 @@ export default function PODetailPage() {
                           <div className="border-t border-slate-100 my-1" />
                           <button 
                             onClick={() => { resetModals(); setShowModifyModal(true); setShowActionsMenu(false); }} 
-                            className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3"
+                            className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3"
                           >
                             <FileEdit size={16} className="text-slate-400" />
                             Modificar PO
@@ -919,7 +914,7 @@ export default function PODetailPage() {
                           {poPerms.canClose && (
                             <button 
                               onClick={() => { resetModals(); setShowCloseModal(true); setShowActionsMenu(false); }} 
-                              className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3"
+                              className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3"
                             >
                               <Lock size={16} className="text-slate-400" />
                               Cerrar PO
@@ -930,7 +925,7 @@ export default function PODetailPage() {
                               <div className="border-t border-slate-100 my-1" />
                               <button 
                                 onClick={() => { resetModals(); setShowCancelModal(true); setShowActionsMenu(false); }} 
-                                className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
+                                className="w-full px-4 py-1.5 text-left text-[13px] text-red-600 hover:bg-red-50 flex items-center gap-3"
                               >
                                 <XCircle size={16} className="text-red-400" />
                                 Anular PO
@@ -946,7 +941,7 @@ export default function PODetailPage() {
                           <div className="border-t border-slate-100 my-1" />
                           <button 
                             onClick={() => { setShowDeleteModal(true); setShowActionsMenu(false); }} 
-                            className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
+                            className="w-full px-4 py-1.5 text-left text-[13px] text-red-600 hover:bg-red-50 flex items-center gap-3"
                           >
                             <Trash2 size={16} className="text-red-400" />
                             Eliminar borrador
@@ -971,18 +966,18 @@ export default function PODetailPage() {
         </div>
       </div>
 
-      <main className="px-24 py-8">
+      <main className="px-6 sm:px-10 py-8">
         <div className="grid grid-cols-3 gap-8">
           <div className="col-span-2 space-y-6">
             {po.generalDescription && (
-              <div className="bg-white border border-slate-200 rounded-2xl p-6">
+              <div className="bg-white border border-slate-200 rounded-lg p-6">
                 <h3 className="font-semibold text-slate-900 mb-3">Descripción</h3>
                 <p className="text-slate-600">{po.generalDescription}</p>
               </div>
             )}
 
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                 <h3 className="font-semibold text-slate-900">Items</h3>
                 <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">{po.items.length}</span>
               </div>
@@ -1034,15 +1029,15 @@ export default function PODetailPage() {
                                 {showItemInfoPopover === index && (
                                   <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowItemInfoPopover(null)}>
                                     <div className="absolute inset-0 bg-black/20" />
-                                    <div className="relative w-80 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                    <div className="relative w-80 bg-white rounded-md shadow-xl border border-slate-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
                                       <div className={`px-4 py-3 ${item.isClosed ? "bg-blue-50" : itemRemaining > 0 ? "bg-amber-50" : "bg-emerald-50"}`}>
-                                        <p className={`font-semibold text-sm ${item.isClosed ? "text-blue-800" : itemRemaining > 0 ? "text-amber-800" : "text-emerald-800"}`}>
+                                        <p className={`font-semibold text-[13px] ${item.isClosed ? "text-blue-800" : itemRemaining > 0 ? "text-amber-800" : "text-emerald-800"}`}>
                                           {item.isClosed ? "Item cerrado" : itemRemaining > 0 ? "Pendiente de facturar" : "Completamente facturado"}
                                         </p>
                                         <p className="text-xs text-slate-600 mt-0.5">{item.description}</p>
                                       </div>
                                       <div className="p-4 space-y-3">
-                                        <div className="grid grid-cols-2 gap-3 text-sm">
+                                        <div className="grid grid-cols-2 gap-3 text-[13px]">
                                           <div>
                                             <p className="text-slate-500 text-xs">Comprometido</p>
                                             <p className="font-semibold text-slate-900">{formatCurrency(itemCommitted)} {getCurrencySymbol()}</p>
@@ -1085,7 +1080,7 @@ export default function PODetailPage() {
                                                   setPasswordInput("");
                                                   setPasswordError("");
                                                 }}
-                                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition-colors"
+                                                className="w-full flex items-center justify-center gap-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[13px] font-medium transition-colors"
                                               >
                                                 <Unlock size={14} />
                                                 Reabrir item
@@ -1098,7 +1093,7 @@ export default function PODetailPage() {
                                                   setPasswordInput("");
                                                   setPasswordError("");
                                                 }}
-                                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors"
+                                                className="w-full flex items-center justify-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[13px] font-medium transition-colors"
                                               >
                                                 <Lock size={14} />
                                                 Cerrar item {itemRemaining > 0 && `(liberar ${formatCurrency(itemRemaining)} ${getCurrencySymbol()})`}
@@ -1113,11 +1108,11 @@ export default function PODetailPage() {
                               </>
                             )}
                           </div>
-                          <p className="text-sm text-slate-500 mt-0.5">{item.subAccountCode} · {item.subAccountDescription}</p>
+                          <p className="text-[13px] text-slate-500 mt-0.5">{item.subAccountCode} · {item.subAccountDescription}</p>
                         </div>
                         <p className="font-bold text-slate-900">{formatCurrency(item.totalAmount)} {getCurrencySymbol()}</p>
                       </div>
-                      <div className="flex items-center gap-6 text-sm text-slate-500">
+                      <div className="flex items-center gap-6 text-[13px] text-slate-500">
                         <span>{item.quantity} × {formatCurrency(item.unitPrice)} {getCurrencySymbol()}</span>
                         {item.vatRate > 0 && <span>IVA {item.vatRate}%</span>}
                         {item.irpfRate > 0 && <span className="text-red-500">IRPF {item.irpfRate}%</span>}
@@ -1203,8 +1198,8 @@ export default function PODetailPage() {
             </div>
 
             {invoices.length > 0 && (
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                   <h3 className="font-semibold text-slate-900">Facturas vinculadas</h3>
                   <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium">{invoices.length}</span>
                 </div>
@@ -1250,18 +1245,18 @@ export default function PODetailPage() {
             )}
 
             {po.modificationHistory && po.modificationHistory.length > 0 && (
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100">
+              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                <div className="px-5 py-3 border-b border-slate-100">
                   <h3 className="font-semibold text-slate-900">Historial de modificaciones</h3>
                 </div>
                 <div className="divide-y divide-slate-100">
                   {po.modificationHistory.map((entry, index) => (
                     <div key={index} className="p-4">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-slate-900">V{String(entry.previousVersion).padStart(2, "0")} → V{String(entry.previousVersion + 1).padStart(2, "0")}</span>
+                        <span className="text-[13px] font-medium text-slate-900">V{String(entry.previousVersion).padStart(2, "0")} → V{String(entry.previousVersion + 1).padStart(2, "0")}</span>
                         <span className="text-xs text-slate-500">{formatDateTime(entry.date?.toDate?.() || entry.date)}</span>
                       </div>
-                      <p className="text-sm text-slate-600">{entry.reason}</p>
+                      <p className="text-[13px] text-slate-600">{entry.reason}</p>
                       <p className="text-xs text-slate-400 mt-1">Por {entry.userName}</p>
                     </div>
                   ))}
@@ -1271,19 +1266,19 @@ export default function PODetailPage() {
           </div>
 
           <div className="space-y-6">
-            <div className="bg-white border border-slate-200 rounded-2xl p-6">
+            <div className="bg-white border border-slate-200 rounded-lg p-6">
               <h3 className="font-semibold text-slate-900 mb-4">Resumen</h3>
               <div className="space-y-3">
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-[13px]">
                   <span className="text-slate-500">Base imponible</span>
                   <span className="font-medium text-slate-900">{formatCurrency(po.baseAmount)} {getCurrencySymbol()}</span>
                 </div>
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-[13px]">
                   <span className="text-slate-500">IVA</span>
                   <span className="font-medium text-slate-700">+{formatCurrency(po.vatAmount)} {getCurrencySymbol()}</span>
                 </div>
                 {po.irpfAmount > 0 && (
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-[13px]">
                     <span className="text-slate-500">IRPF</span>
                     <span className="font-medium text-red-600">-{formatCurrency(po.irpfAmount)} {getCurrencySymbol()}</span>
                   </div>
@@ -1295,9 +1290,9 @@ export default function PODetailPage() {
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-2xl p-6">
+            <div className="bg-white border border-slate-200 rounded-lg p-6">
               <h3 className="font-semibold text-slate-900 mb-4">Detalles</h3>
-              <div className="space-y-4 text-sm">
+              <div className="space-y-4 text-[13px]">
                 <div className="flex items-center gap-3">
                   <Building2 size={16} className="text-slate-400" />
                   <div>
@@ -1343,14 +1338,14 @@ export default function PODetailPage() {
             </div>
 
             {po.attachmentUrl && (
-              <div className="bg-white border border-slate-200 rounded-2xl p-6">
+              <div className="bg-white border border-slate-200 rounded-lg p-6">
                 <h3 className="font-semibold text-slate-900 mb-4">Adjunto</h3>
-                <a href={po.attachmentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
+                <a href={po.attachmentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-slate-50 rounded-md hover:bg-slate-100 transition-colors">
                   <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
                     <FileUp size={18} className="text-indigo-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900 truncate">{po.attachmentFileName}</p>
+                    <p className="text-[13px] font-medium text-slate-900 truncate">{po.attachmentFileName}</p>
                     <p className="text-xs text-slate-500">Ver archivo</p>
                   </div>
                   <ExternalLink size={14} className="text-slate-400" />
@@ -1359,16 +1354,16 @@ export default function PODetailPage() {
             )}
 
             {po.notes && (
-              <div className="bg-white border border-slate-200 rounded-2xl p-6">
+              <div className="bg-white border border-slate-200 rounded-lg p-6">
                 <h3 className="font-semibold text-slate-900 mb-3">Notas</h3>
-                <p className="text-sm text-slate-600">{po.notes}</p>
+                <p className="text-[13px] text-slate-600">{po.notes}</p>
               </div>
             )}
 
             {po.status === "cancelled" && po.cancellationReason && (
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-6">
                 <h3 className="font-semibold text-red-900 mb-3">Motivo de anulación</h3>
-                <p className="text-sm text-red-700">{po.cancellationReason}</p>
+                <p className="text-[13px] text-red-700">{po.cancellationReason}</p>
                 <p className="text-xs text-red-500 mt-2">Por {po.cancelledByName} · {formatDateTime(po.cancelledAt!)}</p>
               </div>
             )}
@@ -1377,7 +1372,7 @@ export default function PODetailPage() {
 
         {/* Firmas */}
         {po.approvalSteps && po.approvalSteps.length > 0 && (
-          <div className="mt-8 bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="mt-8 bg-white border border-slate-200 rounded-lg overflow-hidden">
             <div className="px-6 py-3 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-semibold text-slate-900">Firmas</h3>
               {po.status === "approved" && (
@@ -1426,7 +1421,7 @@ export default function PODetailPage() {
                   return (
                     <div 
                       key={step.id} 
-                      className={`p-3 rounded-xl border text-center ${
+                      className={`p-3 rounded-md border text-center ${
                         isApproved ? "bg-emerald-50 border-emerald-200" : 
                         isRejected ? "bg-red-50 border-red-200" : 
                         isCurrent ? "bg-amber-50 border-amber-200" : 
@@ -1461,7 +1456,7 @@ export default function PODetailPage() {
                          signerName.charAt(0).toUpperCase()}
                       </div>
                       
-                      <p className={`text-sm font-medium truncate ${
+                      <p className={`text-[13px] font-medium truncate ${
                         isApproved ? "text-emerald-800" : 
                         isRejected ? "text-red-800" : 
                         "text-slate-700"
@@ -1500,23 +1495,23 @@ export default function PODetailPage() {
 
       {/* Close Modal */}
       {showCloseModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => { setShowCloseModal(false); resetModals(); }}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowCloseModal(false); resetModals(); }}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-blue-100 rounded-md flex items-center justify-center">
                 <Lock size={20} className="text-blue-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Cerrar PO-{po.number}</h3>
+                <h3 className="text-[14px] font-semibold text-slate-900">Cerrar PO-{po.number}</h3>
                 <p className="text-xs text-slate-500">Esta acción requiere confirmación</p>
               </div>
             </div>
             <div className="p-6">
               {remainingAmount > 0 && (
-                <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
                   <div className="flex items-start gap-3">
                     <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
-                    <div className="text-sm text-amber-800">
+                    <div className="text-[13px] text-amber-800">
                       <p className="font-medium">Esta PO tiene importe sin facturar</p>
                       <p className="text-xs mt-1">Pendiente: {formatCurrency(remainingAmount)} {getCurrencySymbol()}</p>
                       <p className="text-xs mt-1 text-amber-700">Se liberará el presupuesto comprometido restante.</p>
@@ -1525,7 +1520,7 @@ export default function PODetailPage() {
                 </div>
               )}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                <label className="block text-[13px] font-medium text-slate-700 mb-2 flex items-center gap-2">
                   <KeyRound size={14} />
                   Confirma tu contraseña
                 </label>
@@ -1534,16 +1529,16 @@ export default function PODetailPage() {
                   value={passwordInput}
                   onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
                   placeholder="Tu contraseña"
-                  className={`w-full px-4 py-3 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm`}
+                  className={`w-full px-2.5 py-1.5 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]`}
                   autoFocus
                 />
                 {passwordError && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}
               </div>
               <div className="flex gap-3">
-                <button onClick={() => { setShowCloseModal(false); resetModals(); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">
+                <button onClick={() => { setShowCloseModal(false); resetModals(); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">
                   Cancelar
                 </button>
-                <button onClick={handleClosePO} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">
+                <button onClick={handleClosePO} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[13px] font-medium disabled:opacity-50">
                   {processing ? "Cerrando..." : "Cerrar PO"}
                 </button>
               </div>
@@ -1554,14 +1549,14 @@ export default function PODetailPage() {
 
       {/* Close Item Modal */}
       {showCloseItemModal !== null && po && po.items[showCloseItemModal] && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => { setShowCloseItemModal(null); resetModals(); }}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowCloseItemModal(null); resetModals(); }}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-blue-100 rounded-md flex items-center justify-center">
                 <Lock size={20} className="text-blue-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Cerrar item</h3>
+                <h3 className="text-[14px] font-semibold text-slate-900">Cerrar item</h3>
                 <p className="text-xs text-slate-500">{po.items[showCloseItemModal].description}</p>
               </div>
             </div>
@@ -1570,10 +1565,10 @@ export default function PODetailPage() {
                 const item = po.items[showCloseItemModal];
                 const itemRemaining = Math.max(0, (item.baseAmount || 0) - (item.invoicedAmount || 0));
                 return itemRemaining > 0 ? (
-                  <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                  <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
                     <div className="flex items-start gap-3">
                       <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
-                      <div className="text-sm text-amber-800">
+                      <div className="text-[13px] text-amber-800">
                         <p className="font-medium">Este item tiene importe sin facturar</p>
                         <p className="text-xs mt-1">Comprometido: {formatCurrency(item.baseAmount)} {getCurrencySymbol()}</p>
                         <p className="text-xs">Realizado: {formatCurrency(item.invoicedAmount || 0)} {getCurrencySymbol()}</p>
@@ -1584,7 +1579,7 @@ export default function PODetailPage() {
                 ) : null;
               })()}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                <label className="block text-[13px] font-medium text-slate-700 mb-2 flex items-center gap-2">
                   <KeyRound size={14} />
                   Confirma tu contraseña
                 </label>
@@ -1593,16 +1588,16 @@ export default function PODetailPage() {
                   value={passwordInput}
                   onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
                   placeholder="Tu contraseña"
-                  className={`w-full px-4 py-3 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm`}
+                  className={`w-full px-2.5 py-1.5 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]`}
                   autoFocus
                 />
                 {passwordError && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}
               </div>
               <div className="flex gap-3">
-                <button onClick={() => { setShowCloseItemModal(null); resetModals(); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">
+                <button onClick={() => { setShowCloseItemModal(null); resetModals(); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">
                   Cancelar
                 </button>
-                <button onClick={() => handleCloseItem(showCloseItemModal)} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">
+                <button onClick={() => handleCloseItem(showCloseItemModal)} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[13px] font-medium disabled:opacity-50">
                   {processing ? "Cerrando..." : "Cerrar item"}
                 </button>
               </div>
@@ -1613,14 +1608,14 @@ export default function PODetailPage() {
 
       {/* Reopen Item Modal */}
       {showReopenItemModal !== null && po && po.items[showReopenItemModal] && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => { setShowReopenItemModal(null); resetModals(); }}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowReopenItemModal(null); resetModals(); }}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center">
                 <Unlock size={20} className="text-emerald-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Reabrir item</h3>
+                <h3 className="text-[14px] font-semibold text-slate-900">Reabrir item</h3>
                 <p className="text-xs text-slate-500">{po.items[showReopenItemModal].description}</p>
               </div>
             </div>
@@ -1629,10 +1624,10 @@ export default function PODetailPage() {
                 const item = po.items[showReopenItemModal];
                 const itemRemaining = Math.max(0, (item.baseAmount || 0) - (item.invoicedAmount || 0));
                 return itemRemaining > 0 ? (
-                  <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                  <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
                     <div className="flex items-start gap-3">
                       <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
-                      <div className="text-sm text-amber-800">
+                      <div className="text-[13px] text-amber-800">
                         <p className="font-medium">Se restaurará el comprometido</p>
                         <p className="text-xs mt-1">Comprometido original: {formatCurrency(item.baseAmount)} {getCurrencySymbol()}</p>
                         <p className="text-xs">Facturado: {formatCurrency(item.invoicedAmount || 0)} {getCurrencySymbol()}</p>
@@ -1643,7 +1638,7 @@ export default function PODetailPage() {
                 ) : null;
               })()}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                <label className="block text-[13px] font-medium text-slate-700 mb-2 flex items-center gap-2">
                   <KeyRound size={14} />
                   Confirma tu contraseña
                 </label>
@@ -1652,16 +1647,16 @@ export default function PODetailPage() {
                   value={passwordInput}
                   onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
                   placeholder="Tu contraseña"
-                  className={`w-full px-4 py-3 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm`}
+                  className={`w-full px-2.5 py-1.5 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]`}
                   autoFocus
                 />
                 {passwordError && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}
               </div>
               <div className="flex gap-3">
-                <button onClick={() => { setShowReopenItemModal(null); resetModals(); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">
+                <button onClick={() => { setShowReopenItemModal(null); resetModals(); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">
                   Cancelar
                 </button>
-                <button onClick={() => handleReopenItem(showReopenItemModal)} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">
+                <button onClick={() => handleReopenItem(showReopenItemModal)} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[13px] font-medium disabled:opacity-50">
                   {processing ? "Reabriendo..." : "Reabrir item"}
                 </button>
               </div>
@@ -1672,29 +1667,29 @@ export default function PODetailPage() {
 
       {/* Reopen Modal */}
       {showReopenModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => { setShowReopenModal(false); resetModals(); }}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowReopenModal(false); resetModals(); }}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center">
                 <Unlock size={20} className="text-emerald-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Reabrir PO-{po.number}</h3>
+                <h3 className="text-[14px] font-semibold text-slate-900">Reabrir PO-{po.number}</h3>
                 <p className="text-xs text-slate-500">Volverá al estado &quot;Aprobada&quot;</p>
               </div>
             </div>
             <div className="p-6">
-              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
                 <div className="flex items-start gap-3">
                   <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
-                  <div className="text-sm text-amber-800">
+                  <div className="text-[13px] text-amber-800">
                     <p className="font-medium">Se restaurará el presupuesto comprometido</p>
                     <p className="text-xs mt-1">Se volverá a comprometer: {formatCurrency(Math.max(0, po.baseAmount - po.invoicedAmount))} {getCurrencySymbol()}</p>
                   </div>
                 </div>
               </div>
               <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                <label className="block text-[13px] font-medium text-slate-700 mb-2 flex items-center gap-2">
                   <KeyRound size={14} />
                   Confirma tu contraseña
                 </label>
@@ -1703,16 +1698,16 @@ export default function PODetailPage() {
                   value={passwordInput}
                   onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
                   placeholder="Tu contraseña"
-                  className={`w-full px-4 py-3 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm`}
+                  className={`w-full px-2.5 py-1.5 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]`}
                   autoFocus
                 />
                 {passwordError && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}
               </div>
               <div className="flex gap-3">
-                <button onClick={() => { setShowReopenModal(false); resetModals(); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">
+                <button onClick={() => { setShowReopenModal(false); resetModals(); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">
                   Cancelar
                 </button>
-                <button onClick={handleReopenPO} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">
+                <button onClick={handleReopenPO} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[13px] font-medium disabled:opacity-50">
                   {processing ? "Reabriendo..." : "Reabrir PO"}
                 </button>
               </div>
@@ -1723,23 +1718,23 @@ export default function PODetailPage() {
 
       {/* Cancel Modal */}
       {showCancelModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => { setShowCancelModal(false); resetModals(); }}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowCancelModal(false); resetModals(); }}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-red-100 rounded-md flex items-center justify-center">
                 <XCircle size={20} className="text-red-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Anular PO-{po.number}</h3>
+                <h3 className="text-[14px] font-semibold text-slate-900">Anular PO-{po.number}</h3>
                 <p className="text-xs text-slate-500">Esta acción no se puede deshacer</p>
               </div>
             </div>
             <div className="p-6">
               {po.status === "approved" && (
-                <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
                   <div className="flex items-start gap-3">
                     <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
-                    <div className="text-sm text-amber-800">
+                    <div className="text-[13px] text-amber-800">
                       <p className="font-medium">Se liberará el presupuesto comprometido</p>
                       <p className="text-xs mt-1">{formatCurrency(po.committedAmount || po.baseAmount)} {getCurrencySymbol()} volverán a estar disponibles</p>
                     </div>
@@ -1747,17 +1742,17 @@ export default function PODetailPage() {
                 </div>
               )}
               <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 mb-2">Motivo de anulación *</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Motivo de anulación *</label>
                 <textarea
                   value={cancellationReason}
                   onChange={(e) => setCancellationReason(e.target.value)}
                   placeholder="Explica por qué se anula esta PO"
                   rows={3}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none text-sm"
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 resize-none text-[13px]"
                 />
               </div>
               <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                <label className="block text-[13px] font-medium text-slate-700 mb-2 flex items-center gap-2">
                   <KeyRound size={14} />
                   Confirma tu contraseña
                 </label>
@@ -1766,15 +1761,15 @@ export default function PODetailPage() {
                   value={passwordInput}
                   onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
                   placeholder="Tu contraseña"
-                  className={`w-full px-4 py-3 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm`}
+                  className={`w-full px-2.5 py-1.5 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]`}
                 />
                 {passwordError && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}
               </div>
               <div className="flex gap-3">
-                <button onClick={() => { setShowCancelModal(false); resetModals(); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">
+                <button onClick={() => { setShowCancelModal(false); resetModals(); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">
                   Cancelar
                 </button>
-                <button onClick={handleCancelPO} disabled={processing || !cancellationReason.trim() || !passwordInput.trim()} className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">
+                <button onClick={handleCancelPO} disabled={processing || !cancellationReason.trim() || !passwordInput.trim()} className="flex-1 px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-[13px] font-medium disabled:opacity-50">
                   {processing ? "Anulando..." : "Anular PO"}
                 </button>
               </div>
@@ -1785,42 +1780,42 @@ export default function PODetailPage() {
 
       {/* Modify Modal */}
       {showModifyModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => { setShowModifyModal(false); resetModals(); }}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowModifyModal(false); resetModals(); }}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-amber-100 rounded-md flex items-center justify-center">
                 <FileEdit size={20} className="text-amber-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Modificar PO-{po.number}</h3>
+                <h3 className="text-[14px] font-semibold text-slate-900">Modificar PO-{po.number}</h3>
                 <p className="text-xs text-slate-500">Crear nueva versión para editar</p>
               </div>
             </div>
             <div className="p-6">
-              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
                 <div className="flex items-start gap-3">
                   <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
-                  <div className="text-sm text-amber-800">
+                  <div className="text-[13px] text-amber-800">
                     <p className="font-medium">Pasará a V{String((po.version || 1) + 1).padStart(2, "0")} en borrador</p>
                     <p className="text-xs mt-1">Deberás editarla y enviarla nuevamente.</p>
                   </div>
                 </div>
               </div>
               <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-700 mb-2">Motivo de la modificación *</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Motivo de la modificación *</label>
                 <textarea
                   value={modificationReason}
                   onChange={(e) => setModificationReason(e.target.value)}
                   placeholder="Explica por qué se modifica"
                   rows={4}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none text-sm"
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 resize-none text-[13px]"
                 />
               </div>
               <div className="flex gap-3">
-                <button onClick={() => { setShowModifyModal(false); resetModals(); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">
+                <button onClick={() => { setShowModifyModal(false); resetModals(); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">
                   Cancelar
                 </button>
-                <button onClick={handleModifyPO} disabled={processing || !modificationReason.trim()} className="flex-1 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium disabled:opacity-50">
+                <button onClick={handleModifyPO} disabled={processing || !modificationReason.trim()} className="flex-1 px-4 py-1.5 rounded-md text-[13px] font-medium disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                   {processing ? "Modificando..." : "Modificar"}
                 </button>
               </div>
@@ -1831,10 +1826,10 @@ export default function PODetailPage() {
 
       {/* Modal Eliminar Borrador */}
       {showDeleteModal && po && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setShowDeleteModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowDeleteModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="p-6">
-              <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <div className="hidden">
                 <Trash2 size={28} className="text-red-600" />
               </div>
               <h3 className="text-lg font-semibold text-slate-900 text-center mb-2">Eliminar borrador</h3>
@@ -1844,14 +1839,14 @@ export default function PODetailPage() {
               <div className="flex gap-3">
                 <button 
                   onClick={() => setShowDeleteModal(false)} 
-                  className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"
+                  className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium"
                 >
                   Cancelar
                 </button>
                 <button 
                   onClick={handleDeleteDraft} 
                   disabled={processing} 
-                  className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-[13px] font-medium disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {processing ? (
                     <>
@@ -1873,11 +1868,11 @@ export default function PODetailPage() {
 
       {/* Modal Nota del Aprobador */}
       {showApprovalNoteModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setShowApprovalNoteModal(null)}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowApprovalNoteModal(null)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                <div className={`w-12 h-12 rounded-md flex items-center justify-center ${
                   showApprovalNoteModal.type === "approval" ? "bg-emerald-100" :
                   showApprovalNoteModal.type === "rejection" ? "bg-red-100" :
                   "bg-slate-100"
@@ -1890,16 +1885,16 @@ export default function PODetailPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-slate-900">Nota del aprobador</h3>
-                  <p className="text-sm text-slate-500">{showApprovalNoteModal.userName}</p>
+                  <p className="text-[13px] text-slate-500">{showApprovalNoteModal.userName}</p>
                 </div>
               </div>
               
-              <div className={`p-4 rounded-xl border ${
+              <div className={`p-4 rounded-md border ${
                 showApprovalNoteModal.type === "approval" ? "bg-emerald-50 border-emerald-200" :
                 showApprovalNoteModal.type === "rejection" ? "bg-red-50 border-red-200" :
                 "bg-slate-50 border-slate-200"
               }`}>
-                <p className="text-sm text-slate-700 italic">&quot;{showApprovalNoteModal.text}&quot;</p>
+                <p className="text-[13px] text-slate-700 italic">&quot;{showApprovalNoteModal.text}&quot;</p>
               </div>
               
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
@@ -1922,7 +1917,7 @@ export default function PODetailPage() {
               
               <button 
                 onClick={() => setShowApprovalNoteModal(null)}
-                className="w-full mt-4 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
+                className="w-full mt-4 px-4 py-1.5 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
               >
                 Cerrar
               </button>

@@ -562,7 +562,7 @@ export default function PaymentPayPage() {
     return (
       <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
         <div className="text-center max-w-md px-6">
-          <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+          <div className="hidden">
             <ShieldAlert size={32} className="text-red-600" />
           </div>
           <h1 className="text-2xl font-semibold text-slate-900 mb-2">Acceso restringido</h1>
@@ -571,7 +571,7 @@ export default function PaymentPayPage() {
           </p>
           <Link 
             href={`/project/${id}/accounting`} 
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors"
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] font-medium transition-colors border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
           >
             <ArrowLeft size={16} />
             Volver al panel
@@ -588,7 +588,7 @@ export default function PaymentPayPage() {
         <div className="text-center">
           <AlertCircle size={48} className="text-slate-300 mx-auto mb-4" />
           <p className="text-slate-500">Previsión no encontrada</p>
-          <Link href={`/project/${id}/accounting/payments`} className="text-sm text-emerald-600 hover:underline mt-2 inline-block">Volver</Link>
+          <Link href={`/project/${id}/accounting/payments`} className="text-[13px] text-emerald-600 hover:underline mt-2 inline-block">Volver</Link>
         </div>
       </div>
     );
@@ -596,7 +596,7 @@ export default function PaymentPayPage() {
 
   return (
     <div className={`min-h-screen bg-slate-100 ${inter.className}`}>
-      {toast && <div className="fixed bottom-4 left-4 z-[60]"><div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium ${toast.type === "success" ? "bg-emerald-600" : toast.type === "error" ? "bg-red-600" : "bg-amber-500"}`}>{toast.type === "success" ? <CheckCircle2 size={16} /> : toast.type === "error" ? <AlertCircle size={16} /> : <AlertTriangle size={16} />}{toast.message}</div></div>}
+      {toast && <div className="fixed bottom-4 left-4 z-[60]"><div className={`flex items-center gap-2 px-4 py-3 rounded-md shadow-lg text-white text-[13px] font-medium ${toast.type === "success" ? "bg-emerald-600" : toast.type === "error" ? "bg-red-600" : "bg-amber-500"}`}>{toast.type === "success" ? <CheckCircle2 size={16} /> : toast.type === "error" ? <AlertCircle size={16} /> : <AlertTriangle size={16} />}{toast.message}</div></div>}
 
       {/* Header */}
       <div className="bg-emerald-600 text-white px-6 py-3 flex items-center justify-between fixed top-0 left-0 right-0 z-50">
@@ -605,15 +605,15 @@ export default function PaymentPayPage() {
           <div className="flex items-center gap-3">
             <CreditCard size={20} />
             <span className="font-semibold">Pagar remesa</span>
-            <span className="bg-emerald-500 px-2 py-0.5 rounded text-sm">{forecast.name}</span>
+            <span className="bg-emerald-500 px-2 py-0.5 rounded text-[13px]">{forecast.name}</span>
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-6 text-emerald-100 text-sm">
+          <div className="flex items-center gap-6 text-emerald-100 text-[13px]">
             <span>Pendiente: <span className="font-bold text-white">{formatCurrency(totalPending)} €</span></span>
             <span>Completado: <span className="font-bold text-white">{formatCurrency(totalCompleted)} €</span></span>
           </div>
-          <button onClick={() => setShowSepaModal(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-700 text-white rounded-xl text-sm font-medium hover:bg-emerald-800">
+          <button onClick={() => setShowSepaModal(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-700 text-white rounded-md text-[13px] font-medium hover:bg-emerald-800">
             <Download size={16} />SEPA XML
           </button>
         </div>
@@ -623,7 +623,7 @@ export default function PaymentPayPage() {
         {/* Left: Document Preview */}
         <div className="w-1/2 bg-slate-800 p-4 flex flex-col">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-slate-400 text-sm">
+            <span className="text-slate-400 text-[13px]">
               {selectedPayment
                 ? `Documento: ${(selectedPayment.supplierId ? suppliers[selectedPayment.supplierId]?.name : null) || selectedPayment.supplier || "—"}`
                 : "Selecciona un pago"}
@@ -639,7 +639,7 @@ export default function PaymentPayPage() {
               )}
             </div>
           </div>
-          <div className="flex-1 bg-slate-900 rounded-xl overflow-auto flex items-center justify-center">
+          <div className="flex-1 bg-slate-900 rounded-md overflow-auto flex items-center justify-center">
             {(() => {
               const previewUrl = selectedPayment && (itemReceipts[selectedPayment.id]?.url || selectedPayment.receiptUrl || selectedPayment.attachmentUrl);
               if (previewUrl) {
@@ -672,17 +672,17 @@ export default function PaymentPayPage() {
         <div className="w-1/2 overflow-y-auto p-6">
           {/* Summary Cards */}
           <div className="grid grid-cols-3 gap-3 mb-6">
-            <div className="bg-white rounded-xl p-4 border border-slate-200">
+            <div className="bg-white rounded-md p-4 border border-slate-200">
               <div className="flex items-center gap-2 mb-2"><Clock size={16} className="text-amber-500" /><span className="text-xs text-slate-500">Pendiente</span></div>
               <p className="text-lg font-bold text-slate-900">{formatCurrency(totalPending)} €</p>
               <p className="text-xs text-slate-400">{pendingItems.length} pagos</p>
             </div>
-            <div className="bg-white rounded-xl p-4 border border-slate-200">
+            <div className="bg-white rounded-md p-4 border border-slate-200">
               <div className="flex items-center gap-2 mb-2"><CheckCircle2 size={16} className="text-emerald-500" /><span className="text-xs text-slate-500">Completado</span></div>
               <p className="text-lg font-bold text-emerald-600">{formatCurrency(totalCompleted)} €</p>
               <p className="text-xs text-slate-400">{completedItems.length} pagos</p>
             </div>
-            <div className="bg-white rounded-xl p-4 border border-slate-200">
+            <div className="bg-white rounded-md p-4 border border-slate-200">
               <div className="flex items-center gap-2 mb-2"><Euro size={16} className="text-slate-500" /><span className="text-xs text-slate-500">Total</span></div>
               <p className="text-lg font-bold text-slate-900">{formatCurrency(totalPending + totalCompleted)} €</p>
               <div className="w-full h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
@@ -694,7 +694,7 @@ export default function PaymentPayPage() {
           {/* Bulk Upload */}
           {pendingItems.length > 0 && (
             <div 
-              className={`mb-4 border-2 border-dashed rounded-xl p-4 transition-colors ${dragOver ? "border-emerald-400 bg-emerald-50" : "border-slate-300 bg-white hover:border-slate-400"}`}
+              className={`mb-4 border-2 border-dashed rounded-md p-4 transition-colors ${dragOver ? "border-emerald-400 bg-emerald-50" : "border-slate-300 bg-white hover:border-slate-400"}`}
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
@@ -702,10 +702,10 @@ export default function PaymentPayPage() {
               <div className="flex items-center justify-center gap-4 text-center">
                 <FileUp size={20} className={dragOver ? "text-emerald-500" : "text-slate-400"} />
                 <div>
-                  <p className="text-sm font-medium text-slate-700">Arrastra justificantes aquí</p>
+                  <p className="text-[13px] font-medium text-slate-700">Arrastra justificantes aquí</p>
                   <p className="text-xs text-slate-500">Nombra con nº factura (FRA-001.pdf)</p>
                 </div>
-                <button onClick={() => bulkFileInputRef.current?.click()} className="px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg font-medium">Seleccionar</button>
+                <button onClick={() => bulkFileInputRef.current?.click()} className="px-3 py-1.5 text-[13px] text-emerald-600 hover:bg-emerald-50 rounded-lg font-medium">Seleccionar</button>
               </div>
               <input ref={bulkFileInputRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => e.target.files && handleBulkUpload(e.target.files)} />
             </div>
@@ -713,10 +713,10 @@ export default function PaymentPayPage() {
 
           {/* Pending Items */}
           {pendingItems.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 mb-4">
+            <div className="bg-white rounded-lg border border-slate-200 mb-4">
               <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
                 <Clock size={16} className="text-amber-500" />
-                <span className="font-semibold text-slate-900 text-sm">Pagos pendientes</span>
+                <span className="font-semibold text-slate-900 text-[13px]">Pagos pendientes</span>
                 <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg">{pendingItems.length}</span>
               </div>
               <div className="divide-y divide-slate-100">
@@ -734,21 +734,21 @@ export default function PaymentPayPage() {
                     <div key={item.id}>
                       <button
                         onClick={() => setSelectedPaymentId(item.id)}
-                        className={`w-full px-4 py-3 flex items-center gap-3 text-left transition-colors ${isSelected ? "bg-emerald-50" : "hover:bg-slate-50"}`}
+                        className={`w-full px-4 py-2 flex items-center gap-3 text-left transition-colors ${isSelected ? "bg-emerald-50" : "hover:bg-slate-50"}`}
                       >
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSelected ? "bg-emerald-100" : typeInfo.bgColor}`}>
                           <TypeIcon size={14} className={isSelected ? "text-emerald-600" : typeInfo.textColor} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-slate-900 text-sm">{supplierName}</span>
+                            <span className="font-medium text-slate-900 text-[13px]">{supplierName}</span>
                             {item.invoiceNumber && <span className="text-[10px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">FRA-{item.invoiceNumber}</span>}
                             {!hasIban && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Sin IBAN</span>}
                           </div>
                           <p className="text-xs text-slate-500 truncate">{item.description}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold text-slate-900 text-sm">{formatCurrency(payingAmount)} €</p>
+                          <p className="font-semibold text-slate-900 text-[13px]">{formatCurrency(payingAmount)} €</p>
                           {payingAmount < item.amount && <p className="text-[10px] text-amber-600">Parcial</p>}
                         </div>
                         {hasReceipt ? <CheckCircle size={16} className="text-emerald-500" /> : <XCircle size={16} className="text-slate-300" />}
@@ -756,13 +756,13 @@ export default function PaymentPayPage() {
 
                       {isSelected && (
                         <div className="px-4 pb-4 bg-emerald-50 border-t border-emerald-100">
-                          <div className="bg-white rounded-xl p-4 mt-3 space-y-4">
+                          <div className="bg-white rounded-md p-4 mt-3 space-y-4">
                             <div>
                               <label className="block text-xs font-medium text-slate-500 mb-2">Importe a pagar</label>
                               <div className="flex items-center gap-3">
                                 <div className="relative flex-1 max-w-[180px]">
-                                  <input type="number" step="0.01" min="0.01" max={item.amount} value={tempAmounts[item.id] || item.amount} onChange={(e) => setTempAmounts((prev) => ({ ...prev, [item.id]: Math.min(parseFloat(e.target.value) || 0, item.amount) }))} className="w-full px-3 py-2 pr-8 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
-                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">€</span>
+                                  <input type="number" step="0.01" min="0.01" max={item.amount} value={tempAmounts[item.id] || item.amount} onChange={(e) => setTempAmounts((prev) => ({ ...prev, [item.id]: Math.min(parseFloat(e.target.value) || 0, item.amount) }))} className="w-full px-2.5 py-1.5 pr-8 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-emerald-500 focus:outline-none" />
+                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[13px]">€</span>
                                 </div>
                                 <span className="text-xs text-slate-500">de {formatCurrency(item.amount)} €</span>
                                 {payingAmount < item.amount && <button onClick={() => setTempAmounts((prev) => ({ ...prev, [item.id]: item.amount }))} className="text-xs text-emerald-600 hover:underline">Pagar todo</button>}
@@ -773,25 +773,25 @@ export default function PaymentPayPage() {
                             <div>
                               <label className="block text-xs font-medium text-slate-500 mb-2">Justificante <span className="text-red-500">*</span></label>
                               {hasReceipt ? (
-                                <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                                <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-md">
                                   <FileCheck size={18} className="text-emerald-600" />
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-slate-900 truncate">{itemReceipts[item.id].file.name}</p>
+                                    <p className="text-[13px] font-medium text-slate-900 truncate">{itemReceipts[item.id].file.name}</p>
                                     <p className="text-xs text-slate-500">{(itemReceipts[item.id].file.size / 1024).toFixed(1)} KB</p>
                                   </div>
                                   <a href={itemReceipts[item.id].url} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-emerald-100 rounded-lg"><ExternalLink size={14} className="text-emerald-600" /></a>
                                   <button onClick={() => handleRemoveReceipt(item.id)} className="p-1.5 hover:bg-red-50 text-red-500 rounded-lg"><Trash2 size={14} /></button>
                                 </div>
                               ) : (
-                                <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-emerald-300 hover:bg-emerald-50">
+                                <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-200 rounded-md cursor-pointer hover:border-emerald-300 hover:bg-emerald-50">
                                   <Upload size={18} className="text-slate-400" />
-                                  <span className="text-sm text-slate-600">Subir justificante</span>
+                                  <span className="text-[13px] text-slate-600">Subir justificante</span>
                                   <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadReceipt(item.id, f); }} />
                                 </label>
                               )}
                             </div>
 
-                            <button onClick={() => handleMarkAsPaid([item.id])} disabled={!hasReceipt || saving} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <button onClick={() => handleMarkAsPaid([item.id])} disabled={!hasReceipt || saving} className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-md text-[13px] font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
                               {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <CheckCircle size={16} />}
                               Marcar como pagado
                             </button>
@@ -807,10 +807,10 @@ export default function PaymentPayPage() {
 
           {/* Completed Items */}
           {completedItems.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200">
+            <div className="bg-white rounded-lg border border-slate-200">
               <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
                 <CheckCircle2 size={16} className="text-emerald-500" />
-                <span className="font-semibold text-slate-900 text-sm">Completados</span>
+                <span className="font-semibold text-slate-900 text-[13px]">Completados</span>
                 <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-lg">{completedItems.length}</span>
               </div>
               <div className="divide-y divide-slate-100">
@@ -824,21 +824,21 @@ export default function PaymentPayPage() {
                     <div key={item.id}>
                       <button
                         onClick={() => setSelectedPaymentId(isSelected ? null : item.id)}
-                        className={`w-full px-4 py-3 flex items-center gap-3 text-left transition-colors ${isSelected ? "bg-slate-50" : "hover:bg-slate-50"}`}
+                        className={`w-full px-4 py-2 flex items-center gap-3 text-left transition-colors ${isSelected ? "bg-slate-50" : "hover:bg-slate-50"}`}
                       >
                         <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
                           <CheckCircle2 size={14} className="text-emerald-600" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-slate-900 text-sm">{supplierNameC}</span>
+                            <span className="font-medium text-slate-900 text-[13px]">{supplierNameC}</span>
                             {item.invoiceNumber && <span className="text-[10px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">FRA-{item.invoiceNumber}</span>}
                             {isPartialPayment && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Parcial</span>}
                           </div>
                           <p className="text-xs text-slate-500">{item.description}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold text-emerald-600 text-sm">{formatCurrency(item.partialAmount || item.amount)} €</p>
+                          <p className="font-semibold text-emerald-600 text-[13px]">{formatCurrency(item.partialAmount || item.amount)} €</p>
                           {isPartialPayment && <p className="text-[10px] text-amber-600">de {formatCurrency(item.amount)} €</p>}
                           {item.completedAt && !isPartialPayment && <p className="text-[10px] text-slate-400">{formatDate(item.completedAt)}</p>}
                         </div>
@@ -847,9 +847,9 @@ export default function PaymentPayPage() {
 
                       {isSelected && (
                         <div className="px-4 pb-4 bg-slate-50 border-t border-slate-100">
-                          <div className="bg-white rounded-xl p-4 mt-3 space-y-4">
+                          <div className="bg-white rounded-md p-4 mt-3 space-y-4">
                             {/* Info */}
-                            <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="grid grid-cols-2 gap-4 text-[13px]">
                               <div>
                                 <p className="text-xs text-slate-500 mb-1">Pagado el</p>
                                 <p className="font-medium">{item.completedAt ? formatDate(item.completedAt) : "-"}</p>
@@ -876,10 +876,10 @@ export default function PaymentPayPage() {
                             <div>
                               <label className="block text-xs font-medium text-slate-500 mb-2">Justificante</label>
                               {item.receiptUrl ? (
-                                <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                                <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-md">
                                   <FileCheck size={18} className="text-emerald-600" />
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-slate-900 truncate">{item.receiptName || "Justificante"}</p>
+                                    <p className="text-[13px] font-medium text-slate-900 truncate">{item.receiptName || "Justificante"}</p>
                                   </div>
                                   <a href={item.receiptUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-emerald-100 rounded-lg">
                                     <ExternalLink size={14} className="text-emerald-600" />
@@ -890,9 +890,9 @@ export default function PaymentPayPage() {
                                   </label>
                                 </div>
                               ) : (
-                                <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-emerald-300 hover:bg-emerald-50">
+                                <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-200 rounded-md cursor-pointer hover:border-emerald-300 hover:bg-emerald-50">
                                   <Upload size={18} className="text-slate-400" />
-                                  <span className="text-sm text-slate-600">Añadir justificante</span>
+                                  <span className="text-[13px] text-slate-600">Añadir justificante</span>
                                   <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpdateReceipt(item.id, f); }} />
                                 </label>
                               )}
@@ -903,7 +903,7 @@ export default function PaymentPayPage() {
                               <button
                                 onClick={() => handleUndoPayment(item.id)}
                                 disabled={saving}
-                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-red-200 text-red-600 rounded-xl text-sm font-medium hover:bg-red-50 disabled:opacity-50"
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 border border-red-200 text-red-600 rounded-md text-[13px] font-medium hover:bg-red-50 disabled:opacity-50"
                               >
                                 <Undo2 size={14} />
                                 Deshacer pago
@@ -920,18 +920,18 @@ export default function PaymentPayPage() {
           )}
 
           {pendingItems.length === 0 && completedItems.length > 0 && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center mt-4">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-6 text-center mt-4">
               <CheckCircle2 size={32} className="text-emerald-600 mx-auto mb-3" />
               <h3 className="text-lg font-semibold text-emerald-900">¡Todos los pagos completados!</h3>
-              <p className="text-emerald-700 text-sm mt-1">Remesa procesada correctamente</p>
+              <p className="text-emerald-700 text-[13px] mt-1">Remesa procesada correctamente</p>
             </div>
           )}
 
           {forecast.items.length === 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+            <div className="bg-white rounded-lg border border-slate-200 p-12 text-center">
               <Banknote size={32} className="text-slate-300 mx-auto mb-3" />
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">Sin pagos</h3>
-              <p className="text-slate-500 text-sm">Esta previsión no tiene pagos</p>
+              <h3 className="text-[14px] font-semibold text-slate-900 mb-2">Sin pagos</h3>
+              <p className="text-slate-500 text-[13px]">Esta previsión no tiene pagos</p>
             </div>
           )}
         </div>
@@ -939,37 +939,37 @@ export default function PaymentPayPage() {
 
       {/* SEPA Modal */}
       {showSepaModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setShowSepaModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-3"><Landmark size={24} className="text-slate-400" /><div><h3 className="text-lg font-semibold text-slate-900">Generar SEPA</h3><p className="text-xs text-slate-500">XML pain.001.001.03</p></div></div>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowSepaModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-3"><Landmark size={24} className="text-slate-400" /><div><h3 className="text-[14px] font-semibold text-slate-900">Generar SEPA</h3><p className="text-xs text-slate-500">XML pain.001.001.03</p></div></div>
               <button onClick={() => setShowSepaModal(false)} className="p-2 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-5">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Cuenta ordenante</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Cuenta ordenante</label>
                 {bankAccounts.length > 0 ? (
                   <div className="space-y-2">
                     {bankAccounts.map((acc) => (
-                      <label key={acc.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer ${selectedBankAccount?.id === acc.id ? "border-emerald-500 bg-emerald-50" : "border-slate-200 hover:border-slate-300"}`}>
+                      <label key={acc.id} className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer ${selectedBankAccount?.id === acc.id ? "border-emerald-500 bg-emerald-50" : "border-slate-200 hover:border-slate-300"}`}>
                         <input type="radio" name="bankAccount" checked={selectedBankAccount?.id === acc.id} onChange={() => setSelectedBankAccount(acc)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2"><p className="text-sm font-medium text-slate-900">{acc.alias}</p>{acc.isDefault && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Principal</span>}</div>
+                          <div className="flex items-center gap-2"><p className="text-[13px] font-medium text-slate-900">{acc.alias}</p>{acc.isDefault && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Principal</span>}</div>
                           <p className="text-xs font-mono text-slate-400 mt-0.5">{acc.iban.replace(/(.{4})/g, "$1 ").trim()}</p>
                         </div>
                       </label>
                     ))}
                   </div>
                 ) : (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4"><p className="text-sm font-medium text-amber-800">Sin cuentas bancarias</p><p className="text-xs text-amber-700 mt-0.5">Añade una en Configuración</p></div>
+                  <div className="bg-amber-50 border border-amber-200 rounded-md p-4"><p className="text-[13px] font-medium text-amber-800">Sin cuentas bancarias</p><p className="text-xs text-amber-700 mt-0.5">Añade una en Configuración</p></div>
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Fecha de ejecución</label>
-                <input type="date" value={sepaDate} onChange={(e) => setSepaDate(e.target.value)} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm" />
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Fecha de ejecución</label>
+                <input type="date" value={sepaDate} onChange={(e) => setSepaDate(e.target.value)} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-emerald-500 focus:outline-none text-[13px]" />
               </div>
-              <div className="bg-slate-50 rounded-xl p-4">
-                <div className="flex justify-between text-sm mb-2"><span className="text-slate-600">Pagos</span><span className="font-semibold">{pendingItems.length}</span></div>
+              <div className="bg-slate-50 rounded-md p-4">
+                <div className="flex justify-between text-[13px] mb-2"><span className="text-slate-600">Pagos</span><span className="font-semibold">{pendingItems.length}</span></div>
                 <div className="flex justify-between"><span className="text-slate-600">Total</span><span className="font-bold text-lg">{formatCurrency(totalPending)} €</span></div>
               </div>
               {(() => {
@@ -979,11 +979,11 @@ export default function PaymentPayPage() {
                 });
                 if (missing.length === 0) return null;
                 return (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                  <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
                     <div className="flex items-start gap-2">
                       <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-medium text-amber-900">{missing.length} pago{missing.length > 1 ? "s" : ""} sin IBAN</p>
+                        <p className="text-[13px] font-medium text-amber-900">{missing.length} pago{missing.length > 1 ? "s" : ""} sin IBAN</p>
                         <ul className="mt-1 space-y-0.5">
                           {missing.map(item => (
                             <li key={item.id} className="text-xs text-amber-700 truncate">
@@ -998,8 +998,8 @@ export default function PaymentPayPage() {
                 );
               })()}
               <div className="flex gap-3">
-                <button onClick={() => setShowSepaModal(false)} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">Cancelar</button>
-                <button onClick={generateSepaXml} disabled={!selectedBankAccount} className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"><Download size={16} />Descargar XML</button>
+                <button onClick={() => setShowSepaModal(false)} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">Cancelar</button>
+                <button onClick={generateSepaXml} disabled={!selectedBankAccount} className="flex-1 px-4 py-1.5 bg-emerald-600 text-white rounded-md text-[13px] font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"><Download size={16} />Descargar XML</button>
               </div>
             </div>
           </div>

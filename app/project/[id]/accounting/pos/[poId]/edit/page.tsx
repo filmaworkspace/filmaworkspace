@@ -902,14 +902,14 @@ export default function EditPOPage() {
     return (
       <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="hidden">
             <ShieldAlert size={28} className="text-red-500" />
           </div>
-          <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
+          <h2 className="text-[14px] font-semibold text-slate-900 mb-2">Acceso denegado</h2>
           <p className="text-slate-500 mb-6">{permissionsError || "No tienes permisos para editar esta orden de compra"}</p>
           <Link
             href={`/project/${id}/accounting/pos`}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
           >
             <ArrowLeft size={16} />
             Volver a POs
@@ -925,12 +925,11 @@ export default function EditPOPage() {
       {/* Header */}
       <div className="mt-[53px]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
-          <div className="relative flex items-center justify-center">
+          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
             <div className="flex items-center gap-4">
-              <FileText size={22} className="text-slate-400" />
               <div className="flex items-center gap-3 flex-wrap justify-center">
-                <h1 className="text-3xl font-bold text-slate-900 text-center">Editar orden de compra</h1>
-                <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm font-mono font-medium">
+                <h1 className="text-xl font-semibold tracking-tight text-slate-900">Editar orden de compra</h1>
+                <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[13px] font-mono font-medium">
                   PO-{poNumber}
                 </span>
                 {poVersion > 1 && (
@@ -950,17 +949,17 @@ export default function EditPOPage() {
             </div>
 
             <div className="absolute right-0 flex items-center gap-3">
-              <Link href={`/project/${id}/accounting/pos/${poId}`} className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium transition-colors">
+              <Link href={`/project/${id}/accounting/pos/${poId}`} className="flex items-center gap-2 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium transition-colors">
                 <Eye size={16} />
                 Ver
               </Link>
               {canEdit() && (
                 <>
-                  <button onClick={() => savePO(false)} disabled={saving} className="flex items-center gap-2 px-5 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium transition-colors disabled:opacity-50">
+                  <button onClick={() => savePO(false)} disabled={saving} className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium transition-colors disabled:opacity-50">
                     <Save size={16} />
                     Borrador
                   </button>
-                  <button onClick={() => savePO(true)} disabled={saving} className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">
+                  <button onClick={() => savePO(true)} disabled={saving} className="flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                     {saving ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Guardando...</> : <>{approvalPreview.autoApprove ? <CheckCircle size={16} /> : <Send size={16} />}{approvalPreview.autoApprove ? "Aprobar" : "Enviar"}</>}
                   </button>
                 </>
@@ -972,16 +971,16 @@ export default function EditPOPage() {
 
       <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
         {successMessage && (
-          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3">
+          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-3">
             <CheckCircle size={18} className="text-emerald-600" />
-            <span className="text-sm text-emerald-700 font-medium">{successMessage}</span>
+            <span className="text-[13px] text-emerald-700 font-medium">{successMessage}</span>
           </div>
         )}
 
         {!canEdit() && (
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3">
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3">
             <AlertTriangle size={18} className="text-amber-600" />
-            <span className="text-sm text-amber-700 font-medium">Esta PO está pendiente de aprobación y no se puede editar.</span>
+            <span className="text-[13px] text-amber-700 font-medium">Esta PO está pendiente de aprobación y no se puede editar.</span>
           </div>
         )}
 
@@ -989,19 +988,19 @@ export default function EditPOPage() {
           {/* Main Form */}
           <div className="lg:col-span-2 space-y-6">
             {/* Basic Info */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-100">
                 <h2 className="font-semibold text-slate-900">Información básica</h2>
               </div>
 
               <div className="p-6 space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Proveedor {!noSupplier && "*"}</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Proveedor {!noSupplier && "*"}</label>
                   <button
                     onClick={() => canEdit() && setShowSupplierModal(true)}
                     disabled={!canEdit()}
                     onBlur={() => handleBlur("supplier")}
-                    className={`w-full px-4 py-3 border ${noSupplier ? "border-dashed border-slate-300 bg-slate-50" : hasError("supplier") ? "border-red-300 bg-red-50" : isValid("supplier") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"} rounded-xl hover:border-slate-300 transition-colors text-left flex items-center justify-between bg-white disabled:bg-slate-50 disabled:cursor-not-allowed`}
+                    className={`w-full px-4 py-2 border ${noSupplier ? "border-dashed border-slate-300 bg-slate-50" : hasError("supplier") ? "border-red-300 bg-red-50" : isValid("supplier") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"} rounded-md hover:border-slate-300 transition-colors text-left flex items-center justify-between bg-white disabled:bg-slate-50 disabled:cursor-not-allowed`}
                   >
                     {formData.supplierName ? (
                       <div className="flex items-center gap-3">
@@ -1012,10 +1011,10 @@ export default function EditPOPage() {
                       </div>
                     ) : noSupplier ? (
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100">
+                        <div className="hidden">
                           <Building2 size={16} className="text-slate-400" />
                         </div>
-                        <span className="text-slate-500 text-sm">Sin proveedor asignado. Se completará más adelante</span>
+                        <span className="text-slate-500 text-[13px]">Sin proveedor asignado. Se completará más adelante</span>
                       </div>
                     ) : (
                       <span className="text-slate-400">Seleccionar proveedor...</span>
@@ -1027,7 +1026,7 @@ export default function EditPOPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="mb-1.5 block text-xs font-medium text-slate-600">
                       Departamento *
                       {permissions.fixedDepartment && (
                         <span className="ml-2 text-xs text-slate-400 font-normal">(asignado)</span>
@@ -1039,7 +1038,7 @@ export default function EditPOPage() {
                         onClick={() => { if (canEdit() && !permissions.fixedDepartment) setShowDepartmentDropdown(!showDepartmentDropdown); }}
                         onBlur={() => handleBlur("department")}
                         disabled={!canEdit() || !!permissions.fixedDepartment}
-                        className={`w-full px-4 py-3 border ${hasError("department") ? "border-red-300 bg-red-50" : isValid("department") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"} rounded-xl text-left flex items-center justify-between bg-white disabled:bg-slate-50 text-sm disabled:cursor-not-allowed hover:border-slate-300 transition-colors`}
+                        className={`w-full px-4 py-2 border ${hasError("department") ? "border-red-300 bg-red-50" : isValid("department") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"} rounded-md text-left flex items-center justify-between bg-white disabled:bg-slate-50 text-[13px] disabled:cursor-not-allowed hover:border-slate-300 transition-colors`}
                       >
                         <span className={formData.department ? "text-slate-900" : "text-slate-400"}>
                           {formData.department || "Seleccionar..."}
@@ -1051,7 +1050,7 @@ export default function EditPOPage() {
                         </div>
                       </button>
                       {showDepartmentDropdown && (
-                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
                           {availableDepartments.map((dept) => (
                             <button
                               key={dept}
@@ -1069,13 +1068,13 @@ export default function EditPOPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de PO</label>
+                    <label className="mb-1.5 block text-xs font-medium text-slate-600">Tipo de PO</label>
                     <div className="grid grid-cols-2 gap-2">
                       {PO_TYPES.map((type) => {
                         const Icon = type.icon;
                         const isSelected = formData.poType === type.value;
                         return (
-                          <button key={type.value} onClick={() => canEdit() && setFormData({ ...formData, poType: type.value as any })} disabled={!canEdit()} className={`px-3 py-2.5 rounded-xl border transition-all flex items-center gap-2 text-sm ${isSelected ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 hover:border-slate-300 text-slate-600 bg-white"} disabled:opacity-50 disabled:cursor-not-allowed`} title={type.description}>
+                          <button key={type.value} onClick={() => canEdit() && setFormData({ ...formData, poType: type.value as any })} disabled={!canEdit()} className={`px-3 py-1.5 rounded-md border transition-all flex items-center gap-2 text-[13px] ${isSelected ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 hover:border-slate-300 text-slate-600 bg-white"} disabled:opacity-50 disabled:cursor-not-allowed`} title={type.description}>
                             <Icon size={14} />
                             {type.label}
                           </button>
@@ -1086,10 +1085,10 @@ export default function EditPOPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Moneda</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Moneda</label>
                   <div className="flex gap-2">
                     {CURRENCIES.map((currency) => (
-                      <button key={currency.value} onClick={() => canEdit() && setFormData({ ...formData, currency: currency.value })} disabled={!canEdit()} className={`flex-1 px-4 py-2.5 rounded-xl border transition-all text-sm font-medium ${formData.currency === currency.value ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 hover:border-slate-300 text-slate-600 bg-white"} disabled:opacity-50 disabled:cursor-not-allowed`}>
+                      <button key={currency.value} onClick={() => canEdit() && setFormData({ ...formData, currency: currency.value })} disabled={!canEdit()} className={`flex-1 px-4 py-1.5 rounded-md border transition-all text-[13px] font-medium ${formData.currency === currency.value ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 hover:border-slate-300 text-slate-600 bg-white"} disabled:opacity-50 disabled:cursor-not-allowed`}>
                         {currency.symbol} {currency.label}
                       </button>
                     ))}
@@ -1097,9 +1096,9 @@ export default function EditPOPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Descripción general *</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Descripción general *</label>
                   <div className="relative">
-                    <textarea value={formData.generalDescription} onChange={(e) => setFormData({ ...formData, generalDescription: e.target.value })} onBlur={() => handleBlur("generalDescription")} disabled={!canEdit()} placeholder="Describe el propósito de esta orden de compra..." rows={3} className={`w-full px-4 py-3 border ${hasError("generalDescription") ? "border-red-300 bg-red-50" : isValid("generalDescription") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"} rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm pr-10 disabled:bg-slate-50 disabled:cursor-not-allowed`} />
+                    <textarea value={formData.generalDescription} onChange={(e) => setFormData({ ...formData, generalDescription: e.target.value })} onBlur={() => handleBlur("generalDescription")} disabled={!canEdit()} placeholder="Describe el propósito de esta orden de compra..." rows={3} className={`w-full px-2.5 py-1.5 border ${hasError("generalDescription") ? "border-red-300 bg-red-50" : isValid("generalDescription") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"} rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white resize-none text-[13px] pr-10 disabled:bg-slate-50 disabled:cursor-not-allowed`} />
                     {isValid("generalDescription") && <CheckCircle2 size={16} className="absolute right-4 top-4 text-emerald-600" />}
                   </div>
                   {hasError("generalDescription") && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{errors.generalDescription}</p>}
@@ -1109,14 +1108,14 @@ export default function EditPOPage() {
 
 
             {/* Items */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-visible">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-visible">
+              <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <h2 className="font-semibold text-slate-900">Items</h2>
                   <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">{items.length}</span>
                 </div>
                 {canEdit() && (
-                  <button onClick={addItem} className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors">
+                  <button onClick={addItem} className="flex items-center gap-1.5 px-4 py-2 rounded-md text-[13px] font-medium transition-colors border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                     <Plus size={14} />
                     Añadir
                   </button>
@@ -1129,7 +1128,7 @@ export default function EditPOPage() {
                   const selectedAccount = subAccounts.find((a) => a.id === item.subAccountId);
 
                   return (
-                    <div key={item.id} className={`border rounded-xl p-5 transition-all ${itemHasAllFields ? "border-emerald-200 bg-emerald-50/30" : "border-slate-200 bg-slate-50/50"}`}>
+                    <div key={item.id} className={`border rounded-md p-5 transition-all ${itemHasAllFields ? "border-emerald-200 bg-emerald-50/30" : "border-slate-200 bg-slate-50/50"}`}>
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
@@ -1146,7 +1145,7 @@ export default function EditPOPage() {
                       </div>
 
                       <div className="space-y-4">
-                        <input type="text" value={item.description} onChange={(e) => updateItem(index, "description", e.target.value)} onBlur={() => handleBlur(`item_${index}_description`)} disabled={!canEdit()} placeholder="Descripción del item..." className={`w-full px-4 py-3 border ${hasError(`item_${index}_description`) ? "border-red-300 bg-red-50" : item.description.trim() ? "border-emerald-200" : "border-slate-200"} rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white disabled:bg-slate-50 disabled:cursor-not-allowed`} />
+                        <input type="text" value={item.description} onChange={(e) => updateItem(index, "description", e.target.value)} onBlur={() => handleBlur(`item_${index}_description`)} disabled={!canEdit()} placeholder="Descripción del item..." className={`w-full px-2.5 py-1.5 border ${hasError(`item_${index}_description`) ? "border-red-300 bg-red-50" : item.description.trim() ? "border-emerald-200" : "border-slate-200"} rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white disabled:bg-slate-50 disabled:cursor-not-allowed`} />
 
                         <div>
                           {/* Aviso si tiene facturas contabilizadas */}
@@ -1175,7 +1174,7 @@ export default function EditPOPage() {
                               setShowAccountModal(true); 
                             }} 
                             disabled={!canEdit() || itemInvoiceStatus[index]?.hasAccountedInvoices} 
-                            className={`w-full px-4 py-3 border ${hasError(`item_${index}_account`) ? "border-red-300 bg-red-50" : itemInvoiceStatus[index]?.hasAccountedInvoices ? "border-red-200 bg-red-50" : item.subAccountCode ? "border-emerald-200 bg-emerald-50" : "border-slate-200"} rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white disabled:bg-slate-50 disabled:cursor-not-allowed`}>
+                            className={`w-full px-4 py-3 border ${hasError(`item_${index}_account`) ? "border-red-300 bg-red-50" : itemInvoiceStatus[index]?.hasAccountedInvoices ? "border-red-200 bg-red-50" : item.subAccountCode ? "border-emerald-200 bg-emerald-50" : "border-slate-200"} rounded-md text-sm text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white disabled:bg-slate-50 disabled:cursor-not-allowed`}>
                             {item.subAccountCode ? (
                               <div className="flex items-center gap-2">
                                 {itemInvoiceStatus[index]?.hasAccountedInvoices ? (
@@ -1220,7 +1219,7 @@ export default function EditPOPage() {
                                 openEpisodeModal(index);
                               }}
                               disabled={!canEdit() || itemInvoiceStatus[index]?.hasAccountedInvoices}
-                              className={`w-full px-4 py-3 border rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white disabled:bg-slate-50 disabled:cursor-not-allowed ${
+                              className={`w-full px-4 py-2 border rounded-md text-[13px] text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white disabled:bg-slate-50 disabled:cursor-not-allowed ${
                                 itemInvoiceStatus[index]?.hasAccountedInvoices ? "border-red-200 bg-red-50" : item.episodeAssignment === "general" ? "border-slate-200" : "border-violet-200 bg-violet-50"
                               }`}
                             >
@@ -1262,22 +1261,22 @@ export default function EditPOPage() {
                         <div className="grid grid-cols-4 gap-3">
                           <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">Fecha</label>
-                            <input type="date" value={item.date} onChange={(e) => updateItem(index, "date", e.target.value)} disabled={!canEdit()} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white disabled:bg-slate-50 disabled:cursor-not-allowed" />
+                            <input type="date" value={item.date} onChange={(e) => updateItem(index, "date", e.target.value)} disabled={!canEdit()} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] bg-white disabled:bg-slate-50 disabled:cursor-not-allowed" />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">Cantidad</label>
-                            <input type="number" min="1" value={item.quantity} onChange={(e) => updateItem(index, "quantity", parseFloat(e.target.value) || 0)} disabled={!canEdit()} className={`w-full px-3 py-2.5 border ${item.quantity > 0 ? "border-emerald-200" : "border-slate-200"} rounded-xl text-sm bg-white disabled:bg-slate-50 disabled:cursor-not-allowed`} />
+                            <input type="number" min="1" value={item.quantity} onChange={(e) => updateItem(index, "quantity", parseFloat(e.target.value) || 0)} disabled={!canEdit()} className={`w-full px-2.5 py-1.5 border ${item.quantity > 0 ? "border-emerald-200" : "border-slate-200"} rounded-md text-[13px] bg-white disabled:bg-slate-50 disabled:cursor-not-allowed`} />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">Precio unit.</label>
                             <div className="relative">
-                              <input type="number" min="0" step="0.01" value={item.unitPrice} onChange={(e) => updateItem(index, "unitPrice", parseFloat(e.target.value) || 0)} disabled={!canEdit()} className={`w-full pl-6 pr-3 py-2.5 border ${item.unitPrice > 0 ? "border-emerald-200" : "border-slate-200"} rounded-xl text-sm bg-white disabled:bg-slate-50 disabled:cursor-not-allowed`} />
+                              <input type="number" min="0" step="0.01" value={item.unitPrice} onChange={(e) => updateItem(index, "unitPrice", parseFloat(e.target.value) || 0)} disabled={!canEdit()} className={`w-full pl-6 pr-3 py-1.5 border ${item.unitPrice > 0 ? "border-emerald-200" : "border-slate-200"} rounded-md text-[13px] bg-white disabled:bg-slate-50 disabled:cursor-not-allowed`} />
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">{getCurrencySymbol()}</span>
                             </div>
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">Base</label>
-                            <div className="px-3 py-2.5 bg-slate-100 rounded-xl text-sm font-medium text-slate-900">{formatCurrency(item.baseAmount)} {getCurrencySymbol()}</div>
+                            <div className="px-3 py-2.5 bg-slate-100 rounded-md text-[13px] font-medium text-slate-900">{formatCurrency(item.baseAmount)} {getCurrencySymbol()}</div>
                           </div>
                         </div>
 
@@ -1288,19 +1287,19 @@ export default function EditPOPage() {
                               <button
                                 type="button"
                                 onClick={() => { if (canEdit()) setOpenDropdown(openDropdown === `vat-${index}` ? null : `vat-${index}`); }}
-                                className={`w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors ${!canEdit() ? "opacity-50 cursor-not-allowed bg-slate-50" : ""}`}
+                                className={`w-full px-3 py-1.5 border border-slate-200 rounded-md text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors ${!canEdit() ? "opacity-50 cursor-not-allowed bg-slate-50" : ""}`}
                               >
                                 <span className="text-slate-900 truncate">{VAT_RATES.find(r => r.value === item.vatRate)?.label ?? `${item.vatRate}%`}</span>
                                 <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `vat-${index}` ? "rotate-180" : ""}`} />
                               </button>
                               {openDropdown === `vat-${index}` && (
-                                <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                                <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
                                   {VAT_RATES.map(opt => (
                                     <button
                                       key={opt.value}
                                       type="button"
                                       onClick={() => { updateItem(index, "vatRate", parseFloat(String(opt.value))); setOpenDropdown(null); }}
-                                      className={`w-full px-4 py-2 text-left text-sm transition-colors ${item.vatRate === opt.value ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                                      className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${item.vatRate === opt.value ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
                                     >
                                       {opt.label}
                                     </button>
@@ -1315,19 +1314,19 @@ export default function EditPOPage() {
                               <button
                                 type="button"
                                 onClick={() => { if (canEdit()) setOpenDropdown(openDropdown === `irpf-${index}` ? null : `irpf-${index}`); }}
-                                className={`w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors ${!canEdit() ? "opacity-50 cursor-not-allowed bg-slate-50" : ""}`}
+                                className={`w-full px-3 py-1.5 border border-slate-200 rounded-md text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors ${!canEdit() ? "opacity-50 cursor-not-allowed bg-slate-50" : ""}`}
                               >
                                 <span className="text-slate-900 truncate">{IRPF_RATES.find(r => r.value === item.irpfRate)?.label ?? `${item.irpfRate}%`}</span>
                                 <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `irpf-${index}` ? "rotate-180" : ""}`} />
                               </button>
                               {openDropdown === `irpf-${index}` && (
-                                <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                                <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
                                   {IRPF_RATES.map(opt => (
                                     <button
                                       key={opt.value}
                                       type="button"
                                       onClick={() => { updateItem(index, "irpfRate", parseFloat(String(opt.value))); setOpenDropdown(null); }}
-                                      className={`w-full px-4 py-2 text-left text-sm transition-colors ${item.irpfRate === opt.value ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                                      className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${item.irpfRate === opt.value ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
                                     >
                                       {opt.label}
                                     </button>
@@ -1338,16 +1337,16 @@ export default function EditPOPage() {
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">+IVA</label>
-                            <div className="px-3 py-2.5 bg-emerald-50 rounded-xl text-sm font-medium text-emerald-700">+{formatCurrency(item.vatAmount)}</div>
+                            <div className="px-3 py-2.5 bg-emerald-50 rounded-md text-[13px] font-medium text-emerald-700">+{formatCurrency(item.vatAmount)}</div>
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">-IRPF</label>
-                            <div className="px-3 py-2.5 bg-red-50 rounded-xl text-sm font-medium text-red-700">-{formatCurrency(item.irpfAmount)}</div>
+                            <div className="px-3 py-2.5 bg-red-50 rounded-md text-[13px] font-medium text-red-700">-{formatCurrency(item.irpfAmount)}</div>
                           </div>
                         </div>
 
                         <div className="flex justify-end">
-                          <div className="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm">
+                          <div className="bg-slate-900 text-white px-4 py-2 rounded-md text-[13px]">
                             <span className="text-slate-400">Total:</span>
                             <span className="ml-2 font-semibold">{formatCurrency(item.totalAmount)} {getCurrencySymbol()}</span>
                           </div>
@@ -1361,21 +1360,21 @@ export default function EditPOPage() {
 
 
             {/* File Upload */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-100">
                 <h2 className="font-semibold text-slate-900">Adjuntar presupuesto</h2>
                 <p className="text-xs text-slate-500 mt-0.5">Opcional - PDF, JPG o PNG hasta 10MB</p>
               </div>
 
               <div className="p-6">
                 {existingFileUrl && !uploadedFile && (
-                  <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+                  <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-md p-4 mb-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
                         <FileText size={18} className="text-indigo-600" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-slate-900">{existingFileName}</p>
+                        <p className="text-[13px] font-medium text-slate-900">{existingFileName}</p>
                         <a href={existingFileUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 hover:underline">Ver archivo actual</a>
                       </div>
                     </div>
@@ -1388,15 +1387,15 @@ export default function EditPOPage() {
                 )}
 
                 {canEdit() && (
-                  <div onDrop={handleDrop} onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }} onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }} className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${isDragging ? "border-indigo-400 bg-indigo-50" : uploadedFile ? "border-emerald-300 bg-emerald-50" : "border-slate-200 hover:border-slate-300"}`}>
+                  <div onDrop={handleDrop} onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }} onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }} className={`border-2 border-dashed rounded-md p-8 text-center transition-all ${isDragging ? "border-indigo-400 bg-indigo-50" : uploadedFile ? "border-emerald-300 bg-emerald-50" : "border-slate-200 hover:border-slate-300"}`}>
                     {uploadedFile ? (
-                      <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-4">
+                      <div className="flex items-center justify-between bg-white border border-slate-200 rounded-md p-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
                             <FileUp size={18} className="text-emerald-600" />
                           </div>
                           <div className="text-left">
-                            <span className="text-sm font-medium text-slate-900 block">{uploadedFile.name}</span>
+                            <span className="text-[13px] font-medium text-slate-900 block">{uploadedFile.name}</span>
                             <span className="text-xs text-slate-500">{(uploadedFile.size / 1024).toFixed(0)} KB</span>
                           </div>
                         </div>
@@ -1406,10 +1405,10 @@ export default function EditPOPage() {
                       </div>
                     ) : (
                       <label className="cursor-pointer block">
-                        <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                        <div className="hidden">
                           <Upload size={20} className="text-slate-400" />
                         </div>
-                        <p className="text-sm font-medium text-slate-700">Arrastra o haz clic para subir</p>
+                        <p className="text-[13px] font-medium text-slate-700">Arrastra o haz clic para subir</p>
                         <p className="text-xs text-slate-400 mt-1">PDF, JPG, PNG (máx. 10MB)</p>
                         <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleFileUpload(file); }} className="hidden" />
                       </label>
@@ -1420,20 +1419,20 @@ export default function EditPOPage() {
             </div>
 
             {/* Additional Info */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-100">
                 <h2 className="font-semibold text-slate-900">Información adicional</h2>
               </div>
 
               <div className="p-6 space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Condiciones de pago</label>
-                  <input type="text" value={formData.paymentTerms} onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })} disabled={!canEdit()} placeholder="Ej: Transferencia 30 días..." className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm disabled:bg-slate-50 disabled:cursor-not-allowed" />
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Condiciones de pago</label>
+                  <input type="text" value={formData.paymentTerms} onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })} disabled={!canEdit()} placeholder="Ej: Transferencia 30 días..." className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px] disabled:bg-slate-50 disabled:cursor-not-allowed" />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Notas internas</label>
-                  <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} disabled={!canEdit()} placeholder="Notas adicionales..." rows={2} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm disabled:bg-slate-50 disabled:cursor-not-allowed" />
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Notas internas</label>
+                  <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} disabled={!canEdit()} placeholder="Notas adicionales..." rows={2} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white resize-none text-[13px] disabled:bg-slate-50 disabled:cursor-not-allowed" />
                 </div>
               </div>
             </div>
@@ -1444,10 +1443,10 @@ export default function EditPOPage() {
           <div className="lg:col-span-1">
             <div className="space-y-4">
               {/* Progress */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5">
+              <div className="bg-white border border-slate-200 rounded-lg p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-slate-700">Progreso</span>
-                  <span className={`text-sm font-bold ${completionPercentage === 100 ? "text-emerald-600" : "text-slate-900"}`}>{completionPercentage}%</span>
+                  <span className="text-[13px] font-medium text-slate-700">Progreso</span>
+                  <span className={`text-[13px] font-bold ${completionPercentage === 100 ? "text-emerald-600" : "text-slate-900"}`}>{completionPercentage}%</span>
                 </div>
                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                   <div className={`h-full transition-all duration-300 ${completionPercentage === 100 ? "bg-emerald-500" : "bg-indigo-500"}`} style={{ width: `${completionPercentage}%` }} />
@@ -1473,22 +1472,22 @@ export default function EditPOPage() {
               </div>
 
               {/* Totals */}
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100">
+              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                <div className="px-5 py-3 border-b border-slate-100">
                   <h2 className="font-semibold text-slate-900">Total de la orden</h2>
                 </div>
                 <div className="p-6">
                   <div className="space-y-3 mb-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-500">Base imponible</span>
+                      <span className="text-[13px] text-slate-500">Base imponible</span>
                       <span className="font-medium text-slate-900">{formatCurrency(totals.baseAmount)} {getCurrencySymbol()}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-500">IVA</span>
+                      <span className="text-[13px] text-slate-500">IVA</span>
                       <span className="font-medium text-emerald-600">+{formatCurrency(totals.vatAmount)} {getCurrencySymbol()}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-500">IRPF</span>
+                      <span className="text-[13px] text-slate-500">IRPF</span>
                       <span className="font-medium text-red-600">-{formatCurrency(totals.irpfAmount)} {getCurrencySymbol()}</span>
                     </div>
                   </div>
@@ -1503,15 +1502,15 @@ export default function EditPOPage() {
 
               {/* Approval Preview */}
               {canEdit() && (
-                <div className={`border rounded-2xl overflow-hidden ${approvalPreview.autoApprove ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
+                <div className={`border rounded-lg overflow-hidden ${approvalPreview.autoApprove ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
                   <div className="px-5 py-4 border-b border-opacity-50" style={{ borderColor: approvalPreview.autoApprove ? "#a7f3d0" : "#fcd34d" }}>
                     <div className="flex items-center gap-3">
                       {approvalPreview.autoApprove ? (
-                        <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                        <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center">
                           <CheckCircle size={20} className="text-emerald-600" />
                         </div>
                       ) : (
-                        <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                        <div className="w-10 h-10 bg-amber-100 rounded-md flex items-center justify-center">
                           <Clock size={20} className="text-amber-600" />
                         </div>
                       )}
@@ -1519,7 +1518,7 @@ export default function EditPOPage() {
                         <p className={`font-semibold ${approvalPreview.autoApprove ? "text-emerald-800" : "text-amber-800"}`}>
                           {approvalPreview.autoApprove ? "Aprobación automática" : "Requiere aprobación"}
                         </p>
-                        <p className={`text-sm ${approvalPreview.autoApprove ? "text-emerald-700" : "text-amber-700"}`}>{approvalPreview.message}</p>
+                        <p className={`text-[13px] ${approvalPreview.autoApprove ? "text-emerald-700" : "text-amber-700"}`}>{approvalPreview.message}</p>
                       </div>
                     </div>
                   </div>
@@ -1534,7 +1533,7 @@ export default function EditPOPage() {
                               {idx < approvalPreview.steps!.length - 1 && <div className="w-0.5 h-8 bg-amber-200 mt-1" />}
                             </div>
                             <div className="flex-1 pt-0.5">
-                              <p className="text-sm font-medium text-amber-900">
+                              <p className="text-[13px] font-medium text-amber-900">
                                 {step.approverType === "role" && step.roles ? step.roles.join(", ") : step.approverType === "hod" ? "Jefe de departamento" : step.approverType === "coordinator" ? "Coordinador" : "Aprobador fijo"}
                               </p>
                               {step.approverNames.length > 0 && (
@@ -1559,12 +1558,12 @@ export default function EditPOPage() {
               )}
 
               {/* Info */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-5">
                 <div className="flex gap-3">
                   <div className="w-8 h-8 bg-slate-200 rounded-lg flex items-center justify-center flex-shrink-0">
                     <Info size={14} className="text-slate-500" />
                   </div>
-                  <div className="text-sm text-slate-600">
+                  <div className="text-[13px] text-slate-600">
                     <p className="font-medium text-slate-700 mb-2">Proceso de la PO</p>
                     <ul className="space-y-1.5 text-slate-500">
                       <li className="flex items-start gap-2"><ChevronRight size={12} className="mt-0.5 flex-shrink-0" /><span>Los borradores no comprometen presupuesto</span></li>
@@ -1582,32 +1581,32 @@ export default function EditPOPage() {
 
       {/* Supplier Modal */}
       {showSupplierModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4" onClick={() => { setShowSupplierModal(false); setSupplierSearch(""); }}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Seleccionar proveedor</h2>
-              <button onClick={() => { setShowSupplierModal(false); setSupplierSearch(""); }} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4" onClick={() => { setShowSupplierModal(false); setSupplierSearch(""); }}>
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-[14px] font-semibold text-slate-900">Seleccionar proveedor</h2>
+              <button onClick={() => { setShowSupplierModal(false); setSupplierSearch(""); }} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors">
                 <X size={20} />
               </button>
             </div>
             <div className="p-6">
               <div className="relative mb-4">
                 <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="text" value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)} placeholder="Buscar por nombre o NIF..." className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm" autoFocus />
+                <input type="text" value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)} placeholder="Buscar por nombre o NIF..." className="w-full pl-11 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]" autoFocus />
               </div>
               <div className="max-h-80 overflow-y-auto space-y-2">
                 {filteredSuppliers.length === 0 ? (
                   <div className="text-center py-12">
-                    <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3"><Building2 size={20} className="text-slate-400" /></div>
-                    <p className="text-sm text-slate-500">No se encontraron proveedores</p>
+                    <div className="hidden"><Building2 size={20} className="text-slate-400" /></div>
+                    <p className="text-[13px] text-slate-500">No se encontraron proveedores</p>
                   </div>
                 ) : (
                   filteredSuppliers.map((supplier) => (
-                    <button key={supplier.id} onClick={() => selectSupplier(supplier)} className="w-full text-left p-4 border border-slate-200 rounded-xl hover:border-slate-300 hover:bg-slate-50 transition-all group">
+                    <button key={supplier.id} onClick={() => selectSupplier(supplier)} className="w-full text-left p-4 border border-slate-200 rounded-md hover:border-slate-300 hover:bg-slate-50 transition-all group">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <p className="font-medium text-slate-900">{supplier.fiscalName}</p>
-                          {supplier.commercialName && <p className="text-sm text-slate-500">{supplier.commercialName}</p>}
+                          {supplier.commercialName && <p className="text-[13px] text-slate-500">{supplier.commercialName}</p>}
                           <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500">
                             <span className="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded"><Hash size={10} />{supplier.taxId}</span>
                             <span>{supplier.country}</span>
@@ -1645,31 +1644,31 @@ export default function EditPOPage() {
 
       {/* Account Modal */}
       {showAccountModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4" onClick={() => { setShowAccountModal(false); setAccountSearch(""); setCurrentItemIndex(null); }}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Seleccionar cuenta presupuestaria</h2>
-              <button onClick={() => { setShowAccountModal(false); setAccountSearch(""); setCurrentItemIndex(null); }} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4" onClick={() => { setShowAccountModal(false); setAccountSearch(""); setCurrentItemIndex(null); }}>
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-[14px] font-semibold text-slate-900">Seleccionar cuenta presupuestaria</h2>
+              <button onClick={() => { setShowAccountModal(false); setAccountSearch(""); setCurrentItemIndex(null); }} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors">
                 <X size={20} />
               </button>
             </div>
             <div className="p-6">
               <div className="relative mb-4">
                 <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="text" value={accountSearch} onChange={(e) => setAccountSearch(e.target.value)} placeholder="Buscar por código o descripción..." className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm" autoFocus />
+                <input type="text" value={accountSearch} onChange={(e) => setAccountSearch(e.target.value)} placeholder="Buscar por código o descripción..." className="w-full pl-11 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]" autoFocus />
               </div>
               <div className="max-h-80 overflow-y-auto space-y-2 pr-2">
                 {filteredSubAccounts.length === 0 ? (
                   <div className="text-center py-12">
-                    <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3"><Hash size={20} className="text-slate-400" /></div>
-                    <p className="text-sm text-slate-500">No se encontraron cuentas</p>
+                    <div className="hidden"><Hash size={20} className="text-slate-400" /></div>
+                    <p className="text-[13px] text-slate-500">No se encontraron cuentas</p>
                   </div>
                 ) : (
                   filteredSubAccounts.map((subAccount) => {
                     const isLowBudget = subAccount.available < subAccount.budgeted * 0.1;
                     const isOverBudget = subAccount.available < 0;
                     return (
-                      <button key={subAccount.id} onClick={() => selectAccount(subAccount)} className={`w-full text-left p-4 border rounded-xl hover:bg-slate-50 transition-all ${isOverBudget ? "border-red-200 bg-red-50/50" : isLowBudget ? "border-amber-200 bg-amber-50/50" : "border-slate-200"}`}>
+                      <button key={subAccount.id} onClick={() => selectAccount(subAccount)} className={`w-full text-left p-4 border rounded-md hover:bg-slate-50 transition-all ${isOverBudget ? "border-red-200 bg-red-50/50" : isLowBudget ? "border-amber-200 bg-amber-50/50" : "border-slate-200"}`}>
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
@@ -1677,7 +1676,7 @@ export default function EditPOPage() {
                               {isOverBudget && <span className="flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg"><AlertTriangle size={10} />Sin presupuesto</span>}
                               {!isOverBudget && isLowBudget && <span className="flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg"><AlertTriangle size={10} />Bajo</span>}
                             </div>
-                            <p className="text-sm text-slate-700">{subAccount.description}</p>
+                            <p className="text-[13px] text-slate-700">{subAccount.description}</p>
                             <p className="text-xs text-slate-500 mt-1">{subAccount.accountCode} - {subAccount.accountDescription}</p>
                           </div>
                         </div>
@@ -1701,11 +1700,11 @@ export default function EditPOPage() {
 
       {/* Modal de asignación de capítulos */}
       {showEpisodeModal && episodeItemIndex !== null && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setShowEpisodeModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowEpisodeModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-violet-100 rounded-md flex items-center justify-center">
                   <Layers size={20} className="text-violet-600" />
                 </div>
                 <div>
@@ -1719,7 +1718,7 @@ export default function EditPOPage() {
             </div>
 
             <div className="p-6 space-y-4 overflow-y-auto max-h-[60vh]">
-              <button onClick={() => setTempEpisodeDistribution([])} className={`w-full px-4 py-4 rounded-xl text-sm font-medium transition-colors flex items-center gap-3 border-2 ${tempEpisodeDistribution.length === 0 ? "bg-violet-50 border-violet-500 text-violet-700" : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"}`}>
+              <button onClick={() => setTempEpisodeDistribution([])} className={`w-full px-4 py-4 rounded-md text-[13px] font-medium transition-colors flex items-center gap-3 border-2 ${tempEpisodeDistribution.length === 0 ? "bg-violet-50 border-violet-500 text-violet-700" : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"}`}>
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${tempEpisodeDistribution.length === 0 ? "border-violet-500 bg-violet-500" : "border-slate-300"}`}>
                   {tempEpisodeDistribution.length === 0 && <CheckCircle2 size={12} className="text-white" />}
                 </div>
@@ -1729,7 +1728,7 @@ export default function EditPOPage() {
                 </div>
               </button>
 
-              <button onClick={() => { if (tempEpisodeDistribution.length === 0) { const item = items[episodeItemIndex]; setTempEpisodeDistribution([{ episode: 1, amount: item.baseAmount, percentage: 100 }]); }}} className={`w-full px-4 py-4 rounded-xl text-sm font-medium transition-colors flex items-center gap-3 border-2 ${tempEpisodeDistribution.length > 0 ? "bg-violet-50 border-violet-500 text-violet-700" : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"}`}>
+              <button onClick={() => { if (tempEpisodeDistribution.length === 0) { const item = items[episodeItemIndex]; setTempEpisodeDistribution([{ episode: 1, amount: item.baseAmount, percentage: 100 }]); }}} className={`w-full px-4 py-4 rounded-md text-[13px] font-medium transition-colors flex items-center gap-3 border-2 ${tempEpisodeDistribution.length > 0 ? "bg-violet-50 border-violet-500 text-violet-700" : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"}`}>
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${tempEpisodeDistribution.length > 0 ? "border-violet-500 bg-violet-500" : "border-slate-300"}`}>
                   {tempEpisodeDistribution.length > 0 && <CheckCircle2 size={12} className="text-white" />}
                 </div>
@@ -1756,7 +1755,7 @@ export default function EditPOPage() {
                       {Array.from({ length: totalEpisodes }, (_, i) => i + 1).map((epNum) => {
                         const isSelected = tempEpisodeDistribution.some(e => e.episode === epNum);
                         return (
-                          <button key={epNum} onClick={() => toggleEpisodeInDistribution(epNum)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isSelected ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{epNum}</button>
+                          <button key={epNum} onClick={() => toggleEpisodeInDistribution(epNum)} className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${isSelected ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{epNum}</button>
                         );
                       })}
                     </div>
@@ -1768,15 +1767,15 @@ export default function EditPOPage() {
                       <div className="space-y-2">
                         {tempEpisodeDistribution.map((ep) => (
                           <div key={ep.episode} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                            <span className="text-sm font-medium text-slate-700 w-12">{ep.episode}</span>
+                            <span className="text-[13px] font-medium text-slate-700 w-12">{ep.episode}</span>
                             {episodeDistributionMode === "amount" ? (
                               <div className="flex-1 relative">
-                                <input type="number" value={ep.amount || ""} onChange={(e) => updateEpisodeAmount(ep.episode, parseFloat(e.target.value) || 0)} className="w-full pl-6 pr-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="0.00" />
+                                <input type="number" value={ep.amount || ""} onChange={(e) => updateEpisodeAmount(ep.episode, parseFloat(e.target.value) || 0)} className="w-full pl-6 pr-3 py-1.5 border border-slate-200 rounded-lg text-[13px]" placeholder="0.00" />
                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">€</span>
                               </div>
                             ) : (
                               <div className="flex-1 relative">
-                                <input type="number" value={ep.percentage || ""} onChange={(e) => updateEpisodePercentage(ep.episode, parseFloat(e.target.value) || 0)} className="w-full pr-8 pl-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="0" min="0" max="100" />
+                                <input type="number" value={ep.percentage || ""} onChange={(e) => updateEpisodePercentage(ep.episode, parseFloat(e.target.value) || 0)} className="w-full pr-8 pl-3 py-1.5 border border-slate-200 rounded-lg text-[13px]" placeholder="0" min="0" max="100" />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">%</span>
                               </div>
                             )}
@@ -1789,9 +1788,9 @@ export default function EditPOPage() {
 
                   {tempEpisodeDistribution.length > 0 && (
                     <div className={`p-3 rounded-lg flex items-center justify-between ${Math.abs(getTotalDistributedPercentage() - 100) < 0.1 ? "bg-emerald-50" : "bg-amber-50"}`}>
-                      <span className="text-sm font-medium text-slate-700">Total:</span>
+                      <span className="text-[13px] font-medium text-slate-700">Total:</span>
                       <div className="text-right">
-                        <p className={`text-sm font-semibold ${Math.abs(getTotalDistributedPercentage() - 100) < 0.1 ? "text-emerald-700" : "text-amber-700"}`}>{formatCurrency(getTotalDistributedAmount())} € ({getTotalDistributedPercentage().toFixed(1)}%)</p>
+                        <p className={`text-[13px] font-semibold ${Math.abs(getTotalDistributedPercentage() - 100) < 0.1 ? "text-emerald-700" : "text-amber-700"}`}>{formatCurrency(getTotalDistributedAmount())} € ({getTotalDistributedPercentage().toFixed(1)}%)</p>
                         {Math.abs(getTotalDistributedPercentage() - 100) >= 0.1 && <p className="text-xs text-amber-600">Debe sumar 100%</p>}
                       </div>
                     </div>
@@ -1801,8 +1800,8 @@ export default function EditPOPage() {
             </div>
 
             <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3">
-              <button onClick={() => setShowEpisodeModal(false)} className="flex-1 py-2.5 text-slate-600 hover:bg-slate-200 rounded-xl text-sm font-medium transition-colors">Cancelar</button>
-              <button onClick={saveEpisodeDistribution} disabled={tempEpisodeDistribution.length > 0 && Math.abs(getTotalDistributedPercentage() - 100) >= 0.1} className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">Guardar</button>
+              <button onClick={() => setShowEpisodeModal(false)} className="flex-1 py-1.5 text-slate-600 hover:bg-slate-200 rounded-md text-[13px] font-medium transition-colors">Cancelar</button>
+              <button onClick={saveEpisodeDistribution} disabled={tempEpisodeDistribution.length > 0 && Math.abs(getTotalDistributedPercentage() - 100) >= 0.1} className="flex-1 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-md text-[13px] font-medium transition-colors disabled:opacity-50">Guardar</button>
             </div>
           </div>
         </div>

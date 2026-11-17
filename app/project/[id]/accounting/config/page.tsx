@@ -941,7 +941,7 @@ export default function AccountingConfigPage() {
     return (
       <div
         key={step.id}
-        className={`border rounded-2xl overflow-hidden transition-all ${
+        className={`border rounded-lg overflow-hidden transition-all ${
           isExpanded ? "border-slate-300 bg-white shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"
         }`}
       >
@@ -954,8 +954,8 @@ export default function AccountingConfigPage() {
             {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
           </button>
 
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-            step.hasAmountThreshold ? "bg-amber-500 text-white" : "bg-slate-900 text-white"
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-bold ${
+            step.hasAmountThreshold ? "bg-amber-500 text-white" : "bg-[#F1F1F3] text-slate-900"
           }`}>
             {step.order}
           </div>
@@ -963,12 +963,12 @@ export default function AccountingConfigPage() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <Icon size={14} className="text-slate-500" />
-              <span className="text-sm font-medium text-slate-900">
+              <span className="text-[13px] font-medium text-slate-900">
                 {APPROVER_TYPE_LABELS[step.approverType]}
               </span>
               {getThresholdBadge(step)}
               <span className="text-slate-300">•</span>
-              <span className="text-sm text-slate-500 truncate">{getStepSummary(step)}</span>
+              <span className="text-[13px] text-slate-500 truncate">{getStepSummary(step)}</span>
             </div>
           </div>
 
@@ -1000,7 +1000,7 @@ export default function AccountingConfigPage() {
         {isExpanded && (
           <div className="px-5 pb-5 pt-2 border-t border-slate-100 space-y-5">
             {/* Umbral por importe */}
-            <div className={`p-4 rounded-xl border-2 transition-all ${
+            <div className={`p-4 rounded-md border-2 transition-all ${
               step.hasAmountThreshold ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-slate-50"
             }`}>
               <label className="flex items-start gap-3 cursor-pointer">
@@ -1013,7 +1013,7 @@ export default function AccountingConfigPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <TrendingUp size={16} className={step.hasAmountThreshold ? "text-amber-600" : "text-slate-400"} />
-                    <span className={`text-sm font-medium ${step.hasAmountThreshold ? "text-amber-800" : "text-slate-700"}`}>
+                    <span className={`text-[13px] font-medium ${step.hasAmountThreshold ? "text-amber-800" : "text-slate-700"}`}>
                       Activar solo por importe
                     </span>
                   </div>
@@ -1036,7 +1036,7 @@ export default function AccountingConfigPage() {
                           <button
                             key={key}
                             onClick={() => updateStep(type, step.id, "amountCondition", key)}
-                            className={`px-3 py-2 rounded-lg text-sm font-medium border-2 transition-all ${
+                            className={`px-3 py-2 rounded-lg text-[13px] font-medium border-2 transition-all ${
                               step.amountCondition === key
                                 ? "border-amber-500 bg-amber-100 text-amber-800"
                                 : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
@@ -1061,9 +1061,9 @@ export default function AccountingConfigPage() {
                           value={step.amountThreshold || ""}
                           onChange={(e) => updateStep(type, step.id, "amountThreshold", parseFloat(e.target.value) || 0)}
                           placeholder="5000"
-                          className="w-full pl-8 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white text-sm"
+                          className="w-full pl-8 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-amber-500 bg-white text-[13px]"
                         />
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">€</span>
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[13px]">€</span>
                       </div>
                     </div>
 
@@ -1078,9 +1078,9 @@ export default function AccountingConfigPage() {
                             value={step.amountThresholdMax || ""}
                             onChange={(e) => updateStep(type, step.id, "amountThresholdMax", parseFloat(e.target.value) || 0)}
                             placeholder="10000"
-                            className="w-full pl-8 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white text-sm"
+                            className="w-full pl-8 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-amber-500 bg-white text-[13px]"
                           />
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">€</span>
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[13px]">€</span>
                         </div>
                       </div>
                     )}
@@ -1142,7 +1142,7 @@ export default function AccountingConfigPage() {
                     <button
                       key={t}
                       onClick={() => updateStep(type, step.id, "approverType", t)}
-                      className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all text-left ${
+                      className={`flex items-center gap-2 p-3 rounded-md border-2 transition-all text-left ${
                         step.approverType === t
                           ? "border-slate-900 bg-slate-50"
                           : "border-slate-200 hover:border-slate-300"
@@ -1153,7 +1153,7 @@ export default function AccountingConfigPage() {
                         className={step.approverType === t ? "text-slate-900" : "text-slate-400"}
                       />
                       <span
-                        className={`text-sm ${
+                        className={`text-[13px] ${
                           step.approverType === t ? "font-medium text-slate-900" : "text-slate-600"
                         }`}
                       >
@@ -1177,7 +1177,7 @@ export default function AccountingConfigPage() {
                     return (
                       <label
                         key={role}
-                        className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                        className={`flex items-center gap-3 p-3 rounded-md border-2 cursor-pointer transition-all ${
                           step.roles?.includes(role)
                             ? "border-slate-900 bg-slate-50"
                             : "border-slate-200 hover:border-slate-300"
@@ -1190,7 +1190,7 @@ export default function AccountingConfigPage() {
                           className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
                         />
                         <div>
-                          <p className="text-sm font-medium text-slate-900">{role}</p>
+                          <p className="text-[13px] font-medium text-slate-900">{role}</p>
                           <p className="text-xs text-slate-500">
                             {count} usuario{count !== 1 ? "s" : ""}
                           </p>
@@ -1200,7 +1200,7 @@ export default function AccountingConfigPage() {
                   })}
                 </div>
                 {step.roles && step.roles.length > 0 && (
-                  <div className="mt-3 bg-slate-50 rounded-xl p-4 border border-slate-200">
+                  <div className="mt-3 bg-slate-50 rounded-md p-4 border border-slate-200">
                     <p className="text-xs text-slate-500 mb-2">Usuarios que podrán aprobar:</p>
                     <div className="flex flex-wrap gap-1.5">
                       {step.roles.flatMap((r) =>
@@ -1225,9 +1225,9 @@ export default function AccountingConfigPage() {
                 <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">
                   Seleccionar aprobadores
                 </label>
-                <div className="border border-slate-200 rounded-xl p-3 max-h-48 overflow-y-auto space-y-1 bg-slate-50">
+                <div className="border border-slate-200 rounded-md p-3 max-h-48 overflow-y-auto space-y-1 bg-slate-50">
                   {members.length === 0 ? (
-                    <p className="text-sm text-slate-500 text-center py-4">No hay miembros</p>
+                    <p className="text-[13px] text-slate-500 text-center py-4">No hay miembros</p>
                   ) : (
                     members.map((m) => (
                       <label
@@ -1245,7 +1245,7 @@ export default function AccountingConfigPage() {
                           className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-900 truncate">{m.name}</p>
+                          <p className="text-[13px] font-medium text-slate-900 truncate">{m.name}</p>
                           <p className="text-xs text-slate-500 truncate">
                             {m.role || m.position || "Sin rol"}
                           </p>
@@ -1267,17 +1267,17 @@ export default function AccountingConfigPage() {
                   <button
                     type="button"
                     onClick={() => setOpenDropdown(openDropdown === `dept-${step.id}` ? null : `dept-${step.id}`)}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors"
+                    className="w-full px-4 py-2 border border-slate-200 rounded-md text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors"
                   >
                     <span className="text-slate-900 truncate">{step.department || "Departamento del solicitante"}</span>
                     <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `dept-${step.id}` ? "rotate-180" : ""}`} />
                   </button>
                   {openDropdown === `dept-${step.id}` && (
-                    <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                    <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
                       <button
                         type="button"
                         onClick={() => { updateStep(type, step.id, "department", ""); setOpenDropdown(null); }}
-                        className={`w-full px-4 py-2 text-left text-sm transition-colors ${!step.department ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                        className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${!step.department ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
                       >
                         Departamento del solicitante
                       </button>
@@ -1286,7 +1286,7 @@ export default function AccountingConfigPage() {
                           key={d}
                           type="button"
                           onClick={() => { updateStep(type, step.id, "department", d); setOpenDropdown(null); }}
-                          className={`w-full px-4 py-2 text-left text-sm transition-colors ${step.department === d ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                          className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${step.department === d ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
                         >
                           {d}
                         </button>
@@ -1304,7 +1304,7 @@ export default function AccountingConfigPage() {
 
             {/* Require All */}
             {(step.approverType === "fixed" || step.approverType === "role") && (
-              <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
+              <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-md border border-slate-200 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={step.requireAll}
@@ -1312,7 +1312,7 @@ export default function AccountingConfigPage() {
                   className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
                 />
                 <div>
-                  <p className="text-sm font-medium text-slate-900">Requiere aprobación de todos</p>
+                  <p className="text-[13px] font-medium text-slate-900">Requiere aprobación de todos</p>
                   <p className="text-xs text-slate-500">
                     {step.requireAll
                       ? "Todos deben aprobar para pasar al siguiente nivel"
@@ -1331,16 +1331,15 @@ export default function AccountingConfigPage() {
   const renderCompanySection = () => (
     <div className="space-y-6">
       {/* Datos fiscales */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Building2 size={18} className="text-slate-400" />
             <h2 className="font-semibold text-slate-900">Datos fiscales de la empresa</h2>
           </div>
           {!editingCompany && companyData.fiscalName && (
             <button
               onClick={() => setEditingCompany(true)}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
             >
               <Edit2 size={14} />
               Editar
@@ -1364,19 +1363,19 @@ export default function AccountingConfigPage() {
                 </div>
                 <div>
                   <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Dirección</p>
-                  <p className="text-sm text-slate-700">{companyData.address}</p>
-                  <p className="text-sm text-slate-500">{companyData.postalCode} {companyData.city}, {companyData.province}</p>
+                  <p className="text-[13px] text-slate-700">{companyData.address}</p>
+                  <p className="text-[13px] text-slate-500">{companyData.postalCode} {companyData.city}, {companyData.province}</p>
                 </div>
               </div>
             ) : (
               <div className="text-center py-8">
-                <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <div className="hidden">
                   <Building2 size={20} className="text-slate-400" />
                 </div>
-                <p className="text-sm text-slate-500 mb-4">No hay datos fiscales configurados</p>
+                <p className="text-[13px] text-slate-500 mb-4">No hay datos fiscales configurados</p>
                 <button
                   onClick={() => setEditingCompany(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-[13px] font-medium transition-colors border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
                 >
                   <Plus size={14} />
                   Añadir datos fiscales
@@ -1387,75 +1386,75 @@ export default function AccountingConfigPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Razón social *</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Razón social *</label>
                   <input
                     type="text"
                     value={companyForm.fiscalName}
                     onChange={(e) => setCompanyForm({ ...companyForm, fiscalName: e.target.value })}
                     placeholder="Nombre de la empresa"
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">NIF/CIF *</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">NIF/CIF *</label>
                   <input
                     type="text"
                     value={companyForm.taxId}
                     onChange={(e) => setCompanyForm({ ...companyForm, taxId: e.target.value.toUpperCase() })}
                     placeholder="B12345678"
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm font-mono"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px] font-mono"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Dirección *</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Dirección *</label>
                 <input
                   type="text"
                   value={companyForm.address}
                   onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })}
                   placeholder="Calle, número, piso"
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px]"
                 />
               </div>
               <div className="grid grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">C.P. *</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">C.P. *</label>
                   <input
                     type="text"
                     value={companyForm.postalCode}
                     onChange={(e) => setCompanyForm({ ...companyForm, postalCode: e.target.value })}
                     placeholder="28001"
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Ciudad *</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Ciudad *</label>
                   <input
                     type="text"
                     value={companyForm.city}
                     onChange={(e) => setCompanyForm({ ...companyForm, city: e.target.value })}
                     placeholder="Madrid"
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Provincia</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Provincia</label>
                   <input
                     type="text"
                     value={companyForm.province}
                     onChange={(e) => setCompanyForm({ ...companyForm, province: e.target.value })}
                     placeholder="Madrid"
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">País</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">País</label>
                   <input
                     type="text"
                     value={companyForm.country}
                     onChange={(e) => setCompanyForm({ ...companyForm, country: e.target.value })}
                     placeholder="España"
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px]"
                   />
                 </div>
               </div>
@@ -1463,14 +1462,14 @@ export default function AccountingConfigPage() {
                 <button
                   onClick={handleSaveCompany}
                   disabled={savingCompany || !companyForm.fiscalName || !companyForm.taxId || !companyForm.address || !companyForm.postalCode || !companyForm.city}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
                 >
                   <Save size={16} />
                   {savingCompany ? "Guardando..." : "Guardar"}
                 </button>
                 <button
                   onClick={() => { setEditingCompany(false); setCompanyForm(companyData); }}
-                  className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-sm font-medium transition-colors"
+                  className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-md text-[13px] font-medium transition-colors"
                 >
                   Cancelar
                 </button>
@@ -1481,16 +1480,15 @@ export default function AccountingConfigPage() {
       </div>
 
       {/* Cuentas bancarias */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Landmark size={18} className="text-slate-400" />
             <h2 className="font-semibold text-slate-900">Cuentas bancarias</h2>
             <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">{bankAccounts.length}</span>
           </div>
           <button
             onClick={openNewBankAccount}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 text-[13px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
           >
             <Plus size={14} />
             Añadir
@@ -1503,10 +1501,10 @@ export default function AccountingConfigPage() {
               {bankAccounts.map((account) => (
                 <div
                   key={account.id}
-                  className="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors group"
+                  className="flex items-center justify-between p-4 bg-slate-50 rounded-md hover:bg-slate-100 transition-colors group"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-slate-200">
+                    <div className="w-10 h-10 bg-white rounded-md flex items-center justify-center border border-slate-200">
                       <CreditCard size={18} className="text-slate-500" />
                     </div>
                     <div>
@@ -1520,7 +1518,7 @@ export default function AccountingConfigPage() {
                         )}
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">{account.fiscalName} · {account.taxId}</p>
-                      <p className="text-sm font-mono text-slate-600 mt-1">{formatIBAN(account.iban)}</p>
+                      <p className="text-[13px] font-mono text-slate-600 mt-1">{formatIBAN(account.iban)}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1542,13 +1540,13 @@ export default function AccountingConfigPage() {
             </div>
           ) : (
             <div className="text-center py-8">
-              <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+              <div className="hidden">
                 <Landmark size={20} className="text-slate-400" />
               </div>
-              <p className="text-sm text-slate-500 mb-4">No hay cuentas bancarias configuradas</p>
+              <p className="text-[13px] text-slate-500 mb-4">No hay cuentas bancarias configuradas</p>
               <button
                 onClick={openNewBankAccount}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-[13px] font-medium transition-colors border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
               >
                 <Plus size={14} />
                 Añadir cuenta
@@ -1567,8 +1565,8 @@ export default function AccountingConfigPage() {
   const renderCostSection = () => (
     <div className="space-y-6">
       {/* Comprometido - POs */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100">
           <h2 className="font-semibold text-slate-900">Comprometido (POs)</h2>
         </div>
 
@@ -1582,7 +1580,7 @@ export default function AccountingConfigPage() {
               return (
                 <label
                   key={trigger.value}
-                  className={`flex items-start gap-4 p-4 rounded-xl border-2 transition-all ${
+                  className={`flex items-start gap-4 p-4 rounded-md border-2 transition-all ${
                     isDisabled
                       ? "border-slate-100 bg-slate-50 opacity-50 cursor-not-allowed"
                       : isSelected
@@ -1612,7 +1610,7 @@ export default function AccountingConfigPage() {
             })}
           </div>
           {costSettings.poCommitmentTrigger === "on_approve" && poApprovals.length === 0 && (
-            <div className="mt-3 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+            <div className="mt-3 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
               <AlertCircle size={15} className="text-amber-600 flex-shrink-0 mt-0.5" />
               <p className="text-xs text-amber-700">No hay pasos de aprobación configurados para POs. Se usará <strong>Al enviar</strong> hasta que se configuren aprobaciones.</p>
             </div>
@@ -1621,8 +1619,8 @@ export default function AccountingConfigPage() {
       </div>
 
       {/* Realizado - Facturas */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100">
           <h2 className="font-semibold text-slate-900">Realizado (Facturas)</h2>
         </div>
 
@@ -1634,7 +1632,7 @@ export default function AccountingConfigPage() {
               return (
                 <label
                   key={trigger.value}
-                  className={`flex items-start gap-4 p-4 rounded-xl border-2 transition-all ${
+                  className={`flex items-start gap-4 p-4 rounded-md border-2 transition-all ${
                     isDisabled
                       ? "border-slate-100 bg-slate-50 opacity-50 cursor-not-allowed"
                       : isSelected
@@ -1662,8 +1660,8 @@ export default function AccountingConfigPage() {
       </div>
 
       {/* Realizado - BOX */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100">
           <h2 className="font-semibold text-slate-900">Realizado (BOX)</h2>
         </div>
 
@@ -1675,7 +1673,7 @@ export default function AccountingConfigPage() {
               return (
                 <label
                   key={trigger.value}
-                  className={`flex items-start gap-4 p-4 rounded-xl border-2 transition-all ${
+                  className={`flex items-start gap-4 p-4 rounded-md border-2 transition-all ${
                     isDisabled
                       ? "border-slate-100 bg-slate-50 opacity-50 cursor-not-allowed"
                       : isSelected
@@ -1704,18 +1702,18 @@ export default function AccountingConfigPage() {
 
       {/* Asignación por capítulos - Solo para series */}
       {projectType === "serie" && (
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
             <Layers size={18} className="text-violet-500" />
             <div>
               <h2 className="font-semibold text-slate-900">Asignación por capítulos</h2>
-              <p className="text-sm text-slate-500">{projectEpisodes} capítulos configurados</p>
+              <p className="text-[13px] text-slate-500">{projectEpisodes} capítulos configurados</p>
             </div>
           </div>
           <div className="p-6 space-y-4">
-            <label className="flex items-center justify-between p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+            <label className="flex items-center justify-between p-4 bg-slate-50 rounded-md cursor-pointer hover:bg-slate-100 transition-colors">
               <div>
-                <p className="text-sm font-medium text-slate-900">Habilitar asignación a capítulos</p>
+                <p className="text-[13px] font-medium text-slate-900">Habilitar asignación a capítulos</p>
                 <p className="text-xs text-slate-500">Permite asignar POs y facturas a capítulos específicos de la serie</p>
               </div>
               <input
@@ -1727,9 +1725,9 @@ export default function AccountingConfigPage() {
             </label>
             
             {projectSettings.enableEpisodes && (
-              <label className="flex items-center justify-between p-4 bg-amber-50 rounded-xl cursor-pointer border border-amber-200">
+              <label className="flex items-center justify-between p-4 bg-amber-50 rounded-md cursor-pointer border border-amber-200">
                 <div>
-                  <p className="text-sm font-medium text-amber-900">Requerir asignación obligatoria</p>
+                  <p className="text-[13px] font-medium text-amber-900">Requerir asignación obligatoria</p>
                   <p className="text-xs text-amber-700">No se podrán crear POs o facturas sin asignar un capítulo</p>
                 </div>
                 <input
@@ -1747,7 +1745,7 @@ export default function AccountingConfigPage() {
             <button
               onClick={handleSaveProjectSettings}
               disabled={saving}
-              className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
             >
               <Save size={16} />
               {saving ? "Guardando..." : "Guardar capítulos"}
@@ -1765,7 +1763,7 @@ export default function AccountingConfigPage() {
       <div className="flex gap-1 border-b border-slate-200">
         <button
           onClick={() => setActiveTab("po")}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+          className={`flex items-center gap-2 px-4 py-2 text-[13px] font-medium border-b-2 transition-colors ${
             activeTab === "po"
               ? "border-slate-900 text-slate-900"
               : "border-transparent text-slate-500 hover:text-slate-700"
@@ -1781,7 +1779,7 @@ export default function AccountingConfigPage() {
         </button>
         <button
           onClick={() => setActiveTab("invoice")}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+          className={`flex items-center gap-2 px-4 py-2 text-[13px] font-medium border-b-2 transition-colors ${
             activeTab === "invoice"
               ? "border-slate-900 text-slate-900"
               : "border-transparent text-slate-500 hover:text-slate-700"
@@ -1797,7 +1795,7 @@ export default function AccountingConfigPage() {
         </button>
         <button
           onClick={() => setActiveTab("box")}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+          className={`flex items-center gap-2 px-4 py-2 text-[13px] font-medium border-b-2 transition-colors ${
             activeTab === "box"
               ? "border-slate-900 text-slate-900"
               : "border-transparent text-slate-500 hover:text-slate-700"
@@ -1818,10 +1816,10 @@ export default function AccountingConfigPage() {
         {activeTab === "po" ? (
           <>
             {poApprovals.length === 0 ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-8 text-center">
                 <AlertCircle size={28} className="text-amber-600 mx-auto mb-3" />
                 <p className="text-amber-800 font-medium">Sin niveles de aprobación</p>
-                <p className="text-amber-700 text-sm mt-1">Las POs se aprobarán automáticamente</p>
+                <p className="text-amber-700 text-[13px] mt-1">Las POs se aprobarán automáticamente</p>
               </div>
             ) : (
               poApprovals.map((step, i) => renderApprovalStep(step, "po", i))
@@ -1830,14 +1828,14 @@ export default function AccountingConfigPage() {
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => addApprovalStep("po", false)}
-                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-slate-300 rounded-2xl hover:border-slate-400 hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors text-sm"
+                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-slate-300 rounded-lg hover:border-slate-400 hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors text-[13px]"
               >
                 <Plus size={18} />
                 Añadir nivel de aprobación
               </button>
               <button
                 onClick={() => addApprovalStep("po", true)}
-                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-amber-300 rounded-2xl hover:border-amber-400 hover:bg-amber-50 text-amber-600 hover:text-amber-700 transition-colors text-sm"
+                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-amber-300 rounded-lg hover:border-amber-400 hover:bg-amber-50 text-amber-600 hover:text-amber-700 transition-colors text-[13px]"
               >
                 <DollarSign size={18} />
                 Añadir nivel por importe
@@ -1847,10 +1845,10 @@ export default function AccountingConfigPage() {
         ) : activeTab === "invoice" ? (
           <>
             {invoiceApprovals.length === 0 ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-8 text-center">
                 <AlertCircle size={28} className="text-amber-600 mx-auto mb-3" />
                 <p className="text-amber-800 font-medium">Sin niveles de aprobación</p>
-                <p className="text-amber-700 text-sm mt-1">Las facturas se aprobarán automáticamente</p>
+                <p className="text-amber-700 text-[13px] mt-1">Las facturas se aprobarán automáticamente</p>
               </div>
             ) : (
               invoiceApprovals.map((step, i) => renderApprovalStep(step, "invoice", i))
@@ -1859,14 +1857,14 @@ export default function AccountingConfigPage() {
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => addApprovalStep("invoice", false)}
-                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-slate-300 rounded-2xl hover:border-slate-400 hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors text-sm"
+                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-slate-300 rounded-lg hover:border-slate-400 hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors text-[13px]"
               >
                 <Plus size={18} />
                 Añadir nivel de aprobación
               </button>
               <button
                 onClick={() => addApprovalStep("invoice", true)}
-                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-amber-300 rounded-2xl hover:border-amber-400 hover:bg-amber-50 text-amber-600 hover:text-amber-700 transition-colors text-sm"
+                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-amber-300 rounded-lg hover:border-amber-400 hover:bg-amber-50 text-amber-600 hover:text-amber-700 transition-colors text-[13px]"
               >
                 <DollarSign size={18} />
                 Añadir nivel por importe
@@ -1876,10 +1874,10 @@ export default function AccountingConfigPage() {
         ) : (
           <>
             {boxApprovals.length === 0 ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-8 text-center">
                 <AlertCircle size={28} className="text-amber-600 mx-auto mb-3" />
                 <p className="text-amber-800 font-medium">Sin niveles de aprobación</p>
-                <p className="text-amber-700 text-sm mt-1">Los sobres se cerrarán sin aprobación</p>
+                <p className="text-amber-700 text-[13px] mt-1">Los sobres se cerrarán sin aprobación</p>
               </div>
             ) : (
               boxApprovals.map((step, i) => renderApprovalStep(step, "box", i))
@@ -1888,14 +1886,14 @@ export default function AccountingConfigPage() {
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => addApprovalStep("box", false)}
-                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-slate-300 rounded-2xl hover:border-slate-400 hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors text-sm"
+                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-slate-300 rounded-lg hover:border-slate-400 hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors text-[13px]"
               >
                 <Plus size={18} />
                 Añadir nivel de aprobación
               </button>
               <button
                 onClick={() => addApprovalStep("box", true)}
-                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-amber-300 rounded-2xl hover:border-amber-400 hover:bg-amber-50 text-amber-600 hover:text-amber-700 transition-colors text-sm"
+                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-amber-300 rounded-lg hover:border-amber-400 hover:bg-amber-50 text-amber-600 hover:text-amber-700 transition-colors text-[13px]"
               >
                 <DollarSign size={18} />
                 Añadir nivel por importe
@@ -1974,7 +1972,7 @@ export default function AccountingConfigPage() {
       return (
         <div
           key={config.id}
-          className={`border rounded-xl overflow-hidden transition-all ${
+          className={`border rounded-md overflow-hidden transition-all ${
             isExpanded ? "border-slate-300 bg-white shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"
           }`}
         >
@@ -1988,7 +1986,7 @@ export default function AccountingConfigPage() {
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-slate-900">{config.label}</span>
+                <span className="text-[13px] font-medium text-slate-900">{config.label}</span>
                 {isDefault && (
                   <span className="text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">Por defecto</span>
                 )}
@@ -2014,7 +2012,7 @@ export default function AccountingConfigPage() {
                       <button
                         key={role}
                         onClick={() => togglePermissionRole(config.id, role)}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium border-2 transition-all ${
+                        className={`px-3 py-2 rounded-lg text-[13px] font-medium border-2 transition-all ${
                           isSelected
                             ? "border-slate-900 bg-slate-900 text-white"
                             : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
@@ -2036,7 +2034,7 @@ export default function AccountingConfigPage() {
                   <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">
                     Usuarios adicionales (sin el rol requerido)
                   </label>
-                  <div className="border border-slate-200 rounded-xl p-2 max-h-36 overflow-y-auto space-y-1 bg-slate-50">
+                  <div className="border border-slate-200 rounded-md p-2 max-h-36 overflow-y-auto space-y-1 bg-slate-50">
                     {members
                       .filter((m) => !setting.roles.includes(m.role || ""))
                       .map((m) => (
@@ -2053,7 +2051,7 @@ export default function AccountingConfigPage() {
                             className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500"
                           />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-slate-900 truncate">{m.name}</p>
+                            <p className="text-[13px] font-medium text-slate-900 truncate">{m.name}</p>
                             <p className="text-xs text-slate-500">{m.role || "Sin rol"}</p>
                           </div>
                         </label>
@@ -2087,7 +2085,6 @@ export default function AccountingConfigPage() {
         {/* PO Permissions */}
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <FileText size={18} className="text-slate-600" />
             <h3 className="font-semibold text-slate-900">Órdenes de compra</h3>
           </div>
           <div className="space-y-2">
@@ -2098,7 +2095,6 @@ export default function AccountingConfigPage() {
         {/* Invoice Permissions */}
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <Receipt size={18} className="text-slate-600" />
             <h3 className="font-semibold text-slate-900">Facturas</h3>
           </div>
           <div className="space-y-2">
@@ -2109,7 +2105,6 @@ export default function AccountingConfigPage() {
         {/* General Permissions */}
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <Settings size={18} className="text-slate-600" />
             <h3 className="font-semibold text-slate-900">General</h3>
           </div>
           <div className="space-y-2">
@@ -2131,13 +2126,13 @@ export default function AccountingConfigPage() {
     return (
       <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="hidden">
             <AlertCircle size={28} className="text-red-600" />
           </div>
           <p className="text-slate-700 mb-6">{errorMessage}</p>
           <Link
             href={`/project/${id}/accounting`}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
           >
             <ArrowLeft size={16} />
             Volver al Panel
@@ -2150,18 +2145,17 @@ export default function AccountingConfigPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
+        <div className="px-6 pt-8 sm:px-10">
           {/* Page header */}
-          <div className="relative flex items-center justify-center">
+          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
             <div className="flex items-center gap-4">
-              <Settings size={22} style={{ color: "#2F52E0" }} />
-              <h1 className="text-3xl font-bold text-slate-900 text-center">Configuración de contabilidad</h1>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Configuración de contabilidad</h1>
             </div>
 
             <button
               onClick={handleSave}
               disabled={saving}
-              className="absolute right-0 flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+              className="absolute right-0 flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
             >
               {saving ? (
                 <>
@@ -2181,19 +2175,19 @@ export default function AccountingConfigPage() {
 
       {/* Toast */}
       {successMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
+        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
           <CheckCircle2 size={16} />
           {successMessage}
         </div>
       )}
       {errorMessage && hasAccess && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
+        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
           <AlertCircle size={16} />
           {errorMessage}
         </div>
       )}
 
-      <main className="px-24 py-8">
+      <main className="px-6 sm:px-10 py-8">
         {/* Layout con sidebar de secciones */}
         <div className="flex flex-row gap-6">
           {/* Sidebar de secciones - sticky que se mueve con el scroll */}
@@ -2210,12 +2204,12 @@ export default function AccountingConfigPage() {
                       onClick={() => setActiveSection(section.id)}
                       className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all whitespace-nowrap ${
                         isActive
-                          ? "bg-slate-900 text-white"
+                          ? "bg-[#F1F1F3] text-slate-900"
                           : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                       }`}
                     >
-                      <Icon size={16} className={isActive ? "text-white" : "text-slate-400"} />
-                      <span className={`text-sm font-medium ${isActive ? "text-white" : ""}`}>{section.label}</span>
+                      <Icon size={16} className={isActive ? "text-slate-900" : "text-slate-400"} />
+                      <span className={`text-[13px] font-medium ${isActive ? "text-slate-900" : ""}`}>{section.label}</span>
                     </button>
                   );
                 })}
@@ -2259,15 +2253,15 @@ export default function AccountingConfigPage() {
 
       {/* Modal para cuenta bancaria */}
       {showBankAccountModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setShowBankAccountModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowBankAccountModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+                <div className="hidden">
                   <CreditCard size={20} className="text-slate-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900">
+                  <h3 className="text-[14px] font-semibold text-slate-900">
                     {editingBankAccount ? "Editar cuenta" : "Nueva cuenta bancaria"}
                   </h3>
                   <p className="text-xs text-slate-500">Para remesas SEPA</p>
@@ -2280,64 +2274,64 @@ export default function AccountingConfigPage() {
             
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Alias *</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Alias *</label>
                 <input
                   type="text"
                   value={bankAccountForm.alias}
                   onChange={(e) => setBankAccountForm({ ...bankAccountForm, alias: e.target.value })}
                   placeholder="Alias de la cuenta"
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px]"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Razón social titular</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Razón social titular</label>
                   <input
                     type="text"
                     value={bankAccountForm.fiscalName}
                     onChange={(e) => setBankAccountForm({ ...bankAccountForm, fiscalName: e.target.value })}
                     placeholder="Nombre empresa"
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">NIF/CIF titular</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">NIF/CIF titular</label>
                   <input
                     type="text"
                     value={bankAccountForm.taxId}
                     onChange={(e) => setBankAccountForm({ ...bankAccountForm, taxId: e.target.value.toUpperCase() })}
                     placeholder="B12345678"
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm font-mono"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px] font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">IBAN *</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">IBAN *</label>
                 <input
                   type="text"
                   value={bankAccountForm.iban}
                   onChange={(e) => handleBankAccountIbanChange(e.target.value)}
                   placeholder="Pega 20 dígitos o IBAN completo"
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm font-mono"
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px] font-mono"
                 />
                 <p className="text-xs text-slate-400 mt-1">Pega 20 dígitos y se calcula ESXX automáticamente</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">BIC/SWIFT <span className="font-normal text-slate-400">(opcional)</span></label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">BIC/SWIFT <span className="font-normal text-slate-400">(opcional)</span></label>
                 <input
                   type="text"
                   value={bankAccountForm.bic || ""}
                   onChange={(e) => setBankAccountForm({ ...bankAccountForm, bic: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11) })}
                   placeholder="Código BIC"
                   maxLength={11}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm font-mono uppercase"
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px] font-mono uppercase"
                 />
               </div>
 
-              <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+              <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-md cursor-pointer hover:bg-slate-100 transition-colors">
                 <input
                   type="checkbox"
                   checked={bankAccountForm.isDefault || false}
@@ -2345,7 +2339,7 @@ export default function AccountingConfigPage() {
                   className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
                 />
                 <div>
-                  <p className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                  <p className="text-[13px] font-medium text-slate-700 flex items-center gap-2">
                     <Star size={14} className="text-amber-500" />
                     Cuenta principal
                   </p>
@@ -2357,14 +2351,14 @@ export default function AccountingConfigPage() {
             <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
               <button
                 onClick={() => setShowBankAccountModal(false)}
-                className="px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-sm font-medium transition-colors"
+                className="px-4 py-1.5 text-slate-600 hover:bg-slate-100 rounded-md text-[13px] font-medium transition-colors"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleSaveBankAccount}
                 disabled={savingBankAccount || !bankAccountForm.alias || !bankAccountForm.iban}
-                className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
               >
                 <Save size={16} />
                 {savingBankAccount ? "Guardando..." : editingBankAccount ? "Guardar cambios" : "Añadir cuenta"}
@@ -2376,20 +2370,20 @@ export default function AccountingConfigPage() {
 
       {/* Confirm Dialog */}
       {confirmDialog && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
-            <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[14px] font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
+            <p className="text-[13px] text-slate-600 mb-6">{confirmDialog.message}</p>
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmDialog(null)}
-                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm"
+                className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 font-medium text-[13px]"
               >
                 Cancelar
               </button>
               <button
                 onClick={confirmDialog.onConfirm}
-                className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-sm text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
+                className={`flex-1 px-4 py-1.5 rounded-md font-medium text-[13px] text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
               >
                 {confirmDialog.confirmLabel || "Confirmar"}
               </button>

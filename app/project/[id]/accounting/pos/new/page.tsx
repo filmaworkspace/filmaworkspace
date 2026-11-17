@@ -1169,15 +1169,14 @@ export default function NewPOPage() {
     return (
       <div className={cx("min-h-screen bg-white flex items-center justify-center", inter.className)}>
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="hidden">
             <ShieldAlert size={28} className="text-red-500" />
           </div>
-          <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
+          <h2 className="text-[14px] font-semibold text-slate-900 mb-2">Acceso denegado</h2>
           <p className="text-slate-500 mb-6">{permissionsError || "No tienes permisos para crear órdenes de compra"}</p>
           <Link
             href={"/project/" + id + "/accounting/pos"}
-            className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
-            style={{ backgroundColor: "#2F52E0" }}
+            className="inline-flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity"
           >
             <ArrowLeft size={16} />
             Volver a POs
@@ -1191,18 +1190,17 @@ export default function NewPOPage() {
     <div className={cx("min-h-screen bg-white", inter.className)}>
       {/* Header */}
       <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
-          <div className="relative flex items-center justify-center">
+        <div className="px-6 pt-8 sm:px-10">
+          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
             <Link
               href={"/project/" + id + "/accounting/pos"}
-              className="absolute left-0 w-10 h-10 rounded-xl flex items-center justify-center border border-slate-200 hover:bg-slate-50 transition-colors"
+              className="mr-3 w-8 h-8 rounded-md flex items-center justify-center text-slate-500 hover:bg-[#F4F4F5] hover:text-slate-900 transition-colors"
             >
               <ArrowLeft size={18} className="text-slate-600" />
             </Link>
             <div className="flex items-center gap-4">
-              <FileText size={22} style={{ color: "#2F52E0" }} />
               <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-bold text-slate-900 text-center">Nueva orden de compra</h1>
+                <h1 className="text-xl font-semibold tracking-tight text-slate-900">Nueva orden de compra</h1>
                 {permissions.fixedDepartment && (
                   <span className="px-2 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: "rgba(47, 82, 224, 0.1)", color: "#2F52E0" }}>
                     {permissions.fixedDepartment}
@@ -1217,7 +1215,7 @@ export default function NewPOPage() {
                 <button
                   onClick={() => setShowDraftsPanel(!showDraftsPanel)}
                   className={cx(
-                    "flex items-center gap-2 px-3 py-2.5 border rounded-xl text-sm font-medium transition-colors",
+                    "flex items-center gap-2 px-3 py-1.5 border rounded-md text-[13px] font-medium transition-colors",
                     drafts.length > 0
                       ? "border-amber-300 bg-amber-50 text-amber-700"
                       : "border-slate-200 text-slate-600 hover:bg-slate-50"
@@ -1235,9 +1233,9 @@ export default function NewPOPage() {
                 {showDraftsPanel && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowDraftsPanel(false)} />
-                    <div className="absolute right-0 top-12 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                    <div className="absolute right-0 top-12 w-72 bg-white border border-slate-200 rounded-md shadow-xl z-50 overflow-hidden">
                       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                        <h3 className="font-semibold text-slate-900 text-sm">Borradores</h3>
+                        <h3 className="font-semibold text-slate-900 text-[13px]">Borradores</h3>
                         <button onClick={() => setShowDraftsPanel(false)} className="text-slate-400 hover:text-slate-600">
                           <X size={16} />
                         </button>
@@ -1250,7 +1248,7 @@ export default function NewPOPage() {
                               <div className="flex items-center justify-between">
                                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => loadDraft(draft)}>
                                   <div className="flex items-center gap-1.5">
-                                    <p className="text-sm font-medium text-slate-900 truncate">{draft.name}</p>
+                                    <p className="text-[13px] font-medium text-slate-900 truncate">{draft.name}</p>
                                     {draft.auto && (
                                       <span className="flex-shrink-0 text-[9px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Auto</span>
                                     )}
@@ -1271,7 +1269,7 @@ export default function NewPOPage() {
                         ) : (
                           <div className="p-6 text-center">
                             <FileBox size={24} className="text-slate-300 mx-auto mb-2" />
-                            <p className="text-sm text-slate-500">No hay borradores</p>
+                            <p className="text-[13px] text-slate-500">No hay borradores</p>
                           </div>
                         )}
                       </div>
@@ -1279,7 +1277,7 @@ export default function NewPOPage() {
                       <div className="px-3 py-2 border-t border-slate-100 bg-slate-50">
                         <button
                           onClick={saveDraft}
-                          className="w-full px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800"
+                          className="w-full px-3 py-2 rounded-lg text-xs font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
                         >
                           Guardar como borrador
                         </button>
@@ -1292,8 +1290,7 @@ export default function NewPOPage() {
               <button
                 onClick={() => savePO("pending")}
                 disabled={saving}
-                className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium transition-opacity disabled:opacity-50 hover:opacity-90"
-                style={{ backgroundColor: "#2F52E0" }}
+                className="flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity disabled:opacity-50"
               >
                 {saving ? (
                   <>
@@ -1312,25 +1309,25 @@ export default function NewPOPage() {
         </div>
       </div>
 
-      <main className="px-24 py-8">
+      <main className="px-6 sm:px-10 py-8">
         <div className="grid grid-cols-3 gap-8">
           {/* Main Form */}
           <div className="col-span-2 space-y-6">
             {/* Basic Info */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-100">
                 <h2 className="font-semibold text-slate-900">Información básica</h2>
               </div>
 
               <div className="p-6 space-y-5">
                 {/* Proveedor */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Proveedor {!noSupplier && "*"}</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Proveedor {!noSupplier && "*"}</label>
                   <button
                     onClick={() => setShowSupplierModal(true)}
                     onBlur={() => handleBlur("supplier")}
                     className={cx(
-                      "w-full px-4 py-2.5 border rounded-xl hover:border-slate-300 transition-colors text-left flex items-center justify-between bg-white",
+                      "w-full px-4 py-1.5 border rounded-md hover:border-slate-300 transition-colors text-left flex items-center justify-between bg-white",
                       noSupplier
                         ? "border-dashed border-slate-300 bg-slate-50"
                         : hasError("supplier") ? "border-red-300 bg-red-50" : isValid("supplier") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"
@@ -1345,10 +1342,10 @@ export default function NewPOPage() {
                       </div>
                     ) : noSupplier ? (
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100">
+                        <div className="hidden">
                           <Building2 size={16} className="text-slate-400" />
                         </div>
-                        <span className="text-slate-500 text-sm">Sin proveedor asignado. Se completará más adelante</span>
+                        <span className="text-slate-500 text-[13px]">Sin proveedor asignado. Se completará más adelante</span>
                       </div>
                     ) : (
                       <span className="text-slate-400">Seleccionar proveedor</span>
@@ -1366,7 +1363,7 @@ export default function NewPOPage() {
                 <div className="grid grid-cols-2 gap-5">
                   {/* Departamento - Custom Dropdown */}
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="mb-1.5 block text-xs font-medium text-slate-600">
                       Departamento *
                       {permissions.fixedDepartment && (
                         <span className="ml-2 text-xs text-slate-400 font-normal">(asignado)</span>
@@ -1377,7 +1374,7 @@ export default function NewPOPage() {
                         onClick={() => !permissions.fixedDepartment && setShowDepartmentDropdown(!showDepartmentDropdown)}
                         disabled={!!permissions.fixedDepartment}
                         className={cx(
-                          "w-full px-4 py-2.5 border rounded-xl text-left flex items-center justify-between transition-colors",
+                          "w-full px-4 py-1.5 border rounded-md text-left flex items-center justify-between transition-colors",
                           hasError("department") ? "border-red-300 bg-red-50" : isValid("department") ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white",
                           permissions.fixedDepartment ? "cursor-not-allowed bg-slate-50" : "hover:border-slate-300"
                         )}
@@ -1392,7 +1389,7 @@ export default function NewPOPage() {
                         </div>
                       </button>
                       {showDepartmentDropdown && (
-                        <div className="absolute top-full left-0 mt-2 w-full bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 max-h-60 overflow-y-auto">
+                        <div className="absolute top-full left-0 mt-2 w-full bg-white border border-slate-200 rounded-md shadow-lg z-50 py-1 max-h-60 overflow-y-auto">
                           {availableDepartments.map((dept) => (
                             <button
                               key={dept}
@@ -1402,7 +1399,7 @@ export default function NewPOPage() {
                                 setShowDepartmentDropdown(false);
                               }}
                               className={cx(
-                                "w-full text-left px-4 py-2.5 text-sm transition-colors",
+                                "w-full text-left px-4 py-1.5 text-[13px] transition-colors",
                                 formData.department === dept ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"
                               )}
                             >
@@ -1422,7 +1419,7 @@ export default function NewPOPage() {
 
                   {/* Tipo de PO */}
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de PO</label>
+                    <label className="mb-1.5 block text-xs font-medium text-slate-600">Tipo de PO</label>
                     <div className="grid grid-cols-2 gap-2">
                       {PO_TYPES.map((type) => {
                         const Icon = type.icon;
@@ -1432,7 +1429,7 @@ export default function NewPOPage() {
                             key={type.value}
                             onClick={() => setFormData({ ...formData, poType: type.value as any })}
                             className={cx(
-                              "px-3 py-2.5 rounded-xl border transition-all flex items-center justify-center gap-2 text-sm",
+                              "px-3 py-1.5 rounded-md border transition-all flex items-center justify-center gap-2 text-[13px]",
                               isSelected ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 hover:border-slate-300 text-slate-600 bg-white"
                             )}
                             title={type.description}
@@ -1448,11 +1445,11 @@ export default function NewPOPage() {
 
                 {/* Moneda - Custom Dropdown */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Moneda</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Moneda</label>
                   <div className="relative" ref={currencyDropdownRef}>
                     <button
                       onClick={() => setShowCurrencyDropdown(!showCurrencyDropdown)}
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between bg-white hover:border-slate-300 transition-colors"
+                      className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between bg-white hover:border-slate-300 transition-colors"
                     >
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-slate-900">{CURRENCIES.find((c) => c.value === formData.currency)?.symbol}</span>
@@ -1461,7 +1458,7 @@ export default function NewPOPage() {
                       <ChevronDown size={14} className={cx("text-slate-400 transition-transform", showCurrencyDropdown && "rotate-180")} />
                     </button>
                     {showCurrencyDropdown && (
-                      <div className="absolute top-full left-0 mt-2 w-full bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1">
+                      <div className="absolute top-full left-0 mt-2 w-full bg-white border border-slate-200 rounded-md shadow-lg z-50 py-1">
                         {CURRENCIES.map((currency) => (
                           <button
                             key={currency.value}
@@ -1470,7 +1467,7 @@ export default function NewPOPage() {
                               setShowCurrencyDropdown(false);
                             }}
                             className={cx(
-                              "w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2",
+                              "w-full text-left px-4 py-1.5 text-[13px] transition-colors flex items-center gap-2",
                               formData.currency === currency.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"
                             )}
                           >
@@ -1486,7 +1483,7 @@ export default function NewPOPage() {
                 {/* Descripción general */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-slate-700">Descripción general *</label>
+                    <label className="block text-[13px] font-medium text-slate-700">Descripción general *</label>
                     <button
                       type="button"
                       onClick={() => setShowTitleBuilder(!showTitleBuilder)}
@@ -1504,7 +1501,7 @@ export default function NewPOPage() {
 
                   {/* Generador de título */}
                   {showTitleBuilder && (
-                    <div className="mb-3 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                    <div className="mb-3 p-4 bg-slate-50 border border-slate-200 rounded-md space-y-3">
                       {/* Sugerencias de concepto */}
                       <div>
                         <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Concepto</p>
@@ -1530,7 +1527,7 @@ export default function NewPOPage() {
                           value={titleConcept}
                           onChange={(e) => setTitleConcept(e.target.value.toUpperCase())}
                           placeholder="O escribe el concepto"
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-400 uppercase placeholder:normal-case"
+                          className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-400 uppercase placeholder:normal-case"
                         />
                       </div>
 
@@ -1542,7 +1539,7 @@ export default function NewPOPage() {
                           value={titleReference}
                           onChange={(e) => setTitleReference(e.target.value.toUpperCase())}
                           placeholder="CASA AZUL · PERSONAJE · SECUENCIA"
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-400 uppercase placeholder:normal-case"
+                          className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-slate-400 uppercase placeholder:normal-case"
                         />
                       </div>
 
@@ -1561,7 +1558,7 @@ export default function NewPOPage() {
                           type="button"
                           onClick={applyTitle}
                           disabled={!titlePreview}
-                          className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium disabled:opacity-40 hover:bg-slate-700 transition-colors flex-shrink-0"
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-40 transition-colors flex-shrink-0 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
                         >
                           <CheckCircle2 size={12} />
                           Aplicar
@@ -1578,7 +1575,7 @@ export default function NewPOPage() {
                       placeholder="CONCEPTO DE LA ORDEN DE COMPRA"
                       rows={2}
                       className={cx(
-                        "w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm pr-10 uppercase",
+                        "w-full px-2.5 py-1.5 border rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white resize-none text-[13px] pr-10 uppercase",
                         hasError("generalDescription") ? "border-red-300 bg-red-50" : isValid("generalDescription") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"
                       )}
                     />
@@ -1597,8 +1594,8 @@ export default function NewPOPage() {
             </div>
 
             {/* Items */}
-            <div className="bg-white border border-slate-200 rounded-2xl">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="bg-white border border-slate-200 rounded-lg">
+              <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <h2 className="font-semibold text-slate-900">Items</h2>
                   <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">
@@ -1607,8 +1604,7 @@ export default function NewPOPage() {
                 </div>
                 <button
                   onClick={addItem}
-                  className="flex items-center gap-1.5 px-4 py-2 text-white rounded-xl text-sm font-medium transition-opacity hover:opacity-90"
-                  style={{ backgroundColor: "#2F52E0" }}
+                  className="flex items-center gap-1.5 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity"
                 >
                   <Plus size={14} />
                   Añadir
@@ -1624,7 +1620,7 @@ export default function NewPOPage() {
                     <div
                       key={item.id}
                       className={cx(
-                        "border rounded-xl p-5 transition-all",
+                        "border rounded-md p-5 transition-all",
                         itemHasAllFields ? "border-emerald-200 bg-emerald-50/30" : "border-slate-200 bg-slate-50/50"
                       )}
                     >
@@ -1653,7 +1649,7 @@ export default function NewPOPage() {
                           onBlur={() => handleBlur("item_" + index + "_description")}
                           placeholder="Descripción del item"
                           className={cx(
-                            "w-full px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white",
+                            "w-full px-2.5 py-1.5 border rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white",
                             hasError("item_" + index + "_description") ? "border-red-300 bg-red-50" : item.description.trim() ? "border-emerald-200" : "border-slate-200"
                           )}
                         />
@@ -1662,7 +1658,7 @@ export default function NewPOPage() {
                           <button
                             onClick={() => { setCurrentItemIndex(index); setShowAccountModal(true); }}
                             className={cx(
-                              "w-full px-4 py-3 border rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white",
+                              "w-full px-4 py-2 border rounded-md text-[13px] text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white",
                               hasError("item_" + index + "_account") ? "border-red-300 bg-red-50" : item.subAccountCode ? "border-emerald-200 bg-emerald-50" : "border-slate-200"
                             )}
                           >
@@ -1684,7 +1680,7 @@ export default function NewPOPage() {
                             <button
                               onClick={() => openEpisodeModal(index)}
                               className={cx(
-                                "w-full px-4 py-3 border rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white",
+                                "w-full px-4 py-2 border rounded-md text-[13px] text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white",
                                 item.episodeAssignment === "general" ? "border-slate-200" : "border-violet-200 bg-violet-50"
                               )}
                             >
@@ -1725,7 +1721,7 @@ export default function NewPOPage() {
                               type="date"
                               value={item.date}
                               onChange={(e) => updateItem(index, "date", e.target.value)}
-                              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white"
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] bg-white"
                             />
                           </div>
                           <div>
@@ -1735,7 +1731,7 @@ export default function NewPOPage() {
                               min="1"
                               value={item.quantity}
                               onChange={(e) => updateItem(index, "quantity", parseFloat(e.target.value) || 0)}
-                              className={cx("w-full px-3 py-2.5 border rounded-xl text-sm bg-white", item.quantity > 0 ? "border-emerald-200" : "border-slate-200")}
+                              className={cx("w-full px-2.5 py-1.5 border rounded-md text-[13px] bg-white", item.quantity > 0 ? "border-emerald-200" : "border-slate-200")}
                             />
                           </div>
                           <div>
@@ -1747,14 +1743,14 @@ export default function NewPOPage() {
                                 step="0.01"
                                 value={item.unitPrice}
                                 onChange={(e) => updateItem(index, "unitPrice", parseFloat(e.target.value) || 0)}
-                                className={cx("w-full pl-6 pr-3 py-2.5 border rounded-xl text-sm bg-white", item.unitPrice > 0 ? "border-emerald-200" : "border-slate-200")}
+                                className={cx("w-full pl-6 pr-3 py-1.5 border rounded-md text-[13px] bg-white", item.unitPrice > 0 ? "border-emerald-200" : "border-slate-200")}
                               />
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">{getCurrencySymbol()}</span>
                             </div>
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">Base</label>
-                            <div className="px-3 py-2.5 bg-slate-100 rounded-xl text-sm font-medium text-slate-900">
+                            <div className="px-3 py-2.5 bg-slate-100 rounded-md text-[13px] font-medium text-slate-900">
                               {formatCurrency(item.baseAmount)} {getCurrencySymbol()}
                             </div>
                           </div>
@@ -1766,19 +1762,19 @@ export default function NewPOPage() {
                             <button
                               type="button"
                               onClick={() => setShowVatDropdown(showVatDropdown === index ? null : index)}
-                              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white text-left flex items-center justify-between hover:border-slate-300 transition-colors"
+                              className="w-full px-3 py-1.5 border border-slate-200 rounded-md text-[13px] bg-white text-left flex items-center justify-between hover:border-slate-300 transition-colors"
                             >
                               <span>{VAT_RATES.find(r => r.value === item.vatRate)?.label || item.vatRate + "%"}</span>
                               <ChevronDown size={14} className={cx("text-slate-400 transition-transform", showVatDropdown === index && "rotate-180")} />
                             </button>
                             {showVatDropdown === index && (
-                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 max-h-48 overflow-y-auto">
+                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-50 py-1 max-h-48 overflow-y-auto">
                                 {VAT_RATES.map((rate) => (
                                   <button
                                     key={rate.value}
                                     type="button"
                                     onClick={() => { updateItem(index, "vatRate", rate.value); setShowVatDropdown(null); }}
-                                    className={cx("w-full px-3 py-2 text-left text-sm hover:bg-slate-50", item.vatRate === rate.value && "bg-slate-50 font-medium")}
+                                    className={cx("w-full px-3 py-2 text-left text-[13px] hover:bg-slate-50", item.vatRate === rate.value && "bg-slate-50 font-medium")}
                                   >
                                     {rate.label}
                                   </button>
@@ -1791,19 +1787,19 @@ export default function NewPOPage() {
                             <button
                               type="button"
                               onClick={() => setShowIrpfDropdown(showIrpfDropdown === index ? null : index)}
-                              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white text-left flex items-center justify-between hover:border-slate-300 transition-colors"
+                              className="w-full px-3 py-1.5 border border-slate-200 rounded-md text-[13px] bg-white text-left flex items-center justify-between hover:border-slate-300 transition-colors"
                             >
                               <span>{IRPF_RATES.find(r => r.value === item.irpfRate)?.label || item.irpfRate + "%"}</span>
                               <ChevronDown size={14} className={cx("text-slate-400 transition-transform", showIrpfDropdown === index && "rotate-180")} />
                             </button>
                             {showIrpfDropdown === index && (
-                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 max-h-48 overflow-y-auto">
+                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-50 py-1 max-h-48 overflow-y-auto">
                                 {IRPF_RATES.map((rate) => (
                                   <button
                                     key={rate.value}
                                     type="button"
                                     onClick={() => { updateItem(index, "irpfRate", rate.value); setShowIrpfDropdown(null); }}
-                                    className={cx("w-full px-3 py-2 text-left text-sm hover:bg-slate-50", item.irpfRate === rate.value && "bg-slate-50 font-medium")}
+                                    className={cx("w-full px-3 py-2 text-left text-[13px] hover:bg-slate-50", item.irpfRate === rate.value && "bg-slate-50 font-medium")}
                                   >
                                     {rate.label}
                                   </button>
@@ -1813,20 +1809,20 @@ export default function NewPOPage() {
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">+IVA</label>
-                            <div className="px-3 py-2.5 bg-emerald-50 rounded-xl text-sm font-medium text-emerald-700">
+                            <div className="px-3 py-2.5 bg-emerald-50 rounded-md text-[13px] font-medium text-emerald-700">
                               +{formatCurrency(item.vatAmount)}
                             </div>
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">-IRPF</label>
-                            <div className="px-3 py-2.5 bg-red-50 rounded-xl text-sm font-medium text-red-700">
+                            <div className="px-3 py-2.5 bg-red-50 rounded-md text-[13px] font-medium text-red-700">
                               -{formatCurrency(item.irpfAmount)}
                             </div>
                           </div>
                         </div>
 
                         <div className="flex justify-end">
-                          <div className="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm">
+                          <div className="bg-slate-900 text-white px-4 py-2 rounded-md text-[13px]">
                             <span className="text-slate-400">Total:</span>
                             <span className="ml-2 font-semibold">{formatCurrency(item.totalAmount)} {getCurrencySymbol()}</span>
                           </div>
@@ -1839,8 +1835,8 @@ export default function NewPOPage() {
             </div>
 
             {/* File Upload */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-100">
                 <h2 className="font-semibold text-slate-900">Adjuntar presupuesto</h2>
                 <p className="text-xs text-slate-500 mt-0.5">Opcional - PDF, JPG o PNG hasta 10MB</p>
               </div>
@@ -1851,19 +1847,19 @@ export default function NewPOPage() {
                   onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                   onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
                   className={cx(
-                    "border-2 border-dashed rounded-xl p-8 text-center transition-all",
+                    "border-2 border-dashed rounded-md p-8 text-center transition-all",
                     isDragging ? "border-blue-400 bg-blue-50" : uploadedFile ? "border-emerald-300 bg-emerald-50" : "border-slate-200 hover:border-slate-300"
                   )}
                   style={isDragging ? { borderColor: "#2F52E0", backgroundColor: "rgba(47, 82, 224, 0.05)" } : {}}
                 >
                   {uploadedFile ? (
-                    <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between bg-white border border-slate-200 rounded-md p-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
                           <FileUp size={18} className="text-emerald-600" />
                         </div>
                         <div className="text-left">
-                          <span className="text-sm font-medium text-slate-900 block">{uploadedFile.name}</span>
+                          <span className="text-[13px] font-medium text-slate-900 block">{uploadedFile.name}</span>
                           <span className="text-xs text-slate-500">{(uploadedFile.size / 1024).toFixed(0)} KB</span>
                         </div>
                       </div>
@@ -1873,10 +1869,10 @@ export default function NewPOPage() {
                     </div>
                   ) : (
                     <label className="cursor-pointer block">
-                      <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                      <div className="hidden">
                         <Upload size={20} className="text-slate-400" />
                       </div>
-                      <p className="text-sm font-medium text-slate-700">Arrastra o haz clic para subir</p>
+                      <p className="text-[13px] font-medium text-slate-700">Arrastra o haz clic para subir</p>
                       <p className="text-xs text-slate-400 mt-1">PDF, JPG, PNG (máx. 10MB)</p>
                       <input
                         type="file"
@@ -1891,31 +1887,31 @@ export default function NewPOPage() {
             </div>
 
             {/* Additional Info */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-100">
                 <h2 className="font-semibold text-slate-900">Información adicional</h2>
               </div>
 
               <div className="p-6 space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Condiciones de pago</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Condiciones de pago</label>
                   <input
                     type="text"
                     value={formData.paymentTerms}
                     onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
                     placeholder="Condiciones de pago"
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Notas internas</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Notas internas</label>
                   <textarea
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     placeholder="Notas adicionales"
                     rows={2}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white resize-none text-[13px]"
                   />
                 </div>
               </div>
@@ -1926,10 +1922,10 @@ export default function NewPOPage() {
           <div className="col-span-1">
             <div className="space-y-4">
               {/* Progress */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5">
+              <div className="bg-white border border-slate-200 rounded-lg p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-slate-700">Progreso</span>
-                  <span className={cx("text-sm font-bold", completionPercentage === 100 ? "text-emerald-600" : "text-slate-900")}>
+                  <span className="text-[13px] font-medium text-slate-700">Progreso</span>
+                  <span className={cx("text-[13px] font-bold", completionPercentage === 100 ? "text-emerald-600" : "text-slate-900")}>
                     {completionPercentage}%
                   </span>
                 </div>
@@ -1960,23 +1956,23 @@ export default function NewPOPage() {
               </div>
 
               {/* Totals */}
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100">
+              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                <div className="px-5 py-3 border-b border-slate-100">
                   <h2 className="font-semibold text-slate-900">Total de la orden</h2>
                 </div>
 
                 <div className="p-6">
                   <div className="space-y-3 mb-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-500">Base imponible</span>
+                      <span className="text-[13px] text-slate-500">Base imponible</span>
                       <span className="font-medium text-slate-900">{formatCurrency(totals.baseAmount)} {getCurrencySymbol()}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-500">IVA</span>
+                      <span className="text-[13px] text-slate-500">IVA</span>
                       <span className="font-medium text-emerald-600">+{formatCurrency(totals.vatAmount)} {getCurrencySymbol()}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-500">IRPF</span>
+                      <span className="text-[13px] text-slate-500">IRPF</span>
                       <span className="font-medium text-red-600">-{formatCurrency(totals.irpfAmount)} {getCurrencySymbol()}</span>
                     </div>
                   </div>
@@ -1991,15 +1987,15 @@ export default function NewPOPage() {
               </div>
 
               {/* Approval Preview */}
-              <div className={cx("border rounded-2xl overflow-hidden", approvalPreview.autoApprove ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200")}>
+              <div className={cx("border rounded-lg overflow-hidden", approvalPreview.autoApprove ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200")}>
                 <div className="px-5 py-4 border-b" style={{ borderColor: approvalPreview.autoApprove ? "#a7f3d0" : "#fcd34d" }}>
                   <div className="flex items-center gap-3">
                     {approvalPreview.autoApprove ? (
-                      <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center">
                         <CheckCircle size={20} className="text-emerald-600" />
                       </div>
                     ) : (
-                      <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-amber-100 rounded-md flex items-center justify-center">
                         <Clock size={20} className="text-amber-600" />
                       </div>
                     )}
@@ -2007,7 +2003,7 @@ export default function NewPOPage() {
                       <p className={cx("font-semibold", approvalPreview.autoApprove ? "text-emerald-800" : "text-amber-800")}>
                         {approvalPreview.autoApprove ? "Aprobación automática" : "Requiere aprobación"}
                       </p>
-                      <p className={cx("text-sm", approvalPreview.autoApprove ? "text-emerald-700" : "text-amber-700")}>
+                      <p className={cx("text-[13px]", approvalPreview.autoApprove ? "text-emerald-700" : "text-amber-700")}>
                         {approvalPreview.message}
                       </p>
                     </div>
@@ -2028,7 +2024,7 @@ export default function NewPOPage() {
                             )}
                           </div>
                           <div className="flex-1 pt-0.5">
-                            <p className="text-sm font-medium text-amber-900">
+                            <p className="text-[13px] font-medium text-amber-900">
                               {step.approverType === "role" && step.roles
                                 ? step.roles.join(", ")
                                 : step.approverType === "hod"
@@ -2062,12 +2058,12 @@ export default function NewPOPage() {
               </div>
 
               {/* Info */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-5">
                 <div className="flex gap-3">
                   <div className="w-8 h-8 bg-slate-200 rounded-lg flex items-center justify-center flex-shrink-0">
                     <Info size={14} className="text-slate-500" />
                   </div>
-                  <div className="text-sm text-slate-600">
+                  <div className="text-[13px] text-slate-600">
                     <p className="font-medium text-slate-700 mb-2">Proceso de la PO</p>
                     <ul className="space-y-1.5 text-slate-500">
                       <li className="flex items-start gap-2">
@@ -2094,13 +2090,13 @@ export default function NewPOPage() {
       {/* Supplier Modal */}
       {showSupplierModal && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4"
+          className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowSupplierModal(false); setSupplierSearch(""); } }}
         >
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden border border-slate-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Seleccionar proveedor</h2>
-              <button onClick={() => { setShowSupplierModal(false); setSupplierSearch(""); }} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden border border-slate-200">
+            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-[14px] font-semibold text-slate-900">Seleccionar proveedor</h2>
+              <button onClick={() => { setShowSupplierModal(false); setSupplierSearch(""); }} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors">
                 <X size={20} />
               </button>
             </div>
@@ -2114,13 +2110,13 @@ export default function NewPOPage() {
                     value={supplierSearch}
                     onChange={(e) => setSupplierSearch(e.target.value)}
                     placeholder="Buscar por nombre o NIF"
-                    className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm"
+                    className="w-full pl-11 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]"
                     autoFocus
                   />
                 </div>
                 <button
                   onClick={() => setShowCreateSupplierModal(true)}
-                  className="px-4 py-3 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-colors flex items-center gap-2 text-sm font-medium"
+                  className="px-4 py-2 rounded-md transition-colors flex items-center gap-2 text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
                 >
                   <Plus size={16} />
                   Nuevo
@@ -2130,13 +2126,13 @@ export default function NewPOPage() {
               <div className="max-h-80 overflow-y-auto space-y-2">
                 {filteredSuppliers.length === 0 ? (
                   <div className="text-center py-12">
-                    <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                    <div className="hidden">
                       <Building2 size={20} className="text-slate-400" />
                     </div>
-                    <p className="text-sm text-slate-500 mb-3">No se encontraron proveedores</p>
+                    <p className="text-[13px] text-slate-500 mb-3">No se encontraron proveedores</p>
                     <button
                       onClick={() => setShowCreateSupplierModal(true)}
-                      className="text-sm text-slate-900 font-medium hover:underline"
+                      className="text-[13px] text-slate-900 font-medium hover:underline"
                     >
                       Crear nuevo proveedor
                     </button>
@@ -2146,12 +2142,12 @@ export default function NewPOPage() {
                     <button
                       key={supplier.id}
                       onClick={() => selectSupplier(supplier)}
-                      className="w-full text-left p-4 border border-slate-200 rounded-xl hover:border-slate-300 hover:bg-slate-50 transition-all group"
+                      className="w-full text-left p-4 border border-slate-200 rounded-md hover:border-slate-300 hover:bg-slate-50 transition-all group"
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <p className="font-medium text-slate-900">{supplier.fiscalName}</p>
-                          {supplier.commercialName && (<p className="text-sm text-slate-500">{supplier.commercialName}</p>)}
+                          {supplier.commercialName && (<p className="text-[13px] text-slate-500">{supplier.commercialName}</p>)}
                           <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500">
                             <span className="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded">
                               <Hash size={10} />
@@ -2192,58 +2188,58 @@ export default function NewPOPage() {
       {/* Create Supplier Modal */}
       {showCreateSupplierModal && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[80] p-4"
+          className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[80] p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowCreateSupplierModal(false); setNewSupplierData({ fiscalName: "", taxId: "" }); } }}
         >
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-slate-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full border border-slate-200">
+            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+                <div className="hidden">
                   <Building2 size={20} className="text-slate-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Nuevo proveedor</h2>
+                  <h2 className="text-[14px] font-semibold text-slate-900">Nuevo proveedor</h2>
                   <p className="text-xs text-slate-500">Datos básicos · Completa el resto en Proveedores</p>
                 </div>
               </div>
-              <button onClick={() => { setShowCreateSupplierModal(false); setNewSupplierData({ fiscalName: "", taxId: "" }); }} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
+              <button onClick={() => { setShowCreateSupplierModal(false); setNewSupplierData({ fiscalName: "", taxId: "" }); }} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors">
                 <X size={20} />
               </button>
             </div>
 
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Nombre fiscal *</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre fiscal *</label>
                 <input
                   type="text"
                   value={newSupplierData.fiscalName}
                   onChange={(e) => setNewSupplierData({ ...newSupplierData, fiscalName: e.target.value })}
                   placeholder="Nombre o razón social"
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm"
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]"
                   autoFocus
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">NIF/CIF *</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">NIF/CIF *</label>
                 <input
                   type="text"
                   value={newSupplierData.taxId}
                   onChange={(e) => setNewSupplierData({ ...newSupplierData, taxId: e.target.value })}
                   placeholder="B12345678"
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm"
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]"
                 />
               </div>
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => { setShowCreateSupplierModal(false); setNewSupplierData({ fiscalName: "", taxId: "" }); }}
-                  className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"
+                  className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={createQuickSupplier}
                   disabled={creatingSupplier || !newSupplierData.fiscalName.trim() || !newSupplierData.taxId.trim()}
-                  className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium disabled:opacity-50"
+                  className="flex-1 px-4 py-1.5 rounded-md text-[13px] font-medium disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
                 >
                   {creatingSupplier ? "Creando..." : "Crear y seleccionar"}
                 </button>
@@ -2256,13 +2252,13 @@ export default function NewPOPage() {
       {/* Account Modal */}
       {showAccountModal && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4"
+          className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowAccountModal(false); setAccountSearch(""); setCurrentItemIndex(null); } }}
         >
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden border border-slate-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Seleccionar cuenta presupuestaria</h2>
-              <button onClick={() => { setShowAccountModal(false); setAccountSearch(""); setCurrentItemIndex(null); }} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden border border-slate-200">
+            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-[14px] font-semibold text-slate-900">Seleccionar cuenta presupuestaria</h2>
+              <button onClick={() => { setShowAccountModal(false); setAccountSearch(""); setCurrentItemIndex(null); }} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors">
                 <X size={20} />
               </button>
             </div>
@@ -2275,7 +2271,7 @@ export default function NewPOPage() {
                   value={accountSearch}
                   onChange={(e) => setAccountSearch(e.target.value)}
                   placeholder="Buscar por código o descripción"
-                  className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm"
+                  className="w-full pl-11 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]"
                   autoFocus
                 />
               </div>
@@ -2283,20 +2279,20 @@ export default function NewPOPage() {
               <div className="max-h-80 overflow-y-auto space-y-2 pr-2">
                 {filteredSubAccounts.length === 0 ? (
                   <div className="text-center py-12">
-                    <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                    <div className="hidden">
                       <Hash size={20} className="text-slate-400" />
                     </div>
-                    <p className="text-sm text-slate-500">No se encontraron cuentas</p>
+                    <p className="text-[13px] text-slate-500">No se encontraron cuentas</p>
                   </div>
                 ) : (
                   filteredSubAccounts.map((subAccount) => (
                     <button
                       key={subAccount.id}
                       onClick={() => selectAccount(subAccount)}
-                      className="w-full text-left p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all"
+                      className="w-full text-left p-4 border border-slate-200 rounded-md hover:bg-slate-50 transition-all"
                     >
                       <p className="font-mono font-semibold text-slate-900">{subAccount.code}</p>
-                      <p className="text-sm text-slate-700">{subAccount.description}</p>
+                      <p className="text-[13px] text-slate-700">{subAccount.description}</p>
                       <p className="text-xs text-slate-500 mt-1">{subAccount.accountCode} · {subAccount.accountDescription}</p>
                     </button>
                   ))
@@ -2310,13 +2306,13 @@ export default function NewPOPage() {
       {/* Modal de asignación de capítulos */}
       {showEpisodeModal && episodeItemIndex !== null && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) setShowEpisodeModal(false); }}
         >
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden">
+            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-violet-100 rounded-md flex items-center justify-center">
                   <Layers size={20} className="text-violet-600" />
                 </div>
                 <div>
@@ -2334,7 +2330,7 @@ export default function NewPOPage() {
               <button
                 onClick={() => setTempEpisodeDistribution([])}
                 className={cx(
-                  "w-full px-4 py-4 rounded-xl text-sm font-medium transition-colors flex items-center gap-3 border-2",
+                  "w-full px-4 py-4 rounded-md text-[13px] font-medium transition-colors flex items-center gap-3 border-2",
                   tempEpisodeDistribution.length === 0
                     ? "bg-violet-50 border-violet-500 text-violet-700" 
                     : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
@@ -2362,7 +2358,7 @@ export default function NewPOPage() {
                   }
                 }}
                 className={cx(
-                  "w-full px-4 py-4 rounded-xl text-sm font-medium transition-colors flex items-center gap-3 border-2",
+                  "w-full px-4 py-4 rounded-md text-[13px] font-medium transition-colors flex items-center gap-3 border-2",
                   tempEpisodeDistribution.length > 0
                     ? "bg-violet-50 border-violet-500 text-violet-700" 
                     : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
@@ -2428,7 +2424,7 @@ export default function NewPOPage() {
                             key={epNum}
                             onClick={() => toggleEpisodeInDistribution(epNum)}
                             className={cx(
-                              "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                              "px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors",
                               isSelected ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                             )}
                           >
@@ -2446,14 +2442,14 @@ export default function NewPOPage() {
                       <div className="space-y-2">
                         {tempEpisodeDistribution.map((ep) => (
                           <div key={ep.episode} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                            <span className="text-sm font-medium text-slate-700 w-16">Cap {ep.episode}</span>
+                            <span className="text-[13px] font-medium text-slate-700 w-16">Cap {ep.episode}</span>
                             {episodeDistributionMode === "amount" ? (
                               <div className="flex-1 relative">
                                 <input
                                   type="number"
                                   value={ep.amount || ""}
                                   onChange={(e) => updateEpisodeAmount(ep.episode, parseFloat(e.target.value) || 0)}
-                                  className="w-full pl-6 pr-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                  className="w-full pl-6 pr-3 py-1.5 border border-slate-200 rounded-lg text-[13px]"
                                   placeholder="0.00"
                                 />
                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">€</span>
@@ -2464,7 +2460,7 @@ export default function NewPOPage() {
                                   type="number"
                                   value={ep.percentage || ""}
                                   onChange={(e) => updateEpisodePercentage(ep.episode, parseFloat(e.target.value) || 0)}
-                                  className="w-full pr-8 pl-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                  className="w-full pr-8 pl-3 py-1.5 border border-slate-200 rounded-lg text-[13px]"
                                   placeholder="0"
                                   min="0"
                                   max="100"
@@ -2490,10 +2486,10 @@ export default function NewPOPage() {
                       "p-3 rounded-lg flex items-center justify-between",
                       Math.abs(getTotalDistributedPercentage() - 100) < 0.1 ? "bg-emerald-50" : "bg-amber-50"
                     )}>
-                      <span className="text-sm font-medium text-slate-700">Total:</span>
+                      <span className="text-[13px] font-medium text-slate-700">Total:</span>
                       <div className="text-right">
                         <p className={cx(
-                          "text-sm font-semibold",
+                          "text-[13px] font-semibold",
                           Math.abs(getTotalDistributedPercentage() - 100) < 0.1 ? "text-emerald-700" : "text-amber-700"
                         )}>
                           {formatCurrency(getTotalDistributedAmount())} € ({getTotalDistributedPercentage().toFixed(1)}%)
@@ -2511,14 +2507,14 @@ export default function NewPOPage() {
             <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3">
               <button
                 onClick={() => setShowEpisodeModal(false)}
-                className="flex-1 py-2.5 text-slate-600 hover:bg-slate-200 rounded-xl text-sm font-medium transition-colors"
+                className="flex-1 py-1.5 text-slate-600 hover:bg-slate-200 rounded-md text-[13px] font-medium transition-colors"
               >
                 Cancelar
               </button>
               <button
                 onClick={saveEpisodeDistribution}
                 disabled={tempEpisodeDistribution.length > 0 && Math.abs(getTotalDistributedPercentage() - 100) >= 0.1}
-                className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+                className="flex-1 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-md text-[13px] font-medium transition-colors disabled:opacity-50"
               >
                 Guardar
               </button>
@@ -2529,13 +2525,13 @@ export default function NewPOPage() {
 
       {/* Toast notifications */}
       {successMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
+        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
           <CheckCircle size={16} />
           {successMessage}
         </div>
       )}
       {errorMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
+        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
           <AlertCircle size={16} />
           {errorMessage}
           <button onClick={() => setErrorMessage("")} className="ml-2 hover:bg-white/20 rounded p-0.5">

@@ -2050,14 +2050,13 @@ export default function BoxesPage() {
   if (!hasAccess || accessError) return (
     <div className={"min-h-screen bg-white flex items-center justify-center " + inter.className}>
       <div className="text-center max-w-md">
-        <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <div className="hidden">
           <ShieldAlert size={28} className="text-red-500" />
         </div>
-        <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
-        <p className="text-slate-500 mb-6 text-sm">{accessError || "No tienes permisos para acceder a este módulo"}</p>
+        <h2 className="text-[14px] font-semibold text-slate-900 mb-2">Acceso denegado</h2>
+        <p className="text-slate-500 mb-6 text-[13px]">{accessError || "No tienes permisos para acceder a este módulo"}</p>
         <Link href={`/project/${projectId}/accounting`}
-          className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90"
-          style={{ backgroundColor: "#2F52E0" }}>
+          className="inline-flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium">
           <ArrowLeft size={16} /> Volver a contabilidad
         </Link>
       </div>
@@ -2071,7 +2070,7 @@ export default function BoxesPage() {
     <div className={"min-h-screen bg-white " + inter.className}>
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
+        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
           {toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
           {toast.message}
         </div>
@@ -2079,16 +2078,14 @@ export default function BoxesPage() {
 
       {/* Header */}
       <div className="mt-[53px]">
-        <div className="px-24 py-6">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-6">
+        <div className="px-6 pt-8 sm:px-10">
+          <div className="flex min-h-[44px] items-center justify-between border-b border-slate-200 pb-4">
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-bold bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">BOX</span>
-              </div>
-              <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl ml-6">
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Cajas</h1>
+              <div className="ml-4 flex items-center gap-1">
                 <button
                   onClick={() => { setMainTab("tarjetas"); setSelectedBox(null); setSelectedEnvelope(null); setSelectedTransferEnvelope(null); setSearchTerm(""); }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${mainTab === "tarjetas" ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"}`}>
+                  className={`flex items-center gap-2 px-2.5 py-1 rounded-md text-[13px] transition-colors ${mainTab === "tarjetas" ? "font-medium text-slate-900 bg-[#F1F1F3]" : "text-slate-500 hover:text-slate-700"}`}>
                   <CreditCard size={15} /> Tarjetas
                   {openEnvelopes > 0 && (
                     <span className="bg-amber-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{openEnvelopes}</span>
@@ -2096,7 +2093,7 @@ export default function BoxesPage() {
                 </button>
                 <button
                   onClick={() => { setMainTab("transfers"); setSelectedBox(null); setSelectedEnvelope(null); setSelectedTransferEnvelope(null); setSearchTerm(""); }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${mainTab === "transfers" ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"}`}>
+                  className={`flex items-center gap-2 px-2.5 py-1 rounded-md text-[13px] transition-colors ${mainTab === "transfers" ? "font-medium text-slate-900 bg-[#F1F1F3]" : "text-slate-500 hover:text-slate-700"}`}>
                   <Banknote size={15} /> Petty Cash
                   {pendingFormSubmissions > 0 && (
                     <span className="bg-amber-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{pendingFormSubmissions}</span>
@@ -2105,33 +2102,17 @@ export default function BoxesPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-4 text-xs text-slate-500">
-                {mainTab === "tarjetas" ? (
-                  <>
-                    <span><strong className="text-slate-900">{boxes.length}</strong> cajas</span>
-                    <span><strong className="text-amber-600">{openEnvelopes}</strong> sobres abiertos</span>
-                    <span><strong className="text-slate-900">{fmt(totalTarjetasAmount)} €</strong></span>
-                  </>
-                ) : (
-                  <>
-                    <span><strong className="text-slate-900">{transferEnvelopes.length}</strong> sobres</span>
-                    {pendingFormSubmissions > 0 && <span><strong className="text-amber-600">{pendingFormSubmissions}</strong> solicitudes</span>}
-                    <span><strong className="text-slate-900">{fmt(totalTransferAmount)} €</strong></span>
-                  </>
-                )}
-              </div>
               <button
                 onClick={() => setShowExportConfigModal(true)}
                 title="Configurar exportación a servicio de tarjetas"
-                className="p-2 border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-50 hover:text-slate-700 transition-colors">
+                className="p-1.5 text-slate-400 rounded-md hover:bg-[#F4F4F5] hover:text-slate-900 transition-colors">
                 <Settings size={16} />
               </button>
               <button
                 onClick={() => mainTab === "tarjetas"
                   ? (setBoxForm({ name: "", code: "", department: "" }), setShowCreateBoxModal(true))
                   : (setTransferEnvelopeForm(emptyTransferEnvelopeForm), setShowCreateTransferEnvelopeModal(true))}
-                className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90 shadow-lg shadow-orange-500/20"
-                style={{ background: "linear-gradient(135deg, #f59e0b, #f97316)" }}>
+                className="flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium">
                 <Plus size={16} /> {mainTab === "tarjetas" ? "Nueva tarjeta" : "Nuevo sobre"}
               </button>
             </div>
@@ -2140,7 +2121,7 @@ export default function BoxesPage() {
       </div>
 
       {/* Main Content */}
-      <div className="px-24 pb-8">
+      <div className="px-6 sm:px-10 pb-8">
         <div className="flex gap-6">
 
           {/* ── Left Panel ──────────────────────────────────────────────────────── */}
@@ -2154,7 +2135,7 @@ export default function BoxesPage() {
                     placeholder={mainTab === "tarjetas" ? "Buscar tarjeta" : "Buscar sobre"}
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
                   />
                 </div>
               </div>
@@ -2166,15 +2147,15 @@ export default function BoxesPage() {
                     const isSelected = selectedBox?.id === box.id;
                     return (
                       <button key={box.id} onClick={() => { setSelectedBox(box); setSelectedEnvelope(null); }}
-                        className={`w-full text-left p-3 rounded-xl transition-all ${isSelected ? "bg-slate-900 text-white" : "hover:bg-slate-50"}`}>
+                        className={`w-full text-left p-3 rounded-md transition-all ${isSelected ? "bg-[#F1F1F3] text-slate-900" : "hover:bg-slate-50"}`}>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSelected ? "bg-white/20" : "bg-slate-100"}`}>
-                              <CreditCard size={16} className={isSelected ? "text-white" : "text-slate-500"} />
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSelected ? "bg-white" : "bg-slate-100"}`}>
+                              <CreditCard size={16} className={isSelected ? "text-slate-900" : "text-slate-500"} />
                             </div>
                             <div>
-                              <p className={`text-sm font-medium ${isSelected ? "text-white" : "text-slate-900"}`}>{box.name}</p>
-                              <p className={`text-xs ${isSelected ? "text-white/70" : "text-slate-500"}`}>
+                              <p className={`text-[13px] font-medium ${isSelected ? "text-slate-900" : "text-slate-900"}`}>{box.name}</p>
+                              <p className={`text-xs ${isSelected ? "text-slate-500" : "text-slate-500"}`}>
                                 {box.code}{box.department ? ` · ${box.department}` : ""}
                               </p>
                             </div>
@@ -2189,7 +2170,7 @@ export default function BoxesPage() {
                     );
                   })}
                   {filteredBoxes.length === 0 && (
-                    <p className="text-center py-8 text-slate-400 text-sm">{searchTerm ? "Sin resultados" : "No hay tarjetas"}</p>
+                    <p className="text-center py-8 text-slate-400 text-[13px]">{searchTerm ? "Sin resultados" : "No hay tarjetas"}</p>
                   )}
                 </div>
               ) : (
@@ -2203,9 +2184,9 @@ export default function BoxesPage() {
                     </p>
                     <div className="space-y-1">
                       {formSubmissions.filter((fs) => !fs.importedToEnvelopeId).map((fs) => (
-                        <div key={fs.id} className="p-3 rounded-xl border border-amber-100 bg-amber-50 text-left">
+                        <div key={fs.id} className="p-3 rounded-md border border-amber-100 bg-amber-50 text-left">
                           <div className="flex items-start justify-between gap-1 mb-1">
-                            <p className="text-sm font-medium text-slate-900 leading-tight">{fs.requesterName}</p>
+                            <p className="text-[13px] font-medium text-slate-900 leading-tight">{fs.requesterName}</p>
                             <span className="text-xs text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full flex-shrink-0">Pendiente</span>
                           </div>
                           <p className="text-xs text-slate-500">
@@ -2258,9 +2239,9 @@ export default function BoxesPage() {
                     {showVolcadas && (
                       <div className="space-y-1">
                         {formSubmissions.filter((fs) => fs.importedToEnvelopeId).map((fs) => (
-                          <div key={fs.id} className="p-3 rounded-xl border border-emerald-100 bg-emerald-50/50 text-left">
+                          <div key={fs.id} className="p-3 rounded-md border border-emerald-100 bg-emerald-50/50 text-left">
                             <div className="flex items-start justify-between gap-1 mb-1">
-                              <p className="text-sm font-medium text-slate-900 leading-tight">{fs.requesterName}</p>
+                              <p className="text-[13px] font-medium text-slate-900 leading-tight">{fs.requesterName}</p>
                               <span className="text-xs text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full flex-shrink-0">Volcado</span>
                             </div>
                             <p className="text-xs text-slate-500">
@@ -2280,19 +2261,19 @@ export default function BoxesPage() {
                     const isSelected = selectedTransferEnvelope?.id === envelope.id;
                     return (
                       <button key={envelope.id} onClick={() => setSelectedTransferEnvelope(envelope)}
-                        className={`w-full text-left p-3 rounded-xl transition-all ${isSelected ? "bg-slate-900 text-white" : "hover:bg-slate-50"}`}>
+                        className={`w-full text-left p-3 rounded-md transition-all ${isSelected ? "bg-[#F1F1F3] text-slate-900" : "hover:bg-slate-50"}`}>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSelected ? "bg-white/20" : envelope.status === "settled" ? "bg-emerald-50" : "bg-slate-100"}`}>
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSelected ? "bg-white" : envelope.status === "settled" ? "bg-emerald-50" : "bg-slate-100"}`}>
                               {envelope.status === "settled" ? (
-                                <Lock size={16} className={isSelected ? "text-white" : "text-emerald-500"} />
+                                <Lock size={16} className={isSelected ? "text-slate-900" : "text-emerald-500"} />
                               ) : (
-                                <Calendar size={16} className={isSelected ? "text-white" : "text-slate-400"} />
+                                <Calendar size={16} className={isSelected ? "text-slate-900" : "text-slate-400"} />
                               )}
                             </div>
                             <div>
-                              <p className={`text-sm font-medium ${isSelected ? "text-white" : "text-slate-900"}`}>{envelope.displayNumber}</p>
-                              <p className={`text-xs ${isSelected ? "text-white/70" : "text-slate-500"}`}>{envelope.personName || envelope.paymentDate}</p>
+                              <p className={`text-[13px] font-medium ${isSelected ? "text-slate-900" : "text-slate-900"}`}>{envelope.displayNumber}</p>
+                              <p className={`text-xs ${isSelected ? "text-slate-500" : "text-slate-500"}`}>{envelope.personName || envelope.paymentDate}</p>
                             </div>
                           </div>
                           <span className={`text-xs px-1.5 py-0.5 rounded-full ${isSelected ? "bg-white/20 text-white" : `${sc.bg} ${sc.text}`}`}>
@@ -2303,7 +2284,7 @@ export default function BoxesPage() {
                     );
                   })}
                   {filteredTransferEnvelopes.length === 0 && (
-                    <p className="text-center py-8 text-slate-400 text-sm">{searchTerm ? "Sin resultados" : "No hay sobres"}</p>
+                    <p className="text-center py-8 text-slate-400 text-[13px]">{searchTerm ? "Sin resultados" : "No hay sobres"}</p>
                   )}
                 </div>
                 </>
@@ -2317,38 +2298,38 @@ export default function BoxesPage() {
             {mainTab === "tarjetas" ? (
               !selectedBox ? (
                 <div className="flex items-center justify-center h-96">
-                  <p className="text-sm text-slate-400">{boxes.length === 0 ? "No hay cajas creadas" : "Selecciona una caja"}</p>
+                  <p className="text-[13px] text-slate-400">{boxes.length === 0 ? "No hay cajas creadas" : "Selecciona una caja"}</p>
                 </div>
               ) : !selectedEnvelope ? (
                 <div>
                   <div className="flex items-center justify-between mb-5">
                     <div>
                       <h2 className="text-xl font-semibold text-slate-900">{selectedBox.name}</h2>
-                      <p className="text-sm text-slate-500">Código: {selectedBox.code}{selectedBox.department ? ` · ${selectedBox.department}` : ""}</p>
+                      <p className="text-[13px] text-slate-500">Código: {selectedBox.code}{selectedBox.department ? ` · ${selectedBox.department}` : ""}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => { setEditBoxForm({ name: selectedBox.name, code: selectedBox.code }); setShowEditBoxModal(true); }}
-                        className="flex items-center gap-2 px-3 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50">
+                        className="flex items-center gap-2 px-3 py-2 border border-slate-200 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-50">
                         <Edit size={14} /> Editar
                       </button>
                       {canDeleteBox(selectedBox) && (
                         <button onClick={() => setShowDeleteBoxModal(true)}
-                          className="flex items-center gap-2 px-3 py-2 border border-red-100 text-red-500 rounded-xl text-sm font-medium hover:bg-red-50">
+                          className="flex items-center gap-2 px-3 py-2 border border-red-100 text-red-500 rounded-md text-[13px] font-medium hover:bg-red-50">
                           <Trash2 size={14} /> Eliminar
                         </button>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center justify-between mb-4">
-                    <p className="text-sm text-slate-500">{cardEnvelopes.length} sobres</p>
+                    <p className="text-[13px] text-slate-500">{cardEnvelopes.length} sobres</p>
                     <button onClick={() => setShowCreateEnvelopeModal(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800">
+                      className="flex items-center gap-2 px-4 py-2 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                       <Plus size={16} /> Nuevo sobre
                     </button>
                   </div>
                   {cardEnvelopes.length === 0 ? (
-                    <p className="text-center py-16 text-sm text-slate-400">No hay sobres en esta caja</p>
+                    <p className="text-center py-16 text-[13px] text-slate-400">No hay sobres en esta caja</p>
                   ) : (
                     <div className="space-y-2">
                       {cardEnvelopes.map(envelope => {
@@ -2357,10 +2338,10 @@ export default function BoxesPage() {
                         const conflictCount = envExpenses.filter(e => !!e.conflictType).length;
                         const sc = STATUS_CONFIG[envelope.status];
                         return (
-                          <div key={envelope.id} className="p-4 border border-slate-200 rounded-xl hover:border-slate-300 transition-all">
+                          <div key={envelope.id} className="p-4 border border-slate-200 rounded-md hover:border-slate-300 transition-all">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3 cursor-pointer flex-1" onClick={() => setSelectedEnvelope(envelope)}>
-                                <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+                                <div className="hidden">
                                   <Layers size={18} className="text-slate-500" />
                                 </div>
                                 <div>
@@ -2407,7 +2388,7 @@ export default function BoxesPage() {
                           {STATUS_CONFIG[selectedEnvelope.status].label}
                         </span>
                       </div>
-                      <p className="text-sm text-slate-500">
+                      <p className="text-[13px] text-slate-500">
                         {selectedEnvelope.expenseCount} gastos · Base: {fmt(selectedEnvelope.totalBase)} € · Total: {fmt(selectedEnvelope.totalAmount)} €
                         {envelopeExpenses.filter(e => !!e.conflictType).length > 0 && (
                           <span className="ml-2 text-amber-500">
@@ -2419,7 +2400,7 @@ export default function BoxesPage() {
                     <div className="flex items-center gap-2">
                       <button onClick={() => handleExportEnvelope(selectedEnvelope)}
                         disabled={exportingEnvelope || envelopeExpenses.length === 0}
-                        className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
+                        className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50 disabled:opacity-50">
                         {exportingEnvelope
                           ? <><RotateCcw size={16} className="animate-spin" /> Exportando...</>
                           : <><Download size={16} /> Exportar sobre</>}
@@ -2428,23 +2409,23 @@ export default function BoxesPage() {
                     {selectedEnvelope.status === "open" && (
                       <div className="flex items-center gap-2">
                         <button onClick={() => setShowImportModal(true)}
-                          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+                          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">
                           <Upload size={16} /> Importar Excel
                         </button>
                         {envelopeExpenses.length > 0 && (
                           <button onClick={() => { setReceiptFiles([]); setShowReceiptImportModal(true); }}
-                            className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+                            className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">
                             <FileText size={16} /> Importar recibos
                           </button>
                         )}
                         <button onClick={() => { setCardExpensesList([createEmptyCardExpense()]); setShowManualExpenseModal(true); }}
-                          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+                          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">
                           <Plus size={16} /> Añadir gasto
                         </button>
                         <button
                           onClick={() => handleCloseEnvelope(selectedEnvelope)}
                           disabled={envelopeExpenses.some(e => e.status === "pending")}
-                          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-md text-[13px] font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
                           <Lock size={16} /> Cerrar sobre
                         </button>
                       </div>
@@ -2453,16 +2434,15 @@ export default function BoxesPage() {
                   {envelopeExpenses.length === 0 ? (
                     <div className="flex items-center justify-center h-64">
                       <div className="text-center">
-                        <p className="text-sm text-slate-400 mb-4">No hay gastos en este sobre</p>
+                        <p className="text-[13px] text-slate-400 mb-4">No hay gastos en este sobre</p>
                         {selectedEnvelope.status === "open" && (
                           <div className="flex gap-2 justify-center">
                             <button onClick={() => setShowImportModal(true)}
-                              className="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+                              className="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">
                               <Upload size={16} /> Importar Excel
                             </button>
                             <button onClick={() => { setCardExpensesList([createEmptyCardExpense()]); setShowManualExpenseModal(true); }}
-                              className="inline-flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium"
-                              style={{ backgroundColor: "#2F52E0" }}>
+                              className="inline-flex items-center gap-2 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium">
                               <Plus size={16} /> Añadir gasto
                             </button>
                           </div>
@@ -2470,18 +2450,18 @@ export default function BoxesPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="border border-slate-200 rounded-xl overflow-hidden">
-                      <table className="w-full text-sm">
+                    <div className="border border-slate-200 rounded-md overflow-hidden">
+                      <table className="w-full text-[13px]">
                         <thead className="bg-slate-50 border-b border-slate-200">
                           <tr>
-                            <th className="text-left px-4 py-3 font-medium text-slate-600">Número</th>
-                            <th className="text-left px-4 py-3 font-medium text-slate-600">Proveedor</th>
-                            <th className="text-left px-4 py-3 font-medium text-slate-600">Cuenta</th>
-                            <th className="text-right px-4 py-3 font-medium text-slate-600">Base</th>
-                            <th className="text-right px-4 py-3 font-medium text-slate-600">IVA</th>
-                            <th className="text-right px-4 py-3 font-medium text-slate-600">Total</th>
-                            <th className="text-center px-4 py-3 font-medium text-slate-600">Estado</th>
-                            <th className="text-center px-4 py-3 font-medium text-slate-600">Acc.</th>
+                            <th className="text-left px-4 py-2.5 font-medium text-slate-600">Número</th>
+                            <th className="text-left px-4 py-2.5 font-medium text-slate-600">Proveedor</th>
+                            <th className="text-left px-4 py-2.5 font-medium text-slate-600">Cuenta</th>
+                            <th className="text-right px-4 py-2.5 font-medium text-slate-600">Base</th>
+                            <th className="text-right px-4 py-2.5 font-medium text-slate-600">IVA</th>
+                            <th className="text-right px-4 py-2.5 font-medium text-slate-600">Total</th>
+                            <th className="text-center px-4 py-2.5 font-medium text-slate-600">Estado</th>
+                            <th className="text-center px-4 py-2.5 font-medium text-slate-600">Acc.</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -2576,7 +2556,7 @@ export default function BoxesPage() {
               /* ── PETTY CASH TAB ── */
               !selectedTransferEnvelope ? (
                 <div className="flex items-center justify-center h-96">
-                  <p className="text-sm text-slate-400">
+                  <p className="text-[13px] text-slate-400">
                     {transferEnvelopes.length === 0 ? "No hay sobres de Petty Cash" : "Selecciona un sobre"}
                   </p>
                 </div>
@@ -2594,7 +2574,7 @@ export default function BoxesPage() {
                           {TRANSFER_STATUS_CONFIG[selectedTransferEnvelope.status].label}
                         </span>
                       </div>
-                      <p className="text-sm text-slate-500">
+                      <p className="text-[13px] text-slate-500">
                         {selectedTransferEnvelope.personName}
                         {selectedTransferEnvelope.personDepartment && ` · ${selectedTransferEnvelope.personDepartment}`}
                         {" · "}{selectedTransferEnvelope.expenseCount} gastos · Total: {fmt(selectedTransferEnvelope.totalAmount)} €
@@ -2604,29 +2584,28 @@ export default function BoxesPage() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => { setAdvanceForm({ amount: "", method: "bank", date: new Date().toISOString().slice(0, 10), iban: "", proofFile: null }); setShowAddAdvanceModal(true); }}
-                          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+                          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">
                           <Banknote size={16} /> Añadir anticipo
                         </button>
                         <button
                           onClick={() => { setBoxFormRequesterName(selectedTransferEnvelope.personName); setBoxFormMessage(""); setBoxFormTargetEnvelopeId(selectedTransferEnvelope.id); setGeneratedBoxResult(null); setShowSendBoxFormModal(true); }}
-                          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+                          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">
                           <Link2 size={16} /> Enviar solicitud
                         </button>
                         <button
                           onClick={() => { setExpensesList([createEmptyExpense()]); setShowAddExpenseModal(true); }}
-                          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+                          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">
                           <Plus size={16} /> Añadir gasto
                         </button>
                         <button
                           onClick={() => { setSettleForm({ reference: "", proofFile: null }); setShowSettleModal(true); }}
                           disabled={selectedTransferEnvelope.advances.length === 0 && selectedTransferEnvelope.expenseCount === 0}
-                          className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50"
-                          style={{ background: "linear-gradient(135deg, #f59e0b, #f97316)" }}>
+                          className="flex items-center gap-2 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
                           <Scale size={16} /> Liquidación
                         </button>
                         {canDeleteTransferEnvelope(selectedTransferEnvelope) && (
                           <button onClick={() => setShowDeleteTransferEnvelopeModal(selectedTransferEnvelope)}
-                            className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl">
+                            className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md">
                             <Trash2 size={16} />
                           </button>
                         )}
@@ -2639,7 +2618,7 @@ export default function BoxesPage() {
                     const preview = getSettlementPreview(selectedTransferEnvelope);
                     const totalAdvance = getTotalAdvance(selectedTransferEnvelope);
                     return (
-                      <div className="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-sm">
+                      <div className="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-md space-y-2 text-[13px]">
                         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                           <div>
                             <span className="text-slate-500">Anticipo{selectedTransferEnvelope.advances.length > 1 ? "s" : ""}: </span>
@@ -2678,10 +2657,10 @@ export default function BoxesPage() {
                   })()}
 
                   {selectedTransferEnvelope.status === "settled" && (
-                    <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3">
+                    <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-md flex items-start gap-3">
                       <CheckSquare size={18} className="text-emerald-600 flex-shrink-0 mt-0.5" />
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-emerald-800">
+                        <p className="text-[13px] font-medium text-emerald-800">
                           {selectedTransferEnvelope.settlementDirection === "none"
                             ? "Liquidado — sin movimiento"
                             : `Liquidado · ${selectedTransferEnvelope.settlementDirection === "production_to_person"
@@ -2703,7 +2682,7 @@ export default function BoxesPage() {
                   )}
 
                   {selectedTransferEnvelope.notes && (
-                    <div className="mb-4 p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                    <div className="mb-4 p-3 bg-amber-50 border border-amber-100 rounded-md">
                       <p className="text-xs text-amber-700"><strong>Notas:</strong> {selectedTransferEnvelope.notes}</p>
                     </div>
                   )}
@@ -2711,29 +2690,28 @@ export default function BoxesPage() {
                   {currentTransferExpenses.length === 0 ? (
                     <div className="flex items-center justify-center h-48">
                       <div className="text-center">
-                        <p className="text-sm text-slate-400 mb-4">No hay gastos en este sobre</p>
+                        <p className="text-[13px] text-slate-400 mb-4">No hay gastos en este sobre</p>
                         {selectedTransferEnvelope.status === "draft" && (
                           <button
                             onClick={() => { setExpensesList([createEmptyExpense()]); setShowAddExpenseModal(true); }}
-                            className="inline-flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium"
-                            style={{ backgroundColor: "#2F52E0" }}>
+                            className="inline-flex items-center gap-2 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium">
                             <Plus size={16} /> Añadir gasto
                           </button>
                         )}
                       </div>
                     </div>
                   ) : (
-                    <div className="border border-slate-200 rounded-xl overflow-hidden">
-                      <table className="w-full text-sm">
+                    <div className="border border-slate-200 rounded-md overflow-hidden">
+                      <table className="w-full text-[13px]">
                         <thead className="bg-slate-50 border-b border-slate-200">
                           <tr>
-                            <th className="text-left px-4 py-3 font-medium text-slate-600 w-[200px]">Persona</th>
-                            <th className="text-left px-4 py-3 font-medium text-slate-600 w-[160px]">Proveedor</th>
-                            <th className="text-left px-4 py-3 font-medium text-slate-600">Cuentas</th>
-                            <th className="text-right px-4 py-3 font-medium text-slate-600 w-[90px]">Base</th>
-                            <th className="text-right px-4 py-3 font-medium text-slate-600 w-[80px]">IVA</th>
-                            <th className="text-right px-4 py-3 font-medium text-slate-600 w-[90px]">Total</th>
-                            <th className="text-center px-2 py-3 font-medium text-slate-600 w-[60px]"></th>
+                            <th className="text-left px-4 py-2.5 font-medium text-slate-600 w-[200px]">Persona</th>
+                            <th className="text-left px-4 py-2.5 font-medium text-slate-600 w-[160px]">Proveedor</th>
+                            <th className="text-left px-4 py-2.5 font-medium text-slate-600">Cuentas</th>
+                            <th className="text-right px-4 py-2.5 font-medium text-slate-600 w-[90px]">Base</th>
+                            <th className="text-right px-4 py-2.5 font-medium text-slate-600 w-[80px]">IVA</th>
+                            <th className="text-right px-4 py-2.5 font-medium text-slate-600 w-[90px]">Total</th>
+                            <th className="text-center px-2 py-2.5 font-medium text-slate-600 w-[60px]"></th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -2823,7 +2801,7 @@ export default function BoxesPage() {
       )}
 
       {/* Drawer — expands to double panel when preview is open */}
-      <div className={`fixed top-[53px] right-0 bg-white shadow-2xl z-40 flex flex-col transition-all duration-300 ease-out ${drawerExpense ? "translate-x-0" : "translate-x-full"} ${drawerShowPreview ? "w-[900px]" : "w-[480px]"}`} style={{ height: "calc(100vh - 53px)" }}>
+      <div className={`fixed top-[53px] right-0 bg-white shadow-xl z-40 flex flex-col transition-all duration-300 ease-out ${drawerExpense ? "translate-x-0" : "translate-x-full"} ${drawerShowPreview ? "w-[900px]" : "w-[480px]"}`} style={{ height: "calc(100vh - 53px)" }}>
         {drawerExpense && (() => {
           const hasConflict = !!drawerExpense.conflictType;
           const conflictCfg = hasConflict ? CONFLICT_CONFIG[drawerExpense.conflictType!] : null;
@@ -2872,7 +2850,7 @@ export default function BoxesPage() {
                         : <FileText size={16} className="text-blue-500" />}
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">{drawerExpense.displayNumber}</p>
+                      <p className="text-[13px] font-semibold text-slate-900">{drawerExpense.displayNumber}</p>
                       <p className="text-xs text-slate-500">{drawerExpense.supplier}</p>
                     </div>
                   </div>
@@ -2892,11 +2870,11 @@ export default function BoxesPage() {
                 <div className="flex-1 overflow-y-auto">
                   {/* Conflict banner */}
                   {hasConflict && (
-                    <div className="mx-5 mt-4 p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                    <div className="mx-5 mt-4 p-3 bg-amber-50 border border-amber-100 rounded-md">
                       <div className="flex items-start gap-2">
                         <Info size={15} className="text-amber-500 flex-shrink-0 mt-0.5" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-amber-800">{conflictCfg!.label}</p>
+                          <p className="text-[13px] font-medium text-amber-800">{conflictCfg!.label}</p>
                           <p className="text-xs text-amber-600 mt-0.5">{conflictCfg!.description}</p>
                           {!conflictCfg!.resolvable && (
                             <p className="text-xs text-amber-500 mt-1 italic">Esta incidencia se anota para cuadre posterior — no se cierra.</p>
@@ -2973,13 +2951,13 @@ export default function BoxesPage() {
                         <label className="block text-xs font-medium text-slate-600 mb-1">Proveedor</label>
                         <input type="text" value={drawerForm.supplier}
                           onChange={e => setDrawerForm(f => ({ ...f, supplier: e.target.value }))}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                          className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-slate-600 mb-1">CIF / NIF</label>
                         <input type="text" value={drawerForm.supplierTaxId}
                           onChange={e => setDrawerForm(f => ({ ...f, supplierTaxId: e.target.value }))}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                          className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] font-mono focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                       </div>
                     </div>
 
@@ -2988,13 +2966,13 @@ export default function BoxesPage() {
                         <label className="block text-xs font-medium text-slate-600 mb-1">Nº Factura</label>
                         <input type="text" value={drawerForm.supplierNumber}
                           onChange={e => setDrawerForm(f => ({ ...f, supplierNumber: e.target.value }))}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                          className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label>
                         <input type="text" value={drawerForm.date} placeholder="DD/MM/YYYY"
                           onChange={e => setDrawerForm(f => ({ ...f, date: e.target.value }))}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                          className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                       </div>
                     </div>
 
@@ -3002,11 +2980,11 @@ export default function BoxesPage() {
                       <label className="block text-xs font-medium text-slate-600 mb-1">Descripción del gasto</label>
                       <input type="text" value={drawerForm.description}
                         onChange={e => setDrawerForm(f => ({ ...f, description: e.target.value }))}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                     </div>
 
                     {/* Líneas */}
-                    <div className="bg-slate-50 rounded-xl p-3 space-y-2">
+                    <div className="bg-slate-50 rounded-md p-3 space-y-2">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Líneas ({drawerItems.length})</span>
                         <button type="button"
@@ -3044,12 +3022,12 @@ export default function BoxesPage() {
                                 <ChevronDown size={12} className="text-slate-400 flex-shrink-0" />
                               </button>
                               {drawerAccountSelectorItemIdx === idx && (
-                                <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl">
+                                <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-xl">
                                   <div className="p-2 border-b border-slate-100">
                                     <input type="text" value={drawerAccountSearch}
                                       onChange={e => setDrawerAccountSearch(e.target.value)}
                                       placeholder="Buscar cuenta"
-                                      className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-900"
+                                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-900/10 focus:border-slate-900"
                                       autoFocus />
                                   </div>
                                   <div className="max-h-48 overflow-y-auto">
@@ -3076,13 +3054,13 @@ export default function BoxesPage() {
                                 <label className="block text-xs text-slate-500 mb-1">Base *</label>
                                 <input type="number" step="0.01" value={item.baseAmount || ""}
                                   onChange={e => setDrawerItems(prev => prev.map((it, i) => i === idx ? { ...it, baseAmount: parseFloat(e.target.value) || 0 } : it))}
-                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900" />
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900/10 focus:border-slate-900" />
                               </div>
                               <div>
                                 <label className="block text-xs text-slate-500 mb-1">IVA %</label>
                                 <input type="number" step="1" value={item.vatRate}
                                   onChange={e => setDrawerItems(prev => prev.map((it, i) => i === idx ? { ...it, vatRate: parseFloat(e.target.value) || 0 } : it))}
-                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900" />
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900/10 focus:border-slate-900" />
                               </div>
                               <div>
                                 <label className="block text-xs text-slate-500 mb-1">Cuota IVA</label>
@@ -3099,7 +3077,7 @@ export default function BoxesPage() {
                           <label className="text-xs text-slate-500">IRPF %</label>
                           <input type="number" step="1" value={drawerForm.irpfRate}
                             onChange={e => setDrawerForm(f => ({ ...f, irpfRate: e.target.value }))}
-                            className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900 bg-white" />
+                            className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900/10 focus:border-slate-900 bg-white" />
                         </div>
                         <div className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs">
                           <span className="text-slate-400">Total:</span>
@@ -3148,13 +3126,13 @@ export default function BoxesPage() {
                         <textarea value={drawerForm.conflictNote}
                           onChange={e => setDrawerForm(f => ({ ...f, conflictNote: e.target.value }))}
                           rows={2} placeholder="Explica la incidencia"
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none" />
+                          className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 resize-none" />
                       </div>
                     )}
 
                     {/* Linked charges mini-table for invoice_covers_multiple */}
                     {drawerForm.conflictType === "invoice_covers_multiple" && (
-                      <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                      <div className="bg-blue-50 border border-blue-100 rounded-md p-3">
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-xs font-semibold text-blue-700">Cargos de tarjeta que cubre esta factura</p>
                           <button type="button"
@@ -3243,8 +3221,7 @@ export default function BoxesPage() {
                       Cancelar
                     </button>
                     <button onClick={handleSaveDrawer} disabled={drawerSaving}
-                      className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium text-white rounded-lg disabled:opacity-50 transition-colors"
-                      style={{ backgroundColor: "#2F52E0" }}>
+                      className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-lg disabled:opacity-50 transition-colors">
                       {drawerSaving ? "Guardando..." : "Guardar"}
                     </button>
                   </div>
@@ -3297,23 +3274,23 @@ export default function BoxesPage() {
 
       {/* Create Box Modal */}
       {showCreateBoxModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
           onClick={() => setShowCreateBoxModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">Nueva caja</h3>
-              <button onClick={() => setShowCreateBoxModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="text-[14px] font-semibold text-slate-900">Nueva caja</h3>
+              <button onClick={() => setShowCreateBoxModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-md"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Nombre del responsable *</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre del responsable *</label>
                 <input type="text" value={boxForm.name}
                   onChange={e => { const name = e.target.value; setBoxForm({ ...boxForm, name, code: boxForm.code || generateCode(name) }); }}
                   placeholder="Nombre del titular"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Código *</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Código *</label>
                 {(() => {
                   const isDuplicate = boxForm.code.trim().length > 0 && boxes.some(b => b.code.toUpperCase() === boxForm.code.toUpperCase());
                   return (
@@ -3321,7 +3298,7 @@ export default function BoxesPage() {
                       <input type="text" value={boxForm.code}
                         onChange={e => setBoxForm({ ...boxForm, code: e.target.value.toUpperCase().slice(0, 3) })}
                         placeholder="LG" maxLength={3}
-                        className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 font-mono uppercase transition-colors ${isDuplicate ? "border-red-400 bg-red-50 focus:ring-red-400" : "border-slate-200 focus:ring-slate-900"}`} />
+                        className={`w-full px-2.5 py-1.5 border rounded-md focus:outline-none focus:ring-4 font-mono uppercase transition-colors ${isDuplicate ? "border-red-400 bg-red-50 focus:ring-red-400" : "border-slate-200 focus:ring-slate-900/10 focus:border-slate-900"}`} />
                       {isDuplicate && (
                         <p className="flex items-center gap-1.5 mt-1.5 text-xs text-red-600 font-medium">
                           <AlertCircle size={12} />
@@ -3333,29 +3310,29 @@ export default function BoxesPage() {
                 })()}
               </div>
               <div ref={departmentDropdownRef} className="relative">
-                <label className="block text-sm font-medium text-slate-700 mb-2">Departamento</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Departamento</label>
                 <button type="button" onClick={() => setShowDepartmentDropdown(!showDepartmentDropdown)}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between">
+                  className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between">
                   <span className={boxForm.department ? "text-slate-900" : "text-slate-400"}>{boxForm.department || "Seleccionar"}</span>
                   <ChevronDown size={16} className="text-slate-400" />
                 </button>
                 {showDepartmentDropdown && (
-                  <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                  <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
                     <button type="button" onClick={() => { setBoxForm({ ...boxForm, department: "" }); setShowDepartmentDropdown(false); }}
-                      className="w-full px-4 py-2 text-left text-sm text-slate-400 hover:bg-slate-50">Sin departamento</button>
+                      className="w-full px-4 py-2 text-left text-[13px] text-slate-400 hover:bg-slate-50">Sin departamento</button>
                     {departments.map(d => (
                       <button key={d} type="button" onClick={() => { setBoxForm({ ...boxForm, department: d }); setShowDepartmentDropdown(false); }}
-                        className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50">{d}</button>
+                        className="w-full px-4 py-2 text-left text-[13px] hover:bg-slate-50">{d}</button>
                     ))}
                   </div>
                 )}
               </div>
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-              <button onClick={() => setShowCreateBoxModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
+              <button onClick={() => setShowCreateBoxModal(false)} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
               <button onClick={handleCreateBox}
                 disabled={saving || !boxForm.name.trim() || !boxForm.code.trim() || boxes.some(b => b.code.toUpperCase() === boxForm.code.toUpperCase())}
-                className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
+                className="px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
                 {saving ? "Creando..." : "Crear caja"}
               </button>
             </div>
@@ -3365,22 +3342,22 @@ export default function BoxesPage() {
 
       {/* Edit Box Modal */}
       {showEditBoxModal && selectedBox && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
           onClick={() => setShowEditBoxModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">Editar caja</h3>
-              <button onClick={() => setShowEditBoxModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="text-[14px] font-semibold text-slate-900">Editar caja</h3>
+              <button onClick={() => setShowEditBoxModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-md"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Nombre *</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre *</label>
                 <input type="text" value={editBoxForm.name}
                   onChange={e => setEditBoxForm({ ...editBoxForm, name: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Código *</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Código *</label>
                 {(() => {
                   const isDuplicate = editBoxForm.code.trim().length > 0 &&
                     boxes.some(b => b.id !== selectedBox.id && b.code.toUpperCase() === editBoxForm.code.toUpperCase());
@@ -3389,7 +3366,7 @@ export default function BoxesPage() {
                       <input type="text" value={editBoxForm.code}
                         onChange={e => setEditBoxForm({ ...editBoxForm, code: e.target.value.toUpperCase().slice(0, 3) })}
                         maxLength={3}
-                        className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 font-mono uppercase transition-colors ${isDuplicate ? "border-red-400 bg-red-50 focus:ring-red-400" : "border-slate-200 focus:ring-slate-900"}`} />
+                        className={`w-full px-2.5 py-1.5 border rounded-md focus:outline-none focus:ring-4 font-mono uppercase transition-colors ${isDuplicate ? "border-red-400 bg-red-50 focus:ring-red-400" : "border-slate-200 focus:ring-slate-900/10 focus:border-slate-900"}`} />
                       {isDuplicate && (
                         <p className="flex items-center gap-1.5 mt-1.5 text-xs text-red-600 font-medium">
                           <AlertCircle size={12} />
@@ -3402,9 +3379,9 @@ export default function BoxesPage() {
               </div>
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-              <button onClick={() => setShowEditBoxModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
+              <button onClick={() => setShowEditBoxModal(false)} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
               <button onClick={handleEditBox} disabled={saving || !editBoxForm.name.trim() || !editBoxForm.code.trim() || boxes.some(b => b.id !== selectedBox.id && b.code.toUpperCase() === editBoxForm.code.toUpperCase())}
-                className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
+                className="px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
                 {saving ? "Guardando..." : "Guardar"}
               </button>
             </div>
@@ -3414,16 +3391,16 @@ export default function BoxesPage() {
 
       {/* Delete Box Confirm */}
       {showDeleteBoxModal && selectedBox && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
           onClick={() => setShowDeleteBoxModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <div className="p-6">
-              <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mb-4"><AlertTriangle size={22} className="text-red-500" /></div>
+              <div className="w-12 h-12 bg-red-50 rounded-md flex items-center justify-center mb-4"><AlertTriangle size={22} className="text-red-500" /></div>
               <h3 className="text-lg font-semibold text-slate-900 mb-1">Eliminar caja</h3>
-              <p className="text-sm text-slate-500 mb-6">Se eliminará <strong>{selectedBox.name}</strong> y todos sus sobres y gastos pendientes.</p>
+              <p className="text-[13px] text-slate-500 mb-6">Se eliminará <strong>{selectedBox.name}</strong> y todos sus sobres y gastos pendientes.</p>
               <div className="flex gap-3">
-                <button onClick={() => setShowDeleteBoxModal(false)} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50">Cancelar</button>
-                <button onClick={handleDeleteBox} disabled={saving} className="flex-1 px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 disabled:opacity-50">
+                <button onClick={() => setShowDeleteBoxModal(false)} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-50">Cancelar</button>
+                <button onClick={handleDeleteBox} disabled={saving} className="flex-1 px-4 py-2 bg-red-500 text-white rounded-md text-[13px] font-medium hover:bg-red-600 disabled:opacity-50">
                   {saving ? "Eliminando..." : "Eliminar"}
                 </button>
               </div>
@@ -3434,20 +3411,20 @@ export default function BoxesPage() {
 
       {/* Create Envelope Modal */}
       {showCreateEnvelopeModal && selectedBox && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
           onClick={() => setShowCreateEnvelopeModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">Nuevo sobre</h3>
-              <button onClick={() => setShowCreateEnvelopeModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="text-[14px] font-semibold text-slate-900">Nuevo sobre</h3>
+              <button onClick={() => setShowCreateEnvelopeModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-md"><X size={18} /></button>
             </div>
             <div className="p-6 text-center py-8">
               <p className="text-slate-900 font-medium mb-1">BOX-{selectedBox.code}{String(selectedBox.nextEnvelopeNumber || 1).padStart(3, "0")}</p>
-              <p className="text-sm text-slate-500">Se creará un nuevo sobre para {selectedBox.name}</p>
+              <p className="text-[13px] text-slate-500">Se creará un nuevo sobre para {selectedBox.name}</p>
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-              <button onClick={() => setShowCreateEnvelopeModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
-              <button onClick={handleCreateEnvelope} disabled={saving} className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
+              <button onClick={() => setShowCreateEnvelopeModal(false)} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
+              <button onClick={handleCreateEnvelope} disabled={saving} className="px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
                 {saving ? "Creando..." : "Crear sobre"}
               </button>
             </div>
@@ -3457,16 +3434,16 @@ export default function BoxesPage() {
 
       {/* Delete Envelope Confirm */}
       {showDeleteEnvelopeModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
           onClick={() => setShowDeleteEnvelopeModal(null)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <div className="p-6">
-              <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mb-4"><AlertTriangle size={22} className="text-red-500" /></div>
+              <div className="w-12 h-12 bg-red-50 rounded-md flex items-center justify-center mb-4"><AlertTriangle size={22} className="text-red-500" /></div>
               <h3 className="text-lg font-semibold text-slate-900 mb-1">Eliminar sobre</h3>
-              <p className="text-sm text-slate-500 mb-6">Se eliminará <strong>{showDeleteEnvelopeModal.displayNumber}</strong> y todos sus gastos.</p>
+              <p className="text-[13px] text-slate-500 mb-6">Se eliminará <strong>{showDeleteEnvelopeModal.displayNumber}</strong> y todos sus gastos.</p>
               <div className="flex gap-3">
-                <button onClick={() => setShowDeleteEnvelopeModal(null)} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50">Cancelar</button>
-                <button onClick={() => handleDeleteEnvelope(showDeleteEnvelopeModal)} disabled={saving} className="flex-1 px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 disabled:opacity-50">
+                <button onClick={() => setShowDeleteEnvelopeModal(null)} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-50">Cancelar</button>
+                <button onClick={() => handleDeleteEnvelope(showDeleteEnvelopeModal)} disabled={saving} className="flex-1 px-4 py-2 bg-red-500 text-white rounded-md text-[13px] font-medium hover:bg-red-600 disabled:opacity-50">
                   {saving ? "Eliminando..." : "Eliminar"}
                 </button>
               </div>
@@ -3477,28 +3454,28 @@ export default function BoxesPage() {
 
       {/* Manual Expense Modal */}
       {showManualExpenseModal && selectedEnvelope && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
           onClick={() => setShowManualExpenseModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Añadir gastos</h3>
-                <p className="text-sm text-slate-500">{selectedEnvelope.displayNumber} · {selectedBox?.name}</p>
+                <h3 className="text-[14px] font-semibold text-slate-900">Añadir gastos</h3>
+                <p className="text-[13px] text-slate-500">{selectedEnvelope.displayNumber} · {selectedBox?.name}</p>
               </div>
-              <button onClick={() => setShowManualExpenseModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+              <button onClick={() => setShowManualExpenseModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-md"><X size={18} /></button>
             </div>
             <div className="p-6 flex-1 overflow-y-auto space-y-6">
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Gastos ({cardExpensesList.length})</p>
                   <button onClick={() => setCardExpensesList(prev => [...prev, createEmptyCardExpense()])}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg">
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-slate-700 hover:bg-slate-100 rounded-lg">
                     <Plus size={14} /> Nuevo gasto
                   </button>
                 </div>
                 <div className="space-y-4">
                   {cardExpensesList.map((exp, idx) => (
-                    <div key={exp.id} className="p-4 border border-slate-200 rounded-xl space-y-4">
+                    <div key={exp.id} className="p-4 border border-slate-200 rounded-md space-y-4">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Gasto {idx + 1}</span>
                         <div className="flex items-center gap-2">
@@ -3521,53 +3498,53 @@ export default function BoxesPage() {
                             setCardTypeDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
                             setShowCardTypeDropdown(idx);
                           }}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm flex items-center justify-between hover:border-slate-300">
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] flex items-center justify-between hover:border-slate-300">
                             <span className="flex items-center gap-1.5">
                               {exp.type === "ticket" ? <><Receipt size={13} className="text-amber-500" /> Ticket</> : <><FileText size={13} className="text-blue-500" /> Factura</>}
                             </span>
                             <ChevronDown size={13} className="text-slate-400" />
                           </button>
                           {showCardTypeDropdown === idx && cardTypeDropdownPos && (
-                            <div className="fixed z-50 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden"
+                            <div className="fixed z-50 bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden"
                               style={{ top: cardTypeDropdownPos.top, left: cardTypeDropdownPos.left, width: cardTypeDropdownPos.width }}>
-                              <button type="button" onClick={() => { updateCardExpense(idx, "type", "ticket"); setShowCardTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2"><Receipt size={13} className="text-amber-500" /> Ticket</button>
-                              <button type="button" onClick={() => { updateCardExpense(idx, "type", "invoice"); setShowCardTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2"><FileText size={13} className="text-blue-500" /> Factura</button>
+                              <button type="button" onClick={() => { updateCardExpense(idx, "type", "ticket"); setShowCardTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-[13px] hover:bg-slate-50 flex items-center gap-2"><Receipt size={13} className="text-amber-500" /> Ticket</button>
+                              <button type="button" onClick={() => { updateCardExpense(idx, "type", "invoice"); setShowCardTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-[13px] hover:bg-slate-50 flex items-center gap-2"><FileText size={13} className="text-blue-500" /> Factura</button>
                             </div>
                           )}
                         </div>
                         <div className="col-span-2">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label>
                           <input type="text" value={exp.date} onChange={e => updateCardExpense(idx, "date", e.target.value)} placeholder="DD/MM/YYYY"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                         </div>
                         <div className="col-span-3">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Proveedor *</label>
                           <input type="text" value={exp.supplier} onChange={e => updateCardExpense(idx, "supplier", e.target.value)} placeholder="Nombre del proveedor"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                         </div>
                         <div className="col-span-2">
                           <label className="block text-xs font-medium text-slate-600 mb-1">CIF / NIF {exp.type === "invoice" && <span className="text-red-400">*</span>}</label>
                           <input type="text" value={exp.supplierTaxId} onChange={e => updateCardExpense(idx, "supplierTaxId", e.target.value)} placeholder="B12345678"
-                            className={`w-full px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900 ${exp.type === "invoice" && !exp.supplierTaxId.trim() ? "border-red-300 bg-red-50/30" : "border-slate-200"}`} />
+                            className={`w-full px-2.5 py-1.5 border rounded-lg text-[13px] font-mono focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 ${exp.type === "invoice" && !exp.supplierTaxId.trim() ? "border-red-300 bg-red-50/30" : "border-slate-200"}`} />
                         </div>
                         <div className="col-span-2">
                           <label className="block text-xs font-medium text-slate-600 mb-1">{exp.type === "invoice" ? "Nº Factura" : "Referencia"}</label>
                           <input type="text" value={exp.supplierNumber} onChange={e => updateCardExpense(idx, "supplierNumber", e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                         </div>
                         <div className="col-span-1">
                           <label className="block text-xs font-medium text-slate-600 mb-1">IRPF %</label>
                           <input type="number" value={exp.irpfRate} onChange={e => updateCardExpense(idx, "irpfRate", parseFloat(e.target.value) || 0)} step="1"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] font-mono focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                         </div>
                         <div className="col-span-12">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Descripción del gasto</label>
                           <input type="text" value={(exp as any).description ?? ""} onChange={e => updateCardExpense(idx, "description", e.target.value)} placeholder="Concepto del gasto"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                         </div>
                         <div className="col-span-12">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Documento</label>
-                          <label className="w-full px-3 py-2 border border-dashed border-slate-300 rounded-lg text-sm flex items-center justify-center gap-2 cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-colors">
+                          <label className="w-full px-3 py-2 border border-dashed border-slate-300 rounded-lg text-[13px] flex items-center justify-center gap-2 cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-colors">
                             <Upload size={14} className="text-slate-400" />
                             <span className="text-slate-500">{exp.file ? "Cambiar" : "Subir"}</span>
                             <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden"
@@ -3601,12 +3578,12 @@ export default function BoxesPage() {
                               <div className="col-span-3">
                                 {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">Base *</label>}
                                 <input type="number" value={item.baseAmount || ""} onChange={e => updateCardItem(idx, itemIdx, "baseAmount", parseFloat(e.target.value) || 0)} step="0.01"
-                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                               </div>
                               <div className="col-span-2">
                                 {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">IVA %</label>}
                                 <input type="number" value={item.vatRate} onChange={e => updateCardItem(idx, itemIdx, "vatRate", parseFloat(e.target.value) || 0)} step="1"
-                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                               </div>
                               <div className="col-span-1 flex justify-center">
                                 {exp.items.length > 1 && (
@@ -3618,7 +3595,7 @@ export default function BoxesPage() {
                         </div>
                       </div>
                       <div className="flex justify-end">
-                        <div className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm">
+                        <div className="bg-slate-900 text-white px-4 py-2 rounded-lg text-[13px]">
                           <span className="text-slate-400">Total gasto:</span>
                           <span className="ml-2 font-mono font-semibold">{fmt(computeExpenseTotal(exp).totalAmount)} €</span>
                         </div>
@@ -3629,13 +3606,13 @@ export default function BoxesPage() {
               </div>
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
-              <p className="text-sm text-slate-500">
+              <p className="text-[13px] text-slate-500">
                 {cardExpensesList.length > 0 && <>Total: <strong className="text-slate-900 font-mono">{fmt(cardExpensesList.reduce((s, e) => s + computeExpenseTotal(e).totalAmount, 0))} €</strong></>}
               </p>
               <div className="flex gap-3">
-                <button onClick={() => setShowManualExpenseModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
+                <button onClick={() => setShowManualExpenseModal(false)} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
                 <button onClick={handleAddManualExpense} disabled={manualExpenseSaving}
-                  className="px-5 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50 flex items-center gap-2" style={{ backgroundColor: "#2F52E0" }}>
+                  className="px-3 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50 flex items-center gap-2">
                   {manualExpenseSaving ? "Guardando..." : <><Check size={15} /> Guardar gastos</>}
                 </button>
               </div>
@@ -3646,15 +3623,15 @@ export default function BoxesPage() {
 
       {/* Import Excel Modal */}
       {showImportModal && selectedEnvelope && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
           onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Importar gastos</h3>
-                <p className="text-sm text-slate-500">Sube el Excel de gastos de tarjeta</p>
+                <h3 className="text-[14px] font-semibold text-slate-900">Importar gastos</h3>
+                <p className="text-[13px] text-slate-500">Sube el Excel de gastos de tarjeta</p>
               </div>
-              <button onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+              <button onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }} className="p-2 text-slate-400 hover:bg-slate-100 rounded-md"><X size={18} /></button>
             </div>
             <div className="p-6 flex-1 overflow-y-auto">
               {!importFile ? (
@@ -3662,28 +3639,28 @@ export default function BoxesPage() {
                   onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
                   onDragLeave={() => setIsDragging(false)}
                   onDrop={e => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f?.name.endsWith(".xlsx")) handleFileSelect(f); }}
-                  className={`border-2 border-dashed rounded-2xl p-12 text-center transition-colors ${isDragging ? "border-blue-400 bg-blue-50" : "border-slate-200"}`}>
+                  className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${isDragging ? "border-blue-400 bg-blue-50" : "border-slate-200"}`}>
                   <Upload size={40} className="text-slate-300 mx-auto mb-4" />
                   <p className="text-slate-600 mb-2">Arrastra el archivo Excel aquí</p>
-                  <p className="text-sm text-slate-400 mb-4">o</p>
-                  <label className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium cursor-pointer">
+                  <p className="text-[13px] text-slate-400 mb-4">o</p>
+                  <label className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-md text-[13px] font-medium cursor-pointer">
                     <FileSpreadsheet size={16} /> Seleccionar archivo
                     <input type="file" accept=".xlsx" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }} className="hidden" />
                   </label>
                 </div>
               ) : (
                 <div>
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl mb-4">
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-md mb-4">
                     <FileSpreadsheet size={20} className="text-emerald-500" />
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-slate-900">{importFile.name}</p>
+                      <p className="text-[13px] font-medium text-slate-900">{importFile.name}</p>
                       <p className="text-xs text-slate-500">{importPreview.length} gastos detectados</p>
                     </div>
                     <button onClick={() => { setImportFile(null); setImportPreview([]); }} className="p-1.5 text-slate-400 hover:bg-slate-200 rounded"><X size={16} /></button>
                   </div>
                   {importPreview.length > 0 && (
-                    <div className="border border-slate-200 rounded-xl overflow-hidden">
-                      <table className="w-full text-sm">
+                    <div className="border border-slate-200 rounded-md overflow-hidden">
+                      <table className="w-full text-[13px]">
                         <thead className="bg-slate-50 border-b border-slate-200">
                           <tr>
                             <th className="text-left px-3 py-2 font-medium text-slate-600 w-[80px]">Tipo</th>
@@ -3752,7 +3729,7 @@ export default function BoxesPage() {
               )}
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex justify-between items-center flex-shrink-0">
-              <span className="text-sm text-slate-500">
+              <span className="text-[13px] text-slate-500">
                 {importPreview.length > 0 && (() => {
                   const dupCount = importPreview.filter(exp => {
                     if (expenses.some(e => e.pleoReceiptId === exp.pleoReceiptId)) return true;
@@ -3765,9 +3742,9 @@ export default function BoxesPage() {
                 })()}
               </span>
               <div className="flex gap-3">
-                <button onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
+                <button onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
                 <button onClick={handleImportExpenses} disabled={importing || importPreview.length === 0}
-                  className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
+                  className="px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
                   {importing ? "Importando..." : `Importar ${importPreview.length - importPreview.filter(exp => expenses.some(e => e.pleoReceiptId === exp.pleoReceiptId)).length} gastos`}
                 </button>
               </div>
@@ -3789,21 +3766,21 @@ export default function BoxesPage() {
         const coveredIds = new Set(fileMatches.filter(m => m.expense).map(m => m.expense!.id));
         const missingDocs = envelopeExps.filter(e => !e.documentUrl && !coveredIds.has(e.id));
         return (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+          <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
             onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }}>
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-xl flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 flex-shrink-0">
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Importar recibos</h3>
+                  <h3 className="text-[14px] font-semibold text-slate-900">Importar recibos</h3>
                   <p className="text-xs text-slate-500 mt-0.5">Los archivos se emparejan por el ID Pleo en el nombre</p>
                 </div>
                 <button onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }} className="p-2 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
               </div>
               <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                <label className={`flex flex-col items-center justify-center gap-2 w-full py-8 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${receiptFiles.length > 0 ? "border-blue-300 bg-blue-50/30" : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"}`}>
+                <label className={`flex flex-col items-center justify-center gap-2 w-full py-8 border-2 border-dashed rounded-md cursor-pointer transition-colors ${receiptFiles.length > 0 ? "border-blue-300 bg-blue-50/30" : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"}`}>
                   <FileText size={28} className={receiptFiles.length > 0 ? "text-blue-400" : "text-slate-300"} />
                   <div className="text-center">
-                    <p className="text-sm font-medium text-slate-700">{receiptFiles.length > 0 ? `${receiptFiles.length} archivo${receiptFiles.length > 1 ? "s" : ""} seleccionado${receiptFiles.length > 1 ? "s" : ""}` : "Selecciona facturas y tickets"}</p>
+                    <p className="text-[13px] font-medium text-slate-700">{receiptFiles.length > 0 ? `${receiptFiles.length} archivo${receiptFiles.length > 1 ? "s" : ""} seleccionado${receiptFiles.length > 1 ? "s" : ""}` : "Selecciona facturas y tickets"}</p>
                     <p className="text-xs text-slate-400 mt-0.5">PDF, JPG, PNG · varios archivos a la vez</p>
                   </div>
                   <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden"
@@ -3821,7 +3798,7 @@ export default function BoxesPage() {
                         </span>
                       )}
                     </div>
-                    <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
+                    <div className="border border-slate-200 rounded-md overflow-hidden divide-y divide-slate-100">
                       {fileMatches.map(({ file, expense: exp }, i) => (
                         <div key={i} className={`flex items-center gap-3 px-4 py-2.5 ${exp ? "" : "bg-amber-50/40"}`}>
                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${exp ? "bg-emerald-50" : "bg-amber-50"}`}>
@@ -3841,9 +3818,9 @@ export default function BoxesPage() {
               <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
                 <p className="text-xs text-slate-400">{envelopeExps.filter(e => !e.documentUrl).length} gastos sin documento</p>
                 <div className="flex gap-3">
-                  <button onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-200">Cancelar</button>
+                  <button onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-200">Cancelar</button>
                   <button onClick={handleImportReceipts} disabled={uploadingReceipts || matched === 0}
-                    className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
+                    className="flex items-center gap-2 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
                     {uploadingReceipts ? <><RotateCcw size={14} className="animate-spin" /> Subiendo...</> : <><Upload size={14} /> Vincular {matched} recibo{matched !== 1 ? "s" : ""}</>}
                   </button>
                 </div>
@@ -3855,41 +3832,41 @@ export default function BoxesPage() {
 
       {/* Create Transfer Envelope Modal */}
       {showCreateTransferEnvelopeModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
           onClick={() => setShowCreateTransferEnvelopeModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-visible" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-visible" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-              <h3 className="text-lg font-semibold text-slate-900">Nuevo sobre de Petty Cash</h3>
-              <button onClick={() => setShowCreateTransferEnvelopeModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+              <h3 className="text-[14px] font-semibold text-slate-900">Nuevo sobre de Petty Cash</h3>
+              <button onClick={() => setShowCreateTransferEnvelopeModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-md"><X size={18} /></button>
             </div>
             <div className="p-6 flex-1 space-y-5 overflow-visible">
-              <div className="p-3 bg-slate-50 rounded-xl text-center">
+              <div className="p-3 bg-slate-50 rounded-md text-center">
                 <p className="text-slate-900 font-medium">PC-{String(nextTransferNumber).padStart(3, "0")}</p>
               </div>
 
               {/* Persona */}
-              <div className="p-4 bg-slate-50 rounded-xl space-y-3">
+              <div className="p-4 bg-slate-50 rounded-md space-y-3">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Persona</p>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Nombre *</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre *</label>
                   <input type="text" value={transferEnvelopeForm.personName}
                     onChange={e => setTransferEnvelopeForm({ ...transferEnvelopeForm, personName: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white" />
                 </div>
                 <div ref={expenseDepartmentDropdownRef} className="relative">
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Departamento</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Departamento</label>
                   <button type="button" onClick={() => setShowExpenseDepartmentDropdown(!showExpenseDepartmentDropdown)}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between bg-white hover:border-slate-300">
+                    className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between bg-white hover:border-slate-300">
                     <span className={transferEnvelopeForm.personDepartment ? "text-slate-900" : "text-slate-400"}>{transferEnvelopeForm.personDepartment || "Seleccionar"}</span>
                     <ChevronDown size={16} className="text-slate-400" />
                   </button>
                   {showExpenseDepartmentDropdown && (
-                    <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                    <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
                       <button type="button" onClick={() => { setTransferEnvelopeForm({ ...transferEnvelopeForm, personDepartment: "" }); setShowExpenseDepartmentDropdown(false); }}
-                        className="w-full px-4 py-2 text-left text-sm text-slate-400 hover:bg-slate-50">Sin departamento</button>
+                        className="w-full px-4 py-2 text-left text-[13px] text-slate-400 hover:bg-slate-50">Sin departamento</button>
                       {departments.map(d => (
                         <button key={d} type="button" onClick={() => { setTransferEnvelopeForm({ ...transferEnvelopeForm, personDepartment: d }); setShowExpenseDepartmentDropdown(false); }}
-                          className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50">{d}</button>
+                          className="w-full px-4 py-2 text-left text-[13px] hover:bg-slate-50">{d}</button>
                       ))}
                     </div>
                   )}
@@ -3897,17 +3874,17 @@ export default function BoxesPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Notas</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Notas</label>
                 <textarea value={transferEnvelopeForm.notes}
                   onChange={e => setTransferEnvelopeForm({ ...transferEnvelopeForm, notes: e.target.value })}
                   rows={2} placeholder="Observaciones"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none" />
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 resize-none" />
               </div>
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 flex-shrink-0">
-              <button onClick={() => setShowCreateTransferEnvelopeModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
+              <button onClick={() => setShowCreateTransferEnvelopeModal(false)} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
               <button onClick={handleCreateTransferEnvelope} disabled={saving || !transferEnvelopeForm.personName.trim()}
-                className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
+                className="px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
                 {saving ? "Creando..." : "Crear sobre"}
               </button>
             </div>
@@ -3917,16 +3894,16 @@ export default function BoxesPage() {
 
       {/* Delete Transfer Envelope Confirm */}
       {showDeleteTransferEnvelopeModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
           onClick={() => setShowDeleteTransferEnvelopeModal(null)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <div className="p-6">
-              <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mb-4"><AlertTriangle size={22} className="text-red-500" /></div>
+              <div className="w-12 h-12 bg-red-50 rounded-md flex items-center justify-center mb-4"><AlertTriangle size={22} className="text-red-500" /></div>
               <h3 className="text-lg font-semibold text-slate-900 mb-1">Eliminar sobre</h3>
-              <p className="text-sm text-slate-500 mb-6">Se eliminará <strong>{showDeleteTransferEnvelopeModal.displayNumber}</strong> y todos sus gastos.</p>
+              <p className="text-[13px] text-slate-500 mb-6">Se eliminará <strong>{showDeleteTransferEnvelopeModal.displayNumber}</strong> y todos sus gastos.</p>
               <div className="flex gap-3">
-                <button onClick={() => setShowDeleteTransferEnvelopeModal(null)} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50">Cancelar</button>
-                <button onClick={() => handleDeleteTransferEnvelope(showDeleteTransferEnvelopeModal)} disabled={saving} className="flex-1 px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 disabled:opacity-50">
+                <button onClick={() => setShowDeleteTransferEnvelopeModal(null)} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-50">Cancelar</button>
+                <button onClick={() => handleDeleteTransferEnvelope(showDeleteTransferEnvelopeModal)} disabled={saving} className="flex-1 px-4 py-2 bg-red-500 text-white rounded-md text-[13px] font-medium hover:bg-red-600 disabled:opacity-50">
                   {saving ? "Eliminando..." : "Eliminar"}
                 </button>
               </div>
@@ -3937,15 +3914,15 @@ export default function BoxesPage() {
 
       {/* Add Transfer Expense Modal */}
       {showAddExpenseModal && selectedTransferEnvelope && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
           onClick={() => setShowAddExpenseModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Añadir gastos</h3>
+                <h3 className="text-[14px] font-semibold text-slate-900">Añadir gastos</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Contra el sobre de {selectedTransferEnvelope.personName}</p>
               </div>
-              <button onClick={() => setShowAddExpenseModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+              <button onClick={() => setShowAddExpenseModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-md"><X size={18} /></button>
             </div>
             <div className="p-6 flex-1 overflow-y-auto space-y-6">
               {/* Gastos */}
@@ -3953,13 +3930,13 @@ export default function BoxesPage() {
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Gastos ({expensesList.length})</p>
                   <button onClick={() => setExpensesList([...expensesList, createEmptyExpense()])}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg">
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-slate-700 hover:bg-slate-100 rounded-lg">
                     <Plus size={14} /> Nuevo gasto
                   </button>
                 </div>
                 <div className="space-y-4">
                   {expensesList.map((exp, idx) => (
-                    <div key={exp.id} className="p-4 border border-slate-200 rounded-xl space-y-4">
+                    <div key={exp.id} className="p-4 border border-slate-200 rounded-md space-y-4">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Gasto {idx + 1}</span>
                         <div className="flex items-center gap-2">
@@ -3976,31 +3953,31 @@ export default function BoxesPage() {
                             setTypeDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
                             setShowTypeDropdown(idx);
                           }}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-left text-sm flex items-center justify-between hover:border-slate-300">
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-left text-[13px] flex items-center justify-between hover:border-slate-300">
                             <span className="text-slate-900">{exp.type === "ticket" ? "Ticket" : "Factura"}</span>
                             <ChevronDown size={14} className="text-slate-400" />
                           </button>
                           {showTypeDropdown === idx && typeDropdownPos && (
                             <div className="fixed z-50 bg-white border border-slate-200 rounded-lg shadow-lg py-1"
                               style={{ top: typeDropdownPos.top, left: typeDropdownPos.left, width: typeDropdownPos.width }}>
-                              <button type="button" onClick={() => { updateExpenseInList(idx, "type", "ticket"); setShowTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50">Ticket</button>
-                              <button type="button" onClick={() => { updateExpenseInList(idx, "type", "invoice"); setShowTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50">Factura</button>
+                              <button type="button" onClick={() => { updateExpenseInList(idx, "type", "ticket"); setShowTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-[13px] hover:bg-slate-50">Ticket</button>
+                              <button type="button" onClick={() => { updateExpenseInList(idx, "type", "invoice"); setShowTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-[13px] hover:bg-slate-50">Factura</button>
                             </div>
                           )}
                         </div>
                         <div className="col-span-3">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label>
                           <input type="text" value={exp.date} onChange={e => updateExpenseInList(idx, "date", e.target.value)} placeholder="DD/MM/YYYY"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                         </div>
                         <div className="col-span-3">
                           <label className="block text-xs font-medium text-slate-600 mb-1">IRPF %</label>
                           <input type="number" value={exp.irpfRate} onChange={e => updateExpenseInList(idx, "irpfRate", parseFloat(e.target.value) || 0)} step="1"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
+                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 font-mono" />
                         </div>
                         <div className="col-span-3">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Documento</label>
-                          <label className="w-full px-3 py-2 border border-dashed border-slate-300 rounded-lg text-sm flex items-center justify-center gap-2 cursor-pointer hover:border-slate-400 hover:bg-slate-50">
+                          <label className="w-full px-3 py-2 border border-dashed border-slate-300 rounded-lg text-[13px] flex items-center justify-center gap-2 cursor-pointer hover:border-slate-400 hover:bg-slate-50">
                             <Upload size={14} className="text-slate-400" />
                             <span className="text-slate-500">{exp.file ? "Cambiar" : "Subir"}</span>
                             <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
@@ -4017,7 +3994,7 @@ export default function BoxesPage() {
                               setShowExpenseSupplierDropdown(idx);
                             }}
                             placeholder="Nombre del proveedor"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                           {showExpenseSupplierDropdown === idx && expenseSupplierDropdownPos && (() => {
                             const filtered = cardSuppliers.filter(s =>
                               s.name.toLowerCase().includes(exp.supplier.toLowerCase()) || s.taxId.includes(exp.supplier)
@@ -4032,7 +4009,7 @@ export default function BoxesPage() {
                                       setExpensesList(prev => prev.map((e2, i2) => i2 === idx ? { ...e2, supplier: s.name, supplierTaxId: s.taxId } : e2));
                                       setShowExpenseSupplierDropdown(null);
                                     }}
-                                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center justify-between">
+                                    className="w-full px-3 py-2 text-left text-[13px] hover:bg-slate-50 flex items-center justify-between">
                                     <span className="text-slate-900">{s.name}</span>
                                     <span className="text-xs text-slate-400">{s.taxId}</span>
                                   </button>
@@ -4045,11 +4022,11 @@ export default function BoxesPage() {
                           <label className="block text-xs font-medium text-slate-600 mb-1">CIF / NIF</label>
                           <input type="text" value={exp.supplierTaxId} onChange={e => updateExpenseInList(idx, "supplierTaxId", e.target.value)}
                             placeholder="B12345678"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                         </div>
                       </div>
                       <input type="text" value={(exp as any).description ?? ""} onChange={e => updateExpenseInList(idx, "description", e.target.value)} placeholder="Descripción del gasto"
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                       <div className="bg-slate-50 rounded-lg p-3">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-medium text-slate-500">Líneas de detalle ({exp.items.length})</span>
@@ -4076,12 +4053,12 @@ export default function BoxesPage() {
                               <div className="col-span-3">
                                 {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">Base *</label>}
                                 <input type="number" value={item.baseAmount || ""} onChange={e => updateExpenseItem(idx, itemIdx, "baseAmount", parseFloat(e.target.value) || 0)} step="0.01"
-                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 font-mono" />
                               </div>
                               <div className="col-span-2">
                                 {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">IVA %</label>}
                                 <input type="number" value={item.vatRate} onChange={e => updateExpenseItem(idx, itemIdx, "vatRate", parseFloat(e.target.value) || 0)} step="1"
-                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 font-mono" />
                               </div>
                               <div className="col-span-1 flex justify-center">
                                 {exp.items.length > 1 && <button onClick={() => removeItemFromExpense(idx, itemIdx)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={12} /></button>}
@@ -4091,7 +4068,7 @@ export default function BoxesPage() {
                         </div>
                       </div>
                       <div className="flex justify-end">
-                        <div className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm">
+                        <div className="bg-slate-900 text-white px-4 py-2 rounded-lg text-[13px]">
                           <span className="text-slate-400">Total gasto:</span>
                           <span className="ml-2 font-mono font-semibold">{fmt(computeExpenseTotal(exp).totalAmount)} €</span>
                         </div>
@@ -4102,14 +4079,14 @@ export default function BoxesPage() {
               </div>
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between flex-shrink-0 bg-white">
-              <div className="text-sm text-slate-500">
+              <div className="text-[13px] text-slate-500">
                 Total: <strong className="text-slate-900 font-mono">{fmt(expensesList.reduce((sum, exp) => sum + computeExpenseTotal(exp).totalAmount, 0))} €</strong>
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setShowAddExpenseModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
+                <button onClick={() => setShowAddExpenseModal(false)} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
                 <button onClick={handleAddAllExpenses}
                   disabled={saving || expensesList.filter(e => e.supplier.trim() && e.items.some(item => item.baseAmount > 0 && item.subAccountCode)).length === 0}
-                  className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}>
+                  className="px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
                   {saving ? "Guardando..." : `Añadir ${expensesList.filter(e => e.supplier.trim() && e.items.some(item => item.baseAmount > 0 && item.subAccountCode)).length} gasto${expensesList.filter(e => e.supplier.trim() && e.items.some(item => item.baseAmount > 0 && item.subAccountCode)).length !== 1 ? "s" : ""}`}
                 </button>
               </div>
@@ -4122,15 +4099,15 @@ export default function BoxesPage() {
       {showSettleModal && selectedTransferEnvelope && (() => {
         const preview = getSettlementPreview(selectedTransferEnvelope);
         return (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+          <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
             onClick={() => setShowSettleModal(false)}>
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-slate-900">Liquidación</h3>
-                <button onClick={() => setShowSettleModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+              <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+                <h3 className="text-[14px] font-semibold text-slate-900">Liquidación</h3>
+                <button onClick={() => setShowSettleModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-md"><X size={18} /></button>
               </div>
               <div className="p-6 space-y-4">
-                <div className="p-4 bg-slate-50 rounded-xl space-y-1.5 text-sm">
+                <div className="p-4 bg-slate-50 rounded-md space-y-1.5 text-[13px]">
                   <div className="flex justify-between"><span className="text-slate-500">Anticipo{selectedTransferEnvelope.advances.length > 1 ? "s" : ""}</span><span className="font-mono text-slate-900">{fmt(getTotalAdvance(selectedTransferEnvelope))} €</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">Total gastos</span><span className="font-mono text-slate-900">{fmt(selectedTransferEnvelope.totalAmount)} €</span></div>
                   <div className="border-t border-slate-200 my-1.5" />
@@ -4144,26 +4121,25 @@ export default function BoxesPage() {
                 {preview.direction !== "none" && (
                   <>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Extracto del banco *</label>
-                      <label className="flex items-center gap-2 px-4 py-2.5 border border-dashed border-slate-300 rounded-xl bg-white cursor-pointer hover:border-slate-400 text-sm text-slate-500">
+                      <label className="mb-1.5 block text-xs font-medium text-slate-600">Extracto del banco *</label>
+                      <label className="flex items-center gap-2 px-4 py-1.5 border border-dashed border-slate-300 rounded-md bg-white cursor-pointer hover:border-slate-400 text-[13px] text-slate-500">
                         <Upload size={15} />
                         {settleForm.proofFile ? settleForm.proofFile.name : "Subir fichero"}
                         <input type="file" className="hidden" onChange={e => setSettleForm({ ...settleForm, proofFile: e.target.files?.[0] || null })} />
                       </label>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Referencia (opcional)</label>
+                      <label className="mb-1.5 block text-xs font-medium text-slate-600">Referencia (opcional)</label>
                       <input type="text" value={settleForm.reference} onChange={e => setSettleForm({ ...settleForm, reference: e.target.value })} placeholder="2024-PC-001"
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 font-mono" />
                     </div>
                   </>
                 )}
               </div>
               <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-                <button onClick={() => setShowSettleModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
+                <button onClick={() => setShowSettleModal(false)} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
                 <button onClick={handleSettleEnvelope} disabled={saving || (preview.direction !== "none" && !settleForm.proofFile)}
-                  className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50"
-                  style={{ background: "linear-gradient(135deg, #f59e0b, #f97316)" }}>
+                  className="flex items-center gap-2 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
                   <Scale size={14} /> {saving ? "Liquidando..." : "Confirmar liquidación"}
                 </button>
               </div>
@@ -4174,63 +4150,63 @@ export default function BoxesPage() {
 
       {/* Add Advance Modal */}
       {showAddAdvanceModal && selectedTransferEnvelope && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
           onClick={() => setShowAddAdvanceModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Añadir anticipo</h3>
+                <h3 className="text-[14px] font-semibold text-slate-900">Añadir anticipo</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {selectedTransferEnvelope.advances.length > 0
                     ? `Ya hay ${fmt(getTotalAdvance(selectedTransferEnvelope))} € anticipados en este sobre`
                     : `Sobre ${selectedTransferEnvelope.displayNumber} · ${selectedTransferEnvelope.personName}`}
                 </p>
               </div>
-              <button onClick={() => setShowAddAdvanceModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+              <button onClick={() => setShowAddAdvanceModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-md"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Importe *</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Importe *</label>
                   <input type="number" min="0" step="0.01" value={advanceForm.amount}
                     onChange={e => setAdvanceForm({ ...advanceForm, amount: e.target.value })}
                     placeholder="500,00"
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 font-mono" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Método</label>
-                  <div className="flex border border-slate-200 rounded-xl overflow-hidden h-[42px]">
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Método</label>
+                  <div className="flex border border-slate-200 rounded-md overflow-hidden h-[42px]">
                     <button type="button" onClick={() => setAdvanceForm({ ...advanceForm, method: "bank" })}
-                      className={`flex-1 text-xs font-medium transition-colors ${advanceForm.method === "bank" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Transferencia</button>
+                      className={`flex-1 text-xs font-medium transition-colors ${advanceForm.method === "bank" ? "bg-[#F1F1F3] text-slate-900" : "text-slate-600 hover:bg-slate-50"}`}>Transferencia</button>
                     <button type="button" onClick={() => setAdvanceForm({ ...advanceForm, method: "cash" })}
-                      className={`flex-1 text-xs font-medium transition-colors border-l border-slate-200 ${advanceForm.method === "cash" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Efectivo</button>
+                      className={`flex-1 text-xs font-medium transition-colors border-l border-slate-200 ${advanceForm.method === "cash" ? "bg-[#F1F1F3] text-slate-900" : "text-slate-600 hover:bg-slate-50"}`}>Efectivo</button>
                   </div>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Fecha</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Fecha</label>
                 <input type="date" value={advanceForm.date}
                   onChange={e => setAdvanceForm({ ...advanceForm, date: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
               </div>
               {advanceForm.method === "bank" && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">IBAN de {selectedTransferEnvelope.personName} (opcional)</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">IBAN de {selectedTransferEnvelope.personName} (opcional)</label>
                   <input type="text" value={advanceForm.iban}
                     onChange={e => setAdvanceForm({ ...advanceForm, iban: formatIban(e.target.value) })}
                     placeholder="ES00 0000 0000 0000 0000 0000"
-                    className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 font-mono text-xs whitespace-nowrap transition-colors ${
+                    className={`w-full px-2.5 py-1.5 border rounded-md focus:outline-none focus:ring-4 font-mono text-xs whitespace-nowrap transition-colors ${
                       advanceForm.iban && !validateIban(advanceForm.iban) ? "border-red-300 focus:ring-red-400"
                         : advanceForm.iban && validateIban(advanceForm.iban) ? "border-emerald-300 focus:ring-emerald-400"
-                        : "border-slate-200 focus:ring-slate-900"
+                        : "border-slate-200 focus:ring-slate-900/10 focus:border-slate-900"
                     }`} />
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">
                   {advanceForm.method === "cash" ? "Recibí firmado *" : "Comprobante de transferencia *"}
                 </label>
-                <label className="flex items-center gap-2 px-4 py-2.5 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-slate-400 text-sm text-slate-500">
+                <label className="flex items-center gap-2 px-4 py-1.5 border border-dashed border-slate-300 rounded-md cursor-pointer hover:border-slate-400 text-[13px] text-slate-500">
                   <Upload size={15} />
                   {advanceForm.proofFile ? advanceForm.proofFile.name : "Subir fichero"}
                   <input type="file" className="hidden" onChange={e => setAdvanceForm({ ...advanceForm, proofFile: e.target.files?.[0] || null })} />
@@ -4238,10 +4214,9 @@ export default function BoxesPage() {
               </div>
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-              <button onClick={() => setShowAddAdvanceModal(false)} className="px-4 py-2 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100">Cancelar</button>
+              <button onClick={() => setShowAddAdvanceModal(false)} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
               <button onClick={handleAddAdvance} disabled={addingAdvance}
-                className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50"
-                style={{ backgroundColor: "#2F52E0" }}>
+                className="flex items-center gap-2 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
                 <Banknote size={14} /> {addingAdvance ? "Añadiendo..." : "Añadir anticipo"}
               </button>
             </div>
@@ -4254,11 +4229,11 @@ export default function BoxesPage() {
         <>
           <div className="fixed inset-0 z-[60]" onClick={() => { setShowAccountSelector(false); setEditingExpenseIndex(null); }} />
           <div ref={accountSelectorRef}
-            className="fixed z-[70] w-80 bg-white border border-slate-200 rounded-xl shadow-xl"
+            className="fixed z-[70] w-80 bg-white border border-slate-200 rounded-md shadow-xl"
             style={{ top: Math.min(accountSelectorPos.top, window.innerHeight - 300), left: accountSelectorPos.left }}>
             <div className="p-2 border-b border-slate-100">
               <input type="text" value={accountSearchTerm} onChange={e => setAccountSearchTerm(e.target.value)} placeholder="Buscar cuenta"
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-900" autoFocus />
+                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-1 focus:ring-slate-900/10 focus:border-slate-900" autoFocus />
             </div>
             <div className="max-h-64 overflow-y-auto">
               {subAccounts
@@ -4284,11 +4259,11 @@ export default function BoxesPage() {
                     }}
                     className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2 border-b border-slate-50 last:border-0">
                     <span className="font-mono text-xs text-slate-600 w-16 flex-shrink-0">{sa.code}</span>
-                    <span className="text-sm text-slate-700 truncate">{sa.description}</span>
+                    <span className="text-[13px] text-slate-700 truncate">{sa.description}</span>
                   </button>
                 ))}
               {subAccounts.filter(sa => !accountSearchTerm || sa.code.toLowerCase().includes(accountSearchTerm.toLowerCase()) || sa.description.toLowerCase().includes(accountSearchTerm.toLowerCase())).length === 0 && (
-                <p className="px-3 py-4 text-sm text-slate-400 text-center">Sin resultados</p>
+                <p className="px-3 py-4 text-[13px] text-slate-400 text-center">Sin resultados</p>
               )}
             </div>
           </div>
@@ -4299,11 +4274,11 @@ export default function BoxesPage() {
       {showCardAccountSelector && cardAccountSelectorPos && editingCardExpenseIndex !== null && (
         <>
           <div className="fixed inset-0 z-[60]" onClick={() => { setShowCardAccountSelector(false); setEditingCardExpenseIndex(null); }} />
-          <div className="fixed z-[70] w-80 bg-white border border-slate-200 rounded-xl shadow-xl"
+          <div className="fixed z-[70] w-80 bg-white border border-slate-200 rounded-md shadow-xl"
             style={{ top: Math.min(cardAccountSelectorPos.top, window.innerHeight - 300), left: cardAccountSelectorPos.left }}>
             <div className="p-2 border-b border-slate-100">
               <input type="text" value={cardAccountSearch} onChange={e => setCardAccountSearch(e.target.value)} placeholder="Buscar cuenta"
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-900" autoFocus />
+                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-1 focus:ring-slate-900/10 focus:border-slate-900" autoFocus />
             </div>
             <div className="max-h-64 overflow-y-auto">
               {subAccounts
@@ -4321,11 +4296,11 @@ export default function BoxesPage() {
                     }}
                     className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2 border-b border-slate-50 last:border-0">
                     <span className="font-mono text-xs text-slate-600 w-16 flex-shrink-0">{sa.code}</span>
-                    <span className="text-sm text-slate-700 truncate">{sa.description}</span>
+                    <span className="text-[13px] text-slate-700 truncate">{sa.description}</span>
                   </button>
                 ))}
               {subAccounts.filter(sa => !cardAccountSearch || sa.code.toLowerCase().includes(cardAccountSearch.toLowerCase()) || sa.description.toLowerCase().includes(cardAccountSearch.toLowerCase())).length === 0 && (
-                <p className="px-3 py-4 text-sm text-slate-400 text-center">Sin resultados</p>
+                <p className="px-3 py-4 text-[13px] text-slate-400 text-center">Sin resultados</p>
               )}
             </div>
           </div>
@@ -4334,8 +4309,8 @@ export default function BoxesPage() {
 
       {/* ── Send Box Form Modal ────────────────────────────────────────────── */}
       {showSendBoxFormModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => { setShowSendBoxFormModal(false); setGeneratedBoxResult(null); }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/20 backdrop-blur-[2px] p-4" onClick={() => { setShowSendBoxFormModal(false); setGeneratedBoxResult(null); }}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100">
               <h3 className="text-base font-semibold text-slate-900">Enviar solicitud de caja</h3>
               <button onClick={() => { setShowSendBoxFormModal(false); setGeneratedBoxResult(null); }} className="text-slate-400 hover:text-slate-600">
@@ -4346,37 +4321,37 @@ export default function BoxesPage() {
             {!generatedBoxResult ? (
               <div className="px-6 py-5 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Nombre del solicitante</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre del solicitante</label>
                   <input
                     type="text"
                     value={boxFormRequesterName}
                     onChange={e => setBoxFormRequesterName(e.target.value)}
                     placeholder="Nombre del beneficiario"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                    className="w-full border border-slate-200 rounded-md px-2.5 py-1.5 text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Mensaje opcional</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Mensaje opcional</label>
                   <textarea
                     value={boxFormMessage}
                     onChange={e => setBoxFormMessage(e.target.value)}
                     rows={2}
                     placeholder="Instrucciones adicionales para el solicitante"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 resize-none"
+                    className="w-full border border-slate-200 rounded-md px-2.5 py-1.5 text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 resize-none"
                   />
                 </div>
                 <button
                   onClick={handleGenerateBoxForm}
                   disabled={generatingBoxForm || !boxFormRequesterName.trim()}
-                  className="w-full py-2.5 rounded-xl text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
+                  className="w-full py-1.5 rounded-md text-[13px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                   {generatingBoxForm ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Generando...</> : <><Link2 size={15} /> Generar enlace</>}
                 </button>
               </div>
             ) : (
               <div className="px-6 py-5 space-y-4">
-                <p className="text-sm text-slate-600">Comparte este enlace y PIN con <strong>{boxFormRequesterName}</strong>.</p>
+                <p className="text-[13px] text-slate-600">Comparte este enlace y PIN con <strong>{boxFormRequesterName}</strong>.</p>
                 {/* PIN */}
-                <div className="bg-slate-900 rounded-xl p-4 text-center">
+                <div className="bg-slate-900 rounded-md p-4 text-center">
                   <p className="text-xs text-slate-400 mb-2 tracking-widest uppercase">PIN de acceso</p>
                   <div className="flex justify-center gap-3">
                     {generatedBoxResult.pin.split("").map((d, i) => (
@@ -4389,15 +4364,15 @@ export default function BoxesPage() {
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Enlace del formulario</p>
                   <p className="text-xs text-slate-600 break-all font-mono bg-slate-50 rounded-lg px-2 py-1.5">{generatedBoxResult.url}</p>
                   <div className="flex gap-2">
-                    <button onClick={() => copyBoxMessage(generatedBoxResult!.url, generatedBoxResult!.pin)} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-colors ${copiedBoxUrl ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"}`}>
+                    <button onClick={() => copyBoxMessage(generatedBoxResult!.url, generatedBoxResult!.pin)} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium border transition-colors ${copiedBoxUrl ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"}`}>
                       {copiedBoxUrl ? <><Check size={12} /> Copiado</> : <><ClipboardCopy size={12} /> Copiar mensaje</>}
                     </button>
-                    <a href={generatedBoxResult.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
+                    <a href={generatedBoxResult.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
                       <ExternalLink size={12} /> Abrir
                     </a>
                   </div>
                 </div>
-                <button onClick={() => { setShowSendBoxFormModal(false); setGeneratedBoxResult(null); }} className="w-full py-2.5 rounded-xl text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
+                <button onClick={() => { setShowSendBoxFormModal(false); setGeneratedBoxResult(null); }} className="w-full py-1.5 rounded-md text-[13px] font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
                   Cerrar
                 </button>
               </div>
@@ -4430,9 +4405,9 @@ export default function BoxesPage() {
         const IRPF_RATES = [0, 7, 15, 19];
 
         return (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/20 backdrop-blur-[2px] p-4"
             onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); setShowVolcarSupplierDropdown(null); }}>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
 
               {/* Header */}
               <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 flex-shrink-0">
@@ -4450,24 +4425,24 @@ export default function BoxesPage() {
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Sobre de destino</label>
                   {openEnvelopes.length === 0 ? (
-                    <div className="border border-amber-200 bg-amber-50 rounded-xl px-4 py-3 text-sm text-amber-700">
+                    <div className="border border-amber-200 bg-amber-50 rounded-md px-4 py-3 text-[13px] text-amber-700">
                       No hay sobres abiertos. Crea uno en la pestaña de Petty Cash primero.
                     </div>
                   ) : (
                     <div className="relative">
                       <button type="button" onClick={() => setShowVolcarEnvDropdown(!showVolcarEnvDropdown)}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white">
+                        className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white">
                         <span className={selectedEnv ? "text-slate-900 text-sm" : "text-slate-400 text-sm"}>
                           {selectedEnv ? `${selectedEnv.displayNumber}${selectedEnv.paymentDate ? ` · ${selectedEnv.paymentDate}` : ""}` : "Seleccionar sobre"}
                         </span>
                         <ChevronDown size={15} className={`text-slate-400 transition-transform ${showVolcarEnvDropdown ? "rotate-180" : ""}`} />
                       </button>
                       {showVolcarEnvDropdown && (
-                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
                           {openEnvelopes.map(env => (
                             <button key={env.id} type="button"
                               onClick={() => { setVolcarTargetEnvelopeId(env.id); setShowVolcarEnvDropdown(false); }}
-                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 flex items-center justify-between transition-colors ${volcarTargetEnvelopeId === env.id ? "bg-slate-50 font-medium" : ""}`}>
+                              className={`w-full px-4 py-1.5 text-left text-[13px] hover:bg-slate-50 flex items-center justify-between transition-colors ${volcarTargetEnvelopeId === env.id ? "bg-slate-50 font-medium" : ""}`}>
                               <div>
                                 <p className="text-slate-900">{env.displayNumber}</p>
                                 {env.paymentDate && <p className="text-xs text-slate-400">{env.paymentDate}</p>}
@@ -4495,11 +4470,11 @@ export default function BoxesPage() {
                   );
 
                   return (
-                    <div key={i} className="border border-slate-200 rounded-2xl overflow-visible">
+                    <div key={i} className="border border-slate-200 rounded-lg overflow-visible">
                       {/* Expense header */}
-                      <div className="bg-slate-50 rounded-t-2xl px-4 py-3 border-b border-slate-200 flex items-start gap-3">
+                      <div className="bg-slate-50 rounded-t-lg px-4 py-3 border-b border-slate-200 flex items-start gap-3">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-900 truncate">{exp.description || `Gasto ${i + 1}`}</p>
+                          <p className="text-[13px] font-medium text-slate-900 truncate">{exp.description || `Gasto ${i + 1}`}</p>
                           <p className="text-xs text-slate-500 mt-0.5">
                             Total del ticket: <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(totalAmt)} €</strong>
                           </p>
@@ -4560,14 +4535,14 @@ export default function BoxesPage() {
                                 setShowVolcarSupplierDropdown(i);
                               }}
                               placeholder="Nombre del proveedor"
-                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                             {showVolcarSupplierDropdown === i && volcarSupplierDropdownPos && filteredSuppliers.length > 0 && (
-                              <div className="fixed z-20 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-40 overflow-y-auto"
+                              <div className="fixed z-20 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-40 overflow-y-auto"
                                 style={{ top: volcarSupplierDropdownPos.top, left: volcarSupplierDropdownPos.left, width: volcarSupplierDropdownPos.width }}>
                                 {filteredSuppliers.slice(0, 8).map(s => (
                                   <button key={s.taxId} type="button"
                                     onClick={() => { updateEd(i, { supplier: s.name, supplierTaxId: s.taxId }); setShowVolcarSupplierDropdown(null); }}
-                                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center justify-between">
+                                    className="w-full px-3 py-2 text-left text-[13px] hover:bg-slate-50 flex items-center justify-between">
                                     <span className="text-slate-900">{s.name}</span>
                                     <span className="text-xs text-slate-400">{s.taxId}</span>
                                   </button>
@@ -4582,7 +4557,7 @@ export default function BoxesPage() {
                             <input type="text" value={ed.supplierTaxId}
                               onChange={e => updateEd(i, { supplierTaxId: e.target.value })}
                               placeholder="B12345678"
-                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                           </div>
 
                           {/* Fecha */}
@@ -4590,7 +4565,7 @@ export default function BoxesPage() {
                             <label className="block text-xs font-medium text-slate-500 mb-1">Fecha del gasto</label>
                             <input type="date" value={ed.date}
                               onChange={e => updateEd(i, { date: e.target.value })}
-                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                           </div>
 
                           {/* IRPF */}
@@ -4634,14 +4609,14 @@ export default function BoxesPage() {
                                         updateVolcarItem(i, j, { showSubAccountDropdown: true });
                                       }}
                                       placeholder="Buscar cuenta"
-                                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-200" />
+                                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                                     {item.showSubAccountDropdown && volcarAccountDropdownPos && filteredAccounts.length > 0 && (
-                                      <div className="fixed z-20 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto"
+                                      <div className="fixed z-20 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto"
                                         style={{ top: volcarAccountDropdownPos.top, left: volcarAccountDropdownPos.left, width: volcarAccountDropdownPos.width }}>
                                         {filteredAccounts.slice(0, 10).map(a => (
                                           <button key={a.id} type="button"
                                             onClick={() => updateVolcarItem(i, j, { subAccountCode: a.code, subAccountDescription: a.description, subAccountSearch: "", showSubAccountDropdown: false })}
-                                            className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50">
+                                            className="w-full px-3 py-2 text-left text-[13px] hover:bg-slate-50">
                                             <span className="font-mono text-slate-500 mr-2">{a.code}</span>
                                             <span className="text-slate-900">{a.description}</span>
                                           </button>
@@ -4652,11 +4627,11 @@ export default function BoxesPage() {
                                   <input type="number" step="0.01" value={item.baseAmount || ""}
                                     onChange={e => updateVolcarItem(i, j, { baseAmount: parseFloat(e.target.value) || 0 })}
                                     placeholder="Base"
-                                    className="w-24 px-3 py-2 border border-slate-200 rounded-xl text-sm text-right focus:outline-none focus:ring-2 focus:ring-slate-200" />
+                                    className="w-24 px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] text-right focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                                   <div className="relative">
                                     <select value={item.vatRate}
                                       onChange={e => updateVolcarItem(i, j, { vatRate: Number(e.target.value) })}
-                                      className="w-20 px-2 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-200 appearance-none">
+                                      className="w-20 px-2 py-1.5 border border-slate-200 rounded-md text-[13px] bg-white focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 appearance-none">
                                       {VAT_RATES.map(r => <option key={r} value={r}>{r}% IVA</option>)}
                                     </select>
                                   </div>
@@ -4687,12 +4662,12 @@ export default function BoxesPage() {
               {/* Footer */}
               <div className="flex gap-2 px-6 py-4 border-t border-slate-100 flex-shrink-0">
                 <button onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); }}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
+                  className="flex-1 py-1.5 rounded-md text-[13px] font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
                   Cancelar
                 </button>
                 <button onClick={() => handleVolcarToEnvelope(showVolcarModal!)}
                   disabled={!volcarTargetEnvelopeId || volcandoFormId === showVolcarModal}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
+                  className="flex-1 py-1.5 rounded-md text-[13px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                   {volcandoFormId === showVolcarModal
                     ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Volcando</>
                     : "Volcar al sobre"}
@@ -4705,16 +4680,16 @@ export default function BoxesPage() {
 
       {/* ── Configurar exportación (DEMO / vista previa) ──────────────────── */}
       {showExportConfigModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4" onClick={() => setShowExportConfigModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto border border-slate-200" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4" onClick={() => setShowExportConfigModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[85vh] overflow-y-auto border border-slate-200" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #f59e0b, #f97316)" }}>
+                <div className="hidden">
                   <Settings size={18} className="text-white" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-semibold text-slate-900">Exportación a servicio de tarjetas</h2>
+                    <h2 className="text-[14px] font-semibold text-slate-900">Exportación a servicio de tarjetas</h2>
                     <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
                       <Sparkles size={10} /> DEMO
                     </span>
@@ -4722,13 +4697,13 @@ export default function BoxesPage() {
                   <p className="text-xs text-slate-500">Vista previa · aún no conectado a ningún proveedor</p>
                 </div>
               </div>
-              <button onClick={() => setShowExportConfigModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
+              <button onClick={() => setShowExportConfigModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors">
                 <X size={20} />
               </button>
             </div>
 
             <div className="p-6 space-y-5">
-              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex gap-2.5">
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-md flex gap-2.5">
                 <Info size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-amber-800 leading-relaxed">
                   Así se verá el panel para sincronizar BOX con el proveedor de tarjetas corporativas del proyecto
@@ -4738,19 +4713,19 @@ export default function BoxesPage() {
 
               {/* Proveedor */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Proveedor de tarjetas</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Proveedor de tarjetas</label>
                 <input
                   type="text"
                   value={exportConfig.providerName}
                   onChange={(e) => setExportConfig({ ...exportConfig, providerName: e.target.value })}
                   placeholder="Nombre de tu proveedor de tarjetas corporativas"
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-amber-500 bg-white"
                 />
               </div>
 
               {/* Formato */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Formato de exportación</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Formato de exportación</label>
                 <div className="grid grid-cols-3 gap-2">
                   {([
                     { value: "csv", label: "CSV", icon: FileSpreadsheet },
@@ -4763,7 +4738,7 @@ export default function BoxesPage() {
                       <button
                         key={opt.value}
                         onClick={() => setExportConfig({ ...exportConfig, format: opt.value })}
-                        className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 text-xs font-medium transition-all ${active ? "border-amber-400 bg-amber-50 text-amber-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
+                        className={`flex flex-col items-center gap-1.5 py-2 rounded-md border-2 text-xs font-medium transition-all ${active ? "border-amber-400 bg-amber-50 text-amber-700" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
                       >
                         <Icon size={16} />
                         {opt.label}
@@ -4775,19 +4750,19 @@ export default function BoxesPage() {
 
               {exportConfig.format === "api" && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Endpoint / Webhook URL</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Endpoint / Webhook URL</label>
                   <input
                     type="text"
                     disabled
                     placeholder="https://api.tu-proveedor.com/webhooks/box"
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 text-slate-400 cursor-not-allowed"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] bg-slate-50 text-slate-400 cursor-not-allowed"
                   />
                 </div>
               )}
 
               {/* Frecuencia */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Frecuencia de sincronización</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Frecuencia de sincronización</label>
                 <div className="flex gap-2">
                   {([
                     { value: "manual", label: "Manual" },
@@ -4797,7 +4772,7 @@ export default function BoxesPage() {
                     <button
                       key={opt.value}
                       onClick={() => setExportConfig({ ...exportConfig, frequency: opt.value })}
-                      className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-all ${exportConfig.frequency === opt.value ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                      className={`flex-1 py-2 rounded-md text-xs font-medium border transition-all ${exportConfig.frequency === opt.value ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
                     >
                       {opt.label}
                     </button>
@@ -4807,25 +4782,25 @@ export default function BoxesPage() {
 
               {/* Qué se exporta */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Qué se incluye</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Qué se incluye</label>
                 <div className="space-y-2">
-                  <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:border-slate-300 transition-all">
+                  <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-md cursor-pointer hover:border-slate-300 transition-all">
                     <input
                       type="checkbox"
                       checked={exportConfig.mapCategories}
                       onChange={(e) => setExportConfig({ ...exportConfig, mapCategories: e.target.checked })}
                       className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500"
                     />
-                    <span className="text-sm text-slate-700">Mapeo de departamentos y cuentas presupuestarias</span>
+                    <span className="text-[13px] text-slate-700">Mapeo de departamentos y cuentas presupuestarias</span>
                   </label>
-                  <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:border-slate-300 transition-all">
+                  <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-md cursor-pointer hover:border-slate-300 transition-all">
                     <input
                       type="checkbox"
                       checked={exportConfig.mapReceipts}
                       onChange={(e) => setExportConfig({ ...exportConfig, mapReceipts: e.target.checked })}
                       className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500"
                     />
-                    <span className="text-sm text-slate-700">Adjuntar justificantes y tickets</span>
+                    <span className="text-[13px] text-slate-700">Adjuntar justificantes y tickets</span>
                   </label>
                 </div>
               </div>
@@ -4834,14 +4809,13 @@ export default function BoxesPage() {
             <div className="flex gap-3 px-6 py-4 border-t border-slate-100 flex-shrink-0">
               <button
                 onClick={() => setShowExportConfigModal(false)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+                className="flex-1 py-1.5 rounded-md text-[13px] font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
               >
                 Cerrar
               </button>
               <button
                 onClick={() => { setShowExportConfigModal(false); showToast("success", "Vista previa · esta configuración aún no está conectada"); }}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                style={{ background: "linear-gradient(135deg, #f59e0b, #f97316)" }}
+                className="flex-1 py-1.5 rounded-md text-[13px] font-semibold border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] transition-opacity"
               >
                 Guardar configuración
               </button>

@@ -611,15 +611,14 @@ export default function InvoicesPage() {
     return (
       <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="hidden">
             <ShieldAlert size={28} className="text-red-500" />
           </div>
-          <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
+          <h2 className="text-[14px] font-semibold text-slate-900 mb-2">Acceso denegado</h2>
           <p className="text-slate-500 mb-6">{permissionsError || "No tienes permisos para ver facturas"}</p>
           <Link 
             href={`/project/${id}/accounting`} 
-            className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
-            style={{ backgroundColor: '#2F52E0' }}
+            className="inline-flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity"
           >
             Volver al panel
           </Link>
@@ -631,14 +630,13 @@ export default function InvoicesPage() {
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
       <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
+        <div className="px-6 pt-8 sm:px-10">
           {/* Page header */}
-          <div className="relative flex items-center justify-center">
+          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
             <div className="flex items-center gap-4">
-              <Receipt size={22} style={{ color: '#2F52E0' }} />
               <div className="text-center">
                 <div className="flex items-center justify-center gap-2">
-                  <h1 className="text-3xl font-bold text-slate-900 text-center">Facturas</h1>
+                  <h1 className="text-xl font-semibold tracking-tight text-slate-900">Facturas</h1>
                   {/* Company Info Tooltip */}
                   <div className="relative">
                     <button
@@ -649,9 +647,9 @@ export default function InvoicesPage() {
                       <Building2 size={14} />
                     </button>
                     {showCompanyTooltip && (
-                      <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-4 z-50">
+                      <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-72 bg-white rounded-md shadow-xl border border-slate-200 p-4 z-50">
                         <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100">
-                          <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
+                          <div className="hidden">
                             <Building2 size={16} className="text-slate-600" />
                           </div>
                           <p className="text-xs font-medium text-slate-500">Datos fiscales del proyecto</p>
@@ -659,7 +657,7 @@ export default function InvoicesPage() {
                         {companyData ? (
                           <div className="space-y-2">
                             <div>
-                              <p className="text-sm font-semibold text-slate-900">{companyData.fiscalName}</p>
+                              <p className="text-[13px] font-semibold text-slate-900">{companyData.fiscalName}</p>
                               <p className="text-xs font-mono text-slate-600">{companyData.taxId}</p>
                             </div>
                             <div className="text-xs text-slate-600">
@@ -682,7 +680,7 @@ export default function InvoicesPage() {
                   </div>
                 </div>
                 {!permissions.canViewAllPOs && (
-                  <p className="text-sm text-slate-500 mt-0.5">
+                  <p className="text-[13px] text-slate-500 mt-0.5">
                     {permissions.canViewDepartmentPOs ? `Mostrando documentos de ${permissions.department}` : "Mostrando tus documentos"}
                   </p>
                 )}
@@ -692,8 +690,7 @@ export default function InvoicesPage() {
               {permissions.canCreatePO && (
                 <Link
                   href={`/project/${id}/accounting/invoices/new`}
-                  className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
-                  style={{ backgroundColor: '#2F52E0' }}
+                  className="flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity"
                 >
                   <Upload size={16} strokeWidth={2.5} />
                   Subir documento
@@ -711,12 +708,12 @@ export default function InvoicesPage() {
                 <button
                   key={key}
                   onClick={() => setTypeFilter(typeFilter === key ? "all" : key)}
-                  className={`p-3 rounded-xl border transition-all ${typeFilter === key ? `${config.borderColor} ${config.bgColor}` : "border-slate-200 hover:border-slate-300"}`}
+                  className={`p-3 rounded-md border transition-all ${typeFilter === key ? `${config.borderColor} ${config.bgColor}` : "border-slate-200 hover:border-slate-300"}`}
                 >
                   <div className="flex items-center gap-2">
                     <Icon size={16} className={typeFilter === key ? config.textColor : "text-slate-400"} />
-                    <span className={`text-sm font-medium ${typeFilter === key ? config.textColor : "text-slate-700"}`}>{config.label}</span>
-                    <span className={`ml-auto text-sm font-semibold ${typeFilter === key ? config.textColor : "text-slate-900"}`}>{count}</span>
+                    <span className={`text-[13px] font-medium ${typeFilter === key ? config.textColor : "text-slate-700"}`}>{config.label}</span>
+                    <span className={`ml-auto text-[13px] font-semibold ${typeFilter === key ? config.textColor : "text-slate-900"}`}>{count}</span>
                   </div>
                 </button>
               );
@@ -725,21 +722,21 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      <main className="px-24 py-8">
+      <main className="px-6 sm:px-10 py-8">
         {pendingReplacementCount > 0 && (
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 bg-amber-100 rounded-md flex items-center justify-center flex-shrink-0">
                 <AlertTriangle size={20} className="text-amber-600" />
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-amber-900">
                   {pendingReplacementCount} documento{pendingReplacementCount > 1 ? "s" : ""} pendiente{pendingReplacementCount > 1 ? "s" : ""} de factura definitiva
                 </h3>
-                <p className="text-sm text-amber-700 mt-1">Hay proformas o presupuestos que necesitan ser sustituidos por su factura definitiva.</p>
+                <p className="text-[13px] text-amber-700 mt-1">Hay proformas o presupuestos que necesitan ser sustituidos por su factura definitiva.</p>
               </div>
               {permissions.canCreatePO && (
-                <Link href={`/project/${id}/accounting/invoices/replace`} className="px-4 py-2 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 flex-shrink-0 flex items-center gap-2">
+                <Link href={`/project/${id}/accounting/invoices/replace`} className="px-4 py-2 bg-amber-600 text-white text-[13px] rounded-lg hover:bg-amber-700 flex-shrink-0 flex items-center gap-2">
                   <RefreshCw size={14} />
                   Sustituir
                 </Link>
@@ -757,7 +754,7 @@ export default function InvoicesPage() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Buscar facturas"
-              className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm"
+              className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]"
             />
           </div>
           <div className="flex gap-2 flex-shrink-0">
@@ -765,14 +762,14 @@ export default function InvoicesPage() {
             <div className="relative" ref={statusDropdownRef}>
               <button
                 onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                className="flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-xl text-sm hover:border-slate-300 bg-white min-w-[180px]"
+                className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded-md text-[13px] hover:border-slate-300 bg-white min-w-[180px]"
               >
                 <Filter size={14} className="text-slate-400" />
                 <span className="flex-1 text-left text-xs text-slate-700">{getStatusLabel()}</span>
                 <ChevronDown size={14} className={`text-slate-400 transition-transform ${showStatusDropdown ? "rotate-180" : ""}`} />
               </button>
               {showStatusDropdown && (
-                <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden min-w-full">
+                <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-md shadow-lg z-50 py-1 overflow-hidden min-w-full">
                   {STATUS_OPTIONS.map((option) => (
                     <button
                       key={option.value}
@@ -780,7 +777,7 @@ export default function InvoicesPage() {
                         setStatusFilter(option.value);
                         setShowStatusDropdown(false);
                       }}
-                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors whitespace-nowrap ${
+                      className={`w-full text-left px-4 py-1.5 text-[13px] transition-colors whitespace-nowrap ${
                         statusFilter === option.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"
                       }`}
                     >
@@ -795,7 +792,7 @@ export default function InvoicesPage() {
             {canCodeInvoices && (
               <button
                 onClick={() => setShowUncodedOnly(!showUncodedOnly)}
-                className={`flex items-center gap-2 px-3 py-2.5 border rounded-xl text-xs font-medium transition-colors ${
+                className={`flex items-center gap-2 px-3 py-1.5 border rounded-md text-xs font-medium transition-colors ${
                   showUncodedOnly 
                     ? "border-violet-300 bg-violet-50 text-violet-700" 
                     : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
@@ -809,23 +806,23 @@ export default function InvoicesPage() {
         </div>
 
         {filteredInvoices.length === 0 ? (
-          <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
-            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="border-2 border-dashed border-slate-200 rounded-lg p-16 text-center">
+            <div className="hidden">
               <Receipt size={28} className="text-slate-400" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">{searchTerm || statusFilter !== "all" || typeFilter !== "all" || showUncodedOnly ? "No se encontraron resultados" : "Sin documentos"}</h3>
+            <h3 className="text-[14px] font-semibold text-slate-900 mb-2">{searchTerm || statusFilter !== "all" || typeFilter !== "all" || showUncodedOnly ? "No se encontraron resultados" : "Sin documentos"}</h3>
           </div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-2xl">
-            <div className="overflow-x-auto rounded-2xl">
+          <div className="bg-white border border-slate-200 rounded-lg">
+            <div className="overflow-x-auto rounded-lg">
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Documento</th>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Proveedor</th>
-                    <th className="text-right px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Importe</th>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Estado</th>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Vencimiento</th>
+                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Documento</th>
+                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Proveedor</th>
+                    <th className="text-right px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Importe</th>
+                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Estado</th>
+                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Vencimiento</th>
                     <th className="w-16"></th>
                   </tr>
                 </thead>
@@ -847,7 +844,7 @@ export default function InvoicesPage() {
                         }`}
                         onClick={() => router.push(`/project/${id}/accounting/invoices/${invoice.id}`)}
                       >
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-3">
                           <div className="text-left group/inv">
                             <div className="flex items-center gap-2">
                               {getDocumentTypeBadge(invoice.documentType)}
@@ -872,20 +869,20 @@ export default function InvoicesPage() {
                             {invoice.poNumber && <p className="text-xs text-slate-500 mt-0.5 font-mono">PO-{invoice.poNumber}</p>}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <p className="text-sm text-slate-900 font-medium">{invoice.supplier}</p>
+                        <td className="px-4 py-3">
+                          <p className="text-[13px] text-slate-900 font-medium">{invoice.supplier}</p>
                           <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{invoice.description}</p>
                         </td>
-                        <td className="px-6 py-4 text-right">
-                          <p className="text-sm font-semibold text-slate-900">{formatCurrency(invoice.totalAmount)} €</p>
+                        <td className="px-4 py-3 text-right">
+                          <p className="text-[13px] font-semibold text-slate-900">{formatCurrency(invoice.totalAmount)} €</p>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-3">
                           <div className="flex flex-col">
                             {getStatusBadge(invoice)}
                             {!invoice.approvedAt && (invoice.status === "submitted" || invoice.status === "pending_approval") && getApprovalProgress(invoice)}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-3">
                           <div className="flex items-center gap-1.5">
                             <Calendar size={12} className="text-slate-400" />
                             <span className={`text-xs ${dispState === "overdue" ? "text-red-600 font-semibold" : isDueSoon ? "text-amber-600 font-semibold" : "text-slate-600"}`}>
@@ -894,7 +891,7 @@ export default function InvoicesPage() {
                             {isDueSoon && <span className="text-xs text-amber-600">({daysUntilDue}d)</span>}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-3">
                           <div className="relative menu-container">
                             <button
                               onClick={(e) => {
@@ -925,7 +922,7 @@ export default function InvoicesPage() {
 
         {/* Floating menu */}
         {openMenuId && menuPosition && (
-          <div className="fixed w-52 bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] py-1" style={{ top: menuPosition.top, left: menuPosition.left }}>
+          <div className="fixed w-52 bg-white border border-slate-200 rounded-md shadow-xl z-[9999] py-1" style={{ top: menuPosition.top, left: menuPosition.left }}>
             {(() => {
               const invoice = filteredInvoices.find((i) => i.id === openMenuId);
               if (!invoice) return null;
@@ -935,13 +932,13 @@ export default function InvoicesPage() {
                   <Link
                     href={`/project/${id}/accounting/invoices/${invoice.id}`}
                     onClick={closeMenu}
-                    className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3"
+                    className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3"
                   >
                     <Eye size={15} className="text-slate-400" />
                     Ver detalles
                   </Link>
                   {invoice.attachmentUrl && (
-                    <a href={invoice.attachmentUrl} target="_blank" rel="noopener noreferrer" onClick={closeMenu} className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3">
+                    <a href={invoice.attachmentUrl} target="_blank" rel="noopener noreferrer" onClick={closeMenu} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3">
                       <FileText size={15} className="text-slate-400" />
                       Ver adjunto
                     </a>
@@ -949,7 +946,7 @@ export default function InvoicesPage() {
                   {needsReplacement && permissions.canCreatePO && (
                     <>
                       <div className="border-t border-slate-100 my-1" />
-                      <Link href={`/project/${id}/accounting/invoices/new?linkTo=${invoice.id}`} onClick={closeMenu} className="w-full px-4 py-2.5 text-left text-sm text-violet-600 hover:bg-violet-50 flex items-center gap-3">
+                      <Link href={`/project/${id}/accounting/invoices/new?linkTo=${invoice.id}`} onClick={closeMenu} className="w-full px-4 py-1.5 text-left text-[13px] text-violet-600 hover:bg-violet-50 flex items-center gap-3">
                         <Upload size={15} />
                         Subir documento
                       </Link>
@@ -958,7 +955,7 @@ export default function InvoicesPage() {
                   {canEditInvoice(invoice) && !invoice.paidAt && !["cancelled", "rejected", "void"].includes(invoice.status) && (
                     <>
                       <div className="border-t border-slate-100 my-1" />
-                      <button onClick={() => handleCancelInvoice(invoice.id)} className="w-full px-4 py-2.5 text-left text-sm text-amber-600 hover:bg-amber-50 flex items-center gap-3">
+                      <button onClick={() => handleCancelInvoice(invoice.id)} className="w-full px-4 py-1.5 text-left text-[13px] text-amber-600 hover:bg-amber-50 flex items-center gap-3">
                         <XCircle size={15} />
                         Cancelar
                       </button>
@@ -967,7 +964,7 @@ export default function InvoicesPage() {
                   {canDeleteInvoice(invoice) && (
                     <>
                       <div className="border-t border-slate-100 my-1" />
-                      <button onClick={() => handleDeleteInvoice(invoice.id)} className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3">
+                      <button onClick={() => handleDeleteInvoice(invoice.id)} className="w-full px-4 py-1.5 text-left text-[13px] text-red-600 hover:bg-red-50 flex items-center gap-3">
                         <Trash2 size={15} />
                         Eliminar
                       </button>
@@ -982,15 +979,15 @@ export default function InvoicesPage() {
 
       {/* Detail Modal */}
       {showDetailModal && selectedInvoice && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => { setShowDetailModal(false); setSelectedInvoice(null); }}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowDetailModal(false); setSelectedInvoice(null); }}>
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
                   {getDocumentTypeBadge(selectedInvoice.documentType)}
                   <h2 className="text-lg font-semibold text-slate-900 font-mono">{selectedInvoice.displayNumber}</h2>
                 </div>
-                <p className="text-sm text-slate-500">{selectedInvoice.supplier}</p>
+                <p className="text-[13px] text-slate-500">{selectedInvoice.supplier}</p>
               </div>
               <button onClick={() => { setShowDetailModal(false); setSelectedInvoice(null); }} className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
                 <X size={18} />
@@ -998,15 +995,15 @@ export default function InvoicesPage() {
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
               {selectedInvoice.requiresReplacement && (selectedInvoice.paidAt || selectedInvoice.status === "paid") && !selectedInvoice.replacedByInvoiceId && (
-                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-md">
                   <div className="flex items-start gap-3">
                     <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-amber-800">Pendiente de factura definitiva</p>
-                      <p className="text-sm text-amber-700 mt-1">Este documento ha sido pagado. Recuerda subir la factura definitiva del proveedor.</p>
+                      <p className="text-[13px] font-semibold text-amber-800">Pendiente de factura definitiva</p>
+                      <p className="text-[13px] text-amber-700 mt-1">Este documento ha sido pagado. Recuerda subir la factura definitiva del proveedor.</p>
                     </div>
                     {permissions.canCreatePO && (
-                      <Link href={`/project/${id}/accounting/invoices/new?linkTo=${selectedInvoice.id}`} className="px-3 py-1.5 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 flex items-center gap-1.5">
+                      <Link href={`/project/${id}/accounting/invoices/new?linkTo=${selectedInvoice.id}`} className="px-3 py-1.5 bg-amber-600 text-white text-[13px] rounded-lg hover:bg-amber-700 flex items-center gap-1.5">
                         <Upload size={14} />
                         Subir documento
                       </Link>
@@ -1015,37 +1012,37 @@ export default function InvoicesPage() {
                 </div>
               )}
               {selectedInvoice.linkedDocumentId && (
-                <div className="mb-6 p-4 bg-violet-50 border border-violet-200 rounded-xl">
+                <div className="mb-6 p-4 bg-violet-50 border border-violet-200 rounded-md">
                   <div className="flex items-center gap-3">
                     <LinkIcon size={18} className="text-violet-600" />
                     <div>
-                      <p className="text-sm font-semibold text-violet-800">Factura vinculada</p>
-                      <p className="text-sm text-violet-700">Esta factura sustituye un documento previo.</p>
+                      <p className="text-[13px] font-semibold text-violet-800">Factura vinculada</p>
+                      <p className="text-[13px] text-violet-700">Esta factura sustituye un documento previo.</p>
                     </div>
                   </div>
                 </div>
               )}
               <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="bg-slate-50 rounded-xl p-4">
+                <div className="bg-slate-50 rounded-md p-4">
                   <p className="text-xs text-slate-500 mb-1">Importe total</p>
                   <p className="text-lg font-bold text-slate-900">{formatCurrency(selectedInvoice.totalAmount)} €</p>
                 </div>
-                <div className="bg-slate-50 rounded-xl p-4">
+                <div className="bg-slate-50 rounded-md p-4">
                   <p className="text-xs text-slate-500 mb-1">Vencimiento</p>
                   <p className="text-lg font-bold text-slate-900">{formatDate(selectedInvoice.dueDate)}</p>
                 </div>
-                <div className="bg-slate-50 rounded-xl p-4">
+                <div className="bg-slate-50 rounded-md p-4">
                   <p className="text-xs text-slate-500 mb-1">Estado</p>
                   <div className="mt-1">{getStatusBadge(selectedInvoice)}</div>
                 </div>
               </div>
               {selectedInvoice.status === "rejected" && selectedInvoice.rejectionReason && (
-                <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4">
+                <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
                   <div className="flex items-start gap-3">
                     <XCircle size={18} className="text-red-600 mt-0.5" />
                     <div>
-                      <p className="text-sm font-semibold text-red-800">Motivo de rechazo</p>
-                      <p className="text-sm text-red-700 mt-1">{selectedInvoice.rejectionReason}</p>
+                      <p className="text-[13px] font-semibold text-red-800">Motivo de rechazo</p>
+                      <p className="text-[13px] text-red-700 mt-1">{selectedInvoice.rejectionReason}</p>
                       {selectedInvoice.rejectedByName && (
                         <p className="text-xs text-red-600 mt-2">
                           Rechazada por {selectedInvoice.rejectedByName} el {formatDate(selectedInvoice.rejectedAt!)}
@@ -1056,46 +1053,46 @@ export default function InvoicesPage() {
                 </div>
               )}
               {selectedInvoice.poNumber && (
-                <div className="mb-6 bg-slate-50 rounded-xl p-4">
+                <div className="mb-6 bg-slate-50 rounded-md p-4">
                   <p className="text-xs text-slate-500 mb-1">PO Asociada</p>
-                  <p className="text-sm font-mono text-slate-700">PO-{selectedInvoice.poNumber}</p>
+                  <p className="text-[13px] font-mono text-slate-700">PO-{selectedInvoice.poNumber}</p>
                 </div>
               )}
               {selectedInvoice.description && (
                 <div className="mb-6">
                   <p className="text-xs text-slate-500 uppercase mb-2">Descripción</p>
-                  <p className="text-sm text-slate-900 bg-slate-50 p-4 rounded-xl">{selectedInvoice.description}</p>
+                  <p className="text-[13px] text-slate-900 bg-slate-50 p-4 rounded-md">{selectedInvoice.description}</p>
                 </div>
               )}
               <div className="mb-6">
                 <p className="text-xs font-semibold text-slate-700 uppercase mb-3">Items ({selectedInvoice.items?.length || 0})</p>
                 <div className="space-y-2">
                   {selectedInvoice.items?.map((item, index) => (
-                    <div key={item.id || index} className="border border-slate-200 rounded-xl p-4 bg-slate-50">
+                    <div key={item.id || index} className="border border-slate-200 rounded-md p-4 bg-slate-50">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <p className="text-sm font-medium text-slate-900">{item.description}</p>
+                          <p className="text-[13px] font-medium text-slate-900">{item.description}</p>
                           <p className="text-xs text-slate-500 mt-1">
                             {item.subAccountCode} · {item.quantity} × {formatCurrency(item.unitPrice)} €
                           </p>
                         </div>
-                        <p className="text-sm font-semibold text-slate-900">{formatCurrency(item.totalAmount)} €</p>
+                        <p className="text-[13px] font-semibold text-slate-900">{formatCurrency(item.totalAmount)} €</p>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="mb-6 bg-slate-50 rounded-xl p-4">
+              <div className="mb-6 bg-slate-50 rounded-md p-4">
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-[13px]">
                     <span className="text-slate-600">Base imponible</span>
                     <span className="font-semibold text-slate-900">{formatCurrency(selectedInvoice.baseAmount)} €</span>
                   </div>
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-[13px]">
                     <span className="text-slate-600">IVA</span>
                     <span className="font-semibold text-emerald-600">+{formatCurrency(selectedInvoice.vatAmount)} €</span>
                   </div>
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-[13px]">
                     <span className="text-slate-600">IRPF</span>
                     <span className="font-semibold text-red-600">-{formatCurrency(selectedInvoice.irpfAmount)} €</span>
                   </div>
@@ -1108,7 +1105,7 @@ export default function InvoicesPage() {
               {selectedInvoice.notes && (
                 <div className="mb-6">
                   <p className="text-xs text-slate-500 uppercase mb-2">Notas</p>
-                  <p className="text-sm text-slate-600 bg-slate-50 p-4 rounded-xl">{selectedInvoice.notes}</p>
+                  <p className="text-[13px] text-slate-600 bg-slate-50 p-4 rounded-md">{selectedInvoice.notes}</p>
                 </div>
               )}
             </div>
@@ -1119,7 +1116,7 @@ export default function InvoicesPage() {
                     handleMarkAsPaid(selectedInvoice.id);
                     setShowDetailModal(false);
                   }}
-                  className="px-4 py-2 text-sm bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg transition-colors"
+                  className="px-4 py-2 text-[13px] bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg transition-colors"
                 >
                   Marcar como pagada
                 </button>
@@ -1129,13 +1126,12 @@ export default function InvoicesPage() {
                   href={selectedInvoice.attachmentUrl} 
                   target="_blank" 
                   rel="noopener noreferrer" 
-                  className="px-4 py-2 text-sm text-white hover:opacity-90 rounded-lg transition-opacity"
-                  style={{ backgroundColor: '#2F52E0' }}
+                  className="px-4 py-2 text-[13px] border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-lg transition-opacity"
                 >
                   Ver adjunto
                 </a>
               )}
-              <button onClick={() => { setShowDetailModal(false); setSelectedInvoice(null); }} className="px-4 py-2 text-sm border border-slate-200 text-slate-700 hover:bg-white rounded-lg transition-colors">
+              <button onClick={() => { setShowDetailModal(false); setSelectedInvoice(null); }} className="px-4 py-2 text-[13px] border border-slate-200 text-slate-700 hover:bg-white rounded-lg transition-colors">
                 Cerrar
               </button>
             </div>
@@ -1145,20 +1141,20 @@ export default function InvoicesPage() {
 
       {/* Confirm Dialog */}
       {confirmDialog && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
-            <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[14px] font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
+            <p className="text-[13px] text-slate-600 mb-6">{confirmDialog.message}</p>
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmDialog(null)}
-                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm"
+                className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 font-medium text-[13px]"
               >
                 Cancelar
               </button>
               <button
                 onClick={confirmDialog.onConfirm}
-                className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-sm text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
+                className={`flex-1 px-4 py-1.5 rounded-md font-medium text-[13px] text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
               >
                 {confirmDialog.confirmLabel || "Confirmar"}
               </button>

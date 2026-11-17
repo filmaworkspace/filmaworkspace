@@ -359,18 +359,17 @@ export default function ReplaceDocumentPage() {
     <div className={`${inter.className} min-h-screen bg-white`}>
       {/* Header */}
       <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
-          <div className="relative flex items-center justify-center">
+        <div className="px-6 pt-8 sm:px-10">
+          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
             <Link
               href={`/project/${projectId}/accounting/invoices`}
-              className="absolute left-0 w-10 h-10 rounded-xl flex items-center justify-center border border-slate-200 hover:bg-slate-50 transition-colors"
+              className="mr-3 w-8 h-8 rounded-md flex items-center justify-center text-slate-500 hover:bg-[#F4F4F5] hover:text-slate-900 transition-colors"
             >
               <ArrowLeft size={18} className="text-slate-600" />
             </Link>
             <div className="flex items-center gap-4">
-              <RefreshCw size={22} style={{ color: "#2F52E0" }} />
               <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-bold text-slate-900 text-center">Sustituir documento</h1>
+                <h1 className="text-xl font-semibold tracking-tight text-slate-900">Sustituir documento</h1>
                 <span className="px-2.5 py-1 bg-violet-100 text-violet-700 rounded-lg text-xs font-medium">
                   Proformas y presupuestos
                 </span>
@@ -380,9 +379,9 @@ export default function ReplaceDocumentPage() {
         </div>
       </div>
 
-      <main className="px-24 py-6">
+      <main className="px-6 sm:px-10 py-6">
         {/* Filtros */}
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6">
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-6">
           <div className="flex flex-row gap-3">
             {/* Buscador */}
             <div className="relative flex-1">
@@ -392,7 +391,7 @@ export default function ReplaceDocumentPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Buscar por número, proveedor o descripción"
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm bg-white"
+                className="w-full pl-10 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px] bg-white"
               />
             </div>
 
@@ -400,7 +399,7 @@ export default function ReplaceDocumentPage() {
             <div className="relative" ref={typeDropdownRef}>
               <button
                 onClick={() => { setShowTypeDropdown(!showTypeDropdown); setShowStatusDropdown(false); }}
-                className="w-full w-44 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white flex items-center justify-between hover:border-slate-300 transition-colors"
+                className="w-full w-44 px-4 py-1.5 border border-slate-200 rounded-md text-[13px] bg-white flex items-center justify-between hover:border-slate-300 transition-colors"
               >
                 <span className={filterType === "all" ? "text-slate-500" : "text-slate-900"}>
                   {TYPE_OPTIONS.find(o => o.value === filterType)?.label}
@@ -408,12 +407,12 @@ export default function ReplaceDocumentPage() {
                 <ChevronDown size={14} className={`text-slate-400 transition-transform ${showTypeDropdown ? "rotate-180" : ""}`} />
               </button>
               {showTypeDropdown && (
-                <div className="absolute top-full left-0 mt-2 w-full bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1">
+                <div className="absolute top-full left-0 mt-2 w-full bg-white border border-slate-200 rounded-md shadow-lg z-50 py-1">
                   {TYPE_OPTIONS.map((option) => (
                     <button
                       key={option.value}
                       onClick={() => { setFilterType(option.value); setShowTypeDropdown(false); }}
-                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${filterType === option.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"}`}
+                      className={`w-full text-left px-4 py-1.5 text-[13px] transition-colors ${filterType === option.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"}`}
                     >
                       {option.label}
                     </button>
@@ -426,7 +425,7 @@ export default function ReplaceDocumentPage() {
             <div className="relative" ref={statusDropdownRef}>
               <button
                 onClick={() => { setShowStatusDropdown(!showStatusDropdown); setShowTypeDropdown(false); }}
-                className="w-full w-44 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white flex items-center justify-between hover:border-slate-300 transition-colors"
+                className="w-full w-44 px-4 py-1.5 border border-slate-200 rounded-md text-[13px] bg-white flex items-center justify-between hover:border-slate-300 transition-colors"
               >
                 <span className={filterStatus === "all" ? "text-slate-500" : "text-slate-900"}>
                   {STATUS_OPTIONS.find(o => o.value === filterStatus)?.label}
@@ -434,12 +433,12 @@ export default function ReplaceDocumentPage() {
                 <ChevronDown size={14} className={`text-slate-400 transition-transform ${showStatusDropdown ? "rotate-180" : ""}`} />
               </button>
               {showStatusDropdown && (
-                <div className="absolute top-full left-0 mt-2 w-full bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1">
+                <div className="absolute top-full left-0 mt-2 w-full bg-white border border-slate-200 rounded-md shadow-lg z-50 py-1">
                   {STATUS_OPTIONS.map((option) => (
                     <button
                       key={option.value}
                       onClick={() => { setFilterStatus(option.value); setShowStatusDropdown(false); }}
-                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${filterStatus === option.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"}`}
+                      className={`w-full text-left px-4 py-1.5 text-[13px] transition-colors ${filterStatus === option.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"}`}
                     >
                       {option.label}
                     </button>
@@ -451,7 +450,7 @@ export default function ReplaceDocumentPage() {
         </div>
 
         {/* Lista de documentos */}
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden">
+        <div className="bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-white">
             <h2 className="font-semibold text-slate-900">Documentos pendientes de sustitución</h2>
             <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">
@@ -461,11 +460,11 @@ export default function ReplaceDocumentPage() {
 
           {filteredDocs.length === 0 ? (
             <div className="text-center py-16 bg-white">
-              <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <div className="hidden">
                 <FileText size={28} className="text-slate-400" />
               </div>
               <p className="text-slate-500 mb-2">No hay documentos pendientes</p>
-              <p className="text-sm text-slate-400">
+              <p className="text-[13px] text-slate-400">
                 Las proformas y presupuestos aparecerán aquí para ser sustituidos
               </p>
             </div>
@@ -484,7 +483,7 @@ export default function ReplaceDocumentPage() {
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-4 flex-1">
-                        <div className={`w-12 h-12 ${docType.bgColor} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                        <div className={`w-12 h-12 ${docType.bgColor} rounded-md flex items-center justify-center flex-shrink-0`}>
                           <DocIcon size={20} className={docType.textColor} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -498,7 +497,7 @@ export default function ReplaceDocumentPage() {
                               {statusConfig.label}
                             </span>
                           </div>
-                          <p className="text-sm text-slate-600 mb-2">{docItem.description}</p>
+                          <p className="text-[13px] text-slate-600 mb-2">{docItem.description}</p>
                           <div className="flex items-center gap-4 text-xs text-slate-500">
                             <span className="flex items-center gap-1">
                               <Building2 size={12} />
@@ -529,8 +528,7 @@ export default function ReplaceDocumentPage() {
                         </div>
                         <button
                           onClick={() => openReplaceModal(docItem)}
-                          className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
-                          style={{ backgroundColor: "#2F52E0" }}
+                          className="flex items-center gap-2 px-4 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity"
                         >
                           <RefreshCw size={14} />
                           Sustituir
@@ -547,31 +545,31 @@ export default function ReplaceDocumentPage() {
 
       {/* Modal de sustitución */}
       {showReplaceModal && selectedDoc && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4" onClick={closeReplaceModal}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4" onClick={closeReplaceModal}>
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center">
                   <Receipt size={20} className="text-emerald-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Sustituir por factura</h2>
+                  <h2 className="text-[14px] font-semibold text-slate-900">Sustituir por factura</h2>
                   <p className="text-xs text-slate-500">{selectedDoc.displayNumber} → FRA-{selectedDoc.number}</p>
                 </div>
               </div>
-              <button onClick={closeReplaceModal} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+              <button onClick={closeReplaceModal} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md">
                 <X size={20} />
               </button>
             </div>
 
             <div className="p-6 space-y-4">
               {/* Resumen del documento original */}
-              <div className="bg-slate-50 rounded-xl p-4">
+              <div className="bg-slate-50 rounded-md p-4">
                 <p className="text-xs text-slate-500 mb-2">Documento original</p>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium text-slate-900">{selectedDoc.supplierName}</p>
-                    <p className="text-sm text-slate-500">{selectedDoc.description}</p>
+                    <p className="text-[13px] text-slate-500">{selectedDoc.description}</p>
                   </div>
                   <p className="font-bold text-slate-900">
                     {formatCurrency(selectedDoc.totalAmount)} {getCurrencySymbol(selectedDoc.currency)}
@@ -581,21 +579,21 @@ export default function ReplaceDocumentPage() {
 
               {/* Subir archivo */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">
                   Adjuntar factura definitiva *
                 </label>
                 <div
                   onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                   onDragLeave={() => setIsDragging(false)}
                   onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
+                  className={`border-2 border-dashed rounded-md p-6 text-center transition-colors ${
                     isDragging ? "border-slate-400 bg-slate-50" : uploadedFile ? "border-emerald-300 bg-emerald-50" : "border-slate-200"
                   }`}
                 >
                   {uploadedFile ? (
                     <div className="flex items-center justify-center gap-3">
                       <CheckCircle size={20} className="text-emerald-600" />
-                      <span className="text-sm text-slate-700">{uploadedFile.name}</span>
+                      <span className="text-[13px] text-slate-700">{uploadedFile.name}</span>
                       <button
                         onClick={() => setUploadedFile(null)}
                         className="p-1 text-slate-400 hover:text-red-500"
@@ -606,8 +604,8 @@ export default function ReplaceDocumentPage() {
                   ) : (
                     <>
                       <Upload size={24} className="text-slate-400 mx-auto mb-2" />
-                      <p className="text-sm text-slate-500 mb-1">Arrastra el archivo o</p>
-                      <label className="text-sm text-slate-900 font-medium cursor-pointer hover:underline">
+                      <p className="text-[13px] text-slate-500 mb-1">Arrastra el archivo o</p>
+                      <label className="text-[13px] text-slate-900 font-medium cursor-pointer hover:underline">
                         selecciona desde tu equipo
                         <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} />
                       </label>
@@ -619,14 +617,14 @@ export default function ReplaceDocumentPage() {
 
               {/* Error */}
               {error && (
-                <div className="flex items-center gap-2 text-red-600 text-sm">
+                <div className="flex items-center gap-2 text-red-600 text-[13px]">
                   <AlertCircle size={14} />
                   {error}
                 </div>
               )}
 
               {/* Aviso */}
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+              <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
                 <div className="flex items-start gap-2">
                   <AlertTriangle size={14} className="text-amber-600 mt-0.5" />
                   <p className="text-xs text-amber-800">
@@ -639,14 +637,14 @@ export default function ReplaceDocumentPage() {
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={closeReplaceModal}
-                  className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"
+                  className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleReplace}
                   disabled={processing || !uploadedFile}
-                  className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 text-[13px] font-medium disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {processing ? (
                     <>

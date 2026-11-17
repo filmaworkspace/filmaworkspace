@@ -384,14 +384,13 @@ export default function DocumentCenterPage() {
   if (permissionsError || !permissions.hasAccountingAccess) return (
     <div className={cx("min-h-screen bg-white flex items-center justify-center", inter.className)}>
       <div className="text-center max-w-md">
-        <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <div className="hidden">
           <ShieldAlert size={28} className="text-red-500" />
         </div>
-        <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
+        <h2 className="text-[14px] font-semibold text-slate-900 mb-2">Acceso denegado</h2>
         <p className="text-slate-500 mb-6">No tienes permisos para acceder a esta sección</p>
         <Link href={`/project/${id}/accounting`}
-          className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90"
-          style={{ backgroundColor: "#2F52E0" }}>
+          className="inline-flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium">
           <ArrowLeft size={16} /> Volver
         </Link>
       </div>
@@ -403,14 +402,14 @@ export default function DocumentCenterPage() {
   }) => (
     <div className="relative">
       <button onClick={onToggle}
-        className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white hover:border-slate-300 transition-colors min-w-[160px]">
+        className="flex items-center gap-2 px-4 py-1.5 border border-slate-200 rounded-md text-[13px] bg-white hover:border-slate-300 transition-colors min-w-[160px]">
         <span className="text-slate-700 flex-1 text-left">{label}</span>
         <ChevronDown size={13} className={cx("text-slate-400 transition-transform", open && "rotate-180")} />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={onToggle} />
-          <div className="absolute top-full left-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-40 py-1 min-w-full max-h-64 overflow-y-auto">
+          <div className="absolute top-full left-0 mt-1.5 bg-white border border-slate-200 rounded-md shadow-lg z-40 py-1 min-w-full max-h-64 overflow-y-auto">
             {children}
           </div>
         </>
@@ -420,7 +419,7 @@ export default function DocumentCenterPage() {
 
   const DDOpt = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) => (
     <button onClick={onClick}
-      className={cx("w-full text-left px-4 py-2.5 text-sm transition-colors whitespace-nowrap",
+      className={cx("w-full text-left px-4 py-1.5 text-[13px] transition-colors whitespace-nowrap",
         active ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50")}>
       {children}
     </button>
@@ -429,16 +428,14 @@ export default function DocumentCenterPage() {
   return (
     <div className={cx("min-h-screen bg-white", inter.className)}>
       <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
-          <div className="relative flex items-center justify-center">
+        <div className="px-6 pt-8 sm:px-10">
+          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
             <div className="flex items-center gap-4">
-              <FolderDown size={22} className="text-blue-600" />
-              <h1 className="text-3xl font-bold text-slate-900 text-center">Centro de documentación</h1>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Centro de documentación</h1>
             </div>
             {selectedIds.size > 0 && (
               <button onClick={downloadSelected} disabled={downloading}
-                className="absolute right-0 flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-                style={{ backgroundColor: "#2F52E0" }}>
+                className="absolute right-0 flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity disabled:opacity-50">
                 {downloading
                   ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />{dlProgress.current}/{dlProgress.total}</>
                   : <><Download size={16} />Descargar ({selectedIds.size})</>}
@@ -448,16 +445,16 @@ export default function DocumentCenterPage() {
         </div>
       </div>
 
-      <main className="px-24 py-8 space-y-6">
+      <main className="px-6 sm:px-10 py-8 space-y-6">
 
         {/* Filters */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-4">
+        <div className="bg-white border border-slate-200 rounded-lg p-4">
           <div className="flex flex-row gap-4">
             <div className="flex-1 relative">
               <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
               <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
                 placeholder="Buscar por número, proveedor o descripción"
-                className="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent bg-white text-sm" />
+                className="w-full pl-11 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]" />
             </div>
 
             <FilterDropdown open={showStatusDD}
@@ -473,19 +470,19 @@ export default function DocumentCenterPage() {
               <div className="relative">
                 <Calendar size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input type="date" value={dateRange.from} onChange={e => setDateRange({ ...dateRange, from: e.target.value })}
-                  className="pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                  className="pl-9 pr-3 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
               </div>
               <span className="text-slate-400">—</span>
               <div className="relative">
                 <Calendar size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input type="date" value={dateRange.to} onChange={e => setDateRange({ ...dateRange, to: e.target.value })}
-                  className="pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                  className="pl-9 pr-3 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
               </div>
             </div>
 
             {hasFilters && (
               <button onClick={() => { setSearchTerm(""); setStatusFilter("all"); setDateRange({ from: "", to: "" }); }}
-                className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2">
+                className="px-4 py-1.5 border border-slate-200 rounded-md text-[13px] text-slate-600 hover:bg-slate-50 flex items-center gap-2">
                 <X size={14} /> Limpiar
               </button>
             )}
@@ -502,7 +499,7 @@ export default function DocumentCenterPage() {
                 if (count === 0) return null;
                 return (
                   <button key={sid} onClick={() => downloadBySupplier(sid)} disabled={downloading}
-                    className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm hover:border-slate-300 hover:bg-slate-50 transition-colors disabled:opacity-40 group">
+                    className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-md text-[13px] hover:border-slate-300 hover:bg-slate-50 transition-colors disabled:opacity-40 group">
                     <Building2 size={13} className="text-slate-400" />
                     <span className="text-slate-700 font-medium">{sname}</span>
                     <span className="text-xs text-slate-400">{count}</span>
@@ -516,15 +513,15 @@ export default function DocumentCenterPage() {
 
         {/* Selection bar */}
         {selectedIds.size > 0 && (
-          <div className="bg-slate-900 text-white rounded-2xl p-4 flex items-center justify-between">
+          <div className="bg-slate-900 text-white rounded-lg p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <CheckSquare size={20} />
               <span className="font-medium">{selectedIds.size} documento{selectedIds.size > 1 ? "s" : ""} seleccionado{selectedIds.size > 1 ? "s" : ""}</span>
             </div>
             <div className="flex items-center gap-3">
-              <button onClick={() => setSelectedIds(new Set())} className="px-4 py-2 text-sm text-slate-300 hover:text-white">Cancelar</button>
+              <button onClick={() => setSelectedIds(new Set())} className="px-4 py-2 text-[13px] text-slate-300 hover:text-white">Cancelar</button>
               <button onClick={downloadSelected} disabled={downloading}
-                className="flex items-center gap-2 px-5 py-2.5 bg-white text-slate-900 rounded-xl text-sm font-medium hover:bg-slate-100 disabled:opacity-50">
+                className="flex items-center gap-2 px-3 py-1.5 bg-white text-slate-900 rounded-md text-[13px] font-medium hover:bg-slate-100 disabled:opacity-50">
                 {downloading
                   ? <><div className="w-4 h-4 border-2 border-slate-400 border-t-slate-900 rounded-full animate-spin" />Descargando {dlProgress.current}/{dlProgress.total}</>
                   : <><Download size={16} />Descargar expedientes</>}
@@ -535,29 +532,29 @@ export default function DocumentCenterPage() {
 
         {/* Table */}
         {filteredInvoices.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
-            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="bg-white border border-slate-200 rounded-lg p-16 text-center">
+            <div className="hidden">
               <FileText size={28} className="text-slate-400" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">No hay documentos</h3>
+            <h3 className="text-[14px] font-semibold text-slate-900 mb-2">No hay documentos</h3>
           </div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-4 py-3 text-left">
+                  <th className="px-4 py-2.5 text-left">
                     <button onClick={toggleSelectAll} className="p-1 hover:bg-slate-200 rounded transition-colors">
                       {isAllSelected ? <CheckSquare size={18} className="text-slate-700" /> : <Square size={18} className="text-slate-400" />}
                     </button>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Documento</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Proveedor</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Importe</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Estado</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Archivos</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Codificación</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">Acciones</th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-medium text-slate-600 uppercase tracking-wider">Documento</th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-medium text-slate-600 uppercase tracking-wider">Proveedor</th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-medium text-slate-600 uppercase tracking-wider">Importe</th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-medium text-slate-600 uppercase tracking-wider">Estado</th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-medium text-slate-600 uppercase tracking-wider">Archivos</th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-medium text-slate-600 uppercase tracking-wider">Codificación</th>
+                  <th className="px-4 py-2.5 text-right text-[11px] font-medium text-slate-600 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -567,36 +564,36 @@ export default function DocumentCenterPage() {
                   const sc = STATUS_CONFIG[invoice.status] ?? STATUS_FALLBACK;
                   return (
                     <tr key={invoice.id} className={cx("hover:bg-slate-50 transition-colors", isSelected && "bg-blue-50")}>
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-3">
                         <button onClick={() => toggleSelect(invoice.id)} className="p-1 hover:bg-slate-200 rounded transition-colors">
                           {isSelected ? <CheckSquare size={18} className="text-blue-600" /> : <Square size={18} className="text-slate-400" />}
                         </button>
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-slate-100">
+                          <div className="hidden">
                             <DocIcon size={18} className="text-slate-500" />
                           </div>
                           <div>
-                            <p className="font-medium text-slate-900 text-sm">{invoice.displayNumber}</p>
+                            <p className="font-medium text-slate-900 text-[13px]">{invoice.displayNumber}</p>
                             <p className="text-xs text-slate-500">{fmtDate(invoice.invoiceDate || invoice.createdAt)}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-4">
-                        <p className="text-sm text-slate-900">{invoice.supplier}</p>
+                      <td className="px-4 py-3">
+                        <p className="text-[13px] text-slate-900">{invoice.supplier}</p>
                         {invoice.supplierTaxId && <p className="text-xs text-slate-500">{invoice.supplierTaxId}</p>}
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-3">
                         <p className="font-semibold text-slate-900">{fmtMoney(invoice.totalAmount, invoice.currency)}</p>
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-3">
                         <span className={cx("inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium", sc.bg, sc.text)}>{sc.label}</span>
                         {invoice.status === "paid" && invoice.paidAt && (
                           <p className="text-xs text-slate-400 mt-0.5">{fmtDate(invoice.paidAt)}</p>
                         )}
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span title={invoice.attachmentUrl ? "Factura adjunta" : "Sin factura"}>
                             <Paperclip size={14} className={invoice.attachmentUrl ? "text-blue-400" : "text-slate-200"} />
@@ -606,7 +603,7 @@ export default function DocumentCenterPage() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-3">
                         {invoice.codedAt ? (
                           <div className="flex items-center gap-2">
                             <CheckCircle size={14} className="text-emerald-500" />
@@ -619,7 +616,7 @@ export default function DocumentCenterPage() {
                           <span className="text-xs text-slate-400">Sin codificar</span>
                         )}
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
                           <button onClick={() => setPreviewInvoice(invoice)}
                             className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="Vista previa">
@@ -640,7 +637,7 @@ export default function DocumentCenterPage() {
         )}
 
         {filteredInvoices.length > 0 && (
-          <div className="text-sm text-slate-500 text-center">
+          <div className="text-[13px] text-slate-500 text-center">
             Mostrando {filteredInvoices.length} de {invoices.length} documentos
           </div>
         )}
@@ -648,13 +645,13 @@ export default function DocumentCenterPage() {
 
       {/* Preview Modal */}
       {previewInvoice && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
           onClick={() => setPreviewInvoice(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-flex flex-col"
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-flex flex-col"
             onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#2F52E0" }}>
+                <div className="w-10 h-10 rounded-md flex items-center justify-center" style={{ backgroundColor: "#2F52E0" }}>
                   <FileText size={20} className="text-white" />
                 </div>
                 <div>
@@ -669,7 +666,7 @@ export default function DocumentCenterPage() {
               <div>
                 <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Proveedor</h4>
                 <p className="font-medium text-slate-900">{previewInvoice.supplier}</p>
-                {previewInvoice.supplierTaxId && <p className="text-sm text-slate-500">NIF/CIF: {previewInvoice.supplierTaxId}</p>}
+                {previewInvoice.supplierTaxId && <p className="text-[13px] text-slate-500">NIF/CIF: {previewInvoice.supplierTaxId}</p>}
               </div>
 
               {previewInvoice.items?.length > 0 && (
@@ -679,7 +676,7 @@ export default function DocumentCenterPage() {
                     {previewInvoice.items.map((item, i) => (
                       <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
                         <div>
-                          <p className="text-sm font-medium text-slate-900">{item.subAccountCode}</p>
+                          <p className="text-[13px] font-medium text-slate-900">{item.subAccountCode}</p>
                           <p className="text-xs text-slate-500">{item.description || item.subAccountDescription}</p>
                         </div>
                         <div className="text-right">
@@ -694,10 +691,10 @@ export default function DocumentCenterPage() {
 
               <div>
                 <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Importes</h4>
-                <div className="bg-slate-50 rounded-xl p-4 space-y-2">
-                  <div className="flex justify-between text-sm"><span className="text-slate-600">Base imponible</span><span>{fmtMoney(previewInvoice.baseAmount, previewInvoice.currency)}</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-slate-600">IVA</span><span>{fmtMoney(previewInvoice.vatAmount, previewInvoice.currency)}</span></div>
-                  {previewInvoice.irpfAmount > 0 && <div className="flex justify-between text-sm"><span className="text-slate-600">IRPF</span><span>-{fmtMoney(previewInvoice.irpfAmount, previewInvoice.currency)}</span></div>}
+                <div className="bg-slate-50 rounded-md p-4 space-y-2">
+                  <div className="flex justify-between text-[13px]"><span className="text-slate-600">Base imponible</span><span>{fmtMoney(previewInvoice.baseAmount, previewInvoice.currency)}</span></div>
+                  <div className="flex justify-between text-[13px]"><span className="text-slate-600">IVA</span><span>{fmtMoney(previewInvoice.vatAmount, previewInvoice.currency)}</span></div>
+                  {previewInvoice.irpfAmount > 0 && <div className="flex justify-between text-[13px]"><span className="text-slate-600">IRPF</span><span>-{fmtMoney(previewInvoice.irpfAmount, previewInvoice.currency)}</span></div>}
                   <div className="border-t border-slate-200 pt-2 flex justify-between font-semibold">
                     <span className="text-slate-900">Total</span>
                     <span className="text-slate-900">{fmtMoney(previewInvoice.totalAmount, previewInvoice.currency)}</span>
@@ -708,13 +705,13 @@ export default function DocumentCenterPage() {
               {previewInvoice.status === "paid" && previewInvoice.paidAt && (
                 <div>
                   <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Información de pago</h4>
-                  <div className="bg-emerald-50 rounded-xl p-4 space-y-1">
+                  <div className="bg-emerald-50 rounded-md p-4 space-y-1">
                     <div className="flex items-center gap-2 mb-1">
                       <CheckCircle size={15} className="text-emerald-600" />
-                      <span className="text-sm font-medium text-emerald-800">Pagada el {fmtDateTime(previewInvoice.paidAt)}</span>
+                      <span className="text-[13px] font-medium text-emerald-800">Pagada el {fmtDateTime(previewInvoice.paidAt)}</span>
                     </div>
-                    {previewInvoice.paymentMethod && <p className="text-sm text-emerald-700">{PAYMENT_METHODS[previewInvoice.paymentMethod] || previewInvoice.paymentMethod}</p>}
-                    {previewInvoice.paymentReference && <p className="text-sm text-emerald-700">Ref: {previewInvoice.paymentReference}</p>}
+                    {previewInvoice.paymentMethod && <p className="text-[13px] text-emerald-700">{PAYMENT_METHODS[previewInvoice.paymentMethod] || previewInvoice.paymentMethod}</p>}
+                    {previewInvoice.paymentReference && <p className="text-[13px] text-emerald-700">Ref: {previewInvoice.paymentReference}</p>}
                   </div>
                 </div>
               )}
@@ -722,9 +719,9 @@ export default function DocumentCenterPage() {
               {previewInvoice.codedAt && (
                 <div>
                   <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Codificación contable</h4>
-                  <div className="bg-blue-50 rounded-xl p-4 space-y-1">
-                    <p className="text-sm text-blue-700">Por {previewInvoice.codedByName} el {fmtDateTime(previewInvoice.codedAt)}</p>
-                    {previewInvoice.accountingEntry && <p className="text-sm text-blue-700">Asiento: {previewInvoice.accountingEntry}</p>}
+                  <div className="bg-blue-50 rounded-md p-4 space-y-1">
+                    <p className="text-[13px] text-blue-700">Por {previewInvoice.codedByName} el {fmtDateTime(previewInvoice.codedAt)}</p>
+                    {previewInvoice.accountingEntry && <p className="text-[13px] text-blue-700">Asiento: {previewInvoice.accountingEntry}</p>}
                   </div>
                 </div>
               )}
@@ -732,10 +729,9 @@ export default function DocumentCenterPage() {
 
             <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
               <button onClick={() => setPreviewInvoice(null)}
-                className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">Cerrar</button>
+                className="px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">Cerrar</button>
               <button onClick={() => { downloadSingle(previewInvoice); setPreviewInvoice(null); }} disabled={downloading}
-                className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50"
-                style={{ backgroundColor: "#2F52E0" }}>
+                className="flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
                 <Download size={16} /> Descargar expediente
               </button>
             </div>

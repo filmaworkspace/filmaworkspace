@@ -1209,12 +1209,12 @@ export default function ReportsPage() {
     return (
       <div className={"min-h-screen bg-white flex items-center justify-center " + inter.className}>
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="hidden">
             <ShieldAlert size={28} className="text-red-500" />
           </div>
-          <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
+          <h2 className="text-[14px] font-semibold text-slate-900 mb-2">Acceso denegado</h2>
           <p className="text-slate-500 mb-6">{accessError || "No tienes permisos para acceder a esta página"}</p>
-          <Link href={"/project/" + id + "/accounting"} className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90" style={{ backgroundColor: "#2F52E0" }}>
+          <Link href={"/project/" + id + "/accounting"} className="inline-flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium">
             <ArrowLeft size={16} />
             Volver al panel
           </Link>
@@ -1226,11 +1226,10 @@ export default function ReportsPage() {
   return (
     <div className={"min-h-screen bg-white " + inter.className}>
       <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
-          <div className="relative flex items-center justify-center">
+        <div className="px-6 pt-8 sm:px-10">
+          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
             <div className="flex items-center gap-4">
-              <FileSpreadsheet size={22} style={{ color: "#2F52E0" }} />
-              <h1 className="text-3xl font-bold text-slate-900 text-center">Informes</h1>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Informes</h1>
             </div>
             {episodesEnabled && totalEpisodes > 0 && (
               <button onClick={() => setSplitByEpisode(!splitByEpisode)} className={"absolute right-0 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all " + (splitByEpisode ? "bg-violet-100 text-violet-700 border border-violet-200" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}>
@@ -1242,7 +1241,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <main className="px-24 py-6">
+      <main className="px-6 sm:px-10 py-6">
         <div className="space-y-8">
           {REPORT_SECTIONS.map((section) => (
             <div key={section.id}>
@@ -1256,14 +1255,14 @@ export default function ReportsPage() {
                   const count = getReportCount(reportType);
                   
                   return (
-                    <div key={reportType} className="bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-all">
+                    <div key={reportType} className="bg-white border border-slate-200 rounded-md hover:border-slate-300 transition-all">
                       <div className="px-4 py-3 flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                        <div className="hidden">
                           <Icon size={18} className="text-slate-500" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <h3 className="font-medium text-slate-900 text-sm">{info.title}</h3>
+                            <h3 className="font-medium text-slate-900 text-[13px]">{info.title}</h3>
                             <span className="text-xs text-slate-400">{count}</span>
                           </div>
                         </div>
@@ -1274,7 +1273,7 @@ export default function ReportsPage() {
                           <button
                             onClick={() => generateReport(reportType)}
                             disabled={generating !== null}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
                           >
                             {generating === reportType
                               ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /><span>...</span></>
@@ -1314,14 +1313,14 @@ export default function ReportsPage() {
 
       {/* Column config modal — unchanged */}
       {showConfig && configReportType && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setShowConfig(false)}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowConfig(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Configurar columnas</h3>
-                <p className="text-sm text-slate-500">{REPORT_INFO[configReportType].title}</p>
+                <h3 className="text-[14px] font-semibold text-slate-900">Configurar columnas</h3>
+                <p className="text-[13px] text-slate-500">{REPORT_INFO[configReportType].title}</p>
               </div>
-              <button onClick={() => setShowConfig(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+              <button onClick={() => setShowConfig(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md"><X size={18} /></button>
             </div>
 
             <div className="p-6 overflow-y-auto flex-1">
@@ -1342,7 +1341,7 @@ export default function ReportsPage() {
                     <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Columnas del informe</p>
                     <span className="text-xs text-slate-400">{selectedColumns.length}</span>
                   </div>
-                  <div className="space-y-1 min-h-[200px] p-3 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
+                  <div className="space-y-1 min-h-[200px] p-3 bg-slate-50 rounded-md border-2 border-dashed border-slate-200">
                     {selectedColumns.map((column, index) => {
                       const isLocked = REPORT_COLUMNS[configReportType].find(c => c.id === column.originalId)?.locked;
                       return (
@@ -1364,11 +1363,11 @@ export default function ReportsPage() {
                     <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Disponibles</p>
                     <span className="text-xs text-slate-400">{availableColumns.length}</span>
                   </div>
-                  <div className="space-y-1 min-h-[200px] p-3 bg-slate-50 rounded-xl">
+                  <div className="space-y-1 min-h-[200px] p-3 bg-slate-50 rounded-md">
                     {availableColumns.length === 0 ? (<p className="text-xs text-slate-400 text-center py-8">Todas las columnas están en uso</p>) : (
                       availableColumns.map((column) => (
                         <button key={column.id} onClick={() => addColumn(column)} className="w-full flex items-center gap-2 p-2 bg-white border border-slate-200 rounded-lg hover:border-slate-300 hover:bg-slate-50 transition-colors text-left">
-                          <Plus size={14} className="text-slate-400" /><span className="flex-1 text-sm text-slate-600">{column.label}</span>
+                          <Plus size={14} className="text-slate-400" /><span className="flex-1 text-[13px] text-slate-600">{column.label}</span>
                         </button>
                       ))
                     )}
@@ -1381,15 +1380,15 @@ export default function ReportsPage() {
             <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
               {!showSavePreset ? (
                 <div className="flex items-center justify-end gap-3">
-                  <button onClick={() => setShowConfig(false)} className="px-4 py-2.5 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100 transition-colors">Cancelar</button>
-                  <button onClick={() => setShowSavePreset(true)} className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors"><Save size={14} />Guardar plantilla</button>
-                  <button onClick={() => { generateReport(configReportType, selectedColumns); setShowConfig(false); }} disabled={generating !== null} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}><Download size={14} />Exportar</button>
+                  <button onClick={() => setShowConfig(false)} className="px-4 py-1.5 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100 transition-colors">Cancelar</button>
+                  <button onClick={() => setShowSavePreset(true)} className="flex items-center gap-2 px-4 py-1.5 border border-slate-200 bg-white text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50 transition-colors"><Save size={14} />Guardar plantilla</button>
+                  <button onClick={() => { generateReport(configReportType, selectedColumns); setShowConfig(false); }} disabled={generating !== null} className="flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity disabled:opacity-50"><Download size={14} />Exportar</button>
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
-                  <input type="text" value={newPresetName} onChange={(e) => setNewPresetName(e.target.value)} placeholder="Nombre de la plantilla" className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" autoFocus onKeyDown={(e) => e.key === "Enter" && savePreset()} />
-                  <button onClick={() => { setShowSavePreset(false); setNewPresetName(""); }} className="px-4 py-2.5 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100 transition-colors">Cancelar</button>
-                  <button onClick={savePreset} disabled={!newPresetName.trim()} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50" style={{ backgroundColor: "#2F52E0" }}><Check size={14} />Guardar</button>
+                  <input type="text" value={newPresetName} onChange={(e) => setNewPresetName(e.target.value)} placeholder="Nombre de la plantilla" className="flex-1 px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" autoFocus onKeyDown={(e) => e.key === "Enter" && savePreset()} />
+                  <button onClick={() => { setShowSavePreset(false); setNewPresetName(""); }} className="px-4 py-1.5 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100 transition-colors">Cancelar</button>
+                  <button onClick={savePreset} disabled={!newPresetName.trim()} className="flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity disabled:opacity-50"><Check size={14} />Guardar</button>
                 </div>
               )}
             </div>
@@ -1398,24 +1397,24 @@ export default function ReportsPage() {
       )}
 
       {false && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setShowInvoiceBookModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowInvoiceBookModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-indigo-100 rounded-md flex items-center justify-center">
                   <BookMarked size={20} className="text-indigo-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Libro de facturas</h3>
+                  <h3 className="text-[14px] font-semibold text-slate-900">Libro de facturas</h3>
                   <p className="text-xs text-slate-500">Selecciona los filtros para el informe</p>
                 </div>
               </div>
-              <button onClick={() => setShowInvoiceBookModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+              <button onClick={() => setShowInvoiceBookModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md"><X size={18} /></button>
             </div>
 
             <div className="p-6 space-y-5">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Proveedor</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Proveedor</label>
                 <div className="relative">
                   <div className="relative">
                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -1430,22 +1429,22 @@ export default function ReportsPage() {
                       }}
                       onFocus={() => setShowSupplierDropdown(true)}
                       placeholder="Buscar proveedor (mín. 2 caracteres)"
-                      className="w-full pl-10 pr-10 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                      className="w-full pl-10 pr-10 py-1.5 border border-slate-200 rounded-md text-[13px] focus:ring-4 focus:ring-indigo-500 focus:outline-none"
                     />
                     {invoiceBookFilters.supplierId && (
                       <button onClick={clearSupplier} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600"><X size={14} /></button>
                     )}
                   </div>
                   {showSupplierDropdown && supplierSearch.length >= 2 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
                       {loadingSuppliers ? (
-                        <div className="px-4 py-3 text-sm text-slate-500 text-center">Cargando...</div>
+                        <div className="px-4 py-3 text-[13px] text-slate-500 text-center">Cargando...</div>
                       ) : filteredSuppliers.length === 0 ? (
-                        <div className="px-4 py-3 text-sm text-slate-500 text-center">No se encontraron proveedores</div>
+                        <div className="px-4 py-3 text-[13px] text-slate-500 text-center">No se encontraron proveedores</div>
                       ) : (
                         filteredSuppliers.map(supplier => (
-                          <button key={supplier.id} onClick={() => selectSupplier(supplier)} className="w-full px-4 py-2.5 text-left hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
-                            <p className="text-sm font-medium text-slate-900">{supplier.fiscalName}</p>
+                          <button key={supplier.id} onClick={() => selectSupplier(supplier)} className="w-full px-4 py-1.5 text-left hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
+                            <p className="text-[13px] font-medium text-slate-900">{supplier.fiscalName}</p>
                             {(supplier.commercialName || supplier.taxId) && (
                               <p className="text-xs text-slate-500">{[supplier.commercialName, supplier.taxId].filter(Boolean).join(" · ")}</p>
                             )}
@@ -1462,26 +1461,26 @@ export default function ReportsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Desde</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Desde</label>
                   <div className="relative">
                     <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="date" value={invoiceBookFilters.dateFrom} onChange={(e) => setInvoiceBookFilters({ ...invoiceBookFilters, dateFrom: e.target.value })} className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" />
+                    <input type="date" value={invoiceBookFilters.dateFrom} onChange={(e) => setInvoiceBookFilters({ ...invoiceBookFilters, dateFrom: e.target.value })} className="w-full pl-10 pr-4 py-1.5 border border-slate-200 rounded-md text-[13px] focus:ring-4 focus:ring-indigo-500 focus:outline-none" />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Hasta</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Hasta</label>
                   <div className="relative">
                     <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="date" value={invoiceBookFilters.dateTo} onChange={(e) => setInvoiceBookFilters({ ...invoiceBookFilters, dateTo: e.target.value })} className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" />
+                    <input type="date" value={invoiceBookFilters.dateTo} onChange={(e) => setInvoiceBookFilters({ ...invoiceBookFilters, dateTo: e.target.value })} className="w-full pl-10 pr-4 py-1.5 border border-slate-200 rounded-md text-[13px] focus:ring-4 focus:ring-indigo-500 focus:outline-none" />
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Estado de pago</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Estado de pago</label>
                 <div className="flex gap-2">
                   {[{ value: "all", label: "Todas" }, { value: "paid", label: "Pagadas" }, { value: "pending", label: "Pendientes" }].map(option => (
-                    <button key={option.value} onClick={() => setInvoiceBookFilters({ ...invoiceBookFilters, paymentStatus: option.value as "all" | "paid" | "pending" })} className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${invoiceBookFilters.paymentStatus === option.value ? "bg-indigo-100 text-indigo-700 border-2 border-indigo-200" : "bg-slate-100 text-slate-600 border-2 border-transparent hover:bg-slate-200"}`}>
+                    <button key={option.value} onClick={() => setInvoiceBookFilters({ ...invoiceBookFilters, paymentStatus: option.value as "all" | "paid" | "pending" })} className={`flex-1 px-4 py-1.5 rounded-md text-[13px] font-medium transition-all ${invoiceBookFilters.paymentStatus === option.value ? "bg-indigo-100 text-indigo-700 border-2 border-indigo-200" : "bg-slate-100 text-slate-600 border-2 border-transparent hover:bg-slate-200"}`}>
                       {option.label}
                     </button>
                   ))}
@@ -1491,7 +1490,7 @@ export default function ReportsPage() {
               <div>
                 <label className="flex items-center justify-between cursor-pointer">
                   <div>
-                    <p className="text-sm font-medium text-slate-700">Incluir anuladas</p>
+                    <p className="text-[13px] font-medium text-slate-700">Incluir anuladas</p>
                     <p className="text-xs text-slate-500">Por defecto las facturas anuladas no aparecen en el informe</p>
                   </div>
                   <button
@@ -1504,7 +1503,7 @@ export default function ReportsPage() {
                 </label>
               </div>
 
-              <div className="bg-slate-50 rounded-xl p-4">
+              <div className="bg-slate-50 rounded-md p-4">
                 <p className="text-xs text-slate-500">
                   {!invoiceBookFilters.supplierId && !invoiceBookFilters.dateFrom && !invoiceBookFilters.dateTo ? (
                     "Sin filtros seleccionados. Se exportarán todas las facturas."
@@ -1521,12 +1520,11 @@ export default function ReportsPage() {
             </div>
 
             <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex gap-3">
-              <button onClick={() => setShowInvoiceBookModal(false)} className="flex-1 px-4 py-2.5 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100 transition-colors">Cancelar</button>
+              <button onClick={() => setShowInvoiceBookModal(false)} className="flex-1 px-4 py-1.5 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100 transition-colors">Cancelar</button>
               <button
                 onClick={() => generateInvoicesAccountingReport(getDefaultColumns("invoices"), invoiceBookFilters)}
                 disabled={generating !== null}
-                className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-                style={{ backgroundColor: "#2F52E0" }}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity disabled:opacity-50"
               >
                 {generating === "invoices_accounting"
                   ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Generando...</>

@@ -340,16 +340,16 @@ export default function AccountingPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Header */}
       <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
-          <div className="relative flex items-center justify-center">
-            <h1 className="text-3xl font-bold text-slate-900 text-center">Panel de contabilidad</h1>
+        <div className="px-6 pt-8 sm:px-10">
+          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900">Panel de contabilidad</h1>
 
             {/* Iconos top-right */}
             <div className="absolute right-0 flex items-center gap-1">
               {isApprover && (
                 <Link
                   href={`/project/${id}/accounting/approvals`}
-                  className="relative p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+                  className="relative p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
                   title="Aprobaciones"
                 >
                   <ClipboardCheck size={18} />
@@ -362,14 +362,14 @@ export default function AccountingPage() {
                 <>
                   <Link
                     href={`/project/${id}/accounting/document-center`}
-                    className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+                    className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
                     title="Documentos"
                   >
                     <FolderDown size={18} />
                   </Link>
                   <Link
                     href={`/project/${id}/accounting/config`}
-                    className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+                    className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
                     title="Configuración"
                   >
                     <Settings size={18} />
@@ -381,19 +381,19 @@ export default function AccountingPage() {
         </div>
       </div>
 
-      <main className="px-24 py-8">
+      <main className="px-6 sm:px-10 py-8">
         {/* Pending Approvals Alert */}
         {pendingApprovalsCount > 0 && (
           <Link href={`/project/${id}/accounting/approvals`}>
-            <div className="mb-8 bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-5 cursor-pointer hover:shadow-lg transition-shadow">
+            <div className="mb-8 bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg p-5 cursor-pointer hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-md flex items-center justify-center">
                     <Clock size={24} className="text-white" />
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-white">{pendingApprovalsCount} {pendingApprovalsCount === 1 ? "documento pendiente" : "documentos pendientes"} de tu aprobación</h3>
-                    <p className="text-white/80 text-sm">Revisa y aprueba para continuar el flujo</p>
+                    <p className="text-white/80 text-[13px]">Revisa y aprueba para continuar el flujo</p>
                   </div>
                 </div>
                 <ArrowRight size={24} className="text-white/80" />
@@ -405,12 +405,10 @@ export default function AccountingPage() {
         {/* Recent Activity */}
         <div className="flex flex-row gap-6 items-start">
           {/* Recent POs */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1 max-w-[50%]">
+          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm flex-1 max-w-[50%]">
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <FileText size={18} style={{ color: '#2F52E0' }} />
                 <h3 className="font-semibold text-slate-900">POs</h3>
-                <span className="text-xs text-slate-400">recientes</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Link 
@@ -431,21 +429,21 @@ export default function AccountingPage() {
             <div className="p-5">
               {recentPOs.length === 0 ? (
                 <div className="text-center py-12">
-                  <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <div className="hidden">
                     <FileText size={24} className="text-slate-400" />
                   </div>
-                  <p className="text-sm text-slate-500">Sin órdenes de compra</p>
+                  <p className="text-[13px] text-slate-500">Sin órdenes de compra</p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {recentPOs.map((po) => (
                     <Link key={po.id} href={`/project/${id}/accounting/pos/${po.id}`} className="block">
-                      <div className={`flex items-center justify-between px-3 py-3 rounded-xl transition-colors cursor-pointer group border ${po.status === "cancelled" ? "bg-red-50/40 border-red-100 opacity-60 hover:opacity-80" : "bg-slate-50 hover:bg-slate-100 border-transparent hover:border-slate-200"}`}>
+                      <div className={`flex items-center justify-between px-3 py-3 rounded-md transition-colors cursor-pointer group border ${po.status === "cancelled" ? "bg-red-50/40 border-red-100 opacity-60 hover:opacity-80" : "bg-slate-50 hover:bg-slate-100 border-transparent hover:border-slate-200"}`}>
                         <div className="flex-1 min-w-0 mr-3">
                           <div className="flex items-center gap-2 mb-0.5">
-                            <span className={`text-sm font-semibold font-mono ${po.status === "cancelled" ? "line-through text-slate-400" : "text-slate-900"}`}>PO-{po.number}</span>
+                            <span className={`text-[13px] font-semibold font-mono ${po.status === "cancelled" ? "line-through text-slate-400" : "text-slate-900"}`}>PO-{po.number}</span>
                             <span className="text-slate-300">/</span>
-                            <span className="text-sm font-medium text-slate-700 truncate">{po.supplier || "Sin proveedor"}</span>
+                            <span className="text-[13px] font-medium text-slate-700 truncate">{po.supplier || "Sin proveedor"}</span>
                           </div>
                           {po.description && (
                             <p className="text-xs text-slate-500 truncate">{po.description}</p>
@@ -453,7 +451,7 @@ export default function AccountingPage() {
                         </div>
                         <div className="flex items-center gap-3 flex-shrink-0">
                           <div className="text-right">
-                            <p className="text-sm font-semibold text-slate-900">{formatCurrency(po.baseAmount)} €</p>
+                            <p className="text-[13px] font-semibold text-slate-900">{formatCurrency(po.baseAmount)} €</p>
                             {getStatusBadge(po.status)}
                           </div>
                           <ChevronRight size={16} className="text-slate-300 group-hover:text-[#2F52E0] transition-colors" />
@@ -467,12 +465,10 @@ export default function AccountingPage() {
           </div>
 
           {/* Recent Invoices */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1 max-w-[50%]">
+          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm flex-1 max-w-[50%]">
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <Receipt size={18} style={{ color: '#2F52E0' }} />
                 <h3 className="font-semibold text-slate-900">Facturas</h3>
-                <span className="text-xs text-slate-400">recientes</span>
               </div>
               <div className="flex items-center gap-1.5">
                 {hasExtendedAccess && (
@@ -502,10 +498,10 @@ export default function AccountingPage() {
             <div className="p-5">
               {recentInvoices.length === 0 ? (
                 <div className="text-center py-12">
-                  <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <div className="hidden">
                     <Receipt size={24} className="text-slate-400" />
                   </div>
-                  <p className="text-sm text-slate-500">Sin facturas</p>
+                  <p className="text-[13px] text-slate-500">Sin facturas</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -513,13 +509,13 @@ export default function AccountingPage() {
                     const isOverdue = getInvoiceDisplayState(invoice) === "overdue";
                     return (
                       <Link key={invoice.id} href={`/project/${id}/accounting/invoices/${invoice.id}`} className="block">
-                        <div className={`flex items-center justify-between px-3 py-3 rounded-xl transition-colors cursor-pointer group border ${["cancelled","void","rejected"].includes(invoice.status) ? "bg-red-50/40 border-red-100 opacity-60 hover:opacity-80" : "bg-slate-50 hover:bg-slate-100 border-transparent hover:border-slate-200"}`}>
+                        <div className={`flex items-center justify-between px-3 py-3 rounded-md transition-colors cursor-pointer group border ${["cancelled","void","rejected"].includes(invoice.status) ? "bg-red-50/40 border-red-100 opacity-60 hover:opacity-80" : "bg-slate-50 hover:bg-slate-100 border-transparent hover:border-slate-200"}`}>
                           <div className="flex-1 min-w-0 mr-3">
                             <div className="flex items-center gap-2 mb-0.5">
-                              <span className={`text-sm font-semibold font-mono ${["cancelled","void"].includes(invoice.status) ? "line-through text-slate-400" : "text-slate-900"}`}>{invoice.displayNumber}</span>
+                              <span className={`text-[13px] font-semibold font-mono ${["cancelled","void"].includes(invoice.status) ? "line-through text-slate-400" : "text-slate-900"}`}>{invoice.displayNumber}</span>
                               {isOverdue && <AlertCircle size={12} className="text-red-500" />}
                               <span className="text-slate-300">/</span>
-                              <span className="text-sm font-medium text-slate-700 truncate">{invoice.supplier || "Sin proveedor"}</span>
+                              <span className="text-[13px] font-medium text-slate-700 truncate">{invoice.supplier || "Sin proveedor"}</span>
                             </div>
                             {invoice.description && (
                               <p className="text-xs text-slate-500 truncate">{invoice.description}</p>
@@ -527,7 +523,7 @@ export default function AccountingPage() {
                           </div>
                           <div className="flex items-center gap-3 flex-shrink-0">
                             <div className="text-right">
-                              <p className="text-sm font-semibold text-slate-900">{formatCurrency(invoice.baseAmount)} €</p>
+                              <p className="text-[13px] font-semibold text-slate-900">{formatCurrency(invoice.baseAmount)} €</p>
                               {getInvoiceBadge(invoice)}
                             </div>
                             <ChevronRight size={16} className="text-slate-300 group-hover:text-[#2F52E0] transition-colors" />

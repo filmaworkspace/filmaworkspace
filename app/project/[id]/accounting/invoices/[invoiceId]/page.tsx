@@ -881,15 +881,14 @@ export default function InvoiceDetailPage() {
     return (
       <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="hidden">
             <ShieldAlert size={28} className="text-red-500" />
           </div>
-          <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
+          <h2 className="text-[14px] font-semibold text-slate-900 mb-2">Acceso denegado</h2>
           <p className="text-slate-500 mb-6">No tienes permisos para ver este documento.</p>
           <Link
             href={`/project/${projectId}/accounting/invoices`}
-            className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
-            style={{ backgroundColor: "#2F52E0" }}
+            className="inline-flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity"
           >
             Volver a facturas
           </Link>
@@ -910,7 +909,7 @@ export default function InvoiceDetailPage() {
   if (codingMode) {
     return (
       <div className={`min-h-screen bg-slate-100 ${inter.className}`}>
-        {toast && <div className="fixed bottom-4 left-4 z-50"><div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"} text-white text-sm font-medium`}>{toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}{toast.message}</div></div>}
+        {toast && <div className="fixed bottom-4 left-4 z-50"><div className={`flex items-center gap-2 px-4 py-3 rounded-md shadow-lg ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"} text-white text-[13px] font-medium`}>{toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}{toast.message}</div></div>}
         
         {/* Coding Header */}
         <div className="bg-violet-600 text-white px-6 py-3 flex items-center justify-between fixed top-0 left-0 right-0 z-50">
@@ -919,12 +918,12 @@ export default function InvoiceDetailPage() {
             <div className="flex items-center gap-3">
               <Code size={20} />
               <span className="font-semibold">Codificar</span>
-              <span className="bg-violet-500 px-2 py-0.5 rounded text-sm">{invoice.displayNumber}</span>
+              <span className="bg-violet-500 px-2 py-0.5 rounded text-[13px]">{invoice.displayNumber}</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-violet-200 text-sm">Total: <span className="font-bold text-white">{formatCurrency(totals.total)} €</span></span>
-            <button onClick={handleSaveCoding} disabled={saving} className="flex items-center gap-2 px-5 py-2.5 bg-white text-violet-700 rounded-xl text-sm font-semibold hover:bg-violet-50 disabled:opacity-50 shadow-lg">
+            <span className="text-violet-200 text-[13px]">Total: <span className="font-bold text-white">{formatCurrency(totals.total)} €</span></span>
+            <button onClick={handleSaveCoding} disabled={saving} className="flex items-center gap-2 px-3 py-1.5 bg-white text-violet-700 rounded-md text-[13px] font-semibold hover:bg-violet-50 disabled:opacity-50 shadow-lg">
               {saving ? <RefreshCw size={16} className="animate-spin" /> : <FileCheck size={16} />}
               {saving ? "Guardando..." : "Completar codificación"}
             </button>
@@ -936,7 +935,7 @@ export default function InvoiceDetailPage() {
           <div className="w-1/2 bg-slate-800 p-4 flex flex-col">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
-                <span className="text-slate-400 text-sm">Vista previa del documento</span>
+                <span className="text-slate-400 text-[13px]">Vista previa del documento</span>
                 {invoice.replacedFromType && invoice.originalAttachmentUrl && (
                   <button
                     onClick={() => setShowOriginalDoc(!showOriginalDoc)}
@@ -963,7 +962,7 @@ export default function InvoiceDetailPage() {
                 </span>
               </div>
             )}
-            <div className="flex-1 bg-slate-900 rounded-xl overflow-auto">
+            <div className="flex-1 bg-slate-900 rounded-md overflow-auto">
               {(() => {
                 const currentUrl = showOriginalDoc ? invoice.originalAttachmentUrl : invoice.attachmentUrl;
                 return currentUrl ? (
@@ -982,29 +981,29 @@ export default function InvoiceDetailPage() {
           {/* Right: Coding Form */}
           <div className="w-1/2 overflow-y-auto p-6">
             {/* Header Info */}
-            <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
+            <div className="bg-white rounded-lg p-5 mb-4 shadow-sm">
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs text-slate-500 block mb-1">Nº Factura proveedor</label>
-                  <input value={codingForm.supplierNumber} onChange={(e) => setCodingForm({ ...codingForm, supplierNumber: e.target.value })} placeholder="Número de proveedor" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none" />
+                  <input value={codingForm.supplierNumber} onChange={(e) => setCodingForm({ ...codingForm, supplierNumber: e.target.value })} placeholder="Número de proveedor" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none" />
                 </div>
                 <div>
                   <label className="text-xs text-slate-500 block mb-1">Fecha factura</label>
-                  <input type="date" value={codingForm.invoiceDate} onChange={(e) => setCodingForm({ ...codingForm, invoiceDate: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none" />
+                  <input type="date" value={codingForm.invoiceDate} onChange={(e) => setCodingForm({ ...codingForm, invoiceDate: e.target.value })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none" />
                 </div>
                 <div>
                   <label className="text-xs text-slate-500 block mb-1">Fecha vencimiento</label>
-                  <input type="date" value={codingForm.dueDate} onChange={(e) => setCodingForm({ ...codingForm, dueDate: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none" />
+                  <input type="date" value={codingForm.dueDate} onChange={(e) => setCodingForm({ ...codingForm, dueDate: e.target.value })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none" />
                 </div>
               </div>
               <div className="mt-4">
                 <label className="text-xs text-slate-500 block mb-1">Descripción</label>
-                <input value={codingForm.description} onChange={(e) => setCodingForm({ ...codingForm, description: e.target.value })} placeholder="Descripción de la factura" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none" />
+                <input value={codingForm.description} onChange={(e) => setCodingForm({ ...codingForm, description: e.target.value })} placeholder="Descripción de la factura" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none" />
               </div>
             </div>
 
             {/* Supplier Info */}
-            <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
+            <div className="bg-white rounded-lg p-5 mb-4 shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-slate-900 flex items-center gap-2"><Building2 size={16} className="text-slate-400" />Proveedor: {invoice.supplier}</h3>
                 <button onClick={loadSupplierData} className="text-xs text-violet-600 hover:underline flex items-center gap-1"><RefreshCw size={12} />Cargar datos</button>
@@ -1012,7 +1011,7 @@ export default function InvoiceDetailPage() {
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs text-slate-500 block mb-1">CIF/NIF</label>
-                  <input value={codingForm.supplierTaxId} onChange={(e) => setCodingForm({ ...codingForm, supplierTaxId: e.target.value })} placeholder="B12345678" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none font-mono" />
+                  <input value={codingForm.supplierTaxId} onChange={(e) => setCodingForm({ ...codingForm, supplierTaxId: e.target.value })} placeholder="B12345678" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none font-mono" />
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs text-slate-500 block mb-1">IBAN / BIC</label>
@@ -1029,7 +1028,7 @@ export default function InvoiceDetailPage() {
             </div>
 
             {/* Items */}
-            <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
+            <div className="bg-white rounded-lg p-5 mb-4 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-slate-900">Líneas de codificación</h3>
                 <div className="flex items-center gap-2">
@@ -1061,7 +1060,7 @@ export default function InvoiceDetailPage() {
 
               {/* PO Items selector */}
               {linkedPO && linkedPO.items && linkedPO.items.length > 0 && (
-                <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-xl">
+                <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-md">
                   <p className="text-xs font-medium text-indigo-800 mb-2">Añadir línea desde PO-{linkedPO.number}:</p>
                   <div className="flex flex-wrap gap-2">
                     {linkedPO.items.map((poItem: any, idx: number) => (
@@ -1094,7 +1093,7 @@ export default function InvoiceDetailPage() {
 
               <div className="space-y-4">
                 {codingItems.map((item, idx) => (
-                  <div key={idx} className={`border rounded-xl p-4 relative ${item.isNewItem ? "border-amber-200 bg-amber-50/30" : "border-indigo-200 bg-indigo-50/30"}`}>
+                  <div key={idx} className={`border rounded-md p-4 relative ${item.isNewItem ? "border-amber-200 bg-amber-50/30" : "border-indigo-200 bg-indigo-50/30"}`}>
                     <div className="absolute -top-2 left-3 flex items-center gap-2">
                       <span className="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-500 font-medium">Línea {idx + 1}</span>
                       {item.isNewItem ? (
@@ -1112,7 +1111,7 @@ export default function InvoiceDetailPage() {
                     <div className="grid grid-cols-12 gap-3 mt-2">
                       <div className="col-span-12">
                         <label className="text-xs text-slate-500 block mb-1">Descripción</label>
-                        <input value={item.description} onChange={(e) => updateCodingItem(idx, "description", e.target.value)} placeholder="Descripción del concepto" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none" />
+                        <input value={item.description} onChange={(e) => updateCodingItem(idx, "description", e.target.value)} placeholder="Descripción del concepto" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none" />
                       </div>
                       
                       <div className="col-span-6">
@@ -1120,18 +1119,18 @@ export default function InvoiceDetailPage() {
                         <div className="relative">
                           {item.subAccountId ? (
                             <div className="flex items-center gap-2 px-3 py-2 bg-violet-50 border border-violet-200 rounded-lg">
-                              <span className="font-mono text-sm text-violet-700">{item.subAccountCode}</span>
+                              <span className="font-mono text-[13px] text-violet-700">{item.subAccountCode}</span>
                               <span className="text-xs text-slate-600 truncate flex-1">{item.subAccountDescription}</span>
                               <button onClick={() => { updateCodingItem(idx, "subAccountId", ""); updateCodingItem(idx, "subAccountCode", ""); updateCodingItem(idx, "subAccountDescription", ""); }} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
                             </div>
                           ) : (
                             <div className="relative">
                               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                              <input placeholder="Buscar cuenta" value={searchSubAccount} onChange={(e) => setSearchSubAccount(e.target.value)} onFocus={() => setSearchSubAccount("")} className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none" />
+                              <input placeholder="Buscar cuenta" value={searchSubAccount} onChange={(e) => setSearchSubAccount(e.target.value)} onFocus={() => setSearchSubAccount("")} className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none" />
                               {searchSubAccount && (
-                                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-10 max-h-48 overflow-y-auto">
+                                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-xl z-10 max-h-48 overflow-y-auto">
                                   {subAccounts.filter((s) => s.code.toLowerCase().includes(searchSubAccount.toLowerCase()) || s.description.toLowerCase().includes(searchSubAccount.toLowerCase())).slice(0, 10).map((s) => (
-                                    <button key={s.id} onClick={() => selectSubAccount(idx, s)} className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-sm">
+                                    <button key={s.id} onClick={() => selectSubAccount(idx, s)} className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-[13px]">
                                       <span className="font-mono text-violet-600">{s.code}</span>
                                       <span className="text-slate-600 truncate">{s.description}</span>
                                     </button>
@@ -1175,7 +1174,7 @@ export default function InvoiceDetailPage() {
                             <button
                               type="button"
                               onClick={() => setOpenDropdown(openDropdown === `poitem-${idx}` ? null : `poitem-${idx}`)}
-                              className="w-full px-3 py-2 border border-indigo-200 bg-indigo-50 rounded-lg text-sm text-left flex items-center justify-between gap-2 hover:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors"
+                              className="w-full px-3 py-2 border border-indigo-200 bg-indigo-50 rounded-lg text-[13px] text-left flex items-center justify-between gap-2 hover:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors"
                             >
                               <span className="text-slate-900 truncate">
                                 {item.poItemIndex !== undefined && item.poItemIndex !== null
@@ -1185,11 +1184,11 @@ export default function InvoiceDetailPage() {
                               <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `poitem-${idx}` ? "rotate-180" : ""}`} />
                             </button>
                             {openDropdown === `poitem-${idx}` && (
-                              <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                              <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
                                 <button
                                   type="button"
                                   onClick={() => { updateCodingItem(idx, "poItemIndex", undefined); setOpenDropdown(null); }}
-                                  className={`w-full px-4 py-2 text-left text-sm transition-colors ${item.poItemIndex === undefined || item.poItemIndex === null ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                                  className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${item.poItemIndex === undefined || item.poItemIndex === null ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
                                 >
                                   Seleccionar...
                                 </button>
@@ -1198,7 +1197,7 @@ export default function InvoiceDetailPage() {
                                     key={i}
                                     type="button"
                                     onClick={() => { updateCodingItem(idx, "poItemIndex", i); setOpenDropdown(null); }}
-                                    className={`w-full px-4 py-2 text-left text-sm transition-colors ${item.poItemIndex === i ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                                    className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${item.poItemIndex === i ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
                                   >
                                     #{i + 1} - {poItem.description?.substring(0, 30) || `Línea ${i + 1}`}
                                   </button>
@@ -1215,19 +1214,19 @@ export default function InvoiceDetailPage() {
                           <button
                             type="button"
                             onClick={() => setOpenDropdown(openDropdown === `vat-${idx}` ? null : `vat-${idx}`)}
-                            className="w-full px-2 py-2 border border-slate-200 rounded-lg text-sm bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors"
+                            className="w-full px-2 py-2 border border-slate-200 rounded-lg text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors"
                           >
                             <span className="text-slate-900 truncate">{item.vatRate}%</span>
                             <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `vat-${idx}` ? "rotate-180" : ""}`} />
                           </button>
                           {openDropdown === `vat-${idx}` && (
-                            <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                            <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
                               {VAT_RATES.map((r) => (
                                 <button
                                   key={r}
                                   type="button"
                                   onClick={() => { updateCodingItem(idx, "vatRate", Number(r)); setOpenDropdown(null); }}
-                                  className={`w-full px-4 py-2 text-left text-sm transition-colors ${item.vatRate === r ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                                  className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${item.vatRate === r ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
                                 >
                                   {r}%
                                 </button>
@@ -1243,19 +1242,19 @@ export default function InvoiceDetailPage() {
                           <button
                             type="button"
                             onClick={() => setOpenDropdown(openDropdown === `irpf-${idx}` ? null : `irpf-${idx}`)}
-                            className="w-full px-2 py-2 border border-slate-200 rounded-lg text-sm bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors"
+                            className="w-full px-2 py-2 border border-slate-200 rounded-lg text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors"
                           >
                             <span className="text-slate-900 truncate">{item.irpfRate}%</span>
                             <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `irpf-${idx}` ? "rotate-180" : ""}`} />
                           </button>
                           {openDropdown === `irpf-${idx}` && (
-                            <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                            <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
                               {IRPF_RATES.map((r) => (
                                 <button
                                   key={r}
                                   type="button"
                                   onClick={() => { updateCodingItem(idx, "irpfRate", Number(r)); setOpenDropdown(null); }}
-                                  className={`w-full px-4 py-2 text-left text-sm transition-colors ${item.irpfRate === r ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                                  className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${item.irpfRate === r ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
                                 >
                                   {r}%
                                 </button>
@@ -1267,20 +1266,20 @@ export default function InvoiceDetailPage() {
 
                       <div className="col-span-2">
                         <label className="text-xs text-slate-500 block mb-1">Cantidad</label>
-                        <input type="number" step="0.01" min="0" value={item.quantity || ""} onChange={(e) => updateCodingItem(idx, "quantity", parseFloat(e.target.value) || 0)} placeholder="1" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none text-right font-mono" />
+                        <input type="number" step="0.01" min="0" value={item.quantity || ""} onChange={(e) => updateCodingItem(idx, "quantity", parseFloat(e.target.value) || 0)} placeholder="1" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none text-right font-mono" />
                       </div>
 
                       <div className="col-span-3">
                         <label className="text-xs text-slate-500 block mb-1">Precio unit.</label>
                         <div className="relative">
-                          <input type="number" step="0.01" value={item.unitPrice || ""} onChange={(e) => updateCodingItem(idx, "unitPrice", parseFloat(e.target.value) || 0)} placeholder="0.00" className="w-full px-3 py-2 pr-8 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none text-right font-mono" />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">€</span>
+                          <input type="number" step="0.01" value={item.unitPrice || ""} onChange={(e) => updateCodingItem(idx, "unitPrice", parseFloat(e.target.value) || 0)} placeholder="0.00" className="w-full px-2.5 py-1.5 pr-8 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none text-right font-mono" />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[13px]">€</span>
                         </div>
                       </div>
 
                       <div className="col-span-3">
                         <label className="text-xs text-slate-500 block mb-1">Total línea</label>
-                        <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-right font-mono font-semibold text-slate-900">
+                        <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[13px] text-right font-mono font-semibold text-slate-900">
                           {formatCurrency(calculateItemTotals(item).total)} €
                         </div>
                       </div>
@@ -1291,17 +1290,17 @@ export default function InvoiceDetailPage() {
             </div>
 
             {/* Totals */}
-            <div className="bg-violet-50 border border-violet-200 rounded-2xl p-5 mb-4">
-              <div className="grid grid-cols-4 gap-4 text-sm">
+            <div className="bg-violet-50 border border-violet-200 rounded-lg p-5 mb-4">
+              <div className="grid grid-cols-4 gap-4 text-[13px]">
                 <div className="text-center"><p className="text-violet-600 text-xs mb-1">Base imponible</p><p className="font-bold text-slate-900">{formatCurrency(totals.base)} €</p></div>
                 <div className="text-center"><p className="text-violet-600 text-xs mb-1">IVA</p><p className="font-bold text-emerald-600">+{formatCurrency(totals.vat)} €</p></div>
                 <div className="text-center"><p className="text-violet-600 text-xs mb-1">IRPF</p><p className="font-bold text-red-600">-{formatCurrency(totals.irpf)} €</p></div>
-                <div className="text-center bg-white rounded-xl p-3"><p className="text-violet-600 text-xs mb-1">TOTAL</p><p className="font-bold text-xl text-violet-700">{formatCurrency(totals.total)} €</p></div>
+                <div className="text-center bg-white rounded-md p-3"><p className="text-violet-600 text-xs mb-1">TOTAL</p><p className="font-bold text-xl text-violet-700">{formatCurrency(totals.total)} €</p></div>
               </div>
             </div>
 
             {/* Extra Info */}
-            <div className="bg-white rounded-2xl p-5 shadow-sm">
+            <div className="bg-white rounded-lg p-5 shadow-sm">
               <h3 className="font-semibold text-slate-900 mb-4">Información adicional</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
@@ -1310,19 +1309,19 @@ export default function InvoiceDetailPage() {
                     <button
                       type="button"
                       onClick={() => setOpenDropdown(openDropdown === "paymentMethod" ? null : "paymentMethod")}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors"
                     >
                       <span className="text-slate-900 truncate">{PAYMENT_METHODS.find(m => m.value === codingForm.paymentMethod)?.label ?? codingForm.paymentMethod}</span>
                       <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === "paymentMethod" ? "rotate-180" : ""}`} />
                     </button>
                     {openDropdown === "paymentMethod" && (
-                      <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                      <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
                         {PAYMENT_METHODS.map(opt => (
                           <button
                             key={opt.value}
                             type="button"
                             onClick={() => { setCodingForm({ ...codingForm, paymentMethod: opt.value }); setOpenDropdown(null); }}
-                            className={`w-full px-4 py-2 text-left text-sm transition-colors ${codingForm.paymentMethod === opt.value ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                            className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${codingForm.paymentMethod === opt.value ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
                           >
                             {opt.label}
                           </button>
@@ -1334,18 +1333,18 @@ export default function InvoiceDetailPage() {
                 <div className="col-span-2">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={codingForm.isAsset} onChange={(e) => setCodingForm({ ...codingForm, isAsset: e.target.checked })} className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
-                    <span className="text-sm text-slate-700">Es un activo / inventario</span>
+                    <span className="text-[13px] text-slate-700">Es un activo / inventario</span>
                   </label>
                 </div>
                 {codingForm.isAsset && (
                   <div className="col-span-2">
                     <label className="text-xs text-slate-500 block mb-1">Categoría de activo</label>
-                    <input value={codingForm.assetCategory} onChange={(e) => setCodingForm({ ...codingForm, assetCategory: e.target.value })} placeholder="Categoría del activo" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none" />
+                    <input value={codingForm.assetCategory} onChange={(e) => setCodingForm({ ...codingForm, assetCategory: e.target.value })} placeholder="Categoría del activo" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none" />
                   </div>
                 )}
                 <div className="col-span-2">
                   <label className="text-xs text-slate-500 block mb-1">Notas internas</label>
-                  <textarea value={codingForm.notes} onChange={(e) => setCodingForm({ ...codingForm, notes: e.target.value })} rows={2} placeholder="Notas para el equipo de contabilidad" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none resize-none" />
+                  <textarea value={codingForm.notes} onChange={(e) => setCodingForm({ ...codingForm, notes: e.target.value })} rows={2} placeholder="Notas para el equipo de contabilidad" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none resize-none" />
                 </div>
               </div>
             </div>
@@ -1358,44 +1357,42 @@ export default function InvoiceDetailPage() {
   // Normal Detail View
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
-      {toast && <div className="fixed bottom-4 left-4 z-50"><div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"} text-white text-sm font-medium`}>{toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}{toast.message}</div></div>}
+      {toast && <div className="fixed bottom-4 left-4 z-50"><div className={`flex items-center gap-2 px-4 py-3 rounded-md shadow-lg ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"} text-white text-[13px] font-medium`}>{toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}{toast.message}</div></div>}
       
       <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
-          <div className="relative flex items-center justify-center">
+        <div className="px-6 pt-8 sm:px-10">
+          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
             <div className="flex items-center gap-4">
-              <Receipt size={22} className="text-slate-400" />
               <div className="text-center">
                 <div className="flex items-center justify-center gap-3 flex-wrap">
-                  <h1 className="text-3xl font-bold text-slate-900 text-center">{docConfig.label}</h1>
-                  <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm font-mono">{invoice.displayNumber}</span>
+                  <h1 className="text-xl font-semibold tracking-tight text-slate-900">{docConfig.label}</h1>
+                  <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[13px] font-mono">{invoice.displayNumber}</span>
                   {/* Estado principal */}
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium text-sm ${config.bg} ${config.text}`}><StatusIcon size={14} />{config.label}</span>
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium text-[13px] ${config.bg} ${config.text}`}><StatusIcon size={14} />{config.label}</span>
                   {/* Badges independientes por track (se muestran si el track está completo
                       y no es ya el estado principal mostrado) */}
                   {invoice.approvedAt && displayState !== "approved" && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg font-medium text-sm">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg font-medium text-[13px]">
                       <CheckCircle size={14} />Aprobada
                     </span>
                   )}
                   {invoice.codedAt && displayState !== "coded" && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-violet-100 text-violet-700 rounded-lg font-medium text-sm">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-violet-100 text-violet-700 rounded-lg font-medium text-[13px]">
                       <FileCheck size={14} />Codificada
                     </span>
                   )}
                   {(invoice.accountedAt || invoice.accounted) && displayState !== "accounted" && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-teal-100 text-teal-700 rounded-lg font-medium text-sm">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-teal-100 text-teal-700 rounded-lg font-medium text-[13px]">
                       <Lock size={14} />Contabilizada
                     </span>
                   )}
                   {invoice.paidAt && displayState !== "paid" && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-700 rounded-lg font-medium text-sm">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-700 rounded-lg font-medium text-[13px]">
                       <CreditCard size={14} />Pagada
                     </span>
                   )}
                   {invoice.poNumber && <Link href={`/project/${projectId}/accounting/pos/${invoice.poId}`} className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-100"><LinkIcon size={12} />PO-{invoice.poNumber}</Link>}
                 </div>
-                <p className="text-slate-500 text-sm mt-1">{invoice.supplier}{invoice.department && <span className="ml-2 text-slate-400">· {invoice.department}</span>}</p>
               </div>
             </div>
 
@@ -1407,42 +1404,42 @@ export default function InvoiceDetailPage() {
               </div>
 
               {canCode() && invoice.status !== "cancelled" && (
-                <button onClick={() => setCodingMode(true)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium ${invoice.codedAt ? "bg-violet-100 text-violet-700 hover:bg-violet-200" : "bg-violet-600 text-white hover:bg-violet-700"}`}>
+                <button onClick={() => setCodingMode(true)} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-[13px] font-medium ${invoice.codedAt ? "bg-violet-100 text-violet-700 hover:bg-violet-200" : "bg-violet-600 text-white hover:bg-violet-700"}`}>
                   <Code size={16} />
                   {invoice.codedAt ? "Editar codificación" : "Codificar"}
                 </button>
               )}
 
               {canModify() && (
-                <Link href={`/project/${projectId}/accounting/invoices/${invoice.id}/edit`} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium">
+                <Link href={`/project/${projectId}/accounting/invoices/${invoice.id}/edit`} className="flex items-center gap-2 px-4 py-1.5 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                   <Edit size={16} />Modificar
                 </Link>
               )}
-              {invoice.approvedAt && !invoice.paidAt && displayState !== "cancelled" && canPay() && <Link href={`/project/${projectId}/accounting/payments?invoice=${invoice.id}`} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-medium"><CreditCard size={16} />Ir a pagar</Link>}
+              {invoice.approvedAt && !invoice.paidAt && displayState !== "cancelled" && canPay() && <Link href={`/project/${projectId}/accounting/payments?invoice=${invoice.id}`} className="flex items-center gap-2 px-4 py-1.5 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"><CreditCard size={16} />Ir a pagar</Link>}
               
               {/* Botón de devolución para fianzas */}
               {canRegisterReturn() && (
-                <button onClick={openReturnModal} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 text-sm font-medium">
+                <button onClick={openReturnModal} className="flex items-center gap-2 px-4 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 text-[13px] font-medium">
                   <RefreshCw size={16} />Registrar devolución
                 </button>
               )}
 
               <div className="relative">
-                <button onClick={() => setShowActionsMenu(!showActionsMenu)} className="p-2.5 border border-slate-200 rounded-xl hover:bg-slate-50"><MoreHorizontal size={18} /></button>
-                {showActionsMenu && (<><div className="fixed inset-0 z-40" onClick={() => setShowActionsMenu(false)} /><div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1">
-                  {invoice.attachmentUrl && <a href={invoice.attachmentUrl} target="_blank" rel="noopener noreferrer" onClick={() => setShowActionsMenu(false)} className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3"><Download size={16} className="text-slate-400" />Descargar</a>}
+                <button onClick={() => setShowActionsMenu(!showActionsMenu)} className="p-2.5 border border-slate-200 rounded-md hover:bg-slate-50"><MoreHorizontal size={18} /></button>
+                {showActionsMenu && (<><div className="fixed inset-0 z-40" onClick={() => setShowActionsMenu(false)} /><div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-md shadow-xl z-50 py-1">
+                  {invoice.attachmentUrl && <a href={invoice.attachmentUrl} target="_blank" rel="noopener noreferrer" onClick={() => setShowActionsMenu(false)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3"><Download size={16} className="text-slate-400" />Descargar</a>}
                   {canReplaceDocument() && (
                     <button 
                       onClick={() => { fileInputRef.current?.click(); setShowActionsMenu(false); }} 
                       disabled={replacingDocument}
-                      className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3 disabled:opacity-50"
+                      className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3 disabled:opacity-50"
                     >
                       <Upload size={16} className="text-slate-400" />
                       {replacingDocument ? "Subiendo..." : "Reemplazar documento"}
                     </button>
                   )}
-                  {canAdminCorrect() && <Link href={`/project/${projectId}/accounting/invoices/${invoice.id}/edit?mode=correction`} onClick={() => setShowActionsMenu(false)} className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3"><FileCheck size={16} className="text-slate-400" />Corrección administrativa</Link>}
-                  {canCancel() && <><div className="border-t border-slate-100 my-1" /><button onClick={() => { setShowCancelModal(true); setShowActionsMenu(false); }} className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"><XCircle size={16} />Anular</button></>}
+                  {canAdminCorrect() && <Link href={`/project/${projectId}/accounting/invoices/${invoice.id}/edit?mode=correction`} onClick={() => setShowActionsMenu(false)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3"><FileCheck size={16} className="text-slate-400" />Corrección administrativa</Link>}
+                  {canCancel() && <><div className="border-t border-slate-100 my-1" /><button onClick={() => { setShowCancelModal(true); setShowActionsMenu(false); }} className="w-full px-4 py-1.5 text-left text-[13px] text-red-600 hover:bg-red-50 flex items-center gap-3"><XCircle size={16} />Anular</button></>}
                 </div></>)}
               </div>
               
@@ -1459,17 +1456,17 @@ export default function InvoiceDetailPage() {
         </div>
       </div>
 
-      <main className="px-24 py-8">
+      <main className="px-6 sm:px-10 py-8">
         {/* Banner de delegación a contabilidad */}
         {invoice.status === "coding" && invoice.delegatedToAccounting && (
-          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
+          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-md px-5 py-4">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 bg-amber-100 rounded-md flex items-center justify-center flex-shrink-0">
                 <Clock size={20} className="text-amber-600" />
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-amber-800 mb-1">Pendiente de codificación</h3>
-                <p className="text-sm text-amber-700">
+                <p className="text-[13px] text-amber-700">
                   Esta factura fue enviada sin codificar por <span className="font-medium">{invoice.delegatedByName || invoice.createdByName}</span>
                   {invoice.delegatedAt && <span> el {formatDate(invoice.delegatedAt)}</span>}.
                   Los items necesitan asignación de cuentas contables.
@@ -1477,7 +1474,7 @@ export default function InvoiceDetailPage() {
                 {canCode() && (
                   <button 
                     onClick={() => setCodingMode(true)} 
-                    className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700"
+                    className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg text-[13px] font-medium hover:bg-amber-700"
                   >
                     <Code size={14} />
                     Codificar ahora
@@ -1490,7 +1487,7 @@ export default function InvoiceDetailPage() {
 
         {/* Descripción siempre primero */}
         {invoice.description && (
-          <div className="mb-6 bg-slate-50 border border-slate-200 rounded-xl px-5 py-4">
+          <div className="mb-6 bg-slate-50 border border-slate-200 rounded-md px-5 py-4">
             <p className="text-slate-700">{invoice.description}</p>
           </div>
         )}
@@ -1532,8 +1529,8 @@ export default function InvoiceDetailPage() {
           {/* Left: Document Preview */}
           <div className="space-y-6">
             {/* Document Preview with actions */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <h3 className="font-semibold text-slate-900">Documento</h3>
                   {invoice.replacedFromType && invoice.originalAttachmentUrl && (
@@ -1576,18 +1573,18 @@ export default function InvoiceDetailPage() {
                   const currentUrl = showOriginalDoc ? invoice.originalAttachmentUrl : invoice.attachmentUrl;
                   return currentUrl ? (
                     isPDF(currentUrl) ? (
-                      <iframe src={`${currentUrl}#toolbar=0`} className="w-full h-[600px] rounded-xl border border-slate-200" />
+                      <iframe src={`${currentUrl}#toolbar=0`} className="w-full h-[600px] rounded-md border border-slate-200" />
                     ) : (
-                      <img src={currentUrl} alt="Doc" className="w-full rounded-xl border border-slate-200" />
+                      <img src={currentUrl} alt="Doc" className="w-full rounded-md border border-slate-200" />
                     )
                   ) : (
-                    <div className="h-[300px] bg-slate-50 rounded-xl flex flex-col items-center justify-center gap-3">
+                    <div className="h-[300px] bg-slate-50 rounded-md flex flex-col items-center justify-center gap-3">
                       <FileUp size={32} className="text-slate-300" />
-                      <p className="text-sm text-slate-400">Sin documento adjunto</p>
+                      <p className="text-[13px] text-slate-400">Sin documento adjunto</p>
                       {canEdit() && (
                         <Link 
                           href={`/project/${projectId}/accounting/invoices/${invoice.id}/edit?addDoc=true`}
-                          className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
+                          className="flex items-center gap-2 px-4 py-2 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
                         >
                           <FileUp size={14} />
                           Añadir documento
@@ -1599,14 +1596,14 @@ export default function InvoiceDetailPage() {
               </div>
             </div>
 
-            {invoice.notes && <div className="bg-white border border-slate-200 rounded-2xl p-6"><h3 className="font-semibold text-slate-900 mb-3">Notas</h3><p className="text-sm text-slate-600">{invoice.notes}</p></div>}
+            {invoice.notes && <div className="bg-white border border-slate-200 rounded-lg p-6"><h3 className="font-semibold text-slate-900 mb-3">Notas</h3><p className="text-[13px] text-slate-600">{invoice.notes}</p></div>}
           </div>
 
           {/* Right: Info */}
           <div className="space-y-6">
             {/* Items FIRST */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                 <h3 className="font-semibold text-slate-900">Líneas de factura</h3>
                 <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">{invoice.items.length} {invoice.items.length === 1 ? 'línea' : 'líneas'}</span>
               </div>
@@ -1629,7 +1626,7 @@ export default function InvoiceDetailPage() {
                               <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-medium flex items-center gap-0.5"><LinkIcon size={8} />PO #{item.poItemIndex + 1}</span>
                             ) : null}
                           </div>
-                          <p className="text-sm text-slate-500">{item.subAccountCode} · {item.subAccountDescription}</p>
+                          <p className="text-[13px] text-slate-500">{item.subAccountCode} · {item.subAccountDescription}</p>
                         </div>
                         <p className="font-bold text-slate-900">{formatCurrency(item.baseAmount)} €</p>
                       </div>
@@ -1659,12 +1656,12 @@ export default function InvoiceDetailPage() {
             </div>
 
             {/* Summary AFTER items */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6">
+            <div className="bg-white border border-slate-200 rounded-lg p-6">
               <h3 className="font-semibold text-slate-900 mb-4">Resumen</h3>
               <div className="space-y-3">
-                <div className="flex justify-between text-sm"><span className="text-slate-500">Base imponible</span><span className="font-medium">{formatCurrency(invoice.baseAmount)} €</span></div>
-                <div className="flex justify-between text-sm"><span className="text-slate-500">IVA</span><span className="font-medium text-emerald-600">+{formatCurrency(invoice.vatAmount)} €</span></div>
-                {invoice.irpfAmount > 0 && <div className="flex justify-between text-sm"><span className="text-slate-500">IRPF</span><span className="font-medium text-red-600">-{formatCurrency(invoice.irpfAmount)} €</span></div>}
+                <div className="flex justify-between text-[13px]"><span className="text-slate-500">Base imponible</span><span className="font-medium">{formatCurrency(invoice.baseAmount)} €</span></div>
+                <div className="flex justify-between text-[13px]"><span className="text-slate-500">IVA</span><span className="font-medium text-emerald-600">+{formatCurrency(invoice.vatAmount)} €</span></div>
+                {invoice.irpfAmount > 0 && <div className="flex justify-between text-[13px]"><span className="text-slate-500">IRPF</span><span className="font-medium text-red-600">-{formatCurrency(invoice.irpfAmount)} €</span></div>}
                 <div className="pt-3 border-t border-slate-200 flex justify-between"><span className="font-medium">Total</span><span className="text-xl font-bold">{formatCurrency(invoice.totalAmount)} €</span></div>
               </div>
             </div>
@@ -1673,9 +1670,9 @@ export default function InvoiceDetailPage() {
             {!invoice.codedAt && canCode() && invoice.status !== "cancelled" ? (
               <button 
                 onClick={() => setCodingMode(true)} 
-                className="w-full bg-violet-50 border border-violet-200 rounded-2xl p-4 flex items-center gap-3 hover:bg-violet-100 transition-colors text-left"
+                className="w-full bg-violet-50 border border-violet-200 rounded-lg p-4 flex items-center gap-3 hover:bg-violet-100 transition-colors text-left"
               >
-                <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-violet-100 rounded-md flex items-center justify-center">
                   <Code size={20} className="text-violet-600" />
                 </div>
                 <div className="flex-1">
@@ -1685,8 +1682,8 @@ export default function InvoiceDetailPage() {
                 <ChevronRight size={20} className="text-violet-400" />
               </button>
             ) : !invoice.codedAt && (
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center gap-3">
-                <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 flex items-center gap-3">
+                <div className="hidden">
                   <Clock size={16} className="text-slate-400" />
                 </div>
                 <div>
@@ -1698,7 +1695,7 @@ export default function InvoiceDetailPage() {
 
             {/* Payments Section */}
             {(invoice.paidAt || invoice.status === "paid" || payments.length > 0) && (
-              <div className={`border rounded-2xl p-5 ${payments.reduce((sum, p) => sum + p.amount, 0) >= invoice.totalAmount * 0.99 ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
+              <div className={`border rounded-lg p-5 ${payments.reduce((sum, p) => sum + p.amount, 0) >= invoice.totalAmount * 0.99 ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <CreditCard size={18} className={payments.reduce((sum, p) => sum + p.amount, 0) >= invoice.totalAmount * 0.99 ? "text-emerald-600" : "text-amber-600"} />
@@ -1730,12 +1727,12 @@ export default function InvoiceDetailPage() {
                       Pagos realizados ({payments.length})
                     </p>
                     {payments.map((payment) => (
-                      <div key={payment.id} className="bg-white rounded-xl p-3 flex items-center gap-3">
+                      <div key={payment.id} className="bg-white rounded-md p-3 flex items-center gap-3">
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${payments.reduce((sum, p) => sum + p.amount, 0) >= invoice.totalAmount * 0.99 ? "bg-emerald-100" : "bg-amber-100"}`}>
                           <CheckCircle size={14} className={payments.reduce((sum, p) => sum + p.amount, 0) >= invoice.totalAmount * 0.99 ? "text-emerald-600" : "text-amber-600"} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-900 truncate">{payment.forecastName}</p>
+                          <p className="text-[13px] font-medium text-slate-900 truncate">{payment.forecastName}</p>
                           <p className="text-xs text-slate-500">{formatDate(payment.paidAt)} · {payment.paidByName}</p>
                         </div>
                         <div className="text-right">
@@ -1752,12 +1749,12 @@ export default function InvoiceDetailPage() {
                 )}
 
                 {payments.length === 0 && invoice.paidAt && (
-                  <div className="bg-white rounded-xl p-3 flex items-center gap-3">
+                  <div className="bg-white rounded-md p-3 flex items-center gap-3">
                     <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
                       <CheckCircle size={14} className="text-emerald-600" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-slate-900">{formatCurrency(invoice.paidAmount || invoice.totalAmount)} €</p>
+                      <p className="text-[13px] font-medium text-slate-900">{formatCurrency(invoice.paidAmount || invoice.totalAmount)} €</p>
                       <p className="text-xs text-slate-500">Pagado el {formatDate(invoice.paidAt)}</p>
                     </div>
                   </div>
@@ -1767,21 +1764,21 @@ export default function InvoiceDetailPage() {
 
             {/* Replaced Document Alert - factura definitiva subida */}
             {invoice.replacedFromType && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-5">
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center flex-shrink-0">
                     <CheckCircle size={20} className="text-emerald-600" />
                   </div>
                   <div className="flex-1">
                     <p className="font-semibold text-emerald-900">Factura definitiva subida</p>
-                    <p className="text-sm text-emerald-700 mt-1">
+                    <p className="text-[13px] text-emerald-700 mt-1">
                       Este documento era {invoice.replacedFromType === "proforma" ? "una proforma" : "un presupuesto"} y ha sido sustituido por la factura definitiva.
                       {invoice.replacedAt && ` Sustituido el ${formatDate(invoice.replacedAt)}.`}
                     </p>
                     {invoice.originalAttachmentUrl && (
                       <button
                         onClick={() => setShowOriginalDoc(true)}
-                        className="mt-2 text-sm text-emerald-700 hover:text-emerald-900 font-medium flex items-center gap-1"
+                        className="mt-2 text-[13px] text-emerald-700 hover:text-emerald-900 font-medium flex items-center gap-1"
                       >
                         <FileText size={14} />
                         Ver {invoice.replacedFromType === "proforma" ? "proforma" : "presupuesto"} original
@@ -1794,21 +1791,21 @@ export default function InvoiceDetailPage() {
 
             {/* Pending Replacement Alert */}
             {invoice.requiresReplacement && !invoice.replacedFromType && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-5">
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 bg-amber-100 rounded-md flex items-center justify-center flex-shrink-0">
                     <RefreshCw size={20} className="text-amber-600" />
                   </div>
                   <div className="flex-1">
                     <p className="font-semibold text-amber-900">Pendiente de factura definitiva</p>
-                    <p className="text-sm text-amber-700 mt-1">
+                    <p className="text-[13px] text-amber-700 mt-1">
                       {(invoice.paidAt || invoice.status === "paid")
                         ? "Este documento ha sido pagado. Recuerda subir la factura definitiva del proveedor."
                         : "Este documento provisional deberá ser sustituido por la factura definitiva del proveedor."}
                     </p>
                     <Link
                       href={`/project/${projectId}/accounting/invoices/replace?docId=${invoice.id}`}
-                      className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl text-sm font-medium hover:bg-amber-700 transition-colors"
+                      className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-md text-[13px] font-medium hover:bg-amber-700 transition-colors"
                     >
                       <RefreshCw size={16} />
                       Subir factura definitiva
@@ -1820,7 +1817,7 @@ export default function InvoiceDetailPage() {
 
             {/* Linked PO */}
             {linkedPO && (
-              <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5">
+              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-5">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <LinkIcon size={16} className="text-indigo-600" />
@@ -1828,7 +1825,7 @@ export default function InvoiceDetailPage() {
                   </div>
                   <Link href={`/project/${projectId}/accounting/pos/${linkedPO.id}`} className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1">Ver PO <ExternalLink size={10} /></Link>
                 </div>
-                <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-4 text-[13px]">
                   <div>
                     <p className="text-indigo-600 text-xs">Base</p>
                     <p className="font-medium text-slate-900">{formatCurrency(linkedPO.baseAmount)} €</p>
@@ -1848,9 +1845,9 @@ export default function InvoiceDetailPage() {
             )}
 
             {/* Details - More compact */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-5">
+            <div className="bg-white border border-slate-200 rounded-lg p-5">
               <h3 className="font-semibold text-slate-900 mb-4">Detalles</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-2 gap-4 text-[13px]">
                 <div className="flex items-center gap-2">
                   <Building2 size={14} className="text-slate-400" />
                   <div>
@@ -1884,19 +1881,19 @@ export default function InvoiceDetailPage() {
 
             {/* Cancellation Info */}
             {invoice.status === "cancelled" && invoice.cancellationReason && (
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-5">
                 <div className="flex items-center gap-2 mb-2">
                   <Ban size={16} className="text-red-600" />
                   <span className="font-semibold text-red-900">Anulada</span>
                 </div>
-                <p className="text-sm text-red-700">{invoice.cancellationReason}</p>
+                <p className="text-[13px] text-red-700">{invoice.cancellationReason}</p>
                 <p className="text-xs text-red-500 mt-2">{invoice.cancelledByName} · {formatDateTime(invoice.cancelledAt!)}</p>
               </div>
             )}
 
             {/* Guarantee Returns History */}
             {invoice.documentType === "guarantee" && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <RefreshCw size={16} className="text-emerald-600" />
@@ -1915,15 +1912,15 @@ export default function InvoiceDetailPage() {
                 
                 {/* Resumen de importes */}
                 <div className="grid grid-cols-3 gap-4 mb-4">
-                  <div className="bg-white rounded-xl p-3 text-center">
+                  <div className="bg-white rounded-md p-3 text-center">
                     <p className="text-xs text-slate-500 mb-1">Importe total</p>
                     <p className="font-semibold text-slate-900">{formatCurrency(invoice.totalAmount)} €</p>
                   </div>
-                  <div className="bg-white rounded-xl p-3 text-center">
+                  <div className="bg-white rounded-md p-3 text-center">
                     <p className="text-xs text-slate-500 mb-1">Devuelto</p>
                     <p className="font-semibold text-emerald-600">{formatCurrency(invoice.totalReturned || 0)} €</p>
                   </div>
-                  <div className="bg-white rounded-xl p-3 text-center">
+                  <div className="bg-white rounded-md p-3 text-center">
                     <p className="text-xs text-slate-500 mb-1">Pendiente</p>
                     <p className="font-semibold text-amber-600">{formatCurrency(getRemainingGuarantee())} €</p>
                   </div>
@@ -1934,13 +1931,13 @@ export default function InvoiceDetailPage() {
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-emerald-700 mb-2">Historial de devoluciones</p>
                     {invoice.guaranteeReturns.map((ret, idx) => (
-                      <div key={ret.id || idx} className="bg-white rounded-xl p-3 flex items-center justify-between">
+                      <div key={ret.id || idx} className="bg-white rounded-md p-3 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
                             <CheckCircle size={14} className="text-emerald-600" />
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-slate-900">{formatCurrency(ret.amount)} €</p>
+                            <p className="text-[13px] font-medium text-slate-900">{formatCurrency(ret.amount)} €</p>
                             <p className="text-xs text-slate-500">{formatDate(ret.date)} · {ret.createdByName}</p>
                             {ret.notes && <p className="text-xs text-slate-400 mt-0.5">{ret.notes}</p>}
                           </div>
@@ -1963,7 +1960,7 @@ export default function InvoiceDetailPage() {
                 
                 {/* Mensaje si no hay devoluciones */}
                 {(!invoice.guaranteeReturns || invoice.guaranteeReturns.length === 0) && (invoice.paidAt || invoice.status === "paid") && (
-                  <p className="text-sm text-emerald-700 text-center py-2">
+                  <p className="text-[13px] text-emerald-700 text-center py-2">
                     La fianza está depositada. Registra las devoluciones cuando se produzcan.
                   </p>
                 )}
@@ -1974,7 +1971,7 @@ export default function InvoiceDetailPage() {
 
         {/* Firmas */}
         {invoice.approvalSteps && invoice.approvalSteps.length > 0 && (
-          <div className="mt-8 bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="mt-8 bg-white border border-slate-200 rounded-lg overflow-hidden">
             <div className="px-6 py-3 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-semibold text-slate-900">Firmas</h3>
               {invoice.approvedAt ? (
@@ -2019,7 +2016,7 @@ export default function InvoiceDetailPage() {
                   return (
                     <div 
                       key={step.id} 
-                      className={`p-3 rounded-xl border text-center ${
+                      className={`p-3 rounded-md border text-center ${
                         isApproved ? "bg-emerald-50 border-emerald-200" : 
                         isRejected ? "bg-red-50 border-red-200" : 
                         isCurrent ? "bg-amber-50 border-amber-200" : 
@@ -2054,7 +2051,7 @@ export default function InvoiceDetailPage() {
                          signerName.charAt(0).toUpperCase()}
                       </div>
                       
-                      <p className={`text-sm font-medium truncate ${
+                      <p className={`text-[13px] font-medium truncate ${
                         isApproved ? "text-emerald-800" : 
                         isRejected ? "text-red-800" : 
                         "text-slate-700"
@@ -2092,11 +2089,11 @@ export default function InvoiceDetailPage() {
 
       {/* Modal Nota del Aprobador */}
       {showApprovalNoteModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setShowApprovalNoteModal(null)}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowApprovalNoteModal(null)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                <div className={`w-12 h-12 rounded-md flex items-center justify-center ${
                   showApprovalNoteModal.type === "approval" ? "bg-emerald-100" :
                   showApprovalNoteModal.type === "rejection" ? "bg-red-100" :
                   "bg-slate-100"
@@ -2109,16 +2106,16 @@ export default function InvoiceDetailPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-slate-900">Nota del aprobador</h3>
-                  <p className="text-sm text-slate-500">{showApprovalNoteModal.userName}</p>
+                  <p className="text-[13px] text-slate-500">{showApprovalNoteModal.userName}</p>
                 </div>
               </div>
               
-              <div className={`p-4 rounded-xl border ${
+              <div className={`p-4 rounded-md border ${
                 showApprovalNoteModal.type === "approval" ? "bg-emerald-50 border-emerald-200" :
                 showApprovalNoteModal.type === "rejection" ? "bg-red-50 border-red-200" :
                 "bg-slate-50 border-slate-200"
               }`}>
-                <p className="text-sm text-slate-700 italic">&quot;{showApprovalNoteModal.text}&quot;</p>
+                <p className="text-[13px] text-slate-700 italic">&quot;{showApprovalNoteModal.text}&quot;</p>
               </div>
               
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
@@ -2141,7 +2138,7 @@ export default function InvoiceDetailPage() {
               
               <button 
                 onClick={() => setShowApprovalNoteModal(null)}
-                className="w-full mt-4 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
+                className="w-full mt-4 px-4 py-1.5 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
               >
                 Cerrar
               </button>
@@ -2152,16 +2149,16 @@ export default function InvoiceDetailPage() {
 
       {/* Cancel Modal */}
       {showCancelModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setShowCancelModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowCancelModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center"><XCircle size={20} className="text-red-600" /></div>
+              <div className="w-10 h-10 bg-red-100 rounded-md flex items-center justify-center"><XCircle size={20} className="text-red-600" /></div>
               <div><h3 className="text-lg font-semibold">Anular {invoice.displayNumber}</h3><p className="text-xs text-slate-500">Esta acción no se puede deshacer</p></div>
             </div>
             <div className="p-6">
-              <div className="mb-4"><label className="block text-sm font-medium text-slate-700 mb-2">Motivo *</label><textarea value={cancellationReason} onChange={(e) => setCancellationReason(e.target.value)} rows={3} className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-slate-900 outline-none" /></div>
-              <div className="mb-6"><label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2"><KeyRound size={14} />Contraseña</label><input type="password" value={passwordInput} onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }} className={`w-full px-4 py-3 border rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"}`} />{passwordError && <p className="text-xs text-red-600 mt-1 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}</div>
-              <div className="flex gap-3"><button onClick={() => { setShowCancelModal(false); setPasswordInput(""); setCancellationReason(""); }} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">Cancelar</button><button onClick={handleCancelInvoice} disabled={processing || !cancellationReason.trim() || !passwordInput.trim()} className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 text-sm font-medium disabled:opacity-50">{processing ? "Anulando..." : "Anular"}</button></div>
+              <div className="mb-4"><label className="mb-1.5 block text-xs font-medium text-slate-600">Motivo *</label><textarea value={cancellationReason} onChange={(e) => setCancellationReason(e.target.value)} rows={3} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] resize-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none" /></div>
+              <div className="mb-6"><label className="block text-[13px] font-medium text-slate-700 mb-2 flex items-center gap-2"><KeyRound size={14} />Contraseña</label><input type="password" value={passwordInput} onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }} className={`w-full px-2.5 py-1.5 border rounded-md text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"}`} />{passwordError && <p className="text-xs text-red-600 mt-1 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}</div>
+              <div className="flex gap-3"><button onClick={() => { setShowCancelModal(false); setPasswordInput(""); setCancellationReason(""); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">Cancelar</button><button onClick={handleCancelInvoice} disabled={processing || !cancellationReason.trim() || !passwordInput.trim()} className="flex-1 px-4 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 text-[13px] font-medium disabled:opacity-50">{processing ? "Anulando..." : "Anular"}</button></div>
             </div>
           </div>
         </div>
@@ -2169,21 +2166,21 @@ export default function InvoiceDetailPage() {
 
       {/* Guarantee Return Modal */}
       {showReturnModal && invoice && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setShowReturnModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowReturnModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center">
                 <RefreshCw size={20} className="text-emerald-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Registrar devolución de fianza</h3>
+                <h3 className="text-[14px] font-semibold text-slate-900">Registrar devolución de fianza</h3>
                 <p className="text-xs text-slate-500">{invoice.displayNumber} · {invoice.supplier}</p>
               </div>
             </div>
             
             <div className="p-6 space-y-5">
               {/* Resumen de fianza */}
-              <div className="bg-slate-50 rounded-xl p-4">
+              <div className="bg-slate-50 rounded-md p-4">
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
                     <p className="text-xs text-slate-500 mb-1">Importe total</p>
@@ -2202,14 +2199,14 @@ export default function InvoiceDetailPage() {
               
               {/* Importe a devolver */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Importe devuelto *</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Importe devuelto *</label>
                 <div className="relative">
                   <input 
                     type="number" 
                     step="0.01"
                     value={returnForm.amount || ""} 
                     onChange={(e) => setReturnForm({ ...returnForm, amount: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-3 pr-10 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                    className="w-full px-2.5 py-1.5 pr-10 border border-slate-200 rounded-md text-[13px] focus:ring-4 focus:ring-emerald-500 focus:outline-none"
                     placeholder="0.00"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">€</span>
@@ -2233,18 +2230,18 @@ export default function InvoiceDetailPage() {
               
               {/* Fecha de devolución */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Fecha de devolución *</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Fecha de devolución *</label>
                 <input 
                   type="date" 
                   value={returnForm.date} 
                   onChange={(e) => setReturnForm({ ...returnForm, date: e.target.value })}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:ring-4 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
               
               {/* Extracto bancario */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Extracto bancario</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Extracto bancario</label>
                 <input 
                   type="file" 
                   ref={returnFileInputRef}
@@ -2253,9 +2250,9 @@ export default function InvoiceDetailPage() {
                   className="hidden"
                 />
                 {returnFile ? (
-                  <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-md">
                     <FileText size={18} className="text-emerald-600" />
-                    <span className="flex-1 text-sm text-emerald-700 truncate">{returnFile.name}</span>
+                    <span className="flex-1 text-[13px] text-emerald-700 truncate">{returnFile.name}</span>
                     <button onClick={() => setReturnFile(null)} className="p-1 hover:bg-emerald-100 rounded">
                       <X size={16} className="text-emerald-600" />
                     </button>
@@ -2263,7 +2260,7 @@ export default function InvoiceDetailPage() {
                 ) : (
                   <button 
                     onClick={() => returnFileInputRef.current?.click()}
-                    className="w-full px-4 py-3 border-2 border-dashed border-slate-200 rounded-xl text-sm text-slate-500 hover:border-slate-300 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
+                    className="w-full px-4 py-2 border-2 border-dashed border-slate-200 rounded-md text-[13px] text-slate-500 hover:border-slate-300 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
                   >
                     <Upload size={16} />
                     Subir extracto (opcional)
@@ -2273,13 +2270,13 @@ export default function InvoiceDetailPage() {
               
               {/* Observaciones */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Observaciones</label>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Observaciones</label>
                 <textarea 
                   value={returnForm.notes} 
                   onChange={(e) => setReturnForm({ ...returnForm, notes: e.target.value })}
                   rows={2}
                   placeholder="Notas adicionales sobre la devolución"
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-emerald-500 outline-none"
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] resize-none focus:ring-4 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
             </div>
@@ -2287,14 +2284,14 @@ export default function InvoiceDetailPage() {
             <div className="px-6 py-4 border-t border-slate-200 flex gap-3">
               <button 
                 onClick={() => setShowReturnModal(false)} 
-                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"
+                className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium"
               >
                 Cancelar
               </button>
               <button 
                 onClick={handleRegisterReturn} 
                 disabled={processingReturn || !returnForm.amount || !returnForm.date}
-                className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 text-[13px] font-medium disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {processingReturn ? (
                   <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Registrando...</>

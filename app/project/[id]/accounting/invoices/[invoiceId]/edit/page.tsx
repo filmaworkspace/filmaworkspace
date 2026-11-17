@@ -905,12 +905,12 @@ export default function EditInvoicePage() {
     return (
       <div className={cx("min-h-screen bg-white flex items-center justify-center", inter.className)}>
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="hidden">
             <ShieldAlert size={28} className="text-red-500" />
           </div>
-          <h2 className="text-lg font-semibold text-slate-900 mb-2">Acceso denegado</h2>
+          <h2 className="text-[14px] font-semibold text-slate-900 mb-2">Acceso denegado</h2>
           <p className="text-slate-500 mb-6">Solo contabilidad ampliada puede editar facturas.</p>
-          <Link href={`/project/${id}/accounting/invoices/${invoiceId}`} className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800">
+          <Link href={`/project/${id}/accounting/invoices/${invoiceId}`} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
             <ArrowLeft size={16} />
             Volver
           </Link>
@@ -924,14 +924,13 @@ export default function EditInvoicePage() {
       {/* Header */}
       <div className="mt-[53px]">
         <div className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pt-10 pb-6">
-          <div className="relative flex items-center justify-center">
+          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
             <div className="flex items-center gap-4">
-              <DocIcon size={22} className={currentDocType.textColor} />
               <div className="flex items-center gap-3 flex-wrap justify-center">
-                <h1 className="text-3xl font-bold text-slate-900 text-center">
+                <h1 className="text-xl font-semibold tracking-tight text-slate-900">
                   {isAdminCorrection ? "Corrección administrativa" : "Editar"} {currentDocType.label.toLowerCase()}
                 </h1>
-                <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm font-mono font-medium">
+                <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[13px] font-mono font-medium">
                   {invoiceDisplayNumber}
                 </span>
                 {invoiceVersion > 1 && (
@@ -955,17 +954,17 @@ export default function EditInvoicePage() {
             </div>
 
             <div className="absolute right-0 flex items-center gap-3">
-              <Link href={`/project/${id}/accounting/invoices/${invoiceId}`} className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium transition-colors">
+              <Link href={`/project/${id}/accounting/invoices/${invoiceId}`} className="flex items-center gap-2 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium transition-colors">
                 <Eye size={16} />
                 Ver
               </Link>
               {!isAdminCorrection && canEdit() && (
-                <button onClick={() => handleSave(false)} disabled={saving} className="flex items-center gap-2 px-5 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium transition-colors disabled:opacity-50">
+                <button onClick={() => handleSave(false)} disabled={saving} className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium transition-colors disabled:opacity-50">
                   <Save size={16} />
                   Borrador
                 </button>
               )}
-              <button onClick={() => handleSave(true)} disabled={saving} className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">
+              <button onClick={() => handleSave(true)} disabled={saving} className="flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                 {saving ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Guardando...</> : 
                   isAdminCorrection ? <><CheckCircle size={16} />Guardar corrección</> :
                   approvalPreview.autoApprove ? <><CheckCircle size={16} />Aprobar</> : <><Send size={16} />Enviar</>}
@@ -978,26 +977,26 @@ export default function EditInvoicePage() {
       {/* Main Content */}
       <main className="px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-8">
         {successMessage && (
-          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3">
+          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-3">
             <CheckCircle size={18} className="text-emerald-600" />
-            <span className="text-sm text-emerald-700 font-medium">{successMessage}</span>
+            <span className="text-[13px] text-emerald-700 font-medium">{successMessage}</span>
           </div>
         )}
 
         {isAdminCorrection && (
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
             <AlertTriangle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
             <div>
               <h3 className="font-medium text-amber-800">Modo corrección administrativa</h3>
-              <p className="text-sm text-amber-700 mt-1">Los cambios se guardarán sin crear nueva versión ni reiniciar aprobaciones.</p>
+              <p className="text-[13px] text-amber-700 mt-1">Los cambios se guardarán sin crear nueva versión ni reiniciar aprobaciones.</p>
             </div>
           </div>
         )}
 
         {!canEdit() && !isAdminCorrection && (
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3">
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3">
             <AlertTriangle size={18} className="text-amber-600" />
-            <span className="text-sm text-amber-700 font-medium">Esta factura está pendiente de aprobación. Guardar creará una nueva versión.</span>
+            <span className="text-[13px] text-amber-700 font-medium">Esta factura está pendiente de aprobación. Guardar creará una nueva versión.</span>
           </div>
         )}
 
@@ -1005,16 +1004,16 @@ export default function EditInvoicePage() {
           {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
             {/* Información básica */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-100">
                 <h2 className="font-semibold text-slate-900">Información básica</h2>
               </div>
 
               <div className="p-6 space-y-5">
                 {/* Proveedor */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Proveedor *</label>
-                  <button onClick={() => setShowSupplierModal(true)} onBlur={() => handleBlur("supplier")} className={cx("w-full px-4 py-3 border rounded-xl hover:border-slate-300 transition-colors text-left flex items-center justify-between bg-white",
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Proveedor *</label>
+                  <button onClick={() => setShowSupplierModal(true)} onBlur={() => handleBlur("supplier")} className={cx("w-full px-4 py-2 border rounded-md hover:border-slate-300 transition-colors text-left flex items-center justify-between bg-white",
                     hasError("supplier") ? "border-red-300 bg-red-50" : isValid("supplier") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"
                   )}>
                     {formData.supplierName ? (
@@ -1035,9 +1034,9 @@ export default function EditInvoicePage() {
                 {/* Departamento */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Departamento</label>
+                    <label className="mb-1.5 block text-xs font-medium text-slate-600">Departamento</label>
                     <div className="relative" ref={departmentDropdownRef}>
-                      <button type="button" onClick={() => !permissions.fixedDepartment && setShowDepartmentDropdown(!showDepartmentDropdown)} disabled={!!permissions.fixedDepartment} className={cx("w-full px-4 py-3 border rounded-xl text-left flex items-center justify-between bg-white disabled:bg-slate-50 text-sm disabled:cursor-not-allowed hover:border-slate-300 transition-colors", "border-slate-200")}>
+                      <button type="button" onClick={() => !permissions.fixedDepartment && setShowDepartmentDropdown(!showDepartmentDropdown)} disabled={!!permissions.fixedDepartment} className={cx("w-full px-4 py-2 border rounded-md text-left flex items-center justify-between bg-white disabled:bg-slate-50 text-[13px] disabled:cursor-not-allowed hover:border-slate-300 transition-colors", "border-slate-200")}>
                         <span className={formData.department ? "text-slate-900" : "text-slate-400"}>
                           {formData.department || "Seleccionar..."}
                         </span>
@@ -1047,9 +1046,9 @@ export default function EditInvoicePage() {
                         </div>
                       </button>
                       {showDepartmentDropdown && (
-                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
                           {availableDepartments.map(dept => (
-                            <button key={dept} type="button" onClick={() => { setFormData({ ...formData, department: dept }); setShowDepartmentDropdown(false); }} className={cx("w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 transition-colors", formData.department === dept ? "bg-slate-50 text-slate-900 font-medium" : "text-slate-600")}>
+                            <button key={dept} type="button" onClick={() => { setFormData({ ...formData, department: dept }); setShowDepartmentDropdown(false); }} className={cx("w-full px-4 py-1.5 text-left text-[13px] hover:bg-slate-50 transition-colors", formData.department === dept ? "bg-slate-50 text-slate-900 font-medium" : "text-slate-600")}>
                               {dept}
                             </button>
                           ))}
@@ -1059,16 +1058,16 @@ export default function EditInvoicePage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Fecha vencimiento</label>
-                    <input type="date" value={formData.dueDate} onChange={e => setFormData({ ...formData, dueDate: e.target.value })} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white text-sm" />
+                    <label className="mb-1.5 block text-xs font-medium text-slate-600">Fecha vencimiento</label>
+                    <input type="date" value={formData.dueDate} onChange={e => setFormData({ ...formData, dueDate: e.target.value })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]" />
                   </div>
                 </div>
 
                 {/* Descripción */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Descripción *</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Descripción *</label>
                   <div className="relative">
-                    <textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} onBlur={() => handleBlur("description")} placeholder="Describe el propósito de esta factura..." rows={3} className={cx("w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm pr-10",
+                    <textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} onBlur={() => handleBlur("description")} placeholder="Describe el propósito de esta factura..." rows={3} className={cx("w-full px-2.5 py-1.5 border rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white resize-none text-[13px] pr-10",
                       hasError("description") ? "border-red-300 bg-red-50" : isValid("description") ? "border-emerald-300 bg-emerald-50" : "border-slate-200"
                     )} />
                     {isValid("description") && <CheckCircle2 size={16} className="absolute right-4 top-4 text-emerald-600" />}
@@ -1078,27 +1077,27 @@ export default function EditInvoicePage() {
 
                 {/* Notas */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Notas</label>
-                  <textarea value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} rows={2} placeholder="Notas adicionales (opcional)" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white resize-none text-sm" />
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Notas</label>
+                  <textarea value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} rows={2} placeholder="Notas adicionales (opcional)" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white resize-none text-[13px]" />
                 </div>
               </div>
             </div>
 
             {/* Items */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-visible">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-visible">
+              <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <h2 className="font-semibold text-slate-900">Items</h2>
                   <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">{items.length}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {linkedPO && (
-                    <button onClick={loadPOItemsWithInvoiced} className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium transition-colors">
+                    <button onClick={loadPOItemsWithInvoiced} className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-md text-[13px] font-medium transition-colors">
                       <Package size={14} />
                       Items de PO
                     </button>
                   )}
-                  <button onClick={addNewItem} className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors">
+                  <button onClick={addNewItem} className="flex items-center gap-1.5 px-4 py-2 rounded-md text-[13px] font-medium transition-colors border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                     <Plus size={14} />
                     Añadir
                   </button>
@@ -1110,7 +1109,7 @@ export default function EditInvoicePage() {
                   const itemComplete = item.description.trim() && item.subAccountId && item.quantity > 0 && item.unitPrice > 0;
 
                   return (
-                    <div key={item.id} className={cx("border rounded-xl p-5 transition-all", itemComplete ? "border-emerald-200 bg-emerald-50/30" : "border-slate-200 bg-slate-50/50")}>
+                    <div key={item.id} className={cx("border rounded-md p-5 transition-all", itemComplete ? "border-emerald-200 bg-emerald-50/30" : "border-slate-200 bg-slate-50/50")}>
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
@@ -1128,13 +1127,13 @@ export default function EditInvoicePage() {
                       </div>
 
                       <div className="space-y-4">
-                        <input type="text" value={item.description} onChange={e => updateItem(index, "description", e.target.value)} onBlur={() => handleBlur(`item_${index}_description`)} placeholder="Descripción del item..." className={cx("w-full px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white",
+                        <input type="text" value={item.description} onChange={e => updateItem(index, "description", e.target.value)} onBlur={() => handleBlur(`item_${index}_description`)} placeholder="Descripción del item..." className={cx("w-full px-2.5 py-1.5 border rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white",
                           hasError(`item_${index}_description`) ? "border-red-300 bg-red-50" : item.description.trim() ? "border-emerald-200" : "border-slate-200"
                         )} />
 
                         {/* Cuenta */}
                         {item.isNewItem ? (
-                          <button onClick={() => { setCurrentItemIndex(index); setShowAccountModal(true); }} className={cx("w-full px-4 py-2.5 border rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 bg-white",
+                          <button onClick={() => { setCurrentItemIndex(index); setShowAccountModal(true); }} className={cx("w-full px-4 py-1.5 border rounded-md text-[13px] text-left flex items-center justify-between hover:border-slate-300 bg-white",
                             hasError(`item_${index}_account`) ? "border-red-300 bg-red-50" : item.subAccountCode ? "border-emerald-200 bg-emerald-50" : "border-slate-200"
                           )}>
                             {item.subAccountCode ? (
@@ -1148,7 +1147,7 @@ export default function EditInvoicePage() {
                             <Search size={14} className="text-slate-400" />
                           </button>
                         ) : (
-                          <div className="px-4 py-2.5 bg-slate-100 rounded-xl text-sm flex items-center gap-2">
+                          <div className="px-4 py-2.5 bg-slate-100 rounded-md text-[13px] flex items-center gap-2">
                             <CheckCircle2 size={14} className="text-emerald-600" />
                             <span className="font-mono text-slate-700">{item.subAccountCode} - {item.subAccountDescription}</span>
                           </div>
@@ -1156,7 +1155,7 @@ export default function EditInvoicePage() {
 
                         {/* Episodios */}
                         {episodesEnabled && totalEpisodes > 1 && (
-                          <button onClick={() => openEpisodeModal(index)} className={cx("w-full px-4 py-2.5 border rounded-xl text-sm text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white",
+                          <button onClick={() => openEpisodeModal(index)} className={cx("w-full px-4 py-1.5 border rounded-md text-[13px] text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white",
                             item.episodeAssignment === "general" ? "border-slate-200" : "border-violet-200 bg-violet-50"
                           )}>
                             {item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 0 ? (
@@ -1178,11 +1177,11 @@ export default function EditInvoicePage() {
                         <div className="grid grid-cols-4 gap-3">
                           <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">Cantidad</label>
-                            <input type="number" min="0.01" step="0.01" value={item.quantity} onChange={e => updateItem(index, "quantity", parseFloat(e.target.value) || 0)} className={cx("w-full px-3 py-2.5 border rounded-xl text-sm bg-white", item.quantity > 0 ? "border-emerald-200" : "border-slate-200")} />
+                            <input type="number" min="0.01" step="0.01" value={item.quantity} onChange={e => updateItem(index, "quantity", parseFloat(e.target.value) || 0)} className={cx("w-full px-2.5 py-1.5 border rounded-md text-[13px] bg-white", item.quantity > 0 ? "border-emerald-200" : "border-slate-200")} />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">Precio</label>
-                            <input type="number" min="0" step="0.01" value={item.unitPrice} onChange={e => updateItem(index, "unitPrice", parseFloat(e.target.value) || 0)} className={cx("w-full px-3 py-2.5 border rounded-xl text-sm bg-white", item.unitPrice > 0 ? "border-emerald-200" : "border-slate-200")} />
+                            <input type="number" min="0" step="0.01" value={item.unitPrice} onChange={e => updateItem(index, "unitPrice", parseFloat(e.target.value) || 0)} className={cx("w-full px-2.5 py-1.5 border rounded-md text-[13px] bg-white", item.unitPrice > 0 ? "border-emerald-200" : "border-slate-200")} />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">IVA</label>
@@ -1190,19 +1189,19 @@ export default function EditInvoicePage() {
                               <button
                                 type="button"
                                 onClick={() => setOpenDropdown(openDropdown === `vat-${index}` ? null : `vat-${index}`)}
-                                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors"
+                                className="w-full px-3 py-1.5 border border-slate-200 rounded-md text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors"
                               >
                                 <span className="text-slate-900 truncate">{VAT_RATES.find(r => r.value === item.vatRate)?.label ?? `${item.vatRate}%`}</span>
                                 <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `vat-${index}` ? "rotate-180" : ""}`} />
                               </button>
                               {openDropdown === `vat-${index}` && (
-                                <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                                <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
                                   {VAT_RATES.map(opt => (
                                     <button
                                       key={opt.value}
                                       type="button"
                                       onClick={() => { updateItem(index, "vatRate", parseFloat(String(opt.value))); setOpenDropdown(null); }}
-                                      className={`w-full px-4 py-2 text-left text-sm transition-colors ${item.vatRate === opt.value ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                                      className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${item.vatRate === opt.value ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
                                     >
                                       {opt.label}
                                     </button>
@@ -1217,19 +1216,19 @@ export default function EditInvoicePage() {
                               <button
                                 type="button"
                                 onClick={() => setOpenDropdown(openDropdown === `irpf-${index}` ? null : `irpf-${index}`)}
-                                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors"
+                                className="w-full px-3 py-1.5 border border-slate-200 rounded-md text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors"
                               >
                                 <span className="text-slate-900 truncate">{IRPF_RATES.find(r => r.value === item.irpfRate)?.label ?? `${item.irpfRate}%`}</span>
                                 <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `irpf-${index}` ? "rotate-180" : ""}`} />
                               </button>
                               {openDropdown === `irpf-${index}` && (
-                                <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto">
+                                <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
                                   {IRPF_RATES.map(opt => (
                                     <button
                                       key={opt.value}
                                       type="button"
                                       onClick={() => { updateItem(index, "irpfRate", parseFloat(String(opt.value))); setOpenDropdown(null); }}
-                                      className={`w-full px-4 py-2 text-left text-sm transition-colors ${item.irpfRate === opt.value ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                                      className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${item.irpfRate === opt.value ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
                                     >
                                       {opt.label}
                                     </button>
@@ -1241,7 +1240,7 @@ export default function EditInvoicePage() {
                         </div>
 
                         <div className="flex justify-end">
-                          <div className="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm">
+                          <div className="bg-slate-900 text-white px-4 py-2 rounded-md text-[13px]">
                             <span className="text-slate-400">Total:</span>
                             <span className="ml-2 font-semibold">{formatCurrency(item.totalAmount)} €</span>
                           </div>
@@ -1254,11 +1253,11 @@ export default function EditInvoicePage() {
             </div>
 
             {/* Vencimientos múltiples */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                 <h2 className="font-semibold text-slate-900">Vencimientos</h2>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <span className="text-sm text-slate-600">Vencimientos múltiples</span>
+                  <span className="text-[13px] text-slate-600">Vencimientos múltiples</span>
                   <input type="checkbox" checked={multipleDueDates} onChange={e => {
                     setMultipleDueDates(e.target.checked);
                     if (e.target.checked && dueDates.length === 0) {
@@ -1277,20 +1276,20 @@ export default function EditInvoicePage() {
                 <div className="p-6 space-y-4">
                   {dueDates.map((dd, i) => (
                     <div key={dd.id} className="flex items-center gap-4">
-                      <input type="date" value={dd.date} onChange={e => updateDueDate(i, "date", e.target.value)} className="px-3 py-2 border border-slate-200 rounded-lg text-sm flex-1" />
+                      <input type="date" value={dd.date} onChange={e => updateDueDate(i, "date", e.target.value)} className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] flex-1" />
                       <div className="flex items-center gap-2">
-                        <input type="number" value={dd.percentage} onChange={e => updateDueDate(i, "percentage", parseFloat(e.target.value) || 0)} className="w-20 px-3 py-2 border border-slate-200 rounded-lg text-sm text-right" />
-                        <span className="text-sm text-slate-500">%</span>
+                        <input type="number" value={dd.percentage} onChange={e => updateDueDate(i, "percentage", parseFloat(e.target.value) || 0)} className="w-20 px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] text-right" />
+                        <span className="text-[13px] text-slate-500">%</span>
                       </div>
-                      <span className="text-sm text-slate-600 w-24 text-right">{formatCurrency(dd.amount)} €</span>
+                      <span className="text-[13px] text-slate-600 w-24 text-right">{formatCurrency(dd.amount)} €</span>
                       {dueDates.length > 2 && (
                         <button onClick={() => removeDueDate(i)} className="p-1.5 text-slate-400 hover:text-red-500"><Trash2 size={14} /></button>
                       )}
                     </div>
                   ))}
                   <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                    <button onClick={addDueDate} className="text-sm text-slate-600 hover:text-slate-900 flex items-center gap-1"><Plus size={14} />Añadir vencimiento</button>
-                    <div className={cx("text-sm font-medium", isDueDatesValid() ? "text-emerald-600" : "text-red-600")}>
+                    <button onClick={addDueDate} className="text-[13px] text-slate-600 hover:text-slate-900 flex items-center gap-1"><Plus size={14} />Añadir vencimiento</button>
+                    <div className={cx("text-[13px] font-medium", isDueDatesValid() ? "text-emerald-600" : "text-red-600")}>
                       Total: {getDueDatesPercentage().toFixed(1)}%
                     </div>
                   </div>
@@ -1302,10 +1301,10 @@ export default function EditInvoicePage() {
           {/* Right Column - Sidebar */}
           <div className="lg:col-span-1 space-y-4">
             {/* Progreso */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-5">
+            <div className="bg-white border border-slate-200 rounded-lg p-5">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-medium text-slate-700">Progreso</span>
-                <span className={cx("text-sm font-bold", completionPercentage === 100 ? "text-emerald-600" : "text-slate-900")}>{completionPercentage}%</span>
+                <span className="text-[13px] font-medium text-slate-700">Progreso</span>
+                <span className={cx("text-[13px] font-bold", completionPercentage === 100 ? "text-emerald-600" : "text-slate-900")}>{completionPercentage}%</span>
               </div>
               <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                 <div className={cx("h-full transition-all duration-300", completionPercentage === 100 ? "bg-emerald-500" : "bg-slate-900")} style={{ width: `${completionPercentage}%` }} />
@@ -1331,12 +1330,12 @@ export default function EditInvoicePage() {
             </div>
 
             {/* Totales */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-5">
+            <div className="bg-white border border-slate-200 rounded-lg p-5">
               <h3 className="font-semibold text-slate-900 mb-4">Resumen</h3>
               <div className="space-y-2">
-                <div className="flex justify-between text-sm"><span className="text-slate-500">Base imponible</span><span className="text-slate-900">{formatCurrency(totals.baseAmount)} €</span></div>
-                <div className="flex justify-between text-sm"><span className="text-slate-500">IVA</span><span className="text-slate-900">{formatCurrency(totals.vatAmount)} €</span></div>
-                {totals.irpfAmount > 0 && <div className="flex justify-between text-sm"><span className="text-slate-500">IRPF</span><span className="text-red-600">-{formatCurrency(totals.irpfAmount)} €</span></div>}
+                <div className="flex justify-between text-[13px]"><span className="text-slate-500">Base imponible</span><span className="text-slate-900">{formatCurrency(totals.baseAmount)} €</span></div>
+                <div className="flex justify-between text-[13px]"><span className="text-slate-500">IVA</span><span className="text-slate-900">{formatCurrency(totals.vatAmount)} €</span></div>
+                {totals.irpfAmount > 0 && <div className="flex justify-between text-[13px]"><span className="text-slate-500">IRPF</span><span className="text-red-600">-{formatCurrency(totals.irpfAmount)} €</span></div>}
                 <div className="border-t border-slate-100 pt-2 mt-2">
                   <div className="flex justify-between"><span className="font-medium text-slate-900">Total</span><span className="font-bold text-lg text-slate-900">{formatCurrency(totals.totalAmount)} €</span></div>
                 </div>
@@ -1344,16 +1343,16 @@ export default function EditInvoicePage() {
             </div>
 
             {/* Aprobación */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-5">
+            <div className="bg-white border border-slate-200 rounded-lg p-5">
               <h3 className="font-semibold text-slate-900 mb-4">Aprobación</h3>
               {approvalPreview.autoApprove ? (
-                <div className="flex items-center gap-2 text-sm text-emerald-600">
+                <div className="flex items-center gap-2 text-[13px] text-emerald-600">
                   <CheckCircle size={16} />
                   <span>Se aprobará automáticamente</span>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-amber-600">
+                  <div className="flex items-center gap-2 text-[13px] text-amber-600">
                     <Clock size={16} />
                     <span>{approvalPreview.message}</span>
                   </div>
@@ -1368,29 +1367,29 @@ export default function EditInvoicePage() {
             </div>
 
             {/* Documento */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-5">
+            <div className="bg-white border border-slate-200 rounded-lg p-5">
               <h3 className="font-semibold text-slate-900 mb-4">Documento</h3>
               {existingFileUrl && !uploadedFile && (
-                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl mb-3">
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-md mb-3">
                   <FileText size={18} className="text-slate-400" />
-                  <span className="text-sm text-slate-600 flex-1 truncate">{existingFileName}</span>
-                  <a href={existingFileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">Ver</a>
+                  <span className="text-[13px] text-slate-600 flex-1 truncate">{existingFileName}</span>
+                  <a href={existingFileUrl} target="_blank" rel="noopener noreferrer" className="text-[13px] text-blue-600 hover:underline">Ver</a>
                 </div>
               )}
-              <label className={cx("flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer transition-colors",
+              <label className={cx("flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-md cursor-pointer transition-colors",
                 isDragging ? "border-slate-400 bg-slate-50" : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"
               )} onDragOver={e => { e.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={e => { e.preventDefault(); setIsDragging(false); setUploadedFile(e.dataTransfer.files[0]); }}>
                 <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={e => setUploadedFile(e.target.files?.[0] || null)} className="hidden" />
                 {uploadedFile ? (
                   <div className="text-center">
                     <CheckCircle size={24} className="text-emerald-500 mx-auto mb-2" />
-                    <p className="text-sm text-slate-600">{uploadedFile.name}</p>
+                    <p className="text-[13px] text-slate-600">{uploadedFile.name}</p>
                     <p className="text-xs text-slate-400 mt-1">Click para cambiar</p>
                   </div>
                 ) : (
                   <div className="text-center">
                     <Upload size={24} className="text-slate-400 mx-auto mb-2" />
-                    <p className="text-sm text-slate-600">{existingFileUrl ? "Subir nuevo" : "Subir documento"}</p>
+                    <p className="text-[13px] text-slate-600">{existingFileUrl ? "Subir nuevo" : "Subir documento"}</p>
                   </div>
                 )}
               </label>
@@ -1401,14 +1400,14 @@ export default function EditInvoicePage() {
 
       {/* Modal items de PO */}
       {showPOItemsModal && linkedPO && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => setShowPOItemsModal(false)}>
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowPOItemsModal(false)}>
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">Items de PO-{linkedPO.number}</h2>
-                <p className="text-sm text-slate-500">Selecciona un item para añadirlo a la factura</p>
+                <h2 className="text-[14px] font-semibold text-slate-900">Items de PO-{linkedPO.number}</h2>
+                <p className="text-[13px] text-slate-500">Selecciona un item para añadirlo a la factura</p>
               </div>
-              <button onClick={() => setShowPOItemsModal(false)} className="p-2 hover:bg-slate-100 rounded-xl"><X size={20} /></button>
+              <button onClick={() => setShowPOItemsModal(false)} className="p-2 hover:bg-slate-100 rounded-md"><X size={20} /></button>
             </div>
             <div className="p-6 max-h-96 overflow-y-auto space-y-3">
               {poItemsWithInvoiced.map((poItem, idx) => {
@@ -1418,7 +1417,7 @@ export default function EditInvoicePage() {
                     key={poItem.id || idx}
                     onClick={() => addPOItemToInvoice(poItem, idx)}
                     className={cx(
-                      "w-full text-left p-4 border rounded-xl transition-colors",
+                      "w-full text-left p-4 border rounded-md transition-colors",
                       isOver ? "border-red-200 bg-red-50 hover:border-red-300" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
                     )}
                   >
@@ -1432,7 +1431,7 @@ export default function EditInvoicePage() {
                         <p className="text-xs text-slate-500">Total PO</p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4 text-sm mt-3 pt-3 border-t border-slate-100">
+                    <div className="grid grid-cols-3 gap-4 text-[13px] mt-3 pt-3 border-t border-slate-100">
                       <div>
                         <p className="text-slate-500 text-xs">Facturado</p>
                         <p className="font-medium text-slate-700">{formatCurrency(poItem.invoicedAmount)} €</p>
@@ -1472,18 +1471,18 @@ export default function EditInvoicePage() {
 
       {/* Modal proveedor */}
       {showSupplierModal && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => setShowSupplierModal(false)}>
-          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowSupplierModal(false)}>
+          <div className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <Search size={20} className="text-slate-400" />
-                <input type="text" value={supplierSearch} onChange={e => setSupplierSearch(e.target.value)} placeholder="Buscar proveedor..." autoFocus className="flex-1 outline-none text-sm" />
+                <input type="text" value={supplierSearch} onChange={e => setSupplierSearch(e.target.value)} placeholder="Buscar proveedor..." autoFocus className="flex-1 focus:outline-none text-[13px]" />
                 <button onClick={() => setShowSupplierModal(false)} className="p-1 hover:bg-slate-100 rounded"><X size={18} /></button>
               </div>
             </div>
             <div className="max-h-96 overflow-y-auto">
               {filteredSuppliers.map(s => (
-                <button key={s.id} onClick={() => selectSupplier(s)} className="w-full px-4 py-3 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0">
+                <button key={s.id} onClick={() => selectSupplier(s)} className="w-full px-4 py-2 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0">
                   <p className="font-medium text-slate-900">{s.fiscalName}</p>
                   <p className="text-xs text-slate-500">{s.taxId}</p>
                 </button>
@@ -1495,22 +1494,22 @@ export default function EditInvoicePage() {
 
       {/* Modal cuenta */}
       {showAccountModal && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => setShowAccountModal(false)}>
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowAccountModal(false)}>
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <Search size={20} className="text-slate-400" />
-                <input type="text" value={accountSearch} onChange={e => setAccountSearch(e.target.value)} placeholder="Buscar cuenta..." autoFocus className="flex-1 outline-none text-sm" />
+                <input type="text" value={accountSearch} onChange={e => setAccountSearch(e.target.value)} placeholder="Buscar cuenta..." autoFocus className="flex-1 focus:outline-none text-[13px]" />
                 <button onClick={() => setShowAccountModal(false)} className="p-1 hover:bg-slate-100 rounded"><X size={18} /></button>
               </div>
             </div>
             <div className="max-h-96 overflow-y-auto">
               {filteredSubAccounts.map(s => (
-                <button key={s.id} onClick={() => selectAccount(s)} className="w-full px-4 py-3 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0">
+                <button key={s.id} onClick={() => selectAccount(s)} className="w-full px-4 py-2 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium text-slate-900 font-mono">{s.code}</p>
-                      <p className="text-sm text-slate-500">{s.description}</p>
+                      <p className="text-[13px] text-slate-500">{s.description}</p>
                     </div>
                     <div className="text-right text-xs">
                       <p className={cx("font-medium", s.available >= 0 ? "text-emerald-600" : "text-red-600")}>Disp: {formatCurrency(s.available)} €</p>
@@ -1525,18 +1524,18 @@ export default function EditInvoicePage() {
 
       {/* Modal episodios */}
       {showEpisodeModal && episodeItemIndex !== null && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => setShowEpisodeModal(false)}>
-          <div className="bg-white rounded-2xl max-w-md w-full" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowEpisodeModal(false)}>
+          <div className="bg-white rounded-lg max-w-md w-full" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
               <h3 className="font-semibold">Asignar capítulos</h3>
               <button onClick={() => setShowEpisodeModal(false)} className="p-1 hover:bg-slate-100 rounded"><X size={18} /></button>
             </div>
             <div className="p-4">
               <div className="flex gap-2 mb-4">
-                <button onClick={() => { setEpisodeDistributionMode("equal"); recalculateDistribution(tempEpisodeDistribution, items[episodeItemIndex].baseAmount); }} className={cx("flex-1 py-2 rounded-lg text-sm font-medium", episodeDistributionMode === "equal" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600")}>
+                <button onClick={() => { setEpisodeDistributionMode("equal"); recalculateDistribution(tempEpisodeDistribution, items[episodeItemIndex].baseAmount); }} className={cx("flex-1 py-2 rounded-lg text-[13px] font-medium", episodeDistributionMode === "equal" ? "bg-[#F1F1F3] text-slate-900" : "bg-slate-100 text-slate-600")}>
                   Partes iguales
                 </button>
-                <button onClick={() => setEpisodeDistributionMode("amount")} className={cx("flex-1 py-2 rounded-lg text-sm font-medium", episodeDistributionMode === "amount" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600")}>
+                <button onClick={() => setEpisodeDistributionMode("amount")} className={cx("flex-1 py-2 rounded-lg text-[13px] font-medium", episodeDistributionMode === "amount" ? "bg-[#F1F1F3] text-slate-900" : "bg-slate-100 text-slate-600")}>
                   Por importe
                 </button>
               </div>
@@ -1549,10 +1548,10 @@ export default function EditInvoicePage() {
                       <input type="checkbox" checked={!!selected} onChange={() => toggleEpisodeInDistribution(ep)} className="w-4 h-4" />
                       <span className="font-medium">Ep. {ep}</span>
                       {selected && episodeDistributionMode === "amount" && (
-                        <input type="number" value={selected.amount || ""} onChange={e => updateEpisodeAmount(ep, parseFloat(e.target.value) || 0)} placeholder="0.00" className="ml-auto w-24 px-2 py-1 border border-slate-200 rounded text-sm text-right" />
+                        <input type="number" value={selected.amount || ""} onChange={e => updateEpisodeAmount(ep, parseFloat(e.target.value) || 0)} placeholder="0.00" className="ml-auto w-24 px-2 py-1 border border-slate-200 rounded text-[13px] text-right" />
                       )}
                       {selected && episodeDistributionMode === "equal" && (
-                        <span className="ml-auto text-sm text-slate-500">{selected.percentage.toFixed(1)}%</span>
+                        <span className="ml-auto text-[13px] text-slate-500">{selected.percentage.toFixed(1)}%</span>
                       )}
                     </div>
                   );
@@ -1560,10 +1559,10 @@ export default function EditInvoicePage() {
               </div>
 
               <div className="mt-4 pt-4 border-t border-slate-200 flex gap-3">
-                <button onClick={() => setTempEpisodeDistribution([])} className="flex-1 py-2 border border-slate-200 rounded-lg text-sm">
+                <button onClick={() => setTempEpisodeDistribution([])} className="flex-1 py-2 border border-slate-200 rounded-lg text-[13px]">
                   General
                 </button>
-                <button onClick={saveEpisodeDistribution} className="flex-1 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium">
+                <button onClick={saveEpisodeDistribution} className="flex-1 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium">
                   Aplicar
                 </button>
               </div>
