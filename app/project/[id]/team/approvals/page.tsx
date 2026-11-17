@@ -5,13 +5,25 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
 import {
-  collection, doc, getDocs, Timestamp, updateDoc,
+  onAuthStateChanged,
+} from "firebase/auth";
+import {
+  collection,
+  doc,
+  getDocs,
+  Timestamp,
+  updateDoc,
 } from "firebase/firestore";
 import {
-  Check, CheckCircle, ChevronRight, Clock,
-  ClipboardCheck, FileText, Users, X, XCircle,
+  Check,
+  CheckCircle,
+  ChevronRight,
+  Clock,
+  FileText,
+  Users,
+  X,
+  XCircle,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 
@@ -221,44 +233,30 @@ export default function TeamApprovalsPage() {
 
       {/* ── Header (mismo patrón que accounting/approvals) ─────────────────── */}
       <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
-          <div className="relative flex items-center justify-center">
+        <div className="px-6 pt-8 sm:px-10">
+          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
             <div className="flex items-center gap-4">
-              <ClipboardCheck size={22} style={{ color: TEAM_COLOR }} />
-              <div className="text-center">
-                <h1 className="text-3xl font-bold text-slate-900 text-center">Aprobaciones</h1>
-                <p className="text-slate-500 text-sm mt-0.5">
-                  {pendingCount} pendiente{pendingCount !== 1 ? "s" : ""}
-                </p>
+              <div className="flex items-baseline gap-2.5">
+                <h1 className="text-xl font-semibold tracking-tight text-slate-900">Aprobaciones</h1>
+                {pendingCount > 0 && <span className="text-[13px] text-slate-400">{pendingCount}</span>}
               </div>
             </div>
 
             {/* Stats */}
             <div className="absolute right-0 flex items-center gap-4">
-              <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-xl border border-slate-200">
-                <div className="text-center">
-                  <p className="text-lg font-bold text-slate-900">{approvedToday}</p>
-                  <p className="text-xs text-slate-500">Hoy</p>
-                </div>
-                <div className="w-px h-8 bg-slate-200" />
-                <div className="text-center">
-                  <p className="text-lg font-bold text-slate-900">{approvedThisWeek}</p>
-                  <p className="text-xs text-slate-500">Semana</p>
-                </div>
-              </div>
             </div>
           </div>
 
           {/* Filter tabs */}
           <div className="flex items-center gap-4 pt-4">
-            <div className="flex items-center gap-1 border border-slate-200 rounded-xl p-1">
+            <div className="flex items-center gap-1 border border-slate-200 rounded-md p-1">
               {([
                 { key: "pending_approval", label: "Pendientes", count: pendingCount },
                 { key: "approved",         label: "Aprobadas",  count: members.filter((m) => m.approvalStatus === "approved").length },
                 { key: "rejected",         label: "Rechazadas", count: members.filter((m) => m.approvalStatus === "rejected").length },
               ] as const).map((t) => (
                 <button key={t.key} onClick={() => { setTab(t.key); setSelected(null); }}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.key ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900"}`}>
+                  className={`px-4 py-2 rounded-lg text-[13px] font-medium transition-colors ${tab === t.key ? "bg-[#F1F1F3] text-slate-900" : "text-slate-600 hover:text-slate-900"}`}>
                   {t.label}
                   <span className="ml-1.5 text-xs opacity-70">({t.count})</span>
                 </button>
@@ -269,15 +267,15 @@ export default function TeamApprovalsPage() {
       </div>
 
       {/* ── Content ─────────────────────────────────────────────────────────── */}
-      <div className="px-24 py-6">
+      <div className="px-6 sm:px-10 py-6">
         <div className="grid grid-cols-3 gap-6 min-h-[calc(100vh-320px)]">
 
           {/* ── Sidebar ───────────────────────────────────────────────────── */}
           <div className="col-span-1 space-y-2">
             {filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-48 text-slate-400 bg-white rounded-2xl border border-slate-200">
+              <div className="flex flex-col items-center justify-center h-48 text-slate-400 bg-white rounded-lg border border-slate-200">
                 <Users size={28} className="mb-2 opacity-30" />
-                <p className="text-sm">
+                <p className="text-[13px]">
                   {tab === "pending_approval" ? "Sin altas pendientes" :
                    tab === "approved" ? "Sin altas aprobadas" : "Sin altas rechazadas"}
                 </p>
@@ -287,23 +285,23 @@ export default function TeamApprovalsPage() {
               const sc = SECTION_CONFIG[m.section] || SECTION_CONFIG.technical;
               return (
                 <button key={m.id} onClick={() => setSelected(m)}
-                  className={`w-full text-left p-4 rounded-2xl border transition-all ${isActive
+                  className={`w-full text-left p-4 rounded-lg border transition-all ${isActive
                     ? "shadow-lg scale-[1.01]"
                     : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"}`}
                   style={isActive ? { borderColor: TEAM_COLOR, backgroundColor: "rgba(107,163,25,0.04)" } : {}}>
 
                   <div className="flex items-start gap-3">
                     {/* Avatar */}
-                    <div className="w-10 h-10 rounded-xl flex-shrink-0 overflow-hidden bg-slate-100">
+                    <div className="w-10 h-10 rounded-md flex-shrink-0 overflow-hidden bg-slate-100">
                       {m.photoUrl
                         ? <img src={m.photoUrl} alt={m.name} className="w-full h-full object-cover" />
-                        : <span className="w-full h-full flex items-center justify-center text-sm font-bold text-slate-500">{m.name.charAt(0)}</span>
+                        : <span className="w-full h-full flex items-center justify-center text-[13px] font-bold text-slate-500">{m.name.charAt(0)}</span>
                       }
                     </div>
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-1">
-                        <p className="text-sm font-semibold text-slate-900 truncate">{m.name}</p>
+                        <p className="text-[13px] font-semibold text-slate-900 truncate">{m.name}</p>
                         <ChevronRight size={14} className="text-slate-300 flex-shrink-0 mt-0.5" />
                       </div>
                       <p className="text-xs text-slate-500 truncate mt-0.5">{m.role}{m.department ? ` · ${m.department}` : ""}</p>
@@ -348,24 +346,24 @@ export default function TeamApprovalsPage() {
           {/* ── Main detail (col-span-2) ─────────────────────────────────── */}
           <div className="col-span-2">
             {!selected ? (
-              <div className="h-full flex items-center justify-center bg-white rounded-2xl border border-slate-200">
+              <div className="h-full flex items-center justify-center bg-white rounded-lg border border-slate-200">
                 <div className="text-center text-slate-400">
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-slate-50">
+                  <div className="hidden">
                     <FileText size={28} className="opacity-30" />
                   </div>
-                  <p className="text-sm font-medium text-slate-600">Selecciona un alta para revisarla</p>
+                  <p className="text-[13px] font-medium text-slate-600">Selecciona un alta para revisarla</p>
                   <p className="text-xs text-slate-400 mt-1">Verás los detalles y podrás aprobar o rechazar</p>
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-2xl border border-slate-200 overflow-flex flex-col" style={{ minHeight: "calc(100vh - 340px)" }}>
+              <div className="bg-white rounded-lg border border-slate-200 overflow-flex flex-col" style={{ minHeight: "calc(100vh - 340px)" }}>
 
                 {/* Card header */}
                 <div className="px-6 py-5 border-b border-slate-100">
                   <div className="flex items-start justify-between gap-4">
                     {/* Member info */}
                     <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-2xl overflow-hidden bg-slate-100 flex-shrink-0">
+                      <div className="w-16 h-16 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0">
                         {selected.photoUrl
                           ? <img src={selected.photoUrl} alt={selected.name} className="w-full h-full object-cover" />
                           : <span className="w-full h-full flex items-center justify-center text-2xl font-bold text-slate-400">{selected.name.charAt(0)}</span>
@@ -373,7 +371,7 @@ export default function TeamApprovalsPage() {
                       </div>
                       <div>
                         <h2 className="text-xl font-bold text-slate-900">{selected.name}</h2>
-                        {selected.artisticName && <p className="text-sm text-slate-400 italic mt-0.5">&quot;{selected.artisticName}&quot;</p>}
+                        {selected.artisticName && <p className="text-[13px] text-slate-400 italic mt-0.5">&quot;{selected.artisticName}&quot;</p>}
                         <div className="flex flex-wrap items-center gap-2 mt-1.5">
                           {(() => {
                             const sc = SECTION_CONFIG[selected.section] || SECTION_CONFIG.technical;
@@ -393,11 +391,11 @@ export default function TeamApprovalsPage() {
                       {selected.approvalStatus === "pending_approval" && (
                         <div className="flex items-center gap-2">
                           <button onClick={() => setShowRejectModal(true)}
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-md text-[13px] font-medium border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
                             <X size={14} /> Rechazar
                           </button>
                           <button onClick={() => handleApprove(selected)} disabled={processing}
-                            className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-colors shadow-sm"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-md text-[13px] font-semibold text-white disabled:opacity-50 transition-colors shadow-sm"
                             style={{ backgroundColor: TEAM_COLOR }}>
                             {processing
                               ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -408,13 +406,13 @@ export default function TeamApprovalsPage() {
                       )}
 
                       {selected.approvalStatus === "approved" && (
-                        <span className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-xl">
+                        <span className="flex items-center gap-1.5 text-[13px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-md">
                           <CheckCircle size={14} /> Aprobada {fmtDate(selected.approvedAt)}
                         </span>
                       )}
 
                       {selected.approvalStatus === "rejected" && (
-                        <span className="flex items-center gap-1.5 text-sm font-semibold text-red-700 bg-red-50 border border-red-100 px-3 py-1.5 rounded-xl">
+                        <span className="flex items-center gap-1.5 text-[13px] font-semibold text-red-700 bg-red-50 border border-red-100 px-3 py-1.5 rounded-md">
                           <XCircle size={14} /> Rechazada
                         </span>
                       )}
@@ -427,9 +425,9 @@ export default function TeamApprovalsPage() {
 
                   {/* Rejection reason */}
                   {selected.approvalStatus === "rejected" && selected.rejectedReason && (
-                    <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                       <p className="text-xs font-semibold text-red-700 uppercase tracking-wider mb-1.5">Motivo del rechazo</p>
-                      <p className="text-sm text-red-600">{selected.rejectedReason}</p>
+                      <p className="text-[13px] text-red-600">{selected.rejectedReason}</p>
                     </div>
                   )}
 
@@ -439,13 +437,13 @@ export default function TeamApprovalsPage() {
                     <div>
                       <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Contacto</p>
                       <div className="space-y-2">
-                        <div className="bg-slate-50 rounded-xl px-4 py-3">
+                        <div className="bg-slate-50 rounded-md px-4 py-3">
                           <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">Email</p>
-                          <p className="text-sm font-medium text-slate-900">{selected.email || "—"}</p>
+                          <p className="text-[13px] font-medium text-slate-900">{selected.email || "—"}</p>
                         </div>
-                        <div className="bg-slate-50 rounded-xl px-4 py-3">
+                        <div className="bg-slate-50 rounded-md px-4 py-3">
                           <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">Teléfono</p>
-                          <p className="text-sm font-medium text-slate-900">{selected.phone || "—"}</p>
+                          <p className="text-[13px] font-medium text-slate-900">{selected.phone || "—"}</p>
                         </div>
                       </div>
                     </div>
@@ -454,13 +452,13 @@ export default function TeamApprovalsPage() {
                     <div>
                       <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Contrato</p>
                       <div className="space-y-2">
-                        <div className="bg-slate-50 rounded-xl px-4 py-3">
+                        <div className="bg-slate-50 rounded-md px-4 py-3">
                           <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">Fecha de alta</p>
-                          <p className="text-sm font-medium text-slate-900">{selected.startDate || "—"}</p>
+                          <p className="text-[13px] font-medium text-slate-900">{selected.startDate || "—"}</p>
                         </div>
-                        <div className="bg-slate-50 rounded-xl px-4 py-3">
+                        <div className="bg-slate-50 rounded-md px-4 py-3">
                           <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">Remuneración</p>
-                          <p className="text-sm font-medium text-slate-900">
+                          <p className="text-[13px] font-medium text-slate-900">
                             {selected.salaryAmount
                               ? `${new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(selected.salaryAmount)} € / ${selected.salaryType === "weekly" ? "sem." : "mes"}`
                               : selected.salaryPerSession
@@ -476,8 +474,8 @@ export default function TeamApprovalsPage() {
                   {selected.notes && (
                     <div>
                       <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Notas</p>
-                      <div className="bg-slate-50 rounded-xl px-4 py-3">
-                        <p className="text-sm text-slate-600 whitespace-pre-line">{selected.notes}</p>
+                      <div className="bg-slate-50 rounded-md px-4 py-3">
+                        <p className="text-[13px] text-slate-600 whitespace-pre-line">{selected.notes}</p>
                       </div>
                     </div>
                   )}
@@ -501,7 +499,7 @@ export default function TeamApprovalsPage() {
 
                   {/* Ver ficha */}
                   <Link href={`/project/${projectId}/team/crew/${selected.id}`}
-                    className="flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+                    className="flex items-center justify-center gap-2 py-2 border border-slate-200 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 transition-colors">
                     <FileText size={14} /> Ver ficha completa
                   </Link>
                 </div>
@@ -513,8 +511,8 @@ export default function TeamApprovalsPage() {
 
       {/* ── Reject modal ────────────────────────────────────────────────────── */}
       {showRejectModal && selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 backdrop-blur-[2px] p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h3 className="text-base font-semibold text-slate-900">Rechazar alta</h3>
               <button onClick={() => { setShowRejectModal(false); setRejectReason(""); }}
@@ -523,22 +521,22 @@ export default function TeamApprovalsPage() {
               </button>
             </div>
             <div className="px-6 py-5 space-y-4">
-              <p className="text-sm text-slate-600">
+              <p className="text-[13px] text-slate-600">
                 ¿Rechazar el alta de <strong>{selected.name}</strong>? Podrás indicar el motivo.
               </p>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">Motivo (opcional)</label>
                 <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}
                   rows={3} placeholder="Faltan documentos, datos incorrectos…"
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-200 resize-none" />
+                  className="w-full border border-slate-200 rounded-md px-2.5 py-1.5 text-[13px] focus:outline-none focus:ring-4 focus:ring-red-200 resize-none" />
               </div>
               <div className="flex gap-2 pt-1">
                 <button onClick={() => { setShowRejectModal(false); setRejectReason(""); }}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
+                  className="flex-1 py-1.5 rounded-md text-[13px] font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
                   Cancelar
                 </button>
                 <button onClick={handleReject} disabled={processing}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+                  className="flex-1 py-1.5 rounded-md text-[13px] font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
                   {processing
                     ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                     : <X size={14} />}

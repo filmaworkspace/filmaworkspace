@@ -5,10 +5,18 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
-import { doc, getDoc, addDoc, updateDoc, collection, Timestamp } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  addDoc,
+  updateDoc,
+  collection,
+  Timestamp,
+} from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -16,7 +24,6 @@ import {
   ArrowLeft,
   Camera,
   Check,
-  CheckCircle,
   ChevronDown,
   ClipboardCopy,
   Download,
@@ -31,7 +38,6 @@ import {
   Send,
   Upload,
   X,
-  XCircle,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
@@ -157,10 +163,10 @@ function Field({
       {editing ? (
         <input type={type} value={value ?? ""} onChange={(e) => onChange?.(e.target.value)}
           placeholder={placeholder}
-          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319] bg-white" />
+          className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] bg-white" />
       ) : (
         <div className="flex items-center gap-2">
-          <p className={`text-sm font-medium ${display ? "text-slate-900" : "text-slate-300"}`}>
+          <p className={`text-[13px] font-medium ${display ? "text-slate-900" : "text-slate-300"}`}>
             {display ? (sensitive && !revealed ? masked : String(value)) : "—"}
           </p>
           {sensitive && display && (
@@ -182,7 +188,7 @@ function SectionCard({
   title: string; editing: boolean; onEdit?: () => void; children: React.ReactNode; action?: React.ReactNode;
 }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+    <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
       <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
         <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider">{title}</p>
         <div className="flex items-center gap-2">
@@ -208,8 +214,7 @@ function EditActions({ saving, onSave, onCancel }: { saving: boolean; onSave: ()
         Cancelar
       </button>
       <button onClick={onSave} disabled={saving}
-        className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
-        style={{ backgroundColor: "#6BA319" }}>
+        className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-lg disabled:opacity-50 transition-opacity">
         {saving ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />}
         {saving ? "Guardando…" : "Guardar"}
       </button>
@@ -669,10 +674,10 @@ export default function CrewMemberPage() {
 
       {/* ── Top bar ────────────────────────────────────────────────────────── */}
       <div className="mt-[53px]">
-        <div className="bg-white border-b border-slate-200 px-24 py-4">
+        <div className="bg-white border-b border-slate-200 px-6 sm:px-10 py-4">
           <div className="flex items-center justify-between">
             {/* Breadcrumb */}
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2 text-[13px]">
               <Link href={`/project/${projectId}/team/crew`}
                 className="flex items-center gap-1.5 text-slate-500 hover:text-slate-900 transition-colors">
                 <ArrowLeft size={14} />Crew
@@ -699,7 +704,7 @@ export default function CrewMemberPage() {
 
               {/* PDF download */}
               <button onClick={downloadPdf} disabled={exportingPdf}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors">
+                className="flex items-center gap-2 px-3 py-2 text-[13px] font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors">
                 {exportingPdf ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
                 <span className="inline">Ficha PDF</span>
               </button>
@@ -709,13 +714,13 @@ export default function CrewMemberPage() {
                 const cfg = APPROVAL_CONFIG[member.approvalStatus];
                 return (
                   <div className="flex items-center gap-2">
-                    <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium ${cfg.bg} ${cfg.text}`}>
+                    <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium ${cfg.bg} ${cfg.text}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
                       {cfg.label}
                     </span>
                     {(member.approvalStatus === "draft" || member.approvalStatus === "rejected") && (
                       <button onClick={submitForApproval} disabled={submittingApproval}
-                        className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-xl border text-white disabled:opacity-50 transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium rounded-md border text-white disabled:opacity-50 transition-colors"
                         style={{ backgroundColor: "#6BA319", borderColor: "#6BA319" }}>
                         {submittingApproval ? <RefreshCw size={13} className="animate-spin" /> : <Send size={13} />}
                         <span className="inline">Enviar para aprobación</span>
@@ -727,7 +732,7 @@ export default function CrewMemberPage() {
 
               {/* Send form */}
               <button onClick={() => setShowFormModal(true)} disabled={!member.email}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-[13px] font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 title={!member.email ? "Añade un email para enviar el formulario" : "Enviar formulario de alta"}>
                 {formSent ? <MailCheck size={14} className="text-[#6BA319]" /> : <Send size={14} />}
                 {formSent ? "Enviado" : <span className="inline">Enviar formulario</span>}
@@ -736,22 +741,22 @@ export default function CrewMemberPage() {
               {/* Status dropdown */}
               <div className="relative" ref={statusRef}>
                 <button onClick={() => setStatusOpen(!statusOpen)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border transition-colors ${stConf.bg} ${stConf.text} ${sc.borderColor}`}>
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium border transition-colors ${stConf.bg} ${stConf.text} ${sc.borderColor}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${stConf.dot}`} />
                   {stConf.label}
                   <ChevronDown size={12} className={`transition-transform ${statusOpen ? "rotate-180" : ""}`} />
                 </button>
                 {statusOpen && (
-                  <div className="absolute right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 w-36 overflow-hidden">
+                  <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 w-36 overflow-hidden" align="right" gap={6}>
                     {(Object.entries(STATUS_MAP) as [CrewMember["status"], typeof STATUS_MAP.active][]).map(([key, conf]) => (
                       <button key={key} onClick={() => handleStatusChange(key)}
-                        className={`w-full px-3 py-2.5 text-left text-xs flex items-center gap-2 transition-colors ${member.status === key ? "bg-slate-50 font-semibold" : "text-slate-700 hover:bg-slate-50"}`}>
+                        className={`w-full px-3 py-1.5 text-left text-xs flex items-center gap-2 transition-colors ${member.status === key ? "bg-slate-50 font-semibold" : "text-slate-700 hover:bg-slate-50"}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${conf.dot}`} />
                         {conf.label}
                         {member.status === key && <Check size={11} className="ml-auto text-[#6BA319]" />}
                       </button>
                     ))}
-                  </div>
+                  </AnchoredPanel>
                 )}
               </div>
             </div>
@@ -760,17 +765,17 @@ export default function CrewMemberPage() {
       </div>
 
       {/* ── Content ──────────────────────────────────────────────────────────── */}
-      <div className="px-24 py-8">
+      <div className="px-6 sm:px-10 py-8">
         <div className="max-w-5xl mx-auto grid grid-cols-3 gap-6">
 
           {/* ── LEFT ────────────────────────────────────────────────────────── */}
           <div className="col-span-1 flex flex-col gap-6">
 
             {/* Identity card */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col items-center text-center">
+            <div className="bg-white border border-slate-200 rounded-lg p-6 flex flex-col items-center text-center">
               {/* Photo */}
               <div className="relative mb-4">
-                <div className="w-24 h-24 rounded-2xl overflow-hidden bg-slate-100 flex items-center justify-center">
+                <div className="w-24 h-24 rounded-lg overflow-hidden bg-slate-100 flex items-center justify-center">
                   {member.photoUrl
                     ? <img src={member.photoUrl} alt={member.name} className="w-full h-full object-cover" />
                     : <span className="text-3xl font-bold text-slate-400">{member.name.charAt(0).toUpperCase()}</span>
@@ -785,7 +790,7 @@ export default function CrewMemberPage() {
               </div>
 
               <h1 className="text-lg font-bold text-slate-900 leading-tight">{member.name}</h1>
-              {member.artisticName && <p className="text-sm text-slate-400 italic mt-0.5">&quot;{member.artisticName}&quot;</p>}
+              {member.artisticName && <p className="text-[13px] text-slate-400 italic mt-0.5">&quot;{member.artisticName}&quot;</p>}
               <div className="mt-2">
                 <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${sc.bgColor} ${sc.textColor}`}>
                   {sc.label}
@@ -793,7 +798,7 @@ export default function CrewMemberPage() {
               </div>
 
               <div className="mt-4 pt-4 border-t border-slate-100 w-full space-y-1 text-center">
-                <p className="text-sm font-semibold text-slate-900">{member.role}</p>
+                <p className="text-[13px] font-semibold text-slate-900">{member.role}</p>
                 {member.department && <p className="text-xs text-slate-500">{member.department}</p>}
                 {member.company    && <p className="text-xs text-slate-400">{member.company}</p>}
               </div>
@@ -846,7 +851,7 @@ export default function CrewMemberPage() {
             </div>
 
             {/* Form status card */}
-            <div className={`border rounded-2xl p-4 ${member.formSentAt ? "bg-emerald-50 border-emerald-200" : "bg-white border-slate-200"}`}>
+            <div className={`border rounded-lg p-4 ${member.formSentAt ? "bg-emerald-50 border-emerald-200" : "bg-white border-slate-200"}`}>
               <div className="flex items-center gap-3">
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${member.formSentAt ? "bg-emerald-100" : "bg-slate-100"}`}>
                   {member.formSentAt ? <MailCheck size={16} className="text-emerald-600" /> : <Mail size={16} className="text-slate-500" />}
@@ -874,11 +879,11 @@ export default function CrewMemberPage() {
                   <div className="space-y-3">
                     <textarea value={get("notes") || ""} onChange={(e) => setField("notes", e.target.value)}
                       rows={4} placeholder="Observaciones…"
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319] resize-none" />
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] resize-none" />
                     <EditActions saving={saving} onSave={saveEdit} onCancel={cancelEdit} />
                   </div>
                 ) : (
-                  <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{member.notes}</p>
+                  <p className="text-[13px] text-slate-600 leading-relaxed whitespace-pre-line">{member.notes}</p>
                 )}
               </SectionCard>
             )}
@@ -923,7 +928,7 @@ export default function CrewMemberPage() {
                   <>
                     <div>
                       <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Periodicidad</p>
-                      <p className="text-sm font-medium text-slate-900">
+                      <p className="text-[13px] font-medium text-slate-900">
                         {member.salaryType === "weekly" ? "Semanal" : "Mensual"}
                       </p>
                     </div>
@@ -931,7 +936,7 @@ export default function CrewMemberPage() {
                       <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
                         Salario bruto {member.salaryType === "weekly" ? "semanal" : "mensual"}
                       </p>
-                      <p className="text-sm font-medium text-slate-900">{fmtCurrency(member.salaryAmount)}</p>
+                      <p className="text-[13px] font-medium text-slate-900">{fmtCurrency(member.salaryAmount)}</p>
                     </div>
                   </>
                 )}
@@ -943,7 +948,7 @@ export default function CrewMemberPage() {
                         {(["weekly", "monthly"] as const).map((t) => (
                           <button key={t} type="button"
                             onClick={() => setField("salaryType", t)}
-                            className={`py-2 rounded-xl border text-xs font-medium transition-all ${
+                            className={`py-2 rounded-md border text-xs font-medium transition-all ${
                               get("salaryType") === t
                                 ? "border-[#6BA319] bg-[rgba(107,163,25,0.08)] text-[#6BA319]"
                                 : "border-slate-200 text-slate-600 hover:border-slate-300"
@@ -960,7 +965,7 @@ export default function CrewMemberPage() {
                       <input type="number" min={0} value={get("salaryAmount") ?? ""}
                         onChange={(e) => setField("salaryAmount", e.target.value ? Number(e.target.value) : undefined)}
                         placeholder="0.00"
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
                     </div>
                   </>
                 )}
@@ -981,7 +986,7 @@ export default function CrewMemberPage() {
             </SectionCard>
 
             {/* Documentos */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
               <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
                 <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Documentos</p>
                 <span className="text-xs text-slate-400">{docsUploaded} / {REQUIRED_DOCS.length}</span>
@@ -996,7 +1001,7 @@ export default function CrewMemberPage() {
                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${url ? "bg-emerald-50" : "bg-slate-100"}`}>
                           <FileText size={13} className={url ? "text-emerald-600" : "text-slate-400"} />
                         </div>
-                        <span className={`text-sm ${url ? "text-slate-900" : "text-slate-500"}`}>{docDef.label}</span>
+                        <span className={`text-[13px] ${url ? "text-slate-900" : "text-slate-500"}`}>{docDef.label}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         {url && (
@@ -1031,7 +1036,7 @@ export default function CrewMemberPage() {
             {/* Notas (si no están en sidebar) */}
             {!member.notes && !isEdit("notes") && (
               <button onClick={() => startEdit("notes")}
-                className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-sm text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-colors">
+                className="w-full py-4 border-2 border-dashed border-slate-200 rounded-lg text-[13px] text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-colors">
                 + Añadir notas
               </button>
             )}
@@ -1047,11 +1052,11 @@ export default function CrewMemberPage() {
 
       {/* ── Send form modal ─────────────────────────────────────────────────── */}
       {showFormModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowFormModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4" onClick={() => setShowFormModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
 
             {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <div>
                 <h3 className="text-base font-semibold text-slate-900">
                   {member.formSentAt ? "Reenviar formulario" : "Enviar formulario de alta"}
@@ -1065,17 +1070,17 @@ export default function CrewMemberPage() {
 
             {/* Resumen */}
             <div className="px-6 pt-5 pb-4 space-y-4">
-              <div className="bg-slate-50 rounded-xl p-4 space-y-2">
-                <div className="flex items-center justify-between text-sm">
+              <div className="bg-slate-50 rounded-md p-4 space-y-2">
+                <div className="flex items-center justify-between text-[13px]">
                   <span className="text-slate-500">Destinatario</span>
                   <span className="font-medium text-slate-900">{member.name}</span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between text-[13px]">
                   <span className="text-slate-500">Email</span>
                   <span className="font-mono text-slate-700 text-xs">{member.email}</span>
                 </div>
                 {member.formSentAt && (
-                  <div className="flex items-center justify-between text-sm pt-2 border-t border-slate-200">
+                  <div className="flex items-center justify-between text-[13px] pt-2 border-t border-slate-200">
                     <span className="text-slate-500">Último envío</span>
                     <span className="text-xs text-slate-500">{fmtTs(member.formSentAt)}</span>
                   </div>
@@ -1089,7 +1094,7 @@ export default function CrewMemberPage() {
               {/* Enlace copiable */}
               <div>
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Enlace del formulario</p>
-                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-md px-3 py-2.5">
                   <LinkIcon size={13} className="text-slate-400 flex-shrink-0" />
                   <span className="text-xs text-slate-600 font-mono flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
                     {formUrl}
@@ -1106,14 +1111,13 @@ export default function CrewMemberPage() {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3 rounded-b-2xl">
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3 rounded-b-lg">
               <button onClick={() => setShowFormModal(false)}
-                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-white text-sm font-medium">
+                className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-white text-[13px] font-medium">
                 Cancelar
               </button>
               <button onClick={handleSendForm} disabled={sendingForm || !member.email}
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 transition-opacity"
-                style={{ backgroundColor: "#6BA319" }}>
+                className="flex-1 px-4 py-1.5 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] disabled:opacity-50 flex items-center justify-center gap-2 transition-opacity">
                 {sendingForm
                   ? <><RefreshCw size={14} className="animate-spin" />Enviando…</>
                   : <><Send size={14} />{member.formSentAt ? "Reenviar" : "Enviar"}</>

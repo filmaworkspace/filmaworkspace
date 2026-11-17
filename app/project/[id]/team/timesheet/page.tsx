@@ -4,15 +4,43 @@ import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { inter } from "@/lib/fonts";
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
 import {
-  collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc,
-  query, where, orderBy, Timestamp, serverTimestamp,
+  onAuthStateChanged,
+} from "firebase/auth";
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  Timestamp,
+  serverTimestamp,
 } from "firebase/firestore";
 import {
-  AlertCircle, Check, ChevronLeft, ChevronRight, Clock,
-  Download, Eye, Hash, Link2, Pencil, Plus, RefreshCw, Send, Settings, Trash2,
-  UserMinus, UserPlus, Users, X, CheckCircle,
+  AlertCircle,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Download,
+  Eye,
+  Hash,
+  Link2,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Send,
+  Settings,
+  Trash2,
+  UserMinus,
+  UserPlus,
+  Users,
+  X,
+  CheckCircle,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 import { ScheduleType, ScheduleTimes, SCHEDULE_LABELS, DEFAULT_SCHEDULE_TIMES, normalizeSchedules } from "@/lib/horarioSchedules";
@@ -648,15 +676,14 @@ export default function ControlHorarioPage() {
 
       {/* Header */}
       <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
-          <div className="relative flex items-center justify-center">
+        <div className="px-6 pt-8 sm:px-10">
+          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
             <div className="flex items-center gap-4">
-              <Clock size={22} style={{ color: G }} />
-              <h1 className="text-3xl font-bold text-slate-900 text-center">Control horario</h1>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Control horario</h1>
             </div>
             <div className="absolute right-0 flex items-center gap-1">
               <button onClick={() => setShowConfig(true)}
-                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors" title="Configuración">
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors" title="Configuración">
                 <Settings size={18} />
               </button>
             </div>
@@ -664,10 +691,10 @@ export default function ControlHorarioPage() {
         </div>
       </div>
 
-      <main className="px-24 pb-16">
+      <main className="px-6 sm:px-10 pb-16">
 
         {/* ── Navegador de fecha (mes + tira de días) ──────────────────────── */}
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl px-4 pt-3 pb-3.5 mb-8">
+        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 pt-3 pb-3.5 mb-8">
           {/* Month nav */}
           <div className="flex items-center gap-0.5 mb-1.5">
             <button
@@ -709,11 +736,11 @@ export default function ControlHorarioPage() {
             const dayName = new Intl.DateTimeFormat("es-ES", { weekday: "short" }).format(new Date(date + "T00:00:00"));
             return (
               <button key={date} onClick={() => setSelectedDate(date)}
-                className={`flex flex-col items-center gap-1 px-3 py-2.5 rounded-xl border transition-all min-w-[58px] ${
+                className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-md border transition-all min-w-[58px] ${
                   isSel ? "border-transparent text-white shadow-sm"
                   : isT  ? "border-slate-200 bg-slate-50 hover:bg-slate-100"
                   :        "border-transparent hover:bg-slate-50"
-                }`}
+                } text-[13px]`}
                 style={isSel ? { background: G } : {}}
               >
                 <span className={`text-[10px] font-medium uppercase tracking-wide ${isSel ? "text-white/80" : "text-slate-400"}`}>{dayName}</span>
@@ -743,10 +770,10 @@ export default function ControlHorarioPage() {
                       <input
                         type="number" min={1} value={jornadaInput}
                         onChange={(e) => setJornadaInput(e.target.value)}
-                        className="w-16 px-2 py-1 border border-slate-300 rounded-lg text-sm"
+                        className="w-16 px-2 py-1 border border-slate-300 rounded-lg text-[13px]"
                         autoFocus
                       />
-                      <button onClick={handleUpdateJornada} className="p-1.5 rounded-lg text-white text-xs" style={{ background: G }}>
+                      <button onClick={handleUpdateJornada} className="p-1.5 rounded-lg border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] text-xs">
                         <Check size={13} />
                       </button>
                       <button onClick={() => setEditingJornada(false)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100">
@@ -773,15 +800,14 @@ export default function ControlHorarioPage() {
               <div className="flex items-center gap-2">
                 {currentDay?.status === "sent" && pending.length > 0 && (
                   <button onClick={handleResendPending} disabled={sending}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors disabled:opacity-50">
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors disabled:opacity-50">
                     <Send size={13} />
                     Reenviar a {pending.length} pendientes
                   </button>
                 )}
                 {(!currentDay || currentDay.status === "draft") && (
                   <button onClick={handleSendDay} disabled={sending}
-                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-xl text-white transition-opacity disabled:opacity-50"
-                    style={{ background: G }}>
+                    className="flex items-center gap-1.5 px-4 py-2 text-[13px] font-medium rounded-md border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] transition-colors disabled:opacity-50">
                     <Send size={14} />
                     {sending ? "Enviando..." : "Enviar ahora"}
                   </button>
@@ -790,7 +816,7 @@ export default function ControlHorarioPage() {
             </div>
 
             {/* Recipients list — always visible, day auto-created on first action */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
               <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-500">
                   {currentDay ? (
@@ -822,11 +848,11 @@ export default function ControlHorarioPage() {
               {!currentDay || currentDay.recipients.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-14 gap-3">
                   <Users size={24} className="text-slate-300" />
-                  <p className="text-sm text-slate-400">
+                  <p className="text-[13px] text-slate-400">
                     {crew.length === 0 ? "No hay crew activo en el proyecto" : "Añade personas para este día"}
                   </p>
                   <button onClick={() => setShowAddMember(true)}
-                    className="text-xs px-4 py-2 rounded-xl text-white font-medium" style={{ background: G }}>
+                    className="text-xs px-4 py-2 rounded-md border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] font-medium">
                     Añadir personas
                   </button>
                 </div>
@@ -844,7 +870,7 @@ export default function ControlHorarioPage() {
                           {r.name.charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-900 truncate">{r.name}</p>
+                          <p className="text-[13px] font-medium text-slate-900 truncate">{r.name}</p>
                           <p className="text-xs text-slate-400 truncate">
                             {r.role}{r.role ? " · " : ""}{SCHEDULE_LABELS[r.schedule ?? "general"]}
                           </p>
@@ -925,25 +951,25 @@ export default function ControlHorarioPage() {
             {/* Download button */}
             <button
               onClick={() => setShowDownload(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 bg-white rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-1.5 border border-slate-200 bg-white rounded-md text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
             >
               <Download size={14} /> Descargar datos
             </button>
 
             {/* Stats card */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-5">
+            <div className="bg-white border border-slate-200 rounded-lg p-5">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-600">Total enviados</span>
-                  <span className="text-sm font-semibold text-slate-900">{currentDay?.recipients.length ?? 0}</span>
+                  <span className="text-[13px] text-slate-600">Total enviados</span>
+                  <span className="text-[13px] font-semibold text-slate-900">{currentDay?.recipients.length ?? 0}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-600">Respondieron</span>
-                  <span className="text-sm font-semibold" style={{ color: G }}>{responded.length}</span>
+                  <span className="text-[13px] text-slate-600">Respondieron</span>
+                  <span className="text-[13px] font-semibold" style={{ color: G }}>{responded.length}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-600">Pendientes</span>
-                  <span className={`text-sm font-semibold ${pending.length > 0 ? "text-amber-600" : "text-slate-400"}`}>{pending.length}</span>
+                  <span className="text-[13px] text-slate-600">Pendientes</span>
+                  <span className={`text-[13px] font-semibold ${pending.length > 0 ? "text-amber-600" : "text-slate-400"}`}>{pending.length}</span>
                 </div>
                 {currentDay && currentDay.recipients.length > 0 && (
                   <div className="pt-2 border-t border-slate-100">
@@ -959,7 +985,7 @@ export default function ControlHorarioPage() {
             </div>
 
             {/* Legend */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-5">
+            <div className="bg-white border border-slate-200 rounded-lg p-5">
               <div className="space-y-2.5">
                 {[
                   { color: G,        label: "Todos respondieron" },
@@ -981,18 +1007,18 @@ export default function ControlHorarioPage() {
 
       {/* ── Config Modal ───────────────────────────────────────────────────── */}
       {showConfig && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100 flex-shrink-0">
               <h3 className="text-base font-semibold text-slate-900">Configuración</h3>
-              <button onClick={() => setShowConfig(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+              <button onClick={() => setShowConfig(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md">
                 <X size={16} />
               </button>
             </div>
             <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-slate-900">Envío automático</p>
+                  <p className="text-[13px] font-medium text-slate-900">Envío automático</p>
                 </div>
                 <button onClick={() => setCfgEnabled(!cfgEnabled)}
                   className={`w-10 h-6 rounded-full transition-colors relative ${cfgEnabled ? "" : "bg-slate-200"}`}
@@ -1004,7 +1030,7 @@ export default function ControlHorarioPage() {
               <div>
                 <label className="text-xs font-medium text-slate-700 block mb-1.5">Hora de envío diario</label>
                 <input type="time" value={cfgSendTime} onChange={(e) => setCfgSendTime(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2" />
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4" />
               </div>
 
               <div className="pt-1 border-t border-slate-100">
@@ -1017,7 +1043,7 @@ export default function ControlHorarioPage() {
                       value={cfgEmailBody}
                       onChange={(e) => setCfgEmailBody(e.target.value)}
                       placeholder={"Por favor, completa tu parte del control horario de hoy. Solo te llevará un momento."}
-                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2"
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] resize-none focus:outline-none focus:ring-4"
                     />
                     <p className="text-[11px] text-slate-400 mt-1">Si lo dejas vacío se usará el mensaje por defecto.</p>
                   </div>
@@ -1028,7 +1054,7 @@ export default function ControlHorarioPage() {
                       value={cfgContactName}
                       onChange={(e) => setCfgContactName(e.target.value)}
                       placeholder="Ej: María García (Coordinación)"
-                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4"
                     />
                   </div>
                   <div>
@@ -1038,7 +1064,7 @@ export default function ControlHorarioPage() {
                       value={cfgContactMail}
                       onChange={(e) => setCfgContactMail(e.target.value)}
                       placeholder="coordinacion@produccion.com"
-                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4"
                     />
                     <p className="text-[11px] text-slate-400 mt-1">Se muestra al pie del email para que el crew pueda contactar si tiene dudas.</p>
                   </div>
@@ -1049,7 +1075,7 @@ export default function ControlHorarioPage() {
                 <button
                   type="button"
                   onClick={() => { setShowConfig(false); openSchedulesModal(); }}
-                  className="w-full flex items-center justify-between px-3.5 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="w-full flex items-center justify-between px-3.5 py-2 border border-slate-200 rounded-md text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                 >
                   <span className="flex items-center gap-2"><Clock size={14} className="text-slate-400" /> Jornadas y horarios</span>
                   <ChevronRight size={14} className="text-slate-400" />
@@ -1058,12 +1084,11 @@ export default function ControlHorarioPage() {
 
             </div>
             <div className="px-6 py-4 border-t border-slate-100 flex gap-3 flex-shrink-0">
-              <button onClick={() => setShowConfig(false)} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+              <button onClick={() => setShowConfig(false)} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">
                 Cancelar
               </button>
               <button onClick={handleSaveConfig} disabled={saving}
-                className="flex-1 px-4 py-2.5 text-white rounded-xl text-sm font-medium disabled:opacity-50"
-                style={{ background: G }}>
+                className="flex-1 px-4 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
                 {saving ? "Guardando..." : "Guardar"}
               </button>
             </div>
@@ -1073,11 +1098,11 @@ export default function ControlHorarioPage() {
 
       {/* ── Schedules Modal ───────────────────────────────────────────────── */}
       {showSchedules && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100 flex-shrink-0">
               <h3 className="text-base font-semibold text-slate-900">Jornadas</h3>
-              <button onClick={() => setShowSchedules(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+              <button onClick={() => setShowSchedules(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md">
                 <X size={16} />
               </button>
             </div>
@@ -1086,7 +1111,7 @@ export default function ControlHorarioPage() {
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Horarios por tipo</p>
                 <div className="space-y-3">
                   {SCHEDULE_TYPES.map((st) => (
-                    <div key={st} className="border border-slate-200 rounded-xl p-3">
+                    <div key={st} className="border border-slate-200 rounded-md p-3">
                       <p className="text-xs font-semibold text-slate-700 mb-2">{SCHEDULE_LABELS[st]}</p>
                       <div className="grid grid-cols-3 gap-2">
                         <div>
@@ -1095,7 +1120,7 @@ export default function ControlHorarioPage() {
                             type="time"
                             value={cfgSchedules[st].entrada}
                             onChange={(e) => setCfgSchedules((prev) => ({ ...prev, [st]: { ...prev[st], entrada: e.target.value } }))}
-                            className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2"
+                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4"
                           />
                         </div>
                         <div>
@@ -1104,7 +1129,7 @@ export default function ControlHorarioPage() {
                             type="time"
                             value={cfgSchedules[st].salida}
                             onChange={(e) => setCfgSchedules((prev) => ({ ...prev, [st]: { ...prev[st], salida: e.target.value } }))}
-                            className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2"
+                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4"
                           />
                         </div>
                         <div>
@@ -1114,7 +1139,7 @@ export default function ControlHorarioPage() {
                               type="number" min={0} max={480}
                               value={cfgSchedules[st].descanso}
                               onChange={(e) => setCfgSchedules((prev) => ({ ...prev, [st]: { ...prev[st], descanso: Number(e.target.value) } }))}
-                              className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 pr-8"
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 pr-8"
                             />
                             <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">min</span>
                           </div>
@@ -1127,15 +1152,15 @@ export default function ControlHorarioPage() {
 
               <div className="pt-1 border-t border-slate-100">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Jornada habitual por persona</p>
-                <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 max-h-56 overflow-y-auto">
+                <div className="border border-slate-200 rounded-md overflow-hidden divide-y divide-slate-100 max-h-56 overflow-y-auto">
                   {crew.length === 0 ? (
-                    <p className="text-sm text-slate-400 text-center py-6">No hay crew activo</p>
+                    <p className="text-[13px] text-slate-400 text-center py-6">No hay crew activo</p>
                   ) : crew.map((m) => {
                     const st = cfgDefaultSchedules[m.id] ?? "general";
                     return (
                       <div key={m.id} className="flex items-center justify-between gap-2 px-3 py-2.5">
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-slate-900 truncate">{m.firstName} {m.lastName1}</p>
+                          <p className="text-[13px] font-medium text-slate-900 truncate">{m.firstName} {m.lastName1}</p>
                           <p className="text-xs text-slate-400 truncate">{m.role || m.section || "—"}</p>
                         </div>
                         <div className="flex border border-slate-200 rounded-lg overflow-hidden flex-shrink-0">
@@ -1158,12 +1183,11 @@ export default function ControlHorarioPage() {
               </div>
             </div>
             <div className="px-6 py-4 border-t border-slate-100 flex gap-3 flex-shrink-0">
-              <button onClick={() => setShowSchedules(false)} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">
+              <button onClick={() => setShowSchedules(false)} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">
                 Cancelar
               </button>
               <button onClick={handleSaveSchedules} disabled={saving}
-                className="flex-1 px-4 py-2.5 text-white rounded-xl text-sm font-medium disabled:opacity-50"
-                style={{ background: G }}>
+                className="flex-1 px-4 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
                 {saving ? "Guardando..." : "Guardar"}
               </button>
             </div>
@@ -1173,10 +1197,10 @@ export default function ControlHorarioPage() {
 
       {/* ── Add member Modal ───────────────────────────────────────────────── */}
       {showAddMember && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm max-h-[70vh] flex flex-col">
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm max-h-[70vh] flex flex-col">
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-semibold text-slate-900">Añadir persona</h3>
+              <h3 className="text-[13px] font-semibold text-slate-900">Añadir persona</h3>
               <button onClick={() => setShowAddMember(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                 <X size={15} />
               </button>
@@ -1185,19 +1209,19 @@ export default function ControlHorarioPage() {
               {(() => {
                 const available = crew.filter((m) => !currentDay?.recipients.find((r) => r.uid === m.id));
                 if (crew.length === 0) return (
-                  <p className="text-sm text-slate-400 text-center py-10">No hay crew activo en el proyecto</p>
+                  <p className="text-[13px] text-slate-400 text-center py-10">No hay crew activo en el proyecto</p>
                 );
                 if (available.length === 0) return (
-                  <p className="text-sm text-slate-400 text-center py-10">Todos están ya añadidos</p>
+                  <p className="text-[13px] text-slate-400 text-center py-10">Todos están ya añadidos</p>
                 );
                 return available.map((m) => (
                   <button key={m.id} onClick={async () => { await handleAddMember(m); setShowAddMember(false); }}
-                    className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 text-left transition-colors">
+                    className="w-full flex items-center gap-3 px-3 py-3.5 hover:bg-slate-50 text-left transition-colors">
                     <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-semibold text-slate-600 flex-shrink-0">
                       {m.firstName.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900">{m.firstName} {m.lastName1}</p>
+                      <p className="text-[13px] font-medium text-slate-900">{m.firstName} {m.lastName1}</p>
                       <p className="text-xs text-slate-400">{m.role || m.section || "—"}</p>
                     </div>
                   </button>
@@ -1210,17 +1234,17 @@ export default function ControlHorarioPage() {
 
       {/* ── Groups Modal ───────────────────────────────────────────────────── */}
       {showGroups && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
 
             {/* Header */}
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100 flex-shrink-0">
               {groupView !== "list" ? (
-                <button onClick={() => setGroupView("list")} className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800">
+                <button onClick={() => setGroupView("list")} className="flex items-center gap-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-800">
                   <ChevronLeft size={16} /> Grupos
                 </button>
               ) : (
-                <h3 className="text-sm font-semibold text-slate-900">Grupos</h3>
+                <h3 className="text-[13px] font-semibold text-slate-900">Grupos</h3>
               )}
               <button onClick={() => setShowGroups(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                 <X size={15} />
@@ -1234,12 +1258,12 @@ export default function ControlHorarioPage() {
                   {groups.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 gap-2">
                       <Users size={28} className="text-slate-200" />
-                      <p className="text-sm text-slate-400">Sin grupos todavía</p>
+                      <p className="text-[13px] text-slate-400">Sin grupos todavía</p>
                     </div>
                   ) : groups.map((g) => (
                     <div key={g.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50">
                       <div>
-                        <p className="text-sm font-medium text-slate-900">{g.name}</p>
+                        <p className="text-[13px] font-medium text-slate-900">{g.name}</p>
                         <p className="text-xs text-slate-400">
                           {g.recipients.length} persona{g.recipients.length !== 1 ? "s" : ""}
                           {g.schedule && ` · ${SCHEDULE_LABELS[g.schedule]}`}
@@ -1247,7 +1271,7 @@ export default function ControlHorarioPage() {
                       </div>
                       <div className="flex gap-1.5">
                         <button onClick={() => handleApplyGroup(g)}
-                          className="px-3 py-1.5 text-xs font-medium rounded-xl text-white" style={{ background: G }}>
+                          className="px-3 py-1.5 text-xs font-medium rounded-md border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                           Añadir al día
                         </button>
                         <button onClick={() => openEditGroup(g)}
@@ -1264,8 +1288,7 @@ export default function ControlHorarioPage() {
                 </div>
                 <div className="px-5 py-3 border-t border-slate-100 flex-shrink-0">
                   <button onClick={openCreateGroup}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium text-white"
-                    style={{ background: G }}>
+                    className="w-full flex items-center justify-center gap-2 py-1.5 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                     <Plus size={15} /> Nuevo grupo
                   </button>
                 </div>
@@ -1284,7 +1307,7 @@ export default function ControlHorarioPage() {
                       onChange={(e) => setGroupFormName(e.target.value)}
                       placeholder="Ej: Cámara, Dirección, Equipo técnico..."
                       autoFocus
-                      className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4"
                     />
                   </div>
                   <div>
@@ -1312,9 +1335,9 @@ export default function ControlHorarioPage() {
                       Personas del grupo
                       <span className="ml-1.5 text-slate-400 font-normal">{groupFormUids.length} seleccionadas</span>
                     </label>
-                    <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                    <div className="border border-slate-200 rounded-md overflow-hidden divide-y divide-slate-100 max-h-64 overflow-y-auto">
                       {crew.length === 0 ? (
-                        <p className="text-sm text-slate-400 text-center py-6">No hay crew activo</p>
+                        <p className="text-[13px] text-slate-400 text-center py-6">No hay crew activo</p>
                       ) : crew.map((m) => {
                         const checked = groupFormUids.includes(m.id);
                         return (
@@ -1322,7 +1345,7 @@ export default function ControlHorarioPage() {
                             onClick={() => setGroupFormUids((prev) =>
                               checked ? prev.filter((u) => u !== m.id) : [...prev, m.id]
                             )}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-left transition-colors">
+                            className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 text-left transition-colors">
                             <div className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
                               checked ? "border-transparent" : "border-slate-300"
                             }`} style={checked ? { background: G, borderColor: G } : {}}>
@@ -1332,7 +1355,7 @@ export default function ControlHorarioPage() {
                               {m.firstName.charAt(0).toUpperCase()}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-slate-900 truncate">{m.firstName} {m.lastName1}</p>
+                              <p className="text-[13px] font-medium text-slate-900 truncate">{m.firstName} {m.lastName1}</p>
                               <p className="text-xs text-slate-400 truncate">{m.role || m.department || "—"}</p>
                             </div>
                           </button>
@@ -1343,13 +1366,12 @@ export default function ControlHorarioPage() {
                 </div>
                 <div className="px-5 py-3 border-t border-slate-100 flex gap-2 flex-shrink-0">
                   <button onClick={() => setGroupView("list")}
-                    className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
+                    className="flex-1 py-1.5 border border-slate-200 rounded-md text-[13px] font-medium text-slate-700 hover:bg-slate-50">
                     Cancelar
                   </button>
                   <button onClick={handleSaveGroup}
                     disabled={!groupFormName.trim() || groupFormUids.length === 0}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-40"
-                    style={{ background: G }}>
+                    className="flex-1 py-1.5 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] disabled:opacity-40">
                     {groupView === "edit" ? "Guardar cambios" : "Crear grupo"}
                   </button>
                 </div>
@@ -1361,11 +1383,11 @@ export default function ControlHorarioPage() {
 
       {/* ── Form detail Modal ──────────────────────────────────────────────── */}
       {showFormDetail && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
               <div>
-                <p className="text-sm font-semibold text-slate-900">{showFormDetail.recipientName}</p>
+                <p className="text-[13px] font-semibold text-slate-900">{showFormDetail.recipientName}</p>
                 <p className="text-xs text-slate-400">{showFormDetail.recipientRole}</p>
               </div>
               <button onClick={() => setShowFormDetail(null)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
@@ -1380,13 +1402,13 @@ export default function ControlHorarioPage() {
               ].map(({ label, value }) => (
                 <div key={label} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
                   <span className="text-xs text-slate-500">{label}</span>
-                  <span className="text-sm font-semibold text-slate-900">{value}</span>
+                  <span className="text-[13px] font-semibold text-slate-900">{value}</span>
                 </div>
               ))}
               {showFormDetail.observaciones && (
                 <div className="pt-2">
                   <p className="text-xs text-slate-500 mb-1">Observaciones</p>
-                  <p className="text-sm text-slate-700 bg-slate-50 rounded-xl px-3 py-2">{showFormDetail.observaciones}</p>
+                  <p className="text-[13px] text-slate-700 bg-slate-50 rounded-md px-3 py-2">{showFormDetail.observaciones}</p>
                 </div>
               )}
               <p className="text-xs text-slate-400 pt-1">Enviado: {formatTime(showFormDetail.submittedAt)}</p>
@@ -1397,8 +1419,8 @@ export default function ControlHorarioPage() {
 
       {/* Download modal */}
       {showDownload && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowDownload(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20" onClick={() => setShowDownload(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-base font-semibold text-slate-900">Descargar datos</h3>
               <button onClick={() => setShowDownload(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
@@ -1416,7 +1438,7 @@ export default function ControlHorarioPage() {
                 <button
                   key={value}
                   onClick={() => setDlMode(value)}
-                  className={`py-2 rounded-xl text-sm font-medium border transition-all ${
+                  className={`py-2 rounded-md text-[13px] font-medium border transition-all ${
                     dlMode === value
                       ? "text-white border-transparent"
                       : "border-slate-200 text-slate-600 hover:border-slate-300 bg-white"
@@ -1433,7 +1455,7 @@ export default function ControlHorarioPage() {
               {dlMode === "day" && (
                 <div>
                   <label className="text-xs font-medium text-slate-600 mb-1 block">Día</label>
-                  <p className="text-sm font-semibold text-slate-900 px-3.5 py-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                  <p className="text-[13px] font-semibold text-slate-900 px-3.5 py-2.5 bg-slate-50 rounded-md border border-slate-200">
                     {formatFull(selectedDate)}
                   </p>
                 </div>
@@ -1445,7 +1467,7 @@ export default function ControlHorarioPage() {
                     type="week"
                     value={dlWeek}
                     onChange={(e) => setDlWeek(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4"
                   />
                 </div>
               )}
@@ -1456,7 +1478,7 @@ export default function ControlHorarioPage() {
                     type="month"
                     value={dlMonth}
                     onChange={(e) => setDlMonth(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4"
                   />
                 </div>
               )}
@@ -1469,8 +1491,7 @@ export default function ControlHorarioPage() {
             <button
               onClick={handleDownload}
               disabled={downloading}
-              className="w-full py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50"
-              style={{ background: G }}
+              className="w-full py-1.5 rounded-md text-[13px] font-semibold border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {downloading
                 ? <><RefreshCw size={14} className="animate-spin" /> Generando...</>
@@ -1483,7 +1504,7 @@ export default function ControlHorarioPage() {
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed bottom-6 left-6 flex items-center gap-3 px-4 py-3 rounded-2xl shadow-lg z-50 text-sm font-medium ${
+        <div className={`fixed bottom-6 left-6 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg z-50 text-[13px] font-medium ${
           toast.type === "success" ? "bg-white border border-slate-200 text-slate-900" : "bg-red-600 text-white"
         }`}>
           {toast.type === "success" ? <CheckCircle size={16} style={{ color: G }} /> : <AlertCircle size={16} />}

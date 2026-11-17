@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
 import { inter } from "@/lib/fonts";
+import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
@@ -20,7 +21,6 @@ import {
   Timestamp,
   updateDoc,
   setDoc,
-  where,
 } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -166,7 +166,7 @@ function CustomSelect({
       <button
         type="button"
         onClick={toggle}
-        className="w-full flex items-center justify-between px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#6BA319] hover:border-slate-300 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-1.5 border border-slate-200 rounded-md text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[#6BA319] hover:border-slate-300 transition-colors"
       >
         <span className={selected ? "text-slate-900" : "text-slate-400"}>
           {selected?.label || placeholder}
@@ -175,14 +175,14 @@ function CustomSelect({
       </button>
       {open && pos && typeof document !== "undefined" && createPortal(
         <div
-          className="fixed z-[200] bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto"
+          className="fixed z-[200] bg-white border border-slate-200 rounded-md shadow-xl overflow-hidden max-h-52 overflow-y-auto"
           style={{ top: pos.top, left: pos.left, width: pos.width }}
         >
           {options.map((o) => (
             <button
               key={o.value} type="button"
               onMouseDown={() => { onChange(o.value); setOpen(false); }}
-              className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${
+              className={`w-full text-left px-4 py-1.5 text-[13px] flex items-center justify-between transition-colors ${
                 value === o.value ? "bg-[rgba(107,163,25,0.08)] text-[#6BA319] font-medium" : "text-slate-700 hover:bg-slate-50"
               }`}
             >
@@ -240,19 +240,19 @@ function DepartmentSelect({
         type="text" value={q} placeholder={placeholder}
         onFocus={openDropdown}
         onChange={(e) => { setQ(e.target.value); onChange(e.target.value); openDropdown(); }}
-        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319] pr-8 bg-white"
+        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] pr-8 bg-white"
       />
       <ChevronDown size={14} className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
       {open && filtered.length > 0 && pos && typeof document !== "undefined" && createPortal(
         <div
-          className="fixed z-[200] bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto"
+          className="fixed z-[200] bg-white border border-slate-200 rounded-md shadow-xl overflow-hidden max-h-52 overflow-y-auto"
           style={{ top: pos.top, left: pos.left, width: pos.width }}
         >
           {filtered.map((opt) => (
             <button
               key={opt} type="button"
               onMouseDown={() => { onChange(opt); setQ(opt); setOpen(false); }}
-              className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${
+              className={`w-full text-left px-4 py-1.5 text-[13px] flex items-center justify-between transition-colors ${
                 value === opt ? "bg-[rgba(107,163,25,0.08)] text-[#6BA319] font-medium" : "text-slate-700 hover:bg-slate-50"
               }`}
             >
@@ -279,11 +279,11 @@ function SalarySection({
   const [open, setOpen] = useState(!!(formData.salaryAmount));
 
   return (
-    <div className="border border-slate-200 rounded-xl overflow-hidden">
+    <div className="border border-slate-200 rounded-md overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 hover:bg-slate-100 transition-colors"
       >
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Remuneración</span>
@@ -311,7 +311,7 @@ function SalarySection({
                   key={opt.value}
                   type="button"
                   onClick={() => setFormData({ ...formData, salaryType: opt.value })}
-                  className={`py-2.5 rounded-xl border text-xs font-medium transition-all ${
+                  className={`py-1.5 rounded-md border text-xs font-medium transition-all ${
                     formData.salaryType === opt.value
                       ? "border-[#6BA319] bg-[rgba(107,163,25,0.08)] text-[#6BA319]"
                       : "border-slate-200 text-slate-600 hover:border-slate-300"
@@ -333,7 +333,7 @@ function SalarySection({
               value={formData.salaryAmount ?? ""}
               onChange={(e) => setFormData({ ...formData, salaryAmount: e.target.value ? Number(e.target.value) : undefined })}
               placeholder="0.00"
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]"
+              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]"
             />
           </div>
         </div>
@@ -866,13 +866,12 @@ export default function CrewPage() {
 
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
-          <div className="relative flex items-center justify-center">
+        <div className="px-6 pt-8 sm:px-10">
+          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
 
             {/* Left: título solo */}
             <div className="flex items-center gap-4">
-              <Users size={22} style={{ color: "#6BA319" }} />
-              <h1 className="text-3xl font-bold text-slate-900 text-center">Crew</h1>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Crew</h1>
             </div>
 
             {/* Right: botones */}
@@ -880,7 +879,7 @@ export default function CrewPage() {
               <button
                 onClick={openCrewListModal}
                 disabled={crew.length === 0}
-                className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 disabled:opacity-40 transition-colors"
+                className="flex items-center gap-2 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50 disabled:opacity-40 transition-colors"
               >
                 <FileDown size={15} className="text-slate-500" />
                 Crew List
@@ -888,8 +887,7 @@ export default function CrewPage() {
 
               <button
                 onClick={openCreate}
-                className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: "#6BA319" }}
+                className="flex items-center gap-2 px-4 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity"
               >
                 <Plus size={15} />
                 Añadir miembro
@@ -906,15 +904,15 @@ export default function CrewPage() {
                 <button
                   key={section.key}
                   onClick={() => setSectionFilter(active ? "all" : section.key)}
-                  className={`px-4 py-3 rounded-xl border transition-all text-left ${
+                  className={`px-4 py-3 rounded-md border transition-all text-left ${
                     active ? `${section.borderColor} ${section.bgColor}` : "border-slate-200 hover:border-slate-300 bg-white"
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className={`text-sm font-medium ${active ? section.textColor : "text-slate-700"}`}>
+                    <span className={`text-[13px] font-medium ${active ? section.textColor : "text-slate-700"}`}>
                       {section.label}
                     </span>
-                    <span className={`text-sm font-semibold ${active ? section.textColor : "text-slate-900"}`}>
+                    <span className={`text-[13px] font-semibold ${active ? section.textColor : "text-slate-900"}`}>
                       {count}
                     </span>
                   </div>
@@ -926,7 +924,7 @@ export default function CrewPage() {
       </div>
 
       {/* ── Main ─────────────────────────────────────────────────────────────── */}
-      <main className="px-24 py-8">
+      <main className="px-6 sm:px-10 py-8">
 
         {/* Filters */}
         <div className="flex flex-row gap-3 items-center mb-6">
@@ -935,55 +933,55 @@ export default function CrewPage() {
             <input
               type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Buscar por nombre, cargo, departamento"
-              className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6BA319] bg-white text-sm"
+              className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-[#6BA319] bg-white text-[13px]"
             />
           </div>
           <div className="relative flex-shrink-0" ref={statusDropdownRef}>
             <button
               onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-              className="flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-xl text-sm hover:border-slate-300 bg-white min-w-[170px]"
+              className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded-md text-[13px] hover:border-slate-300 bg-white min-w-[170px]"
             >
               <Filter size={13} className="text-slate-400" />
               <span className="flex-1 text-left text-xs text-slate-700">{getStatusLabel()}</span>
               <ChevronDown size={13} className={`text-slate-400 transition-transform ${showStatusDropdown ? "rotate-180" : ""}`} />
             </button>
             {showStatusDropdown && (
-              <div className="absolute top-full right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 min-w-full">
+              <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1" align="right" match="min" gap={8}>
                 {STATUS_OPTIONS.map((o) => (
                   <button key={o.value} onClick={() => { setStatusFilter(o.value); setShowStatusDropdown(false); }}
-                    className={`w-full text-left px-4 py-2.5 text-sm whitespace-nowrap ${statusFilter === o.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"}`}
+                    className={`w-full text-left px-4 py-1.5 text-[13px] whitespace-nowrap ${statusFilter === o.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"}`}
                   >{o.label}</button>
                 ))}
-              </div>
+              </AnchoredPanel>
             )}
           </div>
         </div>
 
         {/* Empty */}
         {filteredCrew.length === 0 ? (
-          <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
-            <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="border-2 border-dashed border-slate-200 rounded-lg p-16 text-center">
+            <div className="hidden">
               <Users size={24} className="text-slate-400" />
             </div>
             <h3 className="text-base font-semibold text-slate-900 mb-1">
               {searchTerm || statusFilter !== "all" || sectionFilter !== "all" ? "Sin resultados" : "Sin miembros aún"}
             </h3>
             {(searchTerm || statusFilter !== "all" || sectionFilter !== "all") && (
-              <p className="text-slate-500 text-sm">Prueba a ajustar los filtros</p>
+              <p className="text-slate-500 text-[13px]">Prueba a ajustar los filtros</p>
             )}
           </div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-12">#</th>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Miembro</th>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Sección</th>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Cargo · Depto.</th>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Contacto</th>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Estado</th>
+                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider w-12">#</th>
+                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Miembro</th>
+                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Sección</th>
+                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Cargo · Depto.</th>
+                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Contacto</th>
+                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Estado</th>
                     <th className="w-14" />
                   </tr>
                 </thead>
@@ -998,31 +996,31 @@ export default function CrewPage() {
                         className={`transition-colors cursor-pointer ${dim ? "opacity-50 hover:opacity-70" : "hover:bg-slate-50"}`}
                       >
                         {/* Número */}
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-3">
                           <span className="text-xs font-mono text-slate-400">{member.crewNumber}</span>
                         </td>
                         {/* Miembro */}
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-slate-600">
                               {member.firstName.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <p className="text-sm font-semibold text-slate-900">{fullName(member)}</p>
+                              <p className="text-[13px] font-semibold text-slate-900">{fullName(member)}</p>
                               {member.artisticName && <p className="text-xs text-slate-400 italic mt-0.5">&quot;{member.artisticName}&quot;</p>}
                               {member.section === "cast" && member.character && <p className="text-xs text-violet-500 mt-0.5">{member.character}</p>}
                             </div>
                           </div>
                         </td>
                         {/* Sección */}
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-3">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${sc.bgColor} ${sc.textColor}`}>
                             {sc.label}
                           </span>
                         </td>
                         {/* Cargo */}
-                        <td className="px-6 py-4">
-                          <p className="text-sm text-slate-900 font-medium">{member.role}</p>
+                        <td className="px-4 py-3">
+                          <p className="text-[13px] text-slate-900 font-medium">{member.role}</p>
                           {member.department && <p className="text-xs text-slate-500 mt-0.5">{member.department}</p>}
                           {/* Salario resumido */}
                           {member.section === "technical" && member.salaryAmount && (
@@ -1039,7 +1037,7 @@ export default function CrewPage() {
                           )}
                         </td>
                         {/* Contacto */}
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-3">
                           <div className="space-y-0.5">
                             {member.email && (
                               <a href={`mailto:${member.email}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900">
@@ -1055,9 +1053,9 @@ export default function CrewPage() {
                           </div>
                         </td>
                         {/* Estado */}
-                        <td className="px-6 py-4">{getStatusBadge(member.status)}</td>
+                        <td className="px-4 py-3">{getStatusBadge(member.status)}</td>
                         {/* Menú */}
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-3">
                           <div className="relative menu-container">
                             <button
                               onClick={(e) => {
@@ -1084,25 +1082,25 @@ export default function CrewPage() {
 
         {/* Floating context menu */}
         {openMenuId && menuPosition && (
-          <div className="fixed w-52 bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] py-1" style={{ top: menuPosition.top, left: menuPosition.left }}>
+          <div className="fixed w-52 bg-white border border-slate-200 rounded-md shadow-xl z-[9999] py-1" style={{ top: menuPosition.top, left: menuPosition.left }}>
             {(() => {
               const member = filteredCrew.find((m) => m.id === openMenuId);
               if (!member) return null;
               return (
                 <>
-                  <button onClick={() => openEdit(member)} className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3">
+                  <button onClick={() => openEdit(member)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3">
                     <Pencil size={14} className="text-slate-400" />Editar datos
                   </button>
-                  <button onClick={() => openSendForm(member)} className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3">
+                  <button onClick={() => openSendForm(member)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3">
                     <Link2 size={14} className="text-slate-400" />Enviar ficha
                   </button>
-                  <button onClick={() => handleToggleStatus(member)} className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3">
+                  <button onClick={() => handleToggleStatus(member)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3">
                     {member.status === "active"
                       ? <><UserMinus size={14} className="text-slate-400" />Marcar inactivo</>
                       : <><UserCheck size={14} className="text-slate-400" />Marcar activo</>}
                   </button>
                   <div className="border-t border-slate-100 my-1" />
-                  <button onClick={() => handleDelete(member)} className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3">
+                  <button onClick={() => handleDelete(member)} className="w-full px-4 py-1.5 text-left text-[13px] text-red-600 hover:bg-red-50 flex items-center gap-3">
                     <Trash2 size={14} />Eliminar
                   </button>
                 </>
@@ -1114,8 +1112,8 @@ export default function CrewPage() {
 
       {/* ── Modal ────────────────────────────────────────────────────────────── */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
 
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
@@ -1144,7 +1142,7 @@ export default function CrewPage() {
                     return (
                       <button key={s.key} type="button"
                         onClick={() => setFormData({ ...formData, section: s.key, department: "" })}
-                        className={`py-2.5 rounded-xl border text-xs font-medium transition-all ${
+                        className={`py-2.5 rounded-md border text-xs font-medium transition-all ${
                           on ? `${s.borderColor} ${s.bgColor} ${s.textColor}` : "border-slate-200 text-slate-600 hover:border-slate-300"
                         }`}
                       >
@@ -1164,7 +1162,7 @@ export default function CrewPage() {
                   <input type="text" value={formData.firstName}
                     onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                     placeholder="Nombre"
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
@@ -1173,14 +1171,14 @@ export default function CrewPage() {
                   <input type="text" value={formData.lastName1}
                     onChange={(e) => setFormData({ ...formData, lastName1: e.target.value })}
                     placeholder="Primer apellido"
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Apellido 2</label>
                   <input type="text" value={formData.lastName2 || ""}
                     onChange={(e) => setFormData({ ...formData, lastName2: e.target.value })}
                     placeholder="Segundo apellido"
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
                 </div>
               </div>
 
@@ -1190,7 +1188,7 @@ export default function CrewPage() {
                 <input type="text" value={formData.artisticName || ""}
                   onChange={(e) => setFormData({ ...formData, artisticName: e.target.value })}
                   placeholder="Alias o nombre de cartel"
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
               </div>
 
               {/* Cargo + Empresa */}
@@ -1202,14 +1200,14 @@ export default function CrewPage() {
                   <input type="text" value={formData.role}
                     onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                     placeholder="p.ej. Director de fotografía"
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Empresa</label>
                   <input type="text" value={formData.company || ""}
                     onChange={(e) => setFormData({ ...formData, company: e.target.value })}
                     placeholder="Razón social"
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
                 </div>
               </div>
 
@@ -1231,7 +1229,7 @@ export default function CrewPage() {
                     <input type="text" value={formData.character || ""}
                       onChange={(e) => setFormData({ ...formData, character: e.target.value })}
                       placeholder="Nombre del personaje"
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -1239,14 +1237,14 @@ export default function CrewPage() {
                       <input type="number" min={0} value={formData.sessions ?? ""}
                         onChange={(e) => setFormData({ ...formData, sessions: e.target.value ? Number(e.target.value) : undefined })}
                         placeholder="0"
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Salario / sesión (€)</label>
                       <input type="number" min={0} value={formData.salaryPerSession ?? ""}
                         onChange={(e) => setFormData({ ...formData, salaryPerSession: e.target.value ? Number(e.target.value) : undefined })}
                         placeholder="0.00"
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
                     </div>
                   </div>
                 </>
@@ -1260,14 +1258,14 @@ export default function CrewPage() {
                     <input type="number" min={0} value={formData.sessions ?? ""}
                       onChange={(e) => setFormData({ ...formData, sessions: e.target.value ? Number(e.target.value) : undefined })}
                       placeholder="0"
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Salario / sesión (€)</label>
                     <input type="number" min={0} value={formData.salaryPerSession ?? ""}
                       onChange={(e) => setFormData({ ...formData, salaryPerSession: e.target.value ? Number(e.target.value) : undefined })}
                       placeholder="0.00"
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
                   </div>
                 </div>
               )}
@@ -1284,14 +1282,14 @@ export default function CrewPage() {
                   <input type="email" value={formData.email || ""}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     placeholder="correo@ejemplo.com"
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Teléfono</label>
                   <input type="tel" value={formData.phone || ""}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="+34 600 000 000"
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319]" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
                 </div>
               </div>
 
@@ -1301,13 +1299,13 @@ export default function CrewPage() {
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Fecha alta</label>
                   <input type="date" value={formData.startDate || ""}
                     onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319] bg-white" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] bg-white" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Baja aprox.</label>
                   <input type="date" value={formData.endDateApprox || ""}
                     onChange={(e) => setFormData({ ...formData, endDateApprox: e.target.value })}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319] bg-white" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] bg-white" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Estado</label>
@@ -1324,25 +1322,24 @@ export default function CrewPage() {
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   placeholder="Observaciones, disponibilidad, condiciones especiales"
                   rows={2}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319] resize-none" />
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] resize-none" />
               </div>
 
-              <p className="text-xs text-slate-400 bg-slate-50 rounded-xl px-3 py-2.5">
+              <p className="text-xs text-slate-400 bg-slate-50 rounded-md px-3 py-2.5">
                 Los datos fiscales completos (DNI, NSS, IRPF, cuenta bancaria) se gestionan en la ficha individual de cada miembro.
               </p>
             </div>
 
             {/* Footer — dos acciones */}
-            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex-shrink-0">
+            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-lg flex-shrink-0">
               <div className="flex items-center gap-3">
                 <button onClick={() => setShowModal(false)}
-                  className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-white text-sm font-medium transition-colors">
+                  className="px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-white text-[13px] font-medium transition-colors">
                   Cancelar
                 </button>
                 <div className="flex-1" />
                 <button onClick={handleSave} disabled={saving || !canSave}
-                  className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
-                  style={{ backgroundColor: "#6BA319" }}>
+                  className="flex items-center gap-2 px-4 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-40 transition-opacity">
                   {saving ? "Guardando…" : editingMember ? "Guardar cambios" : "Guardar"}
                 </button>
               </div>
@@ -1353,8 +1350,8 @@ export default function CrewPage() {
 
       {/* ── Send Form Modal ──────────────────────────────────────────────────── */}
       {formTarget && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={closeSendForm}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4" onClick={closeSendForm}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col" onClick={(e) => e.stopPropagation()}>
 
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
@@ -1378,7 +1375,7 @@ export default function CrewPage() {
               {!generatedResult ? (
                 <>
                   {/* Pre-filled preview */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl divide-y divide-slate-100 text-sm">
+                  <div className="bg-slate-50 border border-slate-200 rounded-md divide-y divide-slate-100 text-[13px]">
                     {[
                       ["Nombre", `${formTarget.firstName} ${formTarget.lastName1}${formTarget.lastName2 ? " " + formTarget.lastName2 : ""}`],
                       formTarget.email ? ["Email", formTarget.email] : null,
@@ -1388,7 +1385,7 @@ export default function CrewPage() {
                     ].filter((row): row is string[] => row !== null).map(([label, value]) => (
                       <div key={label} className="flex items-center justify-between px-4 py-2.5 gap-3">
                         <span className="text-xs text-slate-400 flex-shrink-0">{label}</span>
-                        <span className="text-sm text-slate-700 text-right truncate">{value}</span>
+                        <span className="text-[13px] text-slate-700 text-right truncate">{value}</span>
                       </div>
                     ))}
                   </div>
@@ -1403,11 +1400,11 @@ export default function CrewPage() {
                       onChange={(e) => setFormMessage(e.target.value)}
                       placeholder={`Hola ${formTarget.firstName}, adjunto la ficha de alta para ${projectName || "la producción"}. Rellena todos los campos y adjunta los documentos indicados. ¡Gracias!`}
                       rows={3}
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#6BA319] resize-none"
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] resize-none"
                     />
                   </div>
 
-                  <p className="text-xs text-slate-400 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
+                  <p className="text-xs text-slate-400 bg-amber-50 border border-amber-100 rounded-md px-3 py-2.5">
                     Se generará un enlace único y un código de 4 dígitos válido durante 14 días.
                   </p>
                 </>
@@ -1415,7 +1412,7 @@ export default function CrewPage() {
                 /* Result */
                 <div className="space-y-4">
                   <div className="text-center py-2">
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: "rgba(107,163,25,0.1)" }}>
+                    <div className="w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: "rgba(107,163,25,0.1)" }}>
                       <Check size={22} style={{ color: "#6BA319" }} />
                     </div>
                     <h3 className="text-base font-semibold text-slate-900">¡Ficha generada!</h3>
@@ -1423,11 +1420,11 @@ export default function CrewPage() {
                   </div>
 
                   {/* PIN */}
-                  <div className="bg-slate-900 rounded-2xl p-5 text-center">
+                  <div className="bg-slate-900 rounded-lg p-5 text-center">
                     <p className="text-xs text-slate-400 mb-2 uppercase tracking-wider font-medium">Código de acceso</p>
                     <div className="flex items-center justify-center gap-2 mb-3">
                       {generatedResult.pin.split("").map((d, i) => (
-                        <div key={i} className="w-12 h-14 bg-white/10 rounded-xl flex items-center justify-center">
+                        <div key={i} className="w-12 h-14 bg-white/10 rounded-md flex items-center justify-center">
                           <span className="text-2xl font-bold text-white">{d}</span>
                         </div>
                       ))}
@@ -1442,7 +1439,7 @@ export default function CrewPage() {
                   </div>
 
                   {/* URL */}
-                  <div className="border border-slate-200 rounded-xl p-4 space-y-2">
+                  <div className="border border-slate-200 rounded-md p-4 space-y-2">
                     <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Enlace del formulario</p>
                     <p className="text-xs text-slate-600 break-all font-mono bg-slate-50 rounded-lg px-2 py-1.5">{generatedResult.url}</p>
                     <div className="flex gap-2">
@@ -1473,15 +1470,14 @@ export default function CrewPage() {
 
             {/* Footer */}
             {!generatedResult && (
-              <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex gap-3">
-                <button onClick={closeSendForm} className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-white text-sm font-medium transition-colors">
+              <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-lg flex gap-3">
+                <button onClick={closeSendForm} className="px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-white text-[13px] font-medium transition-colors">
                   Cancelar
                 </button>
                 <button
                   onClick={handleGenerateForm}
                   disabled={generatingForm}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
-                  style={{ backgroundColor: "#6BA319" }}
+                  className="flex-1 flex items-center justify-center gap-2 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-40 transition-opacity"
                 >
                   {generatingForm
                     ? <><Send size={14} className="animate-pulse" /> Generando…</>
@@ -1490,8 +1486,8 @@ export default function CrewPage() {
               </div>
             )}
             {generatedResult && (
-              <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl">
-                <button onClick={closeSendForm} className="w-full py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-white text-sm font-medium transition-colors">
+              <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-lg">
+                <button onClick={closeSendForm} className="w-full py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-white text-[13px] font-medium transition-colors">
                   Cerrar
                 </button>
               </div>
@@ -1503,11 +1499,11 @@ export default function CrewPage() {
       {/* ── Crew List Modal ──────────────────────────────────────────────────── */}
       {showCrewListModal && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4"
           onClick={() => setShowCrewListModal(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col"
+            className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col"
             style={{ maxHeight: "80vh" }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1530,7 +1526,7 @@ export default function CrewPage() {
             {/* Department list */}
             <div className="p-4 overflow-y-auto flex-1 space-y-1.5">
               {deptOrder.length === 0 ? (
-                <p className="text-sm text-slate-400 text-center py-8">No hay miembros activos</p>
+                <p className="text-[13px] text-slate-400 text-center py-8">No hay miembros activos</p>
               ) : (
                 deptOrder.map((dept, idx) => {
                   const count = crew.filter(
@@ -1541,7 +1537,7 @@ export default function CrewPage() {
                   return (
                     <div
                       key={dept}
-                      className="flex items-center gap-3 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl"
+                      className="flex items-center gap-3 px-3 py-3 bg-slate-50 border border-slate-200 rounded-md"
                     >
                       <span className="text-xs font-mono text-slate-300 w-5 text-right flex-shrink-0">{idx + 1}</span>
 
@@ -1551,7 +1547,7 @@ export default function CrewPage() {
                       />
 
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">{dept}</p>
+                        <p className="text-[13px] font-medium text-slate-900 truncate">{dept}</p>
                         <p className="text-xs text-slate-400">{count} miembro{count !== 1 ? "s" : ""}</p>
                       </div>
                     </div>
@@ -1561,7 +1557,7 @@ export default function CrewPage() {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex-shrink-0">
+            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-lg flex-shrink-0">
               {/* PDF preview info */}
               <div className="flex items-center gap-2 text-xs text-slate-400 mb-3">
                 <div className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 font-mono truncate text-slate-500">
@@ -1571,15 +1567,14 @@ export default function CrewPage() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowCrewListModal(false)}
-                  className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-white text-sm font-medium transition-colors"
+                  className="px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-white text-[13px] font-medium transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleExportPdf}
                   disabled={exportingPdf || deptOrder.length === 0}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
-                  style={{ backgroundColor: "#6BA319" }}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-40 transition-opacity"
                 >
                   <FileDown size={15} />
                   {exportingPdf ? "Generando PDF…" : "Exportar PDF"}
@@ -1592,15 +1587,15 @@ export default function CrewPage() {
 
       {/* ── Confirm ──────────────────────────────────────────────────────────── */}
       {confirmDialog && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
-            <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+            <p className="text-[13px] text-slate-600 mb-6">{confirmDialog.message}</p>
             <div className="flex gap-3">
               <button onClick={() => setConfirmDialog(null)}
-                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">Cancelar</button>
+                className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">Cancelar</button>
               <button onClick={confirmDialog.onConfirm}
-                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}>
+                className={`flex-1 px-4 py-1.5 rounded-md text-[13px] font-medium text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}>
                 {confirmDialog.confirmLabel || "Confirmar"}
               </button>
             </div>

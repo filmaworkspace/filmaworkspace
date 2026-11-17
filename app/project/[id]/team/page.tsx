@@ -6,11 +6,23 @@ import Link from "next/link";
 import { inter } from "@/lib/fonts";
 import { auth, db } from "@/lib/firebase";
 import {
-  collection, doc, getDocs, getDoc, limit, orderBy, query,
+  collection,
+  getDocs,
+  limit,
+  orderBy,
+  query,
 } from "firebase/firestore";
 import {
-  ArrowRight, ChevronRight, Clapperboard,
-  ClipboardCheck, Clock, MailPlus, Plus, Settings, Shield, Users,
+  ArrowRight,
+  ChevronRight,
+  Clapperboard,
+  ClipboardCheck,
+  Clock,
+  MailPlus,
+  Plus,
+  Settings,
+  Shield,
+  Users,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -158,14 +170,14 @@ export default function TeamPage() {
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
-          <div className="relative flex items-center justify-center">
-            <h1 className="text-3xl font-bold text-slate-900 text-center">Panel de coordinación</h1>
+        <div className="px-6 pt-8 sm:px-10">
+          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900">Panel de coordinación</h1>
 
             {/* Icons top-right */}
             <div className="absolute right-0 flex items-center gap-1">
               <Link href={`/project/${id}/team/approvals`}
-                className="relative p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+                className="relative p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
                 title="Aprobaciones">
                 <ClipboardCheck size={18} />
                 {pendingApprovals > 0 && (
@@ -173,7 +185,7 @@ export default function TeamPage() {
                 )}
               </Link>
               <Link href={`/project/${id}/team/config`}
-                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
                 title="Configuración">
                 <Settings size={18} />
               </Link>
@@ -182,23 +194,23 @@ export default function TeamPage() {
         </div>
       </div>
 
-      <main className="px-24 py-8">
+      <main className="px-6 sm:px-10 py-8">
 
         {/* ── Pending approvals banner ──────────────────────────────────────── */}
         {pendingApprovals > 0 && (
           <Link href={`/project/${id}/team/approvals`}>
-            <div className="mb-8 rounded-2xl p-5 cursor-pointer hover:shadow-lg transition-shadow"
+            <div className="mb-8 rounded-lg p-5 cursor-pointer hover:shadow-lg transition-shadow"
               style={{ background: `linear-gradient(to right, ${TEAM_COLOR}, #4a7a10)` }}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-md flex items-center justify-center">
                     <Clock size={24} className="text-white" />
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-white">
                       {pendingApprovals} alta{pendingApprovals !== 1 ? "s" : ""} pendiente{pendingApprovals !== 1 ? "s" : ""} de aprobación
                     </h3>
-                    <p className="text-white/80 text-sm">Revisa y aprueba para activar los miembros</p>
+                    <p className="text-white/80 text-[13px]">Revisa y aprueba para activar los miembros</p>
                   </div>
                 </div>
                 <ArrowRight size={24} className="text-white/80" />
@@ -211,12 +223,10 @@ export default function TeamPage() {
         <div className="flex flex-row gap-6 items-start">
 
           {/* Crew reciente */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex-1">
+          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm flex-1">
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <Users size={18} style={{ color: TEAM_COLOR }} />
                 <h3 className="font-semibold text-slate-900">Crew</h3>
-                <span className="text-xs text-slate-400">reciente</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Link href={`/project/${id}/team/crew/new`}
@@ -235,10 +245,10 @@ export default function TeamPage() {
             <div className="p-5">
               {recentCrew.length === 0 ? (
                 <div className="text-center py-12">
-                  <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <div className="hidden">
                     <Users size={24} className="text-slate-400" />
                   </div>
-                  <p className="text-sm text-slate-500">Sin miembros de crew</p>
+                  <p className="text-[13px] text-slate-500">Sin miembros de crew</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -247,7 +257,7 @@ export default function TeamPage() {
                     const dim = member.status === "inactive";
                     return (
                       <Link key={member.id} href={`/project/${id}/team/crew/${member.id}`} className="block">
-                        <div className={`flex items-center justify-between px-3 py-3 rounded-xl transition-colors cursor-pointer group border ${
+                        <div className={`flex items-center justify-between px-3 py-3 rounded-md transition-colors cursor-pointer group border ${
                           dim ? "bg-slate-50/60 border-slate-100 opacity-60 hover:opacity-80"
                               : "bg-slate-50 hover:bg-slate-100 border-transparent hover:border-slate-200"}`}>
                           {/* Avatar + name */}
@@ -260,7 +270,7 @@ export default function TeamPage() {
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 mb-0.5">
-                                <span className="text-sm font-semibold text-slate-900 truncate">{fullName(member)}</span>
+                                <span className="text-[13px] font-semibold text-slate-900 truncate">{fullName(member)}</span>
                                 {member.artisticName && (
                                   <span className="text-xs text-slate-400 italic truncate inline">&quot;{member.artisticName}&quot;</span>
                                 )}

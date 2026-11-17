@@ -4,15 +4,49 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { inter } from "@/lib/fonts";
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
 import {
-  collection, doc, getDocs, getDoc, query, orderBy as fbOrderBy, setDoc, deleteDoc, where, Timestamp,
+  onAuthStateChanged,
+} from "firebase/auth";
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  query,
+  orderBy as fbOrderBy,
+  setDoc,
+  deleteDoc,
+  where,
+  Timestamp,
 } from "firebase/firestore";
 import {
-  AlertCircle, ArrowDown, ArrowUp, Banknote, Car, Check, CheckCircle2,
-  ClipboardList, Copy, ExternalLink, FileCheck, FileDown, Globe, GripVertical, Home,
-  Info, Link2, Lock, Plane, Plus, Save, Settings, Shield, Trash2, Utensils,
-  User, Users, X,
+  AlertCircle,
+  ArrowDown,
+  ArrowUp,
+  Banknote,
+  Car,
+  Check,
+  CheckCircle2,
+  ClipboardList,
+  Copy,
+  ExternalLink,
+  FileCheck,
+  FileDown,
+  Globe,
+  GripVertical,
+  Home,
+  Info,
+  Link2,
+  Lock,
+  Plane,
+  Plus,
+  Save,
+  Shield,
+  Trash2,
+  Utensils,
+  User,
+  Users,
+  X,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 
@@ -576,10 +610,10 @@ export default function TeamConfigPage() {
 const renderAccesos = () => (
     <div className="space-y-4">
       {/* Header card */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-slate-900">Accesos de coordinación</p>
+            <p className="text-[13px] font-semibold text-slate-900">Accesos de coordinación</p>
             <p className="text-xs text-slate-500 mt-0.5">
               Links para que coordinadores marquen complementos sin acceso a la plataforma
             </p>
@@ -594,10 +628,10 @@ const renderAccesos = () => (
 
         {accesos.length === 0 ? (
           <div className="px-6 py-12 text-center">
-            <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <div className="hidden">
               <Link2 size={20} className="text-slate-400" />
             </div>
-            <p className="text-sm text-slate-500">No hay accesos creados</p>
+            <p className="text-[13px] text-slate-500">No hay accesos creados</p>
             <p className="text-xs text-slate-400 mt-1">
               Crea un acceso y comparte el enlace con tu coordinador
             </p>
@@ -610,7 +644,7 @@ const renderAccesos = () => (
                   {/* Color dot + info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-semibold text-slate-900">{entry.name}</p>
+                      <p className="text-[13px] font-semibold text-slate-900">{entry.name}</p>
                       {!entry.active && (
                         <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full uppercase tracking-wide">
                           Inactivo
@@ -695,11 +729,11 @@ const renderAccesos = () => (
 
   const renderApprovals = () => (
     <div className="space-y-4">
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
           <Shield size={18} className="text-amber-500" />
           <div>
-            <p className="text-sm font-semibold text-slate-900">Aprobación de altas</p>
+            <p className="text-[13px] font-semibold text-slate-900">Aprobación de altas</p>
             <p className="text-xs text-slate-500 mt-0.5">Requiere aprobación manual antes de activar una alta de crew</p>
           </div>
           <div className="ml-auto">
@@ -720,11 +754,11 @@ const renderAccesos = () => (
       </div>
 
       {approvalConfig.requireApproval && (
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Users size={16} className="text-slate-400" />
-              <p className="text-sm font-semibold text-slate-900">Aprobadores</p>
+              <p className="text-[13px] font-semibold text-slate-900">Aprobadores</p>
             </div>
             <button onClick={() => setShowMemberPicker(true)}
               className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
@@ -734,10 +768,10 @@ const renderAccesos = () => (
 
           {approvalConfig.approverUserIds.length === 0 ? (
             <div className="px-6 py-10 text-center">
-              <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <div className="hidden">
                 <User size={20} className="text-slate-400" />
               </div>
-              <p className="text-sm text-slate-500">No hay aprobadores configurados</p>
+              <p className="text-[13px] text-slate-500">No hay aprobadores configurados</p>
               <p className="text-xs text-slate-400 mt-1">Añade al menos un aprobador para que el flujo funcione</p>
             </div>
           ) : (
@@ -752,7 +786,7 @@ const renderAccesos = () => (
                         {name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-slate-900">{name}</p>
+                        <p className="text-[13px] font-medium text-slate-900">{name}</p>
                         {member?.role && <p className="text-xs text-slate-400">{member.role}</p>}
                       </div>
                     </div>
@@ -772,9 +806,9 @@ const renderAccesos = () => (
 
   const renderDepartments = () => (
     <div className="space-y-4">
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100">
-          <p className="text-sm font-semibold text-slate-900">Orden de departamentos</p>
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100">
+          <p className="text-[13px] font-semibold text-slate-900">Orden de departamentos</p>
           <p className="text-xs text-slate-500 mt-0.5">
             Define el orden en que aparecen en los listados y exportaciones.
           </p>
@@ -782,7 +816,7 @@ const renderAccesos = () => (
 
         {departments.length === 0 ? (
           <div className="px-6 py-10 text-center">
-            <p className="text-sm text-slate-500">No hay crew con departamentos asignados</p>
+            <p className="text-[13px] text-slate-500">No hay crew con departamentos asignados</p>
             <p className="text-xs text-slate-400 mt-1">Añade miembros al crew y asígnales departamento</p>
           </div>
         ) : (
@@ -798,7 +832,7 @@ const renderAccesos = () => (
                     style={{ backgroundColor: TEAM_COLOR }}
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900">{dept}</p>
+                    <p className="text-[13px] font-medium text-slate-900">{dept}</p>
                   </div>
                   <div className="flex items-center gap-0.5">
                     <button onClick={() => moveDept(i, -1)} disabled={!canMoveUp}
@@ -875,9 +909,9 @@ const renderAccesos = () => (
     ];
     return (
       <div className="space-y-4">
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100">
-            <p className="text-sm font-semibold text-slate-900">Tarifas globales</p>
+        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-100">
+            <p className="text-[13px] font-semibold text-slate-900">Tarifas globales</p>
             <p className="text-xs text-slate-500 mt-0.5">
               Importes por defecto en Nóminas. Las dietas tienen tarifa separada para Técnicos y Actores.
             </p>
@@ -885,27 +919,27 @@ const renderAccesos = () => (
           <div className="divide-y divide-slate-100">
             {groups.map(({ label, description, icon, fields }) => (
               <div key={label} className="flex items-center gap-4 px-6 py-3.5">
-                <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="hidden">
                   {icon}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900">{label}</p>
+                  <p className="text-[13px] font-medium text-slate-900">{label}</p>
                   <p className="text-xs text-slate-400 mt-0.5">{description}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {fields.map(({ key, badge, badgeColor }) => (
                     <div key={key} className="flex flex-col items-end gap-1">
                       <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md ${badgeColor}`}>{badge}</span>
-                      <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-slate-300">
+                      <div className="flex items-center border border-slate-200 rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-slate-300">
                         <input
                           type="number"
                           min="0"
                           step="0.01"
                           value={payrollRates[key]}
                           onChange={e => setPayrollRate(key, parseFloat(e.target.value) || 0)}
-                          className="w-20 text-sm text-right px-3 py-2 focus:outline-none text-slate-900 font-medium"
+                          className="w-20 text-[13px] text-right px-2.5 py-1.5 focus:outline-none text-slate-900 font-medium"
                         />
-                        <span className="px-2.5 py-2 text-sm text-slate-400 bg-slate-50 border-l border-slate-200">€</span>
+                        <span className="px-2.5 py-2 text-[13px] text-slate-400 bg-slate-50 border-l border-slate-200">€</span>
                       </div>
                     </div>
                   ))}
@@ -946,7 +980,7 @@ const renderAccesos = () => (
         </div>
 
         {FORM_SECTIONS.map((section) => (
-          <div key={section.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div key={section.id} className="bg-white border border-slate-200 rounded-lg overflow-hidden">
             <div className="px-6 py-3.5 border-b border-slate-100 bg-slate-50">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{section.label}</p>
             </div>
@@ -957,7 +991,7 @@ const renderAccesos = () => (
                 return (
                   <div key={idx} className="flex items-center gap-4 px-6 py-3.5">
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium ${isLocked && !isOn ? "text-slate-400" : "text-slate-900"}`}>
+                      <p className={`text-[13px] font-medium ${isLocked && !isOn ? "text-slate-400" : "text-slate-900"}`}>
                         {field.label}
                       </p>
                       {field.description && (
@@ -1013,16 +1047,16 @@ const renderAccesos = () => (
     return (
       <div className="space-y-4">
         {/* Campos */}
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100">
-            <p className="text-sm font-semibold text-slate-900">Campos a incluir</p>
+        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-100">
+            <p className="text-[13px] font-semibold text-slate-900">Campos a incluir</p>
             <p className="text-xs text-slate-500 mt-0.5">Selecciona qué campos aparecen en fichas PDF y listados exportados</p>
           </div>
           <div className="divide-y divide-slate-100">
             {fieldToggles.map(({ key, label, description }) => (
               <div key={key} className="flex items-center justify-between px-6 py-3.5 gap-4">
                 <div>
-                  <p className="text-sm font-medium text-slate-900">{label}</p>
+                  <p className="text-[13px] font-medium text-slate-900">{label}</p>
                   {description && <p className="text-xs text-slate-400 mt-0.5">{description}</p>}
                 </div>
                 <button onClick={() => toggleExport(key)}
@@ -1036,16 +1070,16 @@ const renderAccesos = () => (
         </div>
 
         {/* Estructura */}
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100">
-            <p className="text-sm font-semibold text-slate-900">Estructura del listado</p>
+        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-100">
+            <p className="text-[13px] font-semibold text-slate-900">Estructura del listado</p>
             <p className="text-xs text-slate-500 mt-0.5">Cómo se organizan los miembros en los documentos exportados</p>
           </div>
           <div className="divide-y divide-slate-100">
             {structureToggles.map(({ key, label, description }) => (
               <div key={key} className="flex items-center justify-between px-6 py-3.5 gap-4">
                 <div>
-                  <p className="text-sm font-medium text-slate-900">{label}</p>
+                  <p className="text-[13px] font-medium text-slate-900">{label}</p>
                   <p className="text-xs text-slate-400 mt-0.5">{description}</p>
                 </div>
                 <button onClick={() => toggleExport(key)}
@@ -1081,14 +1115,13 @@ const renderAccesos = () => (
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
-          <div className="relative flex items-center justify-center">
+        <div className="px-6 pt-8 sm:px-10">
+          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
             <div className="flex items-center gap-4">
-              <Settings size={22} style={{ color: TEAM_COLOR }} />
-              <h1 className="text-3xl font-bold text-slate-900 text-center">Configuración de team</h1>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Configuración de team</h1>
             </div>
             <button onClick={handleSave} disabled={saving}
-              className="absolute right-0 flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">
+              className="absolute right-0 flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
               {saving
                 ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Guardando...</>
                 : <><Save size={16} />Guardar</>}
@@ -1099,18 +1132,18 @@ const renderAccesos = () => (
 
       {/* ── Toasts ─────────────────────────────────────────────────────────── */}
       {successMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
+        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
           <CheckCircle2 size={16} /> {successMessage}
         </div>
       )}
       {errorMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
+        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
           <AlertCircle size={16} /> {errorMessage}
         </div>
       )}
 
       {/* ── Main layout ────────────────────────────────────────────────────── */}
-      <main className="px-24 py-8">
+      <main className="px-6 sm:px-10 py-8">
         <div className="flex flex-row gap-6">
 
           {/* Sidebar */}
@@ -1123,10 +1156,10 @@ const renderAccesos = () => (
                   return (
                     <button key={section.id} onClick={() => setActiveSection(section.id)}
                       className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all whitespace-nowrap ${
-                        isActive ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                      }`}>
-                      <Icon size={16} className={isActive ? "text-white" : "text-slate-400"} />
-                      <span className={`text-sm font-medium ${isActive ? "text-white" : ""}`}>{section.label}</span>
+                        isActive ? "bg-[#F1F1F3] text-slate-900" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                      } text-[13px]`}>
+                      <Icon size={16} className={isActive ? "text-slate-900" : "text-slate-400"} />
+                      <span className={`text-[13px] font-medium ${isActive ? "text-slate-900" : ""}`}>{section.label}</span>
                     </button>
                   );
                 })}
@@ -1148,14 +1181,14 @@ const renderAccesos = () => (
 
       {/* ── Create access modal ─────────────────────────────────────────── */}
       {showAccessModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-0 p-4">
-          <div className="bg-white rounded-t-3xl rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 backdrop-blur-[2px] p-0 p-4">
+          <div className="bg-white rounded-t-3xl rounded-lg shadow-xl w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden">
 
             {/* Modal header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
               <p className="text-base font-bold text-slate-900">Nuevo acceso</p>
               <button onClick={() => setShowAccessModal(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors">
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors">
                 <X size={18} />
               </button>
             </div>
@@ -1171,7 +1204,7 @@ const renderAccesos = () => (
                   value={accessDraftName}
                   onChange={e => setAccessDraftName(e.target.value)}
                   placeholder="Título del evento"
-                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                  className="w-full text-[13px] border border-slate-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
                 />
               </div>
 
@@ -1180,20 +1213,20 @@ const renderAccesos = () => (
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">
                   Personas ({accessDraftPeople.size} seleccionadas)
                 </label>
-                <div className="border border-slate-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                <div className="border border-slate-200 rounded-md overflow-hidden max-h-48 overflow-y-auto">
                   {crew.length === 0 ? (
-                    <p className="px-4 py-6 text-center text-sm text-slate-400">No hay crew activo</p>
+                    <p className="px-4 py-6 text-center text-[13px] text-slate-400">No hay crew activo</p>
                   ) : crew.map(m => {
                     const sel = accessDraftPeople.has(m.id);
                     return (
                       <button key={m.id} onClick={() => toggleAccessPerson(m.id)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-slate-50 last:border-0 ${sel ? "bg-green-50" : "hover:bg-slate-50"}`}>
+                        className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors border-b border-slate-50 last:border-0 ${sel ? "bg-green-50" : "hover:bg-slate-50"}`}>
                         <div className={`w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-colors ${sel ? "border-transparent" : "border-slate-300"}`}
                           style={sel ? { backgroundColor: TEAM_COLOR } : {}}>
                           {sel && <Check size={12} className="text-white" strokeWidth={2.5} />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-900 truncate">{m.firstName} {m.lastName1}</p>
+                          <p className="text-[13px] font-medium text-slate-900 truncate">{m.firstName} {m.lastName1}</p>
                           {(m.role || m.department) && (
                             <p className="text-xs text-slate-400 truncate">{m.role}{m.department ? ` · ${m.department}` : ""}</p>
                           )}
@@ -1222,10 +1255,10 @@ const renderAccesos = () => (
               </div>
 
               {/* PIN */}
-              <div className="bg-slate-50 rounded-xl p-4 space-y-3">
+              <div className="bg-slate-50 rounded-md p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-slate-800">Proteger con PIN</p>
+                    <p className="text-[13px] font-semibold text-slate-800">Proteger con PIN</p>
                     <p className="text-xs text-slate-400 mt-0.5">El coordinador deberá introducir un PIN para acceder</p>
                   </div>
                   <button onClick={() => {
@@ -1248,7 +1281,7 @@ const renderAccesos = () => (
                     value={accessDraftPIN}
                     onChange={e => setAccessDraftPIN(e.target.value.replace(/\D/g, ""))}
                     placeholder="PIN numérico"
-                    className="w-full text-sm font-mono tracking-widest border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white"
+                    className="w-full text-[13px] font-mono tracking-widest border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white"
                   />
                 )}
               </div>
@@ -1258,13 +1291,13 @@ const renderAccesos = () => (
             {/* Footer */}
             <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-3 flex-shrink-0 bg-white">
               <button onClick={() => setShowAccessModal(false)}
-                className="text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
+                className="text-[13px] font-medium text-slate-500 hover:text-slate-800 transition-colors">
                 Cancelar
               </button>
               <button
                 onClick={saveAccess}
                 disabled={savingAccess || !accessDraftName.trim() || accessDraftPeople.size === 0}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
                 style={{ backgroundColor: TEAM_COLOR }}>
                 {savingAccess ? (
                   <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Creando…</>
@@ -1279,27 +1312,27 @@ const renderAccesos = () => (
 
       {/* Member picker modal */}
       {showMemberPicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 backdrop-blur-[2px] p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <p className="text-sm font-semibold text-slate-900">Seleccionar aprobador</p>
+              <p className="text-[13px] font-semibold text-slate-900">Seleccionar aprobador</p>
               <button onClick={() => setShowMemberPicker(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors">
                 <X size={18} />
               </button>
             </div>
             <div className="max-h-72 overflow-y-auto">
               {members.length === 0 ? (
-                <p className="px-5 py-8 text-center text-sm text-slate-400">No hay miembros del proyecto</p>
+                <p className="px-5 py-8 text-center text-[13px] text-slate-400">No hay miembros del proyecto</p>
               ) : members.map((m) => {
                 const already = approvalConfig.approverUserIds.includes(m.userId);
                 return (
                   <button key={m.userId} onClick={() => addApprover(m)} disabled={already}
-                    className="w-full flex items-center gap-3 px-5 py-3 hover:bg-slate-50 disabled:opacity-50 transition-colors border-b border-slate-50 last:border-0">
+                    className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 disabled:opacity-50 transition-colors border-b border-slate-50 last:border-0">
                     <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-semibold text-slate-600 flex-shrink-0">
                       {m.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 text-left">
-                      <p className="text-sm font-medium text-slate-900">{m.name}</p>
+                      <p className="text-[13px] font-medium text-slate-900">{m.name}</p>
                       {m.role && <p className="text-xs text-slate-400">{m.role}</p>}
                     </div>
                     {already && <Check size={14} style={{ color: TEAM_COLOR }} className="flex-shrink-0" />}
@@ -1313,17 +1346,17 @@ const renderAccesos = () => (
 
       {/* ── Confirm dialog ─────────────────────────────────────────────────── */}
       {confirmDialog && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
-            <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+            <p className="text-[13px] text-slate-600 mb-6">{confirmDialog.message}</p>
             <div className="flex gap-3">
               <button onClick={() => setConfirmDialog(null)}
-                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium">
+                className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">
                 Cancelar
               </button>
               <button onClick={confirmDialog.onConfirm}
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700">
+                className="flex-1 px-4 py-1.5 rounded-md text-[13px] font-medium text-white bg-red-600 hover:bg-red-700">
                 {confirmDialog.confirmLabel || "Confirmar"}
               </button>
             </div>

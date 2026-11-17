@@ -3,16 +3,48 @@
 import { useState, useEffect, useMemo, Fragment } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { inter } from "@/lib/fonts";
+import { AnchoredPanel } from "@/components/ds";
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
 import {
-  collection, doc, getDocs, getDoc, setDoc, addDoc, updateDoc,
-  Timestamp, query, orderBy, where,
+  onAuthStateChanged,
+} from "firebase/auth";
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  setDoc,
+  addDoc,
+  updateDoc,
+  Timestamp,
+  query,
+  orderBy,
+  where,
 } from "firebase/firestore";
 import {
-  Banknote, CalendarRange, Car, ChevronLeft, ChevronRight, Copy, Download, Globe,
-  Home, Lock, Plane, Plus, Printer, Send, TrendingUp, Unlock, Utensils,
-  Users, X, Check, ChevronDown, AlertTriangle, Calendar, Link as LinkIcon, Zap,
+  Banknote,
+  CalendarRange,
+  Car,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Download,
+  Globe,
+  Home,
+  Lock,
+  Plane,
+  Plus,
+  Printer,
+  Send,
+  TrendingUp,
+  Unlock,
+  Utensils,
+  Users,
+  X,
+  Check,
+  ChevronDown,
+  AlertTriangle,
+  Zap,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 
@@ -634,29 +666,28 @@ export default function PayrollPage() {
 
       {/* ── Page header ──────────────────────────────────────────────────── */}
       <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
-          <div className="relative flex items-center justify-center">
+        <div className="px-6 pt-8 sm:px-10">
+          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
             <div className="flex items-center gap-4">
-              <Banknote size={22} style={{ color: TEAM_COLOR }} />
-              <h1 className="text-3xl font-bold text-slate-900 text-center">Confección de nóminas</h1>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Confección de nóminas</h1>
             </div>
             <div className="absolute right-0 flex items-center gap-2">
               {saving && <span className="text-xs text-slate-400 animate-pulse mr-1">Guardando…</span>}
               <div className="relative">
                 <button onClick={() => setShowExport(v => !v)}
-                  className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+                  className="flex items-center gap-2 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50 transition-colors">
                   <Download size={15} /><span className="inline">Exportar</span>
                   <ChevronDown size={13} className="text-slate-400" />
                 </button>
                 {showExport && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowExport(false)} />
-                    <div className="absolute right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 min-w-[160px]">
+                    <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 min-w-[160px]" align="right" gap={6}>
                       <button onClick={exportCSV}
-                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 text-left">
+                        className="w-full flex items-center gap-2 px-4 py-1.5 text-[13px] text-slate-700 hover:bg-slate-50 text-left">
                         <TrendingUp size={14} className="text-slate-400" />CSV completo
                       </button>
-                    </div>
+                    </AnchoredPanel>
                   </>
                 )}
               </div>
@@ -666,8 +697,8 @@ export default function PayrollPage() {
       </div>
 
       {/* ── Controls + legend ────────────────────────────────────────────── */}
-      <div className="px-24 pb-6">
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3">
+      <div className="px-6 sm:px-10 pb-6">
+        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             {/* Month nav */}
             <div className="flex items-center gap-0.5">
@@ -678,10 +709,10 @@ export default function PayrollPage() {
 
             <div className="flex items-center gap-2">
               {/* View */}
-              <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-xl p-0.5">
+              <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-md p-0.5">
                 {(["grid","summary"] as const).map(v => (
                   <button key={v} onClick={() => setViewMode(v)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${viewMode===v ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`}>
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${viewMode===v ? "bg-[#F1F1F3] text-slate-900" : "text-slate-600 hover:bg-slate-100"}`}>
                     {v === "grid" ? "Tabla" : "Resumen"}
                   </button>
                 ))}
@@ -690,7 +721,7 @@ export default function PayrollPage() {
               {/* Period config */}
               <button
                 onClick={() => { setPeriodsDraft({...periods}); setShowPeriodCfg(true); }}
-                className={`flex items-center gap-2 px-3 py-1.5 border rounded-xl text-xs font-medium transition-colors ${Object.keys(periods).length > 0 ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"}`}>
+                className={`flex items-center gap-2 px-3 py-1.5 border rounded-md text-xs font-medium transition-colors ${Object.keys(periods).length > 0 ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"}`}>
                 <CalendarRange size={13} />
                 {Object.keys(periods).length > 0 ? `${Object.keys(periods).length} período${Object.keys(periods).length !== 1 ? "s" : ""}` : "Períodos"}
               </button>
@@ -723,13 +754,13 @@ export default function PayrollPage() {
 
       {/* ── Period config modal ──────────────────────────────────────────── */}
       {showPeriodCfg && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CalendarRange size={16} className="text-amber-500" />
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">Períodos de complementos</p>
+                  <p className="text-[13px] font-semibold text-slate-900">Períodos de complementos</p>
                   <p className="text-xs text-slate-400 mt-0.5">El salario siempre cubre el mes completo</p>
                 </div>
               </div>
@@ -741,7 +772,7 @@ export default function PayrollPage() {
                 const draft = periodsDraft[a.key] || { from: "", to: "" };
                 const hasRange = draft.from || draft.to;
                 return (
-                  <div key={a.key} className={`border rounded-xl p-3 transition-colors ${hasRange ? "border-amber-200 bg-amber-50" : "border-slate-100 bg-slate-50"}`}>
+                  <div key={a.key} className={`border rounded-md p-3 transition-colors ${hasRange ? "border-amber-200 bg-amber-50" : "border-slate-100 bg-slate-50"}`}>
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: a.dot + "22" }}>
                         <Icon size={12} style={{ color: a.dot }} />
@@ -760,22 +791,22 @@ export default function PayrollPage() {
                         <label className="block text-[10px] text-slate-500 mb-1">Desde</label>
                         <input type="date" value={draft.from}
                           onChange={e => setPeriodsDraft(p => ({ ...p, [a.key]: { ...draft, from: e.target.value } }))}
-                          className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white" />
+                          className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-4 focus:ring-amber-300 bg-white" />
                       </div>
                       <div>
                         <label className="block text-[10px] text-slate-500 mb-1">Hasta</label>
                         <input type="date" value={draft.to} min={draft.from}
                           onChange={e => setPeriodsDraft(p => ({ ...p, [a.key]: { ...draft, to: e.target.value } }))}
-                          className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white" />
+                          className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-4 focus:ring-amber-300 bg-white" />
                       </div>
                     </div>
                   </div>
                 );
               })}
             </div>
-            <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
+            <div className="px-5 py-3 border-t border-slate-100 flex justify-end gap-2">
               <button onClick={() => setShowPeriodCfg(false)}
-                className="flex-1 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+                className="flex-1 py-1.5 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50 transition-colors">
                 Cancelar
               </button>
               <button
@@ -787,7 +818,7 @@ export default function PayrollPage() {
                   savePeriods(clean);
                   setShowPeriodCfg(false);
                 }}
-                className="flex-1 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+                className="flex-1 py-1.5 text-white rounded-md text-[13px] font-medium hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: "#d97706" }}>
                 Guardar períodos
               </button>
@@ -802,12 +833,12 @@ export default function PayrollPage() {
         if (!rfMember) return null;
         const anyType = Object.values(rfTypes).some(Boolean) || rfWorked;
         return (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+              <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Zap size={15} className="text-amber-500" />
-                  <p className="text-sm font-semibold text-slate-900">{rfMember.firstName} {rfMember.lastName1}</p>
+                  <p className="text-[13px] font-semibold text-slate-900">{rfMember.firstName} {rfMember.lastName1}</p>
                 </div>
                 <button onClick={() => setRfTarget(null)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"><X size={15} /></button>
               </div>
@@ -820,14 +851,14 @@ export default function PayrollPage() {
                       <label className="block text-[10px] text-slate-400 mb-1">Día inicio</label>
                       <input type="number" min={1} max={numDays} value={rfDay1}
                         onChange={e => setRfDay1(Math.max(1, Math.min(numDays, parseInt(e.target.value)||1)))}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-center font-semibold focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                        className="w-full border border-slate-200 rounded-md px-2.5 py-1.5 text-[13px] text-center font-semibold focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                     </div>
-                    <span className="text-slate-400 text-sm mt-4">→</span>
+                    <span className="text-slate-400 text-[13px] mt-4">→</span>
                     <div className="flex-1">
                       <label className="block text-[10px] text-slate-400 mb-1">Día fin</label>
                       <input type="number" min={rfDay1} max={numDays} value={rfDay2}
                         onChange={e => setRfDay2(Math.max(rfDay1, Math.min(numDays, parseInt(e.target.value)||numDays)))}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-center font-semibold focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                        className="w-full border border-slate-200 rounded-md px-2.5 py-1.5 text-[13px] text-center font-semibold focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                     </div>
                   </div>
                   <p className="text-[10px] text-slate-400 mt-1 text-center">
@@ -839,14 +870,14 @@ export default function PayrollPage() {
                 <div className="flex items-center gap-2">
                   {(["mark","clear"] as const).map(m => (
                     <button key={m} onClick={() => setRfMode(m)}
-                      className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${rfMode===m ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                      className={`flex-1 py-2 rounded-md text-xs font-semibold border transition-all ${rfMode===m ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
                       {m === "mark" ? "✓ Marcar" : "✕ Borrar"}
                     </button>
                   ))}
                 </div>
 
                 {/* Worked days toggle */}
-                <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${rfWorked ? "border-slate-300 bg-slate-50" : "border-slate-100"}`}>
+                <label className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-all ${rfWorked ? "border-slate-300 bg-slate-50" : "border-slate-100"}`}>
                   <input type="checkbox" checked={rfWorked} onChange={() => setRfWorked(v => !v)} className="sr-only" />
                   <div className="w-5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: rfWorked ? TEAM_COLOR : "#cbd5e1" }} />
                   <span className="text-xs font-medium text-slate-700 flex-1">Días trabajados (salario)</span>
@@ -882,13 +913,13 @@ export default function PayrollPage() {
                 </div>
               </div>
 
-              <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
+              <div className="px-5 py-3 border-t border-slate-100 flex justify-end gap-2">
                 <button onClick={() => setRfTarget(null)}
-                  className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+                  className="px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50 transition-colors">
                   Cancelar
                 </button>
                 <button onClick={applyRangeFill} disabled={!anyType}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+                  className="flex-1 flex items-center justify-center gap-2 py-1.5 text-white rounded-md text-[13px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
                   style={{ backgroundColor: TEAM_COLOR }}>
                   <Zap size={13} />
                   {rfMode === "mark" ? "Aplicar" : "Borrar"} días {rfDay1}–{rfDay2}
@@ -924,12 +955,12 @@ export default function PayrollPage() {
         const otherTotal = allDays.reduce((s,x) => s + (x.entry.other ? (x.entry.otherAmount||0) : 0), 0);
 
         return (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-start justify-end">
-            <div className="bg-white h-full w-full max-w-xl shadow-2xl flex flex-col">
+          <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-start justify-end">
+            <div className="bg-white h-full w-full max-w-xl shadow-xl flex flex-col">
               {/* Header */}
               <div className="px-6 py-4 border-b border-slate-100 flex items-start justify-between flex-shrink-0">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-sm font-bold text-white"
+                  <div className="w-10 h-10 rounded-md flex-shrink-0 flex items-center justify-center text-[13px] font-bold text-white"
                     style={{ backgroundColor: TEAM_COLOR + "cc" }}>
                     {m.firstName[0]}{m.lastName1[0]}
                   </div>
@@ -974,7 +1005,7 @@ export default function PayrollPage() {
                   const currentRate = hasOverride ? salaryOverrides[m.id] : baseRate;
                   const rateLabel = m.salaryType === "monthly" ? "€/mes" : m.salaryType === "weekly" ? "€/semana" : "€/sesión";
                   return (
-                    <div className={`border rounded-xl p-4 ${hasOverride ? "border-amber-200 bg-amber-50" : "bg-slate-50 border-slate-200"}`}>
+                    <div className={`border rounded-md p-4 ${hasOverride ? "border-amber-200 bg-amber-50" : "bg-slate-50 border-slate-200"}`}>
                       <div className="flex items-center gap-2 mb-3">
                         <Banknote size={14} className={hasOverride ? "text-amber-500" : "text-slate-400"} />
                         <p className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex-1">Salario</p>
@@ -1001,7 +1032,7 @@ export default function PayrollPage() {
                             type="number" autoFocus min="0" step="0.01"
                             value={salaryDraft}
                             onChange={e => setSalaryDraft(e.target.value)}
-                            className="flex-1 border border-amber-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white"
+                            className="flex-1 border border-amber-300 rounded-lg px-2.5 py-1.5 text-[13px] focus:outline-none focus:ring-4 focus:ring-amber-300 bg-white"
                             placeholder={`Importe ${rateLabel}`}
                           />
                           <span className="text-xs text-slate-500">{rateLabel}</span>
@@ -1042,7 +1073,7 @@ export default function PayrollPage() {
                         <span className="text-slate-500">Días trabajados</span>
                         <span className="text-slate-700 font-medium">{wd} días</span>
                       </div>
-                      <div className="flex justify-between text-sm font-semibold pt-1.5 mt-1 border-t border-slate-200">
+                      <div className="flex justify-between text-[13px] font-semibold pt-1.5 mt-1 border-t border-slate-200">
                         <span className="text-slate-700">Salario estimado</span>
                         <span className="text-slate-900">{fmt(sal)}</span>
                       </div>
@@ -1052,7 +1083,7 @@ export default function PayrollPage() {
 
                 {/* Allowances by type */}
                 {byType.length > 0 && (
-                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="bg-white border border-slate-200 rounded-md overflow-hidden">
                     <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
                       <p className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Complementos</p>
                       <span className="text-xs text-slate-400">{byType.reduce((s,a)=>s+a.count,0)} días totales</span>
@@ -1069,7 +1100,7 @@ export default function PayrollPage() {
                               <p className="text-xs font-medium text-slate-700">{a.label}</p>
                               <p className="text-[10px] text-slate-400">{a.count} día{a.count!==1?"s":""} × {fmt(cfg[a.rateKey])}</p>
                             </div>
-                            <span className="text-sm font-semibold text-slate-900">{fmt(a.total)}</span>
+                            <span className="text-[13px] font-semibold text-slate-900">{fmt(a.total)}</span>
                           </div>
                         );
                       })}
@@ -1079,7 +1110,7 @@ export default function PayrollPage() {
                             <Plus size={11} className="text-slate-400" />
                           </div>
                           <p className="text-xs font-medium text-slate-700 flex-1">Otros</p>
-                          <span className="text-sm font-semibold text-slate-900">{fmt(otherTotal)}</span>
+                          <span className="text-[13px] font-semibold text-slate-900">{fmt(otherTotal)}</span>
                         </div>
                       )}
                     </div>
@@ -1088,14 +1119,14 @@ export default function PayrollPage() {
 
                 {/* Day-by-day table */}
                 {activeDays.length > 0 && (
-                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="bg-white border border-slate-200 rounded-md overflow-hidden">
                     <div className="px-4 py-3 border-b border-slate-100">
                       <p className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Detalle por día</p>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs border-collapse">
                         <thead>
-                          <tr className="bg-slate-50 border-b border-slate-100">
+                          <tr className="bg-[#F7F7F8] border-b border-slate-100">
                             <th className="text-left px-4 py-2 font-medium text-slate-500">Día</th>
                             {ALLOWANCES.filter(a => byType.some(x=>x.key===a.key)).map(a => (
                               <th key={a.key} className="text-center px-2 py-2 font-medium text-slate-500" style={{ color: a.dot }}>
@@ -1135,7 +1166,7 @@ export default function PayrollPage() {
                 )}
 
                 {activeDays.length === 0 && (
-                  <div className="py-12 text-center text-slate-400 text-sm">Sin complementos registrados este mes</div>
+                  <div className="py-12 text-center text-slate-400 text-[13px]">Sin complementos registrados este mes</div>
                 )}
               </div>
 
@@ -1150,13 +1181,13 @@ export default function PayrollPage() {
                   </div>
                 )}
                 {bruto > 0 && (
-                  <div className="flex justify-between text-sm font-semibold text-slate-900 pt-1 border-t border-slate-200">
+                  <div className="flex justify-between text-[13px] font-semibold text-slate-900 pt-1 border-t border-slate-200">
                     <span>Total bruto</span><span>{fmt(bruto)}</span>
                   </div>
                 )}
 
                 {/* Note */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                <div className="bg-slate-50 border border-slate-200 rounded-md p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <p className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex-1">Nota de nómina</p>
                     {notes[m.id] && noteDraft === null && (
@@ -1173,7 +1204,7 @@ export default function PayrollPage() {
                         value={noteDraft}
                         onChange={e => setNoteDraft(e.target.value)}
                         placeholder="Añade una nota visible en el informe de esta persona…"
-                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-300 resize-none bg-white"
+                        className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 resize-none bg-white"
                       />
                       <div className="flex gap-2">
                         <button
@@ -1213,8 +1244,8 @@ export default function PayrollPage() {
 
       {/* ── (solicitar modal removed) ────────────────────────────────────── */}
       {false && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: "92vh" }}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg flex flex-col" style={{ maxHeight: "92vh" }}>
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex-shrink-0">
               <div className="flex items-center justify-between mb-3">
@@ -1242,12 +1273,12 @@ export default function PayrollPage() {
                     <div>
                       <label className="block text-xs font-medium text-slate-700 mb-1.5">Fecha inicio</label>
                       <input type="date" value={solDateFrom} onChange={e => setSolDateFrom(e.target.value)}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                        className="w-full border border-slate-200 rounded-md px-2.5 py-1.5 text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-slate-700 mb-1.5">Fecha fin</label>
                       <input type="date" value={solDateTo} min={solDateFrom} onChange={e => setSolDateTo(e.target.value)}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                        className="w-full border border-slate-200 rounded-md px-2.5 py-1.5 text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                     </div>
                   </div>
                   <div>
@@ -1256,12 +1287,12 @@ export default function PayrollPage() {
                       {ALLOWANCES.map(a => {
                         const Icon = a.Icon;
                         return (
-                          <label key={a.key} className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${solTypes[a.key] ? "border-slate-300 bg-slate-50" : "border-slate-100"}`}>
+                          <label key={a.key} className={`flex items-center gap-3 p-3 border rounded-md cursor-pointer transition-all ${solTypes[a.key] ? "border-slate-300 bg-slate-50" : "border-slate-100"}`}>
                             <input type="checkbox" checked={!!solTypes[a.key]} onChange={() => setSolTypes(t => ({ ...t, [a.key]: !t[a.key] }))} className="sr-only" />
                             <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: a.dot + "22" }}>
                               <Icon size={12} style={{ color: a.dot }} />
                             </div>
-                            <span className="text-sm text-slate-700 flex-1">{a.label}</span>
+                            <span className="text-[13px] text-slate-700 flex-1">{a.label}</span>
                             <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${solTypes[a.key] ? "border-slate-900 bg-slate-900" : "border-slate-300"}`}>
                               {solTypes[a.key] && <Check size={10} className="text-white" />}
                             </div>
@@ -1289,7 +1320,7 @@ export default function PayrollPage() {
                       </div>
                     </div>
                     {Object.entries(byDeptSol).map(([dept, members]) => (
-                      <div key={dept} className="border border-slate-200 rounded-xl overflow-hidden">
+                      <div key={dept} className="border border-slate-200 rounded-md overflow-hidden">
                         <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100">
                           <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">{dept}</span>
                           <button
@@ -1307,13 +1338,13 @@ export default function PayrollPage() {
                         </div>
                         <div className="divide-y divide-slate-50">
                           {members.map(m => (
-                            <label key={m.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-slate-50 transition-colors">
+                            <label key={m.id} className="flex items-center gap-3 px-4 py-1.5 cursor-pointer hover:bg-slate-50 transition-colors">
                               <input type="checkbox" checked={solPeople.has(m.id)} onChange={() => setSolPeople(prev => { const n = new Set(prev); n.has(m.id) ? n.delete(m.id) : n.add(m.id); return n; })} className="sr-only" />
                               <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-all ${solPeople.has(m.id) ? "border-slate-900 bg-slate-900" : "border-slate-300"}`}>
                                 {solPeople.has(m.id) && <Check size={10} className="text-white" />}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm text-slate-800">{m.firstName} {m.lastName1}</p>
+                                <p className="text-[13px] text-slate-800">{m.firstName} {m.lastName1}</p>
                                 <p className="text-xs text-slate-400">{m.role || "—"}</p>
                               </div>
                             </label>
@@ -1332,18 +1363,18 @@ export default function PayrollPage() {
                     { v:"individual" as const, label:"Un formulario por persona", desc:"Cada persona recibe su propio enlace y solo rellena sus días." },
                     { v:"group" as const, label:"Un formulario para todas", desc:"Un enlace único para que un coordinador rellene los datos de todos los seleccionados." },
                   ] as const).map(({ v, label, desc }) => (
-                    <label key={v} className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-all ${solMode===v ? "border-slate-900 bg-slate-50" : "border-slate-200 hover:border-slate-300"}`}>
+                    <label key={v} className={`flex items-start gap-3 p-4 border rounded-md cursor-pointer transition-all ${solMode===v ? "border-slate-900 bg-slate-50" : "border-slate-200 hover:border-slate-300"}`}>
                       <input type="radio" name="solMode" value={v} checked={solMode===v} onChange={() => setSolMode(v)} className="sr-only" />
                       <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${solMode===v ? "border-slate-900" : "border-slate-300"}`}>
                         {solMode===v && <div className="w-2 h-2 rounded-full bg-slate-900" />}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-slate-900">{label}</p>
+                        <p className="text-[13px] font-medium text-slate-900">{label}</p>
                         <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
                       </div>
                     </label>
                   ))}
-                  <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500">
+                  <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-md text-xs text-slate-500">
                     <strong className="text-slate-700">{solPeople.size} persona{solPeople.size!==1?"s":""}</strong> · {solDateFrom} → {solDateTo} · {Object.entries(solTypes).filter(([,v])=>v).length} tipo{Object.entries(solTypes).filter(([,v])=>v).length!==1?"s":""} de dieta
                   </div>
                 </div>
@@ -1351,14 +1382,14 @@ export default function PayrollPage() {
 
               {solStep === 4 && (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-sm text-green-700 font-medium">
+                  <div className="flex items-center gap-2 text-[13px] text-green-700 font-medium">
                     <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
                       <Check size={11} className="text-green-600" />
                     </div>
                     {generatedForms.length} formulario{generatedForms.length!==1?"s":""} creado{generatedForms.length!==1?"s":""}
                   </div>
                   {generatedForms.map((f, i) => (
-                    <div key={f.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div key={f.id} className="border border-slate-200 rounded-md overflow-hidden">
                       <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
                         <p className="text-xs font-semibold text-slate-700">{f.names.join(", ")}</p>
                       </div>
@@ -1375,7 +1406,7 @@ export default function PayrollPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                            <p className="text-sm font-bold text-slate-900 tracking-widest">{f.pin}</p>
+                            <p className="text-[13px] font-bold text-slate-900 tracking-widest">{f.pin}</p>
                           </div>
                           <button onClick={() => copyToClipboard(f.pin, `pin-${i}`)}
                             className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-600 hover:bg-slate-50 transition-colors flex-shrink-0">
@@ -1395,7 +1426,7 @@ export default function PayrollPage() {
               <div className="px-6 py-4 border-t border-slate-100 flex-shrink-0 flex gap-3">
                 {solStep > 1 && (
                   <button onClick={() => setSolStep(s => s-1)}
-                    className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+                    className="px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50 transition-colors">
                     Atrás
                   </button>
                 )}
@@ -1409,7 +1440,7 @@ export default function PayrollPage() {
                     if (solStep < 3) setSolStep(s => s+1);
                     else generateDietasForms();
                   }}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+                  className="flex-1 flex items-center justify-center gap-2 py-1.5 text-white rounded-md text-[13px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
                   style={{ backgroundColor: TEAM_COLOR }}>
                   {generating ? "Creando…" : solStep===3 ? <><Send size={14} /> Crear formulario{solMode==="individual"&&solPeople.size>1?"s":""}</> : "Siguiente"}
                 </button>
@@ -1418,7 +1449,7 @@ export default function PayrollPage() {
             {solStep === 4 && (
               <div className="px-6 py-4 border-t border-slate-100 flex-shrink-0">
                 <button onClick={() => setShowSolicitar(false)}
-                  className="w-full py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+                  className="w-full py-1.5 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50 transition-colors">
                   Cerrar
                 </button>
               </div>
@@ -1429,8 +1460,8 @@ export default function PayrollPage() {
 
       {/* ── Day editor modal ─────────────────────────────────────────────── */}
       {editTarget && editMember && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col" style={{ maxHeight: "92vh" }}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col" style={{ maxHeight: "92vh" }}>
             {/* Modal header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-start justify-between flex-shrink-0">
               <div>
@@ -1449,12 +1480,12 @@ export default function PayrollPage() {
 
             {/* Salary indicator */}
             {dailySalary(editMember) > 0 && (
-              <div className="mx-6 mt-4 flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
+              <div className="mx-6 mt-4 flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-md">
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                   <Banknote size={13} className="text-slate-400" />
                   Salario del día ({editMember.salaryType === "weekly" ? "sem./5" : "mes/30"})
                 </div>
-                <span className="text-sm font-semibold text-slate-900">{fmt(dailySalary(editMember))}</span>
+                <span className="text-[13px] font-semibold text-slate-900">{fmt(dailySalary(editMember))}</span>
               </div>
             )}
 
@@ -1468,14 +1499,14 @@ export default function PayrollPage() {
                 const editingThis = editingOverride === a.key;
                 const Icon = a.Icon;
                 return (
-                  <div key={a.key} className={`border rounded-xl transition-all ${active ? "border-slate-200 bg-white shadow-sm" : "border-slate-100 bg-slate-50"}`}>
+                  <div key={a.key} className={`border rounded-md transition-all ${active ? "border-slate-200 bg-white shadow-sm" : "border-slate-100 bg-slate-50"}`}>
                     <div className="flex items-center gap-3 px-4 py-3">
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: active ? a.dot + "22" : "#f1f5f9" }}>
                         <Icon size={14} style={{ color: active ? a.dot : "#94a3b8" }} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium ${active ? "text-slate-900" : "text-slate-400"}`}>{a.label}</p>
+                        <p className={`text-[13px] font-medium ${active ? "text-slate-900" : "text-slate-400"}`}>{a.label}</p>
                         {active && (
                           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                             {editingThis ? (
@@ -1485,7 +1516,7 @@ export default function PayrollPage() {
                                   if (!isNaN(v)) setEditData(d => ({ ...d, [a.overrideKey]: v }));
                                   setEditingOverride(null);
                                 }}
-                                className="w-20 text-xs border border-slate-300 rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                                className="w-20 text-xs border border-slate-300 rounded-lg px-2 py-0.5 focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
                               />
                             ) : (
                               <>
@@ -1521,19 +1552,19 @@ export default function PayrollPage() {
               })}
 
               {/* Otros */}
-              <div className={`border rounded-xl transition-all ${editData.other ? "border-slate-200 bg-white shadow-sm" : "border-slate-100 bg-slate-50"}`}>
+              <div className={`border rounded-md transition-all ${editData.other ? "border-slate-200 bg-white shadow-sm" : "border-slate-100 bg-slate-50"}`}>
                 <div className="flex items-center gap-3 px-4 py-3">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-slate-100">
+                  <div className="hidden">
                     <Plus size={14} className={editData.other ? "text-slate-600" : "text-slate-400"} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${editData.other ? "text-slate-900" : "text-slate-400"}`}>Otros</p>
+                    <p className={`text-[13px] font-medium ${editData.other ? "text-slate-900" : "text-slate-400"}`}>Otros</p>
                     {editData.other && (
                       <div className="flex items-center gap-2 mt-1.5">
                         <input type="text" placeholder="Concepto"
                           value={editData.otherLabel}
                           onChange={e => setEditData(d => ({ ...d, otherLabel: e.target.value }))}
-                          className="flex-1 min-w-0 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                          className="flex-1 min-w-0 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
                         />
                         <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden">
                           <input type="number" placeholder="0" step="0.01"
@@ -1556,7 +1587,7 @@ export default function PayrollPage() {
 
               {/* Override warning */}
               {ALLOWANCES.some(a => editData[a.overrideKey] !== undefined) && (
-                <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
                   <AlertTriangle size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-amber-700">
                     Este día tiene importes personalizados. El resto del crew seguirá usando las tarifas globales de configuración.
@@ -1566,18 +1597,18 @@ export default function PayrollPage() {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex-shrink-0">
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-lg flex-shrink-0">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-slate-600">Total complementos del día</span>
+                <span className="text-[13px] text-slate-600">Total complementos del día</span>
                 <span className="text-lg font-bold text-slate-900">{fmt(editModalTotal)}</span>
               </div>
               <div className="flex gap-3">
                 <button onClick={() => setEditTarget(null)}
-                  className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-white transition-colors">
+                  className="px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-white transition-colors">
                   Cancelar
                 </button>
                 <button onClick={confirmEdit}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+                  className="flex-1 flex items-center justify-center gap-2 py-1.5 text-white rounded-md text-[13px] font-medium hover:opacity-90 transition-opacity"
                   style={{ backgroundColor: TEAM_COLOR }}>
                   <Check size={15} />Confirmar
                 </button>
@@ -1594,7 +1625,7 @@ export default function PayrollPage() {
   function GridView() {
     if (filtered.length === 0) {
       return (
-        <div className="px-24 py-24 text-center">
+        <div className="px-6 sm:px-10 py-24 text-center">
           <Users size={40} className="text-slate-200 mx-auto mb-4" />
           <p className="text-slate-500">No hay miembros de crew{filterSection !== "all" ? " en esta sección" : ""}</p>
         </div>
@@ -1602,13 +1633,13 @@ export default function PayrollPage() {
     }
 
     return (
-      <div className="px-24 pb-16">
-        <div className="border border-slate-200 rounded-2xl overflow-hidden">
+      <div className="px-6 sm:px-10 pb-16">
+        <div className="border border-slate-200 rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="border-collapse" style={{ minWidth: `${224 + numDays * 36 + 100}px`, width: "100%" }}>
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="sticky left-0 z-20 bg-slate-50 border-r border-slate-200 w-56 min-w-[224px] px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <tr className="bg-[#F7F7F8] border-b border-slate-200">
+                  <th className="sticky left-0 z-20 bg-[#F7F7F8] border-r border-slate-200 w-56 min-w-[224px] px-4 py-2.5 text-left text-[11px] font-medium text-slate-500 uppercase tracking-wider">
                     Miembro
                   </th>
                   {days.map(d => {
@@ -1617,8 +1648,7 @@ export default function PayrollPage() {
                     const outside = dayOutsidePeriod(d);
                     return (
                       <th key={d}
-                        className={`w-9 min-w-[36px] text-center py-3 text-xs font-medium select-none
-                          ${w ? "text-slate-300" : outside ? "text-amber-400" : "text-slate-500"}
+                        className={`w-9 min-w-[36px] text-center py-3 text-xs font-medium select-none ${w ? "text-slate-300" : outside ? "text-amber-400" : "text-slate-500"}
                           ${isM && d > 1 ? "border-l border-slate-300" : ""}
                         `}
                         style={outside ? { backgroundColor: "#fef3c720" } : {}}>
@@ -1628,7 +1658,7 @@ export default function PayrollPage() {
                       </th>
                     );
                   })}
-                  <th className="min-w-[110px] text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider border-l border-slate-200">
+                  <th className="min-w-[110px] text-right px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider border-l border-slate-200">
                     Total
                   </th>
                 </tr>
@@ -1640,7 +1670,7 @@ export default function PayrollPage() {
                     {/* Department row */}
                     <tr>
                       <td colSpan={numDays + 2}
-                        className="px-4 py-2 text-xs font-semibold text-white uppercase tracking-wider bg-slate-800">
+                        className="px-4 py-2 text-[11px] font-medium text-slate-600 uppercase tracking-wider bg-[#F7F7F8] border-y border-slate-200">
                         {dept}
                         <span className="ml-2 font-normal normal-case text-slate-400">
                           {members.length} persona{members.length !== 1 ? "s" : ""}
@@ -1660,14 +1690,13 @@ export default function PayrollPage() {
                           {/* Sticky info cell */}
                           <td className="sticky left-0 z-10 bg-white group-hover:bg-slate-50/60 border-r border-slate-100 px-3 py-2 w-56 min-w-[224px] transition-colors">
                             <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center text-xs font-bold text-white select-none"
-                                style={{ backgroundColor: TEAM_COLOR + "cc" }}>
+                              <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[11px] font-semibold text-slate-700 border border-[#E4E4E7] bg-[#F1F1F3] select-none">
                                 {m.firstName[0]}{m.lastName1[0]}
                               </div>
                               <div className="min-w-0 flex-1">
                                 <button
                                   onClick={() => setDetailId(m.id)}
-                                  className="text-sm font-medium text-slate-900 truncate leading-tight hover:text-slate-600 transition-colors text-left w-full">
+                                  className="text-[13px] font-medium text-slate-900 truncate leading-tight hover:text-slate-600 transition-colors text-left w-full">
                                   {m.firstName} {m.lastName1}
                                 </button>
                                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
@@ -1698,8 +1727,7 @@ export default function PayrollPage() {
                             return (
                               <td key={d}
                                 title={`${m.firstName} ${m.lastName1} · ${d} ${MONTH_NAMES[month]}${worked ? " · día trabajado" : ""}${outside ? " (fuera de período)" : ""}`}
-                                className={`w-9 min-w-[36px] text-center align-top transition-colors
-                                  ${isM && d > 1 ? "border-l border-slate-200" : ""}
+                                className={`w-9 min-w-[36px] text-center align-top transition-colors ${isM && d > 1 ? "border-l border-slate-200" : ""}
                                   ${w && !outside ? "bg-slate-50" : ""}
                                 `}
                                 style={outside ? { backgroundColor: "#fef9c320" } : {}}>
@@ -1740,7 +1768,7 @@ export default function PayrollPage() {
                                 <span>Comp. </span><span className="font-medium text-slate-500">{fmt(allowTotal)}</span>
                               </div>
                             )}
-                            <div className={`text-sm font-semibold mt-0.5 ${grandTotal > 0 ? "text-slate-900" : "text-slate-200"}`}>
+                            <div className={`text-[13px] font-semibold mt-0.5 ${grandTotal > 0 ? "text-slate-900" : "text-slate-200"}`}>
                               {grandTotal > 0 ? fmt(grandTotal) : "—"}
                             </div>
                           </td>
@@ -1780,7 +1808,7 @@ export default function PayrollPage() {
                         {fmt(filtered.reduce((s,m) => s + memberMonthAllowances(m.id), 0))}
                       </span>
                     </div>
-                    <span className="text-sm font-bold text-slate-900">{fmt(grandTotal)}</span>
+                    <span className="text-[13px] font-bold text-slate-900">{fmt(grandTotal)}</span>
                   </td>
                 </tr>
               </tbody>
@@ -1796,7 +1824,7 @@ export default function PayrollPage() {
   function SummaryView() {
     if (filtered.length === 0) {
       return (
-        <div className="px-24 py-24 text-center">
+        <div className="px-6 sm:px-10 py-24 text-center">
           <Users size={40} className="text-slate-200 mx-auto mb-4" />
           <p className="text-slate-500">No hay miembros de crew{filterSection !== "all" ? " en esta sección" : ""}</p>
         </div>
@@ -1804,7 +1832,7 @@ export default function PayrollPage() {
     }
 
     return (
-      <div className="px-24 pb-16">
+      <div className="px-6 sm:px-10 pb-16">
         <div className="grid grid-cols-3 gap-4">
           {filtered.map(m => {
             const ds      = dailySalary(m);
@@ -1829,14 +1857,14 @@ export default function PayrollPage() {
             }, 0);
 
             return (
-              <div key={m.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              <div key={m.id} className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center text-sm font-bold text-white select-none"
+                  <div className="w-9 h-9 rounded-md flex-shrink-0 flex items-center justify-center text-[13px] font-bold text-white select-none"
                     style={{ backgroundColor: TEAM_COLOR + "cc" }}>
                     {m.firstName[0]}{m.lastName1[0]}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-900">{m.firstName} {m.lastName1}</p>
+                    <p className="text-[13px] font-semibold text-slate-900">{m.firstName} {m.lastName1}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       {m.role && <span className="text-xs text-slate-400 truncate">{m.role}</span>}
                       <span className={`text-xs font-semibold ${regime.color}`}>{regime.label}</span>
@@ -1844,7 +1872,7 @@ export default function PayrollPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-slate-400">{wd} días</p>
-                    <p className="text-sm font-bold text-slate-900">{fmt(bruto)}</p>
+                    <p className="text-[13px] font-bold text-slate-900">{fmt(bruto)}</p>
                   </div>
                 </div>
 
@@ -1886,8 +1914,8 @@ export default function PayrollPage() {
                   {/* Totals */}
                   <div className="pt-2 border-t-2 border-slate-200">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-slate-900">Total bruto</span>
-                      <span className="text-sm font-bold text-slate-900">{fmt(bruto)}</span>
+                      <span className="text-[13px] font-semibold text-slate-900">Total bruto</span>
+                      <span className="text-[13px] font-bold text-slate-900">{fmt(bruto)}</span>
                     </div>
                   </div>
                 </div>
@@ -1898,9 +1926,9 @@ export default function PayrollPage() {
 
         {/* Grand total */}
         {filtered.length > 0 && (
-          <div className="mt-6 bg-slate-900 rounded-2xl px-8 py-6 flex items-center justify-between">
+          <div className="mt-6 bg-slate-900 rounded-lg px-8 py-6 flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-400">Total nómina · {MONTH_NAMES[month]} {year}</p>
+              <p className="text-[13px] text-slate-400">Total nómina · {MONTH_NAMES[month]} {year}</p>
               <p className="text-xs text-slate-500 mt-0.5">{filtered.length} personas · {
                 filtered.reduce((s, m) => s + workingDays(m.id), 0)
               } días con dietas</p>
