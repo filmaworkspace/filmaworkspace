@@ -99,7 +99,7 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
 
         {/* Marca, abajo y separada por una línea */}
         <div className="relative z-10 w-full max-w-[600px]">
-          <p className="text-center text-sm text-white/70">
+          <p className="text-center text-xs text-white/70">
             © {new Date().getFullYear()} Filma Workspace
           </p>
         </div>
