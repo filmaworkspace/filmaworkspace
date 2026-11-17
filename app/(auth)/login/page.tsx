@@ -20,13 +20,36 @@ import {
 import {
   AlertCircle,
   ArrowRight,
+  Calculator,
+  Clock,
   Eye,
   EyeOff,
+  FileCheck2,
+  Lock,
+  Mail,
+  Receipt,
+  Users,
 } from "lucide-react";
 
-// ─── Decoration ──────────────────────────────────────────────────────────────
-// Opacidades del mosaico decorativo del panel izquierdo
-const POSTERS = [0.07, 0.14, 0.09, 0.16, 0.12, 0.06, 0.15, 0.08, 0.1, 0.13, 0.07, 0.11];
+// ─── Tokens ──────────────────────────────────────────────────────────────────
+const BRAND = "#2F52E0";
+const BRAND_HOVER = "#2545C7";
+const INK = "#0B1020";
+
+// ─── Panel de marca ──────────────────────────────────────────────────────────
+// Vista previa ilustrativa (no son datos reales) de lo que hay dentro.
+const PREVIEW_CHAPTERS = [
+  { label: "Equipo técnico", pct: 72 },
+  { label: "Localizaciones", pct: 54 },
+  { label: "Alquiler de equipo", pct: 88 },
+  { label: "Postproducción", pct: 23 },
+];
+
+const MODULES = [
+  { icon: Receipt, title: "Contabilidad", text: "Órdenes de compra, facturas, pagos y caja." },
+  { icon: Users, title: "Equipo", text: "Fichas, partes de horas y nóminas." },
+  { icon: Calculator, title: "Budgeting", text: "Presupuestos por capítulos y versiones." },
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -87,177 +110,243 @@ export default function LoginPage() {
   };
 
   return (
-    <div className={`min-h-screen flex flex-col lg:flex-row ${inter.className}`}>
+    <div className={`min-h-screen flex bg-white ${inter.className}`}>
 
-      {/* ── Left Side (franja superior en móvil) ── */}
-      <div
-        className="relative overflow-hidden flex items-end h-44 p-6 lg:h-auto lg:w-1/2 lg:p-16"
-        style={{
-          background: "linear-gradient(135deg, #1a3a9e 0%, #2F52E0 50%, #4F6FE8 100%)",
-        }}
+      {/* ── Panel de marca (solo escritorio) ── */}
+      <aside
+        className="relative hidden lg:flex lg:w-[52%] xl:w-[55%] flex-col justify-between overflow-hidden px-12 py-10 xl:px-16 xl:py-12 text-white"
+        style={{ backgroundColor: INK }}
       >
-        {/* Mosaico decorativo de pósters */}
+        {/* Fondo: resplandor de marca + retícula */}
         <div
           aria-hidden="true"
-          className="absolute grid grid-cols-3 gap-2.5 w-60 -top-16 -right-14 lg:grid-cols-4 lg:gap-4 lg:w-[720px] lg:-top-36 lg:-right-32"
-          style={{ transform: "rotate(-10deg)" }}
-        >
-          {POSTERS.map((opacity, i) => (
-            <div
-              key={i}
-              className={`aspect-[2/3] rounded-lg lg:rounded-xl ${i % 2 === 1 ? "mt-8 lg:mt-16" : ""} ${i >= 6 ? "hidden lg:block" : ""}`}
-              style={{ backgroundColor: `rgba(255, 255, 255, ${opacity})` }}
-            />
-          ))}
-        </div>
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              `radial-gradient(900px 520px at 0% 0%, ${BRAND}55 0%, transparent 60%),` +
+              `radial-gradient(700px 480px at 100% 100%, ${BRAND}30 0%, transparent 60%)`,
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,0.9) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.9) 1px, transparent 1px)",
+            backgroundSize: "48px 48px",
+            maskImage: "radial-gradient(ellipse at 30% 40%, black 30%, transparent 75%)",
+            WebkitMaskImage: "radial-gradient(ellipse at 30% 40%, black 30%, transparent 75%)",
+          }}
+        />
 
+        {/* Logo */}
         <div className="relative z-10">
-          <Image
-            src="/logo.svg"
-            alt="Logo"
-            width={180}
-            height={48}
-            className="w-[120px] lg:w-[180px] h-auto opacity-95"
-            priority
-          />
+          <Image src="/logo.svg" alt="Filma Workspace" width={168} height={34} className="h-auto w-[168px]" priority />
         </div>
-      </div>
 
-      {/* ── Right Side – Form ── */}
-      <div className="w-full flex-1 lg:w-1/2 flex items-center justify-center p-8" style={{ backgroundColor: "#FFFFFF" }}>
-        <div className="w-full max-w-xs">
+        {/* Mensaje + vista previa */}
+        <div className="relative z-10 max-w-xl">
+          <p className="mb-4 text-xs font-medium uppercase tracking-[0.18em] text-white/50">
+            Gestión de producción audiovisual
+          </p>
+          <h2 className="text-4xl xl:text-[2.75rem] font-semibold leading-[1.1] tracking-tight">
+            Toda tu producción,<br />bajo control.
+          </h2>
+          <p className="mt-4 max-w-md text-[15px] leading-relaxed text-white/60">
+            Contabilidad, equipo y presupuestos de cada proyecto en un único espacio de trabajo.
+          </p>
 
-          {/* Title */}
-          <h1 className="mb-8 text-2xl font-semibold tracking-tight text-center" style={{ color: "#363636" }}>
-            Inicia sesión
-          </h1>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-
-            {/* Email */}
-            <div>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email"
-                disabled={loading}
-                autoComplete="email"
-                className="w-full px-3.5 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50"
-                style={{ color: "#363636", backgroundColor: "#FFFFFF", borderColor: "rgba(54, 54, 54, 0.2)" }}
-              />
-            </div>
-
-            {/* Password */}
-            <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Contraseña"
-                disabled={loading}
-                autoComplete="current-password"
-                className="w-full px-3.5 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50 pr-10"
-                style={{ color: "#363636", backgroundColor: "#FFFFFF", borderColor: "rgba(54, 54, 54, 0.2)" }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                disabled={loading}
-                className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors disabled:opacity-50"
-                style={{ color: "rgba(54, 54, 54, 0.4)" }}
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-
-            {/* Remember me + forgot password */}
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    disabled={loading}
-                    className="sr-only peer"
-                  />
-                  <div
-                    className="w-4 h-4 border rounded transition-all"
-                    style={{
-                      borderColor: rememberMe ? "#363636" : "rgba(54, 54, 54, 0.3)",
-                      backgroundColor: rememberMe ? "#363636" : "transparent",
-                    }}
-                  />
-                  <svg
-                    className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 transition-opacity ${rememberMe ? "opacity-100" : "opacity-0"}`}
-                    style={{ color: "#FFFFFF" }}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={3}
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <span className="text-xs" style={{ color: "rgba(54, 54, 54, 0.6)" }}>Recordarme</span>
-              </label>
-
-              <Link
-                href="/forgot-password"
-                className="text-xs transition-colors hover:opacity-80"
-                style={{ color: "rgba(54, 54, 54, 0.5)" }}
-              >
-                ¿Olvidaste tu contraseña?
-              </Link>
-            </div>
-
-            {/* Error */}
-            {error && (
-              <div className="flex items-center gap-2 p-2.5 bg-red-50 rounded-xl">
-                <AlertCircle size={14} className="text-red-500 flex-shrink-0" />
-                <span className="text-xs text-red-600">{error}</span>
+          {/* Vista previa de la plataforma */}
+          <div aria-hidden="true" className="relative mt-12 mr-8">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-2xl shadow-black/40 backdrop-blur-sm">
+              <div className="mb-4">
+                <span className="text-[11px] font-medium text-white/40">Presupuesto · Gastado vs. previsto</span>
               </div>
-            )}
-
-            {/* Submit */}
-            <div className="flex items-center justify-between pt-2">
-              <span className="text-lg font-semibold" style={{ color: "#363636" }}>Acceder</span>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-10 h-10 rounded-xl flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
-                style={{ backgroundColor: "#363636" }}
-              >
-                {loading ? (
-                  <div
-                    className="w-4 h-4 border-2 rounded-full animate-spin"
-                    style={{ borderColor: "rgba(255, 255, 255, 0.3)", borderTopColor: "#FFFFFF" }}
-                  />
-                ) : (
-                  <ArrowRight size={18} style={{ color: "#FFFFFF" }} />
-                )}
-              </button>
+              <div className="space-y-3.5">
+                {PREVIEW_CHAPTERS.map((c) => (
+                  <div key={c.label}>
+                    <div className="mb-1.5 flex justify-between text-xs">
+                      <span className="text-white/75">{c.label}</span>
+                      <span className="tabular-nums text-white/45">{c.pct}%</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${c.pct}%`,
+                          background: c.pct > 85 ? "#F5A524" : `linear-gradient(90deg, ${BRAND}, #6C8BFF)`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </form>
 
-          {/* Register link */}
-          <p className="mt-6 text-center text-xs" style={{ color: "rgba(54, 54, 54, 0.5)" }}>
+            {/* Tarjetas flotantes */}
+            <div className="absolute -right-8 -top-9 flex items-center gap-3 rounded-xl border border-white/10 bg-[#141A2E]/95 px-4 py-3 shadow-xl shadow-black/40">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: `${BRAND}33` }}>
+                <FileCheck2 size={16} className="text-[#8EA6FF]" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-white/90">Orden de compra aprobada</p>
+                <p className="text-[11px] text-white/45">Lista para facturar</p>
+              </div>
+            </div>
+            <div className="absolute -bottom-11 left-10 flex items-center gap-3 rounded-xl border border-white/10 bg-[#141A2E]/95 px-4 py-3 shadow-xl shadow-black/40">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-400/15">
+                <Clock size={16} className="text-emerald-300" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-white/90">Partes de horas del día</p>
+                <p className="text-[11px] text-white/45">Enviados al equipo</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Módulos */}
+        <div className="relative z-10">
+          <div className="grid grid-cols-3 gap-6 border-t border-white/10 pt-8">
+            {MODULES.map(({ icon: Icon, title, text }) => (
+              <div key={title}>
+                <Icon size={18} className="mb-2.5 text-[#8EA6FF]" />
+                <p className="text-sm font-medium text-white/90">{title}</p>
+                <p className="mt-1 text-xs leading-relaxed text-white/45">{text}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-8 text-xs text-white/30">© {new Date().getFullYear()} Filma Workspace</p>
+        </div>
+      </aside>
+
+      {/* ── Formulario ── */}
+      <main className="flex flex-1 flex-col px-6 py-8 sm:px-10 lg:px-16">
+        {/* Cabecera */}
+        <div className="flex items-center justify-between lg:justify-end">
+          <Image src="/logodark.svg" alt="Filma Workspace" width={140} height={28} className="h-auto w-[140px] lg:hidden" priority />
+          <p className="hidden text-sm text-slate-500 sm:block">
             ¿No tienes cuenta?{" "}
-            <Link
-              href="/register"
-              className="font-medium transition-colors hover:opacity-80"
-              style={{ color: "#363636" }}
-            >
+            <Link href="/register" className="font-medium hover:underline" style={{ color: BRAND }}>
               Crear cuenta
             </Link>
           </p>
         </div>
-      </div>
 
+        <div className="flex flex-1 items-center justify-center py-12">
+          <div className="w-full max-w-[380px]">
+            <h1 className="text-[1.75rem] font-semibold tracking-tight text-slate-900">Bienvenido de nuevo</h1>
+            <p className="mt-2 text-sm text-slate-500">Accede a tu espacio de trabajo.</p>
+
+            <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+              {/* Email */}
+              <div>
+                <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Email
+                </label>
+                <div className="relative">
+                  <Mail size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="nombre@productora.com"
+                    disabled={loading}
+                    autoComplete="email"
+                    className="h-11 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm transition focus:border-[#2F52E0] focus:outline-none focus:ring-4 focus:ring-[#2F52E0]/15 disabled:opacity-60"
+                  />
+                </div>
+              </div>
+
+              {/* Contraseña */}
+              <div>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+                    Contraseña
+                  </label>
+                  <Link href="/forgot-password" className="text-xs font-medium hover:underline" style={{ color: BRAND }}>
+                    ¿La has olvidado?
+                  </Link>
+                </div>
+                <div className="relative">
+                  <Lock size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    disabled={loading}
+                    autoComplete="current-password"
+                    className="h-11 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-11 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm transition focus:border-[#2F52E0] focus:outline-none focus:ring-4 focus:ring-[#2F52E0]/15 disabled:opacity-60"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={loading}
+                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Recordarme */}
+              <label className="flex cursor-pointer select-none items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  disabled={loading}
+                  className="h-4 w-4 cursor-pointer rounded border-slate-300 accent-[#2F52E0]"
+                />
+                <span className="text-sm text-slate-600">Mantener la sesión iniciada</span>
+              </label>
+
+              {/* Error */}
+              {error && (
+                <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-3">
+                  <AlertCircle size={16} className="mt-px flex-shrink-0 text-red-500" />
+                  <span className="text-sm text-red-700">{error}</span>
+                </div>
+              )}
+
+              {/* Enviar */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="group flex h-11 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--brand-hover)] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#2F52E0]/30 disabled:cursor-not-allowed disabled:opacity-70"
+                style={{ backgroundColor: BRAND, ["--brand-hover" as string]: BRAND_HOVER }}
+              >
+                {loading ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    Accediendo…
+                  </>
+                ) : (
+                  <>
+                    Iniciar sesión
+                    <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
+                  </>
+                )}
+              </button>
+            </form>
+
+            <p className="mt-8 text-center text-sm text-slate-500 sm:hidden">
+              ¿No tienes cuenta?{" "}
+              <Link href="/register" className="font-medium hover:underline" style={{ color: BRAND }}>
+                Crear cuenta
+              </Link>
+            </p>
+          </div>
+        </div>
+
+        <p className="text-center text-xs text-slate-400 lg:hidden">© {new Date().getFullYear()} Filma Workspace</p>
+      </main>
     </div>
   );
 }
