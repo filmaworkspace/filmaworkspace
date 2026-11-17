@@ -763,7 +763,7 @@ export default function ControlHorarioPage() {
             {/* Day header */}
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-slate-900 capitalize">{formatFull(selectedDate)}</h2>
+                <h2 className="text-xl font-semibold text-slate-900 first-letter:uppercase">{formatFull(selectedDate)}</h2>
                 <div className="flex items-center gap-2 mt-1">
                   {editingJornada ? (
                     <div className="flex items-center gap-2">

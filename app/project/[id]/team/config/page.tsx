@@ -1118,7 +1118,7 @@ const renderAccesos = () => (
         <div className="px-6 pt-8 sm:px-10">
           <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
             <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Configuración de team</h1>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Configuración de equipo</h1>
             </div>
             <button onClick={handleSave} disabled={saving}
               className="absolute right-0 flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">

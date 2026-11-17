@@ -1121,9 +1121,6 @@ export default function CrewPage() {
                 <h2 className="text-base font-semibold text-slate-900">
                   {editingMember ? `Editar · ${editingMember.crewNumber}` : "Nuevo miembro"}
                 </h2>
-                {!editingMember && (
-                  <p className="text-xs text-slate-400 mt-0.5">Se asignará número automáticamente</p>
-                )}
               </div>
               <button onClick={() => setShowModal(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
                 <X size={16} />
@@ -1515,7 +1512,7 @@ export default function CrewPage() {
                 </div>
                 <div>
                   <h2 className="text-base font-semibold text-slate-900">Exportar Crew List</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">Orden según configuración de team</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Orden según configuración de equipo</p>
                 </div>
               </div>
               <button onClick={() => setShowCrewListModal(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
