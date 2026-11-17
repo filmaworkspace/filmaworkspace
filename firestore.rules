@@ -48,9 +48,6 @@ service cloud.firestore {
              get(docPath).data.permissions[permission] == true;
     }
 
-    function canAddSelfAsMember(memberId) {
-      return isSignedIn() && request.auth.uid == memberId;
-    }
 
     function hasAccountingAccess(projectId) {
       let docPath = /databases/$(database)/documents/userProjects/$(request.auth.uid)/projects/$(projectId);
@@ -103,6 +100,19 @@ service cloud.firestore {
              exists(/databases/$(database)/documents/companyProjects/$(companyId)/projects/$(projectId));
     }
 
+    // Campos de users/{uid} que solo puede tocar un admin (o el servidor):
+    // si el propio usuario pudiera escribirlos, podría hacerse admin, entrar
+    // en una productora o darse acceso a Budgeting.
+    function protectedUserFields() {
+      return ["role", "companyId", "budgetingAccess", "supportSpecialty"];
+    }
+
+    // Lo único que puede escribir quien rellena un horario desde su enlace.
+    function isHorarioSubmission() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(["entrada", "salida", "comida", "observaciones", "submittedAt"]);
+    }
+
     function hasBudgetingAccess() {
       return isSignedIn() &&
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -111,14 +121,23 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // Al registrarse, el usuario crea su propio doc siempre como "user" y
+      // sin campos protegidos.
+      allow create: if isAdmin() || (
+        isSignedIn() && request.auth.uid == userId &&
+        request.resource.data.get("role", "user") == "user" &&
+        !request.resource.data.keys().hasAny(["companyId", "budgetingAccess", "supportSpecialty"])
+      );
+      // El propio usuario puede editar su perfil, pero no los campos protegidos.
+      allow update: if isAdmin() || (
+        isSignedIn() && request.auth.uid == userId &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedUserFields())
+      );
       allow delete: if isAdmin();
 
       match /projects/{projectId} {
         allow read: if isSignedIn() && request.auth.uid == userId;
-        allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-        allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        allow create, update: if isAdmin();
         allow delete: if isAdmin();
       }
 
@@ -154,8 +173,9 @@ service cloud.firestore {
                          hasUserProjectPermission(projectId, 'config') ||
                          hasMemberPermission(projectId, 'config') ||
                          hasUserProjectPermission(projectId, 'team') ||
-                         hasMemberPermission(projectId, 'team') ||
-                         canAddSelfAsMember(memberId);
+                         hasMemberPermission(projectId, 'team');
+        // Aceptar una invitación lo hace el servidor (/api/accept-invitation):
+        // un usuario no puede añadirse a sí mismo a un proyecto.
         allow update, delete: if isAdmin() ||
                                   hasUserProjectPermission(projectId, 'config') ||
                                   hasMemberPermission(projectId, 'config') ||
@@ -437,12 +457,14 @@ service cloud.firestore {
       }
 
       match /payrollMonths/{monthId} {
-        allow read: if (isSignedIn() && (
+        allow read: if isSignedIn() && (
                         isAdmin() ||
                         hasTeamAccess(projectId) ||
                         hasProjectAccess(projectId)
-                      )) ||
-                      request.auth == null;
+                      );
+        // La página pública /access/[code] lee el mes por id. No se puede
+        // listar sin sesión.
+        allow get: if request.auth == null;
 
         allow write: if (isSignedIn() && (
                         isAdmin() ||
@@ -481,8 +503,8 @@ service cloud.firestore {
           hasTeamAccess(projectId) ||
           hasProjectAccess(projectId)
         );
-        allow create: if isSignedIn();
-        allow update: if true;
+        allow create: if isAdmin() || hasTeamAccess(projectId);
+        allow update: if isAdmin() || hasTeamAccess(projectId) || isHorarioSubmission();
         allow delete: if isAdmin();
       }
 
@@ -504,13 +526,18 @@ service cloud.firestore {
 
     match /userProjects/{userId}/projects/{projectId} {
       allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // Quien gestiona el proyecto puede dar, cambiar y quitar accesos.
       allow write: if isSignedIn() && (
-        request.auth.uid == userId ||
         isAdmin() ||
         hasUserProjectPermission(projectId, 'config') ||
         hasMemberPermission(projectId, 'config') ||
         hasAccountingExtendedAccess(projectId)
       );
+      // El propio usuario solo puede cambiar sus preferencias (archivar,
+      // favorito, notificaciones), nunca sus permisos ni darse de alta.
+      allow update: if isSignedIn() && request.auth.uid == userId &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(["archived", "favorite", "notifications"]);
     }
 
     match /companyProjects/{companyId}/projects/{projectId} {
@@ -590,9 +617,21 @@ service cloud.firestore {
       );
       allow update: if isSignedIn() && (
         isAdmin() ||
-        resource.data.invitedUserId == request.auth.uid ||
-        resource.data.invitedEmail == request.auth.token.email ||
-        hasProjectAccess(resource.data.projectId)
+        hasProjectAccess(resource.data.projectId) ||
+        (
+          // El invitado solo puede rechazarla o vincularla a su uid al
+          // registrarse; aceptar la hace el servidor. No puede cambiarse
+          // los permisos de la invitación.
+          (resource.data.invitedUserId == request.auth.uid ||
+           resource.data.invitedEmail == request.auth.token.email) &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["status", "respondedAt", "invitedUserId"]) &&
+          request.resource.data.get("invitedUserId", null) in [null, request.auth.uid] &&
+          (
+            request.resource.data.status == resource.data.status ||
+            (resource.data.status == "pending" && request.resource.data.status == "rejected")
+          )
+        )
       );
       allow delete: if isAdmin() || hasProjectAccess(resource.data.projectId);
     }
@@ -603,7 +642,14 @@ service cloud.firestore {
     }
 
     match /forms/{formId} {
-      allow read: if true;
+      // Quien tiene el enlace (el id es secreto) puede abrir su formulario,
+      // pero nadie sin acceso al proyecto puede listar la colección.
+      allow get: if true;
+      allow list: if isSignedIn() && (
+        isAdmin() ||
+        hasTeamAccess(resource.data.projectId) ||
+        hasProjectAccess(resource.data.projectId)
+      );
 
       allow create: if isSignedIn() && (
         isAdmin() ||
@@ -612,8 +658,11 @@ service cloud.firestore {
       );
 
       allow update: if (
+        // Envío desde el enlace público: solo la respuesta, una vez.
         resource.data.status == "pending" &&
-        request.resource.data.status == "submitted"
+        request.resource.data.status == "submitted" &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(["status", "submittedAt", "responseData", "response"])
       ) || isAdmin() || (
         isSignedIn() && (
           hasTeamAccess(resource.data.projectId) ||
@@ -625,10 +674,14 @@ service cloud.firestore {
     }
 
     match /access/{code} {
-      allow read: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      // El código es el secreto: se puede abrir por código, pero no listar.
+      allow get: if true;
+      allow list: if isSignedIn() && (isAdmin() || hasTeamAccess(resource.data.projectId));
+      allow create: if isSignedIn() && (isAdmin() || hasTeamAccess(request.resource.data.projectId));
+      allow update: if isSignedIn() &&
+        (isAdmin() || hasTeamAccess(resource.data.projectId)) &&
+        request.resource.data.projectId == resource.data.projectId;
+      allow delete: if isSignedIn() && (isAdmin() || hasTeamAccess(resource.data.projectId));
     }
 
     match /supportChats/{userId} {
@@ -641,16 +694,22 @@ service cloud.firestore {
       }
     }
 
+    // Los crea el servidor (/api/horario/*). El destinatario lo abre por
+    // enlace (el id es secreto) y solo puede rellenar sus horas.
     match /horarioForms/{formId} {
-      allow read: if true;
-      allow create: if isSignedIn();
-      allow update: if true;
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() || isHorarioSubmission();
       allow delete: if isAdmin();
     }
 
+    // Códigos de /timesheet-review: los crea el servidor y la página los lee
+    // a través de /api/horario/review.
     match /horarioAccess/{code} {
-      allow read: if true;
-      allow create, update: if isSignedIn();
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
