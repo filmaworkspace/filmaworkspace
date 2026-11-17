@@ -4,17 +4,12 @@
 // que las tres pantallas se vean igual.
 
 import Image from "next/image";
-import { AlertCircle, Calculator, Receipt, Users } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { inter } from "@/lib/fonts";
 import { coverGradient } from "@/lib/projectCover";
 
 export const BRAND = "#2F52E0";
 
-const MODULES = [
-  { icon: Receipt, title: "Contabilidad" },
-  { icon: Users, title: "Equipo" },
-  { icon: Calculator, title: "Presupuesto" },
-];
 
 // Titular del panel derecho.
 const HEADLINE = "Esto es cine.";
@@ -96,18 +91,11 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
           </h2>
         </div>
 
-        {/* Módulos, abajo y separados por una línea */}
+        {/* Marca, abajo y separada por una línea */}
         <div className="relative z-10 w-full max-w-[600px]">
-          <ul className="grid grid-cols-3 gap-6 border-t border-white/20 pt-6">
-            {MODULES.map(({ icon: Icon, title }) => (
-              <li key={title} className="flex items-center gap-2.5">
-                <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-white/20 bg-white/10">
-                  <Icon size={15} className="text-white" />
-                </span>
-                <span className="text-sm font-medium text-white/85">{title}</span>
-              </li>
-            ))}
-          </ul>
+          <p className="border-t border-white/20 pt-6 text-sm text-white/70">
+            © {new Date().getFullYear()} Filma Workspace
+          </p>
         </div>
       </aside>
     </div>
