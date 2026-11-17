@@ -28,23 +28,23 @@ import {
   AlertCircle,
   Archive,
   ArchiveRestore,
-  BarChart3,
   Bell,
   CheckCircle,
-  ChevronDown,
+  ExternalLink,
   Eye,
   EyeOff,
-  ExternalLink,
-  FolderOpen,
   Lock,
   LogOut,
   MoreHorizontal,
+  Receipt,
   Star,
   Users,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
+import { coverGradient } from "@/lib/projectCover";
+import { MODULE_COLORS, ui } from "@/lib/ui";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -62,19 +62,12 @@ interface ProjectMembership {
   favorite: boolean;
   joinedAt: Date;
   phase?: string;
+  coverUrl?: string | null;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 // Keys match the Spanish values stored in Firestore
-const PHASES: Record<string, { bg: string; text: string }> = {
-  Desarrollo:      { bg: "bg-sky-50",     text: "text-sky-700"     },
-  Preproducción:   { bg: "bg-amber-50",   text: "text-amber-700"   },
-  Rodaje:          { bg: "bg-indigo-50",  text: "text-indigo-700"  },
-  Postproducción:  { bg: "bg-purple-50",  text: "text-purple-700"  },
-  Finalizado:      { bg: "bg-emerald-50", text: "text-emerald-700" },
-};
-
 const NOTIFICATION_TYPES: { id: string; label: string; description: string; entorno: "accounting" | "team" }[] = [
   { id: "approvals", label: "Aprobaciones", description: "POs y facturas pendientes de aprobación", entorno: "accounting" },
   { id: "payments",  label: "Pagos",        description: "Vencimientos y pagos realizados",         entorno: "accounting" },
@@ -153,6 +146,7 @@ export default function ProfilePage() {
             favorite:  upData.favorite  || false,
             joinedAt:  upData.joinedAt?.toDate() || new Date(),
             phase:     pData.phase,
+            coverUrl:  pData.coverUrl || null,
           } as ProjectMembership;
         })
       );
@@ -218,9 +212,11 @@ export default function ProfilePage() {
     if (!project) return;
     try {
       const newArchived = !project.archived;
+      // Para uno mismo siempre; para todo el proyecto solo si se tiene permiso
+      // de configuración (las reglas no dejan a los demás tocar el proyecto).
       await Promise.all([
         updateDoc(doc(db, `userProjects/${user.uid}/projects`, projectId), { archived: newArchived }),
-        updateDoc(doc(db, "projects", projectId), { archived: newArchived }),
+        ...(project.permissions.config ? [updateDoc(doc(db, "projects", projectId), { archived: newArchived })] : []),
       ]);
       setProjects(projects.map(p => p.projectId === projectId ? { ...p, archived: newArchived } : p));
       showToast("success", project.archived ? "Proyecto restaurado" : "Proyecto archivado");
@@ -288,10 +284,39 @@ export default function ProfilePage() {
   const favoriteProjects = projects.filter(p =>  p.favorite && !p.archived).length;
   const userInitial      = formData.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U";
 
+  // Función (no componente) para que el campo no se vuelva a montar en cada
+  // pulsación y no pierda el foco.
+  const passwordInput = (field: "current" | "new" | "confirm", value: string, onChange: (v: string) => void, autoComplete: string) => (
+    <div className="relative">
+      <input
+        type={showPassword[field] ? "text" : "password"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        autoComplete={autoComplete}
+        placeholder="••••••••"
+        className={`${ui.input} pr-11`}
+      />
+      <button
+        type="button"
+        onClick={() => setShowPassword({ ...showPassword, [field]: !showPassword[field] })}
+        aria-label={showPassword[field] ? "Ocultar contraseña" : "Mostrar contraseña"}
+        className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+      >
+        {showPassword[field] ? <EyeOff size={16} /> : <Eye size={16} />}
+      </button>
+    </div>
+  );
+
+  const Switch = ({ on }: { on: boolean }) => (
+    <span className={`relative h-5 w-9 flex-shrink-0 rounded-full transition-colors ${on ? "bg-slate-900" : "bg-slate-300"}`}>
+      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all ${on ? "left-[18px]" : "left-0.5"}`} />
+    </span>
+  );
+
   if (isLoading) {
     return (
-      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-        <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+      <div className={`flex min-h-screen items-center justify-center bg-white ${inter.className}`}>
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
       </div>
     );
   }
@@ -299,225 +324,98 @@ export default function ProfilePage() {
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
 
-      {/* Toast */}
+      {/* Aviso */}
       {toast && (
-        <div className={`fixed bottom-6 left-6 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2 transition-all ${
-          toast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
+        <div className={`fixed bottom-6 left-6 z-50 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-white shadow-lg ${
+          toast.type === "success" ? "bg-slate-900" : "bg-red-600"
         }`}>
           {toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
           {toast.message}
         </div>
       )}
 
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-0">
-          <div className="flex items-center justify-between mb-8">
-            {/* Avatar + info */}
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-slate-900 text-white flex items-center justify-center text-xl font-bold">
-                {userInitial}
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900">{formData.name || "Usuario"}</h1>
-                <p className="text-sm text-slate-500">{formData.email}</p>
-              </div>
+      <main className={`${ui.page} max-w-[880px]`}>
+
+        {/* Cabecera: franja con el degradado + avatar */}
+        <div className="h-32 rounded-2xl" style={{ background: coverGradient(user?.uid) }} />
+        <div className="-mt-10 flex flex-wrap items-start justify-between gap-4 px-2 sm:px-6">
+          <div className="flex items-start gap-4">
+            <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-full border border-[#E4E4E7] bg-[#F1F1F3] text-2xl font-semibold text-slate-700 ring-4 ring-white">
+              {userInitial}
             </div>
-
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl text-sm font-medium transition-colors"
-            >
-              <LogOut size={16} />
-              Cerrar sesión
-            </button>
+            <div className="pt-12">
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900">{formData.name || "Usuario"}</h1>
+              <p className="text-sm text-slate-500">{formData.email}</p>
+            </div>
           </div>
-
-          {/* Tabs */}
-          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-            <button
-              onClick={() => setActiveTab("account")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === "account" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              Mi cuenta
-            </button>
-            <button
-              onClick={() => setActiveTab("projects")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === "projects" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              Mis proyectos
-              <span className={`text-xs px-1.5 py-0.5 rounded-md ${activeTab === "projects" ? "bg-slate-100 text-slate-600" : "bg-slate-200 text-slate-500"}`}>
-                {activeProjects}
-              </span>
-            </button>
-          </div>
+          <button onClick={handleLogout} className={`${ui.softButton} mt-12`}>
+            <LogOut size={14} /> Cerrar sesión
+          </button>
         </div>
-      </div>
 
-      <main className="px-24 py-8">
+        {/* Pestañas */}
+        <div className={`${ui.tabs} mt-10`}>
+          <button onClick={() => setActiveTab("account")} className={ui.tab(activeTab === "account")}>Mi cuenta</button>
+          <button onClick={() => setActiveTab("projects")} className={ui.tab(activeTab === "projects")}>
+            Mis proyectos <span className="text-xs font-normal text-slate-400">{activeProjects}</span>
+          </button>
+        </div>
 
-        {/* ── TAB: MI CUENTA ─────────────────────────────────────────────────── */}
+        {/* ── Mi cuenta ── */}
         {activeTab === "account" && (
-          <div className="max-w-2xl">
-            {/* Sub-nav */}
-            <div className="flex gap-6 mb-8 border-b border-slate-200">
-              {(["profile", "security"] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setActiveSection(s)}
-                  className={`pb-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                    activeSection === s
-                      ? "border-slate-900 text-slate-900"
-                      : "border-transparent text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  {s === "profile" ? "Información personal" : "Seguridad"}
+          <div className="mt-8 space-y-6">
+            <form onSubmit={handleProfileSubmit} className={`${ui.card} p-6`}>
+              <h2 className="mb-5 text-[15px] font-semibold text-slate-900">Datos personales</h2>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="name" className={ui.label}>Nombre</label>
+                  <input id="name" type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className={ui.input} />
+                </div>
+                <div>
+                  <label htmlFor="email" className={ui.label}>Email</label>
+                  <div className="relative">
+                    <input id="email" type="email" disabled value={formData.email} className={`${ui.input} pr-10`} />
+                    <Lock size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  </div>
+                </div>
+              </div>
+              <div className="mt-6 flex justify-end">
+                <button type="submit" disabled={saving} className={ui.softButton}>
+                  {saving ? "Guardando…" : "Guardar"}
                 </button>
-              ))}
-            </div>
+              </div>
+            </form>
 
-            {/* ─ Perfil ─ */}
-            {activeSection === "profile" && (
-              <form onSubmit={handleProfileSubmit} className="space-y-6">
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-6">
-                  {/* Avatar row */}
-                  <div className="flex items-center gap-4 pb-5 border-b border-slate-100">
-                    <div className="w-16 h-16 rounded-full bg-slate-900 text-white flex items-center justify-center text-2xl font-bold">
-                      {userInitial}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-900">{formData.name || "Usuario"}</p>
-                      <p className="text-sm text-slate-500 mt-0.5">{formData.email}</p>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-lg flex items-center gap-1">
-                          <CheckCircle size={10} />
-                          Verificado
-                        </span>
-                        <span className="text-xs text-slate-400">{activeProjects} proyecto{activeProjects !== 1 ? "s" : ""} activo{activeProjects !== 1 ? "s" : ""}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Fields */}
-                  <div className="grid grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Nombre</label>
-                      <input
-                        type="text"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Email</label>
-                      <div className="relative">
-                        <input
-                          type="email"
-                          disabled
-                          value={formData.email}
-                          className="w-full px-4 py-2.5 border border-slate-200 bg-slate-50 rounded-xl text-sm text-slate-400 pr-10"
-                        />
-                        <Lock size={13} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                      </div>
-                      <p className="text-[11px] text-slate-400 mt-1.5">El email no se puede cambiar</p>
-                    </div>
-                  </div>
+            <form onSubmit={handlePasswordSubmit} className={`${ui.card} p-6`}>
+              <h2 className="mb-5 text-[15px] font-semibold text-slate-900">Contraseña</h2>
+              <div className="grid gap-5 sm:grid-cols-3">
+                <div>
+                  <label className={ui.label}>Actual</label>
+                  {passwordInput("current", passwordData.currentPassword, (v) => setPasswordData({ ...passwordData, currentPassword: v }), "current-password")}
                 </div>
-
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
-                  >
-                    {saving ? "Guardando..." : "Guardar cambios"}
-                  </button>
+                <div>
+                  <label className={ui.label}>Nueva</label>
+                  {passwordInput("new", passwordData.newPassword, (v) => setPasswordData({ ...passwordData, newPassword: v }), "new-password")}
                 </div>
-              </form>
-            )}
-
-            {/* ─ Seguridad ─ */}
-            {activeSection === "security" && (
-              <form onSubmit={handlePasswordSubmit} className="space-y-6">
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-5">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Contraseña actual</label>
-                    <div className="relative">
-                      <input
-                        type={showPassword.current ? "text" : "password"}
-                        value={passwordData.currentPassword}
-                        onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm pr-12"
-                        placeholder="••••••••"
-                      />
-                      <button type="button" onClick={() => setShowPassword({ ...showPassword, current: !showPassword.current })}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                        {showPassword.current ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Nueva contraseña</label>
-                      <div className="relative">
-                        <input
-                          type={showPassword.new ? "text" : "password"}
-                          value={passwordData.newPassword}
-                          onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                          className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm pr-12"
-                          placeholder="••••••••"
-                        />
-                        <button type="button" onClick={() => setShowPassword({ ...showPassword, new: !showPassword.new })}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                          {showPassword.new ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Confirmar</label>
-                      <div className="relative">
-                        <input
-                          type={showPassword.confirm ? "text" : "password"}
-                          value={passwordData.confirmPassword}
-                          onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                          className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm pr-12"
-                          placeholder="••••••••"
-                        />
-                        <button type="button" onClick={() => setShowPassword({ ...showPassword, confirm: !showPassword.confirm })}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                          {showPassword.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-400">Mínimo 6 caracteres</p>
+                <div>
+                  <label className={ui.label}>Repetir nueva</label>
+                  {passwordInput("confirm", passwordData.confirmPassword, (v) => setPasswordData({ ...passwordData, confirmPassword: v }), "new-password")}
                 </div>
-
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
-                  >
-                    {saving ? "Actualizando..." : "Cambiar contraseña"}
-                  </button>
-                </div>
-              </form>
-            )}
+              </div>
+              <div className="mt-6 flex items-center justify-between gap-4">
+                <p className="text-xs text-slate-400">Mínimo 6 caracteres</p>
+                <button type="submit" disabled={saving} className={ui.softButton}>
+                  {saving ? "Actualizando…" : "Cambiar contraseña"}
+                </button>
+              </div>
+            </form>
           </div>
         )}
 
-        {/* ── TAB: MIS PROYECTOS ─────────────────────────────────────────────── */}
+        {/* ── Mis proyectos ── */}
         {activeTab === "projects" && (
-          <div className="max-w-3xl">
-            {/* Filtros */}
-            <div className="flex gap-2 mb-6">
+          <div className="mt-6">
+            <div className="mb-5 flex flex-wrap gap-1">
               {([
                 { id: "active",    label: "Activos",    count: activeProjects   },
                 { id: "favorites", label: "Favoritos",  count: favoriteProjects },
@@ -527,268 +425,158 @@ export default function ProfilePage() {
                 <button
                   key={f.id}
                   onClick={() => setProjectFilter(f.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    projectFilter === f.id
-                      ? "bg-slate-900 text-white"
-                      : "text-slate-600 hover:bg-slate-100"
+                  className={`flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[13px] transition-colors ${
+                    projectFilter === f.id ? "font-medium text-slate-900" : "text-slate-500 hover:text-slate-900"
                   }`}
                 >
                   {f.label}
-                  {f.count > 0 && (
-                    <span className={`text-xs ${projectFilter === f.id ? "text-slate-300" : "text-slate-400"}`}>
-                      {f.count}
-                    </span>
-                  )}
+                  {f.count > 0 && <span className="text-xs font-normal text-slate-400">{f.count}</span>}
                 </button>
               ))}
             </div>
 
-            {/* Lista */}
             {loadingProjects ? (
               <div className="flex justify-center py-12">
-                <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-600 rounded-full animate-spin" />
+                <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
               </div>
             ) : filteredProjects.length === 0 ? (
-              <div className="bg-white border border-dashed border-slate-200 rounded-2xl p-12 text-center">
-                <FolderOpen size={28} className="text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500 text-sm">
-                  {projectFilter === "archived"  ? "No tienes proyectos archivados" :
-                   projectFilter === "favorites" ? "No tienes proyectos favoritos"  :
+              <div className={`${ui.card} px-4 py-12 text-center`}>
+                <p className="text-sm text-slate-500">
+                  {projectFilter === "archived" ? "No tienes proyectos archivados" :
+                   projectFilter === "favorites" ? "No tienes proyectos favoritos" :
                    "No tienes proyectos"}
                 </p>
               </div>
             ) : (
               <div className="space-y-3">
                 {filteredProjects.map((project) => {
-                  const phaseStyle  = project.phase ? PHASES[project.phase] : null;
-                  const isExpanded  = expandedProject === project.projectId;
-                  const allNotifOn  = Object.values(project.notifications).every(Boolean);
-                  const allNotifOff = Object.values(project.notifications).every(v => !v);
+                  const isExpanded = expandedProject === project.projectId;
+                  const allNotifOn = Object.values(project.notifications).every(Boolean);
+                  const allNotifOff = Object.values(project.notifications).every((v) => !v);
+                  const groups = [
+                    project.permissions.accounting && { key: "accounting" as const, label: "Contabilidad" },
+                    project.permissions.team && { key: "team" as const, label: "Equipo" },
+                  ].filter(Boolean) as { key: "accounting" | "team"; label: string }[];
 
                   return (
-                    <div
-                      key={project.projectId}
-                      className={`bg-white border rounded-2xl transition-all ${
-                        project.archived ? "border-slate-200 opacity-70" : "border-slate-200 hover:border-slate-300"
-                      }`}
-                    >
-                      {/* ─ Card header ─ */}
-                      <div className="px-5 py-4">
-                        <div className="flex items-start justify-between gap-3">
+                    <div key={project.projectId} className={`${ui.card} ${project.archived ? "opacity-70" : ""}`}>
+                      <div className="flex items-center gap-4 p-3 pr-4">
+                        {/* Miniatura de la portada */}
+                        <Link
+                          href={`/project/${project.projectId}`}
+                          className={`h-14 w-24 flex-shrink-0 rounded-lg bg-cover bg-center ${project.archived ? "grayscale" : ""}`}
+                          style={project.coverUrl ? { backgroundImage: `url("${project.coverUrl}")` } : { background: coverGradient(project.projectId) }}
+                        />
 
-                          {/* Left: star + info */}
-                          <div className="flex items-start gap-3 flex-1 min-w-0">
-                            <button
-                              onClick={() => toggleProjectFavorite(project.projectId)}
-                              className={`mt-0.5 p-1 rounded-lg transition-colors flex-shrink-0 ${
-                                project.favorite ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                              }`}
-                            >
-                              <Star size={16} fill={project.favorite ? "currentColor" : "none"} />
-                            </button>
-
-                            <div className="flex-1 min-w-0">
-                              {/* Name + badges */}
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className="font-semibold text-slate-900 text-sm">{project.projectName}</h3>
-                                {phaseStyle && (
-                                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-lg ${phaseStyle.bg} ${phaseStyle.text}`}>
-                                    {project.phase}
-                                  </span>
-                                )}
-                                {project.archived && (
-                                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-lg bg-amber-50 text-amber-700 flex items-center gap-1">
-                                    <Archive size={9} />
-                                    Archivado
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Role */}
-                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                {project.role && (
-                                  <span className="text-[11px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg">
-                                    {project.role}
-                                  </span>
-                                )}
-                                {project.department && (
-                                  <span className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-lg">
-                                    {project.department}{project.position ? ` · ${project.position}` : ""}
-                                  </span>
-                                )}
-                                <span className="text-[11px] text-slate-400">
-                                  desde {project.joinedAt.toLocaleDateString("es-ES", { month: "short", year: "numeric" })}
-                                </span>
-                              </div>
-
-                              {/* ─ Entornos ─ */}
-                              {(project.permissions.accounting || project.permissions.team) && (
-                                <div className="mt-3">
-                                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Entornos</p>
-                                  <div className="flex gap-2">
-                                    {project.permissions.accounting && (
-                                      <Link href={`/project/${project.projectId}/accounting`}>
-                                        <div
-                                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors hover:opacity-80"
-                                          style={{
-                                            backgroundColor: "rgba(47, 82, 224, 0.08)",
-                                            borderColor:     "rgba(47, 82, 224, 0.25)",
-                                            color:           "#2F52E0",
-                                          }}
-                                        >
-                                          <BarChart3 size={11} />
-                                          Accounting
-                                        </div>
-                                      </Link>
-                                    )}
-                                    {project.permissions.team && (
-                                      <Link href={`/project/${project.projectId}/team`}>
-                                        <div
-                                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors hover:opacity-80"
-                                          style={{
-                                            backgroundColor: "rgba(137, 211, 34, 0.12)",
-                                            borderColor:     "rgba(137, 211, 34, 0.35)",
-                                            color:           "#6BA319",
-                                          }}
-                                        >
-                                          <Users size={11} />
-                                          Team
-                                        </div>
-                                      </Link>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <Link href={`/project/${project.projectId}`} className="truncate text-sm font-semibold text-slate-900 hover:underline">
+                              {project.projectName}
+                            </Link>
+                            {project.archived && <span className={ui.chip}>Archivado</span>}
                           </div>
+                          <p className="mt-0.5 truncate text-xs text-slate-500">
+                            {[project.phase, project.role, project.department && `${project.department}${project.position ? ` · ${project.position}` : ""}`]
+                              .filter(Boolean).join(" · ")}
+                          </p>
+                        </div>
 
-                          {/* Right: actions */}
-                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <div className="flex flex-shrink-0 items-center gap-1">
+                          {project.permissions.accounting && (
+                            <Link href={`/project/${project.projectId}/accounting`} className={ui.iconButton} title="Contabilidad">
+                              <Receipt size={16} style={{ color: MODULE_COLORS.accounting }} />
+                            </Link>
+                          )}
+                          {project.permissions.team && (
+                            <Link href={`/project/${project.projectId}/team`} className={ui.iconButton} title="Equipo">
+                              <Users size={16} style={{ color: MODULE_COLORS.team }} />
+                            </Link>
+                          )}
+                          <span className="mx-1 h-5 w-px bg-slate-200" />
+                          <button
+                            onClick={() => toggleProjectFavorite(project.projectId)}
+                            className={`${ui.iconButton} ${project.favorite ? "!text-amber-500" : ""}`}
+                            title={project.favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
+                          >
+                            <Star size={16} fill={project.favorite ? "currentColor" : "none"} />
+                          </button>
+                          <button
+                            onClick={() => setExpandedProject(isExpanded ? null : project.projectId)}
+                            className={`${ui.iconButton} ${isExpanded ? "bg-[#F1F1F3] !text-slate-900" : ""}`}
+                            title="Notificaciones"
+                          >
+                            <Bell size={16} />
+                          </button>
+                          <div className="relative">
                             <button
-                              onClick={() => setExpandedProject(isExpanded ? null : project.projectId)}
-                              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                                isExpanded ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"
-                              }`}
+                              onClick={() => setProjectMenuOpen(projectMenuOpen === project.projectId ? null : project.projectId)}
+                              className={ui.iconButton}
+                              title="Más"
                             >
-                              <Bell size={13} />
-                              <ChevronDown size={12} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                              <MoreHorizontal size={16} />
                             </button>
-
-                            <div className="relative">
-                              <button
-                                onClick={() => setProjectMenuOpen(projectMenuOpen === project.projectId ? null : project.projectId)}
-                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                              >
-                                <MoreHorizontal size={16} />
-                              </button>
-                              {projectMenuOpen === project.projectId && (
-                                <>
-                                  <div className="fixed inset-0 z-40" onClick={() => setProjectMenuOpen(null)} />
-                                  <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden">
-                                    <Link
-                                      href={`/project/${project.projectId}`}
-                                      onClick={() => setProjectMenuOpen(null)}
-                                      className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                                    >
-                                      <ExternalLink size={13} className="text-slate-400" />
-                                      Ir al proyecto
-                                    </Link>
-                                    <button
-                                      onClick={() => toggleProjectArchive(project.projectId)}
-                                      className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                                    >
-                                      {project.archived ? (
-                                        <><ArchiveRestore size={13} className="text-slate-400" />Restaurar</>
-                                      ) : (
-                                        <><Archive size={13} className="text-slate-400" />Archivar</>
-                                      )}
-                                    </button>
-                                  </div>
-                                </>
-                              )}
-                            </div>
+                            {projectMenuOpen === project.projectId && (
+                              <>
+                                <div className="fixed inset-0 z-40" onClick={() => setProjectMenuOpen(null)} />
+                                <div className={ui.menu}>
+                                  <Link href={`/project/${project.projectId}`} onClick={() => setProjectMenuOpen(null)} className={ui.menuItem}>
+                                    <ExternalLink size={15} /> Ir al proyecto
+                                  </Link>
+                                  <button onClick={() => toggleProjectArchive(project.projectId)} className={ui.menuItem}>
+                                    {project.archived ? <><ArchiveRestore size={15} /> Restaurar</> : <><Archive size={15} /> Archivar</>}
+                                  </button>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
 
-                      {/* ─ Notificaciones expandidas ─ */}
+                      {/* Notificaciones */}
                       {isExpanded && (
-                        <div className="border-t border-slate-100 px-5 py-4 bg-slate-50/60 rounded-b-2xl">
-                          <div className="flex items-center justify-between mb-3">
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Notificaciones</p>
-                            <button
-                              onClick={() => toggleAllNotifications(project.projectId, allNotifOff ? true : !allNotifOn)}
-                              className="text-xs text-slate-500 hover:text-slate-700 font-medium"
-                            >
-                              {allNotifOn ? "Silenciar todo" : "Activar todo"}
-                            </button>
+                        <div className="border-t border-slate-100 px-4 py-4">
+                          <div className="mb-3 flex items-center justify-between">
+                            <p className="text-[13px] font-medium text-slate-900">Notificaciones</p>
+                            {groups.length > 0 && (
+                              <button
+                                onClick={() => toggleAllNotifications(project.projectId, allNotifOff ? true : !allNotifOn)}
+                                className="text-xs text-slate-500 hover:text-slate-900"
+                              >
+                                {allNotifOn ? "Silenciar todo" : "Activar todo"}
+                              </button>
+                            )}
                           </div>
-
-                          {/* Accounting notifications */}
-                          {project.permissions.accounting && (
-                            <div className="mb-3">
-                              <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#2F52E0" }}>
-                                Accounting
-                              </p>
-                              <div className="grid grid-cols-2 gap-2">
-                                {NOTIFICATION_TYPES.filter((nt) => nt.entorno === "accounting").map((nt) => {
-                                  const enabled = project.notifications[nt.id as keyof typeof project.notifications];
-                                  return (
-                                    <button
-                                      key={nt.id}
-                                      onClick={() => updateProjectNotification(project.projectId, nt.id, !enabled)}
-                                      className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-left transition-all ${
-                                        enabled ? "bg-white border-slate-200 hover:border-slate-300" : "bg-slate-100/60 border-slate-200 opacity-60 hover:opacity-80"
-                                      }`}
-                                    >
-                                      <div>
-                                        <p className="text-xs font-medium text-slate-800">{nt.label}</p>
-                                        <p className="text-[10px] text-slate-400 mt-0.5">{nt.description}</p>
-                                      </div>
-                                      <div className={`w-8 h-4 rounded-full transition-colors flex-shrink-0 ml-3 relative ${enabled ? "bg-slate-900" : "bg-slate-300"}`}>
-                                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-all ${enabled ? "left-4" : "left-0.5"}`} />
-                                      </div>
-                                    </button>
-                                  );
-                                })}
-                              </div>
+                          {groups.length === 0 ? (
+                            <p className="py-2 text-xs text-slate-400">No tienes acceso a ningún módulo de este proyecto.</p>
+                          ) : (
+                            <div className="space-y-4">
+                              {groups.map((g) => (
+                                <div key={g.key}>
+                                  <p className="mb-1.5 flex items-center gap-1.5 text-xs text-slate-500">
+                                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: MODULE_COLORS[g.key] }} />
+                                    {g.label}
+                                  </p>
+                                  <div className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+                                    {NOTIFICATION_TYPES.filter((nt) => nt.entorno === g.key).map((nt) => {
+                                      const enabled = project.notifications[nt.id as keyof typeof project.notifications];
+                                      return (
+                                        <button
+                                          key={nt.id}
+                                          onClick={() => updateProjectNotification(project.projectId, nt.id, !enabled)}
+                                          className="flex w-full items-center justify-between gap-4 px-3.5 py-2.5 text-left transition-colors hover:bg-[#F7F7F8]"
+                                        >
+                                          <span>
+                                            <span className="block text-[13px] text-slate-900">{nt.label}</span>
+                                            <span className="block text-xs text-slate-400">{nt.description}</span>
+                                          </span>
+                                          <Switch on={enabled} />
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                          )}
-
-                          {/* Team notifications */}
-                          {project.permissions.team && (
-                            <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#6BA319" }}>
-                                Team
-                              </p>
-                              <div className="grid grid-cols-2 gap-2">
-                                {NOTIFICATION_TYPES.filter((nt) => nt.entorno === "team").map((nt) => {
-                                  const enabled = project.notifications[nt.id as keyof typeof project.notifications];
-                                  return (
-                                    <button
-                                      key={nt.id}
-                                      onClick={() => updateProjectNotification(project.projectId, nt.id, !enabled)}
-                                      className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-left transition-all ${
-                                        enabled ? "bg-white border-slate-200 hover:border-slate-300" : "bg-slate-100/60 border-slate-200 opacity-60 hover:opacity-80"
-                                      }`}
-                                    >
-                                      <div>
-                                        <p className="text-xs font-medium text-slate-800">{nt.label}</p>
-                                        <p className="text-[10px] text-slate-400 mt-0.5">{nt.description}</p>
-                                      </div>
-                                      <div className={`w-8 h-4 rounded-full transition-colors flex-shrink-0 ml-3 relative ${enabled ? "bg-slate-900" : "bg-slate-300"}`}>
-                                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-all ${enabled ? "left-4" : "left-0.5"}`} />
-                                      </div>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Neither entorno */}
-                          {!project.permissions.accounting && !project.permissions.team && (
-                            <p className="text-xs text-slate-400 text-center py-2">Sin acceso a entornos en este proyecto</p>
                           )}
                         </div>
                       )}

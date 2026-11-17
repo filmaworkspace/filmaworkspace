@@ -19,19 +19,18 @@ import {
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  BarChart3,
-  Briefcase,
-  Building2,
-  CheckCircle,
+  Check,
   ChevronRight,
   Clock,
   Copy,
-  Film,
+  Receipt,
   Settings,
-  Shield,
-  Tv,
   Users,
 } from "lucide-react";
+
+// ─── Internal ────────────────────────────────────────────────────────────────
+import ProjectCover from "@/components/ProjectCover";
+import { MODULE_COLORS, ui } from "@/lib/ui";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -62,6 +61,8 @@ interface ProjectData {
   createdAt?: Timestamp;
   archived?: boolean;
   closingAt?: Timestamp | null;
+  coverUrl?: string | null;
+  coverPath?: string | null;
 }
 
 interface UserPermissions {
@@ -138,6 +139,17 @@ export default function ProjectOverviewPage() {
         return;
       }
       const projectData = projectSnap.data() as ProjectData;
+      // Nombres de las productoras (el proyecto solo guarda sus ids)
+      const producerIds = projectData.producers || [];
+      if (producerIds.length && !projectData.producerNames?.length) {
+        const producerSnaps = await Promise.all(
+          producerIds.map((pid) => getDoc(doc(db, "producers", pid)).catch(() => null))
+        );
+        projectData.producerNames = producerSnaps
+          .filter((d): d is NonNullable<typeof d> => !!d && d.exists())
+          .map((d) => (d.data()?.name as string) || "")
+          .filter(Boolean);
+      }
       setProject(projectData);
 
       // Calcular días hasta cierre
@@ -232,242 +244,168 @@ export default function ProjectOverviewPage() {
   const projectRoleMembers = visibleMembers.filter(m => PROJECT_ROLES.includes(m.role || ""));
   const departmentMembers = visibleMembers.filter(m => !PROJECT_ROLES.includes(m.role || "") && m.department);
 
+  const MemberRow = ({ member, badge, detail }: { member: Member; badge?: string; detail?: string }) => (
+    <div className="group flex items-center gap-3 px-4 py-3">
+      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-[#E4E4E7] bg-[#F1F1F3] text-[13px] font-semibold text-slate-700">
+        {(member.name || "?").charAt(0).toUpperCase()}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="truncate text-[13px] font-medium text-slate-900">{member.name}</p>
+          {member.userId === userId && <span className="text-[11px] text-slate-400">Tú</span>}
+        </div>
+        <div className="flex items-center gap-1">
+          <p className="truncate text-xs text-slate-500">{detail || member.email}</p>
+          {!detail && member.email && (
+            <button
+              onClick={() => copyEmail(member.email)}
+              className="rounded p-0.5 text-slate-400 opacity-0 transition-opacity hover:text-slate-700 group-hover:opacity-100"
+              title="Copiar email"
+            >
+              {copiedEmail === member.email ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+            </button>
+          )}
+        </div>
+      </div>
+      {badge && <span className={ui.chip}>{badge}</span>}
+    </div>
+  );
+
   if (loading) {
     return (
-      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-        <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+      <div className={`flex min-h-screen items-center justify-center bg-white ${inter.className}`}>
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
       </div>
     );
   }
 
   if (!project) {
     return (
-      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
+      <div className={`flex min-h-screen items-center justify-center bg-white ${inter.className}`}>
         <div className="text-center">
-          <p className="text-slate-600">Proyecto no encontrado</p>
-          <Link href="/dashboard" className="text-blue-600 hover:underline mt-2 inline-block">
-            Volver al dashboard
+          <p className="text-sm text-slate-500">Proyecto no encontrado</p>
+          <Link href="/dashboard" className="mt-2 inline-block text-sm font-medium text-slate-900 hover:underline">
+            Volver a proyectos
           </Link>
         </div>
       </div>
     );
   }
 
+  const typeLabel = projectType === "serie" ? `Serie${episodes ? ` · ${episodes} cap.` : ""}` : projectType === "pelicula" ? "Película" : null;
+
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
-      <div className="px-24 pt-24 pb-12">
-        
-        {/* Header del proyecto */}
-        <div className="mb-10">
-          <div className="flex items-center gap-3 mb-3">
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">{project.name}</h1>
-              <div className="flex items-center gap-3 mt-1">
-                {project.phase && (
-                  <span className="text-xs font-medium px-2 py-0.5 rounded-lg bg-slate-100 text-slate-500">
-                    {project.phase}
-                  </span>
-                )}
-                {projectType && (
-                  <span className="text-xs font-medium px-2 py-0.5 rounded-lg bg-violet-100 text-violet-700">
-                    {projectType === "serie" ? `Serie · ${episodes} cap.` : "Película"}
-                  </span>
-                )}
-              </div>
+      <main className={`${ui.page} max-w-[1200px]`}>
+
+        {/* Portada con el nombre del proyecto */}
+        <ProjectCover
+          projectId={id}
+          coverUrl={project.coverUrl}
+          coverPath={project.coverPath}
+          editable={userPermissions.config}
+          onChange={(cover) => setProject((prev) => (prev ? { ...prev, coverUrl: cover.url, coverPath: cover.path } : prev))}
+          onError={(msg) => alert(msg)}
+          className="aspect-[16/5] min-h-[220px] rounded-2xl"
+        >
+          <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8">
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {project.phase && <span className={ui.glassPill}>{project.phase}</span>}
+              {typeLabel && <span className={ui.glassPill}>{typeLabel}</span>}
+              {daysUntilClose !== null && (
+                <span className={`${ui.glassPill} !border-red-300/40 !bg-red-500/80`}>
+                  <Clock size={11} /> Cierra en {daysUntilClose} día{daysUntilClose !== 1 ? "s" : ""}
+                </span>
+              )}
             </div>
+            <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">{project.name}</h1>
           </div>
+        </ProjectCover>
 
-          {/* Aviso de cierre - debajo del título */}
-          {daysUntilClose !== null && (
-            <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg">
-              <Clock size={14} className="text-red-500" />
-              <span className="text-sm font-medium text-red-700">
-                Cierra en {daysUntilClose} día{daysUntilClose !== 1 ? "s" : ""} · {project.closingAt ? formatDate(project.closingAt) : ""}
-              </span>
-            </div>
-          )}
-          
-          {/* Productoras */}
-          {project.producerNames && project.producerNames.length > 0 && (
-            <p className="flex items-center gap-1.5 mt-4 text-sm text-slate-500">
-              <Building2 size={14} className="text-slate-400" />
-              {project.producerNames.join(", ")}
-            </p>
-          )}
-
-          {project.description && (
-            <p className="mt-4 text-slate-600 max-w-2xl">{project.description}</p>
-          )}
-        </div>
-
-        {/* Entornos */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Entornos</h2>
-            {userPermissions.config && (
-              <Link
-                href={`/project/${id}/config`}
-                className="flex items-center gap-1.5 p-1.5 rounded-lg text-slate-300 hover:text-slate-600 transition-colors"
-                title="Configuración"
-              >
-                <Settings size={14} />
-              </Link>
+        {/* Productoras + accesos */}
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+          <div className="min-w-0">
+            {project.producerNames && project.producerNames.length > 0 && (
+              <p className="text-sm text-slate-500">{project.producerNames.join(", ")}</p>
+            )}
+            {project.closingAt && daysUntilClose !== null && (
+              <p className="mt-0.5 text-xs text-slate-400">Cierre el {formatDate(project.closingAt)}</p>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             {userPermissions.accounting && (
-              <Link href={`/project/${id}/accounting`}>
-                <div
-                  className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium border transition-colors"
-                  style={{
-                    backgroundColor: "rgba(47, 82, 224, 0.1)",
-                    borderColor: "rgba(47, 82, 224, 0.3)",
-                    color: "#2F52E0",
-                  }}
-                >
-                  <BarChart3 size={12} />
-                  Accounting
-                </div>
+              <Link href={`/project/${id}/accounting`} className={ui.softButton}>
+                <Receipt size={14} style={{ color: MODULE_COLORS.accounting }} /> Contabilidad
               </Link>
             )}
             {userPermissions.team && (
-              <Link href={`/project/${id}/team`}>
-                <div
-                  className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium border transition-colors"
-                  style={{
-                    backgroundColor: "rgba(137, 211, 34, 0.15)",
-                    borderColor: "rgba(137, 211, 34, 0.4)",
-                    color: "#6BA319",
-                  }}
-                >
-                  <Users size={12} />
-                  Team
-                </div>
+              <Link href={`/project/${id}/team`} className={ui.softButton}>
+                <Users size={14} style={{ color: MODULE_COLORS.team }} /> Equipo
+              </Link>
+            )}
+            {userPermissions.config && (
+              <Link href={`/project/${id}/config`} className={ui.iconButton} title="Configuración">
+                <Settings size={16} />
               </Link>
             )}
           </div>
         </div>
+
+        {project.description && (
+          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-slate-600">{project.description}</p>
+        )}
 
         {/* Equipo del proyecto */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Equipo ({visibleMembers.length}{!canViewAllMembers && members.length > visibleMembers.length ? ` de ${members.length}` : ""})
+        <section className="mt-12">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className={ui.sectionTitle}>
+              Equipo · {visibleMembers.length}
+              {!canViewAllMembers && members.length > visibleMembers.length ? ` de ${members.length}` : ""}
             </h2>
             {userPermissions.config && (
-              <Link 
-                href={`/project/${id}/config/users`}
-                className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"
-              >
-                Gestionar
-                <ChevronRight size={12} />
+              <Link href={`/project/${id}/config/users`} className="flex items-center gap-0.5 text-[13px] text-slate-500 hover:text-slate-900">
+                Gestionar <ChevronRight size={14} />
               </Link>
             )}
           </div>
 
-          <div className="flex flex-row gap-4 items-start">
-            {/* Roles de proyecto */}
-            {projectRoleMembers.length > 0 && (
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-flex-1 max-w-[50%] w-full">
-                <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
-                  <Shield size={16} className="text-slate-400" />
-                  <h3 className="font-semibold text-slate-900 text-sm">Roles de proyecto</h3>
-                  <span className="ml-auto text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">{projectRoleMembers.length}</span>
-                </div>
-                <div className="divide-y divide-slate-100">
-                  {projectRoleMembers.map((member) => (
-                    <div key={member.userId} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50/50 group">
-                      <div className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center font-semibold text-sm flex-shrink-0">
-                        {(member.name || "?").charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-slate-900 text-sm">{member.name}</p>
-                          <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600">
-                            {member.role}
-                          </span>
-                          {member.userId === userId && <span className="text-xs text-slate-400">(tú)</span>}
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-xs text-slate-500 truncate">{member.email}</p>
-                          <button
-                            onClick={() => copyEmail(member.email)}
-                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 rounded transition-all"
-                            title="Copiar email"
-                          >
-                            {copiedEmail === member.email ? (
-                              <CheckCircle size={12} className="text-emerald-500" />
-                            ) : (
-                              <Copy size={12} className="text-slate-400" />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Departamentos */}
-            {departmentMembers.length > 0 && (
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-flex-1 max-w-[50%] w-full">
-                <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
-                  <Briefcase size={16} className="text-slate-400" />
-                  <h3 className="font-semibold text-slate-900 text-sm">Departamentos</h3>
-                  <span className="ml-auto text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">{departmentMembers.length}</span>
-                </div>
-                <div className="divide-y divide-slate-100">
-                  {departmentMembers.map((member) => (
-                    <div key={member.userId} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50/50 group">
-                      <div className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center font-semibold text-sm flex-shrink-0">
-                        {(member.name || "?").charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-slate-900 text-sm">{member.name}</p>
-                          {member.position && (
-                            <span className="px-2 py-0.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-600">
-                              {member.position}
-                            </span>
-                          )}
-                          {member.department && (
-                            <span className="text-xs text-slate-400">{member.department}</span>
-                          )}
-                          {member.userId === userId && <span className="text-xs text-slate-400">(tú)</span>}
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-xs text-slate-500 truncate">{member.email}</p>
-                          <button
-                            onClick={() => copyEmail(member.email)}
-                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 rounded transition-all"
-                            title="Copiar email"
-                          >
-                            {copiedEmail === member.email ? (
-                              <CheckCircle size={12} className="text-emerald-500" />
-                            ) : (
-                              <Copy size={12} className="text-slate-400" />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {visibleMembers.length === 0 && (
-            <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-200">
-              <Users size={32} className="text-slate-300 mx-auto mb-2" />
+          {visibleMembers.length === 0 ? (
+            <div className={`${ui.card} px-4 py-12 text-center`}>
               <p className="text-sm text-slate-500">
-                {members.length === 0 ? "No hay miembros en este proyecto" : "No tienes acceso para ver otros miembros"}
+                {members.length === 0 ? "Aún no hay nadie en este proyecto" : "No tienes acceso para ver otros miembros"}
               </p>
             </div>
+          ) : (
+            <div className="grid items-start gap-4 lg:grid-cols-2">
+              {projectRoleMembers.length > 0 && (
+                <div className={ui.card}>
+                  <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                    <h3 className="text-[13px] font-medium text-slate-900">Producción</h3>
+                    <span className="text-xs text-slate-400">{projectRoleMembers.length}</span>
+                  </div>
+                  <div className="divide-y divide-slate-100">
+                    {projectRoleMembers.map((m) => <MemberRow key={m.userId} member={m} badge={m.role} />)}
+                  </div>
+                </div>
+              )}
+              {departmentMembers.length > 0 && (
+                <div className={ui.card}>
+                  <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                    <h3 className="text-[13px] font-medium text-slate-900">Departamentos</h3>
+                    <span className="text-xs text-slate-400">{departmentMembers.length}</span>
+                  </div>
+                  <div className="divide-y divide-slate-100">
+                    {departmentMembers.map((m) => (
+                      <MemberRow key={m.userId} member={m} badge={[m.position, m.department].filter(Boolean).join(" · ") || undefined} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
-        </div>
-      </div>
+        </section>
+      </main>
     </div>
   );
 }

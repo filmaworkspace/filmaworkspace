@@ -9,12 +9,10 @@ import { inter } from "@/lib/fonts";
 import { db, auth } from "@/lib/firebase";
 import {
   collection,
-  deleteDoc,
   doc,
   DocumentData,
   getDocs,
   getDoc,
-  orderBy,
   query,
   QueryDocumentSnapshot,
   Timestamp,
@@ -24,16 +22,11 @@ import {
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  AlertTriangle,
   Archive,
-  ArrowRight,
   ArrowUpDown,
-  Bell,
   Check,
-  CheckCircle,
   ChevronDown,
   Clock,
-  Info,
   Receipt,
   Search,
   Settings,
@@ -109,30 +102,12 @@ interface Invitation {
   expiresAt: Date | Timestamp;
 }
 
-interface AdminMessage {
-  id: string;
-  content: string;
-  type: "info" | "warning" | "success";
-  sentAt: Timestamp;
-  sentByName: string;
-  read: boolean;
-}
-
-interface PendingAction {
-  projectId: string;
-  projectName: string;
-  type: "accounting" | "team";
-  count: number;
-  href: string;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const { user, isLoading: userLoading } = useUser();
   const [projects, setProjects] = useState<Project[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
-  const [messages, setMessages] = useState<AdminMessage[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingInvite, setProcessingInvite] = useState<string | null>(null);
@@ -142,9 +117,7 @@ export default function Dashboard() {
   const [showArchived, setShowArchived] = useState(false);
   const [showPhaseDropdown, setShowPhaseDropdown] = useState(false);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
-  const [expandedMessage, setExpandedMessage] = useState<string | null>(null);
   const [reloadTrigger, setReloadTrigger] = useState(0);
-  const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
   const phaseDropdownRef = useRef<HTMLDivElement>(null);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -216,7 +189,7 @@ export default function Dashboard() {
                 createdAt: projectData.createdAt || null,
                 addedAt: userProjectData.addedAt || null,
                 memberCount: membersSnapshot.size,
-                archived: projectData.archived || false,
+                archived: projectData.archived || userProjectData.archived || false,
                 closingAt: projectData.closingAt || null,
                 coverUrl: projectData.coverUrl || null,
                 coverPath: projectData.coverPath || null,
@@ -228,9 +201,6 @@ export default function Dashboard() {
         projectsData.sort((a, b) => (b.addedAt?.toMillis() || 0) - (a.addedAt?.toMillis() || 0));
         setProjects(projectsData);
         setFilteredProjects(projectsData.filter((p) => !p.archived));
-
-        // Load pending actions in background (non-blocking)
-        loadPendingActions(projectsData, userId);
 
         const invitationsRef = collection(db, "invitations");
         const q = query(invitationsRef, where("invitedEmail", "==", userEmail), where("status", "==", "pending"));
@@ -255,27 +225,6 @@ export default function Dashboard() {
         });
         setInvitations(invitationsData);
 
-        // Load admin messages (limpiando los caducados de paso)
-        const messagesRef = collection(db, `users/${userId}/messages`);
-        const messagesQuery = query(messagesRef, orderBy("sentAt", "desc"));
-        const messagesSnapshot = await getDocs(messagesQuery);
-        const messagesData: AdminMessage[] = [];
-        for (const msgDoc of messagesSnapshot.docs) {
-          const data = msgDoc.data();
-          if (data.expiresAt && data.expiresAt.toDate() < new Date()) {
-            deleteDoc(doc(db, `users/${userId}/messages`, msgDoc.id)).catch(() => {});
-            continue;
-          }
-          messagesData.push({
-            id: msgDoc.id,
-            content: data.content,
-            type: data.type || "info",
-            sentAt: data.sentAt,
-            sentByName: data.sentByName,
-            read: data.read || false,
-          });
-        }
-        setMessages(messagesData);
       } catch (error) {
         console.error("Error al cargar datos:", error);
       } finally {
@@ -313,44 +262,6 @@ export default function Dashboard() {
   const archivedProjects = projects.filter((p) => p.archived);
   const activeProjectsCount = projects.filter((p) => !p.archived).length;
 
-  const loadPendingActions = async (projectsList: Project[], uid: string) => {
-    const actions: PendingAction[] = [];
-    await Promise.all(
-      projectsList
-        .filter((p) => !p.archived && (p.permissions.accounting || p.permissions.team))
-        .map(async (project) => {
-          if (project.permissions.accounting) {
-            const [posSnap, invSnap] = await Promise.all([
-              getDocs(query(collection(db, `projects/${project.id}/pos`), where("status", "==", "pending"))),
-              getDocs(query(collection(db, `projects/${project.id}/invoices`), where("status", "in", ["submitted", "pending_approval"]))),
-            ]);
-            let count = 0;
-            posSnap.forEach((d) => {
-              const data = d.data();
-              const step = data.approvalSteps?.[data.currentApprovalStep];
-              if (step?.approvers?.includes(uid)) count++;
-            });
-            invSnap.forEach((d) => {
-              const data = d.data();
-              if (data.approvedAt) return;
-              const step = data.approvalSteps?.[data.currentApprovalStep];
-              if (step?.approvers?.includes(uid)) count++;
-            });
-            if (count > 0) {
-              actions.push({ projectId: project.id, projectName: project.name, type: "accounting", count, href: `/project/${project.id}/accounting/approvals` });
-            }
-          }
-          if (project.permissions.team) {
-            const crewSnap = await getDocs(query(collection(db, `projects/${project.id}/crew`), where("approvalStatus", "==", "pending_approval")));
-            if (crewSnap.size > 0) {
-              actions.push({ projectId: project.id, projectName: project.name, type: "team", count: crewSnap.size, href: `/project/${project.id}/team/approvals` });
-            }
-          }
-        })
-    );
-    setPendingActions(actions);
-  };
-
   const handleAcceptInvitation = async (invitation: Invitation) => {
     if (!userId) return;
     setProcessingInvite(invitation.id);
@@ -387,43 +298,6 @@ export default function Dashboard() {
       console.error("Error rechazando invitación:", error);
       alert("Error al rechazar la invitación");
       setProcessingInvite(null);
-    }
-  };
-
-  // Message handlers
-  const handleMarkMessageAsRead = async (messageId: string) => {
-    if (!userId) return;
-    try {
-      await updateDoc(doc(db, `users/${userId}/messages`, messageId), { read: true });
-      setMessages(messages.map((m) => (m.id === messageId ? { ...m, read: true } : m)));
-    } catch (error) {
-      console.error("Error marking message as read:", error);
-    }
-  };
-
-  const handleDismissMessage = async (messageId: string) => {
-    if (!userId) return;
-    try {
-      await deleteDoc(doc(db, `users/${userId}/messages`, messageId));
-      setMessages(messages.filter((m) => m.id !== messageId));
-      if (expandedMessage === messageId) setExpandedMessage(null);
-    } catch (error) {
-      console.error("Error dismissing message:", error);
-    }
-  };
-
-  const unreadMessagesCount = messages.filter((m) => !m.read).length;
-  const totalPendingCount = pendingActions.reduce((s, a) => s + a.count, 0);
-  const bellBadgeCount = unreadMessagesCount + (totalPendingCount > 0 ? 1 : 0);
-
-  const getMessageConfig = (type: AdminMessage["type"]) => {
-    switch (type) {
-      case "warning":
-        return { icon: AlertTriangle, bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700", iconBg: "bg-amber-100" };
-      case "success":
-        return { icon: CheckCircle, bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", iconBg: "bg-emerald-100" };
-      default:
-        return { icon: Info, bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700", iconBg: "bg-blue-100" };
     }
   };
 
@@ -556,100 +430,7 @@ export default function Dashboard() {
             <h1 className="text-[1.75rem] font-semibold tracking-tight text-slate-900">Proyectos</h1>
             {activeProjectsCount > 0 && <span className="text-sm text-slate-400">{activeProjectsCount}</span>}
           </div>
-
-          <button
-            onClick={() => setExpandedMessage(expandedMessage ? null : "panel")}
-            className={iconButton}
-            aria-label="Notificaciones"
-          >
-            <Bell size={18} />
-            {bellBadgeCount > 0 && (
-              <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
-                {bellBadgeCount > 9 ? "9+" : bellBadgeCount}
-              </span>
-            )}
-          </button>
         </div>
-
-        {/* Panel de notificaciones */}
-        {expandedMessage === "panel" && (
-          <>
-            <div className="fixed inset-0 z-[100]" onClick={() => setExpandedMessage(null)} />
-            <div className="fixed right-6 top-[132px] z-[101] w-80 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg sm:right-10">
-              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-                <span className="text-[13px] font-semibold text-slate-900">Notificaciones</span>
-                {unreadMessagesCount > 0 && <span className="text-xs text-slate-500">{unreadMessagesCount} sin leer</span>}
-              </div>
-
-              <div className="max-h-[28rem] overflow-y-auto">
-                {pendingActions.length > 0 && (
-                  <div className="border-b border-slate-100 py-1">
-                    {pendingActions.map((action) => (
-                      <Link
-                        key={`${action.projectId}-${action.type}`}
-                        href={action.href}
-                        onClick={() => setExpandedMessage(null)}
-                        className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[#F7F7F8]"
-                      >
-                        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[#F1F1F3]">
-                          {action.type === "accounting"
-                            ? <Receipt size={14} style={{ color: "#2F52E0" }} />
-                            : <Users size={14} style={{ color: "#6BA319" }} />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-medium text-slate-900">{action.projectName}</p>
-                          <p className="mt-0.5 text-[11px] text-slate-500">
-                            {action.count} {action.count === 1 ? "aprobación pendiente" : "aprobaciones pendientes"}
-                          </p>
-                        </div>
-                        <ArrowRight size={13} className="flex-shrink-0 text-slate-300" />
-                      </Link>
-                    ))}
-                  </div>
-                )}
-
-                {messages.length === 0 && pendingActions.length === 0 ? (
-                  <div className="px-4 py-10 text-center">
-                    <Bell size={20} className="mx-auto mb-2 text-slate-300" />
-                    <p className="text-[13px] text-slate-500">Sin notificaciones</p>
-                  </div>
-                ) : (
-                  messages.map((message) => {
-                    const config = getMessageConfig(message.type);
-                    const Icon = config.icon;
-                    return (
-                      <div key={message.id} className={`border-b border-slate-50 px-4 py-3 last:border-0 ${!message.read ? "bg-[#F7F8FF]" : ""}`}>
-                        <div className="flex items-start gap-3">
-                          <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${config.bg}`}>
-                            <Icon size={14} className={config.text} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="line-clamp-3 text-xs text-slate-800">{message.content}</p>
-                            <div className="mt-1.5 flex items-center justify-between">
-                              <span className="text-[10px] text-slate-400">{message.sentByName}</span>
-                              <button onClick={(e) => { e.stopPropagation(); handleDismissMessage(message.id); }} className="text-[10px] text-slate-400 hover:text-red-500">
-                                Descartar
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              {messages.some((m) => !m.read) && (
-                <button
-                  onClick={() => messages.forEach((m) => { if (!m.read) handleMarkMessageAsRead(m.id); })}
-                  className="w-full border-t border-slate-100 px-4 py-2.5 text-center text-xs text-slate-500 hover:bg-[#F7F7F8] hover:text-slate-800"
-                >
-                  Marcar todas como leídas
-                </button>
-              )}
-            </div>
-          </>
-        )}
 
         {/* Invitaciones */}
         {invitations.length > 0 && (
