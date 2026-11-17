@@ -28,19 +28,13 @@ import {
   Archive,
   ArrowRight,
   ArrowUpDown,
-  BarChart3,
   Bell,
-  Building2,
   Check,
   CheckCircle,
   ChevronDown,
   Clock,
-  ClipboardCheck,
-  Filter,
-  Folder,
-  FolderOpen,
   Info,
-  Mail,
+  Receipt,
   Search,
   Settings,
   Users,
@@ -49,6 +43,8 @@ import {
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
+import ProjectCover from "@/components/ProjectCover";
+import { coverGradient } from "@/lib/projectCover";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -93,6 +89,8 @@ interface Project {
   memberCount?: number;
   archived?: boolean;
   closingAt?: Timestamp | null;
+  coverUrl?: string | null;
+  coverPath?: string | null;
 }
 
 interface Invitation {
@@ -220,6 +218,8 @@ export default function Dashboard() {
                 memberCount: membersSnapshot.size,
                 archived: projectData.archived || false,
                 closingAt: projectData.closingAt || null,
+                coverUrl: projectData.coverUrl || null,
+                coverPath: projectData.coverPath || null,
               } as Project;
             })
           )
@@ -447,177 +447,91 @@ export default function Dashboard() {
     return diffDays > 0 ? diffDays : 0;
   };
 
-  const renderProjectCard = (project: Project) => {
-    const hasConfig = project.permissions.config;
-    const hasAccounting = project.permissions.accounting;
-    const hasTeam = project.permissions.team;
-    const daysUntilClose = getDaysUntilClose(project.closingAt);
-  
-    return (
-      <div key={project.id} className="group relative bg-white border border-slate-200 rounded-2xl p-5 hover:border-slate-300 hover:shadow-lg">
-        {/* Aviso de cierre - Badge absoluto */}
-        {daysUntilClose !== null && (
-          <div className="absolute -top-2 -right-2 px-2 py-1 bg-red-500 text-white rounded-lg flex items-center gap-1 shadow-sm">
-            <Clock size={10} />
-            <span className="text-[10px] font-semibold">{daysUntilClose}d</span>
-          </div>
-        )}
-  
-        {/* Config - icono discreto esquina superior derecha (solo si no hay badge de cierre) */}
-        {hasConfig && daysUntilClose === null && (
-          <Link
-            href={`/project/${project.id}/config`}
-            className="absolute top-3.5 right-4 p-1.5 rounded-lg text-slate-300 hover:text-slate-600 transition-colors"
-            title="Configuración"
-          >
-            <Settings size={14} />
-          </Link>
-        )}
-  
-        {/* Config - icono discreto cuando hay badge de cierre (desplazado) */}
-        {hasConfig && daysUntilClose !== null && (
-          <Link
-            href={`/project/${project.id}/config`}
-            className="absolute top-3.5 right-12 p-1.5 rounded-lg text-slate-300 hover:text-slate-600 transition-colors"
-            title="Configuración"
-          >
-            <Settings size={14} />
-          </Link>
-        )}
-  
-        {/* Nombre y fase */}
-        <div className={`flex items-start justify-between mb-2 ${hasConfig ? "pr-8" : ""}`}>
-          <h2 className="text-base font-semibold text-slate-900 truncate flex-1 min-w-0">{project.name}</h2>
-          <span className="text-[10px] font-medium px-2 py-0.5 rounded-lg bg-slate-100 text-slate-500 ml-2 flex-shrink-0">
-            {project.phase}
-          </span>
-        </div>
-  
-        {/* Productoras */}
-        {project.producerNames && project.producerNames.length > 0 && (
-          <div className="flex items-center gap-1.5 mb-2">
-            <Building2 size={11} className="text-slate-400" />
-            <span className="text-[11px] text-slate-500 truncate">{project.producerNames.join(", ")}</span>
-          </div>
-        )}
-  
-        {/* Rol */}
-        <div className="flex flex-wrap items-center gap-1.5 mb-3">
-          {project.role && (
-            <span className="text-[10px] text-slate-600 bg-slate-100 rounded-lg px-2 py-0.5">{project.role}</span>
-          )}
-          {project.position && (
-            <span className="text-[10px] text-slate-600 bg-slate-100 rounded-lg px-2 py-0.5">{project.position}</span>
-          )}
-        </div>
-  
-        {/* Botones principales */}
-        {(hasAccounting || hasTeam) && (
-          <div className="flex gap-2 pt-3 border-t border-slate-100">
-            {hasAccounting && (
-              <Link href={`/project/${project.id}/accounting`} className="flex-1">
-                <div
-                  className="flex items-center justify-center gap-1.5 p-2 rounded-xl text-xs font-medium border"
-                  style={{
-                    backgroundColor: "rgba(47, 82, 224, 0.1)",
-                    borderColor: "rgba(47, 82, 224, 0.3)",
-                    color: "#2F52E0",
-                  }}
-                >
-                  <BarChart3 size={12} />
-                  Accounting
-                </div>
-              </Link>
-            )}
-            {hasTeam && (
-              <Link href={`/project/${project.id}/team`} className="flex-1">
-                <div
-                  className="flex items-center justify-center gap-1.5 p-2 rounded-xl text-xs font-medium border"
-                  style={{
-                    backgroundColor: "rgba(137, 211, 34, 0.15)",
-                    borderColor: "rgba(137, 211, 34, 0.4)",
-                    color: "#6BA319",
-                  }}
-                >
-                  <Users size={12} />
-                  Team
-                </div>
-              </Link>
-            )}
-          </div>
-        )}
-      </div>
-    );
+  const updateProjectCover = (projectId: string, cover: { url: string | null; path: string | null }) => {
+    setProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, coverUrl: cover.url, coverPath: cover.path } : p)));
   };
 
-  const renderArchivedCard = (project: Project) => {
+  // ── Estilos comunes (mismos que las pantallas de acceso) ──────────────────
+  const control = "flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-[13px] text-slate-700 transition-colors hover:border-slate-300";
+  const softButton = "flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#E4E4E7] bg-[#F1F1F3] px-3 text-[13px] font-medium text-slate-900 transition-colors hover:bg-[#E8E8EB] disabled:opacity-60";
+  const iconButton = "relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-[#F1F1F3] hover:text-slate-900";
+  const glassPill = "inline-flex h-6 items-center gap-1 rounded-md border border-white/25 bg-black/25 px-2 text-[11px] font-medium text-white backdrop-blur-md";
+
+  const renderProjectCard = (project: Project, archived = false) => {
     const hasConfig = project.permissions.config;
     const hasAccounting = project.permissions.accounting;
     const hasTeam = project.permissions.team;
-  
+    const daysUntilClose = archived ? null : getDaysUntilClose(project.closingAt);
+
     return (
-      <div key={project.id} className="group relative bg-slate-50/50 border border-slate-200 rounded-2xl p-5 hover:bg-white hover:border-slate-300 hover:shadow-md transition-all">
-        {/* Config - icono discreto */}
-        {hasConfig && (
-          <Link
-            href={`/project/${project.id}/config`}
-            className="absolute top-3.5 right-4 p-1.5 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors"
-            title="Configuración"
-          >
-            <Settings size={14} />
-          </Link>
-        )}
-  
-        {/* Nombre y badge archivado */}
-        <div className="flex items-start justify-between mb-2 pr-8">
-          <h2 className="text-base font-semibold text-slate-600 truncate flex-1 min-w-0">{project.name}</h2>
-          <span className="text-[10px] font-medium px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 ml-2 flex-shrink-0">
-            Archivado
-          </span>
-        </div>
-  
-        {/* Productoras */}
-        {project.producerNames && project.producerNames.length > 0 && (
-          <div className="flex items-center gap-1.5 mb-2">
-            <Building2 size={11} className="text-slate-400" />
-            <span className="text-[11px] text-slate-400 truncate">{project.producerNames.join(", ")}</span>
-          </div>
-        )}
-  
-        {/* Fase y rol */}
-        <div className="flex flex-wrap items-center gap-1.5 mb-3">
-          <span className="text-[10px] font-medium px-2 py-0.5 rounded-lg bg-slate-100 text-slate-400">
-            {project.phase}
-          </span>
-          {project.role && (
-            <span className="text-[10px] text-slate-500 bg-slate-100 rounded-lg px-2 py-0.5">{project.role}</span>
-          )}
-          {project.position && (
-            <span className="text-[10px] text-slate-500 bg-slate-100 rounded-lg px-2 py-0.5">{project.position}</span>
-          )}
-        </div>
-  
-        {/* Botones principales */}
-        {(hasAccounting || hasTeam) && (
-          <div className="flex gap-2 pt-3 border-t border-slate-200">
-            {hasAccounting && (
-              <Link href={`/project/${project.id}/accounting`} className="flex-1">
-                <div className="flex items-center justify-center gap-1.5 p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-slate-500 text-xs font-medium">
-                  <BarChart3 size={12} />
-                  Accounting
-                </div>
-              </Link>
+      <div
+        key={project.id}
+        className={`group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white transition-all hover:border-slate-300 hover:shadow-[0_12px_32px_-16px_rgba(15,23,42,0.25)] ${archived ? "opacity-75 hover:opacity-100" : ""}`}
+      >
+        {/* Portada */}
+        <ProjectCover
+          projectId={project.id}
+          href={`/project/${project.id}`}
+          compact
+          coverUrl={project.coverUrl}
+          coverPath={project.coverPath}
+          editable={hasConfig}
+          onChange={(cover) => updateProjectCover(project.id, cover)}
+          onError={(msg) => alert(msg)}
+          className={`aspect-[16/7] ${archived ? "grayscale" : ""}`}
+        >
+          <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
+          <div className="absolute left-3 top-3 flex gap-1.5">
+            <span className={glassPill}>{archived ? "Archivado" : project.phase}</span>
+            {daysUntilClose !== null && (
+              <span className={`${glassPill} !border-red-300/40 !bg-red-500/80`}>
+                <Clock size={11} /> Cierra en {daysUntilClose} d
+              </span>
             )}
-            {hasTeam && (
-              <Link href={`/project/${project.id}/team`} className="flex-1">
-                <div className="flex items-center justify-center gap-1.5 p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-slate-500 text-xs font-medium">
-                  <Users size={12} />
-                  Team
-                </div>
+          </div>
+        </ProjectCover>
+
+        {/* Datos */}
+        <div className="flex flex-1 flex-col p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <Link href={`/project/${project.id}`} className="block truncate text-[15px] font-semibold text-slate-900 hover:underline">
+                {project.name}
+              </Link>
+              {project.producerNames && project.producerNames.length > 0 && (
+                <p className="mt-0.5 truncate text-xs text-slate-500">{project.producerNames.join(", ")}</p>
+              )}
+            </div>
+            {hasConfig && (
+              <Link href={`/project/${project.id}/config`} className="-mr-1.5 -mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-[#F1F1F3] hover:text-slate-700" title="Configuración">
+                <Settings size={15} />
               </Link>
             )}
           </div>
-        )}
+
+          {(project.role || project.position) && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {[project.role, project.position].filter(Boolean).map((label) => (
+                <span key={label} className="rounded-md bg-[#F4F4F5] px-2 py-0.5 text-[11px] text-slate-600">{label}</span>
+              ))}
+            </div>
+          )}
+
+          {(hasAccounting || hasTeam) && (
+            <div className="mt-auto flex gap-2 pt-4">
+              {hasAccounting && (
+                <Link href={`/project/${project.id}/accounting`} className={`${softButton} flex-1`}>
+                  <Receipt size={14} style={{ color: "#2F52E0" }} /> Contabilidad
+                </Link>
+              )}
+              {hasTeam && (
+                <Link href={`/project/${project.id}/team`} className={`${softButton} flex-1`}>
+                  <Users size={14} style={{ color: "#6BA319" }} /> Equipo
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -625,119 +539,95 @@ export default function Dashboard() {
   if (loading || userLoading) {
     return (
       <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-        <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
       </div>
     );
   }
 
+  const hasFilters = !!searchTerm || selectedPhase !== "all";
+
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
-      {/* Header con título y notificaciones */}
-      <div className="mt-[53px]">
-        <div className="px-24 pt-10 pb-6">
-          <div className="flex items-center justify-center relative">
-            <h1 className="text-3xl font-bold text-slate-900">Panel de proyectos</h1>
-            
-            {/* Notification Bell */}
-            <div className="absolute right-0 top-1/2 -translate-y-1/2">
-              <button
-                onClick={() => setExpandedMessage(expandedMessage ? null : "panel")}
-                className="relative p-2 hover:bg-slate-100 rounded-xl transition-colors"
-              >
-                <Bell size={20} className="text-slate-500" />
-                {bellBadgeCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                    {bellBadgeCount > 9 ? "9+" : bellBadgeCount}
-                  </span>
-                )}
-              </button>
-            </div>
+      <main className="mx-auto max-w-[1440px] px-6 pb-20 pt-[85px] sm:px-10">
+
+        {/* Cabecera de la página */}
+        <div className="mb-8 flex items-center justify-between gap-4">
+          <div className="flex items-baseline gap-3">
+            <h1 className="text-[1.75rem] font-semibold tracking-tight text-slate-900">Proyectos</h1>
+            {activeProjectsCount > 0 && <span className="text-sm text-slate-400">{activeProjectsCount}</span>}
           </div>
+
+          <button
+            onClick={() => setExpandedMessage(expandedMessage ? null : "panel")}
+            className={iconButton}
+            aria-label="Notificaciones"
+          >
+            <Bell size={18} />
+            {bellBadgeCount > 0 && (
+              <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+                {bellBadgeCount > 9 ? "9+" : bellBadgeCount}
+              </span>
+            )}
+          </button>
         </div>
-      </div>
 
+        {/* Panel de notificaciones */}
+        {expandedMessage === "panel" && (
+          <>
+            <div className="fixed inset-0 z-[100]" onClick={() => setExpandedMessage(null)} />
+            <div className="fixed right-6 top-[132px] z-[101] w-80 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg sm:right-10">
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                <span className="text-[13px] font-semibold text-slate-900">Notificaciones</span>
+                {unreadMessagesCount > 0 && <span className="text-xs text-slate-500">{unreadMessagesCount} sin leer</span>}
+              </div>
 
-      {/* Notification Panel - Fixed position fuera del flow */}
-      {expandedMessage === "panel" && (
-        <>
-          <div 
-            className="fixed inset-0 z-[100]" 
-            onClick={() => setExpandedMessage(null)}
-          />
-          <div className="fixed top-40 right-24 w-80 bg-white border border-slate-200 rounded-2xl shadow-lg z-[101] overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <span className="text-sm font-semibold text-slate-900">Notificaciones</span>
-              {unreadMessagesCount > 0 && (
-                <span className="text-xs text-slate-500">{unreadMessagesCount} sin leer</span>
-              )}
-            </div>
+              <div className="max-h-[28rem] overflow-y-auto">
+                {pendingActions.length > 0 && (
+                  <div className="border-b border-slate-100 py-1">
+                    {pendingActions.map((action) => (
+                      <Link
+                        key={`${action.projectId}-${action.type}`}
+                        href={action.href}
+                        onClick={() => setExpandedMessage(null)}
+                        className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[#F7F7F8]"
+                      >
+                        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[#F1F1F3]">
+                          {action.type === "accounting"
+                            ? <Receipt size={14} style={{ color: "#2F52E0" }} />
+                            : <Users size={14} style={{ color: "#6BA319" }} />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-medium text-slate-900">{action.projectName}</p>
+                          <p className="mt-0.5 text-[11px] text-slate-500">
+                            {action.count} {action.count === 1 ? "aprobación pendiente" : "aprobaciones pendientes"}
+                          </p>
+                        </div>
+                        <ArrowRight size={13} className="flex-shrink-0 text-slate-300" />
+                      </Link>
+                    ))}
+                  </div>
+                )}
 
-            <div className="max-h-[28rem] overflow-y-auto">
-              {/* ── Acciones pendientes ── */}
-              {pendingActions.length > 0 && (
-                <div className="border-b border-slate-100">
-                  <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Pendientes de acción</p>
-                  {pendingActions.map((action) => (
-                    <Link
-                      key={`${action.projectId}-${action.type}`}
-                      href={action.href}
-                      onClick={() => setExpandedMessage(null)}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"
-                    >
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        action.type === "accounting" ? "bg-blue-50" : "bg-green-50"
-                      }`}>
-                        {action.type === "accounting"
-                          ? <BarChart3 size={14} className="text-blue-600" />
-                          : <Users size={14} className="text-green-600" />
-                        }
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-slate-800 truncate">{action.projectName}</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          {action.count} {action.count === 1 ? "aprobación pendiente" : "aprobaciones pendientes"} en {action.type === "accounting" ? "Contabilidad" : "Coordinación"}
-                        </p>
-                      </div>
-                      <ArrowRight size={13} className="text-slate-300 flex-shrink-0" />
-                    </Link>
-                  ))}
-                </div>
-              )}
-
-              {/* ── Mensajes admin ── */}
-              {messages.length === 0 && pendingActions.length === 0 ? (
-                <div className="px-4 py-8 text-center">
-                  <Bell size={24} className="text-slate-300 mx-auto mb-2" />
-                  <p className="text-sm text-slate-500">No hay notificaciones</p>
-                </div>
-              ) : messages.length > 0 && (
-                <>
-                  {pendingActions.length > 0 && (
-                    <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Mensajes</p>
-                  )}
-                  {messages.map((message) => {
+                {messages.length === 0 && pendingActions.length === 0 ? (
+                  <div className="px-4 py-10 text-center">
+                    <Bell size={20} className="mx-auto mb-2 text-slate-300" />
+                    <p className="text-[13px] text-slate-500">Sin notificaciones</p>
+                  </div>
+                ) : (
+                  messages.map((message) => {
                     const config = getMessageConfig(message.type);
                     const Icon = config.icon;
                     return (
-                      <div
-                        key={message.id}
-                        className={`px-4 py-3 border-b border-slate-50 last:border-0 ${!message.read ? "bg-blue-50/50" : ""}`}
-                      >
+                      <div key={message.id} className={`border-b border-slate-50 px-4 py-3 last:border-0 ${!message.read ? "bg-[#F7F8FF]" : ""}`}>
                         <div className="flex items-start gap-3">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${config.bg}`}>
+                          <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${config.bg}`}>
                             <Icon size={14} className={config.text} />
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="text-xs font-medium text-slate-900 line-clamp-2">{message.content}</p>
-                              {!message.read && <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0 mt-1" />}
-                            </div>
-                            <div className="flex items-center justify-between mt-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="line-clamp-3 text-xs text-slate-800">{message.content}</p>
+                            <div className="mt-1.5 flex items-center justify-between">
                               <span className="text-[10px] text-slate-400">{message.sentByName}</span>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleDismissMessage(message.id); }}
-                                className="text-[10px] text-slate-400 hover:text-red-500"
-                              >
+                              <button onClick={(e) => { e.stopPropagation(); handleDismissMessage(message.id); }} className="text-[10px] text-slate-400 hover:text-red-500">
                                 Descartar
                               </button>
                             </div>
@@ -745,280 +635,177 @@ export default function Dashboard() {
                         </div>
                       </div>
                     );
-                  })}
-                </>
-              )}
-            </div>
+                  })
+                )}
+              </div>
 
-            {messages.some((m) => !m.read) && (
-              <div className="px-4 py-2 border-t border-slate-100 bg-slate-50">
+              {messages.some((m) => !m.read) && (
                 <button
                   onClick={() => messages.forEach((m) => { if (!m.read) handleMarkMessageAsRead(m.id); })}
-                  className="text-xs text-slate-500 hover:text-slate-700 w-full text-center"
+                  className="w-full border-t border-slate-100 px-4 py-2.5 text-center text-xs text-slate-500 hover:bg-[#F7F7F8] hover:text-slate-800"
                 >
                   Marcar todas como leídas
                 </button>
-              </div>
-            )}
-          </div>
-                </>
               )}
-
-      <main className="px-24 py-6">
-        {/* Invitaciones */}
-        {invitations.length > 0 && (
-          <div className="mb-6">
-            <div className="rounded-2xl p-6 shadow-lg" style={{ background: 'linear-gradient(to right, #2F52E0, #4F6FE8)' }}>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
-                  <Mail size={20} className="text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-white">
-                    Tienes {invitations.length} {invitations.length === 1 ? "invitación pendiente" : "invitaciones pendientes"}
-                  </h2>
-                </div>
-              </div>
-              <div className="grid gap-3 grid-cols-3">
-                {invitations.map((invitation) => (
-                  <div key={invitation.id} className="bg-white rounded-2xl p-4 shadow-sm">
-                    <div className="flex items-start gap-3 mb-3">
-                      <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <Folder size={18} className="text-slate-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold text-slate-900 truncate">{invitation.projectName}</h3>
-                        <p className="text-xs text-slate-500">Invitado por {invitation.invitedByName}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-medium text-slate-700 bg-slate-100 rounded-lg px-2 py-1">
-                        {invitation.roleType === "project" ? invitation.role : invitation.position}
-                      </span>
-                      {invitation.permissions.accounting && (
-                        <span
-                          className="text-xs px-2 py-1 rounded-lg"
-                          style={{ backgroundColor: 'rgba(47, 82, 224, 0.1)', color: '#2F52E0' }}
-                        >
-                          Accounting
-                        </span>
-                      )}
-                      {invitation.permissions.team && (
-                        <span
-                          className="text-xs px-2 py-1 rounded-lg"
-                          style={{ backgroundColor: 'rgba(137, 211, 34, 0.15)', color: '#6BA319' }}
-                        >
-                          Team
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleAcceptInvitation(invitation)}
-                        disabled={processingInvite === invitation.id}
-                        className="flex-1 flex items-center justify-center gap-1.5 font-medium rounded-xl py-2 text-sm transition-all disabled:opacity-50"
-                        style={{ backgroundColor: '#463E39', color: '#F4F3EE' }}
-                      >
-                        <Check size={14} />
-                        {processingInvite === invitation.id ? "..." : "Aceptar"}
-                      </button>
-                      <button
-                        onClick={() => handleRejectInvitation(invitation.id)}
-                        disabled={processingInvite === invitation.id}
-                        className="flex items-center justify-center px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl py-2 transition-all disabled:opacity-50"
-                      >
-                        <XIcon size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
-          </div>
+          </>
         )}
 
-        {/* Empty state */}
+        {/* Invitaciones */}
+        {invitations.length > 0 && (
+          <section className="mb-10">
+            <h2 className="mb-3 text-[13px] font-medium text-slate-500">
+              {invitations.length === 1 ? "Invitación pendiente" : `${invitations.length} invitaciones pendientes`}
+            </h2>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {invitations.map((invitation) => (
+                <div key={invitation.id} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                  <span className="h-12 w-12 flex-shrink-0 rounded-lg" style={{ background: coverGradient(invitation.projectId) }} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-slate-900">{invitation.projectName}</p>
+                    <p className="truncate text-xs text-slate-500">
+                      {invitation.roleType === "project" ? invitation.role : invitation.position}
+                      {invitation.invitedByName ? ` · ${invitation.invitedByName}` : ""}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleAcceptInvitation(invitation)}
+                    disabled={processingInvite === invitation.id}
+                    className={softButton}
+                  >
+                    <Check size={14} /> {processingInvite === invitation.id ? "…" : "Aceptar"}
+                  </button>
+                  <button
+                    onClick={() => handleRejectInvitation(invitation.id)}
+                    disabled={processingInvite === invitation.id}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-[#F1F1F3] hover:text-slate-700 disabled:opacity-60"
+                    aria-label="Rechazar invitación"
+                  >
+                    <XIcon size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {projects.length === 0 && invitations.length === 0 ? (
-          <div className="border-2 border-dashed border-slate-200 rounded-2xl">
-            <div className="flex items-center justify-center py-20">
-              <div className="text-center">
-                <Folder size={32} className="text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500">No tienes proyectos asignados</p>
-              </div>
+          /* Sin proyectos */
+          <div className="relative overflow-hidden rounded-2xl" style={{ background: coverGradient() }}>
+            <div className="flex aspect-[16/5] min-h-[220px] flex-col items-center justify-center gap-2 text-center">
+              <p className="text-2xl font-semibold tracking-tight text-white">Aún no hay proyectos</p>
+              <p className="text-sm text-white/70">Aparecerán aquí cuando te inviten a uno.</p>
             </div>
           </div>
         ) : (
           <>
-            {/* Barra de filtros */}
+            {/* Barra de herramientas */}
             {activeProjectsCount > 0 && (
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6 relative z-30">
-                <div className="flex flex-row gap-3 items-center">
-                  {/* Buscador */}
-                  <div className="relative flex-1">
-                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Buscar proyectos"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white"
-                    />
-                  </div>
-
-                  {/* Filtros */}
-                  <div className="flex flex-wrap gap-2 flex-shrink-0">
-                    {/* Phase Dropdown */}
-                    <div className="relative" ref={phaseDropdownRef}>
-                      <button
-                        onClick={() => {
-                          setShowPhaseDropdown(!showPhaseDropdown);
-                          setShowSortDropdown(false);
-                        }}
-                        className={`flex items-center gap-2 px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors min-w-[160px] ${
-                          selectedPhase !== "all" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 hover:border-slate-300 text-slate-700 bg-white"
-                        }`}
-                      >
-                        <Filter size={14} className={selectedPhase !== "all" ? "text-white" : "text-slate-400"} />
-                        <span className="flex-1 text-left truncate">{getPhaseLabel()}</span>
-                        <ChevronDown size={14} className={`transition-transform ${showPhaseDropdown ? "rotate-180" : ""} ${selectedPhase !== "all" ? "text-white" : "text-slate-400"}`} />
-                      </button>
-                      {showPhaseDropdown && (
-                        <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-40 py-1 overflow-hidden min-w-full">
-                          {PHASE_OPTIONS.map((option) => (
-                            <button
-                              key={option.value}
-                              onClick={() => {
-                                setSelectedPhase(option.value);
-                                setShowPhaseDropdown(false);
-                              }}
-                              className={`w-full text-left px-4 py-2.5 text-sm transition-colors whitespace-nowrap ${
-                                selectedPhase === option.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"
-                              }`}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Sort Dropdown */}
-                    <div className="relative" ref={sortDropdownRef}>
-                      <button
-                        onClick={() => {
-                          setShowSortDropdown(!showSortDropdown);
-                          setShowPhaseDropdown(false);
-                        }}
-                        className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-medium bg-white hover:border-slate-300 transition-colors"
-                      >
-                        <ArrowUpDown size={14} className="text-slate-400" />
-                        <span className="text-slate-700">{getSortLabel()}</span>
-                        <ChevronDown size={14} className={`text-slate-400 transition-transform ${showSortDropdown ? "rotate-180" : ""}`} />
-                      </button>
-                      {showSortDropdown && (
-                        <div className="absolute top-full right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-40 py-1 overflow-hidden min-w-full">
-                          {SORT_OPTIONS.map((option) => (
-                            <button
-                              key={option.value}
-                              onClick={() => {
-                                setSortBy(option.value as "recent" | "name" | "phase");
-                                setShowSortDropdown(false);
-                              }}
-                              className={`w-full text-left px-4 py-2.5 text-sm transition-colors whitespace-nowrap ${
-                                sortBy === option.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"
-                              }`}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Limpiar filtros */}
-                    {(searchTerm || selectedPhase !== "all") && (
-                      <button
-                        onClick={() => {
-                          setSearchTerm("");
-                          setSelectedPhase("all");
-                        }}
-                        className="flex items-center gap-1.5 px-4 py-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl text-sm font-medium transition-colors"
-                      >
-                        <XIcon size={14} />
-                        Limpiar
-                      </button>
-                    )}
-
-                    {/* Archivados toggle */}
-                    {archivedProjects.length > 0 && (
-                      <button
-                        onClick={() => setShowArchived(!showArchived)}
-                        className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                          showArchived 
-                            ? "bg-amber-100 text-amber-700 border border-amber-200" 
-                            : "text-slate-600 hover:text-slate-700 hover:bg-slate-100 bg-white border border-slate-200"
-                        }`}
-                      >
-                        <Archive size={14} />
-                        <span>{archivedProjects.length} archivado{archivedProjects.length !== 1 ? "s" : ""}</span>
-                      </button>
-                    )}
-                  </div>
+              <div className="relative z-30 mb-6 flex flex-wrap items-center gap-2">
+                <div className="relative w-full sm:w-72">
+                  <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-[13px] text-slate-900 placeholder:text-slate-400 transition focus:border-slate-900 focus:outline-none focus:ring-4 focus:ring-slate-900/10"
+                  />
                 </div>
+
+                {/* Fase */}
+                <div className="relative" ref={phaseDropdownRef}>
+                  <button
+                    onClick={() => { setShowPhaseDropdown(!showPhaseDropdown); setShowSortDropdown(false); }}
+                    className={`${control} ${selectedPhase !== "all" ? "!border-slate-900 font-medium text-slate-900" : ""}`}
+                  >
+                    {getPhaseLabel()}
+                    <ChevronDown size={14} className={`text-slate-400 transition-transform ${showPhaseDropdown ? "rotate-180" : ""}`} />
+                  </button>
+                  {showPhaseDropdown && (
+                    <div className="absolute left-0 top-full z-40 mt-1.5 min-w-[180px] rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
+                      {PHASE_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => { setSelectedPhase(option.value); setShowPhaseDropdown(false); }}
+                          className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-[#F7F7F8] ${
+                            selectedPhase === option.value ? "font-medium text-slate-900" : "text-slate-600"
+                          }`}
+                        >
+                          {option.label}
+                          {selectedPhase === option.value && <Check size={14} />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Orden */}
+                <div className="relative" ref={sortDropdownRef}>
+                  <button onClick={() => { setShowSortDropdown(!showSortDropdown); setShowPhaseDropdown(false); }} className={control}>
+                    <ArrowUpDown size={14} className="text-slate-400" />
+                    {getSortLabel()}
+                  </button>
+                  {showSortDropdown && (
+                    <div className="absolute left-0 top-full z-40 mt-1.5 min-w-[160px] rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
+                      {SORT_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => { setSortBy(option.value as "recent" | "name" | "phase"); setShowSortDropdown(false); }}
+                          className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-[#F7F7F8] ${
+                            sortBy === option.value ? "font-medium text-slate-900" : "text-slate-600"
+                          }`}
+                        >
+                          {option.label}
+                          {sortBy === option.value && <Check size={14} />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {hasFilters && (
+                  <button onClick={() => { setSearchTerm(""); setSelectedPhase("all"); }} className="flex h-9 items-center gap-1 rounded-lg px-2.5 text-[13px] text-slate-500 transition-colors hover:bg-[#F1F1F3] hover:text-slate-900">
+                    <XIcon size={14} /> Limpiar
+                  </button>
+                )}
+
+                {archivedProjects.length > 0 && (
+                  <button
+                    onClick={() => setShowArchived(!showArchived)}
+                    className={`${control} sm:ml-auto ${showArchived ? "!border-slate-900 font-medium text-slate-900" : ""}`}
+                  >
+                    <Archive size={14} className="text-slate-400" />
+                    {archivedProjects.length} archivado{archivedProjects.length !== 1 ? "s" : ""}
+                  </button>
+                )}
               </div>
             )}
 
             {/* Proyectos activos */}
             {activeProjectsCount > 0 && (
-              <>
-                {filteredProjects.length === 0 ? (
-                  <div className="text-center py-16 border-2 border-dashed border-slate-200 rounded-2xl">
-                    <FolderOpen size={32} className="text-slate-300 mx-auto mb-3" />
-                    <p className="text-slate-500 text-sm font-medium mb-2">No se encontraron proyectos</p>
-                    <button
-                      onClick={() => {
-                        setSearchTerm("");
-                        setSelectedPhase("all");
-                      }}
-                      className="text-sm text-slate-700 hover:text-slate-900 font-medium underline"
-                    >
-                      Limpiar filtros
-                    </button>
-                  </div>
-                ) : (
-                  <div className="grid gap-4 grid-cols-3 items-start">
-                    {filteredProjects.map((project) => renderProjectCard(project))}
-                  </div>
-                )}
-              </>
+              filteredProjects.length === 0 ? (
+                <div className="py-20 text-center">
+                  <p className="text-sm text-slate-500">Ningún proyecto coincide con la búsqueda.</p>
+                  <button onClick={() => { setSearchTerm(""); setSelectedPhase("all"); }} className="mt-2 text-sm font-medium text-slate-900 underline-offset-2 hover:underline">
+                    Limpiar filtros
+                  </button>
+                </div>
+              ) : (
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 min-[1280px]:grid-cols-4">
+                  {filteredProjects.map((project) => renderProjectCard(project))}
+                </div>
+              )
             )}
 
-            {/* Proyectos archivados - Siempre visibles si existen */}
-            {archivedProjects.length > 0 && (
-              <div className={`mt-10 ${!showArchived ? 'opacity-60' : ''}`}>
-                <button
-                  onClick={() => setShowArchived(!showArchived)}
-                  className="flex items-center gap-3 mb-5 group cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <Archive size={18} className="text-amber-600" />
-                    <span className="text-base font-semibold text-slate-700">Proyectos archivados</span>
-                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                      {archivedProjects.length}
-                    </span>
-                  </div>
-                  <ChevronDown 
-                    size={16} 
-                    className={`text-slate-400 transition-transform ${showArchived ? 'rotate-180' : ''}`} 
-                  />
-                </button>
-                
-                {showArchived && (
-                  <div className="grid gap-4 grid-cols-3 items-start">
-                    {archivedProjects.map((project) => renderArchivedCard(project))}
-                  </div>
-                )}
-              </div>
+            {/* Archivados */}
+            {archivedProjects.length > 0 && (showArchived || activeProjectsCount === 0) && (
+              <section className="mt-12">
+                <h2 className="mb-4 text-[13px] font-medium text-slate-500">Archivados</h2>
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 min-[1280px]:grid-cols-4">
+                  {archivedProjects.map((project) => renderProjectCard(project, true))}
+                </div>
+              </section>
             )}
           </>
         )}

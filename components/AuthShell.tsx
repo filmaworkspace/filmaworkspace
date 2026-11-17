@@ -6,6 +6,7 @@
 import Image from "next/image";
 import { AlertCircle, Calculator, Receipt, Users } from "lucide-react";
 import { inter } from "@/lib/fonts";
+import { coverGradient } from "@/lib/projectCover";
 
 export const BRAND = "#2F52E0";
 
@@ -80,13 +81,7 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(60% 50% at 85% 15%, rgba(148,190,214,0.85) 0%, transparent 70%)," +
-              "radial-gradient(55% 45% at 10% 90%, rgba(120,150,210,0.7) 0%, transparent 70%)," +
-              "radial-gradient(70% 60% at 30% 30%, rgba(47,82,224,0.55) 0%, transparent 70%)," +
-              "linear-gradient(160deg, #3B5A86 0%, #24406E 45%, #1A2E52 100%)",
-          }}
+          style={{ background: coverGradient() }}
         />
         <div
           aria-hidden="true"

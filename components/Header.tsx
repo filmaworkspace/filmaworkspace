@@ -16,18 +16,15 @@ import { doc, getDoc } from "firebase/firestore";
 import {
   ArrowLeftRight,
   Banknote,
-  BarChart3,
-  Clock,
   Briefcase,
   Building2,
   Calendar,
+  Clock,
   FileSpreadsheet,
-  FileText,
   Folder,
   Info,
   LayoutDashboard,
   LogOut,
-  Menu,
   Package,
   Receipt,
   Settings,
@@ -36,11 +33,11 @@ import {
   UserCog,
   Users,
   Wallet,
-  X,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
+import { coverGradient } from "@/lib/projectCover";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -55,11 +52,11 @@ const ACCOUNTS_NAV = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function Header() {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [envSwitcherOpen, setEnvSwitcherOpen] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>("");
+  const [projectCover, setProjectCover] = useState<string | null>(null);
   const [permissions, setPermissions] = useState({
     config: false,
     accounting: false,
@@ -116,10 +113,13 @@ export default function Header() {
 
   useEffect(() => {
     const loadProjectName = async () => {
-      if (!projectId) { setProjectName(""); return; }
+      if (!projectId) { setProjectName(""); setProjectCover(null); return; }
       try {
         const projectDoc = await getDoc(doc(db, "projects", projectId));
-        if (projectDoc.exists()) setProjectName(projectDoc.data().name || "Proyecto");
+        if (projectDoc.exists()) {
+          setProjectName(projectDoc.data().name || "Proyecto");
+          setProjectCover(projectDoc.data().coverUrl || null);
+        }
       } catch (error) {
         console.error("Error cargando nombre del proyecto:", error);
       }
@@ -236,50 +236,58 @@ export default function Header() {
     : "general"
     : null;
 
-  // ── Shared NavLink ────────────────────────────────────────────────────────
+  // ── Piezas de UI ──────────────────────────────────────────────────────────
   const NavLink = ({ href, isActive, children }: { href: string; isActive: boolean; children: React.ReactNode }) => (
     <Link
       href={href}
-      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all ${
+      className={`flex h-8 items-center gap-1.5 rounded-lg px-3 text-[13px] transition-colors ${
         isActive
-          ? "text-slate-900 bg-slate-100 font-medium"
-          : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+          ? "bg-[#F1F1F3] font-medium text-slate-900"
+          : "text-slate-500 hover:bg-[#F7F7F8] hover:text-slate-900"
       }`}
     >
       {children}
     </Link>
   );
 
-  const SECTION_COLORS: Record<string, string> = {
-    accounting: "text-[#2F52E0]",
-    team: "text-[#6BA319]",
-    config: "text-slate-600",
-  };
-  const SECTION_LABELS: Record<string, string> = {
-    accounting: "Accounting",
-    team: "Team",
-    config: "Config",
+  // Color propio de cada módulo (punto junto al nombre de la sección)
+  const SECTIONS: Record<string, { label: string; color: string }> = {
+    accounting: { label: "Contabilidad", color: "#2F52E0" },
+    team:       { label: "Equipo",       color: "#6BA319" },
+    config:     { label: "Configuración", color: "#64748B" },
   };
 
-  const ProjectBadge = () => {
+  const Separator = () => <span className="select-none text-slate-300">/</span>;
+
+  const Breadcrumb = () => {
+    if (isAccountsSection && accountsProjectName) {
+      return (
+        <div className="flex min-w-0 items-center gap-2.5 text-[13px]">
+          <Separator />
+          <span className="truncate font-medium text-slate-900">{accountsProjectName}</span>
+          <Separator />
+          <span className="text-slate-500">Contabilidad</span>
+        </div>
+      );
+    }
     if (!isInProjectSection || !projectId || !projectName) return null;
+    const section = currentSection ? SECTIONS[currentSection] : null;
     return (
-      <div className="flex items-center gap-2 text-xs">
-        <span className="text-slate-300">·</span>
-        <Link
-          href={`/project/${projectId}`}
-          className="text-slate-600 font-medium uppercase hover:text-slate-900 transition-colors"
-        >
-          {projectName}
+      <div className="flex min-w-0 items-center gap-2.5 text-[13px]">
+        <Separator />
+        <Link href={`/project/${projectId}`} className="flex min-w-0 items-center gap-2 text-slate-900 hover:opacity-75">
+          <span
+            className="h-5 w-5 flex-shrink-0 rounded-md bg-cover bg-center ring-1 ring-black/5"
+            style={projectCover ? { backgroundImage: `url("${projectCover}")` } : { background: coverGradient(projectId) }}
+          />
+          <span className="max-w-[220px] truncate font-medium">{projectName}</span>
         </Link>
-        {currentSection && (
+        {section && (
           <>
-            <span className="text-slate-300">/</span>
-            <Link
-              href={`/project/${projectId}/${currentSection}`}
-              className={`font-medium uppercase hover:opacity-70 transition-opacity ${SECTION_COLORS[currentSection] || "text-slate-600"}`}
-            >
-              {SECTION_LABELS[currentSection] || currentSection}
+            <Separator />
+            <Link href={`/project/${projectId}/${currentSection}`} className="flex items-center gap-1.5 text-slate-500 hover:text-slate-900">
+              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: section.color }} />
+              {section.label}
             </Link>
           </>
         )}
@@ -287,188 +295,109 @@ export default function Header() {
     );
   };
 
-  const AccountsBadge = () => {
-    if (!isAccountsSection || !accountsProjectName) return null;
-    return (
-      <div className="flex items-center gap-2 text-xs">
-        <span className="text-slate-300">·</span>
-        <span className="text-slate-600 font-medium uppercase">{accountsProjectName}</span>
-        <span className="text-slate-300">·</span>
-        <span className="text-xs text-slate-400">Contabilidad</span>
-      </div>
-    );
-  };
+  const iconButton = "flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-[#F1F1F3] hover:text-slate-900";
+  const menuItem = "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-slate-600 transition-colors hover:bg-[#F7F7F8] hover:text-slate-900";
 
   return (
-    <header className={`fixed top-0 left-0 w-full z-50 bg-white border-b border-slate-200 print:hidden ${inter.className}`}>
-      <div className="px-6 py-2.5 flex items-center justify-between">
+    <header className={`fixed left-0 top-0 z-50 w-full border-b border-slate-200/80 bg-white/90 backdrop-blur-md print:hidden ${inter.className}`}>
+      <div className="relative flex h-[52px] items-center justify-between px-5">
 
-        {/* Left: Logo + badge */}
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="select-none flex-shrink-0">
-            <Image src="/logodark.svg" alt="Logo" width={100} height={24} priority />
+        {/* Izquierda: logo + ruta */}
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Link href="/dashboard" className="flex-shrink-0 select-none">
+            <Image src="/logodark.svg" alt="Filma Workspace" width={92} height={22} priority className="h-auto w-[92px]" />
           </Link>
-          {isAccountsSection ? <AccountsBadge /> : <ProjectBadge />}
+          <Breadcrumb />
         </div>
 
-        {/* Center: Navigation - Desktop */}
-        <nav className="flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
+        {/* Centro: navegación de la sección */}
+        <nav className="absolute left-1/2 flex -translate-x-1/2 items-center gap-0.5">
+          {isAccountsSection && accountsProjectId && ACCOUNTS_NAV.map((n) => {
+            const href = `/companydashboard/${accountsProducerId}/accounts/${accountsProjectId}${n.path ? `/${n.path}` : ""}`;
+            return <NavLink key={n.id} href={href} isActive={activeAccountsTab === n.id}>{n.label}</NavLink>;
+          })}
 
-          {/* ── ACCOUNTS section nav ── */}
-          {isAccountsSection && accountsProjectId && (
-            <>
-              {ACCOUNTS_NAV.map((n) => {
-                const href = `/companydashboard/${accountsProducerId}/accounts/${accountsProjectId}${n.path ? `/${n.path}` : ""}`;
-                return (
-                  <NavLink key={n.id} href={href} isActive={activeAccountsTab === n.id}>
-                    {n.label}
-                  </NavLink>
-                );
-              })}
-            </>
-          )}
-
-          {/* ── Default menu ── */}
-          {!isAccountsSection && !isAdminSection && !isAccountingSection && !isTeamSection && !isConfigSection && (
+          {!isAccountsSection && !isAdminSection && !isInProjectSection && (
             <>
               <NavLink href="/dashboard" isActive={pathname === "/dashboard"}>
-                <Folder size={14} />
-                <span>Proyectos</span>
+                <Folder size={15} /> Proyectos
               </NavLink>
               {isAdmin && (
                 <NavLink href="/admindashboard" isActive={false}>
-                  <Shield size={14} />
-                  <span>Admin</span>
+                  <Shield size={15} /> Admin
                 </NavLink>
               )}
             </>
           )}
 
-          {/* ── Admin ── */}
           {isAdminSection && (
             <NavLink href="/admindashboard" isActive={true}>
-              <Shield size={14} />
-              <span>Panel de administración</span>
+              <Shield size={15} /> Administración
             </NavLink>
           )}
 
-          {/* ── Config ── */}
           {isConfigSection && projectId && (
             <>
-              <NavLink href={`/project/${projectId}/config`} isActive={configTab === "general"}>
-                <Info size={14} />
-                <span>General</span>
-              </NavLink>
-              <NavLink href={`/project/${projectId}/config/users`} isActive={configTab === "users"}>
-                <UserCog size={14} />
-                <span>Usuarios</span>
-              </NavLink>
-              <NavLink href={`/project/${projectId}/config/departments`} isActive={configTab === "departments"}>
-                <Briefcase size={14} />
-                <span>Departamentos</span>
-              </NavLink>
+              <NavLink href={`/project/${projectId}/config`} isActive={configTab === "general"}><Info size={15} /> General</NavLink>
+              <NavLink href={`/project/${projectId}/config/users`} isActive={configTab === "users"}><UserCog size={15} /> Usuarios</NavLink>
+              <NavLink href={`/project/${projectId}/config/departments`} isActive={configTab === "departments"}><Briefcase size={15} /> Departamentos</NavLink>
             </>
           )}
 
-          {/* ── Accounting ── */}
           {isAccountingSection && projectId && (
             <>
-              {accountingAccess.panel && (
-                <NavLink href={`/project/${projectId}/accounting`} isActive={accountingPage === "panel"}>
-                  <LayoutDashboard size={14} />
-                  <span>Panel</span>
-                </NavLink>
-              )}
-              {accountingAccess.suppliers && (
-                <NavLink href={`/project/${projectId}/accounting/suppliers`} isActive={accountingPage === "suppliers"}>
-                  <Building2 size={14} />
-                  <span>Proveedores</span>
-                </NavLink>
-              )}
-              {accountingAccess.budget && (
-                <NavLink href={`/project/${projectId}/accounting/budget`} isActive={accountingPage === "budget"}>
-                  <Wallet size={14} />
-                  <span>Presupuesto</span>
-                </NavLink>
-              )}
-              {accountingAccess.users && (
-                <NavLink href={`/project/${projectId}/accounting/users`} isActive={accountingPage === "users"}>
-                  <Users size={14} />
-                  <span>Usuarios</span>
-                </NavLink>
-              )}
-              {accountingAccess.reports && (
-                <NavLink href={`/project/${projectId}/accounting/reports`} isActive={accountingPage === "reports"}>
-                  <FileSpreadsheet size={14} />
-                  <span>Informes</span>
-                </NavLink>
-              )}
+              {accountingAccess.panel     && <NavLink href={`/project/${projectId}/accounting`} isActive={accountingPage === "panel"}><LayoutDashboard size={15} /> Panel</NavLink>}
+              {accountingAccess.suppliers && <NavLink href={`/project/${projectId}/accounting/suppliers`} isActive={accountingPage === "suppliers"}><Building2 size={15} /> Proveedores</NavLink>}
+              {accountingAccess.budget    && <NavLink href={`/project/${projectId}/accounting/budget`} isActive={accountingPage === "budget"}><Wallet size={15} /> Presupuesto</NavLink>}
+              {accountingAccess.users     && <NavLink href={`/project/${projectId}/accounting/users`} isActive={accountingPage === "users"}><Users size={15} /> Usuarios</NavLink>}
+              {accountingAccess.reports   && <NavLink href={`/project/${projectId}/accounting/reports`} isActive={accountingPage === "reports"}><FileSpreadsheet size={15} /> Informes</NavLink>}
             </>
           )}
 
-          {/* ── Team ── */}
           {isTeamSection && projectId && (
             <>
-              <NavLink href={`/project/${projectId}/team`} isActive={teamPage === "panel"}>
-                <LayoutDashboard size={14} />
-                <span>Panel</span>
-              </NavLink>
-              <NavLink href={`/project/${projectId}/team/crew`} isActive={teamPage === "crew"}>
-                <Users size={14} />
-                <span>Crew</span>
-              </NavLink>
-              <NavLink href={`/project/${projectId}/team/calendar`} isActive={teamPage === "calendar"}>
-                <Calendar size={14} />
-                <span>Calendario</span>
-              </NavLink>
-              <NavLink href={`/project/${projectId}/team/payroll`} isActive={teamPage === "payroll"}>
-                <Banknote size={14} />
-                <span>Nóminas</span>
-              </NavLink>
-              <NavLink href={`/project/${projectId}/team/timesheet`} isActive={teamPage === "timesheet"}>
-                <Clock size={14} />
-                <span>Control horario</span>
-              </NavLink>
+              <NavLink href={`/project/${projectId}/team`} isActive={teamPage === "panel"}><LayoutDashboard size={15} /> Panel</NavLink>
+              <NavLink href={`/project/${projectId}/team/crew`} isActive={teamPage === "crew"}><Users size={15} /> Crew</NavLink>
+              <NavLink href={`/project/${projectId}/team/calendar`} isActive={teamPage === "calendar"}><Calendar size={15} /> Calendario</NavLink>
+              <NavLink href={`/project/${projectId}/team/payroll`} isActive={teamPage === "payroll"}><Banknote size={15} /> Nóminas</NavLink>
+              <NavLink href={`/project/${projectId}/team/timesheet`} isActive={teamPage === "timesheet"}><Clock size={15} /> Control horario</NavLink>
             </>
           )}
         </nav>
 
-        {/* Right side */}
-        <div className="relative flex items-center gap-2">
-          {/* BOX Icon */}
+        {/* Derecha */}
+        <div className="relative flex items-center gap-1.5">
+          {/* Cajas (BOX) */}
           {isAccountingSection && projectId && accountingAccess.box && (
-            <Link
-              href={`/project/${projectId}/accounting/box`}
-              className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 shadow-sm hover:shadow-md hover:scale-105 transition-all"
-              title="Cajas (BOX)"
-            >
-              <Package size={14} className="text-white" />
+            <Link href={`/project/${projectId}/accounting/box`} className={iconButton} title="Cajas">
+              <Package size={16} />
             </Link>
           )}
 
-          {/* Environment Switcher */}
+          {/* Cambiar de entorno dentro del proyecto */}
           {isInProjectSection && projectId && (() => {
-            const availableEnvs = [
-              permissions.config     && { key: "config",     icon: Settings,  href: `/project/${projectId}/config`,     bg: "bg-slate-100",              color: "text-slate-600",   hoverBg: "hover:bg-slate-200"                   },
-              permissions.accounting && { key: "accounting", icon: BarChart3,  href: `/project/${projectId}/accounting`, bg: "bg-[rgba(47,82,224,0.1)]",  color: "text-[#2F52E0]",   hoverBg: "hover:bg-[rgba(47,82,224,0.15)]"      },
-              permissions.team       && { key: "team",       icon: Users,      href: `/project/${projectId}/team`,       bg: "bg-[rgba(137,211,34,0.15)]", color: "text-[#6BA319]",  hoverBg: "hover:bg-[rgba(137,211,34,0.25)]"     },
-            ].filter(Boolean) as { key: string; icon: any; href: string; bg: string; color: string; hoverBg: string }[];
-            if (availableEnvs.length <= 1) return null;
-            const otherEnvs = availableEnvs.filter(env => env.key !== currentSection);
-            if (otherEnvs.length === 0) return null;
+            const envs = [
+              permissions.config     && { key: "config",     icon: Settings, href: `/project/${projectId}/config` },
+              permissions.accounting && { key: "accounting", icon: Receipt,  href: `/project/${projectId}/accounting` },
+              permissions.team       && { key: "team",       icon: Users,    href: `/project/${projectId}/team` },
+            ].filter(Boolean) as { key: string; icon: any; href: string }[];
+            const otherEnvs = envs.filter((env) => env.key !== currentSection);
+            if (envs.length <= 1 || otherEnvs.length === 0) return null;
             return (
-              <div className="relative block">
-                <button onClick={() => setEnvSwitcherOpen(!envSwitcherOpen)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Cambiar entorno">
-                  <ArrowLeftRight size={15} />
+              <div className="relative">
+                <button onClick={() => setEnvSwitcherOpen(!envSwitcherOpen)} className={iconButton} title="Cambiar de módulo">
+                  <ArrowLeftRight size={16} />
                 </button>
                 {envSwitcherOpen && <div className="fixed inset-0 z-40" onClick={() => setEnvSwitcherOpen(false)} />}
                 {envSwitcherOpen && (
-                  <div className="absolute right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg p-1.5 z-50 flex gap-1">
+                  <div className="animate-fadeIn absolute right-0 top-full z-50 mt-2 w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
                     {otherEnvs.map((env) => {
                       const Icon = env.icon;
+                      const section = SECTIONS[env.key];
                       return (
-                        <Link key={env.key} href={env.href} onClick={() => setEnvSwitcherOpen(false)} className={`w-8 h-8 rounded-lg ${env.bg} ${env.hoverBg} flex items-center justify-center transition-colors`} title={env.key.charAt(0).toUpperCase() + env.key.slice(1)}>
-                          <Icon size={14} className={env.color} />
+                        <Link key={env.key} href={env.href} onClick={() => setEnvSwitcherOpen(false)} className={menuItem}>
+                          <Icon size={15} style={{ color: section.color }} />
+                          {section.label}
                         </Link>
                       );
                     })}
@@ -478,193 +407,57 @@ export default function Header() {
             );
           })()}
 
-          {/* Budgeting quick access — solo en Dashboard */}
+          {/* Budgeting (solo en el panel de proyectos) */}
           {user?.budgetingAccess && pathname === "/dashboard" && (
             <button
               onClick={openBudgeting}
-              className="flex items-center justify-center h-8 px-2.5 rounded-lg shadow-sm hover:shadow-md hover:scale-105 transition-all"
-              style={{ background: "linear-gradient(135deg, #ED8C6E, #E86F4A)", border: "1px solid rgba(255,255,255,0.25)" }}
+              className="flex h-8 items-center justify-center rounded-lg px-2.5 transition-opacity hover:opacity-90"
+              style={{ background: "linear-gradient(135deg, #ED8C6E, #E86F4A)" }}
               title="Budgeting"
             >
               <Image src="/logo-budgeting-white.svg" alt="Budgeting" width={26} height={8} className="h-2.5 w-auto" />
             </button>
           )}
 
-          {/* Profile Avatar */}
-          <button onClick={() => setProfileOpen(!profileOpen)} className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-semibold hover:bg-slate-800 transition-colors">
+          {/* Perfil */}
+          <button
+            onClick={() => setProfileOpen(!profileOpen)}
+            className="ml-1 flex h-8 w-8 items-center justify-center rounded-full border border-[#E4E4E7] bg-[#F1F1F3] text-xs font-semibold text-slate-700 transition-colors hover:bg-[#E8E8EB]"
+            aria-label="Menú de usuario"
+          >
             {userInitial}
           </button>
           {profileOpen && <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />}
           {profileOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-44 bg-white border border-slate-200 rounded-xl shadow-lg py-1 text-xs z-50 animate-fadeIn">
-              <div className="px-3 py-2 border-b border-slate-100">
-                <p className="font-medium text-slate-900 truncate">{userName}</p>
-                {isAdmin && <span className="inline-block mt-1 text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">Admin</span>}
+            <div className="animate-fadeIn absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
+              <div className="px-2.5 pb-2 pt-1.5">
+                <p className="truncate text-[13px] font-medium text-slate-900">{userName}</p>
+                {user?.email && <p className="truncate text-xs text-slate-500">{user.email}</p>}
               </div>
+              <div className="my-1 border-t border-slate-100" />
               {isAdmin && (
-                <Link href="/admindashboard" className="flex items-center gap-2 px-3 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition" onClick={() => setProfileOpen(false)}>
-                  <Shield size={13} /> Administración
+                <Link href="/admindashboard" className={menuItem} onClick={() => setProfileOpen(false)}>
+                  <Shield size={15} /> Administración
                 </Link>
               )}
-              <Link href="/profile" className="flex items-center gap-2 px-3 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition" onClick={() => setProfileOpen(false)}>
-                <User size={13} /> Mi cuenta
+              <Link href="/profile" className={menuItem} onClick={() => setProfileOpen(false)}>
+                <User size={15} /> Mi cuenta
               </Link>
-              <div className="border-t border-slate-100 my-0.5" />
-              <button onClick={handleLogout} className="flex w-full items-center gap-2 px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-red-50 text-left transition">
-                <LogOut size={13} /> Cerrar sesión
+              <div className="my-1 border-t border-slate-100" />
+              <button onClick={handleLogout} className={`${menuItem} hover:!bg-red-50 hover:!text-red-600`}>
+                <LogOut size={15} /> Cerrar sesión
               </button>
             </div>
           )}
-
-          {/* Mobile Menu Button */}
-          <button className="hidden p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition" onClick={() => setMenuOpen(!menuOpen)}>
-            {menuOpen ? <X size={18} /> : <Menu size={18} />}
-          </button>
         </div>
       </div>
-
-      {/* ── Mobile Menu ───────────────────────────────────────────────────── */}
-      {menuOpen && (
-        <div className="hidden bg-white border-t border-slate-100">
-          <nav className="flex flex-col p-2 gap-0.5">
-
-            {/* Accounts section — mobile */}
-            {isAccountsSection && accountsProjectId && (
-              <>
-                <div className="px-3 py-2 mb-1">
-                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
-                    <span className="text-slate-900 font-semibold uppercase">{accountsProjectName}</span>
-                    <span className="text-slate-400 text-[10px]">Contabilidad</span>
-                  </div>
-                </div>
-                <div className="border-t border-slate-100 my-1" />
-                <p className="px-3 py-1 text-[10px] text-slate-400 uppercase tracking-wider">Secciones</p>
-                {ACCOUNTS_NAV.map((n) => {
-                  const href     = `/companydashboard/${accountsProducerId}/accounts/${accountsProjectId}${n.path ? `/${n.path}` : ""}`;
-                  const isActive = activeAccountsTab === n.id;
-                  return (
-                    <Link key={n.id} href={href} onClick={() => setMenuOpen(false)}
-                      className={`flex items-center px-3 py-2 rounded-lg text-xs ${
-                        isActive ? "text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                      }`}>
-                      {n.label}
-                    </Link>
-                  );
-                })}
-                <div className="border-t border-slate-100 my-1" />
-                <button onClick={() => { setMenuOpen(false); handleLogout(); }} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-600 hover:text-red-600 hover:bg-red-50 text-left">
-                  <LogOut size={14} /> Cerrar sesión
-                </button>
-              </>
-            )}
-
-            {/* All other sections */}
-            {!isAccountsSection && (
-              <>
-                {isInProjectSection && projectId && projectName && (
-                  <>
-                    <div className="px-3 py-2 mb-1">
-                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
-                        <Link href={`/project/${projectId}`} onClick={() => setMenuOpen(false)} className="text-slate-900 font-semibold uppercase hover:text-slate-700">{projectName}</Link>
-                        <span className="text-slate-300">·</span>
-                        <div className="flex items-center gap-1">
-                          {permissions.config && <Link href={`/project/${projectId}/config`} onClick={() => setMenuOpen(false)} className={currentSection === "config" ? "text-slate-900 font-semibold" : "text-slate-500"}>Config</Link>}
-                          {permissions.config && (permissions.accounting || permissions.team) && <span className="text-slate-300">/</span>}
-                          {permissions.accounting && <Link href={`/project/${projectId}/accounting`} onClick={() => setMenuOpen(false)} className={currentSection === "accounting" ? "text-slate-900 font-semibold" : "text-slate-500"}>Accounting</Link>}
-                          {permissions.accounting && permissions.team && <span className="text-slate-300">/</span>}
-                          {permissions.team && <Link href={`/project/${projectId}/team`} onClick={() => setMenuOpen(false)} className={currentSection === "team" ? "text-slate-900 font-semibold" : "text-slate-500"}>Team</Link>}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="border-t border-slate-100 my-1" />
-                    <p className="px-3 py-1 text-[10px] text-slate-400 uppercase tracking-wider">En esta sección</p>
-                  </>
-                )}
-
-                {!isAdminSection && !isAccountingSection && !isTeamSection && !isConfigSection ? (
-                  <>
-                    <Link href="/dashboard" onClick={() => setMenuOpen(false)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${pathname === "/dashboard" ? "text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}><Folder size={14} />Proyectos</Link>
-                    {isAdmin && <Link href="/admindashboard" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50"><Shield size={14} />Administración</Link>}
-                    <div className="border-t border-slate-100 my-1" />
-                    <Link href="/profile" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50"><User size={14} />Mi cuenta</Link>
-                    <button onClick={() => { setMenuOpen(false); handleLogout(); }} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-600 hover:text-red-600 hover:bg-red-50 text-left"><LogOut size={14} />Cerrar sesión</button>
-                  </>
-                ) : isAdminSection ? (
-                  <>
-                    <Link href="/admindashboard" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50"><Shield size={14} />Panel de administración</Link>
-                    <div className="border-t border-slate-100 my-1" />
-                    <Link href="/dashboard" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50"><Folder size={14} />Proyectos</Link>
-                    <Link href="/profile" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50"><User size={14} />Mi cuenta</Link>
-                    <button onClick={() => { setMenuOpen(false); handleLogout(); }} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-600 hover:text-red-600 hover:bg-red-50 text-left"><LogOut size={14} />Cerrar sesión</button>
-                  </>
-                ) : isConfigSection ? (
-                  <>
-                    <Link href={`/project/${projectId}/config`} onClick={() => setMenuOpen(false)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${configTab === "general" ? "text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}><Info size={14} />General</Link>
-                    <Link href={`/project/${projectId}/config/users`} onClick={() => setMenuOpen(false)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${configTab === "users" ? "text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}><UserCog size={14} />Usuarios</Link>
-                    <Link href={`/project/${projectId}/config/departments`} onClick={() => setMenuOpen(false)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${configTab === "departments" ? "text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}><Briefcase size={14} />Departamentos</Link>
-                    <div className="border-t border-slate-100 my-1" />
-                    <button onClick={() => { setMenuOpen(false); handleLogout(); }} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-600 hover:text-red-600 hover:bg-red-50 text-left"><LogOut size={14} />Cerrar sesión</button>
-                  </>
-                ) : isAccountingSection ? (
-                  <>
-                    {accountingAccess.panel     && <Link href={`/project/${projectId}/accounting`}           onClick={() => setMenuOpen(false)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${accountingPage === "panel"     ? "text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}><LayoutDashboard size={14} />Panel</Link>}
-                    {accountingAccess.suppliers && <Link href={`/project/${projectId}/accounting/suppliers`} onClick={() => setMenuOpen(false)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${accountingPage === "suppliers" ? "text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}><Building2 size={14} />Proveedores</Link>}
-                    {accountingAccess.budget    && <Link href={`/project/${projectId}/accounting/budget`}    onClick={() => setMenuOpen(false)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${accountingPage === "budget"    ? "text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}><Wallet size={14} />Presupuesto</Link>}
-                    {accountingAccess.users     && <Link href={`/project/${projectId}/accounting/users`}     onClick={() => setMenuOpen(false)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${accountingPage === "users"     ? "text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}><Users size={14} />Usuarios</Link>}
-                    {accountingAccess.reports   && <Link href={`/project/${projectId}/accounting/reports`}   onClick={() => setMenuOpen(false)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${accountingPage === "reports"   ? "text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}><BarChart3 size={14} />Informes</Link>}
-                    <div className="border-t border-slate-100 my-1" />
-                    <button onClick={() => { setMenuOpen(false); handleLogout(); }} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-600 hover:text-red-600 hover:bg-red-50 text-left"><LogOut size={14} />Cerrar sesión</button>
-                  </>
-                ) : isTeamSection ? (
-                  <>
-                    <Link href={`/project/${projectId}/team`} onClick={() => setMenuOpen(false)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${
-                        teamPage === "panel"
-                          ? "text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50"
-                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                      }`}>
-                      <LayoutDashboard size={14} />Panel
-                    </Link>
-                    <Link href={`/project/${projectId}/team/crew`} onClick={() => setMenuOpen(false)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${
-                        teamPage === "crew"
-                          ? "text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50"
-                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                      }`}>
-                      <Users size={14} />Crew
-                    </Link>
-                    <Link href={`/project/${projectId}/team/calendar`} onClick={() => setMenuOpen(false)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${
-                        teamPage === "calendar"
-                          ? "text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50"
-                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                      }`}>
-                      <Calendar size={14} />Calendario
-                    </Link>
-                    <Link href={`/project/${projectId}/team/payroll`} onClick={() => setMenuOpen(false)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${
-                        teamPage === "payroll"
-                          ? "text-slate-900 font-medium border-l-2 border-slate-900 bg-slate-50"
-                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                      }`}>
-                      <Banknote size={14} />Nóminas
-                    </Link>
-                    <div className="border-t border-slate-100 my-1" />
-                    <button onClick={() => { setMenuOpen(false); handleLogout(); }} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-600 hover:text-red-600 hover:bg-red-50 text-left"><LogOut size={14} />Cerrar sesión</button>
-                  </>
-                ) : null}
-              </>
-            )}
-          </nav>
-        </div>
-      )}
 
       <style jsx>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(-4px); }
           to   { opacity: 1; transform: translateY(0);    }
         }
-        .animate-fadeIn { animation: fadeIn 0.1s ease-out; }
+        :global(.animate-fadeIn) { animation: fadeIn 0.12s ease-out; }
       `}</style>
     </header>
   );

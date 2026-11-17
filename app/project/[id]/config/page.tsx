@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+import ProjectCover from "@/components/ProjectCover";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
@@ -59,6 +60,8 @@ interface ProjectData {
   createdAt: Timestamp;
   updatedAt?: Timestamp;
   archived?: boolean;
+  coverUrl?: string | null;
+  coverPath?: string | null;
 }
 
 interface Producer {
@@ -164,6 +167,8 @@ export default function ConfigGeneral() {
             createdAt: d.createdAt,
             updatedAt: d.updatedAt,
             archived: d.archived || false,
+            coverUrl: d.coverUrl || null,
+            coverPath: d.coverPath || null,
           });
           setProjectForm({ name: d.name, phase: d.phase, description: d.description || "" });
         }
@@ -414,6 +419,21 @@ export default function ConfigGeneral() {
         {!editingProject && !editingProduction ? (
           /* VIEW MODE */
           <div className="space-y-8">
+            {/* Portada */}
+            <ProjectCover
+              projectId={id as string}
+              coverUrl={project?.coverUrl}
+              coverPath={project?.coverPath}
+              editable
+              alwaysShowControls
+              className="aspect-[16/4] min-h-[140px] rounded-2xl"
+              onChange={(cover) => {
+                setProject((prev) => (prev ? { ...prev, coverUrl: cover.url, coverPath: cover.path } : prev));
+                showToast("success", cover.url ? "Portada actualizada" : "Portada eliminada");
+              }}
+              onError={(msg) => showToast("error", msg)}
+            />
+
             {/* Project Identity */}
             <section>
               <div className="flex items-baseline gap-4 mb-1">

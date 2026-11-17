@@ -90,6 +90,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        // Mientras se cargan sus datos no hay que redirigir a /login: justo
+        // después de iniciar sesión, la página de destino podría ver user=null
+        // y devolver al usuario al login.
+        setIsLoading(true);
         await loadUserData(firebaseUser);
       } else {
         setUser(null);
