@@ -95,8 +95,8 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
         />
 
         {/* Titular */}
-        <div className="relative z-10 flex w-full max-w-[600px] flex-1 items-center">
-          <h2 className="text-5xl font-semibold leading-[1.05] tracking-tight text-white xl:text-6xl">
+        <div className="relative z-10 flex w-full max-w-[600px] flex-1 items-center justify-center">
+          <h2 className="text-center text-5xl font-semibold leading-[1.05] tracking-tight text-white xl:text-6xl">
             {HEADLINE}
           </h2>
         </div>
