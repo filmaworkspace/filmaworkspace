@@ -691,7 +691,7 @@ export default function ControlHorarioPage() {
         </div>
       </div>
 
-      <main className="px-6 sm:px-10 pb-16">
+      <main className="px-6 sm:px-10 pt-6 pb-16">
 
         {/* ── Navegador de fecha (mes + tira de días) ──────────────────────── */}
         <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 pt-3 pb-3.5 mb-8">

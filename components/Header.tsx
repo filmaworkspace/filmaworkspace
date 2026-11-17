@@ -268,12 +268,10 @@ export default function Header() {
       href={href}
       aria-current={isActive ? "page" : undefined}
       className={`relative flex h-8 items-center gap-1.5 px-2.5 text-[12.5px] transition-colors ${
-        isActive ? "font-medium text-slate-900" : "text-slate-500 hover:text-slate-900"
+        isActive ? "font-semibold text-slate-900" : "text-slate-500 hover:text-slate-900"
       }`}
     >
       {children}
-      {/* Marca fina de página activa, a ras del borde inferior del header */}
-      {isActive && <span className="absolute inset-x-2.5 -bottom-[10px] h-[1.5px] rounded-full bg-slate-900" />}
     </Link>
   );
 

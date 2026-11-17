@@ -697,7 +697,7 @@ export default function PayrollPage() {
       </div>
 
       {/* ── Controls + legend ────────────────────────────────────────────── */}
-      <div className="px-6 sm:px-10 pb-6">
+      <div className="px-6 sm:px-10 pt-6 pb-6">
         <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             {/* Month nav */}
