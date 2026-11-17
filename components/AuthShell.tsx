@@ -12,7 +12,13 @@ export const BRAND = "#2F52E0";
 
 
 // Titular del panel derecho.
-const HEADLINE = "Esto es cine.";
+const HEADLINE = (
+  <>
+    Toda la producción,
+    <br />
+    en una única plataforma.
+  </>
+);
 
 // ─── Estilos compartidos ─────────────────────────────────────────────────────
 const FIELD =
@@ -86,14 +92,14 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
 
         {/* Titular */}
         <div className="relative z-10 flex w-full max-w-[600px] flex-1 items-center justify-center">
-          <h2 className="text-center text-5xl font-semibold leading-[1.05] tracking-tight text-white xl:text-6xl">
+          <h2 className="text-center text-4xl font-semibold leading-[1.1] tracking-tight text-white xl:text-5xl">
             {HEADLINE}
           </h2>
         </div>
 
         {/* Marca, abajo y separada por una línea */}
         <div className="relative z-10 w-full max-w-[600px]">
-          <p className="border-t border-white/20 pt-6 text-sm text-white/70">
+          <p className="border-t border-white/20 pt-6 text-center text-sm text-white/70">
             © {new Date().getFullYear()} Filma Workspace
           </p>
         </div>
