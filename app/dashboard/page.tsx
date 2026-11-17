@@ -17,7 +17,6 @@ import {
   orderBy,
   query,
   QueryDocumentSnapshot,
-  setDoc,
   Timestamp,
   updateDoc,
   where,
@@ -152,7 +151,6 @@ export default function Dashboard() {
   const sortDropdownRef = useRef<HTMLDivElement>(null);
 
   const userId = user?.uid || null;
-  const userName = user?.name || "Usuario";
   const userEmail = user?.email || "";
 
   useEffect(() => {
@@ -357,48 +355,23 @@ export default function Dashboard() {
     if (!userId) return;
     setProcessingInvite(invitation.id);
     try {
-      await updateDoc(doc(db, "invitations", invitation.id), { status: "accepted", respondedAt: new Date() });
-      // Log: invitation accepted
-      try {
-        const { addDoc, collection: col, serverTimestamp: sts } = await import("firebase/firestore");
-        const { db: fdb } = await import("@/lib/firebase");
-        await addDoc(col(fdb, `projects/${invitation.projectId}/logs`), {
-          type: "invitation_accepted",
-          actorName: userName,
-          actorEmail: userEmail,
-          createdAt: sts(),
-        });
-      } catch (_) {}
-      await setDoc(doc(db, `projects/${invitation.projectId}/members`, userId), {
-        userId,
-        name: userName,
-        email: userEmail,
-        role: invitation.role || null,
-        department: invitation.department || null,
-        position: invitation.position || null,
-        permissions: {
-          config: invitation.permissions.config || false,
-          accounting: invitation.permissions.accounting,
-          team: invitation.permissions.team,
-        },
-        addedAt: new Date(),
+      // La aceptación la hace el servidor: copia los permisos de la invitación
+      // al proyecto. Las reglas de Firestore no dejan que un usuario se añada
+      // a sí mismo a un proyecto.
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/accept-invitation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ invitationId: invitation.id }),
       });
-      await setDoc(doc(db, `userProjects/${userId}/projects/${invitation.projectId}`), {
-        projectId: invitation.projectId,
-        role: invitation.role || null,
-        department: invitation.department || null,
-        position: invitation.position || null,
-        permissions: {
-          config: invitation.permissions.config || false,
-          accounting: invitation.permissions.accounting,
-          team: invitation.permissions.team,
-        },
-        addedAt: new Date(),
-      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
       setReloadTrigger((t) => t + 1);
     } catch (error) {
       console.error("Error aceptando invitación:", error);
-      alert("Error al aceptar la invitación");
+      alert(error instanceof Error && error.message ? `Error al aceptar la invitación: ${error.message}` : "Error al aceptar la invitación");
       setProcessingInvite(null);
     }
   };

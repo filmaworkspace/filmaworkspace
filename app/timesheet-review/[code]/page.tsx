@@ -3,10 +3,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { inter } from "@/lib/fonts";
-import { db } from "@/lib/firebase";
-import {
-  doc, getDoc, collection, query, where, getDocs, orderBy,
-} from "firebase/firestore";
 import { AlertCircle, CheckCircle2, Clock, ExternalLink, LogIn, LogOut } from "lucide-react";
 import Image from "next/image";
 
@@ -56,24 +52,15 @@ export default function TimesheetReviewPage() {
   useEffect(() => {
     (async () => {
       try {
-        const accessSnap = await getDoc(doc(db, "horarioAccess", code));
-        if (!accessSnap.exists() || !accessSnap.data().active) {
+        // El servidor valida el código y devuelve solo los horarios de esta persona.
+        const res = await fetch(`/api/horario/review?code=${encodeURIComponent(code)}`);
+        if (!res.ok) {
           setStatus("notfound");
           return;
         }
-        const accessData = accessSnap.data() as AccessDoc;
-        setAccess(accessData);
-
-        // Load all forms for this person + project
-        const q = query(
-          collection(db, "horarioForms"),
-          where("recipientUid", "==", accessData.recipientUid),
-          where("projectId",    "==", accessData.projectId),
-          orderBy("date", "desc"),
-        );
-        const snap = await getDocs(q);
-        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as FormDoc));
-        setForms(docs);
+        const data = await res.json() as { access: AccessDoc; forms: FormDoc[] };
+        setAccess(data.access);
+        setForms(data.forms);
         setStatus("ready");
       } catch (e) {
         console.error(e);
