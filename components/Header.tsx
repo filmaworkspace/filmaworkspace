@@ -9,23 +9,20 @@ import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
-import {
-  signOut,
-} from "firebase/auth";
-import {
-  doc,
-  getDoc,
-} from "firebase/firestore";
+import { signOut } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
   ArrowLeftRight,
   Banknote,
+  Briefcase,
   Building2,
   Calendar,
   Clock,
   FileSpreadsheet,
   Folder,
+  Info,
   LayoutDashboard,
   LogOut,
   Package,
@@ -33,6 +30,7 @@ import {
   Settings,
   Shield,
   User,
+  UserCog,
   Users,
   Wallet,
 } from "lucide-react";
@@ -367,9 +365,9 @@ export default function Header() {
 
           {isConfigSection && projectId && (
             <>
-              <NavLink href={`/project/${projectId}/config`} isActive={configTab === "general"}>General</NavLink>
-              <NavLink href={`/project/${projectId}/config/users`} isActive={configTab === "users"}>Usuarios</NavLink>
-              <NavLink href={`/project/${projectId}/config/departments`} isActive={configTab === "departments"}>Departamentos</NavLink>
+              <NavLink href={`/project/${projectId}/config`} isActive={configTab === "general"}><Info size={14} /> General</NavLink>
+              <NavLink href={`/project/${projectId}/config/users`} isActive={configTab === "users"}><UserCog size={14} /> Usuarios</NavLink>
+              <NavLink href={`/project/${projectId}/config/departments`} isActive={configTab === "departments"}><Briefcase size={14} /> Departamentos</NavLink>
             </>
           )}
 
