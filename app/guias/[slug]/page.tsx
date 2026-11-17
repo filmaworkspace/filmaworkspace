@@ -48,7 +48,7 @@ export default function GuidePublicPage() {
   if (status === "loading") {
     return (
       <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-        <div className="w-10 h-10 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
       </div>
     );
   }

@@ -350,7 +350,7 @@ export default function ReplaceDocumentPage() {
   if (loading || permissionsLoading) {
     return (
       <div className={`${inter.className} min-h-screen bg-white flex items-center justify-center`}>
-        <div className="w-8 h-8 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
       </div>
     );
   }

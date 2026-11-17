@@ -814,7 +814,7 @@ export default function ApprovalsPage() {
   const getCheckIcon = (status: AutoCheck["status"]) => { switch (status) { case "pass": return <CheckCircle size={14} className="text-emerald-500" />; case "warning": return <AlertTriangle size={14} className="text-amber-500" />; case "fail": return <XCircle size={14} className="text-red-500" />; case "info": return <Info size={14} className="text-blue-500" />; } };
   const getCheckBg = (status: AutoCheck["status"]) => { switch (status) { case "pass": return "bg-emerald-50 border-emerald-200"; case "warning": return "bg-amber-50 border-amber-200"; case "fail": return "bg-red-50 border-red-200"; case "info": return "bg-blue-50 border-blue-200"; } };
 
-  if (loading) return (<div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}><div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" /></div>);
+  if (loading) return (<div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}><div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" /></div>);
 
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>

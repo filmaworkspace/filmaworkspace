@@ -404,7 +404,7 @@ export default function AccountingUsersPage() {
     return <span className={`w-2 h-2 rounded-full ${accessLevel.dot}`}></span>;
   };
 
-  if (loading) { return (<div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}><div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" /></div>); }
+  if (loading) { return (<div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}><div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" /></div>); }
   if (errorMessage && !hasAccountingAccess) { return (<div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}><div className="text-center max-w-md"><AlertCircle size={48} className="mx-auto text-red-500 mb-4" /><p className="text-slate-700 mb-4">{errorMessage}</p><Link href="/dashboard" className="text-slate-900 hover:underline font-medium">Volver al panel principal</Link></div></div>); }
 
   return (

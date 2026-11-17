@@ -1160,7 +1160,7 @@ export default function NewPOPage() {
   if (permissionsLoading || loading) {
     return (
       <div className={cx("min-h-screen bg-white flex items-center justify-center", inter.className)}>
-        <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
       </div>
     );
   }

@@ -318,7 +318,7 @@ function ReceivedSourcesModal({
         <div className="overflow-y-auto flex-1">
           {loading ? (
             <div className="flex items-center justify-center py-10">
-              <div className="w-6 h-6 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
             </div>
           ) : sources.length === 0 ? (
             <p className="text-xs text-slate-400 text-center py-8">Ninguna línea redirige aquí ahora mismo</p>
@@ -1382,7 +1382,7 @@ export default function BudgetingSubchapterPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
       </div>
     );
   }

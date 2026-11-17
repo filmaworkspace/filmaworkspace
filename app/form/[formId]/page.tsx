@@ -3,11 +3,28 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { db, storage } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, setDoc, Timestamp } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  updateDoc,
+  Timestamp,
+} from "firebase/firestore";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import {
-  AlertCircle, ArrowLeft, ArrowRight, Check, CheckCircle2,
-  Eye, EyeOff, Loader2, Lock, Plus, Trash2, Upload, User, X,
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Plus,
+  Trash2,
+  Upload,
+  User,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -764,7 +781,7 @@ export default function FormPage() {
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#FAF8F5" }}>
-      <Loader2 size={28} className="animate-spin" style={{ color: D }} />
+      <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
     </div>
   );
 

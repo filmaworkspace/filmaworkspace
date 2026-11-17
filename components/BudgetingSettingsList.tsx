@@ -108,7 +108,7 @@ export default function BudgetingSettingsList({ draftId, arrayField, fields, emp
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
       </div>
     );
   }

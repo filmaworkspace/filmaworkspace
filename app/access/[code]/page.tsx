@@ -255,7 +255,7 @@ const allowances = access
   // ── Loading ───────────────────────────────────────────────────────────────
   if (status === "loading") return (
     <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor:"#FAF8F5" }}>
-      <div className="w-8 h-8 border-3 border-stone-200 border-t-stone-500 rounded-full animate-spin" style={{ borderWidth:3 }} />
+      <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
     </div>
   );
 
@@ -531,7 +531,7 @@ const allowances = access
           <div className="overflow-y-auto flex-1 px-4 py-2">
             {sheetLoading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="w-6 h-6 border-2 border-stone-200 border-t-stone-500 rounded-full animate-spin"/>
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700"/>
               </div>
             ) : (
               Array.from({length:sheetDays}, (_,i) => i+1).map(d => {

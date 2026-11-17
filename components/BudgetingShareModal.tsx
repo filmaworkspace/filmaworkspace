@@ -126,7 +126,7 @@ export default function BudgetingShareModal({
         <div className="flex-1 overflow-y-auto px-2.5 pb-3">
           {loadingUsers ? (
             <div className="flex items-center justify-center py-10">
-              <div className="w-6 h-6 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
             </div>
           ) : filtered.length === 0 ? (
             <p className="text-xs text-slate-400 text-center py-8">

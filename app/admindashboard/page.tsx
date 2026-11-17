@@ -32,30 +32,23 @@ import {
   Activity,
   AlertCircle,
   AlertTriangle,
-  ArrowRight,
   Bell,
   BookOpen,
   Briefcase,
   Building2,
-  Calendar,
   CheckCircle,
   CheckSquare,
   ChevronDown,
-  ChevronRight,
-  Clapperboard,
   Clock,
   Crown,
   Download,
   Edit2,
   ExternalLink,
   Eye,
-  Film,
-  Folder,
   FolderOpen,
   FolderPlus,
   Hash,
   Info,
-  LayoutDashboard,
   Mail,
   MessageSquare,
   MoreHorizontal,
@@ -69,7 +62,6 @@ import {
   Sparkles,
   Square,
   Trash2,
-  TrendingUp,
   UserCheck,
   UserPlus,
   Users,
@@ -1738,7 +1730,7 @@ export default function AdminDashboard() {
   if (loading || userLoading) {
     return (
       <div className={"min-h-screen bg-white flex items-center justify-center " + inter.className}>
-        <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
       </div>
     );
   }
@@ -3042,7 +3034,7 @@ export default function AdminDashboard() {
 
             {systemDataLoading ? (
               <div className="flex items-center justify-center py-16">
-                <Loader2 size={20} className="animate-spin text-slate-400" />
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
               </div>
             ) : systemSubTab === "cron" ? (
               cronRuns.length === 0 ? (
@@ -4170,7 +4162,7 @@ export default function AdminDashboard() {
 
             {automatedMessagesLoading ? (
               <div className="flex-1 flex items-center justify-center py-16">
-                <Loader2 size={20} className="animate-spin text-slate-400" />
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto p-6 space-y-5">

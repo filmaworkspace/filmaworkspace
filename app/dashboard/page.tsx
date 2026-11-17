@@ -413,7 +413,7 @@ export default function Dashboard() {
   if (loading || userLoading) {
     return (
       <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
       </div>
     );
   }
