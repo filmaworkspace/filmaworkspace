@@ -8,9 +8,9 @@ import { auth, db } from "@/lib/firebase";
 import { browserLocalPersistence, createUserWithEmailAndPassword, setPersistence, updateProfile } from "firebase/auth";
 import { doc, setDoc, Timestamp } from "firebase/firestore";
 
-import { ArrowLeft, ArrowRight, ChevronDown, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, Eye, EyeOff } from "lucide-react";
 
-import AuthShell, { AuthError, BRAND, Spinner, authStyles as ui } from "@/components/AuthShell";
+import AuthShell, { AuthError, Spinner, authStyles as ui } from "@/components/AuthShell";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -200,20 +200,19 @@ export default function RegisterPage() {
             <div>
               <label htmlFor="name" className={ui.label}>Nombre completo</label>
               <div className="relative">
-                <User size={16} className={ui.fieldIcon} />
                 <input id="name" type="text" required value={name} onChange={e => setName(e.target.value)}
                   placeholder="Nombre y apellidos" disabled={loading} autoComplete="name"
-                  className={ui.inputWithIcon} />
+                  className={ui.input} />
               </div>
             </div>
 
             {/* Teléfono con prefijo */}
             <div>
               <label htmlFor="phone" className={ui.label}>Teléfono</label>
-              <div className={`flex h-11 rounded-lg border shadow-sm transition focus-within:ring-4 ${
+              <div className={`flex h-10 rounded-lg border transition focus-within:ring-4 ${
                 phoneError
                   ? "border-red-300 bg-red-50 focus-within:ring-red-500/15"
-                  : "border-slate-300 bg-white focus-within:border-[#2F52E0] focus-within:ring-[#2F52E0]/15"
+                  : "border-slate-300 bg-white focus-within:border-slate-900 focus-within:ring-slate-900/10"
               }`}>
                 <div className="relative">
                   <button
@@ -269,21 +268,19 @@ export default function RegisterPage() {
             <div>
               <label htmlFor="email" className={ui.label}>Email</label>
               <div className="relative">
-                <Mail size={16} className={ui.fieldIcon} />
                 <input id="email" type="email" required value={email} onChange={e => setEmail(e.target.value)}
                   placeholder="nombre@productora.com" disabled={loading} autoComplete="email"
-                  className={ui.inputWithIcon} />
+                  className={ui.input} />
               </div>
             </div>
 
             <div>
               <label htmlFor="password" className={ui.label}>Contraseña</label>
               <div className="relative">
-                <Lock size={16} className={ui.fieldIcon} />
                 <input id="password" type={showPassword ? "text" : "password"} required value={password}
                   onChange={e => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres"
                   disabled={loading} autoComplete="new-password" minLength={6}
-                  className={`${ui.inputWithIcon} pr-11`} />
+                  className={ui.inputWithButton} />
                 <button type="button" onClick={() => setShowPassword(v => !v)} disabled={loading}
                   aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                   className={ui.iconButton}>
@@ -294,7 +291,7 @@ export default function RegisterPage() {
 
             {error && <AuthError>{error}</AuthError>}
 
-            <button type="submit" disabled={loading} className={ui.primaryButton} style={ui.primaryButtonStyle}>
+            <button type="submit" disabled={loading} className={ui.primaryButton}>
               {loading ? (
                 <><Spinner /> Enviando código…</>
               ) : (
@@ -305,7 +302,7 @@ export default function RegisterPage() {
 
           <p className={ui.footer}>
             ¿Ya tienes cuenta?{" "}
-            <Link href="/login" className={ui.link} style={{ color: BRAND }}>Inicia sesión</Link>
+            <Link href="/login" className={ui.link}>Inicia sesión</Link>
           </p>
         </>
       )}
@@ -316,7 +313,7 @@ export default function RegisterPage() {
           <button
             type="button"
             onClick={() => { setStep(1); setCodeError(""); }}
-            className="mb-6 inline-flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-800"
+            className={ui.back}
           >
             <ArrowLeft size={15} /> Volver
           </button>
@@ -339,12 +336,12 @@ export default function RegisterPage() {
                 onKeyDown={e => handleDigitKey(i, e)}
                 disabled={loading}
                 aria-label={`Dígito ${i + 1}`}
-                className={`h-14 w-12 rounded-lg border text-center text-xl font-semibold shadow-sm transition focus:outline-none focus:ring-4 disabled:opacity-60 ${
+                className={`h-14 w-12 rounded-lg border text-center text-xl font-semibold transition focus:outline-none focus:ring-4 disabled:opacity-60 ${
                   codeError
                     ? "border-red-300 bg-red-50 text-red-600 focus:ring-red-500/15"
                     : d
-                      ? "border-slate-400 bg-white text-slate-900 focus:border-[#2F52E0] focus:ring-[#2F52E0]/15"
-                      : "border-slate-300 bg-white text-slate-900 focus:border-[#2F52E0] focus:ring-[#2F52E0]/15"
+                      ? "border-slate-400 bg-white text-slate-900 focus:border-slate-900 focus:ring-slate-900/10"
+                      : "border-slate-300 bg-white text-slate-900 focus:border-slate-900 focus:ring-slate-900/10"
                 }`}
               />
             ))}
@@ -358,7 +355,7 @@ export default function RegisterPage() {
 
           <p className={ui.footer}>
             ¿No te ha llegado?{" "}
-            <button type="button" onClick={handleSendCode as any} className={ui.link} style={{ color: BRAND }}>
+            <button type="button" onClick={handleSendCode as any} className={ui.link}>
               Reenviar
             </button>
           </p>

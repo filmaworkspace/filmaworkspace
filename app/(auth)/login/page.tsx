@@ -15,10 +15,10 @@ import {
 } from "firebase/auth";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
-import AuthShell, { AuthError, BRAND, Spinner, authStyles as ui } from "@/components/AuthShell";
+import AuthShell, { AuthError, Spinner, authStyles as ui } from "@/components/AuthShell";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -86,7 +86,6 @@ export default function LoginPage() {
         <div>
           <label htmlFor="email" className={ui.label}>Email</label>
           <div className="relative">
-            <Mail size={16} className={ui.fieldIcon} />
             <input
               id="email"
               type="email"
@@ -96,7 +95,7 @@ export default function LoginPage() {
               placeholder="nombre@productora.com"
               disabled={loading}
               autoComplete="email"
-              className={ui.inputWithIcon}
+              className={ui.input}
             />
           </div>
         </div>
@@ -105,12 +104,11 @@ export default function LoginPage() {
         <div>
           <div className="mb-1.5 flex items-center justify-between">
             <label htmlFor="password" className="block text-sm font-medium text-slate-700">Contraseña</label>
-            <Link href="/forgot-password" className="text-xs font-medium hover:underline" style={{ color: BRAND }}>
+            <Link href="/forgot-password" className="text-xs font-medium text-slate-500 hover:text-slate-900 hover:underline">
               ¿La has olvidado?
             </Link>
           </div>
           <div className="relative">
-            <Lock size={16} className={ui.fieldIcon} />
             <input
               id="password"
               type={showPassword ? "text" : "password"}
@@ -120,7 +118,7 @@ export default function LoginPage() {
               placeholder="••••••••"
               disabled={loading}
               autoComplete="current-password"
-              className={`${ui.inputWithIcon} pr-11`}
+              className={ui.inputWithButton}
             />
             <button
               type="button"
@@ -141,14 +139,14 @@ export default function LoginPage() {
             checked={rememberMe}
             onChange={(e) => setRememberMe(e.target.checked)}
             disabled={loading}
-            className="h-4 w-4 cursor-pointer rounded border-slate-300 accent-[#2F52E0]"
+            className="h-4 w-4 cursor-pointer rounded border-slate-300 accent-slate-900"
           />
           <span className="text-sm text-slate-600">Mantener la sesión iniciada</span>
         </label>
 
         {error && <AuthError>{error}</AuthError>}
 
-        <button type="submit" disabled={loading} className={ui.primaryButton} style={ui.primaryButtonStyle}>
+        <button type="submit" disabled={loading} className={ui.primaryButton}>
           {loading ? (
             <><Spinner /> Accediendo…</>
           ) : (
@@ -159,7 +157,7 @@ export default function LoginPage() {
 
       <p className={ui.footer}>
         ¿No tienes cuenta?{" "}
-        <Link href="/register" className={ui.link} style={{ color: BRAND }}>Crear cuenta</Link>
+        <Link href="/register" className={ui.link}>Crear cuenta</Link>
       </p>
     </AuthShell>
   );

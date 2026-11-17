@@ -5,10 +5,10 @@ import { useState } from "react";
 import Link from "next/link";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import { ArrowLeft, ArrowRight, Mail, MailCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, MailCheck } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
-import AuthShell, { AuthError, BRAND, Spinner, authStyles as ui } from "@/components/AuthShell";
+import AuthShell, { AuthError, Spinner, authStyles as ui } from "@/components/AuthShell";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -49,7 +49,7 @@ export default function ForgotPasswordPage() {
     <AuthShell>
       <Link
         href="/login"
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-800"
+        className={ui.back}
       >
         <ArrowLeft size={15} />
         Volver
@@ -57,15 +57,15 @@ export default function ForgotPasswordPage() {
 
       {success ? (
         <div>
-          <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl" style={{ backgroundColor: `${BRAND}14` }}>
-            <MailCheck size={20} style={{ color: BRAND }} />
+          <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white">
+            <MailCheck size={20} className="text-slate-700" />
           </div>
           <h1 className={ui.title}>Revisa tu email</h1>
           <p className="mt-2 text-sm text-slate-500">
             Enlace enviado a <span className="font-medium text-slate-800">{email}</span>
           </p>
 
-          <Link href="/login" className={`${ui.primaryButton} mt-8`} style={ui.primaryButtonStyle}>
+          <Link href="/login" className={`${ui.primaryButton} mt-8`}>
             Volver a iniciar sesión
           </Link>
 
@@ -75,7 +75,7 @@ export default function ForgotPasswordPage() {
               type="button"
               onClick={() => { setSuccess(false); setEmail(""); }}
               className={ui.link}
-              style={{ color: BRAND }}
+             
             >
               Reenviar
             </button>
@@ -89,7 +89,6 @@ export default function ForgotPasswordPage() {
             <div>
               <label htmlFor="email" className={ui.label}>Email</label>
               <div className="relative">
-                <Mail size={16} className={ui.fieldIcon} />
                 <input
                   id="email"
                   type="email"
@@ -99,14 +98,14 @@ export default function ForgotPasswordPage() {
                   placeholder="nombre@productora.com"
                   disabled={loading}
                   autoComplete="email"
-                  className={ui.inputWithIcon}
+                  className={ui.input}
                 />
               </div>
             </div>
 
             {error && <AuthError>{error}</AuthError>}
 
-            <button type="submit" disabled={loading} className={ui.primaryButton} style={ui.primaryButtonStyle}>
+            <button type="submit" disabled={loading} className={ui.primaryButton}>
               {loading ? (
                 <><Spinner /> Enviando…</>
               ) : (
@@ -117,7 +116,7 @@ export default function ForgotPasswordPage() {
 
           <p className={ui.footer}>
             ¿La recuerdas?{" "}
-            <Link href="/login" className={ui.link} style={{ color: BRAND }}>Inicia sesión</Link>
+            <Link href="/login" className={ui.link}>Inicia sesión</Link>
           </p>
         </>
       )}
