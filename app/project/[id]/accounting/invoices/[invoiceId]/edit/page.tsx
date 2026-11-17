@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db, storage } from "@/lib/firebase";
@@ -1040,13 +1041,13 @@ export default function EditInvoicePage() {
                         </div>
                       </button>
                       {showDepartmentDropdown && (
-                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
+                        <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
                           {availableDepartments.map(dept => (
                             <button key={dept} type="button" onClick={() => { setFormData({ ...formData, department: dept }); setShowDepartmentDropdown(false); }} className={cx("w-full px-4 py-1.5 text-left text-[13px] hover:bg-slate-50 transition-colors", formData.department === dept ? "bg-slate-50 text-slate-900 font-medium" : "text-slate-600")}>
                               {dept}
                             </button>
                           ))}
-                        </div>
+                        </AnchoredPanel>
                       )}
                     </div>
                   </div>
@@ -1189,7 +1190,7 @@ export default function EditInvoicePage() {
                                 <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `vat-${index}` ? "rotate-180" : ""}`} />
                               </button>
                               {openDropdown === `vat-${index}` && (
-                                <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
+                                <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
                                   {VAT_RATES.map(opt => (
                                     <button
                                       key={opt.value}
@@ -1200,7 +1201,7 @@ export default function EditInvoicePage() {
                                       {opt.label}
                                     </button>
                                   ))}
-                                </div>
+                                </AnchoredPanel>
                               )}
                             </div>
                           </div>
@@ -1216,7 +1217,7 @@ export default function EditInvoicePage() {
                                 <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `irpf-${index}` ? "rotate-180" : ""}`} />
                               </button>
                               {openDropdown === `irpf-${index}` && (
-                                <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
+                                <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
                                   {IRPF_RATES.map(opt => (
                                     <button
                                       key={opt.value}
@@ -1227,7 +1228,7 @@ export default function EditInvoicePage() {
                                       {opt.label}
                                     </button>
                                   ))}
-                                </div>
+                                </AnchoredPanel>
                               )}
                             </div>
                           </div>

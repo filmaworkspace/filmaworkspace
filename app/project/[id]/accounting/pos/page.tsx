@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
@@ -810,7 +811,7 @@ export default function POsPage() {
                 <ChevronDown size={14} className={`text-slate-400 transition-transform ${showSortDropdown ? "rotate-180" : ""}`} />
               </button>
               {showSortDropdown && (
-                <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-md shadow-lg z-50 py-1 overflow-hidden min-w-full">
+                <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 overflow-hidden" match="min" gap={8}>
                   {SORT_OPTIONS.map((option) => (
                     <button
                       key={option.value}
@@ -822,7 +823,7 @@ export default function POsPage() {
                       {option.label}
                     </button>
                   ))}
-                </div>
+                </AnchoredPanel>
               )}
             </div>
 

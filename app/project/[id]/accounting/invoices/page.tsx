@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
@@ -642,7 +643,7 @@ export default function InvoicesPage() {
                       <Building2 size={14} />
                     </button>
                     {showCompanyTooltip && (
-                      <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-72 bg-white rounded-md shadow-xl border border-slate-200 p-4 z-50">
+                      <AnchoredPanel className="w-72 bg-white rounded-md shadow-xl border border-slate-200 p-4" align="center" gap={8}>
                         <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100">
                           <div className="hidden">
                             <Building2 size={16} className="text-slate-600" />
@@ -670,7 +671,7 @@ export default function InvoicesPage() {
                         ) : (
                           <p className="text-xs text-slate-500 text-center py-2">No hay datos fiscales configurados</p>
                         )}
-                      </div>
+                      </AnchoredPanel>
                     )}
                   </div>
                 </div>
@@ -764,7 +765,7 @@ export default function InvoicesPage() {
                 <ChevronDown size={14} className={`text-slate-400 transition-transform ${showStatusDropdown ? "rotate-180" : ""}`} />
               </button>
               {showStatusDropdown && (
-                <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-md shadow-lg z-50 py-1 overflow-hidden min-w-full">
+                <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 overflow-hidden" match="min" gap={8}>
                   {STATUS_OPTIONS.map((option) => (
                     <button
                       key={option.value}
@@ -779,7 +780,7 @@ export default function InvoicesPage() {
                       {option.label}
                     </button>
                   ))}
-                </div>
+                </AnchoredPanel>
               )}
             </div>
 

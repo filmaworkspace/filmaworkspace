@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+import { AnchoredPanel } from "@/components/ds";
 import { IBANField } from "@/components/IBANField";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
@@ -700,7 +701,7 @@ export default function SuppliersPage() {
                 <ChevronDown size={14} className={`transition-transform ${showStatusDropdown ? "rotate-180" : ""} ${filterStatus !== "all" ? "text-white" : "text-slate-400"}`} />
               </button>
               {showStatusDropdown && (
-                <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-md shadow-lg z-50 py-1 overflow-hidden min-w-full">
+                <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 overflow-hidden" match="min" gap={8}>
                   {STATUS_OPTIONS.map((option) => (
                     <button
                       key={option.value}
@@ -712,7 +713,7 @@ export default function SuppliersPage() {
                       {option.label}
                     </button>
                   ))}
-                </div>
+                </AnchoredPanel>
               )}
             </div>
 

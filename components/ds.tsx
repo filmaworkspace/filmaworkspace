@@ -485,6 +485,71 @@ export function Menu({ trigger, children, align = "right" }: {
   );
 }
 
+/**
+ * Panel desplegable anclado a su contenedor (el elemento padre, normalmente
+ * con `relative`), pintado en la capa flotante para que nunca se corte dentro
+ * de modales o tablas. Sustituye a un `<div className="absolute top-full ...">`.
+ *   align: "left" | "right" | "center"   match: "width" (mismo ancho) | "min" (mínimo)
+ *   gap: separación en px; offsetTop: distancia desde arriba del ancla (en vez de debajo)
+ */
+export function AnchoredPanel({
+  children, className, align = "left", match, gap = 4, offsetTop, onMouseDown, style,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  align?: "left" | "right" | "center";
+  match?: "width" | "min";
+  gap?: number;
+  offsetTop?: number;
+  onMouseDown?: React.MouseEventHandler<HTMLDivElement>;
+  style?: React.CSSProperties;
+}) {
+  const markerRef = useRef<HTMLSpanElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<React.CSSProperties>({ top: -9999, left: -9999 });
+  const update = useCallback(() => {
+    const anchor = markerRef.current?.parentElement;
+    const p = panelRef.current;
+    if (!anchor || !p) return;
+    const r = anchor.getBoundingClientRect();
+    const margin = 8;
+    const width = match === "width" ? r.width : Math.max(p.offsetWidth, match === "min" ? r.width : 0);
+    const height = p.offsetHeight;
+    const belowTop = offsetTop !== undefined ? r.top + offsetTop : r.bottom + gap;
+    const spaceBelow = window.innerHeight - belowTop - margin;
+    const spaceAbove = r.top - gap - margin;
+    const top = height <= spaceBelow || spaceBelow >= spaceAbove ? belowTop : r.top - gap - height;
+    let left = align === "right" ? r.right - width : align === "center" ? r.left + r.width / 2 - width / 2 : r.left;
+    left = Math.min(Math.max(margin, left), window.innerWidth - width - margin);
+    const next: React.CSSProperties = { top: Math.round(Math.max(margin, top)), left: Math.round(left) };
+    if (match === "width") next.width = Math.round(r.width);
+    if (match === "min") next.minWidth = Math.round(r.width);
+    setPos((prev) => (prev.top === next.top && prev.left === next.left && prev.width === next.width && prev.minWidth === next.minWidth ? prev : next));
+  }, [align, match, gap, offsetTop]);
+  useLayoutEffect(() => { update(); });
+  useEffect(() => {
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => { window.removeEventListener("scroll", update, true); window.removeEventListener("resize", update); };
+  }, [update]);
+  return (
+    <>
+      <span ref={markerRef} hidden />
+      <FloatingLayer>
+        <div
+          ref={panelRef}
+          // Los clics dentro del panel no deben llegar a los "clic fuera" de la página.
+          onMouseDown={(e) => { e.stopPropagation(); onMouseDown?.(e); }}
+          style={{ ...style, ...pos }}
+          className={cx("fixed z-[80]", inter.className, className)}
+        >
+          {children}
+        </div>
+      </FloatingLayer>
+    </>
+  );
+}
+
 export function MenuItem({ onClick, danger, children }: { onClick: () => void; danger?: boolean; children: React.ReactNode }) {
   return (
     <button

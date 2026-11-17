@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
@@ -413,9 +414,9 @@ export default function DocumentCenterPage() {
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={onToggle} />
-          <div className="absolute top-full left-0 mt-1.5 bg-white border border-slate-200 rounded-md shadow-lg z-40 py-1 min-w-full max-h-64 overflow-y-auto">
+          <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-64 overflow-y-auto" match="min" gap={6}>
             {children}
-          </div>
+          </AnchoredPanel>
         </>
       )}
     </div>

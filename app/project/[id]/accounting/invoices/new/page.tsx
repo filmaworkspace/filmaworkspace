@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db, storage } from "@/lib/firebase";
@@ -1671,7 +1672,7 @@ export default function NewInvoicePage() {
                 {showDraftsPanel && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowDraftsPanel(false)} />
-                    <div className="absolute right-0 top-12 w-72 bg-white border border-slate-200 rounded-md shadow-xl z-50 overflow-hidden">
+                    <AnchoredPanel className="w-72 bg-white border border-slate-200 rounded-md shadow-xl overflow-hidden" align="right" offsetTop={48}>
                       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                         <h3 className="font-semibold text-slate-900 text-[13px]">Borradores</h3>
                         <button onClick={() => setShowDraftsPanel(false)} className="text-slate-400 hover:text-slate-600">
@@ -1715,7 +1716,7 @@ export default function NewInvoicePage() {
                           Guardar como borrador
                         </button>
                       </div>
-                    </div>
+                    </AnchoredPanel>
                   </>
                 )}
               </div>
@@ -2609,7 +2610,7 @@ export default function NewInvoicePage() {
                                     <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `vat-${index}` ? "rotate-180" : ""}`} />
                                   </button>
                                   {openDropdown === `vat-${index}` && (
-                                    <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
+                                    <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
                                       {VAT_RATES.map(opt => (
                                         <button
                                           key={opt.value}
@@ -2620,7 +2621,7 @@ export default function NewInvoicePage() {
                                           {opt.label}
                                         </button>
                                       ))}
-                                    </div>
+                                    </AnchoredPanel>
                                   )}
                                 </div>
                               </div>
@@ -2636,7 +2637,7 @@ export default function NewInvoicePage() {
                                     <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `irpf-${index}` ? "rotate-180" : ""}`} />
                                   </button>
                                   {openDropdown === `irpf-${index}` && (
-                                    <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
+                                    <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
                                       {IRPF_RATES.map(opt => (
                                         <button
                                           key={opt.value}
@@ -2647,7 +2648,7 @@ export default function NewInvoicePage() {
                                           {opt.label}
                                         </button>
                                       ))}
-                                    </div>
+                                    </AnchoredPanel>
                                   )}
                                 </div>
                               </div>

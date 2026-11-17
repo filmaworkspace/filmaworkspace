@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+import { AnchoredPanel } from "@/components/ds";
 import { getInvoiceDisplayState } from "@/lib/invoiceHelpers";
 import { IBANField } from "@/components/IBANField";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
@@ -1065,7 +1066,7 @@ export default function SupplierDetailPage() {
                 {showSupplierSearch && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => { setShowSupplierSearch(false); setSupplierSearch(""); }} />
-                    <div className="absolute left-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-lg shadow-xl z-20 overflow-hidden">
+                    <AnchoredPanel className="w-72 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden" gap={8}>
                       <div className="p-2 border-b border-slate-100">
                         <div className="relative">
                           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -1112,7 +1113,7 @@ export default function SupplierDetailPage() {
                           </div>
                         )}
                       </div>
-                    </div>
+                    </AnchoredPanel>
                   </>
                 )}
               </div>
@@ -1133,7 +1134,7 @@ export default function SupplierDetailPage() {
                 {showActionsMenu && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowActionsMenu(false)} />
-                    <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-lg shadow-xl py-2 z-20">
+                    <AnchoredPanel className="w-64 bg-white border border-slate-200 rounded-lg shadow-xl py-2" align="right" gap={8}>
                       <button
                         onClick={generateInvoiceListPdf}
                         disabled={invoices.length === 0 || generatingPdf === "invoices"}
@@ -1173,7 +1174,7 @@ export default function SupplierDetailPage() {
                           <p className="text-xs text-slate-500">Para Excel o Sheets</p>
                         </div>
                       </button>
-                    </div>
+                    </AnchoredPanel>
                   </>
                 )}
               </div>
@@ -1402,7 +1403,7 @@ export default function SupplierDetailPage() {
                             <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === "editPaymentMethod" ? "rotate-180" : ""}`} />
                           </button>
                           {openDropdown === "editPaymentMethod" && (
-                            <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
+                            <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
                               {Object.entries(PAYMENT_METHODS).map(([value, label]) => (
                                 <button
                                   key={value}
@@ -1413,7 +1414,7 @@ export default function SupplierDetailPage() {
                                   {label as string}
                                 </button>
                               ))}
-                            </div>
+                            </AnchoredPanel>
                           )}
                         </div>
                       </div>

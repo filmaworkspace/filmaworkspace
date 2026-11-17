@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+import { AnchoredPanel } from "@/components/ds";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
@@ -1272,7 +1273,7 @@ export default function AccountingConfigPage() {
                     <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `dept-${step.id}` ? "rotate-180" : ""}`} />
                   </button>
                   {openDropdown === `dept-${step.id}` && (
-                    <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
+                    <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
                       <button
                         type="button"
                         onClick={() => { updateStep(type, step.id, "department", ""); setOpenDropdown(null); }}
@@ -1290,7 +1291,7 @@ export default function AccountingConfigPage() {
                           {d}
                         </button>
                       ))}
-                    </div>
+                    </AnchoredPanel>
                   )}
                 </div>
                 <p className="text-xs text-slate-500 mt-2">

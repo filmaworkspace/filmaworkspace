@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
@@ -3017,7 +3018,7 @@ export default function BoxesPage() {
                                 <ChevronDown size={12} className="text-slate-400 flex-shrink-0" />
                               </button>
                               {drawerAccountSelectorItemIdx === idx && (
-                                <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-xl">
+                                <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-xl" match="width">
                                   <div className="p-2 border-b border-slate-100">
                                     <input type="text" value={drawerAccountSearch}
                                       onChange={e => setDrawerAccountSearch(e.target.value)}
@@ -3041,7 +3042,7 @@ export default function BoxesPage() {
                                         </button>
                                       ))}
                                   </div>
-                                </div>
+                                </AnchoredPanel>
                               )}
                             </div>
                             <div className="grid grid-cols-3 gap-2">
@@ -3312,14 +3313,14 @@ export default function BoxesPage() {
                   <ChevronDown size={16} className="text-slate-400" />
                 </button>
                 {showDepartmentDropdown && (
-                  <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
+                  <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
                     <button type="button" onClick={() => { setBoxForm({ ...boxForm, department: "" }); setShowDepartmentDropdown(false); }}
                       className="w-full px-4 py-2 text-left text-[13px] text-slate-400 hover:bg-slate-50">Sin departamento</button>
                     {departments.map(d => (
                       <button key={d} type="button" onClick={() => { setBoxForm({ ...boxForm, department: d }); setShowDepartmentDropdown(false); }}
                         className="w-full px-4 py-2 text-left text-[13px] hover:bg-slate-50">{d}</button>
                     ))}
-                  </div>
+                  </AnchoredPanel>
                 )}
               </div>
             </div>
@@ -3856,14 +3857,14 @@ export default function BoxesPage() {
                     <ChevronDown size={16} className="text-slate-400" />
                   </button>
                   {showExpenseDepartmentDropdown && (
-                    <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
+                    <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
                       <button type="button" onClick={() => { setTransferEnvelopeForm({ ...transferEnvelopeForm, personDepartment: "" }); setShowExpenseDepartmentDropdown(false); }}
                         className="w-full px-4 py-2 text-left text-[13px] text-slate-400 hover:bg-slate-50">Sin departamento</button>
                       {departments.map(d => (
                         <button key={d} type="button" onClick={() => { setTransferEnvelopeForm({ ...transferEnvelopeForm, personDepartment: d }); setShowExpenseDepartmentDropdown(false); }}
                           className="w-full px-4 py-2 text-left text-[13px] hover:bg-slate-50">{d}</button>
                       ))}
-                    </div>
+                    </AnchoredPanel>
                   )}
                 </div>
               </div>
@@ -4433,7 +4434,7 @@ export default function BoxesPage() {
                         <ChevronDown size={15} className={`text-slate-400 transition-transform ${showVolcarEnvDropdown ? "rotate-180" : ""}`} />
                       </button>
                       {showVolcarEnvDropdown && (
-                        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
+                        <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
                           {openEnvelopes.map(env => (
                             <button key={env.id} type="button"
                               onClick={() => { setVolcarTargetEnvelopeId(env.id); setShowVolcarEnvDropdown(false); }}
@@ -4445,7 +4446,7 @@ export default function BoxesPage() {
                               {volcarTargetEnvelopeId === env.id && <Check size={14} className="text-slate-600 flex-shrink-0" />}
                             </button>
                           ))}
-                        </div>
+                        </AnchoredPanel>
                       )}
                     </div>
                   )}

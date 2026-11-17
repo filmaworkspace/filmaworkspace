@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
@@ -1122,14 +1123,14 @@ export default function InvoiceDetailPage() {
                               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                               <input placeholder="Buscar cuenta" value={searchSubAccount} onChange={(e) => setSearchSubAccount(e.target.value)} onFocus={() => setSearchSubAccount("")} className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none" />
                               {searchSubAccount && (
-                                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-xl z-10 max-h-48 overflow-y-auto">
+                                <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-xl max-h-48 overflow-y-auto" match="width">
                                   {subAccounts.filter((s) => s.code.toLowerCase().includes(searchSubAccount.toLowerCase()) || s.description.toLowerCase().includes(searchSubAccount.toLowerCase())).slice(0, 10).map((s) => (
                                     <button key={s.id} onClick={() => selectSubAccount(idx, s)} className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-[13px]">
                                       <span className="font-mono text-violet-600">{s.code}</span>
                                       <span className="text-slate-600 truncate">{s.description}</span>
                                     </button>
                                   ))}
-                                </div>
+                                </AnchoredPanel>
                               )}
                             </div>
                           )}
@@ -1178,7 +1179,7 @@ export default function InvoiceDetailPage() {
                               <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `poitem-${idx}` ? "rotate-180" : ""}`} />
                             </button>
                             {openDropdown === `poitem-${idx}` && (
-                              <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
+                              <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
                                 <button
                                   type="button"
                                   onClick={() => { updateCodingItem(idx, "poItemIndex", undefined); setOpenDropdown(null); }}
@@ -1196,7 +1197,7 @@ export default function InvoiceDetailPage() {
                                     #{i + 1} - {poItem.description?.substring(0, 30) || `Línea ${i + 1}`}
                                   </button>
                                 ))}
-                              </div>
+                              </AnchoredPanel>
                             )}
                           </div>
                         </div>
@@ -1214,7 +1215,7 @@ export default function InvoiceDetailPage() {
                             <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `vat-${idx}` ? "rotate-180" : ""}`} />
                           </button>
                           {openDropdown === `vat-${idx}` && (
-                            <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
+                            <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
                               {VAT_RATES.map((r) => (
                                 <button
                                   key={r}
@@ -1225,7 +1226,7 @@ export default function InvoiceDetailPage() {
                                   {r}%
                                 </button>
                               ))}
-                            </div>
+                            </AnchoredPanel>
                           )}
                         </div>
                       </div>
@@ -1242,7 +1243,7 @@ export default function InvoiceDetailPage() {
                             <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `irpf-${idx}` ? "rotate-180" : ""}`} />
                           </button>
                           {openDropdown === `irpf-${idx}` && (
-                            <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
+                            <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
                               {IRPF_RATES.map((r) => (
                                 <button
                                   key={r}
@@ -1253,7 +1254,7 @@ export default function InvoiceDetailPage() {
                                   {r}%
                                 </button>
                               ))}
-                            </div>
+                            </AnchoredPanel>
                           )}
                         </div>
                       </div>
@@ -1309,7 +1310,7 @@ export default function InvoiceDetailPage() {
                       <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === "paymentMethod" ? "rotate-180" : ""}`} />
                     </button>
                     {openDropdown === "paymentMethod" && (
-                      <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto">
+                      <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
                         {PAYMENT_METHODS.map(opt => (
                           <button
                             key={opt.value}
@@ -1320,7 +1321,7 @@ export default function InvoiceDetailPage() {
                             {opt.label}
                           </button>
                         ))}
-                      </div>
+                      </AnchoredPanel>
                     )}
                   </div>
                 </div>
@@ -1420,7 +1421,7 @@ export default function InvoiceDetailPage() {
 
               <div className="relative">
                 <button onClick={() => setShowActionsMenu(!showActionsMenu)} className="p-2.5 border border-slate-200 rounded-md hover:bg-slate-50"><MoreHorizontal size={18} /></button>
-                {showActionsMenu && (<><div className="fixed inset-0 z-40" onClick={() => setShowActionsMenu(false)} /><div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-md shadow-xl z-50 py-1">
+                {showActionsMenu && (<><div className="fixed inset-0 z-40" onClick={() => setShowActionsMenu(false)} /><AnchoredPanel className="w-56 bg-white border border-slate-200 rounded-md shadow-xl py-1" align="right" gap={8}>
                   {invoice.attachmentUrl && <a href={invoice.attachmentUrl} target="_blank" rel="noopener noreferrer" onClick={() => setShowActionsMenu(false)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3"><Download size={16} className="text-slate-400" />Descargar</a>}
                   {canReplaceDocument() && (
                     <button 
@@ -1434,7 +1435,7 @@ export default function InvoiceDetailPage() {
                   )}
                   {canAdminCorrect() && <Link href={`/project/${projectId}/accounting/invoices/${invoice.id}/edit?mode=correction`} onClick={() => setShowActionsMenu(false)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3"><FileCheck size={16} className="text-slate-400" />Corrección administrativa</Link>}
                   {canCancel() && <><div className="border-t border-slate-100 my-1" /><button onClick={() => { setShowCancelModal(true); setShowActionsMenu(false); }} className="w-full px-4 py-1.5 text-left text-[13px] text-red-600 hover:bg-red-50 flex items-center gap-3"><XCircle size={16} />Anular</button></>}
-                </div></>)}
+                </AnchoredPanel></>)}
               </div>
               
               {/* Input oculto para reemplazar documento */}

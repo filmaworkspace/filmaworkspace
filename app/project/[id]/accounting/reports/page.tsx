@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+import { AnchoredPanel } from "@/components/ds";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
@@ -1435,7 +1436,7 @@ export default function ReportsPage() {
                     )}
                   </div>
                   {showSupplierDropdown && supplierSearch.length >= 2 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg max-h-48 overflow-y-auto" match="width">
                       {loadingSuppliers ? (
                         <div className="px-4 py-3 text-[13px] text-slate-500 text-center">Cargando...</div>
                       ) : filteredSuppliers.length === 0 ? (
@@ -1450,7 +1451,7 @@ export default function ReportsPage() {
                           </button>
                         ))
                       )}
-                    </div>
+                    </AnchoredPanel>
                   )}
                 </div>
                 {invoiceBookFilters.supplierId && (

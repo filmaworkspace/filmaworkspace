@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
@@ -409,7 +410,7 @@ export default function ReplaceDocumentPage() {
                 <ChevronDown size={14} className={`text-slate-400 transition-transform ${showTypeDropdown ? "rotate-180" : ""}`} />
               </button>
               {showTypeDropdown && (
-                <div className="absolute top-full left-0 mt-2 w-full bg-white border border-slate-200 rounded-md shadow-lg z-50 py-1">
+                <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1" match="width" gap={8}>
                   {TYPE_OPTIONS.map((option) => (
                     <button
                       key={option.value}
@@ -419,7 +420,7 @@ export default function ReplaceDocumentPage() {
                       {option.label}
                     </button>
                   ))}
-                </div>
+                </AnchoredPanel>
               )}
             </div>
 
@@ -435,7 +436,7 @@ export default function ReplaceDocumentPage() {
                 <ChevronDown size={14} className={`text-slate-400 transition-transform ${showStatusDropdown ? "rotate-180" : ""}`} />
               </button>
               {showStatusDropdown && (
-                <div className="absolute top-full left-0 mt-2 w-full bg-white border border-slate-200 rounded-md shadow-lg z-50 py-1">
+                <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1" match="width" gap={8}>
                   {STATUS_OPTIONS.map((option) => (
                     <button
                       key={option.value}
@@ -445,7 +446,7 @@ export default function ReplaceDocumentPage() {
                       {option.label}
                     </button>
                   ))}
-                </div>
+                </AnchoredPanel>
               )}
             </div>
           </div>

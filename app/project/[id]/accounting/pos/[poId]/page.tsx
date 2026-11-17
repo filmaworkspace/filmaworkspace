@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
@@ -877,7 +878,7 @@ export default function PODetailPage() {
                 {showActionsMenu && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowActionsMenu(false)} />
-                    <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-md shadow-xl z-50 py-1 animate-fadeIn">
+                    <AnchoredPanel className="w-56 bg-white border border-slate-200 rounded-md shadow-xl py-1 animate-fadeIn" align="right" gap={8}>
                       {/* Descargar PDF - Siempre visible */}
                       <button 
                         onClick={() => { generatePDF(); setShowActionsMenu(false); }} 
@@ -947,7 +948,7 @@ export default function PODetailPage() {
                           </button>
                         </>
                       )}
-                    </div>
+                    </AnchoredPanel>
                   </>
                 )}
               </div>

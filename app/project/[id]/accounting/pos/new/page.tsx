@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
+import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
@@ -1227,7 +1228,7 @@ export default function NewPOPage() {
                 {showDraftsPanel && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowDraftsPanel(false)} />
-                    <div className="absolute right-0 top-12 w-72 bg-white border border-slate-200 rounded-md shadow-xl z-50 overflow-hidden">
+                    <AnchoredPanel className="w-72 bg-white border border-slate-200 rounded-md shadow-xl overflow-hidden" align="right" offsetTop={48}>
                       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                         <h3 className="font-semibold text-slate-900 text-[13px]">Borradores</h3>
                         <button onClick={() => setShowDraftsPanel(false)} className="text-slate-400 hover:text-slate-600">
@@ -1276,7 +1277,7 @@ export default function NewPOPage() {
                           Guardar como borrador
                         </button>
                       </div>
-                    </div>
+                    </AnchoredPanel>
                   </>
                 )}
               </div>
@@ -1383,7 +1384,7 @@ export default function NewPOPage() {
                         </div>
                       </button>
                       {showDepartmentDropdown && (
-                        <div className="absolute top-full left-0 mt-2 w-full bg-white border border-slate-200 rounded-md shadow-lg z-50 py-1 max-h-60 overflow-y-auto">
+                        <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-60 overflow-y-auto" match="width" gap={8}>
                           {availableDepartments.map((dept) => (
                             <button
                               key={dept}
@@ -1400,7 +1401,7 @@ export default function NewPOPage() {
                               {dept}
                             </button>
                           ))}
-                        </div>
+                        </AnchoredPanel>
                       )}
                     </div>
                     {hasError("department") && (
@@ -1452,7 +1453,7 @@ export default function NewPOPage() {
                       <ChevronDown size={14} className={cx("text-slate-400 transition-transform", showCurrencyDropdown && "rotate-180")} />
                     </button>
                     {showCurrencyDropdown && (
-                      <div className="absolute top-full left-0 mt-2 w-full bg-white border border-slate-200 rounded-md shadow-lg z-50 py-1">
+                      <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1" match="width" gap={8}>
                         {CURRENCIES.map((currency) => (
                           <button
                             key={currency.value}
@@ -1469,7 +1470,7 @@ export default function NewPOPage() {
                             <span>{currency.label}</span>
                           </button>
                         ))}
-                      </div>
+                      </AnchoredPanel>
                     )}
                   </div>
                 </div>
@@ -1762,7 +1763,7 @@ export default function NewPOPage() {
                               <ChevronDown size={14} className={cx("text-slate-400 transition-transform", showVatDropdown === index && "rotate-180")} />
                             </button>
                             {showVatDropdown === index && (
-                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-50 py-1 max-h-48 overflow-y-auto">
+                              <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
                                 {VAT_RATES.map((rate) => (
                                   <button
                                     key={rate.value}
@@ -1773,7 +1774,7 @@ export default function NewPOPage() {
                                     {rate.label}
                                   </button>
                                 ))}
-                              </div>
+                              </AnchoredPanel>
                             )}
                           </div>
                           <div className="relative">
@@ -1787,7 +1788,7 @@ export default function NewPOPage() {
                               <ChevronDown size={14} className={cx("text-slate-400 transition-transform", showIrpfDropdown === index && "rotate-180")} />
                             </button>
                             {showIrpfDropdown === index && (
-                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-50 py-1 max-h-48 overflow-y-auto">
+                              <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
                                 {IRPF_RATES.map((rate) => (
                                   <button
                                     key={rate.value}
@@ -1798,7 +1799,7 @@ export default function NewPOPage() {
                                     {rate.label}
                                   </button>
                                 ))}
-                              </div>
+                              </AnchoredPanel>
                             )}
                           </div>
                           <div>
