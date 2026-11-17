@@ -23,6 +23,10 @@ await env.withSecurityRulesDisabled(async (c) => {
   await setDoc(doc(db, "projects/p1/horarioForms/h1"), { projectId: "p1", recipientUid: "x" });
   await setDoc(doc(db, "horarioAccess/r1"), { projectId: "p1", recipientUid: "x", active: true });
   await setDoc(doc(db, "projects/p1/payrollMonths/2026-11"), { entries: {} });
+  await setDoc(doc(db, "users/agent"), { role: "support_agent", name: "Ag" });
+  await setDoc(doc(db, "supportArchive/a1"), { userId: "alice", status: "resolved" });
+  await setDoc(doc(db, "supportArchive/a1/messages/m1"), { text: "hola" });
+  await setDoc(doc(db, "meta/featureFlags"), { x: { enabledGlobally: false } });
 });
 
 const anon = env.unauthenticatedContext().firestore();
@@ -106,6 +110,22 @@ await t("anon lista meses", false, () => getDocs(collection(anon, "projects/p1/p
 await t("anon escribe con código activo", true, () => setDoc(doc(anon, "projects/p1/payrollMonths/2026-11"), { entries: { a: 1 }, accessCode: "c5" }));
 await t("anon escribe con código desactivado", false, () => setDoc(doc(anon, "projects/p1/payrollMonths/2026-11"), { entries: { a: 1 }, accessCode: "c1" }));
 await t("equipo lee meses", true, () => getDocs(collection(alice, "projects/p1/payrollMonths")));
+
+console.log("soporte");
+const agent = env.authenticatedContext("agent", { email: "ag@x.com" }).firestore();
+await t("usuario no lee el archivo", false, () => getDoc(doc(alice, "supportArchive/a1")));
+await t("usuario no lee mensajes archivados", false, () => getDocs(collection(alice, "supportArchive/a1/messages")));
+await t("agente lee el archivo", true, () => getDocs(collection(agent, "supportArchive")));
+await t("agente lee mensajes archivados", true, () => getDocs(collection(agent, "supportArchive/a1/messages")));
+await t("nadie escribe en el archivo desde cliente", false, () => setDoc(doc(agent, "supportArchive/a2"), { x: 1 }));
+await t("usuario no puede desactivar el chat", false, () => setDoc(doc(alice, "meta/supportChat"), { enabled: false }));
+await t("agente desactiva el chat", true, () => setDoc(doc(agent, "meta/supportChat"), { enabled: false }));
+await t("chat desactivado: no se abren conversaciones", false, () => setDoc(doc(alice, "supportChats/alice"), { status: "open" }));
+await t("agente activa el chat", true, () => setDoc(doc(agent, "meta/supportChat"), { enabled: true }));
+await t("chat activo: el usuario abre conversación", true, () => setDoc(doc(alice, "supportChats/alice"), { status: "open" }));
+await t("contador de tickets", true, () => setDoc(doc(alice, "meta/supportTicketCounter"), { count: 1 }, { merge: true }));
+await t("usuario edita featureFlags", false, () => setDoc(doc(mallory, "meta/featureFlags"), { x: { enabledGlobally: true } }));
+await t("usuario edita mantenimiento", false, () => setDoc(doc(mallory, "meta/maintenance"), { enabled: true }));
 
 console.log(`\n${pass} ok, ${fail} fallos`);
 await env.cleanup();

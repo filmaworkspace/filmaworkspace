@@ -28,3 +28,27 @@ export async function requireAdmin(req: NextRequest): Promise<AdminCheckResult> 
     return { ok: false, response: NextResponse.json({ error: "Token inválido" }, { status: 401 }) };
   }
 }
+
+/**
+ * Like requireAdmin, but also lets support agents through (role "support_agent").
+ * Use for support-desk actions (closing/archiving chats, etc.).
+ */
+export async function requireSupportStaff(req: NextRequest): Promise<AdminCheckResult> {
+  const authHeader = req.headers.get("authorization") || "";
+  const match = authHeader.match(/^Bearer (.+)$/);
+  if (!match) {
+    return { ok: false, response: NextResponse.json({ error: "No autenticado" }, { status: 401 }) };
+  }
+
+  try {
+    const decoded = await adminAuth.verifyIdToken(match[1]);
+    const userDoc = await db.collection("users").doc(decoded.uid).get();
+    const role = userDoc.data()?.role;
+    if (role !== "admin" && role !== "support_agent") {
+      return { ok: false, response: NextResponse.json({ error: "No autorizado" }, { status: 403 }) };
+    }
+    return { ok: true, uid: decoded.uid };
+  } catch {
+    return { ok: false, response: NextResponse.json({ error: "Token inválido" }, { status: 401 }) };
+  }
+}

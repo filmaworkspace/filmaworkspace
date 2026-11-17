@@ -76,7 +76,6 @@ import {
   X,
   HeadphonesIcon,
   CheckCheck,
-  Circle,
   Loader2,
   Wrench,
   Calculator,
@@ -193,6 +192,11 @@ interface SupportChat {
   assignedToName?: string | null;
   assignedAt?:     Timestamp | null;
   resolvedAt?:     Timestamp | null;
+  // Solo en conversaciones archivadas (supportArchive)
+  archived?:       boolean;
+  closedAt?:       Timestamp | null;
+  closedByName?:   string;
+  messageCount?:   number;
 }
 
 const SPECIALTY_LABEL: Record<string, string> = {
@@ -283,6 +287,12 @@ export default function AdminDashboard() {
 
   // Support
   const [supportChats,      setSupportChats]      = useState<SupportChat[]>([]);
+  // Conversaciones cerradas: se archivan en supportArchive y solo las ven admins y agentes.
+  const [archivedChats,     setArchivedChats]     = useState<SupportChat[]>([]);
+  // Chat de soporte activo para los usuarios (meta/supportChat.enabled).
+  const [supportEnabled,    setSupportEnabled]    = useState(true);
+  const [supportToggleSaving, setSupportToggleSaving] = useState(false);
+  const legacyArchivedRef = useRef<Set<string>>(new Set());
   const [activeChatId,      setActiveChatId]      = useState<string | null>(null);
   const [chatMessages,      setChatMessages]       = useState<SupportMessage[]>([]);
   const [supportInput,      setSupportInput]       = useState("");
@@ -651,6 +661,37 @@ export default function AdminDashboard() {
     return () => unsub();
   }, [hasAdminAccess]);
 
+  // Archivo de conversaciones cerradas
+  useEffect(() => {
+    if (!hasAdminAccess) return;
+    const q = query(collection(db, "supportArchive"), orderBy("closedAt", "desc"), limit(300));
+    const unsub = onSnapshot(q, (snap) => {
+      setArchivedChats(snap.docs.map((d) => ({ id: d.id, ...d.data(), archived: true } as SupportChat)));
+    }, () => {});
+    return () => unsub();
+  }, [hasAdminAccess]);
+
+  // Interruptor global del chat de soporte
+  useEffect(() => {
+    if (!hasAdminAccess) return;
+    const unsub = onSnapshot(doc(db, "meta", "supportChat"), (snap) => {
+      setSupportEnabled(snap.data()?.enabled !== false);
+    }, () => {});
+    return () => unsub();
+  }, [hasAdminAccess]);
+
+  // Conversaciones cerradas con el sistema antiguo (status "resolved" pero sin
+  // archivar): se archivan para que el usuario deje de verlas.
+  useEffect(() => {
+    if (!hasAdminAccess) return;
+    supportChats
+      .filter((c) => c.status === "resolved" && !legacyArchivedRef.current.has(c.id))
+      .forEach((c) => {
+        legacyArchivedRef.current.add(c.id);
+        closeSupportChat(c.id).catch((e) => console.error("[support] archivar conversación antigua", c.id, e));
+      });
+  }, [supportChats, hasAdminAccess]);
+
   // Live roster of agents (full admins + support agents) who can own/receive tickets
   useEffect(() => {
     if (!hasAdminAccess) return;
@@ -673,10 +714,12 @@ export default function AdminDashboard() {
 
 
   // Load messages when active chat changes
+  const activeIsArchived = !!activeChatId && archivedChats.some((c) => c.id === activeChatId);
   useEffect(() => {
     if (!activeChatId) { setChatMessages([]); return; }
+    const base = activeIsArchived ? "supportArchive" : "supportChats";
     const q = query(
-      collection(db, `supportChats/${activeChatId}/messages`),
+      collection(db, `${base}/${activeChatId}/messages`),
       orderBy("createdAt", "asc")
     );
     const unsub = onSnapshot(q, (snap) => {
@@ -684,9 +727,11 @@ export default function AdminDashboard() {
       setTimeout(() => supportMsgsRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
     });
     // Mark as read
-    updateDoc(doc(db, "supportChats", activeChatId), { unreadAdmin: 0 }).catch(() => {});
+    if (!activeIsArchived) {
+      updateDoc(doc(db, "supportChats", activeChatId), { unreadAdmin: 0 }).catch(() => {});
+    }
     return () => unsub();
-  }, [activeChatId]);
+  }, [activeChatId, activeIsArchived]);
 
   const handleSupportReply = async () => {
     const text = supportInput.trim();
@@ -705,13 +750,77 @@ export default function AdminDashboard() {
     }
   };
 
+  // Cerrar = archivar en supportArchive y borrar del usuario (lo hace el
+  // servidor). El usuario vuelve a empezar de cero y no ve la conversación.
+  async function closeSupportChat(chatId: string) {
+    const idToken = await auth.currentUser?.getIdToken();
+    const res = await fetch("/api/support/close", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ chatId }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+  }
+
   const handleResolveChat = async (chatId: string) => {
-    await updateDoc(doc(db, "supportChats", chatId), { status: "resolved", unreadAdmin: 0, resolvedAt: serverTimestamp() });
-    if (activeChatId === chatId) setActiveChatId(null);
+    try {
+      await closeSupportChat(chatId);
+      if (activeChatId === chatId) setActiveChatId(null);
+      showToast("success", "Conversación cerrada y archivada");
+    } catch (error: any) {
+      showToast("error", error.message || "No se pudo cerrar la conversación");
+    }
   };
 
-  const handleReopenChat = async (chatId: string) => {
-    await updateDoc(doc(db, "supportChats", chatId), { status: "open" });
+  const handleToggleSupportChat = async () => {
+    const next = !supportEnabled;
+    setSupportToggleSaving(true);
+    try {
+      await setDoc(doc(db, "meta", "supportChat"), {
+        enabled: next,
+        updatedAt: serverTimestamp(),
+        updatedBy: contextUser?.uid || null,
+      }, { merge: true });
+      showToast("success", next ? "Chat de soporte activado" : "Chat de soporte desactivado");
+    } catch (error) {
+      console.error(error);
+      showToast("error", "No se pudo cambiar el estado del chat");
+    } finally {
+      setSupportToggleSaving(false);
+    }
+  };
+
+  // Descarga la transcripción de una conversación (.txt)
+  const handleDownloadChat = (chat: SupportChat, messages: SupportMessage[]) => {
+    const fmt = (ts: Timestamp | null | undefined) =>
+      ts ? ts.toDate().toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" }) : "";
+    const ticket = chat.ticketNumber ? `#${String(chat.ticketNumber).padStart(5, "0")}` : chat.id;
+    const lines = [
+      `Conversación de soporte ${ticket}`,
+      `Usuario: ${chat.userName} <${chat.userEmail}>`,
+      `Departamento: ${chat.department === "sales" ? "Ventas" : "Técnico"}`,
+      `Atendida por: ${chat.assignedToName || "—"}`,
+      `Cerrada: ${fmt(chat.closedAt)}${chat.closedByName ? ` por ${chat.closedByName}` : ""}`,
+      "",
+      "─".repeat(60),
+      "",
+      ...messages.map((m) => {
+        if (m.system) return `[${fmt(m.createdAt)}] — ${m.text} —`;
+        const text = m.guide ? `${m.guide.title} (${m.guide.url})` : m.text;
+        return `[${fmt(m.createdAt)}] ${m.senderName || (m.sender === "admin" ? "Soporte" : "Usuario")}: ${text}`;
+      }),
+      "",
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `soporte-${ticket.replace("#", "")}-${(chat.userName || "usuario").replace(/[^a-zA-Z0-9]+/g, "_")}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   // Reclama un ticket sin asignar. La transacción evita que dos agentes se lo
@@ -1604,11 +1713,9 @@ export default function AdminDashboard() {
   const openSupportChats = supportChats.filter((c) => c.status === "open").length;
   const unassignedSupportChats = supportChats.filter((c) => c.status === "open" && !c.assignedTo).length;
   const myOpenSupportChats = supportChats.filter((c) => c.status === "open" && c.assignedTo === contextUser?.uid).length;
-  const resolvedTodaySupportChats = supportChats.filter((c) => {
-    if (c.status !== "resolved" || !c.resolvedAt) return false;
-    const now = new Date();
-    const resolved = c.resolvedAt.toDate();
-    return resolved.toDateString() === now.toDateString();
+  const resolvedTodaySupportChats = archivedChats.filter((c) => {
+    const closed = c.closedAt?.toDate?.();
+    return !!closed && closed.toDateString() === new Date().toDateString();
   }).length;
   const formatDate = (ts?: Timestamp | null) =>
     ts && typeof (ts as any).toDate === "function"
@@ -2496,7 +2603,7 @@ export default function AdminDashboard() {
           const openChats = supportChats.filter((c) => c.status === "open");
           const unassignedChats = openChats.filter((c) => !c.assignedTo);
           const myChats = openChats.filter((c) => c.assignedTo === myId);
-          const resolvedChats = supportChats.filter((c) => c.status === "resolved");
+          const resolvedChats = archivedChats;
           const visibleChats =
             supportQueueFilter === "unassigned" ? unassignedChats :
             supportQueueFilter === "mine" ? myChats :
@@ -2511,7 +2618,38 @@ export default function AdminDashboard() {
           ];
 
           return (
-          <div className="flex gap-4" style={{ height: "calc(100vh - 320px)", minHeight: 480 }}>
+          <>
+          {/* Interruptor global del chat */}
+          <div className={`mb-4 flex items-center justify-between gap-4 rounded-2xl border px-5 py-3.5 ${
+            supportEnabled ? "border-slate-200 bg-white" : "border-amber-200 bg-amber-50"
+          }`}>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900">
+                Chat de soporte {supportEnabled ? "activo" : "desactivado"}
+              </p>
+              <p className="text-xs text-slate-500">
+                {supportEnabled
+                  ? "Los usuarios ven el icono del chat y pueden abrir conversaciones."
+                  : "Nadie ve el icono del chat. Las conversaciones abiertas se pueden seguir atendiendo aquí."}
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={supportEnabled}
+              aria-label="Activar o desactivar el chat de soporte"
+              onClick={handleToggleSupportChat}
+              disabled={supportToggleSaving}
+              className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors disabled:opacity-60 ${
+                supportEnabled ? "bg-emerald-500" : "bg-slate-300"
+              }`}
+            >
+              <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                supportEnabled ? "translate-x-5" : "translate-x-0"
+              }`} />
+            </button>
+          </div>
+          <div className="flex gap-4" style={{ height: "calc(100vh - 400px)", minHeight: 480 }}>
 
             {/* Chat list */}
             <div className="w-80 flex-shrink-0 bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden">
@@ -2596,7 +2734,7 @@ export default function AdminDashboard() {
 
             {/* Conversation */}
             {activeChatId ? (() => {
-              const activeChat = supportChats.find((c) => c.id === activeChatId);
+              const activeChat = supportChats.find((c) => c.id === activeChatId) || archivedChats.find((c) => c.id === activeChatId);
               if (!activeChat) return null;
               const isMine = activeChat.assignedTo === myId;
               const isUnassigned = !activeChat.assignedTo;
@@ -2734,11 +2872,11 @@ export default function AdminDashboard() {
                         </button>
                       ) : (
                         <button
-                          onClick={() => handleReopenChat(activeChat.id)}
+                          onClick={() => handleDownloadChat(activeChat, chatMessages)}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors"
                         >
-                          <Circle size={11} />
-                          Reabrir
+                          <Download size={13} />
+                          Descargar
                         </button>
                       )}
                     </div>
@@ -2879,6 +3017,7 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
+          </>
           );
         })()}
 

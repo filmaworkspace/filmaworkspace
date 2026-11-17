@@ -113,6 +113,11 @@ service cloud.firestore {
         .hasOnly(["entrada", "salida", "comida", "observaciones", "submittedAt"]);
     }
 
+    function isSupportChatEnabled() {
+      let ref = /databases/$(database)/documents/meta/supportChat;
+      return !exists(ref) || get(ref).data.get("enabled", true) != false;
+    }
+
     function hasBudgetingAccess() {
       return isSignedIn() &&
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -685,7 +690,13 @@ service cloud.firestore {
     }
 
     match /supportChats/{userId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isSupportAgent());
+      allow read, update, delete: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isSupportAgent());
+      // Con el chat desactivado (meta/supportChat.enabled == false) nadie
+      // puede abrir conversaciones nuevas.
+      allow create: if isSignedIn() && (
+        isAdmin() || isSupportAgent() ||
+        (request.auth.uid == userId && isSupportChatEnabled())
+      );
 
       match /messages/{msgId} {
         allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isSupportAgent());
@@ -696,6 +707,18 @@ service cloud.firestore {
 
     // Los crea el servidor (/api/horario/*). El destinatario lo abre por
     // enlace (el id es secreto) y solo puede rellenar sus horas.
+    // Conversaciones de soporte cerradas (las archiva /api/support/close).
+    // Solo las ven admins y agentes; ningún usuario, sea del rol que sea.
+    match /supportArchive/{archiveId} {
+      allow read: if isAdmin() || isSupportAgent();
+      allow write: if false;
+
+      match /messages/{msgId} {
+        allow read: if isAdmin() || isSupportAgent();
+        allow write: if false;
+      }
+    }
+
     match /horarioForms/{formId} {
       allow get: if true;
       allow list: if isAdmin();
@@ -715,10 +738,18 @@ service cloud.firestore {
 
     match /meta/{docId} {
       allow read: if true;
-      // automatedMessages y maintenance tienen su propia regla más abajo;
-      // el resto de docs de meta (ej. supportTicketCounter) los puede tocar
-      // cualquier usuario autenticado, incluidos anónimos.
-      allow write: if isSignedIn() && docId != "automatedMessages" && docId != "maintenance";
+      // El resto de docs de meta tienen su propia regla más abajo. Ojo: las
+      // reglas se suman, así que este comodín no puede permitir más de la
+      // cuenta (antes dejaba a cualquiera editar featureFlags).
+      // Solo el contador de tickets lo puede tocar cualquier usuario con sesión.
+      allow write: if isSignedIn() && docId == "supportTicketCounter" &&
+        request.resource.data.keys().hasOnly(["count"]);
+    }
+
+    // Activar/desactivar el chat de soporte para todo el mundo.
+    match /meta/supportChat {
+      allow read: if true;
+      allow write: if isAdmin() || isSupportAgent();
     }
 
     match /meta/automatedMessages {

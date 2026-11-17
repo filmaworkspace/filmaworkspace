@@ -31,7 +31,6 @@ export default function SupportChat() {
   const [input,          setInput]          = useState("");
   const [sending,        setSending]        = useState(false);
   const [unread,         setUnread]         = useState(0);
-  const [resolved,       setResolved]       = useState(false);
   const [ticketNumber,   setTicketNumber]   = useState<number | null>(null);
   const [step,           setStep]           = useState<"info" | "type" | "chat">("info");
   const [idName,         setIdName]         = useState("");
@@ -40,6 +39,11 @@ export default function SupportChat() {
   const [idSaving,       setIdSaving]       = useState(false);
   const [contactType,    setContactType]    = useState<"person" | "company" | null>(null);
   const [interestedInFW, setInterestedInFW] = useState<boolean | null>(null);
+  // Se activa/desactiva desde admindashboard (meta/supportChat). Si no existe el doc, está activo.
+  const [chatEnabled,    setChatEnabled]    = useState(true);
+  // Inicio de la conversación actual: se ocultan mensajes anteriores que
+  // pudieran quedar de una conversación ya cerrada.
+  const [chatStartedAt,  setChatStartedAt]  = useState<number | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLTextAreaElement>(null);
@@ -50,6 +54,15 @@ export default function SupportChat() {
 
   // All hooks before any conditional return
   useEffect(() => {
+    const unsub = onSnapshot(
+      doc(db, "meta", "supportChat"),
+      (snap) => setChatEnabled(snap.data()?.enabled !== false),
+      () => {}
+    );
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
     if (!uid || isAdmin) return;
 
     const chatRef = doc(db, "supportChats", uid);
@@ -58,9 +71,20 @@ export default function SupportChat() {
     const unsubMeta = onSnapshot(
       chatRef,
       (snap) => {
-        if (!snap.exists()) return;
+        // Sin conversación (nunca la hubo, o soporte la cerró y la archivó):
+        // el chat vuelve a empezar de cero, sin historial ni avisos.
+        if (!snap.exists() || snap.data().status === "resolved") {
+          setStep("info");
+          setTicketNumber(null);
+          setContactType(null);
+          setInterestedInFW(null);
+          setUnread(0);
+          setChatStartedAt(null);
+          setMessages([]);
+          return;
+        }
         const d = snap.data();
-        setResolved(d.status === "resolved");
+        setChatStartedAt(d.createdAt?.toMillis?.() ?? null);
         setStep("chat");
         setIdName(d.userName ?? "");
         setIdEmail(d.userEmail ?? "");
@@ -92,17 +116,27 @@ export default function SupportChat() {
     }, 80);
   }, [open]);
 
+  // Solo los mensajes de la conversación actual (no restos de una ya cerrada).
+  const visibleMessages = messages.filter((m) =>
+    !chatStartedAt || !m.createdAt || m.createdAt.toMillis() >= chatStartedAt - 5000
+  );
+
+  // Solo cuenta como no leído un mensaje NUEVO de soporte (no cuando se borran
+  // mensajes al cerrar la conversación).
+  const prevCountRef = useRef(0);
   useEffect(() => {
+    const prev = prevCountRef.current;
+    prevCountRef.current = visibleMessages.length;
     if (open) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    } else if (messages.length > 0) {
-      const last = messages[messages.length - 1];
+    } else if (visibleMessages.length > prev && step === "chat") {
+      const last = visibleMessages[visibleMessages.length - 1];
       if (last.sender === "admin") setUnread((n) => n + 1);
     }
-  }, [messages.length]);
+  }, [visibleMessages.length]);
 
   // ── After all hooks: guard render ──────────────────────────────────────────
-  if (!user || isAdmin) return null;
+  if (!user || isAdmin || !chatEnabled) return null;
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -338,7 +372,7 @@ export default function SupportChat() {
           {step === "chat" && (
             <>
               <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-slate-50">
-                {messages.length === 0 && (
+                {visibleMessages.length === 0 && (
                   <div className="h-full flex flex-col items-center justify-center text-center gap-3 py-8">
                     <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center">
                       <MessageCircle size={20} className="text-slate-400" />
@@ -347,7 +381,7 @@ export default function SupportChat() {
                   </div>
                 )}
 
-                {messages.map((msg) => {
+                {visibleMessages.map((msg) => {
                   if (msg.system) {
                     return (
                       <div key={msg.id} className="flex justify-center">
@@ -404,27 +438,10 @@ export default function SupportChat() {
                   );
                 })}
 
-                {resolved && (
-                  <div className="flex flex-col items-center gap-2 py-3">
-                    <span className="text-[11px] bg-green-50 text-green-600 border border-green-100 px-3 py-1 rounded-full">
-                      Conversación cerrada
-                    </span>
-                    <button
-                      onClick={() => {
-                        setMessages([]);
-                        setResolved(false);
-                        setStep("info");
-                      }}
-                      className="text-xs text-slate-500 hover:text-slate-800 underline underline-offset-2"
-                    >
-                      Iniciar nueva conversación
-                    </button>
-                  </div>
-                )}
                 <div ref={bottomRef} />
               </div>
 
-              {!resolved && (
+              {(
                 <div className="px-3 py-3 border-t border-slate-100 bg-white flex items-end gap-2">
                   <textarea
                     ref={inputRef}
