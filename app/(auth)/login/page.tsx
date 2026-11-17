@@ -21,10 +21,8 @@ import {
   AlertCircle,
   ArrowRight,
   Calculator,
-  Clock,
   Eye,
   EyeOff,
-  FileCheck2,
   Lock,
   Mail,
   Receipt,
@@ -37,18 +35,10 @@ const BRAND_HOVER = "#2545C7";
 const INK = "#0B1020";
 
 // ─── Panel de marca ──────────────────────────────────────────────────────────
-// Vista previa ilustrativa (no son datos reales) de lo que hay dentro.
-const PREVIEW_CHAPTERS = [
-  { label: "Equipo técnico", pct: 72 },
-  { label: "Localizaciones", pct: 54 },
-  { label: "Alquiler de equipo", pct: 88 },
-  { label: "Postproducción", pct: 23 },
-];
-
 const MODULES = [
-  { icon: Receipt, title: "Contabilidad", text: "Órdenes de compra, facturas, pagos y caja." },
-  { icon: Users, title: "Equipo", text: "Fichas, partes de horas y nóminas." },
-  { icon: Calculator, title: "Budgeting", text: "Presupuestos por capítulos y versiones." },
+  { icon: Receipt, title: "Contabilidad" },
+  { icon: Users, title: "Equipo" },
+  { icon: Calculator, title: "Presupuesto" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,131 +102,47 @@ export default function LoginPage() {
   return (
     <div className={`min-h-screen flex bg-white ${inter.className}`}>
 
-      {/* ── Panel de marca (solo escritorio) ── */}
+      {/* ── Panel de marca (solo pantallas anchas) ── */}
       <aside
-        className="relative hidden lg:flex lg:w-[52%] xl:w-[55%] flex-col justify-between overflow-hidden px-12 py-10 xl:px-16 xl:py-12 text-white"
+        className="relative hidden lg:flex lg:w-[45%] xl:w-1/2 flex-col items-center justify-center overflow-hidden px-10 text-white"
         style={{ backgroundColor: INK }}
       >
-        {/* Fondo: resplandor de marca + retícula */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              `radial-gradient(900px 520px at 0% 0%, ${BRAND}55 0%, transparent 60%),` +
-              `radial-gradient(700px 480px at 100% 100%, ${BRAND}30 0%, transparent 60%)`,
-          }}
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 opacity-[0.07]"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.9) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.9) 1px, transparent 1px)",
-            backgroundSize: "48px 48px",
-            maskImage: "radial-gradient(ellipse at 30% 40%, black 30%, transparent 75%)",
-            WebkitMaskImage: "radial-gradient(ellipse at 30% 40%, black 30%, transparent 75%)",
+              `radial-gradient(70% 55% at 50% 42%, ${BRAND}40 0%, transparent 70%),` +
+              `radial-gradient(60% 40% at 50% 100%, ${BRAND}26 0%, transparent 70%)`,
           }}
         />
 
-        {/* Logo */}
-        <div className="relative z-10">
-          <Image src="/logo.svg" alt="Filma Workspace" width={168} height={34} className="h-auto w-[168px]" priority />
-        </div>
+        <div className="relative z-10 flex flex-col items-center gap-14">
+          <Image src="/logo.svg" alt="Filma Workspace" width={220} height={44} className="h-auto w-[180px] xl:w-[220px]" priority />
 
-        {/* Mensaje + vista previa */}
-        <div className="relative z-10 max-w-xl">
-          <p className="mb-4 text-xs font-medium uppercase tracking-[0.18em] text-white/50">
-            Gestión de producción audiovisual
-          </p>
-          <h2 className="text-4xl xl:text-[2.75rem] font-semibold leading-[1.1] tracking-tight">
-            Toda tu producción,<br />bajo control.
-          </h2>
-          <p className="mt-4 max-w-md text-[15px] leading-relaxed text-white/60">
-            Contabilidad, equipo y presupuestos de cada proyecto en un único espacio de trabajo.
-          </p>
-
-          {/* Vista previa de la plataforma */}
-          <div aria-hidden="true" className="relative mt-12 mr-8">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-2xl shadow-black/40 backdrop-blur-sm">
-              <div className="mb-4">
-                <span className="text-[11px] font-medium text-white/40">Presupuesto · Gastado vs. previsto</span>
-              </div>
-              <div className="space-y-3.5">
-                {PREVIEW_CHAPTERS.map((c) => (
-                  <div key={c.label}>
-                    <div className="mb-1.5 flex justify-between text-xs">
-                      <span className="text-white/75">{c.label}</span>
-                      <span className="tabular-nums text-white/45">{c.pct}%</span>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${c.pct}%`,
-                          background: c.pct > 85 ? "#F5A524" : `linear-gradient(90deg, ${BRAND}, #6C8BFF)`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Tarjetas flotantes */}
-            <div className="absolute -right-8 -top-9 flex items-center gap-3 rounded-xl border border-white/10 bg-[#141A2E]/95 px-4 py-3 shadow-xl shadow-black/40">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: `${BRAND}33` }}>
-                <FileCheck2 size={16} className="text-[#8EA6FF]" />
-              </div>
-              <div>
-                <p className="text-xs font-medium text-white/90">Orden de compra aprobada</p>
-                <p className="text-[11px] text-white/45">Lista para facturar</p>
-              </div>
-            </div>
-            <div className="absolute -bottom-11 left-10 flex items-center gap-3 rounded-xl border border-white/10 bg-[#141A2E]/95 px-4 py-3 shadow-xl shadow-black/40">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-400/15">
-                <Clock size={16} className="text-emerald-300" />
-              </div>
-              <div>
-                <p className="text-xs font-medium text-white/90">Partes de horas del día</p>
-                <p className="text-[11px] text-white/45">Enviados al equipo</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Módulos */}
-        <div className="relative z-10">
-          <div className="grid grid-cols-3 gap-6 border-t border-white/10 pt-8">
-            {MODULES.map(({ icon: Icon, title, text }) => (
-              <div key={title}>
-                <Icon size={18} className="mb-2.5 text-[#8EA6FF]" />
-                <p className="text-sm font-medium text-white/90">{title}</p>
-                <p className="mt-1 text-xs leading-relaxed text-white/45">{text}</p>
-              </div>
+          <ul className="flex items-start gap-10 xl:gap-14">
+            {MODULES.map(({ icon: Icon, title }) => (
+              <li key={title} className="flex flex-col items-center gap-2.5">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06]">
+                  <Icon size={18} className="text-[#8EA6FF]" />
+                </span>
+                <span className="text-xs font-medium text-white/60">{title}</span>
+              </li>
             ))}
-          </div>
-          <p className="mt-8 text-xs text-white/30">© {new Date().getFullYear()} Filma Workspace</p>
+          </ul>
         </div>
       </aside>
 
       {/* ── Formulario ── */}
-      <main className="flex flex-1 flex-col px-6 py-8 sm:px-10 lg:px-16">
-        {/* Cabecera */}
-        <div className="flex items-center justify-between lg:justify-end">
-          <Image src="/logodark.svg" alt="Filma Workspace" width={140} height={28} className="h-auto w-[140px] lg:hidden" priority />
-          <p className="hidden text-sm text-slate-500 sm:block">
-            ¿No tienes cuenta?{" "}
-            <Link href="/register" className="font-medium hover:underline" style={{ color: BRAND }}>
-              Crear cuenta
-            </Link>
-          </p>
+      <main className="flex flex-1 flex-col px-6 py-8 sm:px-10">
+        {/* Logo (sin panel de marca) */}
+        <div className="flex justify-center lg:hidden">
+          <Image src="/logodark.svg" alt="Filma Workspace" width={140} height={28} className="h-auto w-[130px]" priority />
         </div>
 
-        <div className="flex flex-1 items-center justify-center py-12">
-          <div className="w-full max-w-[380px]">
-            <h1 className="text-[1.75rem] font-semibold tracking-tight text-slate-900">Bienvenido de nuevo</h1>
-            <p className="mt-2 text-sm text-slate-500">Accede a tu espacio de trabajo.</p>
+        <div className="flex flex-1 items-center justify-center py-10">
+          <div className="w-full max-w-[360px]">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Inicia sesión</h1>
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-5">
               {/* Email */}
@@ -336,7 +242,7 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <p className="mt-8 text-center text-sm text-slate-500 sm:hidden">
+            <p className="mt-8 text-center text-sm text-slate-500">
               ¿No tienes cuenta?{" "}
               <Link href="/register" className="font-medium hover:underline" style={{ color: BRAND }}>
                 Crear cuenta
@@ -345,7 +251,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-slate-400 lg:hidden">© {new Date().getFullYear()} Filma Workspace</p>
       </main>
     </div>
   );
