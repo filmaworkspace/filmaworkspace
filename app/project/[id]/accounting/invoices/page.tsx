@@ -779,12 +779,13 @@ export default function InvoicesPage() {
             <table className="tbl w-full min-w-[1000px] border-collapse text-[13px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
-                  <th scope="col" className="px-4 py-2 text-left font-medium">Documento</th>
+                  <th scope="col" className="w-44 px-4 py-2 text-left font-medium">Documento</th>
+                  <th scope="col" className="w-[30%] px-3 py-2 text-left font-medium">Concepto</th>
                   <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Base</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Total</th>
-                  <th scope="col" className="px-3 py-2 text-left font-medium">Estado</th>
-                  <th scope="col" className="px-3 py-2 text-left font-medium">Vencimiento</th>
+                  <th scope="col" className="w-32 px-3 py-2 text-left font-medium">Estado</th>
+                  <th scope="col" className="w-44 px-3 py-2 text-left font-medium">Vencimiento</th>
                   <th scope="col" className="w-12 py-2 pr-3" />
                 </tr>
               </thead>
@@ -808,12 +809,14 @@ export default function InvoicesPage() {
                           {(invoice.accounted || invoice.accountedAt) && <span title={`Contabilizada${invoice.accountingEntryNumber ? ` · asiento ${invoice.accountingEntryNumber}` : ""}`}><Lock size={11} className="text-slate-400" /></span>}
                           {needsReplacement && <span className="rounded border border-amber-200 bg-amber-50 px-1 text-[10px] text-amber-800">falta factura</span>}
                         </span>
+                      </td>
+                      <td className="px-3 py-1.5" title={invoice.description || undefined}>
+                        {invoice.description
+                          ? <span className={`font-medium ${dead ? "" : "text-slate-900"}`}>{invoice.description}</span>
+                          : <span className="text-slate-300">Sin concepto</span>}
                         {invoice.poNumber && <span className="ml-2 font-mono text-[11px] text-slate-400">PO-{invoice.poNumber}</span>}
                       </td>
-                      <td className="max-w-[320px] px-3 py-1.5">
-                        <span className="block truncate font-medium text-slate-900">{invoice.supplier}</span>
-                        {invoice.description && <span className="block truncate text-xs text-slate-500">{invoice.description}</span>}
-                      </td>
+                      <td className="px-3 py-1.5 text-slate-600" title={invoice.supplier}>{invoice.supplier}</td>
                       <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs text-slate-600">{formatCurrency(invoice.baseAmount)}</td>
                       <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs font-medium">{formatCurrency(invoice.totalAmount)}</td>
                       <td className="whitespace-nowrap px-3 py-1.5">
@@ -854,7 +857,7 @@ export default function InvoicesPage() {
               </tbody>
               <tfoot>
                 <tr className="border-t border-slate-200 bg-[#F4F4F5] text-xs">
-                  <td className="px-4 py-2 font-semibold" colSpan={2}>Total {rows.length === invoices.length ? "" : "filtrado "}sin anuladas</td>
+                  <td className="px-4 py-2 font-semibold" colSpan={3}>Total {rows.length === invoices.length ? "" : "filtrado "}sin anuladas</td>
                   <td className="px-3 py-2 text-right font-mono font-semibold">{formatCurrency(totals.base)}</td>
                   <td className="px-3 py-2 text-right font-mono font-semibold">{formatCurrency(totals.total)}</td>
                   <td colSpan={3} />

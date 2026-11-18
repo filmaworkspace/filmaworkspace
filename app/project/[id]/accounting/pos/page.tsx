@@ -880,13 +880,14 @@ export default function POsPage() {
             <table className="tbl w-full min-w-[1000px] border-collapse text-[13px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
-                  <th scope="col" className="px-4 py-2 text-left font-medium">Nº</th>
+                  <th scope="col" className="w-28 px-4 py-2 text-left font-medium">Nº</th>
+                  <th scope="col" className="w-[30%] px-3 py-2 text-left font-medium">Concepto</th>
                   <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor</th>
-                  <th scope="col" className="px-3 py-2 text-left font-medium">Departamento</th>
+                  <th scope="col" className="w-32 px-3 py-2 text-left font-medium">Departamento</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Base</th>
                   <th scope="col" className="px-3 py-2 text-left font-medium">Facturado</th>
-                  <th scope="col" className="px-3 py-2 text-left font-medium">Estado</th>
-                  <th scope="col" className="px-3 py-2 text-right font-medium">Fecha</th>
+                  <th scope="col" className="w-40 px-3 py-2 text-left font-medium">Estado</th>
+                  <th scope="col" className="w-28 px-3 py-2 text-right font-medium">Fecha</th>
                   <th scope="col" className="w-12 py-2 pr-3" />
                 </tr>
               </thead>
@@ -906,10 +907,12 @@ export default function POsPage() {
                           {po.version > 1 && <span className="font-mono text-[10px] text-slate-500">v{po.version}</span>}
                         </span>
                       </td>
-                      <td className="max-w-[320px] px-3 py-1.5">
-                        <span className={`block truncate font-medium ${po.supplier ? "text-slate-900" : "italic text-slate-400"}`}>{po.supplier || "Sin proveedor"}</span>
-                        {(po.generalDescription || po.description) && <span className="block truncate text-xs text-slate-500">{po.generalDescription || po.description}</span>}
+                      <td className="px-3 py-1.5" title={po.generalDescription || po.description || undefined}>
+                        {po.generalDescription || po.description
+                          ? <span className={`font-medium ${dead ? "" : "text-slate-900"}`}>{po.generalDescription || po.description}</span>
+                          : <span className="text-slate-300">Sin concepto</span>}
                       </td>
+                      <td className={`px-3 py-1.5 ${po.supplier ? "text-slate-600" : "text-slate-400"}`} title={po.supplier || undefined}>{po.supplier || "Sin proveedor"}</td>
                       <td className="whitespace-nowrap px-3 py-1.5 text-slate-600">{po.department || "—"}</td>
                       <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs font-medium">{formatCurrency(base)}</td>
                       <td className="px-3 py-1.5">
@@ -950,7 +953,7 @@ export default function POsPage() {
               </tbody>
               <tfoot>
                 <tr className="border-t border-slate-200 bg-[#F4F4F5] text-xs">
-                  <td className="px-4 py-2 font-semibold" colSpan={3}>Total {rows.length === pos.length ? "" : "filtrado "}sin anuladas</td>
+                  <td className="px-4 py-2 font-semibold" colSpan={4}>Total {rows.length === pos.length ? "" : "filtrado "}sin anuladas</td>
                   <td className="px-3 py-2 text-right font-mono font-semibold">{formatCurrency(totals.base)}</td>
                   <td className="px-3 py-2 font-mono text-slate-600">{formatCurrency(totals.invoiced)} facturado</td>
                   <td colSpan={3} />

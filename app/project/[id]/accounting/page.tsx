@@ -408,7 +408,7 @@ export default function AccountingPanelPage() {
   const showDocsAndConfig = role === "EP" || role === "PM" || role === "Controller";
   const tableTitle =
     profile === "accounting" ? "Movimientos recientes" : profile === "head" ? (department ? `Movimientos · ${department}` : "Movimientos del departamento") : "Mis documentos";
-  const thirdColumn = profile === "accounting" ? "Departamento" : profile === "head" ? "Solicitante" : "Cuenta";
+  const thirdColumn = profile === "accounting" ? "Dpto." : profile === "head" ? "Solicitante" : "Cuenta";
   const showBudget = profile === "accounting" && extended;
   const showDue = profile === "accounting" && extended;
   const showOpenPOs = profile !== "accounting";
@@ -520,12 +520,13 @@ export default function AccountingPanelPage() {
                 <table className="tbl w-full min-w-[760px] border-collapse text-[13px]">
                   <thead>
                     <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
-                      <th scope="col" className="px-4 py-2 text-left font-medium">Nº</th>
-                      <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor</th>
-                      <th scope="col" className="px-3 py-2 text-left font-medium">{thirdColumn}</th>
-                      <th scope="col" className="px-3 py-2 text-right font-medium">Base</th>
-                      <th scope="col" className="px-3 py-2 text-left font-medium">Estado</th>
-                      <th scope="col" className="px-4 py-2 text-right font-medium">Fecha</th>
+                      <th scope="col" className="w-24 px-4 py-2 text-left font-medium">Nº</th>
+                      <th scope="col" className="px-3 py-2 text-left font-medium">Concepto</th>
+                      <th scope="col" className="w-36 px-3 py-2 text-left font-medium">Proveedor</th>
+                      <th scope="col" className="w-28 px-3 py-2 text-left font-medium">{thirdColumn}</th>
+                      <th scope="col" className="w-28 px-3 py-2 text-right font-medium">Base</th>
+                      <th scope="col" className="w-36 px-3 py-2 text-left font-medium">Estado</th>
+                      <th scope="col" className="w-20 px-4 py-2 text-right font-medium">Fecha</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -538,12 +539,12 @@ export default function AccountingPanelPage() {
                           <td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs font-medium">
                             <Link href={href} className="hover:underline">{r.number}</Link>
                           </td>
-                          <td className="max-w-[320px] px-3 py-2.5">
-                            <Link href={href} className="block">
-                              <span className="block truncate font-medium text-slate-900">{r.supplier}</span>
-                              {r.concept && <span className="block truncate text-xs text-slate-500">{r.concept}</span>}
+                          <td className="px-3 py-2.5" title={r.concept || undefined}>
+                            <Link href={href} className="hover:underline">
+                              {r.concept ? <span className="font-medium text-slate-900">{r.concept}</span> : <span className="text-slate-300">Sin concepto</span>}
                             </Link>
                           </td>
+                          <td className="px-3 py-2.5 text-slate-600" title={r.supplier}>{r.supplier}</td>
                           <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{third || "—"}</td>
                           <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-xs">{money(r.base)}</td>
                           <td className="whitespace-nowrap px-3 py-2.5">
