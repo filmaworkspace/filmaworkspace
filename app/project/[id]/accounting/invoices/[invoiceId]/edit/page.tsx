@@ -10,7 +10,7 @@ import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db, storage } from "@/lib/firebase";
-import { AccountPickerModal, EpisodeModal, SupplierPickerModal } from "@/components/accounting/Pickers";
+import { AccountPickerModal, EpisodeModal, POItemsModal, SupplierPickerModal } from "@/components/accounting/Pickers";
 import { documentTotals, lineAmounts } from "@/lib/amounts";
 import { getScopedDocs, scopeFromPermissions } from "@/lib/accountingScope";
 import { approverIdsOf } from "@/lib/approvers";
@@ -1395,76 +1395,13 @@ export default function EditInvoicePage() {
         </div>
       </main>
 
-      {/* Modal items de PO */}
-      {showPOItemsModal && linkedPO && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowPOItemsModal(false)}>
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-              <div>
-                <h2 className="text-[14px] font-semibold text-slate-900">Items de PO-{linkedPO.number}</h2>
-                <p className="text-[13px] text-slate-500">Selecciona un item para añadirlo a la factura</p>
-              </div>
-              <button onClick={() => setShowPOItemsModal(false)} className="p-2 hover:bg-slate-100 rounded-md"><X size={20} /></button>
-            </div>
-            <div className="p-6 max-h-96 overflow-y-auto space-y-3">
-              {poItemsWithInvoiced.map((poItem, idx) => {
-                const isOver = poItem.availableAmount < 0;
-                return (
-                  <button
-                    key={poItem.id || idx}
-                    onClick={() => addPOItemToInvoice(poItem, idx)}
-                    className={cx(
-                      "w-full text-left p-4 border rounded-md transition-colors",
-                      isOver ? "border-red-200 bg-red-50 hover:border-red-300" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-                    )}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <p className="font-medium text-slate-900">{poItem.description || "Sin descripción"}</p>
-                        <p className="text-xs text-slate-500 font-mono mt-1">{poItem.subAccountCode} - {poItem.subAccountDescription}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-slate-900">{formatCurrency(poItem.totalAmount)} €</p>
-                        <p className="text-xs text-slate-500">Total PO</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4 text-[13px] mt-3 pt-3 border-t border-slate-100">
-                      <div>
-                        <p className="text-slate-500 text-xs">Facturado</p>
-                        <p className="font-medium text-slate-700">{formatCurrency(poItem.invoicedAmount)} €</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500 text-xs">Disponible</p>
-                        <p className={cx("font-medium", isOver ? "text-red-600" : poItem.availableAmount < poItem.totalAmount * 0.1 ? "text-amber-600" : "text-emerald-600")}>
-                          {formatCurrency(poItem.availableAmount)} €
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <span className="inline-flex items-center gap-1 text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg">
-                          <Plus size={12} />
-                          Añadir
-                        </span>
-                      </div>
-                    </div>
-                    {isOver && (
-                      <div className="flex items-center gap-2 mt-3 text-xs text-red-600">
-                        <AlertTriangle size={12} />
-                        Este item ya está sobre-facturado
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-              {poItemsWithInvoiced.length === 0 && (
-                <div className="text-center py-8">
-                  <Package size={32} className="text-slate-300 mx-auto mb-3" />
-                  <p className="text-slate-500">No hay items en esta PO</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <POItemsModal
+        open={showPOItemsModal && !!linkedPO}
+        onClose={() => setShowPOItemsModal(false)}
+        poNumber={linkedPO?.number}
+        items={poItemsWithInvoiced}
+        onPick={addPOItemToInvoice}
+      />
 
       <SupplierPickerModal
         open={showSupplierModal}

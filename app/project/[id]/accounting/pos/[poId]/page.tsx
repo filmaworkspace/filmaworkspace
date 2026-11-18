@@ -5,10 +5,11 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
-import { AnchoredPanel } from "@/components/ds";
+import { AnchoredPanel, Button, Modal } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
+import { ActionModal } from "@/components/accounting/ActionModal";
 import { getScopedDocs, scopeFromPermissions, sortByTime } from "@/lib/accountingScope";
 import {
   EmailAuthProvider,
@@ -1029,86 +1030,36 @@ export default function PODetailPage() {
                                   <Info size={16} />
                                 </button>
                                 
-                                {/* Popover como modal centrado */}
-                                {showItemInfoPopover === index && (
-                                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowItemInfoPopover(null)}>
-                                    <div className="absolute inset-0 bg-black/20" />
-                                    <div className="relative w-80 bg-white rounded-md shadow-xl border border-slate-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                      <div className={`px-4 py-3 ${item.isClosed ? "bg-[#F7F7F8]" : itemRemaining > 0 ? "bg-amber-50" : "bg-emerald-50"}`}>
-                                        <p className={`font-semibold text-[13px] ${item.isClosed ? "text-slate-900" : itemRemaining > 0 ? "text-amber-800" : "text-emerald-800"}`}>
-                                          {item.isClosed ? "Item cerrado" : itemRemaining > 0 ? "Pendiente de facturar" : "Completamente facturado"}
-                                        </p>
-                                        <p className="text-xs text-slate-600 mt-0.5">{item.description}</p>
-                                      </div>
-                                      <div className="p-4 space-y-3">
-                                        <div className="grid grid-cols-2 gap-3 text-[13px]">
-                                          <div>
-                                            <p className="text-slate-500 text-xs">Comprometido</p>
-                                            <p className="font-semibold text-slate-900">{formatCurrency(itemCommitted)} {getCurrencySymbol()}</p>
-                                          </div>
-                                          <div>
-                                            <p className="text-slate-500 text-xs">Facturado</p>
-                                            <p className={`font-semibold ${isOverInvoiced ? "text-amber-600" : "text-emerald-600"}`}>{formatCurrency(itemInvoiced)} {getCurrencySymbol()}</p>
-                                          </div>
-                                        </div>
-                                        <div className={`p-3 rounded-lg ${item.isClosed ? "bg-[#F7F7F8]" : itemRemaining > 0 ? "bg-amber-50" : "bg-slate-50"}`}>
-                                          <p className="text-xs text-slate-500 mb-1">Pendiente</p>
-                                          <p className={`font-bold text-lg ${item.isClosed ? "text-slate-900" : itemRemaining > 0 ? "text-amber-700" : "text-slate-600"}`}>
-                                            {item.isClosed ? "0,00" : formatCurrency(itemRemaining)} {getCurrencySymbol()}
-                                          </p>
-                                          {!item.isClosed && itemRemaining > 0 && (
-                                            <p className="text-xs text-amber-600 mt-1">Este importe se liberará al cerrar</p>
-                                          )}
-                                        </div>
-                                        {/* Barra de progreso */}
-                                        <div>
-                                          <div className="flex justify-between text-xs text-slate-500 mb-1">
-                                            <span>Progreso</span>
-                                            <span>{Math.round(itemProgress)}%</span>
-                                          </div>
-                                          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                                            <div 
-                                              className={`h-full rounded-full ${isOverInvoiced ? "bg-amber-500" : "bg-emerald-500"}`} 
-                                              style={{ width: `${Math.min(100, itemProgress)}%` }} 
-                                            />
-                                          </div>
-                                        </div>
-                                        {/* Botón de acción - disponible para POs aprobadas y abiertas */}
-                                        {po.status === "approved" && po.isOpen !== false && (permissions.role === "EP" || permissions.role === "PM" || permissions.role === "Controller" || permissions.accountingAccessLevel === "accounting_extended") && (
-                                          <div className="pt-2 border-t border-slate-100">
-                                            {item.isClosed ? (
-                                              <button
-                                                onClick={() => {
-                                                  setShowItemInfoPopover(null);
-                                                  setShowReopenItemModal(index);
-                                                  setPasswordInput("");
-                                                  setPasswordError("");
-                                                }}
-                                                className="w-full flex items-center justify-center gap-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[13px] font-medium transition-colors"
-                                              >
-                                                <Unlock size={14} />
-                                                Reabrir item
-                                              </button>
-                                            ) : (
-                                              <button
-                                                onClick={() => {
-                                                  setShowItemInfoPopover(null);
-                                                  setShowCloseItemModal(index);
-                                                  setPasswordInput("");
-                                                  setPasswordError("");
-                                                }}
-                                                className="w-full flex items-center justify-center gap-2 px-4 py-1.5 rounded-md text-[13px] font-medium transition-colors border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
-                                              >
-                                                <Lock size={14} />
-                                                Cerrar item {itemRemaining > 0 && `(liberar ${formatCurrency(itemRemaining)} ${getCurrencySymbol()})`}
-                                              </button>
-                                            )}
-                                          </div>
-                                        )}
+                                <Modal
+                                  open={showItemInfoPopover === index}
+                                  onClose={() => setShowItemInfoPopover(null)}
+                                  title={item.isClosed ? "Línea cerrada" : itemRemaining > 0 ? "Pendiente de facturar" : "Facturada por completo"}
+                                  width="max-w-sm"
+                                  footer={po.status === "approved" && po.isOpen !== false && (permissions.role === "EP" || permissions.role === "PM" || permissions.role === "Controller" || permissions.accountingAccessLevel === "accounting_extended") ? (
+                                    item.isClosed ? (
+                                      <Button variant="secondary" onClick={() => { setShowItemInfoPopover(null); setShowReopenItemModal(index); setPasswordInput(""); setPasswordError(""); }}>Reabrir línea</Button>
+                                    ) : (
+                                      <Button variant="secondary" onClick={() => { setShowItemInfoPopover(null); setShowCloseItemModal(index); setPasswordInput(""); setPasswordError(""); }}>
+                                        Cerrar línea{itemRemaining > 0 ? ` y liberar ${formatCurrency(itemRemaining)} ${getCurrencySymbol()}` : ""}
+                                      </Button>
+                                    )
+                                  ) : undefined}
+                                >
+                                  <div className="flex flex-col gap-3 text-[13px]">
+                                    <p className="text-slate-600">{item.description}</p>
+                                    <dl className="grid grid-cols-2 gap-y-1.5">
+                                      <dt className="text-slate-500">Comprometido</dt><dd className="text-right font-mono">{formatCurrency(itemCommitted)} {getCurrencySymbol()}</dd>
+                                      <dt className="text-slate-500">Facturado</dt><dd className={`text-right font-mono ${isOverInvoiced ? "text-amber-800" : ""}`}>{formatCurrency(itemInvoiced)} {getCurrencySymbol()}</dd>
+                                      <dt className="font-medium text-slate-900">Pendiente</dt><dd className="text-right font-mono font-semibold">{item.isClosed ? "0,00" : formatCurrency(itemRemaining)} {getCurrencySymbol()}</dd>
+                                    </dl>
+                                    <div>
+                                      <div className="mb-1 flex justify-between text-xs text-slate-500"><span>Facturado</span><span>{Math.round(itemProgress)} %</span></div>
+                                      <div className="h-1 overflow-hidden rounded-full bg-slate-100">
+                                        <div className={`h-full ${isOverInvoiced ? "bg-amber-500" : "bg-[#2F52E0]"}`} style={{ width: `${Math.min(100, itemProgress)}%` }} />
                                       </div>
                                     </div>
                                   </div>
-                                )}
+                                </Modal>
                               </>
                             )}
                           </div>
@@ -1497,438 +1448,115 @@ export default function PODetailPage() {
         )}
       </main>
 
-      {/* Close Modal */}
-      {showCloseModal && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowCloseModal(false); resetModals(); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#F1F1F3] rounded-md flex items-center justify-center">
-                <Lock size={20} className="text-slate-700" />
-              </div>
-              <div>
-                <h3 className="text-[14px] font-semibold text-slate-900">Cerrar PO-{po.number}</h3>
-                <p className="text-xs text-slate-500">Esta acción requiere confirmación</p>
-              </div>
-            </div>
-            <div className="p-6">
-              {remainingAmount > 0 && (
-                <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
-                    <div className="text-[13px] text-amber-800">
-                      <p className="font-medium">Esta PO tiene importe sin facturar</p>
-                      <p className="text-xs mt-1">Pendiente: {formatCurrency(remainingAmount)} {getCurrencySymbol()}</p>
-                      <p className="text-xs mt-1 text-amber-700">Se liberará el presupuesto comprometido restante.</p>
-                    </div>
-                  </div>
+      {po && (() => {
+        const cur = getCurrencySymbol();
+        const pwd = { value: passwordInput, onChange: (v: string) => { setPasswordInput(v); setPasswordError(""); }, error: passwordError, email: permissions.userEmail };
+        const closeItem = showCloseItemModal !== null ? po.items[showCloseItemModal] : null;
+        const reopenItem = showReopenItemModal !== null ? po.items[showReopenItemModal] : null;
+        const left = (it: any) => Math.max(0, (it?.baseAmount || 0) - (it?.invoicedAmount || 0));
+        const note = showApprovalNoteModal;
+        const NOTE_LABEL: Record<string, string> = { approval: "Aprobación", rejection: "Rechazo", info_request: "Solicitud de información", comment: "Comentario" };
+        return (
+          <>
+            <ActionModal
+              open={showCloseModal}
+              onClose={() => { setShowCloseModal(false); resetModals(); }}
+              title={`Cerrar PO-${po.number}`}
+              notice={remainingAmount > 0 ? <>Queda <b>{formatCurrency(remainingAmount)} {cur}</b> sin facturar. Al cerrar la PO se libera ese comprometido del presupuesto.</> : undefined}
+              password={pwd}
+              confirmLabel="Cerrar PO"
+              processingLabel="Cerrando…"
+              processing={processing}
+              onConfirm={handleClosePO}
+            />
+            <ActionModal
+              open={!!closeItem}
+              onClose={() => { setShowCloseItemModal(null); resetModals(); }}
+              title="Cerrar línea"
+              subtitle={closeItem?.description}
+              notice={closeItem && left(closeItem) > 0 ? <>Comprometido {formatCurrency(closeItem.baseAmount)} {cur} · facturado {formatCurrency(closeItem.invoicedAmount || 0)} {cur}. Se liberan <b>{formatCurrency(left(closeItem))} {cur}</b>.</> : undefined}
+              password={pwd}
+              confirmLabel="Cerrar línea"
+              processingLabel="Cerrando…"
+              processing={processing}
+              onConfirm={() => showCloseItemModal !== null && handleCloseItem(showCloseItemModal)}
+            />
+            <ActionModal
+              open={!!reopenItem}
+              onClose={() => { setShowReopenItemModal(null); resetModals(); }}
+              title="Reabrir línea"
+              subtitle={reopenItem?.description}
+              notice={reopenItem ? <>Comprometido original {formatCurrency(reopenItem.baseAmount)} {cur} · facturado {formatCurrency(reopenItem.invoicedAmount || 0)} {cur}. Se vuelven a comprometer <b>{formatCurrency(left(reopenItem))} {cur}</b>.</> : undefined}
+              password={pwd}
+              confirmLabel="Reabrir línea"
+              processingLabel="Reabriendo…"
+              processing={processing}
+              onConfirm={() => showReopenItemModal !== null && handleReopenItem(showReopenItemModal)}
+            />
+            <ActionModal
+              open={showReopenModal}
+              onClose={() => { setShowReopenModal(false); resetModals(); }}
+              title={`Reabrir PO-${po.number}`}
+              subtitle="Vuelve a estar aprobada."
+              notice={<>Se vuelven a comprometer <b>{formatCurrency(Math.max(0, po.baseAmount - po.invoicedAmount))} {cur}</b> del presupuesto.</>}
+              password={pwd}
+              confirmLabel="Reabrir PO"
+              processingLabel="Reabriendo…"
+              processing={processing}
+              onConfirm={handleReopenPO}
+            />
+            <ActionModal
+              open={showCancelModal}
+              onClose={() => { setShowCancelModal(false); resetModals(); }}
+              title={`Anular PO-${po.number}`}
+              subtitle="No se puede deshacer."
+              notice={po.status === "approved" ? <>Se liberan <b>{formatCurrency(po.committedAmount || po.baseAmount)} {cur}</b> comprometidos.</> : undefined}
+              reason={{ label: "Motivo de la anulación", value: cancellationReason, onChange: setCancellationReason, placeholder: "Por qué se anula" }}
+              password={pwd}
+              confirmLabel="Anular PO"
+              processingLabel="Anulando…"
+              processing={processing}
+              danger
+              onConfirm={handleCancelPO}
+            />
+            <ActionModal
+              open={showModifyModal}
+              onClose={() => { setShowModifyModal(false); resetModals(); }}
+              title={`Modificar PO-${po.number}`}
+              notice={<>Pasa a la versión <b>V{String((po.version || 1) + 1).padStart(2, "0")}</b> en borrador. Tendrás que editarla y enviarla de nuevo a aprobación.</>}
+              reason={{ label: "Motivo de la modificación", value: modificationReason, onChange: setModificationReason, placeholder: "Qué cambia y por qué", rows: 4 }}
+              confirmLabel="Modificar"
+              processingLabel="Modificando…"
+              processing={processing}
+              onConfirm={handleModifyPO}
+            />
+            <ActionModal
+              open={showDeleteModal}
+              onClose={() => setShowDeleteModal(false)}
+              title="Eliminar borrador"
+              subtitle={`Se elimina el borrador PO-${po.number}. No se puede deshacer.`}
+              confirmLabel="Eliminar"
+              processingLabel="Eliminando…"
+              processing={processing}
+              danger
+              onConfirm={handleDeleteDraft}
+            />
+            <Modal
+              open={!!note}
+              onClose={() => setShowApprovalNoteModal(null)}
+              title={note ? `${NOTE_LABEL[note.type] || "Nota"} · ${note.userName}` : ""}
+              footer={<Button variant="secondary" onClick={() => setShowApprovalNoteModal(null)}>Cerrar</Button>}
+            >
+              {note && (
+                <div className="flex flex-col gap-3">
+                  <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-slate-800">{note.text}</p>
+                  <p className="text-xs text-slate-400">{formatDateTime(note.createdAt)}</p>
                 </div>
               )}
-              <div className="mb-6">
-                <label className="block text-[13px] font-medium text-slate-700 mb-2 flex items-center gap-2">
-                  <KeyRound size={14} />
-                  Confirma tu contraseña
-                </label>
-                <input
-                  type="password"
-                  value={passwordInput}
-                  onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
-                  placeholder="Tu contraseña"
-                  className={`w-full px-2.5 py-1.5 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]`}
-                  autoFocus
-                />
-                {passwordError && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => { setShowCloseModal(false); resetModals(); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">
-                  Cancelar
-                </button>
-                <button onClick={handleClosePO} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-1.5 rounded-md text-[13px] font-medium disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
-                  {processing ? "Cerrando..." : "Cerrar PO"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Close Item Modal */}
-      {showCloseItemModal !== null && po && po.items[showCloseItemModal] && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowCloseItemModal(null); resetModals(); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#F1F1F3] rounded-md flex items-center justify-center">
-                <Lock size={20} className="text-slate-700" />
-              </div>
-              <div>
-                <h3 className="text-[14px] font-semibold text-slate-900">Cerrar item</h3>
-                <p className="text-xs text-slate-500">{po.items[showCloseItemModal].description}</p>
-              </div>
-            </div>
-            <div className="p-6">
-              {(() => {
-                const item = po.items[showCloseItemModal];
-                const itemRemaining = Math.max(0, (item.baseAmount || 0) - (item.invoicedAmount || 0));
-                return itemRemaining > 0 ? (
-                  <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
-                      <div className="text-[13px] text-amber-800">
-                        <p className="font-medium">Este item tiene importe sin facturar</p>
-                        <p className="text-xs mt-1">Comprometido: {formatCurrency(item.baseAmount)} {getCurrencySymbol()}</p>
-                        <p className="text-xs">Realizado: {formatCurrency(item.invoicedAmount || 0)} {getCurrencySymbol()}</p>
-                        <p className="text-xs font-medium mt-1">Se liberarán: {formatCurrency(itemRemaining)} {getCurrencySymbol()}</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : null;
-              })()}
-              <div className="mb-6">
-                <label className="block text-[13px] font-medium text-slate-700 mb-2 flex items-center gap-2">
-                  <KeyRound size={14} />
-                  Confirma tu contraseña
-                </label>
-                <input
-                  type="password"
-                  value={passwordInput}
-                  onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
-                  placeholder="Tu contraseña"
-                  className={`w-full px-2.5 py-1.5 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]`}
-                  autoFocus
-                />
-                {passwordError && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => { setShowCloseItemModal(null); resetModals(); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">
-                  Cancelar
-                </button>
-                <button onClick={() => handleCloseItem(showCloseItemModal)} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-1.5 rounded-md text-[13px] font-medium disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
-                  {processing ? "Cerrando..." : "Cerrar item"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Reopen Item Modal */}
-      {showReopenItemModal !== null && po && po.items[showReopenItemModal] && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowReopenItemModal(null); resetModals(); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center">
-                <Unlock size={20} className="text-emerald-600" />
-              </div>
-              <div>
-                <h3 className="text-[14px] font-semibold text-slate-900">Reabrir item</h3>
-                <p className="text-xs text-slate-500">{po.items[showReopenItemModal].description}</p>
-              </div>
-            </div>
-            <div className="p-6">
-              {(() => {
-                const item = po.items[showReopenItemModal];
-                const itemRemaining = Math.max(0, (item.baseAmount || 0) - (item.invoicedAmount || 0));
-                return itemRemaining > 0 ? (
-                  <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
-                      <div className="text-[13px] text-amber-800">
-                        <p className="font-medium">Se restaurará el comprometido</p>
-                        <p className="text-xs mt-1">Comprometido original: {formatCurrency(item.baseAmount)} {getCurrencySymbol()}</p>
-                        <p className="text-xs">Facturado: {formatCurrency(item.invoicedAmount || 0)} {getCurrencySymbol()}</p>
-                        <p className="text-xs font-medium mt-1">Se volverán a comprometer: {formatCurrency(itemRemaining)} {getCurrencySymbol()}</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : null;
-              })()}
-              <div className="mb-6">
-                <label className="block text-[13px] font-medium text-slate-700 mb-2 flex items-center gap-2">
-                  <KeyRound size={14} />
-                  Confirma tu contraseña
-                </label>
-                <input
-                  type="password"
-                  value={passwordInput}
-                  onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
-                  placeholder="Tu contraseña"
-                  className={`w-full px-2.5 py-1.5 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]`}
-                  autoFocus
-                />
-                {passwordError && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => { setShowReopenItemModal(null); resetModals(); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">
-                  Cancelar
-                </button>
-                <button onClick={() => handleReopenItem(showReopenItemModal)} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[13px] font-medium disabled:opacity-50">
-                  {processing ? "Reabriendo..." : "Reabrir item"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Reopen Modal */}
-      {showReopenModal && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowReopenModal(false); resetModals(); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center">
-                <Unlock size={20} className="text-emerald-600" />
-              </div>
-              <div>
-                <h3 className="text-[14px] font-semibold text-slate-900">Reabrir PO-{po.number}</h3>
-                <p className="text-xs text-slate-500">Volverá al estado &quot;Aprobada&quot;</p>
-              </div>
-            </div>
-            <div className="p-6">
-              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
-                  <div className="text-[13px] text-amber-800">
-                    <p className="font-medium">Se restaurará el presupuesto comprometido</p>
-                    <p className="text-xs mt-1">Se volverá a comprometer: {formatCurrency(Math.max(0, po.baseAmount - po.invoicedAmount))} {getCurrencySymbol()}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="mb-6">
-                <label className="block text-[13px] font-medium text-slate-700 mb-2 flex items-center gap-2">
-                  <KeyRound size={14} />
-                  Confirma tu contraseña
-                </label>
-                <input
-                  type="password"
-                  value={passwordInput}
-                  onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
-                  placeholder="Tu contraseña"
-                  className={`w-full px-2.5 py-1.5 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]`}
-                  autoFocus
-                />
-                {passwordError && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => { setShowReopenModal(false); resetModals(); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">
-                  Cancelar
-                </button>
-                <button onClick={handleReopenPO} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[13px] font-medium disabled:opacity-50">
-                  {processing ? "Reabriendo..." : "Reabrir PO"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Cancel Modal */}
-      {showCancelModal && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowCancelModal(false); resetModals(); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-100 rounded-md flex items-center justify-center">
-                <XCircle size={20} className="text-red-600" />
-              </div>
-              <div>
-                <h3 className="text-[14px] font-semibold text-slate-900">Anular PO-{po.number}</h3>
-                <p className="text-xs text-slate-500">Esta acción no se puede deshacer</p>
-              </div>
-            </div>
-            <div className="p-6">
-              {po.status === "approved" && (
-                <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
-                    <div className="text-[13px] text-amber-800">
-                      <p className="font-medium">Se liberará el presupuesto comprometido</p>
-                      <p className="text-xs mt-1">{formatCurrency(po.committedAmount || po.baseAmount)} {getCurrencySymbol()} volverán a estar disponibles</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div className="mb-4">
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Motivo de anulación *</label>
-                <textarea
-                  value={cancellationReason}
-                  onChange={(e) => setCancellationReason(e.target.value)}
-                  placeholder="Explica por qué se anula esta PO"
-                  rows={3}
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 resize-none text-[13px]"
-                />
-              </div>
-              <div className="mb-6">
-                <label className="block text-[13px] font-medium text-slate-700 mb-2 flex items-center gap-2">
-                  <KeyRound size={14} />
-                  Confirma tu contraseña
-                </label>
-                <input
-                  type="password"
-                  value={passwordInput}
-                  onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
-                  placeholder="Tu contraseña"
-                  className={`w-full px-2.5 py-1.5 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]`}
-                />
-                {passwordError && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => { setShowCancelModal(false); resetModals(); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">
-                  Cancelar
-                </button>
-                <button onClick={handleCancelPO} disabled={processing || !cancellationReason.trim() || !passwordInput.trim()} className="flex-1 px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-[13px] font-medium disabled:opacity-50">
-                  {processing ? "Anulando..." : "Anular PO"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modify Modal */}
-      {showModifyModal && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowModifyModal(false); resetModals(); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-100 rounded-md flex items-center justify-center">
-                <FileEdit size={20} className="text-amber-600" />
-              </div>
-              <div>
-                <h3 className="text-[14px] font-semibold text-slate-900">Modificar PO-{po.number}</h3>
-                <p className="text-xs text-slate-500">Crear nueva versión para editar</p>
-              </div>
-            </div>
-            <div className="p-6">
-              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
-                  <div className="text-[13px] text-amber-800">
-                    <p className="font-medium">Pasará a V{String((po.version || 1) + 1).padStart(2, "0")} en borrador</p>
-                    <p className="text-xs mt-1">Deberás editarla y enviarla nuevamente.</p>
-                  </div>
-                </div>
-              </div>
-              <div className="mb-6">
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Motivo de la modificación *</label>
-                <textarea
-                  value={modificationReason}
-                  onChange={(e) => setModificationReason(e.target.value)}
-                  placeholder="Explica por qué se modifica"
-                  rows={4}
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 resize-none text-[13px]"
-                />
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => { setShowModifyModal(false); resetModals(); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">
-                  Cancelar
-                </button>
-                <button onClick={handleModifyPO} disabled={processing || !modificationReason.trim()} className="flex-1 px-4 py-1.5 rounded-md text-[13px] font-medium disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
-                  {processing ? "Modificando..." : "Modificar"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Eliminar Borrador */}
-      {showDeleteModal && po && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowDeleteModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6">
-              <div className="hidden">
-                <Trash2 size={28} className="text-red-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-slate-900 text-center mb-2">Eliminar borrador</h3>
-              <p className="text-slate-500 text-center mb-6">
-                ¿Estás seguro de que quieres eliminar el borrador <strong>PO-{po.number}</strong>? Esta acción no se puede deshacer.
-              </p>
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setShowDeleteModal(false)} 
-                  className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  onClick={handleDeleteDraft} 
-                  disabled={processing} 
-                  className="flex-1 px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-[13px] font-medium disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {processing ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Eliminando...
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 size={16} />
-                      Eliminar
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Nota del Aprobador */}
-      {showApprovalNoteModal && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowApprovalNoteModal(null)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className={`w-12 h-12 rounded-md flex items-center justify-center ${
-                  showApprovalNoteModal.type === "approval" ? "bg-emerald-100" :
-                  showApprovalNoteModal.type === "rejection" ? "bg-red-100" :
-                  "bg-slate-100"
-                }`}>
-                  <Glasses size={24} className={
-                    showApprovalNoteModal.type === "approval" ? "text-emerald-600" :
-                    showApprovalNoteModal.type === "rejection" ? "text-red-600" :
-                    "text-slate-600"
-                  } />
-                </div>
-                <div>
-                  <h3 className="text-[13px] font-semibold text-slate-900">Nota del aprobador</h3>
-                  <p className="text-[13px] text-slate-500">{showApprovalNoteModal.userName}</p>
-                </div>
-              </div>
-              
-              <div className={`p-4 rounded-md border ${
-                showApprovalNoteModal.type === "approval" ? "bg-emerald-50 border-emerald-200" :
-                showApprovalNoteModal.type === "rejection" ? "bg-red-50 border-red-200" :
-                "bg-slate-50 border-slate-200"
-              }`}>
-                <p className="text-[13px] text-slate-700 italic">&quot;{showApprovalNoteModal.text}&quot;</p>
-              </div>
-              
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
-                <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <Calendar size={12} />
-                  {formatDateTime(showApprovalNoteModal.createdAt)}
-                </div>
-                <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                  showApprovalNoteModal.type === "approval" ? "bg-emerald-100 text-emerald-700" :
-                  showApprovalNoteModal.type === "rejection" ? "bg-red-100 text-red-700" :
-                  showApprovalNoteModal.type === "info_request" ? "bg-amber-100 text-amber-700" :
-                  "bg-slate-100 text-slate-700"
-                }`}>
-                  {showApprovalNoteModal.type === "approval" && "Aprobación"}
-                  {showApprovalNoteModal.type === "rejection" && "Rechazo"}
-                  {showApprovalNoteModal.type === "info_request" && "Solicitud de info"}
-                  {showApprovalNoteModal.type === "comment" && "Comentario"}
-                </span>
-              </div>
-              
-              <button 
-                onClick={() => setShowApprovalNoteModal(null)}
-                className="w-full mt-4 px-4 py-1.5 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </Modal>
+          </>
+        );
+      })()}
     </div>
   );
 }

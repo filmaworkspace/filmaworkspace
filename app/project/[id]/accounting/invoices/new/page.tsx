@@ -6,11 +6,11 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
-import { AnchoredPanel } from "@/components/ds";
+import { AnchoredPanel, Input, Modal } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db, storage } from "@/lib/firebase";
-import { AccountPickerModal, EpisodeModal, SupplierPickerModal } from "@/components/accounting/Pickers";
+import { AccountPickerModal, EpisodeModal, POItemsModal, SupplierPickerModal } from "@/components/accounting/Pickers";
 import { documentTotals, lineAmounts } from "@/lib/amounts";
 import { getScopedDocs, scopeFromPermissions } from "@/lib/accountingScope";
 import { nextDocNumber } from "@/lib/docCounter";
@@ -2849,205 +2849,85 @@ export default function NewInvoicePage() {
         </div>
       </main>
 
-      {/* Modals */}
-      {/* Replace Modal */}
-      {showReplaceModal && (
-        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4" onClick={() => setShowReplaceModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h2 className="text-[14px] font-semibold text-slate-900">Sustituir por factura definitiva</h2>
-                <p className="text-[13px] text-slate-500">Selecciona el documento a sustituir</p>
-              </div>
-              <button onClick={() => setShowReplaceModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-6 max-h-96 overflow-y-auto">
-              {pendingDocuments.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="hidden">
-                    <CheckCircle size={20} className="text-slate-400" />
-                  </div>
-                  <p className="text-[13px] text-slate-500">No hay documentos pendientes</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {pendingDocuments.map((pd) => {
-                    const dc = DOCUMENT_TYPES[pd.documentType];
-                    const DI = dc.icon;
-                    return (
-                      <button
-                        key={pd.id}
-                        onClick={() => startReplacement(pd)}
-                        className={cx("w-full text-left p-4 border rounded-md hover:bg-slate-50 transition-all hover:shadow-md", dc.borderColor)}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className={cx("w-12 h-12 rounded-md flex items-center justify-center flex-shrink-0", dc.bgColor)}>
-                            <DI size={20} className={dc.textColor} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="font-semibold text-slate-900">{pd.displayNumber}</p>
-                              <span className={cx("text-xs px-2 py-0.5 rounded-lg", dc.bgColor, dc.textColor)}>{dc.label}</span>
-                            </div>
-                            <p className="text-[13px] text-slate-600 truncate">{pd.supplier}</p>
-                            <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
-                              <span>Pagado el {formatDate(pd.paidAt)}</span>
-                              {pd.poNumber && <span className="bg-slate-100 px-2 py-0.5 rounded">PO-{pd.poNumber}</span>}
-                            </div>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <p className="font-bold text-slate-900 text-lg">{formatCurrency(pd.totalAmount)} €</p>
-                            <p className="text-xs text-slate-700 mt-1 flex items-center gap-1 justify-end">
-                              <ArrowRight size={12} />
-                              Sustituir
-                            </p>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+      {/* Sustituir proforma/presupuesto pagado por la factura definitiva */}
+      <Modal open={showReplaceModal} onClose={() => setShowReplaceModal(false)} title="Sustituir por factura definitiva" width="max-w-2xl">
+        {pendingDocuments.length === 0 ? (
+          <p className="py-10 text-center text-[13px] text-slate-500">No hay documentos pagados pendientes de factura definitiva</p>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-slate-200">
+            <table className="tbl w-full border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
+                  <th scope="col" className="w-32 px-3 py-2 text-left font-medium">Documento</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor</th>
+                  <th scope="col" className="w-28 px-3 py-2 text-left font-medium">Pagado</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingDocuments.map((pd) => (
+                  <tr key={pd.id} onClick={() => startReplacement(pd)} className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#F4F4F5]">
+                    <td className="px-3 py-1.5">
+                      <span className="font-mono text-xs font-medium">{pd.displayNumber}</span>
+                      <span className="ml-2 text-xs text-slate-400">{DOCUMENT_TYPES[pd.documentType]?.label}</span>
+                    </td>
+                    <td className="px-3 py-1.5">
+                      {pd.supplier}
+                      {pd.poNumber && <span className="ml-2 font-mono text-[11px] text-slate-400">PO-{pd.poNumber}</span>}
+                    </td>
+                    <td className="px-3 py-1.5 text-xs text-slate-600">{formatDate(pd.paidAt)}</td>
+                    <td className="px-3 py-1.5 text-right font-mono text-xs">{formatCurrency(pd.totalAmount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
-      {/* PO Modal */}
-      {showPOModal && (
-        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4" onClick={() => { setShowPOModal(false); setPOSearch(""); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-[14px] font-semibold text-slate-900">Seleccionar PO</h2>
-              <button
-                onClick={() => {
-                  setShowPOModal(false);
-                  setPOSearch("");
-                }}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-6">
-              <div className="relative mb-4">
-                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={poSearch}
-                  onChange={(e) => setPOSearch(e.target.value)}
-                  placeholder="Buscar por número o proveedor"
-                  className="w-full pl-11 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]"
-                  autoFocus
-                />
-              </div>
-              <div className="max-h-80 overflow-y-auto space-y-2">
-                {filteredPOs.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="hidden">
-                      <FileText size={20} className="text-slate-400" />
-                    </div>
-                    <p className="text-[13px] text-slate-500">No hay POs aprobadas</p>
-                  </div>
-                ) : (
-                  filteredPOs.map((po) => (
-                    <button
-                      key={po.id}
-                      onClick={() => selectPO(po)}
-                      className="w-full text-left p-4 border border-slate-200 rounded-md hover:border-slate-300 hover:bg-slate-50"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="font-semibold text-slate-900">PO-{po.number}</p>
-                            <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-lg font-medium">Aprobada</span>
-                          </div>
-                          <p className="text-[13px] text-slate-600">{po.supplier}</p>
-                          <p className="text-xs text-slate-500 mt-1">{po.items.length} items</p>
-                        </div>
-                        <p className="font-semibold text-slate-900">{formatCurrency(po.totalAmount)} €</p>
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
+      {/* Elegir PO */}
+      <Modal open={showPOModal} onClose={() => { setShowPOModal(false); setPOSearch(""); }} title="Seleccionar PO" width="max-w-2xl">
+        <div className="flex flex-col gap-3">
+          <div className="relative">
+            <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Input value={poSearch} onChange={(e) => setPOSearch(e.target.value)} placeholder="Número, proveedor o concepto" className="pl-8" autoFocus />
           </div>
+          {filteredPOs.length === 0 ? (
+            <p className="py-10 text-center text-[13px] text-slate-500">{poSearch ? "Sin resultados" : "No hay POs aprobadas"}</p>
+          ) : (
+            <div className="max-h-[55vh] overflow-y-auto rounded-lg border border-slate-200">
+              <table className="tbl w-full border-collapse text-[13px]">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
+                    <th scope="col" className="w-24 px-3 py-2 text-left font-medium">Nº</th>
+                    <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor</th>
+                    <th scope="col" className="w-20 px-3 py-2 text-right font-medium">Líneas</th>
+                    <th scope="col" className="px-3 py-2 text-right font-medium">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredPOs.map((po) => (
+                    <tr key={po.id} onClick={() => selectPO(po)} className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#F4F4F5]">
+                      <td className="px-3 py-1.5 font-mono text-xs font-medium">PO-{po.number}</td>
+                      <td className="px-3 py-1.5">{po.supplier}{po.department && <span className="ml-2 text-xs text-slate-400">{po.department}</span>}</td>
+                      <td className="px-3 py-1.5 text-right font-mono text-xs">{po.items.length}</td>
+                      <td className="px-3 py-1.5 text-right font-mono text-xs">{formatCurrency(po.totalAmount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
+      </Modal>
 
-      {/* PO Items Modal */}
-      {showPOItemsModal && selectedPO && (
-        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4" onClick={() => setShowPOItemsModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h2 className="text-[14px] font-semibold text-slate-900">Items de PO-{selectedPO.number}</h2>
-                <p className="text-[13px] text-slate-500">Selecciona el item a facturar</p>
-              </div>
-              <button onClick={() => setShowPOItemsModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-6 max-h-96 overflow-y-auto">
-              <div className="space-y-3">
-                {poItemsWithInvoiced.map((poItem, idx) => {
-                  const isOver = poItem.availableAmount < 0;
-                  return (
-                    <button
-                      key={poItem.id || idx}
-                      onClick={() => addPOItemToInvoice(poItem, idx)}
-                      className={cx(
-                        "w-full text-left p-4 border rounded-md",
-                        isOver ? "border-red-200 bg-red-50 hover:border-red-300" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-                      )}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <p className="font-medium text-slate-900">{poItem.description || "Sin descripción"}</p>
-                          <p className="text-xs text-slate-500 font-mono mt-1">
-                            {poItem.subAccountCode} - {poItem.subAccountDescription}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-slate-900">{formatCurrency(poItem.totalAmount)} €</p>
-                          <p className="text-xs text-slate-500">Total PO</p>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-4 text-[13px] mt-3 pt-3 border-t border-slate-100">
-                        <div>
-                          <p className="text-slate-500 text-xs">Facturado</p>
-                          <p className="font-medium text-slate-700">{formatCurrency(poItem.invoicedAmount)} €</p>
-                        </div>
-                        <div>
-                          <p className="text-slate-500 text-xs">Disponible</p>
-                          <p className={cx("font-medium", isOver ? "text-red-600" : poItem.availableAmount < poItem.totalAmount * 0.1 ? "text-amber-600" : "text-emerald-600")}>
-                            {formatCurrency(poItem.availableAmount)} €
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <span className="inline-flex items-center gap-1 text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg">
-                            <Plus size={12} />
-                            Añadir
-                          </span>
-                        </div>
-                      </div>
-                      {isOver && (
-                        <div className="flex items-center gap-2 mt-3 text-xs text-red-600">
-                          <AlertTriangle size={12} />
-                          Este item ya está sobre-facturado
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <POItemsModal
+        open={showPOItemsModal && !!selectedPO}
+        onClose={() => setShowPOItemsModal(false)}
+        poNumber={selectedPO?.number}
+        items={poItemsWithInvoiced}
+        onPick={addPOItemToInvoice}
+      />
 
       <SupplierPickerModal
         open={showSupplierModal}

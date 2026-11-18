@@ -5,12 +5,13 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
-import { AnchoredPanel, Checkbox, EmptyState, IconButton, Menu, MenuItem, MenuSeparator, Page, PageHeader, PageLoading, Segmented, Select, buttonClass } from "@/components/ds";
+import { Modal, AnchoredPanel, Checkbox, EmptyState, IconButton, Menu, MenuItem, MenuSeparator, Page, PageHeader, PageLoading, Segmented, Select, buttonClass } from "@/components/ds";
 import SearchBar, { type SearchField } from "@/components/SearchBar";
 import { matchAmount, matchCode, matchWords } from "@/lib/search";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
+import { ActionModal } from "@/components/accounting/ActionModal";
 import { getScopedDocs, scopeFromPermissions, sortByTime } from "@/lib/accountingScope";
 import {
   EmailAuthProvider,
@@ -958,326 +959,98 @@ export default function POsPage() {
         )}
       </div>
 
-      {/* Quick Preview Modal */}
-      {previewPO && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setPreviewPO(null)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full border border-slate-200 overflow-hidden max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className={`bg-gradient-to-r ${STATUS_CONFIG[previewPO.status].gradient} px-5 py-4 flex-shrink-0`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-white text-lg font-mono">PO-{previewPO.number}</h3>
-                    {previewPO.version > 1 && <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-lg">V{String(previewPO.version).padStart(2, "0")}</span>}
-                  </div>
-                  <p className="text-white/80 text-[13px] mt-0.5">{previewPO.supplier}</p>
-                </div>
-                <button onClick={() => setPreviewPO(null)} className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-md transition-colors">
-                  <X size={18} />
-                </button>
+      {/* Vista rápida */}
+      <Modal
+        open={!!previewPO}
+        onClose={() => setPreviewPO(null)}
+        title={previewPO ? `PO-${previewPO.number}${previewPO.version > 1 ? ` · V${String(previewPO.version).padStart(2, "0")}` : ""}` : ""}
+        footer={previewPO ? (
+          <Link href={`/project/${id}/accounting/pos/${previewPO.id}`} onClick={() => setPreviewPO(null)} className={buttonClass("primary")}>Abrir PO</Link>
+        ) : undefined}
+      >
+        {previewPO && (() => {
+          const base = previewPO.baseAmount || previewPO.totalAmount || 0;
+          const pct = base ? Math.min(100, ((previewPO.invoicedAmount || 0) / base) * 100) : 0;
+          return (
+            <div className="flex flex-col gap-4 text-[13px]">
+              <div>
+                <p className="font-medium text-slate-900">{previewPO.supplier || "Sin proveedor"}</p>
+                {(previewPO.generalDescription || previewPO.description) && <p className="mt-1 text-slate-600">{previewPO.generalDescription || previewPO.description}</p>}
               </div>
-            </div>
-
-            <div className="p-5 overflow-y-auto flex-1 min-h-0">
-              {(previewPO.generalDescription || previewPO.description) && (
-                <div className="mb-4 p-3 bg-slate-50 rounded-md border border-slate-100">
-                  <p className="text-[10px] text-slate-400 uppercase mb-1 font-medium">Descripción</p>
-                  <p className="text-[13px] text-slate-700 leading-relaxed">{previewPO.generalDescription || previewPO.description}</p>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="bg-slate-50 rounded-md p-3">
-                  <p className="text-[10px] text-slate-400 uppercase mb-1">Base imponible</p>
-                  <p className="text-lg font-bold text-slate-900">{formatCurrency(previewPO.baseAmount || previewPO.totalAmount)} €</p>
-                </div>
-                <div className="bg-slate-50 rounded-md p-3">
-                  <p className="text-[10px] text-slate-400 uppercase mb-1">Total con IVA</p>
-                  <p className="text-lg font-bold text-slate-900">{formatCurrency(previewPO.totalAmount)} €</p>
-                </div>
-              </div>
-
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+                <dt className="text-slate-500">Base</dt><dd className="text-right font-mono">{formatCurrency(base)} €</dd>
+                <dt className="text-slate-500">Total con IVA</dt><dd className="text-right font-mono">{formatCurrency(previewPO.totalAmount)} €</dd>
+                {previewPO.status === "approved" && (<><dt className="text-slate-500">Facturado</dt><dd className="text-right font-mono">{formatCurrency(previewPO.invoicedAmount || 0)} € · {pct.toFixed(0)} %</dd></>)}
+                <dt className="text-slate-500">Líneas</dt><dd className="text-right font-mono">{previewPO.items?.length || 0}</dd>
+                <dt className="text-slate-500">Fecha</dt><dd className="text-right">{formatDate(previewPO.createdAt)}</dd>
+                <dt className="text-slate-500">Creada por</dt><dd className="text-right">{previewPO.createdByName}</dd>
+                {previewPO.department && (<><dt className="text-slate-500">Departamento</dt><dd className="text-right">{previewPO.department}</dd></>)}
+              </dl>
               {previewPO.status === "approved" && (
-                <div className="mb-4 p-3 bg-emerald-50 rounded-md border border-emerald-100">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-emerald-700 font-medium">Facturación</span>
-                    <span className="text-xs text-emerald-700 font-bold">
-                      {formatCurrency(previewPO.invoicedAmount)} / {formatCurrency(previewPO.baseAmount || previewPO.totalAmount)} €
-                    </span>
-                  </div>
-                  <div className="w-full h-1.5 bg-emerald-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all"
-                      style={{ width: `${Math.min(100, ((previewPO.invoicedAmount || 0) / (previewPO.baseAmount || previewPO.totalAmount || 1)) * 100)}%` }}
-                    />
-                  </div>
-                </div>
+                <div className="h-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-[#2F52E0]" style={{ width: `${pct}%` }} /></div>
               )}
+            </div>
+          );
+        })()}
+      </Modal>
 
-              <div className="mb-4 flex items-center justify-between p-3 bg-slate-50 rounded-md">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 bg-slate-200 rounded-lg flex items-center justify-center">
-                    <FileText size={14} className="text-slate-600" />
-                  </div>
-                  <span className="text-xs text-slate-600">Items</span>
-                </div>
-                <span className="font-bold text-slate-900 text-[13px]">{previewPO.items?.length || 0}</span>
-              </div>
-
-              <div className="text-xs text-slate-500 space-y-0">
-                <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                  <span>Fecha</span>
-                  <span className="text-slate-700 font-medium">{formatDate(previewPO.createdAt)}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                  <span>Creado por</span>
-                  <span className="text-slate-700 font-medium">{previewPO.createdByName}</span>
-                </div>
-                {previewPO.department && (
-                  <div className="flex justify-between items-center py-2">
-                    <span>Departamento</span>
-                    <span className="text-slate-700 font-medium">{previewPO.department}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 flex-shrink-0">
-              <Link
-                href={`/project/${id}/accounting/pos/${previewPO.id}`}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-xs font-medium transition-opacity"
-                onClick={() => setPreviewPO(null)}
-              >
-                <ExternalLink size={14} />
-                Ver detalle completo
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Close PO Modal */}
-      {showCloseModal && selectedPO && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowCloseModal(false); resetModalState(); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="hidden">
-                <Lock size={20} className="text-slate-600" />
-              </div>
-              <div>
-                <h3 className="text-[14px] font-semibold text-slate-900">Cerrar PO-{selectedPO.number}</h3>
-                <p className="text-xs text-slate-500">Esta acción requiere confirmación</p>
-              </div>
-            </div>
-            <div className="p-6">
-              {(selectedPO.baseAmount || selectedPO.totalAmount) - selectedPO.invoicedAmount > 0 && (
-                <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle size={18} className="text-amber-600 mt-0.5 flex-shrink-0" />
-                    <div className="text-[13px] text-amber-800">
-                      <p className="font-medium">Esta PO tiene importe sin facturar</p>
-                      <p className="text-xs mt-1">Pendiente: {formatCurrency((selectedPO.baseAmount || selectedPO.totalAmount) - selectedPO.invoicedAmount)} €</p>
-                      <p className="text-xs mt-1 text-amber-700">Se liberará el presupuesto comprometido restante.</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div className="mb-6">
-                <label className="block text-[13px] font-medium text-slate-700 mb-2 flex items-center gap-2">
-                  <KeyRound size={14} />
-                  Confirma tu contraseña
-                </label>
-                <input
-                  type="password"
-                  value={passwordInput}
-                  onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
-                  placeholder="Tu contraseña de usuario"
-                  className={`w-full px-2.5 py-1.5 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]`}
-                  autoFocus
-                />
-                {passwordError && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}
-                <p className="text-xs text-slate-500 mt-2">Usuario: {permissions.userEmail}</p>
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => { setShowCloseModal(false); resetModalState(); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium transition-colors">
-                  Cancelar
-                </button>
-                <button 
-                  onClick={confirmClosePO} 
-                  disabled={processing || !passwordInput.trim()} 
-                  className="flex-1 px-4 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity disabled:opacity-50"
-                >
-                  {processing ? "Cerrando..." : "Cerrar PO"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Reopen PO Modal */}
-      {showReopenModal && selectedPO && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowReopenModal(false); resetModalState(); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center">
-                <Unlock size={20} className="text-emerald-600" />
-              </div>
-              <div>
-                <h3 className="text-[14px] font-semibold text-slate-900">Reabrir PO-{selectedPO.number}</h3>
-                <p className="text-xs text-slate-500">Volverá al estado &quot;Aprobada&quot;</p>
-              </div>
-            </div>
-            <div className="p-6">
-              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle size={18} className="text-amber-600 mt-0.5 flex-shrink-0" />
-                  <div className="text-[13px] text-amber-800">
-                    <p className="font-medium">Se restaurará el presupuesto comprometido</p>
-                    <p className="text-xs mt-1">Se volverá a comprometer: {formatCurrency((selectedPO.baseAmount || selectedPO.totalAmount) - selectedPO.invoicedAmount)} €</p>
-                  </div>
-                </div>
-              </div>
-              <div className="mb-6">
-                <label className="block text-[13px] font-medium text-slate-700 mb-2 flex items-center gap-2">
-                  <KeyRound size={14} />
-                  Confirma tu contraseña
-                </label>
-                <input
-                  type="password"
-                  value={passwordInput}
-                  onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
-                  placeholder="Tu contraseña de usuario"
-                  className={`w-full px-2.5 py-1.5 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]`}
-                  autoFocus
-                />
-                {passwordError && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}
-                <p className="text-xs text-slate-500 mt-2">Usuario: {permissions.userEmail}</p>
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => { setShowReopenModal(false); resetModalState(); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium transition-colors">
-                  Cancelar
-                </button>
-                <button onClick={confirmReopenPO} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[13px] font-medium transition-colors disabled:opacity-50">
-                  {processing ? "Reabriendo..." : "Reabrir PO"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Cancel PO Modal */}
-      {showCancelModal && selectedPO && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowCancelModal(false); resetModalState(); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-100 rounded-md flex items-center justify-center">
-                <XCircle size={20} className="text-red-600" />
-              </div>
-              <div>
-                <h3 className="text-[14px] font-semibold text-slate-900">Anular PO-{selectedPO.number}</h3>
-                <p className="text-xs text-slate-500">Esta acción no se puede deshacer</p>
-              </div>
-            </div>
-            <div className="p-6">
-              {selectedPO.status === "approved" && (
-                <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle size={18} className="text-amber-600 mt-0.5 flex-shrink-0" />
-                    <div className="text-[13px] text-amber-800">
-                      <p className="font-medium">Se liberará el presupuesto comprometido</p>
-                      <p className="text-xs mt-1">{formatCurrency(selectedPO.committedAmount || selectedPO.baseAmount || selectedPO.totalAmount)} € volverán a estar disponibles</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div className="mb-4">
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Motivo de anulación *</label>
-                <textarea
-                  value={cancellationReason}
-                  onChange={(e) => setCancellationReason(e.target.value)}
-                  placeholder="Explica por qué se anula esta PO"
-                  rows={3}
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 resize-none text-[13px]"
-                />
-              </div>
-              <div className="mb-6">
-                <label className="block text-[13px] font-medium text-slate-700 mb-2 flex items-center gap-2">
-                  <KeyRound size={14} />
-                  Confirma tu contraseña
-                </label>
-                <input
-                  type="password"
-                  value={passwordInput}
-                  onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
-                  placeholder="Tu contraseña de usuario"
-                  className={`w-full px-2.5 py-1.5 border ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"} rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]`}
-                />
-                {passwordError && <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}
-                <p className="text-xs text-slate-500 mt-2">Usuario: {permissions.userEmail}</p>
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => { setShowCancelModal(false); resetModalState(); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium transition-colors">
-                  Cancelar
-                </button>
-                <button onClick={confirmCancelPO} disabled={processing || !cancellationReason.trim() || !passwordInput.trim()} className="flex-1 px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-[13px] font-medium transition-colors disabled:opacity-50">
-                  {processing ? "Anulando..." : "Anular PO"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modify Modal */}
-      {showModifyModal && selectedPO && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowModifyModal(false); resetModalState(); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-100 rounded-md flex items-center justify-center">
-                <FileEdit size={20} className="text-amber-600" />
-              </div>
-              <div>
-                <h3 className="text-[14px] font-semibold text-slate-900">Modificar PO-{selectedPO.number}</h3>
-                <p className="text-xs text-slate-500">Crear nueva versión para editar</p>
-              </div>
-            </div>
-            <div className="p-6">
-              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle size={18} className="text-amber-600 mt-0.5 flex-shrink-0" />
-                  <div className="text-[13px] text-amber-800">
-                    <p className="font-medium">Pasará a V{String((selectedPO.version || 1) + 1).padStart(2, "0")} en borrador</p>
-                    <p className="text-xs mt-1">Deberás editarla y enviarla nuevamente para aprobación.</p>
-                  </div>
-                </div>
-              </div>
-              <div className="mb-6">
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Motivo de la modificación *</label>
-                <textarea
-                  value={modificationReason}
-                  onChange={(e) => setModificationReason(e.target.value)}
-                  placeholder="Explica por qué se modifica esta PO"
-                  rows={4}
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 resize-none text-[13px]"
-                />
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => { setShowModifyModal(false); resetModalState(); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium transition-colors">
-                  Cancelar
-                </button>
-                <button 
-                  onClick={confirmModifyPO} 
-                  disabled={processing || !modificationReason.trim()} 
-                  className="flex-1 px-4 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity disabled:opacity-50"
-                >
-                  {processing ? "Modificando..." : "Modificar"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {selectedPO && (() => {
+        const base = selectedPO.baseAmount || selectedPO.totalAmount || 0;
+        const pending = base - (selectedPO.invoicedAmount || 0);
+        const pwd = { value: passwordInput, onChange: (v: string) => { setPasswordInput(v); setPasswordError(""); }, error: passwordError, email: permissions.userEmail };
+        return (
+          <>
+            <ActionModal
+              open={showCloseModal}
+              onClose={() => { setShowCloseModal(false); resetModalState(); }}
+              title={`Cerrar PO-${selectedPO.number}`}
+              notice={pending > 0 ? <>Queda <b>{formatCurrency(pending)} €</b> sin facturar. Al cerrar la PO se libera ese comprometido del presupuesto.</> : undefined}
+              password={pwd}
+              confirmLabel="Cerrar PO"
+              processingLabel="Cerrando…"
+              processing={processing}
+              onConfirm={confirmClosePO}
+            />
+            <ActionModal
+              open={showReopenModal}
+              onClose={() => { setShowReopenModal(false); resetModalState(); }}
+              title={`Reabrir PO-${selectedPO.number}`}
+              subtitle="Vuelve a estar aprobada."
+              notice={<>Se vuelven a comprometer <b>{formatCurrency(pending)} €</b> del presupuesto.</>}
+              password={pwd}
+              confirmLabel="Reabrir PO"
+              processingLabel="Reabriendo…"
+              processing={processing}
+              onConfirm={confirmReopenPO}
+            />
+            <ActionModal
+              open={showCancelModal}
+              onClose={() => { setShowCancelModal(false); resetModalState(); }}
+              title={`Anular PO-${selectedPO.number}`}
+              subtitle="No se puede deshacer."
+              notice={selectedPO.status === "approved" ? <>Se liberan <b>{formatCurrency(selectedPO.committedAmount || base)} €</b> comprometidos.</> : undefined}
+              reason={{ label: "Motivo de la anulación", value: cancellationReason, onChange: setCancellationReason, placeholder: "Por qué se anula" }}
+              password={pwd}
+              confirmLabel="Anular PO"
+              processingLabel="Anulando…"
+              processing={processing}
+              danger
+              onConfirm={confirmCancelPO}
+            />
+            <ActionModal
+              open={showModifyModal}
+              onClose={() => { setShowModifyModal(false); resetModalState(); }}
+              title={`Modificar PO-${selectedPO.number}`}
+              notice={<>Pasa a la versión <b>V{String((selectedPO.version || 1) + 1).padStart(2, "0")}</b> en borrador. Tendrás que editarla y enviarla de nuevo a aprobación.</>}
+              reason={{ label: "Motivo de la modificación", value: modificationReason, onChange: setModificationReason, placeholder: "Qué cambia y por qué", rows: 4 }}
+              confirmLabel="Modificar"
+              processingLabel="Modificando…"
+              processing={processing}
+              onConfirm={confirmModifyPO}
+            />
+          </>
+        );
+      })()}
     </Page>
   );
 }

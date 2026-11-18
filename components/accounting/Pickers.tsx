@@ -410,3 +410,64 @@ export function EpisodeModal({
     </Modal>
   );
 }
+
+// ─── Líneas de una PO para facturar ──────────────────────────────────────────
+
+export interface PickerPOItem {
+  id?: string;
+  description?: string;
+  subAccountCode?: string;
+  totalAmount: number;
+  invoicedAmount: number;
+  availableAmount: number;
+}
+
+export function POItemsModal<T extends PickerPOItem>({
+  open, onClose, poNumber, items, onPick,
+}: {
+  open: boolean;
+  onClose: () => void;
+  poNumber?: string;
+  items: T[];
+  onPick: (item: T, index: number) => void;
+}) {
+  return (
+    <Modal open={open} onClose={onClose} title={poNumber ? `Líneas de PO-${poNumber}` : "Líneas de la PO"} width="max-w-3xl">
+      {items.length === 0 ? (
+        <p className="py-10 text-center text-[13px] text-slate-500">La PO no tiene líneas</p>
+      ) : (
+        <>
+          <div className="overflow-hidden rounded-lg border border-slate-200">
+            <table className="tbl w-full border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Línea</th>
+                  <th scope="col" className="w-20 px-3 py-2 text-left font-medium">Cuenta</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">Total</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">Facturado</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">Disponible</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((it, idx) => {
+                  const over = it.availableAmount < 0;
+                  const low = !over && it.availableAmount < it.totalAmount * 0.1;
+                  return (
+                    <tr key={it.id || idx} onClick={() => onPick(it, idx)} title="Añadir a la factura" className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#F4F4F5]">
+                      <td className="px-3 py-1.5">{it.description || "Sin descripción"}</td>
+                      <td className="px-3 py-1.5 font-mono text-xs text-slate-600">{it.subAccountCode || "—"}</td>
+                      <td className="px-3 py-1.5 text-right font-mono text-xs">{money(it.totalAmount)}</td>
+                      <td className="px-3 py-1.5 text-right font-mono text-xs text-slate-600">{money(it.invoicedAmount)}</td>
+                      <td className={`px-3 py-1.5 text-right font-mono text-xs ${over ? "text-red-700" : low ? "text-amber-800" : ""}`}>{money(it.availableAmount)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-xs text-slate-500">Pulsa una línea para añadirla a la factura.</p>
+        </>
+      )}
+    </Modal>
+  );
+}
