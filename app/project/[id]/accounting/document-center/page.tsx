@@ -452,8 +452,8 @@ export default function DocumentCenterPage() {
     draft: { label: "Borrador", dot: "bg-slate-300", text: "text-slate-600" },
   };
   const DOC_FIELDS: SearchField<"all" | "number" | "supplier" | "concept" | "amount">[] = [
-    { value: "all", label: "Buscar en todo", placeholder: "Número, proveedor, concepto o importe" },
-    { value: "number", label: "Nº documento o PO", placeholder: "Ej. FAC-0012", mono: true },
+    { value: "all", label: "Buscar en todo", placeholder: "Número, proveedor o concepto" },
+    { value: "number", label: "Nº documento o PO", placeholder: "Ej. FRA-0012", mono: true },
     { value: "supplier", label: "Proveedor", placeholder: "Nombre o NIF" },
     { value: "concept", label: "Concepto", placeholder: "Ej. alquiler" },
     { value: "amount", label: "Importe", placeholder: "1500 · >1000 · 500-2000", mono: true },

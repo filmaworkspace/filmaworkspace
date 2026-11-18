@@ -1047,7 +1047,7 @@ export default function SupplierDetailPage() {
   type DocField = "all" | "number" | "concept";
   const DOC_FIELDS: SearchField<DocField>[] = [
     { value: "all", label: "Buscar en todo", placeholder: "Número o concepto" },
-    { value: "number", label: "Número", placeholder: "Ej. FAC-0012 o 0003", mono: true },
+    { value: "number", label: "Número", placeholder: "Ej. FRA-0012 o 0003", mono: true },
     { value: "concept", label: "Concepto", placeholder: "Ej. alquiler cámara" },
   ];
   const docMatches = (number: string, concept: string) => {

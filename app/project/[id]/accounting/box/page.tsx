@@ -382,10 +382,11 @@ export default function BoxesPage() {
   // Búsqueda dentro de un sobre de tarjeta
   const [envSearch, setEnvSearch] = useState("");
   const [trfSearch, setTrfSearch] = useState("");
+  const [trfField, setTrfField] = useState<"all" | "supplier" | "account" | "amount">("all");
   const [envField, setEnvField] = useState<"all" | "number" | "supplier" | "account" | "amount">("all");
   const [envStatus, setEnvStatus] = useState<"all" | "pending" | "reviewed" | "conflict" | "nodoc">("all");
   const ENV_FIELDS: SearchField<"all" | "number" | "supplier" | "account" | "amount">[] = [
-    { value: "all", label: "Buscar en todo", placeholder: "Nº, proveedor, concepto, cuenta o importe" },
+    { value: "all", label: "Buscar en todo", placeholder: "Nº, proveedor o cuenta" },
     { value: "number", label: "Nº de gasto", placeholder: "Ej. TP-02-T01", mono: true },
     { value: "supplier", label: "Proveedor", placeholder: "Nombre o NIF" },
     { value: "account", label: "Cuenta", placeholder: "Ej. 04.02", mono: true },
@@ -2542,7 +2543,13 @@ export default function BoxesPage() {
                 const visible = currentTransferExpenses.filter((exp) => {
                   if (!q) return true;
                   const items = exp.items?.length ? exp.items : [{ subAccountCode: exp.subAccountCode || "", subAccountDescription: exp.subAccountDescription || "", description: exp.description || "" } as any];
-                  return matchWords(q, exp.supplier, exp.description, ...items.map((i: any) => i.description)) || matchCode(q, exp.supplierTaxId, ...items.map((i: any) => i.subAccountCode)) || matchAmount(q, exp.totalAmount, exp.baseAmount) === true;
+                  const bySupplier = matchWords(q, exp.supplier) || matchCode(q, exp.supplierTaxId);
+                  const byAccount = items.some((i: any) => matchCode(q, i.subAccountCode) || matchWords(q, i.subAccountDescription));
+                  const byAmount = matchAmount(q, exp.totalAmount, exp.baseAmount) === true;
+                  if (trfField === "supplier") return bySupplier;
+                  if (trfField === "account") return byAccount;
+                  if (trfField === "amount") return byAmount;
+                  return bySupplier || byAccount || byAmount || matchWords(q, exp.description, ...items.map((i: any) => i.description));
                 });
                 const bank = env.personIban ? detectBank(env.personIban) : null;
                 return (
@@ -2623,9 +2630,19 @@ export default function BoxesPage() {
                     ) : (
                       <>
                         <div className="flex flex-wrap items-center gap-3">
-                          <div className="relative min-w-[260px] flex-1">
-                            <Input value={trfSearch} onChange={(e) => setTrfSearch(e.target.value)} placeholder="Buscar proveedor, concepto, cuenta o importe (>50, 20-80)" />
-                          </div>
+                          <SearchBar
+                            fields={[
+                              { value: "all", label: "Buscar en todo", placeholder: "Proveedor, concepto o cuenta" },
+                              { value: "supplier", label: "Proveedor", placeholder: "Nombre o NIF" },
+                              { value: "account", label: "Cuenta", placeholder: "Ej. 03.02", mono: true },
+                              { value: "amount", label: "Importe", placeholder: "50 · >100 · 20-80", mono: true },
+                            ]}
+                            field={trfField}
+                            onField={setTrfField}
+                            value={trfSearch}
+                            onChange={setTrfSearch}
+                            count={visible.length}
+                          />
                         </div>
                         <div className="overflow-x-auto rounded-lg border border-slate-200">
                           <table className="w-full min-w-[760px] border-collapse text-[13px]">

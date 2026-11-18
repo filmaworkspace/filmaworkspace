@@ -185,10 +185,10 @@ export default function PaymentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [payField, setPayField] = useState<"all" | "name" | "supplier" | "invoice" | "amount">("all");
   const PAY_FIELDS: SearchField<"all" | "name" | "supplier" | "invoice" | "amount">[] = [
-    { value: "all", label: "Buscar en todo", placeholder: "Previsión, proveedor, factura o importe" },
+    { value: "all", label: "Buscar en todo", placeholder: "Previsión, proveedor o factura" },
     { value: "name", label: "Previsión", placeholder: "Ej. Remesa 15 nov" },
     { value: "supplier", label: "Proveedor", placeholder: "Ej. Rental Norte" },
-    { value: "invoice", label: "Nº factura", placeholder: "Ej. FAC-0001", mono: true },
+    { value: "invoice", label: "Nº factura", placeholder: "Ej. FRA-0001", mono: true },
     { value: "amount", label: "Importe", placeholder: "1500 · >1000 · 500-2000", mono: true },
   ];
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");

@@ -47,6 +47,7 @@ import {
 import { strToU8, unzipSync, zipSync } from "fflate";
 
 import { committedBySubaccount as computeCommitted, actualBySubaccount as computeActual, loadBoxBySubaccount } from "@/lib/budgetTotals";
+import SearchBar from "@/components/SearchBar";
 import { Badge, Button, Checkbox, EmptyState, Field, IconButton, Input, Menu, MenuItem, MenuSeparator, Modal, Page, PageHeader, PageLoading, Segmented, Select, Spinner, buttonClass } from "@/components/ds";
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { CostSettings, getCostSettings } from "@/lib/budgetRules";
@@ -1088,25 +1089,18 @@ export default function BudgetPage() {
 
       {/* Barra de herramientas */}
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <div className="flex min-w-[300px] flex-1 items-center gap-2">
-          <div className="w-44 flex-shrink-0">
-            <Select value={searchField} onChange={(e) => setSearchField(e.target.value as typeof searchField)}>
-              <option value="all">Buscar en todo</option>
-              <option value="code">Código de cuenta</option>
-              <option value="description">Descripción</option>
-            </Select>
-          </div>
-          <div className="relative flex-1">
-            <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <Input
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder={searchField === "code" ? "Ej. 03 o 03.01" : searchField === "description" ? "Ej. atrezzo" : "Código o descripción"}
-              className={`pl-8 ${searchField === "code" ? "font-mono" : ""}`}
-            />
-          </div>
-          {searchQuery && <span className="whitespace-nowrap text-xs text-slate-500">{matchCount} {matchCount === 1 ? "resultado" : "resultados"}</span>}
-        </div>
+        <SearchBar
+          fields={[
+            { value: "all", label: "Buscar en todo", placeholder: "Código o descripción" },
+            { value: "code", label: "Código de cuenta", placeholder: "Ej. 03 o 03.01", mono: true },
+            { value: "description", label: "Descripción", placeholder: "Ej. atrezzo" },
+          ]}
+          field={searchField}
+          onField={setSearchField}
+          value={searchTerm}
+          onChange={setSearchTerm}
+          count={matchCount}
+        />
         <Segmented
           value={view}
           onChange={setView}

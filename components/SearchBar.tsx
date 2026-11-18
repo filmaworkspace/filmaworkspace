@@ -44,7 +44,9 @@ export default function SearchBar<T extends string>({
     return () => document.removeEventListener("keydown", onKey);
   }, []);
   return (
-    <div className="flex min-w-[300px] flex-1 items-center gap-2">
+    // Ancho fijo e igual en toda la app (selector 176 px + texto 288 px): no se
+    // estira para llenar la fila ni se comprime cuando hay más filtros al lado.
+    <div className="flex flex-none items-center gap-2">
       <div className="w-44 flex-shrink-0">
         <Select value={field} onChange={(e) => onField(e.target.value as T)}>
           {fields.map((f) => (
@@ -52,7 +54,7 @@ export default function SearchBar<T extends string>({
           ))}
         </Select>
       </div>
-      <div className="relative flex-1">
+      <div className="relative w-72 flex-none">
         <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
         <Input
           ref={inputRef}
@@ -77,7 +79,7 @@ export default function SearchBar<T extends string>({
         )}
       </div>
       {value.trim() && count !== undefined && (
-        <span className="whitespace-nowrap text-xs text-slate-500">{count} {count === 1 ? "resultado" : "resultados"}</span>
+        <span className="w-20 whitespace-nowrap text-xs text-slate-500">{count} {count === 1 ? "resultado" : "resultados"}</span>
       )}
     </div>
   );

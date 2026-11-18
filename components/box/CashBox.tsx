@@ -181,7 +181,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
     return floatMovements.map((m) => { running = round2(running + cashEffect(m)); return { m, running }; });
   }, [floatMovements]);
   const LEDGER_FIELDS: SearchField<LedgerField>[] = [
-    { value: "all", label: "Buscar en todo", placeholder: "Vale, persona, proveedor, concepto o importe" },
+    { value: "all", label: "Buscar en todo", placeholder: "Vale, persona o proveedor" },
     { value: "number", label: "Nº de vale", placeholder: "Ej. CP-0012", mono: true },
     { value: "person", label: "Persona", placeholder: "Ej. Lucía" },
     { value: "supplier", label: "Proveedor", placeholder: "Nombre o NIF" },

@@ -405,7 +405,7 @@ export default function AccountingUsersPage() {
   // ── Búsqueda avanzada y filtros ───────────────────────────────────────────
   type UserField = "all" | "name" | "email" | "department";
   const USER_FIELDS: SearchField<UserField>[] = [
-    { value: "all", label: "Buscar en todo", placeholder: "Nombre, email, rol o departamento" },
+    { value: "all", label: "Buscar en todo", placeholder: "Nombre, email o departamento" },
     { value: "name", label: "Nombre", placeholder: "Ej. Marta" },
     { value: "email", label: "Email", placeholder: "Ej. @productora.com" },
     { value: "department", label: "Departamento", placeholder: "Ej. Arte" },

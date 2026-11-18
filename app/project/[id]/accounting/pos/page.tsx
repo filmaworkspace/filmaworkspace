@@ -750,7 +750,7 @@ export default function POsPage() {
   // ── Búsqueda avanzada, vistas y filtros ───────────────────────────────────
   type POField = "all" | "number" | "supplier" | "concept" | "account" | "amount";
   const PO_FIELDS: SearchField<POField>[] = [
-    { value: "all", label: "Buscar en todo", placeholder: "Número, proveedor, concepto o cuenta" },
+    { value: "all", label: "Buscar en todo", placeholder: "Número, proveedor o concepto" },
     { value: "number", label: "Nº de PO", placeholder: "Ej. 0012", mono: true },
     { value: "supplier", label: "Proveedor", placeholder: "Ej. Rental Norte" },
     { value: "concept", label: "Concepto", placeholder: "Ej. alquiler" },

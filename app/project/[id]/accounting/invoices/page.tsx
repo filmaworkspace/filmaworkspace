@@ -604,8 +604,8 @@ export default function InvoicesPage() {
   // ── Vistas, búsqueda avanzada y filtros ───────────────────────────────────
   type InvField = "all" | "number" | "supplier" | "concept" | "account" | "amount";
   const INV_FIELDS: SearchField<InvField>[] = [
-    { value: "all", label: "Buscar en todo", placeholder: "Número, proveedor, concepto o cuenta" },
-    { value: "number", label: "Nº documento o PO", placeholder: "Ej. FAC-0012 o PO-0003", mono: true },
+    { value: "all", label: "Buscar en todo", placeholder: "Número, proveedor o concepto" },
+    { value: "number", label: "Nº documento o PO", placeholder: "Ej. FRA-0012 o PO-0003", mono: true },
     { value: "supplier", label: "Proveedor", placeholder: "Ej. Rental Norte" },
     { value: "concept", label: "Concepto", placeholder: "Ej. alquiler cámara" },
     { value: "account", label: "Cuenta", placeholder: "Ej. 04.01 o iluminación", mono: true },
