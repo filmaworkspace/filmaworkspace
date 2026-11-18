@@ -1,3 +1,4 @@
+import { emailAttachments } from "@/lib/emails/headerImage";
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { projectInviteHtml, projectInviteText } from "@/lib/emails/project-invite";
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
     subject:        `${projectLabel} | ${invitedByName} te ha invitado`,
     html:           projectInviteHtml({ inviteeName, invitedByName, projectName, role: role ?? "", isExistingUser, loginUrl, registerUrl }),
     text:           projectInviteText({ inviteeName, invitedByName, projectName, role: role ?? "", isExistingUser, loginUrl, registerUrl }),
+    attachments:           emailAttachments(),
     tags:           [{ name: "type", value: "project-invite" }],
   }, { idempotencyKey: `project-invite/${projectId}/${invitedEmail}` });
 

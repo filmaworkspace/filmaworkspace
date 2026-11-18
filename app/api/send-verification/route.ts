@@ -1,3 +1,4 @@
+import { emailAttachments } from "@/lib/emails/headerImage";
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { db as adminDb } from "@/lib/firebase-admin";
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
     subject: `Filma Workspace | ${code} es tu código de verificación`,
     html:    verifyCodeHtml({ name, code }),
     text:    verifyCodeText({ name, code }),
+    attachments:    emailAttachments(),
     tags:    [{ name: "type", value: "verify-code" }],
   });
 

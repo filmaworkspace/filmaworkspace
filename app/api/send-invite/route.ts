@@ -1,3 +1,4 @@
+import { emailAttachments } from "@/lib/emails/headerImage";
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { fichaInviteHtml, fichaInviteText } from "@/lib/emails/ficha-invite";
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
     subject: `${projectLabel} | Completa tu ficha`,
     html: fichaInviteHtml({ firstName, projectName, role, formUrl, pin, senderName }),
     text: fichaInviteText({ firstName, projectName, role, formUrl, pin, senderName }),
+    attachments: emailAttachments(),
     tags: [{ name: "type", value: "ficha-invite" }],
   }, { idempotencyKey: `ficha-invite/${memberId}/${Date.now()}` });
 

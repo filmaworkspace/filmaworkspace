@@ -1,3 +1,4 @@
+import { emailAttachments } from "@/lib/emails/headerImage";
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { adminAuth } from "@/lib/firebase-admin";
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
       subject:        "Filma Workspace | Restablecer tu contraseña",
       html:           resetPasswordHtml({ name, resetUrl }),
       text:           resetPasswordText({ name, resetUrl }),
+      attachments:           emailAttachments(),
       tags:           [{ name: "type", value: "reset-password" }],
     }, { idempotencyKey: `reset-password/${email}/${Date.now()}` });
 

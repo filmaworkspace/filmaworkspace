@@ -6,6 +6,7 @@ interface BroadcastProps {
 
 export function broadcastHtml({ content }: BroadcastProps): string {
   return emailLayout({
+    remoteHeader: true,
     title: "Mensaje de Filma Workspace",
     eyebrow: "Mensaje",
     heading: "Novedades de Filma Workspace",

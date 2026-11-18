@@ -1,3 +1,4 @@
+import { emailAttachments } from "@/lib/emails/headerImage";
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { db } from "@/lib/firebase-admin";
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
       subject,
       html:    horarioReviewHtml({ recipientName, projectName, reviewUrl }),
       text:    horarioReviewText({ recipientName, projectName, reviewUrl }),
+      attachments:    emailAttachments(),
       tags:    [{ name: "type", value: "horario-review" }],
     });
 

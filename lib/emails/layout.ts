@@ -1,10 +1,14 @@
 // ─── Plantilla común de los emails ───────────────────────────────────────────
 // Cabecera con el degradado del login (imagen public/email/header.jpg: los
-// clientes de correo no pintan bien los degradados CSS ni los SVG), tarjeta
+// clientes de correo no pintan bien los degradados CSS ni los SVG). Por defecto
+// va incrustada (cid:, hay que enviar emailAttachments()); los envíos por lotes
+// de Resend no admiten adjuntos y usan remoteHeader con la URL pública. Tarjeta
 // blanca y tipografía del sistema. Todo lo que viene de datos del usuario pasa
 // por esc() para que nadie pueda meter HTML en un correo con nuestra marca.
 
-const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://filmaworkspace.com").replace(/\/$/, "");
+import { HEADER_CID } from "./headerImage";
+
+const APP_URL = (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://filmaworkspace.com").replace(/\/$/, "");
 
 const INK = "#0F172A";
 const TEXT = "#334155";
@@ -72,14 +76,17 @@ export const facts = (rows: [string, string][]) => `
  * Correo completo. `eyebrow` y `heading` se escapan; `body` es HTML ya
  * construido con las funciones de arriba (que escapan los datos).
  */
-export function emailLayout({ title, preheader, eyebrow, heading, body, footer }: {
+export function emailLayout({ title, preheader, eyebrow, heading, body, footer, remoteHeader }: {
   title: string;
   preheader?: string;
   eyebrow?: string;
   heading: string;
   body: string;
   footer?: string;
+  /** true: la cabecera se carga de la web en vez de ir incrustada. */
+  remoteHeader?: boolean;
 }): string {
+  const headerSrc = remoteHeader ? `${APP_URL}/email/header.jpg` : `cid:${HEADER_CID}`;
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -93,8 +100,8 @@ export function emailLayout({ title, preheader, eyebrow, heading, body, footer }
   <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${BG};padding:32px 12px;">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;background:#FFFFFF;border:1px solid ${LINE};border-radius:12px;overflow:hidden;">
-        <tr><td style="background:#24406E;line-height:0;font-size:0;">
-          <img src="${APP_URL}/email/header.jpg" width="600" alt="Filma Workspace" style="display:block;width:100%;max-width:600px;height:auto;border:0;color:#FFFFFF;font-size:16px;font-weight:600;" />
+        <tr><td style="background-color:#24406E;background-image:linear-gradient(160deg,#3B5A86 0%,#24406E 45%,#1A2E52 100%);line-height:0;font-size:0;">
+          <img src="${headerSrc}" width="600" alt="Filma Workspace" style="display:block;width:100%;max-width:600px;height:auto;border:0;color:#FFFFFF;font-size:16px;font-weight:600;" />
         </td></tr>
         <tr><td style="padding:32px 36px 12px;">
           ${eyebrow ? `<p style="margin:0 0 6px;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:${FAINT};">${esc(eyebrow)}</p>` : ""}
