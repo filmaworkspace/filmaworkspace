@@ -10,6 +10,7 @@ import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
+import { AccountPickerModal, EpisodeModal, SupplierPickerModal } from "@/components/accounting/Pickers";
 import { documentTotals, lineAmounts } from "@/lib/amounts";
 import { getScopedDocs, scopeFromPermissions } from "@/lib/accountingScope";
 import { approverIdsOf } from "@/lib/approvers";
@@ -577,14 +578,14 @@ export default function EditPOPage() {
     setTempEpisodeDistribution(tempEpisodeDistribution.map(e => ({ ...e, percentage: equalPercentage, amount: equalAmount })));
   };
 
-  const saveEpisodeDistribution = () => {
+  const saveEpisodeDistribution = (dist: EpisodeDistribution[] = tempEpisodeDistribution) => {
     if (episodeItemIndex === null) return;
     const newItems = [...items];
-    const isGeneral = tempEpisodeDistribution.length === 0 || tempEpisodeDistribution.length === totalEpisodes;
+    const isGeneral = dist.length === 0 || dist.length === totalEpisodes;
     newItems[episodeItemIndex] = {
       ...newItems[episodeItemIndex],
       episodeAssignment: isGeneral ? "general" : "specific",
-      episodes: tempEpisodeDistribution.length > 0 && tempEpisodeDistribution.length < totalEpisodes ? tempEpisodeDistribution : undefined,
+      episodes: dist.length > 0 && dist.length < totalEpisodes ? dist : undefined,
     };
     setItems(newItems);
     setShowEpisodeModal(false);
@@ -1580,233 +1581,35 @@ export default function EditPOPage() {
       </main>
 
 
-      {/* Supplier Modal */}
-      {showSupplierModal && (
-        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4" onClick={() => { setShowSupplierModal(false); setSupplierSearch(""); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-[14px] font-semibold text-slate-900">Seleccionar proveedor</h2>
-              <button onClick={() => { setShowSupplierModal(false); setSupplierSearch(""); }} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-6">
-              <div className="relative mb-4">
-                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="text" value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)} placeholder="Buscar por nombre o NIF..." className="w-full pl-11 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]" autoFocus />
-              </div>
-              <div className="max-h-80 overflow-y-auto space-y-2">
-                {filteredSuppliers.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="hidden"><Building2 size={20} className="text-slate-400" /></div>
-                    <p className="text-[13px] text-slate-500">No se encontraron proveedores</p>
-                  </div>
-                ) : (
-                  filteredSuppliers.map((supplier) => (
-                    <button key={supplier.id} onClick={() => selectSupplier(supplier)} className="w-full text-left p-4 border border-slate-200 rounded-md hover:border-slate-300 hover:bg-slate-50 transition-all group">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="font-medium text-slate-900">{supplier.fiscalName}</p>
-                          {supplier.commercialName && <p className="text-[13px] text-slate-500">{supplier.commercialName}</p>}
-                          <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500">
-                            <span className="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded"><Hash size={10} />{supplier.taxId}</span>
-                            <span>{supplier.country}</span>
-                          </div>
-                        </div>
-                        <Building2 size={16} className="text-slate-300 group-hover:text-slate-400" />
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Discreta a propósito: no es la opción recomendada, así que va
-                al fondo del modal, en texto pequeño y apagado. */}
-            {canEdit() && (
-              <div className="px-6 py-3 border-t border-slate-100 text-center">
-                <button
-                  onClick={() => {
-                    setNoSupplier(true);
-                    setFormData((prev) => ({ ...prev, supplier: "", supplierName: "" }));
-                    setErrors((prev) => { const { supplier, ...rest } = prev; return rest; });
-                    setShowSupplierModal(false);
-                    setSupplierSearch("");
-                  }}
-                  className="text-xs text-slate-400 hover:text-slate-600 hover:underline"
-                >
-                  Continuar sin proveedor (se asignará más adelante)
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Account Modal */}
-      {showAccountModal && (
-        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4" onClick={() => { setShowAccountModal(false); setAccountSearch(""); setCurrentItemIndex(null); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-[14px] font-semibold text-slate-900">Seleccionar cuenta presupuestaria</h2>
-              <button onClick={() => { setShowAccountModal(false); setAccountSearch(""); setCurrentItemIndex(null); }} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-6">
-              <div className="relative mb-4">
-                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="text" value={accountSearch} onChange={(e) => setAccountSearch(e.target.value)} placeholder="Buscar por código o descripción..." className="w-full pl-11 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]" autoFocus />
-              </div>
-              <div className="max-h-80 overflow-y-auto space-y-2 pr-2">
-                {filteredSubAccounts.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="hidden"><Hash size={20} className="text-slate-400" /></div>
-                    <p className="text-[13px] text-slate-500">No se encontraron cuentas</p>
-                  </div>
-                ) : (
-                  filteredSubAccounts.map((subAccount) => {
-                    const isLowBudget = canSeeBudgetFigures && subAccount.available < subAccount.budgeted * 0.1;
-                    const isOverBudget = canSeeBudgetFigures && subAccount.available < 0;
-                    return (
-                      <button key={subAccount.id} onClick={() => selectAccount(subAccount)} className={`w-full text-left p-4 border rounded-md hover:bg-slate-50 transition-all ${isOverBudget ? "border-red-200 bg-red-50/50" : isLowBudget ? "border-amber-200 bg-amber-50/50" : "border-slate-200"}`}>
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <p className="font-mono font-semibold text-slate-900">{subAccount.code}</p>
-                              {isOverBudget && <span className="flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg"><AlertTriangle size={10} />Sin presupuesto</span>}
-                              {!isOverBudget && isLowBudget && <span className="flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg"><AlertTriangle size={10} />Bajo</span>}
-                            </div>
-                            <p className="text-[13px] text-slate-700">{subAccount.description}</p>
-                            <p className="text-xs text-slate-500 mt-1">{subAccount.accountCode} - {subAccount.accountDescription}</p>
-                          </div>
-                        </div>
-                        {canSeeBudgetFigures && (
-                          <div className="grid grid-cols-4 gap-3 text-xs">
-                            <div className="bg-slate-50 rounded-lg p-2"><p className="text-slate-500">Presupuestado</p><p className="font-semibold text-slate-900">{formatCurrency(subAccount.budgeted)} €</p></div>
-                            <div className="bg-amber-50 rounded-lg p-2"><p className="text-amber-600">Comprometido</p><p className="font-semibold text-amber-700">{formatCurrency(subAccount.committed)} €</p></div>
-                            <div className="bg-emerald-50 rounded-lg p-2"><p className="text-emerald-600">Realizado</p><p className="font-semibold text-emerald-700">{formatCurrency(subAccount.actual)} €</p></div>
-                            <div className={`rounded-lg p-2 ${isOverBudget ? "bg-red-50" : isLowBudget ? "bg-amber-50" : "bg-emerald-50"}`}><p className={isOverBudget ? "text-red-600" : isLowBudget ? "text-amber-600" : "text-emerald-600"}>Disponible</p><p className={`font-semibold ${isOverBudget ? "text-red-700" : isLowBudget ? "text-amber-700" : "text-emerald-700"}`}>{formatCurrency(subAccount.available)} €</p></div>
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de asignación de capítulos */}
-      {showEpisodeModal && episodeItemIndex !== null && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowEpisodeModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#F1F1F3] rounded-md flex items-center justify-center">
-                  <Layers size={20} className="text-slate-700" />
-                </div>
-                <div>
-                  <h2 className="font-semibold text-slate-900">Asignar capítulos</h2>
-                  <p className="text-xs text-slate-500">Item {episodeItemIndex + 1}: {formatCurrency(items[episodeItemIndex].baseAmount)} {getCurrencySymbol()}</p>
-                </div>
-              </div>
-              <button onClick={() => setShowEpisodeModal(false)} className="p-2 hover:bg-slate-100 rounded-lg">
-                <X size={20} className="text-slate-500" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4 overflow-y-auto max-h-[60vh]">
-              <button onClick={() => setTempEpisodeDistribution([])} className={`w-full px-4 py-4 rounded-md text-[13px] font-medium transition-colors flex items-center gap-3 border-2 ${tempEpisodeDistribution.length === 0 ? "bg-[#F7F7F8] border-slate-400 text-slate-900" : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"}`}>
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${tempEpisodeDistribution.length === 0 ? "border-slate-400 bg-slate-700" : "border-slate-300"}`}>
-                  {tempEpisodeDistribution.length === 0 && <CheckCircle2 size={12} className="text-white" />}
-                </div>
-                <div className="text-left">
-                  <p className="font-medium">General (todos los capítulos)</p>
-                  <p className="text-xs text-slate-500">El importe se reparte equitativamente entre todos</p>
-                </div>
-              </button>
-
-              <button onClick={() => { if (tempEpisodeDistribution.length === 0) { const item = items[episodeItemIndex]; setTempEpisodeDistribution([{ episode: 1, amount: item.baseAmount, percentage: 100 }]); }}} className={`w-full px-4 py-4 rounded-md text-[13px] font-medium transition-colors flex items-center gap-3 border-2 ${tempEpisodeDistribution.length > 0 ? "bg-[#F7F7F8] border-slate-400 text-slate-900" : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"}`}>
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${tempEpisodeDistribution.length > 0 ? "border-slate-400 bg-slate-700" : "border-slate-300"}`}>
-                  {tempEpisodeDistribution.length > 0 && <CheckCircle2 size={12} className="text-white" />}
-                </div>
-                <div className="text-left">
-                  <p className="font-medium">Capítulos específicos</p>
-                  <p className="text-xs text-slate-500">Asignar a uno o varios capítulos concretos</p>
-                </div>
-              </button>
-
-              {tempEpisodeDistribution.length > 0 && (
-                <div className="space-y-4 pt-2">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Distribución</label>
-                    <div className="flex gap-2">
-                      <button onClick={() => { setEpisodeDistributionMode("equal"); applyEqualDistribution(); }} className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${episodeDistributionMode === "equal" ? "bg-[#F1F1F3] text-slate-900" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Partes iguales</button>
-                      <button onClick={() => setEpisodeDistributionMode("amount")} className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${episodeDistributionMode === "amount" ? "bg-[#F1F1F3] text-slate-900" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Por importe</button>
-                      <button onClick={() => setEpisodeDistributionMode("percentage")} className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${episodeDistributionMode === "percentage" ? "bg-[#F1F1F3] text-slate-900" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Por porcentaje</button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Capítulos</label>
-                    <div className="flex flex-wrap gap-2">
-                      {Array.from({ length: totalEpisodes }, (_, i) => i + 1).map((epNum) => {
-                        const isSelected = tempEpisodeDistribution.some(e => e.episode === epNum);
-                        return (
-                          <button key={epNum} onClick={() => toggleEpisodeInDistribution(epNum)} className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${isSelected ? "border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{epNum}</button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {tempEpisodeDistribution.length > 0 && episodeDistributionMode !== "equal" && (
-                    <div>
-                      <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Importes</label>
-                      <div className="space-y-2">
-                        {tempEpisodeDistribution.map((ep) => (
-                          <div key={ep.episode} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                            <span className="text-[13px] font-medium text-slate-700 w-12">{ep.episode}</span>
-                            {episodeDistributionMode === "amount" ? (
-                              <div className="flex-1 relative">
-                                <input type="number" value={ep.amount || ""} onChange={(e) => updateEpisodeAmount(ep.episode, parseFloat(e.target.value) || 0)} className="w-full pl-6 pr-3 py-1.5 border border-slate-200 rounded-lg text-[13px]" placeholder="0.00" />
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">€</span>
-                              </div>
-                            ) : (
-                              <div className="flex-1 relative">
-                                <input type="number" value={ep.percentage || ""} onChange={(e) => updateEpisodePercentage(ep.episode, parseFloat(e.target.value) || 0)} className="w-full pr-8 pl-3 py-1.5 border border-slate-200 rounded-lg text-[13px]" placeholder="0" min="0" max="100" />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">%</span>
-                              </div>
-                            )}
-                            <span className="text-xs text-slate-500 w-20 text-right">{episodeDistributionMode === "amount" ? `${ep.percentage.toFixed(1)}%` : `${formatCurrency(ep.amount)} €`}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {tempEpisodeDistribution.length > 0 && (
-                    <div className={`p-3 rounded-lg flex items-center justify-between ${Math.abs(getTotalDistributedPercentage() - 100) < 0.1 ? "bg-emerald-50" : "bg-amber-50"}`}>
-                      <span className="text-[13px] font-medium text-slate-700">Total:</span>
-                      <div className="text-right">
-                        <p className={`text-[13px] font-semibold ${Math.abs(getTotalDistributedPercentage() - 100) < 0.1 ? "text-emerald-700" : "text-amber-700"}`}>{formatCurrency(getTotalDistributedAmount())} € ({getTotalDistributedPercentage().toFixed(1)}%)</p>
-                        {Math.abs(getTotalDistributedPercentage() - 100) >= 0.1 && <p className="text-xs text-amber-600">Debe sumar 100%</p>}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3">
-              <button onClick={() => setShowEpisodeModal(false)} className="flex-1 py-1.5 text-slate-600 hover:bg-slate-200 rounded-md text-[13px] font-medium transition-colors">Cancelar</button>
-              <button onClick={saveEpisodeDistribution} disabled={tempEpisodeDistribution.length > 0 && Math.abs(getTotalDistributedPercentage() - 100) >= 0.1} className="flex-1 py-1.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">Guardar</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SupplierPickerModal
+        open={showSupplierModal}
+        onClose={() => { setShowSupplierModal(false); setSupplierSearch(""); }}
+        suppliers={suppliers}
+        onSelect={selectSupplier}
+        onNoSupplier={() => {
+          setNoSupplier(true);
+          setFormData((prev: any) => ({ ...prev, supplier: "", supplierName: "" }));
+          setShowSupplierModal(false);
+          setSupplierSearch("");
+        }}
+      />
+      <AccountPickerModal
+        open={showAccountModal}
+        onClose={() => { setShowAccountModal(false); setAccountSearch(""); setCurrentItemIndex(null); }}
+        subAccounts={subAccounts}
+        showFigures={canSeeBudgetFigures}
+        selectedId={currentItemIndex !== null ? items[currentItemIndex]?.subAccountId : undefined}
+        onSelect={selectAccount}
+      />
+      <EpisodeModal
+        open={showEpisodeModal && episodeItemIndex !== null}
+        onClose={() => { setShowEpisodeModal(false); setEpisodeItemIndex(null); }}
+        baseAmount={episodeItemIndex !== null ? items[episodeItemIndex]?.baseAmount || 0 : 0}
+        totalEpisodes={totalEpisodes}
+        initial={episodeItemIndex !== null ? items[episodeItemIndex]?.episodes : undefined}
+        label={episodeItemIndex !== null ? `Línea ${episodeItemIndex + 1}` : undefined}
+        onSave={(dist) => saveEpisodeDistribution(dist)}
+      />
     </div>
   );
 }

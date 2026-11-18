@@ -10,6 +10,7 @@ import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db, storage } from "@/lib/firebase";
+import { AccountPickerModal, EpisodeModal, SupplierPickerModal } from "@/components/accounting/Pickers";
 import { documentTotals, lineAmounts } from "@/lib/amounts";
 import { getScopedDocs, scopeFromPermissions } from "@/lib/accountingScope";
 import { approverIdsOf } from "@/lib/approvers";
@@ -616,11 +617,11 @@ export default function EditInvoicePage() {
     setTempEpisodeDistribution(prev => prev.map(e => e.episode === episodeNum ? { ...e, amount, percentage: item.baseAmount > 0 ? (amount / item.baseAmount) * 100 : 0 } : e));
   };
 
-  const saveEpisodeDistribution = () => {
+  const saveEpisodeDistribution = (dist: EpisodeDistribution[] = tempEpisodeDistribution) => {
     if (episodeItemIndex === null) return;
     const n = [...items];
-    if (tempEpisodeDistribution.length > 0) {
-      n[episodeItemIndex] = { ...n[episodeItemIndex], episodeAssignment: "specific", episodes: tempEpisodeDistribution };
+    if (dist.length > 0) {
+      n[episodeItemIndex] = { ...n[episodeItemIndex], episodeAssignment: "specific", episodes: dist };
     } else {
       n[episodeItemIndex] = { ...n[episodeItemIndex], episodeAssignment: "general", episodes: undefined };
     }
@@ -1465,109 +1466,29 @@ export default function EditInvoicePage() {
         </div>
       )}
 
-      {/* Modal proveedor */}
-      {showSupplierModal && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowSupplierModal(false)}>
-          <div className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-200">
-              <div className="flex items-center gap-3">
-                <Search size={20} className="text-slate-400" />
-                <input type="text" value={supplierSearch} onChange={e => setSupplierSearch(e.target.value)} placeholder="Buscar proveedor..." autoFocus className="flex-1 focus:outline-none text-[13px]" />
-                <button onClick={() => setShowSupplierModal(false)} className="p-1 hover:bg-slate-100 rounded"><X size={18} /></button>
-              </div>
-            </div>
-            <div className="max-h-96 overflow-y-auto">
-              {filteredSuppliers.map(s => (
-                <button key={s.id} onClick={() => selectSupplier(s)} className="w-full px-4 py-2 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0">
-                  <p className="font-medium text-slate-900">{s.fiscalName}</p>
-                  <p className="text-xs text-slate-500">{s.taxId}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal cuenta */}
-      {showAccountModal && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowAccountModal(false)}>
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-200">
-              <div className="flex items-center gap-3">
-                <Search size={20} className="text-slate-400" />
-                <input type="text" value={accountSearch} onChange={e => setAccountSearch(e.target.value)} placeholder="Buscar cuenta..." autoFocus className="flex-1 focus:outline-none text-[13px]" />
-                <button onClick={() => setShowAccountModal(false)} className="p-1 hover:bg-slate-100 rounded"><X size={18} /></button>
-              </div>
-            </div>
-            <div className="max-h-96 overflow-y-auto">
-              {filteredSubAccounts.map(s => (
-                <button key={s.id} onClick={() => selectAccount(s)} className="w-full px-4 py-2 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-slate-900 font-mono">{s.code}</p>
-                      <p className="text-[13px] text-slate-500">{s.description}</p>
-                    </div>
-                    {canSeeBudgetFigures && (
-                    <div className="text-right text-xs">
-                      <p className={cx("font-medium", s.available >= 0 ? "text-emerald-600" : "text-red-600")}>Disp: {formatCurrency(s.available)} €</p>
-                    </div>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal episodios */}
-      {showEpisodeModal && episodeItemIndex !== null && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowEpisodeModal(false)}>
-          <div className="bg-white rounded-lg max-w-md w-full" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="font-semibold">Asignar capítulos</h3>
-              <button onClick={() => setShowEpisodeModal(false)} className="p-1 hover:bg-slate-100 rounded"><X size={18} /></button>
-            </div>
-            <div className="p-4">
-              <div className="flex gap-2 mb-4">
-                <button onClick={() => { setEpisodeDistributionMode("equal"); recalculateDistribution(tempEpisodeDistribution, items[episodeItemIndex].baseAmount); }} className={cx("flex-1 py-2 rounded-lg text-[13px] font-medium", episodeDistributionMode === "equal" ? "bg-[#F1F1F3] text-slate-900" : "bg-slate-100 text-slate-600")}>
-                  Partes iguales
-                </button>
-                <button onClick={() => setEpisodeDistributionMode("amount")} className={cx("flex-1 py-2 rounded-lg text-[13px] font-medium", episodeDistributionMode === "amount" ? "bg-[#F1F1F3] text-slate-900" : "bg-slate-100 text-slate-600")}>
-                  Por importe
-                </button>
-              </div>
-              
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {Array.from({ length: totalEpisodes }, (_, i) => i + 1).map(ep => {
-                  const selected = tempEpisodeDistribution.find(e => e.episode === ep);
-                  return (
-                    <div key={ep} className={cx("flex items-center gap-3 p-3 rounded-lg border", selected ? "border-slate-300 bg-slate-50" : "border-slate-200")}>
-                      <input type="checkbox" checked={!!selected} onChange={() => toggleEpisodeInDistribution(ep)} className="w-4 h-4 text-[13px]" />
-                      <span className="font-medium">Ep. {ep}</span>
-                      {selected && episodeDistributionMode === "amount" && (
-                        <input type="number" value={selected.amount || ""} onChange={e => updateEpisodeAmount(ep, parseFloat(e.target.value) || 0)} placeholder="0.00" className="ml-auto w-24 px-2 py-1 border border-slate-200 rounded text-[13px] text-right" />
-                      )}
-                      {selected && episodeDistributionMode === "equal" && (
-                        <span className="ml-auto text-[13px] text-slate-500">{selected.percentage.toFixed(1)}%</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-slate-200 flex gap-3">
-                <button onClick={() => setTempEpisodeDistribution([])} className="flex-1 py-2 border border-slate-200 rounded-lg text-[13px]">
-                  General
-                </button>
-                <button onClick={saveEpisodeDistribution} className="flex-1 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium">
-                  Aplicar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <SupplierPickerModal
+        open={showSupplierModal}
+        onClose={() => { setShowSupplierModal(false); setSupplierSearch(""); }}
+        suppliers={suppliers}
+        onSelect={selectSupplier}
+      />
+      <AccountPickerModal
+        open={showAccountModal}
+        onClose={() => { setShowAccountModal(false); setAccountSearch(""); setCurrentItemIndex(null); }}
+        subAccounts={subAccounts}
+        showFigures={canSeeBudgetFigures}
+        selectedId={currentItemIndex !== null ? items[currentItemIndex]?.subAccountId : undefined}
+        onSelect={selectAccount}
+      />
+      <EpisodeModal
+        open={showEpisodeModal && episodeItemIndex !== null}
+        onClose={() => { setShowEpisodeModal(false); setEpisodeItemIndex(null); }}
+        baseAmount={episodeItemIndex !== null ? items[episodeItemIndex]?.baseAmount || 0 : 0}
+        totalEpisodes={totalEpisodes}
+        initial={episodeItemIndex !== null ? items[episodeItemIndex]?.episodes : undefined}
+        label={episodeItemIndex !== null ? `Línea ${episodeItemIndex + 1}` : undefined}
+        onSave={(dist) => saveEpisodeDistribution(dist)}
+      />
     </div>
   );
 }
