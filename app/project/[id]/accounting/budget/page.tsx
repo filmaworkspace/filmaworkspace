@@ -45,8 +45,9 @@ import {
 // ─── Libraries ───────────────────────────────────────────────────────────────
 import { strToU8, unzipSync, zipSync } from "fflate";
 
+import { committedBySubaccount as computeCommitted, actualBySubaccount as computeActual, loadBoxBySubaccount } from "@/lib/budgetTotals";
 // ─── Internal ────────────────────────────────────────────────────────────────
-import { CostSettings, getCostSettings, shouldCommitPO, shouldRealizeInvoice } from "@/lib/budgetRules";
+import { CostSettings, getCostSettings } from "@/lib/budgetRules";
 import { parseFwbText, flattenFwbToAccountRows, FwbSubaccountLevel } from "@/lib/budgetingExport";
 import BudgetLevelMappingChoice from "@/components/BudgetLevelMappingChoice";
 
@@ -188,98 +189,14 @@ export default function BudgetPage() {
       const loadedCostConfig = await getCostSettings(id);
       setCostConfig(loadedCostConfig);
 
-      // Cargar POs y calcular committed por subcuenta
-      // Comprometido = baseAmount - invoicedAmount (lo pendiente de facturar)
-      // Si item cerrado: committed = 0 (se liberó el resto)
-      const committedBySubaccount: Record<string, number> = {};
-      const posSnapshot = await getDocs(collection(db, `projects/${id}/pos`));
-      posSnapshot.docs.forEach(poDoc => {
-        const poData = poDoc.data();
-
-        // Si la PO está siendo modificada (tiene previousCommittedItems y está en draft/pending),
-        // mostrar el comprometido de la versión anterior hasta que la nueva sea aprobada.
-        const isModificationInProgress =
-          poData.previousCommittedItems?.length > 0 &&
-          (poData.status === "draft" || poData.status === "pending");
-
-        if (isModificationInProgress) {
-          poData.previousCommittedItems.forEach((item: any) => {
-            if (item.subAccountCode) {
-              const itemInvoiced = item.invoicedAmount || 0;
-              const itemCommitted = Math.max(0, (item.baseAmount || 0) - itemInvoiced);
-              committedBySubaccount[item.subAccountCode] =
-                (committedBySubaccount[item.subAccountCode] || 0) + itemCommitted;
-            }
-          });
-          return;
-        }
-
-        // Usar shouldCommitPO de budgetRules para determinar si cuenta
-        if (poData.status && shouldCommitPO(poData.status, loadedCostConfig) && poData.items) {
-          poData.items.forEach((item: any) => {
-            if (item.subAccountCode) {
-              const key = item.subAccountCode;
-              // Si el item está cerrado, no hay comprometido pendiente
-              // Si está abierto, el comprometido es lo que falta por facturar
-              const itemInvoiced = item.invoicedAmount || 0;
-              const itemBase = item.baseAmount || 0;
-              const itemCommitted = item.isClosed
-                ? 0
-                : Math.max(0, itemBase - itemInvoiced);
-              committedBySubaccount[key] = (committedBySubaccount[key] || 0) + itemCommitted;
-            }
-          });
-        }
-      });
-
-      // Cargar Facturas y calcular actual por subcuenta
-      const actualBySubaccount: Record<string, number> = {};
-      const invoicesSnapshot = await getDocs(collection(db, `projects/${id}/invoices`));
-      invoicesSnapshot.docs.forEach(invDoc => {
-        const invData = invDoc.data();
-        // La realización depende de los tracks, no del lifecycle (la factura puede
-        // estar en "submitted" y ya codificada/contabilizada). Pasamos los tracks.
-        const terminal = ["cancelled", "rejected", "void"].includes(invData.status);
-        const isRealized = terminal
-          ? false
-          : loadedCostConfig.invoiceActualTrigger === "on_code"
-            ? !!invData.codedAt
-            : loadedCostConfig.invoiceActualTrigger === "on_account"
-              ? !!(invData.accountedAt || invData.accounted)
-              : shouldRealizeInvoice(invData.status, loadedCostConfig, {
-                  codedAt: invData.codedAt, accountedAt: invData.accountedAt || invData.accounted, paidAt: invData.paidAt, approvedAt: invData.approvedAt,
-                });
-        if (invData.status && isRealized && invData.items) {
-          invData.items.forEach((item: any) => {
-            if (item.subAccountCode) {
-              const key = item.subAccountCode;
-              actualBySubaccount[key] = (actualBySubaccount[key] || 0) + (item.baseAmount || 0);
-            }
-          });
-        }
-      });
-
-      // Cargar gastos de caja (BOX) y calcular por subcuenta
-      // Solo cuentan los gastos Pleo con status "accounted" (sobre cerrado)
-      const boxBySubaccount: Record<string, number> = {};
-      const boxExpensesSnapshot = await getDocs(collection(db, `projects/${id}/cardExpenses`));
-      boxExpensesSnapshot.docs.forEach(expDoc => {
-        const expData = expDoc.data();
-        if (expData.status === "accounted" && expData.subAccountCode) {
-          const key = expData.subAccountCode;
-          boxBySubaccount[key] = (boxBySubaccount[key] || 0) + (expData.baseAmount || 0);
-        }
-      });
-
-      // Cargar gastos de transferencias (todos cuentan, se suman al crear)
-      const transferExpensesSnapshot = await getDocs(collection(db, `projects/${id}/transferExpenses`));
-      transferExpensesSnapshot.docs.forEach(expDoc => {
-        const expData = expDoc.data();
-        if (expData.subAccountCode) {
-          const key = expData.subAccountCode;
-          boxBySubaccount[key] = (boxBySubaccount[key] || 0) + (expData.baseAmount || 0);
-        }
-      });
+      // Comprometido, realizado y caja por subcuenta (lib/budgetTotals)
+      const [posSnapshot, invoicesSnapshot, boxBySubaccount] = await Promise.all([
+        getDocs(collection(db, `projects/${id}/pos`)),
+        getDocs(collection(db, `projects/${id}/invoices`)),
+        loadBoxBySubaccount(id),
+      ]);
+      const committedBySubaccount = computeCommitted(posSnapshot.docs.map((d) => d.data()), loadedCostConfig);
+      const actualBySubaccount = computeActual(invoicesSnapshot.docs.map((d) => d.data()), loadedCostConfig);
 
       // Cargar cuentas y subcuentas
       const accountsRef = collection(db, `projects/${id}/accounts`);

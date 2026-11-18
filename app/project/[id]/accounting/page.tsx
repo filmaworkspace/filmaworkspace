@@ -1,543 +1,666 @@
 "use client";
 
-// ─── Framework ────────────────────────────────────────────────────────────────
-import { useState, useEffect } from "react";
+// ─── Panel de contabilidad ───────────────────────────────────────────────────
+// Lo ve todo el equipo, pero cada perfil ve lo suyo:
+//   · Contabilidad (roles de proyecto y niveles contables): circuito de facturas
+//     y movimientos de todo el proyecto; con acceso ampliado, además
+//     presupuesto y vencimientos.
+//   · Jefe de departamento (HOD / coordinador): movimientos y POs abiertas de
+//     su departamento.
+//   · Usuario: sus propios documentos y sus POs abiertas.
+
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { inter } from "@/lib/fonts";
+import { ClipboardCheck, FolderDown, Plus, Settings, Upload } from "lucide-react";
 
-// ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
-import {
-  collection,
-  doc,
-  getDocs,
-  getDoc,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  where,
-} from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } from "firebase/firestore";
 
-// ─── Icons ───────────────────────────────────────────────────────────────────
-import {
-  AlertCircle,
-  ArrowRight,
-  ChevronRight,
-  ClipboardCheck,
-  Clock,
-  Banknote,
-  FileText,
-  FolderDown,
-  Plus,
-  Receipt,
-  Settings,
-  Upload,
-} from "lucide-react";
-
-// ─── Internal ────────────────────────────────────────────────────────────────
+import { Page, PageHeader, PageLoading, buttonClass } from "@/components/ds";
 import { PROJECT_ROLES } from "@/hooks/useAccountingPermissions";
 import { getInvoiceDisplayState } from "@/lib/invoiceHelpers";
+import { getCostSettings } from "@/lib/budgetRules";
+import { actualBySubaccount, committedBySubaccount, loadBoxBySubaccount } from "@/lib/budgetTotals";
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Tipos ───────────────────────────────────────────────────────────────────
 
+type Profile = "accounting" | "head" | "user";
+type Kind = "po" | "invoice";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface PO {
+interface Row {
+  kind: Kind;
   id: string;
   number: string;
   supplier: string;
-  description: string;
-  baseAmount: number;
-  status: "draft" | "pending" | "approved" | "rejected" | "closed" | "cancelled";
+  concept: string;
+  department: string;
+  requester: string;
+  account: string;
+  base: number;
+  state: string;
   createdAt: Date | null;
-  department?: string;
-  createdBy: string;
 }
 
-interface Invoice {
+interface InvoiceLite {
   id: string;
-  number: string;
-  displayNumber: string;
-  documentType: string;
   supplier: string;
-  description: string;
-  baseAmount: number;
-  status: string;
+  state: string;
+  total: number;
+  base: number;
   dueDate: Date | null;
-  createdAt: Date | null;
-  department?: string;
-  createdBy: string;
-  codedAt?: Date | null;
-  approvedAt?: Date | null;
-  accountedAt?: Date | null;
-  paidAt?: Date | null;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+interface OpenPO {
+  id: string;
+  number: string;
+  supplier: string;
+  base: number;
+  invoiced: number;
+}
 
-export default function AccountingPage() {
+interface BudgetLine {
+  code: string;
+  name: string;
+  budgeted: number;
+  executed: number;
+}
+
+interface Budget {
+  budgeted: number;
+  actual: number;
+  committed: number;
+  lines: BudgetLine[];
+}
+
+// ─── Estados ─────────────────────────────────────────────────────────────────
+
+const STATES: Record<string, { label: string; dot: string; text: string }> = {
+  draft:          { label: "Borrador",         dot: "bg-slate-300",   text: "text-slate-600" },
+  pending:        { label: "Pend. aprobación", dot: "bg-amber-500",   text: "text-amber-800" },
+  submitted:      { label: "Pend. aprobación", dot: "bg-amber-500",   text: "text-amber-800" },
+  approved:       { label: "Aprobada",         dot: "bg-emerald-500", text: "text-emerald-800" },
+  coded:          { label: "Codificada",       dot: "bg-violet-500",  text: "text-violet-800" },
+  accounted:      { label: "Contabilizada",    dot: "bg-teal-500",    text: "text-teal-800" },
+  paid:           { label: "Pagada",           dot: "bg-[#2F52E0]",   text: "text-blue-800" },
+  overdue:        { label: "Vencida",          dot: "bg-red-500",     text: "text-red-700" },
+  closed:         { label: "Cerrada",          dot: "bg-slate-400",   text: "text-slate-600" },
+  rejected:       { label: "Rechazada",        dot: "bg-red-500",     text: "text-red-700" },
+  cancelled:      { label: "Anulada",          dot: "bg-slate-300",   text: "text-slate-500 line-through" },
+  void:           { label: "Anulada",          dot: "bg-slate-300",   text: "text-slate-500 line-through" },
+  returned:       { label: "Devuelta",         dot: "bg-teal-500",    text: "text-teal-800" },
+  partial_return: { label: "Dev. parcial",     dot: "bg-cyan-500",    text: "text-cyan-800" },
+};
+
+const ACTIVE_INVOICE = (s: string) => !["draft", "cancelled", "void", "rejected", "returned", "partial_return"].includes(s);
+
+// ─── Formato ─────────────────────────────────────────────────────────────────
+
+const money = (n: number, decimals = 2) =>
+  `${new Intl.NumberFormat("es-ES", { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: "always" } as Intl.NumberFormatOptions).format(n || 0)} €`;
+const shortDate = (d: Date | null) => (d ? d.toLocaleDateString("es-ES", { day: "numeric", month: "short" }).replace(".", "") : "—");
+const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
+
+/** Domingo de esta semana, 23:59. */
+function endOfWeek() {
+  const d = new Date();
+  const day = d.getDay(); // 0 = domingo
+  d.setDate(d.getDate() + (day === 0 ? 0 : 7 - day));
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+function startOfToday() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+// ─── Mapeo de documentos ─────────────────────────────────────────────────────
+
+const toDate = (v: any): Date | null => (v?.toDate ? v.toDate() : v instanceof Date ? v : null);
+
+function firstAccount(data: any) {
+  const item = (data.items || []).find((i: any) => i.subAccountCode);
+  if (!item) return "";
+  return [item.subAccountCode, item.subAccountDescription].filter(Boolean).join(" ");
+}
+
+function poRow(id: string, data: any): Row {
+  return {
+    kind: "po",
+    id,
+    number: `PO-${data.number || ""}`,
+    supplier: data.supplier || "Sin proveedor",
+    concept: data.generalDescription || data.description || "",
+    department: data.department || "",
+    requester: data.createdByName || "",
+    account: firstAccount(data),
+    base: data.baseAmount || 0,
+    state: data.status || "draft",
+    createdAt: toDate(data.createdAt),
+  };
+}
+
+function invoiceState(data: any) {
+  return getInvoiceDisplayState({ ...data, dueDate: toDate(data.dueDate) });
+}
+
+function invoiceRow(id: string, data: any): Row {
+  const type = data.documentType || "invoice";
+  const prefix = type === "proforma" ? "PRF" : type === "budget" ? "PRS" : type === "guarantee" ? "FNZ" : "FRA";
+  return {
+    kind: "invoice",
+    id,
+    number: data.displayNumber || `${prefix}-${data.number || ""}`,
+    supplier: data.supplier || "Sin proveedor",
+    concept: data.description || "",
+    department: data.department || "",
+    requester: data.createdByName || "",
+    account: firstAccount(data),
+    base: data.baseAmount || 0,
+    state: invoiceState(data),
+    createdAt: toDate(data.createdAt),
+  };
+}
+
+// ─── Página ──────────────────────────────────────────────────────────────────
+
+export default function AccountingPanelPage() {
   const params = useParams();
   const id = params?.id as string;
-  const [projectName, setProjectName] = useState<string>("");
-  const [loading, setLoading] = useState(true);
-  const [recentPOs, setRecentPOs] = useState<PO[]>([]);
-  const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
+
   const [userId, setUserId] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState("");
-  const [userDepartment, setUserDepartment] = useState("");
-  const [userPosition, setUserPosition] = useState("");
-  const [accountingAccessLevel, setAccountingAccessLevel] = useState<string>("");
-  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const [role, setRole] = useState("");
+  const [department, setDepartment] = useState("");
+  const [accessLevel, setAccessLevel] = useState("user");
+  const [profile, setProfile] = useState<Profile>("user");
   const [isApprover, setIsApprover] = useState(false);
+  const [pendingApprovals, setPendingApprovals] = useState(0);
+
+  const [rows, setRows] = useState<Row[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceLite[]>([]);
+  const [openPOs, setOpenPOs] = useState<OpenPO[]>([]);
+  const [budget, setBudget] = useState<Budget | null>(null);
+  const [tab, setTab] = useState<"all" | Kind>("all");
+
+  const extended = accessLevel === "accounting_extended";
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => { if (user) setUserId(user.uid); });
-    return () => unsubscribe();
+    const unsub = auth.onAuthStateChanged((u) => { if (u) setUserId(u.uid); });
+    return () => unsub();
   }, []);
 
+  // ── Carga ──────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const loadProjectData = async () => {
-      if (!userId || !id) return;
+    if (!userId || !id) return;
+    const load = async () => {
       try {
-        const projectDoc = await getDoc(doc(db, "projects", id));
-        if (projectDoc.exists()) setProjectName(projectDoc.data().name || "Proyecto");
+        const memberSnap = await getDoc(doc(db, `projects/${id}/members`, userId));
+        const m = memberSnap.exists() ? memberSnap.data() : {};
+        const mRole: string = m.role || "";
+        const mDept: string = m.department || "";
+        const mPos: string = m.position || "";
+        const mLevel: string = m.accountingAccessLevel || "user";
+        setRole(mRole);
+        setDepartment(mDept);
+        setAccessLevel(mLevel);
 
-        const memberDoc = await getDoc(doc(db, `projects/${id}/members`, userId));
-        let currentUserRole = "";
-        let currentUserDepartment = "";
-        let currentUserPosition = "";
-        if (memberDoc.exists()) {
-          const memberData = memberDoc.data();
-          currentUserRole = memberData.role || "";
-          currentUserDepartment = memberData.department || "";
-          currentUserPosition = memberData.position || "";
-          setUserRole(currentUserRole);
-          setUserDepartment(currentUserDepartment);
-          setUserPosition(currentUserPosition);
-          setAccountingAccessLevel(memberData.accountingAccessLevel || "user");
-        }
-        
-        const isProjectRole = PROJECT_ROLES.includes(currentUserRole);
-        const canViewAllPOs = isProjectRole;
-        const canViewDepartmentPOs = !isProjectRole && (
-          currentUserPosition === "HOD" ||
-          currentUserPosition === "Coordinator"
-        );
-        const canViewOwnPOs = !isProjectRole && !canViewDepartmentPOs;
+        const isProjectRole = PROJECT_ROLES.includes(mRole);
+        const p: Profile =
+          isProjectRole || mLevel === "accounting" || mLevel === "accounting_extended"
+            ? "accounting"
+            : mPos === "HOD" || mPos === "Coordinator"
+              ? "head"
+              : "user";
+        setProfile(p);
 
-        let userIsApprover = false;
-        
-        const approvalConfigDoc = await getDoc(doc(db, `projects/${id}/config`, "approvals"));
-        if (approvalConfigDoc.exists()) {
-          const config = approvalConfigDoc.data();
-          
-          const checkStepForUser = (step: any): boolean => {
+        // ¿Aprueba algo? (para el acceso directo a aprobaciones)
+        const approvalCfg = await getDoc(doc(db, `projects/${id}/config`, "approvals"));
+        if (approvalCfg.exists()) {
+          const cfg = approvalCfg.data();
+          const lower = mPos.toLowerCase();
+          const matches = (step: any) => {
             if (!step) return false;
             if (step.approverType === "fixed" && step.approvers?.includes(userId)) return true;
-            if (step.approverType === "role" && step.roles?.includes(currentUserRole)) return true;
-            if (step.approverType === "hod") {
-              const isHOD = currentUserPosition?.toLowerCase().includes("head") || 
-                           currentUserPosition?.toLowerCase().includes("jefe") ||
-                           currentUserRole === "HOD";
-              if (isHOD && (!step.department || step.department === currentUserDepartment)) return true;
-            }
-            if (step.approverType === "coordinator") {
-              const isCoordinator = currentUserPosition?.toLowerCase().includes("coordinator") || 
-                                   currentUserPosition?.toLowerCase().includes("coordinador") ||
-                                   currentUserRole === "Coordinator";
-              if (isCoordinator && (!step.department || step.department === currentUserDepartment)) return true;
-            }
+            if (step.approverType === "role" && step.roles?.includes(mRole)) return true;
+            const sameDept = !step.department || step.department === mDept;
+            if (step.approverType === "hod" && (lower.includes("head") || lower.includes("jefe") || mPos === "HOD" || mRole === "HOD") && sameDept) return true;
+            if (step.approverType === "coordinator" && (lower.includes("coordinator") || lower.includes("coordinador") || mPos === "Coordinator" || mRole === "Coordinator") && sameDept) return true;
             return false;
           };
-          
-          if (config.poApprovals) {
-            for (const step of config.poApprovals) {
-              if (checkStepForUser(step)) { userIsApprover = true; break; }
-            }
-          }
-          if (!userIsApprover && config.invoiceApprovals) {
-            for (const step of config.invoiceApprovals) {
-              if (checkStepForUser(step)) { userIsApprover = true; break; }
-            }
-          }
+          setIsApprover([...(cfg.poApprovals || []), ...(cfg.invoiceApprovals || [])].some(matches));
         }
-        
-        setIsApprover(userIsApprover);
 
-        const posRecentQuery = query(collection(db, `projects/${id}/pos`), orderBy("createdAt", "desc"), limit(20));
-        const posRecentSnapshot = await getDocs(posRecentQuery);
-        const allPOs = posRecentSnapshot.docs.map(doc => {
-          const data = doc.data();
-          return { 
-            id: doc.id, 
-            number: data.number || "", 
-            supplier: data.supplier || "", 
-            description: data.generalDescription || data.description || "", 
-            baseAmount: data.baseAmount || 0, 
-            status: data.status || "draft", 
-            createdAt: data.createdAt?.toDate() || null,
-            department: data.department || "",
-            createdBy: data.createdBy || "",
-          };
-        });
-        
-        const filteredPOs = allPOs.filter((po) => {
-          if (canViewAllPOs) return true;
-          if (canViewDepartmentPOs && po.department === currentUserDepartment) return true;
-          if (canViewOwnPOs && po.createdBy === userId) return true;
-          return false;
-        }).slice(0, 5);
-        setRecentPOs(filteredPOs);
+        // POs y facturas visibles para este perfil
+        const posRef = collection(db, `projects/${id}/pos`);
+        const invRef = collection(db, `projects/${id}/invoices`);
+        const scope =
+          p === "accounting" ? null : p === "head" ? where("department", "==", mDept) : where("createdBy", "==", userId);
+        const [posSnap, invSnap] = await Promise.all([
+          getDocs(scope ? query(posRef, scope) : posRef),
+          getDocs(scope ? query(invRef, scope) : invRef),
+        ]);
 
-        const invoicesRecentQuery = query(collection(db, `projects/${id}/invoices`), orderBy("createdAt", "desc"), limit(20));
-        const invoicesRecentSnapshot = await getDocs(invoicesRecentQuery);
-        const allInvoices = invoicesRecentSnapshot.docs.map(doc => {
-          const data = doc.data();
-          const docType = data.documentType || "invoice";
-          const typePrefix = docType === "proforma" ? "PRF" : docType === "budget" ? "PRS" : docType === "guarantee" ? "FNZ" : "FRA";
-          return { 
-            id: doc.id, 
-            number: data.number || "", 
-            displayNumber: data.displayNumber || `${typePrefix}-${data.number}`,
-            documentType: docType,
-            supplier: data.supplier || "", 
-            description: data.description || "", 
-            baseAmount: data.baseAmount || 0, 
-            status: data.status || "pending", 
-            createdAt: data.createdAt?.toDate() || null,
-            dueDate: data.dueDate?.toDate() || null,
-            department: data.department || "",
-            createdBy: data.createdBy || "",
-            codedAt: data.codedAt?.toDate() || null,
-            approvedAt: data.approvedAt?.toDate() || null,
-            accountedAt: data.accountedAt?.toDate() || null,
-            paidAt: data.paidAt?.toDate() || null,
-          };
-        });
-        
-        const filteredInvoices = allInvoices.filter((inv) => {
-          if (canViewAllPOs) return true;
-          if (canViewDepartmentPOs && inv.department === currentUserDepartment) return true;
-          if (canViewOwnPOs && inv.createdBy === userId) return true;
-          return false;
-        }).slice(0, 5);
-        setRecentInvoices(filteredInvoices);
-      } catch (error) {
-        console.error("Error cargando datos:", error);
+        const poDocs = posSnap.docs.map((d) => ({ id: d.id, data: d.data() }));
+        const invDocs = invSnap.docs.map((d) => ({ id: d.id, data: d.data() }));
+
+        setRows([
+          ...poDocs.map((d) => poRow(d.id, d.data)),
+          ...invDocs.map((d) => invoiceRow(d.id, d.data)),
+        ]);
+
+        setInvoices(
+          invDocs.map(({ id: invId, data }) => ({
+            id: invId,
+            supplier: data.supplier || "Sin proveedor",
+            state: invoiceState(data),
+            total: data.totalAmount || data.baseAmount || 0,
+            base: data.baseAmount || 0,
+            dueDate: toDate(data.dueDate),
+          })),
+        );
+
+        setOpenPOs(
+          poDocs
+            .filter(({ data }) => data.status === "approved")
+            .map(({ id: poId, data }) => ({
+              id: poId,
+              number: `PO-${data.number || ""}`,
+              supplier: data.supplier || "Sin proveedor",
+              base: data.baseAmount || 0,
+              invoiced: data.invoicedAmount || 0,
+            }))
+            .sort((a, b) => pct(b.invoiced, b.base) - pct(a.invoiced, a.base)),
+        );
+
+        // Presupuesto: solo con acceso ampliado (igual que la pestaña Presupuesto)
+        if (p === "accounting" && mLevel === "accounting_extended") {
+          const [costCfg, box, accountsSnap] = await Promise.all([
+            getCostSettings(id),
+            loadBoxBySubaccount(id),
+            getDocs(query(collection(db, `projects/${id}/accounts`), orderBy("code", "asc"))),
+          ]);
+          const committed = committedBySubaccount(poDocs.map((d) => d.data), costCfg);
+          const actual = actualBySubaccount(invDocs.map((d) => d.data), costCfg);
+
+          const lines: BudgetLine[] = [];
+          let tBudgeted = 0, tActual = 0, tCommitted = 0;
+          await Promise.all(
+            accountsSnap.docs.map(async (acc, i) => {
+              const subs = await getDocs(collection(db, `projects/${id}/accounts/${acc.id}/subaccounts`));
+              let b = 0, a = 0, c = 0;
+              subs.docs.forEach((s) => {
+                const code = s.data().code || "";
+                b += s.data().budgeted || 0;
+                a += (actual[code] || 0) + (box[code] || 0);
+                c += committed[code] || 0;
+              });
+              tBudgeted += b; tActual += a; tCommitted += c;
+              lines[i] = { code: acc.data().code || "", name: acc.data().description || "", budgeted: b, executed: a + c };
+            }),
+          );
+          setBudget({ budgeted: tBudgeted, actual: tActual, committed: tCommitted, lines: lines.filter((l) => l && l.budgeted > 0) });
+        }
+      } catch (err) {
+        console.error("Error cargando el panel de contabilidad:", err);
       } finally {
         setLoading(false);
       }
     };
-    loadProjectData();
+    load();
   }, [id, userId]);
 
+  // ── Aprobaciones pendientes (punto en el acceso directo) ─────────────────
   useEffect(() => {
-    if (!id || !userId) return;
-
-    let poCount = 0;
-    let invCount = 0;
-    const updateTotal = () => setPendingApprovalsCount(poCount + invCount);
-
-    const poUnsub = onSnapshot(
-      query(collection(db, `projects/${id}/pos`), where("status", "==", "pending")),
-      (snap) => {
-        poCount = 0;
-        snap.forEach((d) => {
-          const data = d.data();
-          if (data.approvalSteps && data.currentApprovalStep !== undefined) {
-            const step = data.approvalSteps[data.currentApprovalStep];
-            if (step?.approvers?.includes(userId)) poCount++;
-          }
-        });
-        updateTotal();
-      }
-    );
-
-    const invUnsub = onSnapshot(
+    if (!id || !userId || !isApprover) return;
+    let po = 0, inv = 0;
+    const isMine = (d: any) => {
+      if (!d.approvalSteps || d.currentApprovalStep === undefined) return false;
+      return !!d.approvalSteps[d.currentApprovalStep]?.approvers?.includes(userId);
+    };
+    const u1 = onSnapshot(query(collection(db, `projects/${id}/pos`), where("status", "==", "pending")), (s) => {
+      po = s.docs.filter((d) => isMine(d.data())).length;
+      setPendingApprovals(po + inv);
+    });
+    const u2 = onSnapshot(
       query(collection(db, `projects/${id}/invoices`), where("status", "in", ["submitted", "pending_approval"])),
-      (snap) => {
-        invCount = 0;
-        snap.forEach((d) => {
-          const data = d.data();
-          // Solo pendientes de aprobar (sin track de aprobación).
-          if (data.approvedAt) return;
-          if (data.approvalSteps && data.currentApprovalStep !== undefined) {
-            const step = data.approvalSteps[data.currentApprovalStep];
-            if (step?.approvers?.includes(userId)) invCount++;
-          }
-        });
-        updateTotal();
-      }
+      (s) => {
+        inv = s.docs.filter((d) => !d.data().approvedAt && isMine(d.data())).length;
+        setPendingApprovals(po + inv);
+      },
     );
+    return () => { u1(); u2(); };
+  }, [id, userId, isApprover]);
 
-    return () => {
-      poUnsub();
-      invUnsub();
-    };
-  }, [id, userId]);
-
-  const getStatusBadge = (status: string) => {
-    const config: Record<string, { bg: string; text: string; label: string }> = {
-      draft: { bg: "bg-slate-100", text: "text-slate-600", label: "Borrador" },
-      pending: { bg: "bg-amber-50", text: "text-amber-700", label: "Pendiente" },
-      approved: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Aprobada" },
-      rejected: { bg: "bg-red-50", text: "text-red-700", label: "Rechazada" },
-      closed: { bg: "bg-blue-50", text: "text-blue-700", label: "Cerrada" },
-      cancelled: { bg: "bg-red-100", text: "text-red-800", label: "Anulada" },
-      pending_approval: { bg: "bg-purple-50", text: "text-purple-700", label: "Pend. aprob." },
-    };
-    const c = config[status] || config.pending;
-    return (
-      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${c.bg} ${c.text} ${status === "cancelled" ? "line-through" : ""}`}>
-        {status === "cancelled" && <span className="font-bold not-italic">✕</span>}
-        {c.label}
-      </span>
-    );
+  // ── Derivados ──────────────────────────────────────────────────────────────
+  const sortedRows = useMemo(
+    () => [...rows].sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)),
+    [rows],
+  );
+  const visibleRows = sortedRows.filter((r) => tab === "all" || r.kind === tab).slice(0, 10);
+  const counts = {
+    all: rows.length,
+    po: rows.filter((r) => r.kind === "po").length,
+    invoice: rows.filter((r) => r.kind === "invoice").length,
   };
 
-  const getInvoiceBadge = (invoice: any) => {
-    const state = getInvoiceDisplayState(invoice);
-    const config: Record<string, { bg: string; text: string; label: string; icon?: string }> = {
-      draft:           { bg: "bg-slate-100",   text: "text-slate-600",  label: "Borrador" },
-      submitted:       { bg: "bg-purple-50",   text: "text-purple-700", label: "En sistema" },
-      approved:        { bg: "bg-emerald-50",  text: "text-emerald-700",label: "Aprobada" },
-      coded:           { bg: "bg-violet-50",   text: "text-violet-700", label: "Codificada" },
-      accounted:       { bg: "bg-teal-50",     text: "text-teal-700",   label: "Contabilizada" },
-      paid:            { bg: "bg-blue-50",     text: "text-blue-700",   label: "Pagada", icon: "💲" },
-      overdue:         { bg: "bg-red-50",      text: "text-red-700",    label: "Vencida" },
-      cancelled:       { bg: "bg-red-100",     text: "text-red-800",    label: "Anulada" },
-      void:            { bg: "bg-red-100",     text: "text-red-800",    label: "Anulada" },
-      rejected:        { bg: "bg-red-50",      text: "text-red-700",    label: "Rechazada" },
-      returned:        { bg: "bg-teal-50",     text: "text-teal-700",   label: "Devuelta" },
-      partial_return:  { bg: "bg-cyan-50",     text: "text-cyan-700",   label: "Dev. parcial" },
+  const flow = useMemo(() => {
+    const active = invoices.filter((i) => ACTIVE_INVOICE(i.state));
+    const sum = (list: InvoiceLite[], key: "base" | "total") => list.reduce((s, i) => s + i[key], 0);
+    const received = active.filter((i) => i.state === "submitted" || i.state === "overdue");
+    const approved = active.filter((i) => ["approved", "coded", "accounted"].includes(i.state));
+    const paid = active.filter((i) => i.state === "paid");
+    const weekEnd = endOfWeek();
+    const due = active
+      .filter((i) => i.state !== "paid" && i.dueDate && i.dueDate <= weekEnd)
+      .sort((a, b) => (a.dueDate!.getTime() - b.dueDate!.getTime()));
+    return {
+      steps: [
+        { label: "Recibidas", count: received.length, amount: sum(received, "base"), bar: "bg-slate-200" },
+        { label: "Aprobadas", count: approved.length, amount: sum(approved, "base"), bar: "bg-[#AEBDF5]" },
+        { label: "Pagadas", count: paid.length, amount: sum(paid, "base"), bar: "bg-[#2F52E0]" },
+      ],
+      due,
+      dueTotal: sum(due, "total"),
     };
-    const c = config[state] || config.submitted;
-    const struck = state === "cancelled" || state === "void";
-    return (
-      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${c.bg} ${c.text} ${struck ? "line-through" : ""}`}>
-        {c.icon && <span className="text-[10px]">{c.icon}</span>}
-        {struck && <span className="font-bold not-italic">✕</span>}
-        {c.label}
-      </span>
-    );
-  };
+  }, [invoices]);
 
-  const formatCurrency = (amount: number) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
-  const hasExtendedAccess = accountingAccessLevel === "accounting_extended";
+  if (loading) return <PageLoading />;
 
-  if (loading) {
-    return (
-      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
-      </div>
-    );
-  }
+  const showDocsAndConfig = role === "EP" || role === "PM" || role === "Controller";
+  const tableTitle =
+    profile === "accounting" ? "Movimientos recientes" : profile === "head" ? (department ? `Movimientos · ${department}` : "Movimientos del departamento") : "Mis documentos";
+  const thirdColumn = profile === "accounting" ? "Departamento" : profile === "head" ? "Solicitante" : "Cuenta";
+  const showBudget = profile === "accounting" && extended;
+  const showDue = profile === "accounting" && extended;
+  const showOpenPOs = profile !== "accounting";
+  const hasAside = showBudget || showDue || showOpenPOs;
+  const today = startOfToday();
 
   return (
-    <div className={`min-h-screen bg-white ${inter.className}`}>
-      {/* Header */}
-      <div className="mt-[53px]">
-        <div className="px-6 pt-8 sm:px-10">
-          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900">Panel de contabilidad</h1>
+    <Page>
+      <PageHeader
+        title="Panel de contabilidad"
+        actions={
+          <>
+            {isApprover && (
+              <Link
+                href={`/project/${id}/accounting/approvals`}
+                title="Aprobaciones"
+                aria-label="Aprobaciones"
+                className="relative flex h-9 w-9 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-[#F1F1F3] hover:text-slate-900"
+              >
+                <ClipboardCheck size={17} />
+                {pendingApprovals > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-500" />}
+              </Link>
+            )}
+            {showDocsAndConfig && (
+              <>
+                <Link href={`/project/${id}/accounting/document-center`} title="Documentos" aria-label="Documentos" className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-[#F1F1F3] hover:text-slate-900">
+                  <FolderDown size={17} />
+                </Link>
+                <Link href={`/project/${id}/accounting/config`} title="Configuración" aria-label="Configuración" className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-[#F1F1F3] hover:text-slate-900">
+                  <Settings size={17} />
+                </Link>
+              </>
+            )}
+            <Link href={`/project/${id}/accounting/invoices/new`} className={buttonClass("secondary")}>
+              <Upload size={14} /> Subir factura
+            </Link>
+            <Link href={`/project/${id}/accounting/pos/new`} className={buttonClass("primary")}>
+              <Plus size={14} /> Nueva PO
+            </Link>
+          </>
+        }
+      />
 
-            {/* Iconos top-right */}
-            <div className="absolute right-0 flex items-center gap-1">
-              {isApprover && (
+      <div className={`mt-7 grid items-start gap-7 text-[13px] text-slate-900 ${hasAside ? "xl:grid-cols-[minmax(0,1fr)_360px]" : ""}`}>
+        {/* ── Columna principal ─────────────────────────────────────────── */}
+        <div className="flex min-w-0 flex-col gap-7">
+          {profile === "accounting" && (
+            <section aria-labelledby="flow-title" className="flex flex-col gap-2.5">
+              <h2 id="flow-title" className="text-xs font-medium text-slate-500">Circuito de facturas</h2>
+              <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-slate-200 md:grid-cols-4">
+                {flow.steps.map((s, i) => (
+                  <Link
+                    key={s.label}
+                    href={`/project/${id}/accounting/invoices`}
+                    className="relative flex flex-col gap-1 border-b border-r border-slate-100 px-4 py-3.5 transition-colors hover:bg-[#FAFAFA] md:border-b-0"
+                  >
+                    <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-slate-500">
+                      <span className="font-mono">{String(i + 1).padStart(2, "0")}</span>
+                      {s.label}
+                    </span>
+                    <span className="text-lg font-semibold tabular-nums text-slate-900">{s.count}</span>
+                    <span className="font-mono text-xs text-slate-600">{money(s.amount)}</span>
+                    <span className={`absolute inset-x-0 bottom-0 h-0.5 ${s.bar}`} />
+                  </Link>
+                ))}
                 <Link
-                  href={`/project/${id}/accounting/approvals`}
-                  className="relative p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
-                  title="Aprobaciones"
+                  href={`/project/${id}/accounting/payments`}
+                  className="relative flex flex-col gap-1 bg-[#FEF7F7] px-4 py-3.5 transition-colors hover:bg-[#FDEFEF]"
                 >
-                  <ClipboardCheck size={18} />
-                  {pendingApprovalsCount > 0 && (
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-500 rounded-full" />
-                  )}
+                  <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-red-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                    Vencen esta semana
+                  </span>
+                  <span className="text-lg font-semibold tabular-nums text-slate-900">{flow.due.length}</span>
+                  <span className="font-mono text-xs text-slate-600">{money(flow.dueTotal)}</span>
+                  <span className="absolute inset-x-0 bottom-0 h-0.5 bg-red-500" />
                 </Link>
-              )}
-              {(userRole === "EP" || userRole === "PM" || userRole === "Controller") && (
-                <>
-                  <Link
-                    href={`/project/${id}/accounting/document-center`}
-                    className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
-                    title="Documentos"
+              </div>
+            </section>
+          )}
+
+          <section aria-labelledby="rows-title" className="flex flex-col gap-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 id="rows-title" className="text-xs font-medium text-slate-500">{tableTitle}</h2>
+              <div role="tablist" aria-label="Filtrar movimientos" className="flex gap-0.5 rounded-md bg-[#F4F4F5] p-0.5">
+                {([["all", "Todo"], ["po", "POs"], ["invoice", "Facturas"]] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === key}
+                    onClick={() => setTab(key)}
+                    className={`flex h-7 items-center gap-1.5 rounded-[5px] px-2.5 text-xs transition-colors ${
+                      tab === key ? "bg-white font-medium text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                    }`}
                   >
-                    <FolderDown size={18} />
-                  </Link>
-                  <Link
-                    href={`/project/${id}/accounting/config`}
-                    className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
-                    title="Configuración"
-                  >
-                    <Settings size={18} />
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <main className="px-6 sm:px-10 py-8">
-        {/* Pending Approvals Alert */}
-        {pendingApprovalsCount > 0 && (
-          <Link href={`/project/${id}/accounting/approvals`}>
-            <div className="mb-8 bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg p-5 cursor-pointer hover:shadow-lg transition-shadow">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-md flex items-center justify-center">
-                    <Clock size={24} className="text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">{pendingApprovalsCount} {pendingApprovalsCount === 1 ? "documento pendiente" : "documentos pendientes"} de tu aprobación</h3>
-                    <p className="text-white/80 text-[13px]">Revisa y aprueba para continuar el flujo</p>
-                  </div>
-                </div>
-                <ArrowRight size={24} className="text-white/80" />
-              </div>
-            </div>
-          </Link>
-        )}
-
-        {/* Recent Activity */}
-        <div className="flex flex-row gap-6 items-start">
-          {/* Recent POs */}
-          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm flex-1 max-w-[50%]">
-            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <h3 className="font-semibold text-slate-900">POs</h3>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Link 
-                  href={`/project/${id}/accounting/pos/new`} 
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                >
-                  <Plus size={16} />
-                </Link>
-                <Link 
-                  href={`/project/${id}/accounting/pos`} 
-                  className="text-xs font-medium flex items-center gap-0.5 px-2 py-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-                >
-                  Ver todas <ChevronRight size={12} />
-                </Link>
+                    {label}
+                    <span className="tabular-nums text-slate-500">{counts[key]}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div className="p-5">
-              {recentPOs.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="hidden">
-                    <FileText size={24} className="text-slate-400" />
-                  </div>
-                  <p className="text-[13px] text-slate-500">Sin órdenes de compra</p>
-                </div>
+            <div className="overflow-x-auto rounded-lg border border-slate-200">
+              {visibleRows.length === 0 ? (
+                <p className="px-4 py-12 text-center text-[13px] text-slate-500">Sin movimientos</p>
               ) : (
-                <div className="space-y-2">
-                  {recentPOs.map((po) => (
-                    <Link key={po.id} href={`/project/${id}/accounting/pos/${po.id}`} className="block">
-                      <div className={`flex items-center justify-between px-3 py-3 rounded-md transition-colors cursor-pointer group border ${po.status === "cancelled" ? "bg-red-50/40 border-red-100 opacity-60 hover:opacity-80" : "bg-slate-50 hover:bg-slate-100 border-transparent hover:border-slate-200"}`}>
-                        <div className="flex-1 min-w-0 mr-3">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <span className={`text-[13px] font-semibold font-mono ${po.status === "cancelled" ? "line-through text-slate-400" : "text-slate-900"}`}>PO-{po.number}</span>
-                            <span className="text-slate-300">/</span>
-                            <span className="text-[13px] font-medium text-slate-700 truncate">{po.supplier || "Sin proveedor"}</span>
-                          </div>
-                          {po.description && (
-                            <p className="text-xs text-slate-500 truncate">{po.description}</p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          <div className="text-right">
-                            <p className="text-[13px] font-semibold text-slate-900">{formatCurrency(po.baseAmount)} €</p>
-                            {getStatusBadge(po.status)}
-                          </div>
-                          <ChevronRight size={16} className="text-slate-300 group-hover:text-[#2F52E0] transition-colors" />
-                        </div>
+                <table className="w-full min-w-[760px] border-collapse text-[13px]">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
+                      <th scope="col" className="px-4 py-2 text-left font-medium">Nº</th>
+                      <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor</th>
+                      <th scope="col" className="px-3 py-2 text-left font-medium">{thirdColumn}</th>
+                      <th scope="col" className="px-3 py-2 text-right font-medium">Base</th>
+                      <th scope="col" className="px-3 py-2 text-left font-medium">Estado</th>
+                      <th scope="col" className="px-4 py-2 text-right font-medium">Fecha</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleRows.map((r) => {
+                      const st = STATES[r.state] || STATES.draft;
+                      const href = `/project/${id}/accounting/${r.kind === "po" ? "pos" : "invoices"}/${r.id}`;
+                      const third = profile === "accounting" ? r.department : profile === "head" ? r.requester : r.account;
+                      return (
+                        <tr key={`${r.kind}-${r.id}`} className="border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA]">
+                          <td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs font-medium">
+                            <Link href={href} className="hover:underline">{r.number}</Link>
+                          </td>
+                          <td className="max-w-[320px] px-3 py-2.5">
+                            <Link href={href} className="block">
+                              <span className="block truncate font-medium text-slate-900">{r.supplier}</span>
+                              {r.concept && <span className="block truncate text-xs text-slate-500">{r.concept}</span>}
+                            </Link>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{third || "—"}</td>
+                          <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-xs">{money(r.base)}</td>
+                          <td className="whitespace-nowrap px-3 py-2.5">
+                            <span className={`inline-flex items-center gap-1.5 text-xs ${st.text}`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />
+                              {st.label}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-500">{shortDate(r.createdAt)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+              <div className="flex gap-4 border-t border-slate-100 px-4 py-2.5 text-xs text-slate-600">
+                <Link href={`/project/${id}/accounting/pos`} className="hover:text-slate-900">Ver POs →</Link>
+                <Link href={`/project/${id}/accounting/invoices`} className="hover:text-slate-900">Ver facturas →</Link>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        {/* ── Columna lateral ───────────────────────────────────────────── */}
+        {hasAside && (
+          <aside className="flex min-w-0 flex-col gap-7">
+            {showBudget && (
+              <section aria-labelledby="budget-title" className="flex flex-col gap-2.5">
+                <div className="flex items-baseline justify-between">
+                  <h2 id="budget-title" className="text-xs font-medium text-slate-500">Presupuesto</h2>
+                  <Link href={`/project/${id}/accounting/budget`} className="text-xs text-slate-600 hover:text-slate-900">Detalle →</Link>
+                </div>
+                {!budget || budget.budgeted === 0 ? (
+                  <p className="rounded-lg border border-dashed border-slate-200 px-4 py-10 text-center text-[13px] text-slate-500">Sin presupuesto</p>
+                ) : (
+                  <div className="flex flex-col gap-3.5 rounded-lg border border-slate-200 p-4">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xl font-semibold tabular-nums tracking-tight">{money(budget.budgeted, 0)}</span>
+                        <span className="text-xs text-slate-500">total</span>
                       </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Recent Invoices */}
-          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm flex-1 max-w-[50%]">
-            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <h3 className="font-semibold text-slate-900">Facturas</h3>
-              </div>
-              <div className="flex items-center gap-1.5">
-                {hasExtendedAccess && (
-                  <Link 
-                    href={`/project/${id}/accounting/payments`} 
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors" 
-                    title="Pagos"
-                  >
-                    <Banknote size={16} />
-                  </Link>
-                )}
-                <Link 
-                  href={`/project/${id}/accounting/invoices/new`} 
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                >
-                  <Upload size={16} />
-                </Link>
-                <Link 
-                  href={`/project/${id}/accounting/invoices`} 
-                  className="text-xs font-medium flex items-center gap-0.5 px-2 py-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-                >
-                  Ver todas <ChevronRight size={12} />
-                </Link>
-              </div>
-            </div>
-
-            <div className="p-5">
-              {recentInvoices.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="hidden">
-                    <Receipt size={24} className="text-slate-400" />
+                      <div aria-hidden="true" className="flex h-1.5 overflow-hidden rounded-full bg-[#F1F1F3]">
+                        <span className="bg-[#2F52E0]" style={{ width: `${Math.min(100, pct(budget.actual, budget.budgeted))}%` }} />
+                        <span className="bg-[#AEBDF5]" style={{ width: `${Math.min(100 - Math.min(100, pct(budget.actual, budget.budgeted)), pct(budget.committed, budget.budgeted))}%` }} />
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-sm bg-[#2F52E0]" />Realizado
+                          <b className="font-medium tabular-nums text-slate-900">{money(budget.actual, 0)}</b>
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-sm bg-[#AEBDF5]" />Comprometido
+                          <b className="font-medium tabular-nums text-slate-900">{money(budget.committed, 0)}</b>
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col border-t border-slate-100 pt-1.5">
+                      {budget.lines.map((l) => {
+                        const p = pct(l.executed, l.budgeted);
+                        const tone = p > 100 ? "over" : p >= 90 ? "warn" : "ok";
+                        return (
+                          <Link
+                            key={l.code}
+                            href={`/project/${id}/accounting/budget`}
+                            className="grid grid-cols-[40px_minmax(0,1fr)_44px] items-center gap-x-2 gap-y-1.5 rounded-md px-1 py-2 hover:bg-[#FAFAFA]"
+                          >
+                            <span className="font-mono text-[11px] text-slate-500">{l.code}</span>
+                            <span className="truncate">{l.name}</span>
+                            <span className={`text-right text-xs font-medium tabular-nums ${tone === "over" ? "text-red-700" : tone === "warn" ? "text-amber-800" : "text-slate-900"}`}>{p} %</span>
+                            <span />
+                            <span aria-hidden="true" className="flex h-[3px] overflow-hidden rounded-full bg-[#F1F1F3]">
+                              <span className={tone === "over" ? "bg-red-600" : tone === "warn" ? "bg-amber-600" : "bg-[#2F52E0]"} style={{ width: `${Math.min(100, p)}%` }} />
+                            </span>
+                            <span />
+                          </Link>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <p className="text-[13px] text-slate-500">Sin facturas</p>
+                )}
+              </section>
+            )}
+
+            {showOpenPOs && (
+              <section aria-labelledby="open-title" className="flex flex-col gap-2.5">
+                <div className="flex items-baseline justify-between">
+                  <h2 id="open-title" className="text-xs font-medium text-slate-500">
+                    {profile === "head" ? "POs abiertas del departamento" : "Mis POs abiertas"}
+                  </h2>
+                  <Link href={`/project/${id}/accounting/pos`} className="text-xs text-slate-600 hover:text-slate-900">Ver todas →</Link>
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  {recentInvoices.map((invoice) => {
-                    const isOverdue = getInvoiceDisplayState(invoice) === "overdue";
-                    return (
-                      <Link key={invoice.id} href={`/project/${id}/accounting/invoices/${invoice.id}`} className="block">
-                        <div className={`flex items-center justify-between px-3 py-3 rounded-md transition-colors cursor-pointer group border ${["cancelled","void","rejected"].includes(invoice.status) ? "bg-red-50/40 border-red-100 opacity-60 hover:opacity-80" : "bg-slate-50 hover:bg-slate-100 border-transparent hover:border-slate-200"}`}>
-                          <div className="flex-1 min-w-0 mr-3">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <span className={`text-[13px] font-semibold font-mono ${["cancelled","void"].includes(invoice.status) ? "line-through text-slate-400" : "text-slate-900"}`}>{invoice.displayNumber}</span>
-                              {isOverdue && <AlertCircle size={12} className="text-red-500" />}
-                              <span className="text-slate-300">/</span>
-                              <span className="text-[13px] font-medium text-slate-700 truncate">{invoice.supplier || "Sin proveedor"}</span>
-                            </div>
-                            {invoice.description && (
-                              <p className="text-xs text-slate-500 truncate">{invoice.description}</p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            <div className="text-right">
-                              <p className="text-[13px] font-semibold text-slate-900">{formatCurrency(invoice.baseAmount)} €</p>
-                              {getInvoiceBadge(invoice)}
-                            </div>
-                            <ChevronRight size={16} className="text-slate-300 group-hover:text-[#2F52E0] transition-colors" />
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
+                {openPOs.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-slate-200 px-4 py-10 text-center text-[13px] text-slate-500">Sin POs abiertas</p>
+                ) : (
+                  <div className="overflow-hidden rounded-lg border border-slate-200">
+                    {openPOs.slice(0, 6).map((po) => {
+                      const p = pct(po.invoiced, po.base);
+                      const warn = p >= 90;
+                      return (
+                        <Link key={po.id} href={`/project/${id}/accounting/pos/${po.id}`} className="flex flex-col gap-1.5 border-b border-slate-100 px-3.5 py-3 last:border-0 hover:bg-[#FAFAFA]">
+                          <span className="flex items-baseline justify-between gap-2.5">
+                            <span className="flex min-w-0 items-baseline gap-2">
+                              <span className="font-mono text-xs font-medium">{po.number}</span>
+                              <span className="truncate">{po.supplier}</span>
+                            </span>
+                            <span className="whitespace-nowrap font-mono text-xs">{money(po.base)}</span>
+                          </span>
+                          <span aria-hidden="true" className="flex h-[3px] overflow-hidden rounded-full bg-[#F1F1F3]">
+                            <span className={warn ? "bg-amber-600" : "bg-[#2F52E0]"} style={{ width: `${Math.min(100, p)}%` }} />
+                          </span>
+                          <span className="flex justify-between text-xs text-slate-500">
+                            <span>Facturado {money(po.invoiced)}</span>
+                            <span className={warn ? "text-amber-800" : ""}>Disponible {money(Math.max(0, po.base - po.invoiced))}</span>
+                          </span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {showDue && (
+              <section aria-labelledby="due-title" className="flex flex-col gap-2.5">
+                <div className="flex items-baseline justify-between">
+                  <h2 id="due-title" className="text-xs font-medium text-slate-500">Próximos vencimientos</h2>
+                  <Link href={`/project/${id}/accounting/payments`} className="text-xs text-slate-600 hover:text-slate-900">Pagos →</Link>
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
+                {flow.due.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-slate-200 px-4 py-10 text-center text-[13px] text-slate-500">Nada vence esta semana</p>
+                ) : (
+                  <div className="overflow-hidden rounded-lg border border-slate-200">
+                    {flow.due.slice(0, 6).map((inv) => {
+                      const late = !!inv.dueDate && inv.dueDate < today;
+                      return (
+                        <Link key={inv.id} href={`/project/${id}/accounting/invoices/${inv.id}`} className="grid grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-2.5 border-b border-slate-100 px-3.5 py-2.5 hover:bg-[#FAFAFA]">
+                          <span className={`text-xs font-medium tabular-nums ${late ? "text-red-700" : "text-slate-900"}`}>{late ? "Vencida" : shortDate(inv.dueDate)}</span>
+                          <span className="truncate">{inv.supplier}</span>
+                          <span className="font-mono text-xs">{money(inv.total)}</span>
+                        </Link>
+                      );
+                    })}
+                    <div className="flex justify-between bg-[#FAFAFA] px-3.5 py-2.5 text-xs text-slate-600">
+                      <span>Total esta semana</span>
+                      <span className="font-mono font-medium text-slate-900">{money(flow.dueTotal)}</span>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+          </aside>
+        )}
+      </div>
+    </Page>
   );
 }
