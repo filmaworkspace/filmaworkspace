@@ -58,6 +58,11 @@ export interface CashMovement {
   advanceId?: string;          // justificaciones, devoluciones y reembolsos
   attachmentUrl?: string;
   attachmentFileName?: string;
+  /** Reposición pedida a tesorería que aún no ha llegado a la caja. */
+  pendingFunding?: boolean;
+  forecastId?: string;
+  forecastName?: string;
+  treasuryPaidAt?: any;
   status: CashMovementStatus;
   createdAt: Date | null;
   createdByName?: string;
@@ -89,7 +94,8 @@ export const MOVEMENT_LABEL: Record<CashMovementType, string> = {
 };
 
 /** Efecto del movimiento sobre el efectivo de la caja (+ entra, − sale). */
-export function cashEffect(m: Pick<CashMovement, "type" | "amount">): number {
+export function cashEffect(m: Pick<CashMovement, "type" | "amount" | "pendingFunding">): number {
+  if (m.pendingFunding) return 0; // aún no ha entrado en la caja
   switch (m.type) {
     case "funding":
     case "return":

@@ -67,6 +67,7 @@ const PAYMENT_TYPES = {
   budget: { label: "Presupuesto", icon: Wallet, bgColor: "bg-amber-50", textColor: "text-amber-600" },
   deposit: { label: "Depósito", icon: PiggyBank, bgColor: "bg-[#F7F7F8]", textColor: "text-slate-700" },
   guarantee: { label: "Fianza", icon: Shield, bgColor: "bg-slate-100", textColor: "text-slate-600" },
+  cash_funding: { label: "Reposición de caja", icon: Wallet, bgColor: "bg-[#F7F7F8]", textColor: "text-slate-700" },
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -272,6 +273,15 @@ export default function PaymentPayPage() {
           newPendingItems.push(newItem);
         }
         
+        // Reposición de caja de efectivo: tesorería ya ha pagado; el cajero
+        // confirmará la recepción desde Cajas › Efectivo.
+        if ((item as any).cashMovementId && !isPartialPayment) {
+          await updateDoc(doc(db, `projects/${id}/cashMovements`, (item as any).cashMovementId), {
+            treasuryPaidAt: Timestamp.now(),
+            treasuryPaidByName: permissions.userName,
+          });
+        }
+
         // Update invoice status and handle budget realization
         if (item.invoiceId) {
           const newStatus = isPartialPayment ? "partial_paid" : "paid";

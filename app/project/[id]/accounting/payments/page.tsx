@@ -81,6 +81,7 @@ const PAYMENT_TYPES = {
   budget: { label: "Pago de presupuesto", icon: Wallet, color: "amber" },
   deposit: { label: "Pago de depósito", icon: PiggyBank, color: "indigo" },
   guarantee: { label: "Pago de fianza", icon: Shield, color: "slate" },
+  cash_funding: { label: "Reposición de caja", icon: Wallet, color: "slate" },
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────

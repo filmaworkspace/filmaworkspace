@@ -8,7 +8,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Plus, Paperclip, X } from "lucide-react";
 import {
-  addDoc, collection, doc, onSnapshot, orderBy, query, runTransaction, Timestamp, updateDoc, deleteDoc,
+  addDoc, collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, runTransaction, Timestamp, updateDoc, deleteDoc, where,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import jsPDF from "jspdf";
@@ -69,11 +69,17 @@ interface MovementForm {
   settleLeftover: "return" | "keep";
   file: File | null;
   printVoucher: boolean;
+  fundingSource: "now" | "treasury";
+  forecastId: string;
+  /** Tickets que llegan del enlace público: se adjuntan todos al movimiento. */
+  attachments: { url: string; name: string }[];
+  fromFormId: string;
 }
 
 const emptyForm = (kind: FormKind): MovementForm => ({
   kind, date: todayISO(), personName: "", personDepartment: "", supplier: "", supplierTaxId: "", documentType: "ticket",
   description: "", reference: "", amount: "", lines: [emptyLine()], advanceId: "", settleLeftover: "return", file: null, printVoucher: kind === "advance",
+  fundingSource: "now", forecastId: "", attachments: [], fromFormId: "",
 });
 
 const STATUS_LABEL: Record<string, { label: string; dot: string; text: string }> = {
@@ -107,6 +113,11 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
   const [countNotes, setCountNotes] = useState("");
   const [countAdjust, setCountAdjust] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<CashMovement | null>(null);
+  // Previsiones de pago en borrador (para pedir reposiciones a tesorería)
+  const [draftForecasts, setDraftForecasts] = useState<{ id: string; name: string; paymentDate: string }[] | null>(null);
+  // Enlaces públicos para que cada persona suba los tickets de su anticipo
+  const [ticketForms, setTicketForms] = useState<any[]>([]);
+  const [linkModal, setLinkModal] = useState<{ url: string; pin: string; personName: string; advanceNumber: string } | null>(null);
 
   // ── Datos en vivo ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -130,8 +141,23 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
     const u3 = onSnapshot(collection(db, `${base}/cashCounts`), (snap) => {
       setCounts(snap.docs.map((d) => ({ id: d.id, ...d.data(), createdAt: toDate(d.data().createdAt) }) as CashCount));
     });
-    return () => { u1(); u2(); u3(); };
+    const u4 = onSnapshot(
+      query(collection(db, "forms"), where("projectId", "==", projectId), where("type", "==", "cash_settlement")),
+      (snap) => setTicketForms(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      () => setTicketForms([]),
+    );
+    return () => { u1(); u2(); u3(); u4(); };
   }, [projectId]);
+
+  useEffect(() => {
+    if (form?.kind !== "funding" || draftForecasts !== null) return;
+    getDocs(query(collection(db, `projects/${projectId}/paymentForecasts`), where("status", "==", "draft")))
+      .then((snap) => setDraftForecasts(snap.docs.map((d) => ({
+        id: d.id, name: d.data().name || "Previsión",
+        paymentDate: d.data().paymentDate?.toDate ? d.data().paymentDate.toDate().toISOString().slice(0, 10) : "",
+      }))))
+      .catch(() => setDraftForecasts([])); // sin acceso a Pagos: solo efectivo recibido
+  }, [form?.kind, draftForecasts, projectId]);
 
   const current = floats.find((f) => f.id === floatId) || null;
   const floatMovements = useMemo(
@@ -258,7 +284,25 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
 
       if (form.kind === "funding") {
         if (amount <= 0) throw new Error("Indica el importe que entra en caja");
-        await createMovement({ ...base, type: "funding", amount, reference: form.reference.trim(), description: base.description || "Reposición de caja", ...att });
+        if (form.fundingSource === "treasury") {
+          const fc = draftForecasts?.find((f) => f.id === form.forecastId);
+          if (!fc) throw new Error("Elige la previsión de pago");
+          const { id: movId, number } = await createMovement({
+            ...base, type: "funding", amount, pendingFunding: true, forecastId: fc.id, forecastName: fc.name,
+            reference: form.reference.trim(), description: base.description || "Reposición de caja", ...att,
+          });
+          // Se añade como pago a la previsión: tesorería lo verá junto al resto.
+          const fRef = doc(db, `projects/${projectId}/paymentForecasts`, fc.id);
+          const fSnap = await getDoc(fRef);
+          const items = [...(fSnap.data()?.items || []), {
+            id: `cash_${movId}`, type: "cash_funding", cashMovementId: movId,
+            supplier: `${current.name} · ${current.custodianName}`, description: `${number} · ${base.description || "Reposición de caja"}`,
+            amount, addedBy: userId, addedByName: userName, addedAt: new Date(), status: "pending",
+          }];
+          await updateDoc(fRef, { items, totalAmount: items.reduce((t: number, i: any) => t + (i.partialAmount || i.amount || 0), 0) });
+        } else {
+          await createMovement({ ...base, type: "funding", amount, reference: form.reference.trim(), description: base.description || "Reposición de caja", ...att });
+        }
       }
 
       if (form.kind === "advance") {
@@ -289,7 +333,9 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
           ...base, type: "settlement", amount: formTotals.total, advanceId: adv.id, personName: adv.personName, personDepartment: adv.personDepartment,
           supplier: form.supplier.trim(), supplierTaxId: form.supplierTaxId.trim().toUpperCase(), documentType: form.documentType,
           description: base.description || `Justificación de ${adv.number}`, lines: form.lines.filter((l) => l.baseAmount > 0), ...att,
-        });
+          ...(form.attachments.length ? { attachments: form.attachments, attachmentUrl: attachment?.url || form.attachments[0].url, attachmentFileName: attachment?.name || form.attachments[0].name } : {}),
+        } as any);
+        if (form.fromFormId) await updateDoc(doc(db, "forms", form.fromFormId), { importedAt: Timestamp.now(), importedByName: userName });
         const diff = round2(settleAdvance.outstanding - formTotals.total);
         if (diff > 0.004 && form.settleLeftover === "return") {
           await createMovement({ floatId: current.id, type: "return", date: form.date, amount: diff, advanceId: adv.id, personName: adv.personName, description: `Sobrante de ${adv.number}` });
@@ -312,6 +358,50 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
     } finally {
       setSaving(false);
     }
+  };
+
+  const formForAdvance = (advanceId: string) =>
+    ticketForms.filter((f) => f.advanceId === advanceId && !f.importedAt).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))[0];
+
+  const createTicketLink = async (a: CashMovement, outstanding: number) => {
+    try {
+      const existing = formForAdvance(a.id);
+      let id = existing?.id, pin = existing?.pin;
+      if (!existing || existing.status === "submitted") {
+        pin = String(Math.floor(1000 + Math.random() * 9000));
+        const expires = new Date(); expires.setDate(expires.getDate() + 30);
+        const refDoc = await addDoc(collection(db, "forms"), {
+          type: "cash_settlement", pin, status: "pending", projectId, projectName,
+          floatId: a.floatId, advanceId: a.id, advanceNumber: a.number, personName: a.personName, amount: outstanding,
+          createdBy: userId, createdByName: userName, createdAt: Timestamp.now(), expiresAt: Timestamp.fromDate(expires), prefilled: {},
+        });
+        id = refDoc.id;
+      }
+      setLinkModal({ url: `${window.location.origin}/caja/${id}`, pin: String(pin), personName: a.personName || "", advanceNumber: a.number });
+    } catch (e: any) { onToast("error", e?.message || "No se pudo crear el enlace"); }
+  };
+
+  const reviewTickets = (a: CashMovement, f: any) => {
+    const tickets: any[] = f.responseData?.tickets || [];
+    setForm({
+      ...emptyForm("settle"),
+      advanceId: a.id,
+      supplier: tickets.length === 1 ? tickets[0].supplier : "Varios",
+      date: tickets[tickets.length - 1]?.date || todayISO(),
+      description: `Tickets enviados por ${a.personName}`,
+      // El ticket trae el total; IVA a 0 % hasta que el cajero lo revise.
+      lines: tickets.map((t) => ({ ...emptyLine(), description: [t.supplier, t.description].filter(Boolean).join(" · "), baseAmount: t.amount, vatRate: 0, vatAmount: 0 })),
+      attachments: tickets.filter((t) => t.fileUrl).map((t) => ({ url: t.fileUrl, name: t.fileName || t.supplier || "ticket" })),
+      fromFormId: f.id,
+      printVoucher: false,
+    });
+  };
+
+  const confirmFunding = async (m: CashMovement) => {
+    try {
+      await updateDoc(doc(db, `projects/${projectId}/cashMovements`, m.id), { pendingFunding: false, receivedAt: Timestamp.now(), receivedByName: userName });
+      onToast("success", `${money(m.amount)} € recibidos en caja`);
+    } catch (e: any) { onToast("error", e?.message || "No se pudo confirmar"); }
   };
 
   const setStatus = async (m: CashMovement, status: CashMovement["status"]) => {
@@ -588,14 +678,21 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
                                 </td>
                                 <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs font-medium">{money(running)}</td>
                                 <td className="whitespace-nowrap px-3 py-1.5 text-xs">
-                                  {st ? <span className={`inline-flex items-center gap-1.5 ${st.text}`}><span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />{st.label}</span> : <span className="text-slate-400">—</span>}
+                                  {m.pendingFunding ? (
+                                    <span className="inline-flex items-center gap-1.5 text-amber-800" title={m.forecastName ? `Previsión: ${m.forecastName}` : undefined}>
+                                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />{m.treasuryPaidAt ? "Pagada por tesorería" : "Pedida a tesorería"}
+                                    </span>
+                                  ) : st ? <span className={`inline-flex items-center gap-1.5 ${st.text}`}><span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />{st.label}</span> : <span className="text-slate-400">—</span>}
                                   {isCostMovement(m) && !m.attachmentUrl && <span className="ml-1.5 text-red-700" title="Falta el ticket o la factura">· sin ticket</span>}
                                 </td>
                                 <td className="py-1.5 pr-3 text-right">
                                   <Menu trigger={(t) => <IconButton label="Acciones del movimiento" onClick={t} className="-my-1"><span className="text-base leading-none">⋯</span></IconButton>}>
                                     {(close) => (
                                       <>
-                                        {m.attachmentUrl && <MenuItem onClick={() => { close(); window.open(m.attachmentUrl, "_blank", "noopener"); }}>Ver justificante</MenuItem>}
+                                        {m.pendingFunding && <MenuItem onClick={() => { close(); confirmFunding(m); }}>Confirmar recepción del efectivo</MenuItem>}
+                                        {(m as any).attachments?.length > 1
+                                          ? (m as any).attachments.map((a: any, i: number) => <MenuItem key={i} onClick={() => { close(); window.open(a.url, "_blank", "noopener"); }}>Ver ticket {i + 1}</MenuItem>)
+                                          : m.attachmentUrl && <MenuItem onClick={() => { close(); window.open(m.attachmentUrl, "_blank", "noopener"); }}>Ver justificante</MenuItem>}
                                         {isCostMovement(m) && (
                                           <label className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-slate-600 hover:bg-[#F7F7F8] hover:text-slate-900">
                                             {m.attachmentUrl ? "Cambiar justificante" : "Adjuntar justificante"}
@@ -660,12 +757,44 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
                                   <button onClick={() => openForm("settle", { advanceId: a.id })} className="font-medium text-slate-900 hover:underline">Justificar</button>
                                 </span>
                               </div>
+                              <div className="flex items-center justify-between gap-2 text-xs">
+                                {(() => {
+                                  const f = formForAdvance(a.id);
+                                  if (f?.status === "submitted") return (
+                                    <button onClick={() => reviewTickets(a, f)} className="inline-flex items-center gap-1.5 font-medium text-slate-900 hover:underline">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />{f.responseData?.tickets?.length || 0} tickets recibidos · revisar
+                                    </button>
+                                  );
+                                  return (
+                                    <button onClick={() => createTicketLink(a, outstanding)} className="text-slate-500 hover:text-slate-900">
+                                      {f ? "Enlace enviado · ver" : "Pedir tickets por enlace"}
+                                    </button>
+                                  );
+                                })()}
+                              </div>
                             </div>
                           );
                         })}
                       </div>
                     )}
                   </section>
+
+                  {floatMovements.some((m) => m.pendingFunding) && (
+                    <section className="flex flex-col gap-2">
+                      <h3 className="text-xs font-medium text-slate-500">Reposiciones en camino</h3>
+                      <div className="overflow-hidden rounded-lg border border-slate-200">
+                        {floatMovements.filter((m) => m.pendingFunding).map((m) => (
+                          <div key={m.id} className="flex items-center justify-between gap-2 border-b border-slate-100 px-3.5 py-2.5 text-xs last:border-0">
+                            <span className="min-w-0">
+                              <span className="block font-mono font-medium text-slate-900">{money(m.amount)} €</span>
+                              <span className="block truncate text-slate-500">{m.forecastName} · {m.treasuryPaidAt ? "pagada por tesorería" : "pendiente de pago"}</span>
+                            </span>
+                            <button onClick={() => confirmFunding(m)} className="flex-shrink-0 font-medium text-slate-900 hover:underline">Recibida</button>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
 
                   <section className="flex flex-col gap-2">
                     <h3 className="text-xs font-medium text-slate-500">Arqueos</h3>
@@ -788,7 +917,25 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
             </div>
 
             {form.kind === "funding" && (
-              <Field label="Referencia"><Input value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} placeholder="Cheque, retirada de cajero, transferencia…" /></Field>
+              <>
+                {!!draftForecasts?.length && (
+                  <Segmented
+                    value={form.fundingSource}
+                    onChange={(v) => setForm({ ...form, fundingSource: v, forecastId: form.forecastId || draftForecasts[0]?.id || "" })}
+                    options={[{ value: "now", label: "Ya tengo el efectivo" }, { value: "treasury", label: "Pedir a tesorería" }]}
+                  />
+                )}
+                {form.fundingSource === "treasury" ? (
+                  <Field label="Previsión de pago">
+                    <Select value={form.forecastId} onChange={(e) => setForm({ ...form, forecastId: e.target.value })}>
+                      {(draftForecasts || []).map((f) => <option key={f.id} value={f.id}>{f.name}{f.paymentDate ? ` · ${shortDate(f.paymentDate)}` : ""}</option>)}
+                    </Select>
+                  </Field>
+                ) : (
+                  <Field label="Referencia"><Input value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} placeholder="Cheque, retirada de cajero, transferencia…" /></Field>
+                )}
+                {form.fundingSource === "treasury" && <p className="text-xs text-slate-500">Se añade a la previsión como pago. El saldo no cambia hasta que confirmes que has recibido el efectivo.</p>}
+              </>
             )}
 
             <Field label="Concepto"><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
@@ -811,6 +958,11 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
               );
             })()}
 
+            {form.attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 text-xs">
+                {form.attachments.map((a, i) => <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" className="rounded border border-slate-200 px-2 py-1 text-slate-700 hover:border-slate-300">Ticket {i + 1} ↗</a>)}
+              </div>
+            )}
             {form.kind !== "return" && fileInput}
             {form.kind === "advance" && <Checkbox label="Descargar vale en PDF para firmar" checked={form.printVoucher} onChange={(v) => setForm({ ...form, printVoucher: v })} />}
           </div>
@@ -850,6 +1002,34 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
           )}
           <Field label="Notas"><Input value={countNotes} onChange={(e) => setCountNotes(e.target.value)} placeholder="Opcional" /></Field>
         </div>
+      </Modal>
+
+      <Modal
+        open={!!linkModal}
+        onClose={() => setLinkModal(null)}
+        title="Enlace para subir tickets"
+        footer={<Button variant="primary" onClick={() => setLinkModal(null)}>Listo</Button>}
+      >
+        {linkModal && (
+          <div className="flex flex-col gap-4 text-[13px]">
+            <p className="text-slate-600">{linkModal.personName} podrá hacer foto a sus tickets desde el móvil para justificar <span className="font-mono">{linkModal.advanceNumber}</span>. Te avisará aquí cuando los envíe.</p>
+            <div className="flex items-center gap-2">
+              <Input value={linkModal.url} readOnly className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
+              <Button variant="secondary" onClick={() => { navigator.clipboard?.writeText(linkModal.url); onToast("success", "Enlace copiado"); }}>Copiar</Button>
+            </div>
+            <div className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2">
+              <span className="text-slate-600">PIN</span>
+              <span className="font-mono text-lg tracking-[0.3em]">{linkModal.pin}</span>
+            </div>
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(`Hola ${linkModal.personName}, sube aquí los tickets del anticipo ${linkModal.advanceNumber}: ${linkModal.url} (PIN ${linkModal.pin})`)}`}
+              target="_blank" rel="noopener noreferrer"
+              className="text-xs font-medium text-slate-900 hover:underline"
+            >
+              Enviar por WhatsApp ↗
+            </a>
+          </div>
+        )}
       </Modal>
 
       <Modal
