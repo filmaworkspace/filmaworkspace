@@ -821,20 +821,25 @@ export default function SuppliersPage() {
         )}
       </div>
 
-      {/* Create/Edit Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4" onClick={() => { setShowModal(false); resetForm(); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-[14px] font-semibold text-slate-900">{modalMode === "create" ? "Nuevo proveedor" : "Editar proveedor"}</h2>
-              <button onClick={() => { setShowModal(false); resetForm(); }} className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"><X size={18} /></button>
-            </div>
-
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+      {/* Alta / edición de proveedor */}
+      <Modal
+        open={showModal}
+        onClose={() => { setShowModal(false); resetForm(); }}
+        title={modalMode === "create" ? "Nuevo proveedor" : "Editar proveedor"}
+        width="max-w-3xl"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => { setShowModal(false); resetForm(); }}>Cancelar</Button>
+            <Button variant="primary" onClick={modalMode === "create" ? handleCreateSupplier : handleUpdateSupplier} disabled={saving}>
+              {saving ? "Guardando…" : modalMode === "create" ? "Crear proveedor" : "Guardar cambios"}
+            </Button>
+          </>
+        }
+      >
               <div className="space-y-6">
                 {/* Información básica */}
                 <div>
-                  <h3 className="mb-3 text-xs font-medium text-slate-500">Información básica</h3>
+                  <h3 className="mb-3 text-[13px] font-semibold text-slate-900">Información básica</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre fiscal *</label>
@@ -861,7 +866,7 @@ export default function SuppliersPage() {
 
                 {/* Persona de contacto */}
                 <div>
-                  <h3 className="mb-3 text-xs font-medium text-slate-500">Persona de contacto</h3>
+                  <h3 className="mb-3 text-[13px] font-semibold text-slate-900">Persona de contacto</h3>
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre</label>
@@ -889,7 +894,7 @@ export default function SuppliersPage() {
 
                 {/* Dirección */}
                 <div>
-                  <h3 className="mb-3 text-xs font-medium text-slate-500">Dirección</h3>
+                  <h3 className="mb-3 text-[13px] font-semibold text-slate-900">Dirección</h3>
                   <div className="grid grid-cols-3 gap-4">
                     <div className="col-span-2">
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Calle</label>
@@ -916,7 +921,7 @@ export default function SuppliersPage() {
 
                 {/* Información de pago */}
                 <div>
-                  <h3 className="mb-3 text-xs font-medium text-slate-500">Información de pago</h3>
+                  <h3 className="mb-3 text-[13px] font-semibold text-slate-900">Información de pago</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Método de pago</label>
@@ -942,7 +947,7 @@ export default function SuppliersPage() {
 
                 {/* Certificados */}
                 <div>
-                  <h3 className="mb-3 text-xs font-medium text-slate-500">Certificados</h3>
+                  <h3 className="mb-3 text-[13px] font-semibold text-slate-900">Certificados</h3>
                   <div className="space-y-4">
                     {/* Bank Ownership Certificate */}
                     <div className="border border-slate-200 rounded-md p-4">
@@ -1008,19 +1013,7 @@ export default function SuppliersPage() {
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* Actions */}
-            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 bg-slate-50">
-              <button onClick={() => { setShowModal(false); resetForm(); }} className="px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-white font-medium transition-colors text-[13px]">Cancelar</button>
-              <button onClick={modalMode === "create" ? handleCreateSupplier : handleUpdateSupplier} disabled={saving} className="px-4 py-1.5 rounded-md font-medium transition-colors disabled:opacity-50 flex items-center gap-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] text-[13px]">
-                {saving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                {modalMode === "create" ? "Crear proveedor" : "Guardar cambios"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* Toast notifications */}
       {successMessage && (

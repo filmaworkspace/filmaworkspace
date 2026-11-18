@@ -2,7 +2,7 @@
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import CashBox from "@/components/box/CashBox";
-import { Button, EmptyState, IconButton, Input, Menu, MenuItem, MenuSeparator, Segmented } from "@/components/ds";
+import { Button, EmptyState, IconButton, Input, Menu, MenuItem, MenuSeparator, Modal, Segmented, buttonClass } from "@/components/ds";
 import SearchBar, { type SearchField } from "@/components/SearchBar";
 import { matchAmount, matchCode, matchWords } from "@/lib/search";
 import { useState, useEffect, useRef } from "react";
@@ -3188,15 +3188,23 @@ export default function BoxesPage() {
       {/* ═══════════════════════════════════════════════════════════════════════ */}
 
       {/* Create Box Modal */}
-      {showCreateBoxModal && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
-          onClick={() => setShowCreateBoxModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-[14px] font-semibold text-slate-900">Nueva caja</h3>
-              <button onClick={() => setShowCreateBoxModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-md"><X size={18} /></button>
-            </div>
-            <div className="p-6 space-y-4">
+            <Modal
+        open={!!(showCreateBoxModal)}
+        onClose={() => setShowCreateBoxModal(false)}
+        title={"Nueva caja"}
+        width="max-w-md"
+        footer={(showCreateBoxModal) ? <>
+<button onClick={() => setShowCreateBoxModal(false)} className={buttonClass("ghost")}>Cancelar</button>
+              <button onClick={handleCreateBox}
+                disabled={saving || !boxForm.name.trim() || !boxForm.code.trim() || boxes.some(b => b.code.toUpperCase() === boxForm.code.toUpperCase())}
+                className={buttonClass("primary")}>
+                {saving ? "Creando..." : "Crear caja"}
+              </button>
+        </> : undefined}
+        >
+        {(showCreateBoxModal) && (
+          <>
+<div className="space-y-4">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre del responsable *</label>
                 <input type="text" value={boxForm.name}
@@ -3243,28 +3251,27 @@ export default function BoxesPage() {
                 )}
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-              <button onClick={() => setShowCreateBoxModal(false)} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
-              <button onClick={handleCreateBox}
-                disabled={saving || !boxForm.name.trim() || !boxForm.code.trim() || boxes.some(b => b.code.toUpperCase() === boxForm.code.toUpperCase())}
-                className="px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
-                {saving ? "Creando..." : "Crear caja"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
       {/* Edit Box Modal */}
-      {showEditBoxModal && selectedBox && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
-          onClick={() => setShowEditBoxModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-[14px] font-semibold text-slate-900">Editar caja</h3>
-              <button onClick={() => setShowEditBoxModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-md"><X size={18} /></button>
-            </div>
-            <div className="p-6 space-y-4">
+            <Modal
+        open={!!(showEditBoxModal && selectedBox)}
+        onClose={() => setShowEditBoxModal(false)}
+        title={"Editar caja"}
+        width="max-w-md"
+        footer={(showEditBoxModal && selectedBox) ? <>
+<button onClick={() => setShowEditBoxModal(false)} className={buttonClass("ghost")}>Cancelar</button>
+              <button onClick={handleEditBox} disabled={saving || !editBoxForm.name.trim() || !editBoxForm.code.trim() || boxes.some(b => b.id !== selectedBox.id && b.code.toUpperCase() === editBoxForm.code.toUpperCase())}
+                className={buttonClass("primary")}>
+                {saving ? "Guardando..." : "Guardar"}
+              </button>
+        </> : undefined}
+        >
+        {(showEditBoxModal && selectedBox) && (
+          <>
+<div className="space-y-4">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre *</label>
                 <input type="text" value={editBoxForm.name}
@@ -3293,93 +3300,96 @@ export default function BoxesPage() {
                 })()}
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-              <button onClick={() => setShowEditBoxModal(false)} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
-              <button onClick={handleEditBox} disabled={saving || !editBoxForm.name.trim() || !editBoxForm.code.trim() || boxes.some(b => b.id !== selectedBox.id && b.code.toUpperCase() === editBoxForm.code.toUpperCase())}
-                className="px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
-                {saving ? "Guardando..." : "Guardar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
       {/* Delete Box Confirm */}
-      {showDeleteBoxModal && selectedBox && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
-          onClick={() => setShowDeleteBoxModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
-            <div className="p-6">
-              <div className="w-12 h-12 bg-red-50 rounded-md flex items-center justify-center mb-4"><AlertTriangle size={22} className="text-red-500" /></div>
-              <h3 className="text-lg font-semibold text-slate-900 mb-1">Eliminar caja</h3>
-              <p className="text-[13px] text-slate-500 mb-6">Se eliminará <strong>{selectedBox.name}</strong> y todos sus sobres y gastos pendientes.</p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowDeleteBoxModal(false)} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-50">Cancelar</button>
-                <button onClick={handleDeleteBox} disabled={saving} className="flex-1 px-4 py-2 bg-red-500 text-white rounded-md text-[13px] font-medium hover:bg-red-600 disabled:opacity-50">
+            <Modal
+        open={!!(showDeleteBoxModal && selectedBox)}
+        onClose={() => setShowDeleteBoxModal(false)}
+        title={"Eliminar caja"}
+        width="max-w-sm"
+        footer={(showDeleteBoxModal && selectedBox) ? <>
+<button onClick={() => setShowDeleteBoxModal(false)} className={buttonClass("secondary")}>Cancelar</button>
+                <button onClick={handleDeleteBox} disabled={saving} className={buttonClass("danger")}>
                   {saving ? "Eliminando..." : "Eliminar"}
                 </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+        </> : undefined}
+        >
+        {(showDeleteBoxModal && selectedBox) && (
+          <>
+<p className="text-[13px] text-slate-600">Se eliminará <strong>{selectedBox.name}</strong> y todos sus sobres y gastos pendientes.</p>
+          </>
+        )}
+      </Modal>
 
       {/* Create Envelope Modal */}
-      {showCreateEnvelopeModal && selectedBox && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
-          onClick={() => setShowCreateEnvelopeModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-[14px] font-semibold text-slate-900">Nuevo sobre</h3>
-              <button onClick={() => setShowCreateEnvelopeModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-md"><X size={18} /></button>
-            </div>
-            <div className="p-6 text-center py-8">
+            <Modal
+        open={!!(showCreateEnvelopeModal && selectedBox)}
+        onClose={() => setShowCreateEnvelopeModal(false)}
+        title={"Nuevo sobre"}
+        width="max-w-md"
+        footer={(showCreateEnvelopeModal && selectedBox) ? <>
+<button onClick={() => setShowCreateEnvelopeModal(false)} className={buttonClass("ghost")}>Cancelar</button>
+              <button onClick={handleCreateEnvelope} disabled={saving} className={buttonClass("primary")}>
+                {saving ? "Creando..." : "Crear sobre"}
+              </button>
+        </> : undefined}
+        >
+        {(showCreateEnvelopeModal && selectedBox) && (
+          <>
+<div className="">
               <p className="text-slate-900 font-medium mb-1">BOX-{selectedBox.code}{String(selectedBox.nextEnvelopeNumber || 1).padStart(3, "0")}</p>
               <p className="text-[13px] text-slate-500">Se creará un nuevo sobre para {selectedBox.name}</p>
             </div>
-            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-              <button onClick={() => setShowCreateEnvelopeModal(false)} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
-              <button onClick={handleCreateEnvelope} disabled={saving} className="px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
-                {saving ? "Creando..." : "Crear sobre"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
       {/* Delete Envelope Confirm */}
-      {showDeleteEnvelopeModal && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
-          onClick={() => setShowDeleteEnvelopeModal(null)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
-            <div className="p-6">
-              <div className="w-12 h-12 bg-red-50 rounded-md flex items-center justify-center mb-4"><AlertTriangle size={22} className="text-red-500" /></div>
-              <h3 className="text-lg font-semibold text-slate-900 mb-1">Eliminar sobre</h3>
-              <p className="text-[13px] text-slate-500 mb-6">Se eliminará <strong>{showDeleteEnvelopeModal.displayNumber}</strong> y todos sus gastos.</p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowDeleteEnvelopeModal(null)} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-50">Cancelar</button>
-                <button onClick={() => handleDeleteEnvelope(showDeleteEnvelopeModal)} disabled={saving} className="flex-1 px-4 py-2 bg-red-500 text-white rounded-md text-[13px] font-medium hover:bg-red-600 disabled:opacity-50">
+            <Modal
+        open={!!(showDeleteEnvelopeModal)}
+        onClose={() => setShowDeleteEnvelopeModal(null)}
+        title={"Eliminar sobre"}
+        width="max-w-sm"
+        footer={(showDeleteEnvelopeModal) ? <>
+<button onClick={() => setShowDeleteEnvelopeModal(null)} className={buttonClass("secondary")}>Cancelar</button>
+                <button onClick={() => handleDeleteEnvelope(showDeleteEnvelopeModal)} disabled={saving} className={buttonClass("danger")}>
                   {saving ? "Eliminando..." : "Eliminar"}
                 </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+        </> : undefined}
+        >
+        {(showDeleteEnvelopeModal) && (
+          <>
+<p className="text-[13px] text-slate-600">Se eliminará <strong>{showDeleteEnvelopeModal.displayNumber}</strong> y todos sus gastos.</p>
+          </>
+        )}
+      </Modal>
 
       {/* Manual Expense Modal */}
-      {showManualExpenseModal && selectedEnvelope && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
-          onClick={() => setShowManualExpenseModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-              <div>
-                <h3 className="text-[14px] font-semibold text-slate-900">Añadir gastos</h3>
-                <p className="text-[13px] text-slate-500">{selectedEnvelope.displayNumber} · {selectedBox?.name}</p>
+            <Modal
+        open={!!(showManualExpenseModal && selectedEnvelope)}
+        onClose={() => setShowManualExpenseModal(false)}
+        title={"Añadir gastos"}
+        width="max-w-5xl"
+        footer={(showManualExpenseModal && selectedEnvelope) ? <>
+<p className="text-[13px] text-slate-500">
+                {cardExpensesList.length > 0 && <>Total: <strong className="text-slate-900 font-mono">{fmt(cardExpensesList.reduce((s, e) => s + computeExpenseTotal(e).totalAmount, 0))} €</strong></>}
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setShowManualExpenseModal(false)} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
+                <button onClick={handleAddManualExpense} disabled={manualExpenseSaving}
+                  className={buttonClass("primary")}>
+                  {manualExpenseSaving ? "Guardando..." : <><Check size={15} /> Guardar gastos</>}
+                </button>
               </div>
-              <button onClick={() => setShowManualExpenseModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-md"><X size={18} /></button>
-            </div>
-            <div className="p-6 flex-1 overflow-y-auto space-y-6">
+        </> : undefined}
+        >
+        {(showManualExpenseModal && selectedEnvelope) && (
+          <>
+            <p className="-mt-1 mb-3 text-[13px] text-slate-500">{selectedEnvelope.displayNumber} · {selectedBox?.name}</p>
+<div className="flex-1 overflow-y-auto space-y-6">
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Gastos ({cardExpensesList.length})</p>
@@ -3520,35 +3530,42 @@ export default function BoxesPage() {
                 </div>
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
-              <p className="text-[13px] text-slate-500">
-                {cardExpensesList.length > 0 && <>Total: <strong className="text-slate-900 font-mono">{fmt(cardExpensesList.reduce((s, e) => s + computeExpenseTotal(e).totalAmount, 0))} €</strong></>}
-              </p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowManualExpenseModal(false)} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
-                <button onClick={handleAddManualExpense} disabled={manualExpenseSaving}
-                  className="px-3 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50 flex items-center gap-2">
-                  {manualExpenseSaving ? "Guardando..." : <><Check size={15} /> Guardar gastos</>}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
       {/* Import Excel Modal */}
-      {showImportModal && selectedEnvelope && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
-          onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-              <div>
-                <h3 className="text-[14px] font-semibold text-slate-900">Importar gastos</h3>
-                <p className="text-[13px] text-slate-500">Sube el Excel de gastos de tarjeta</p>
+            <Modal
+        open={!!(showImportModal && selectedEnvelope)}
+        onClose={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }}
+        title={"Importar gastos"}
+        width="max-w-3xl"
+        footer={(showImportModal && selectedEnvelope) ? <>
+<span className="text-[13px] text-slate-500">
+                {importPreview.length > 0 && (() => {
+                  const dupCount = importPreview.filter(exp => {
+                    if (expenses.some(e => e.pleoReceiptId === exp.pleoReceiptId)) return true;
+                    if (exp.type === "invoice" && exp.supplierTaxId && exp.supplierNumber)
+                      return expenses.some(e => e.type === "invoice" && e.supplierTaxId === exp.supplierTaxId && e.supplierNumber === exp.supplierNumber);
+                    return false;
+                  }).length;
+                  const newCount = importPreview.length - dupCount;
+                  return <><strong className="text-slate-900">{newCount}</strong> nuevos{dupCount > 0 && <> · <strong className="text-amber-600">{dupCount} duplicado{dupCount > 1 ? "s" : ""}</strong> (se omitirán)</>}</>;
+                })()}
+              </span>
+              <div className="flex gap-3">
+                <button onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
+                <button onClick={handleImportExpenses} disabled={importing || importPreview.length === 0}
+                  className={buttonClass("primary")}>
+                  {importing ? "Importando..." : `Importar ${importPreview.length - importPreview.filter(exp => expenses.some(e => e.pleoReceiptId === exp.pleoReceiptId)).length} gastos`}
+                </button>
               </div>
-              <button onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }} className="p-2 text-slate-400 hover:bg-slate-100 rounded-md"><X size={18} /></button>
-            </div>
-            <div className="p-6 flex-1 overflow-y-auto">
+        </> : undefined}
+        >
+        {(showImportModal && selectedEnvelope) && (
+          <>
+            <p className="-mt-1 mb-3 text-[13px] text-slate-500">Sube el Excel de gastos de tarjeta</p>
+<div className="flex-1 overflow-y-auto">
               {!importFile ? (
                 <div
                   onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
@@ -3643,30 +3660,9 @@ export default function BoxesPage() {
                 </div>
               )}
             </div>
-            <div className="px-6 py-4 border-t border-slate-200 flex justify-between items-center flex-shrink-0">
-              <span className="text-[13px] text-slate-500">
-                {importPreview.length > 0 && (() => {
-                  const dupCount = importPreview.filter(exp => {
-                    if (expenses.some(e => e.pleoReceiptId === exp.pleoReceiptId)) return true;
-                    if (exp.type === "invoice" && exp.supplierTaxId && exp.supplierNumber)
-                      return expenses.some(e => e.type === "invoice" && e.supplierTaxId === exp.supplierTaxId && e.supplierNumber === exp.supplierNumber);
-                    return false;
-                  }).length;
-                  const newCount = importPreview.length - dupCount;
-                  return <><strong className="text-slate-900">{newCount}</strong> nuevos{dupCount > 0 && <> · <strong className="text-amber-600">{dupCount} duplicado{dupCount > 1 ? "s" : ""}</strong> (se omitirán)</>}</>;
-                })()}
-              </span>
-              <div className="flex gap-3">
-                <button onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
-                <button onClick={handleImportExpenses} disabled={importing || importPreview.length === 0}
-                  className="px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
-                  {importing ? "Importando..." : `Importar ${importPreview.length - importPreview.filter(exp => expenses.some(e => e.pleoReceiptId === exp.pleoReceiptId)).length} gastos`}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
       {/* Receipt Import Modal */}
       {showReceiptImportModal && selectedEnvelope && (() => {
@@ -3681,17 +3677,18 @@ export default function BoxesPage() {
         const coveredIds = new Set(fileMatches.filter(m => m.expense).map(m => m.expense!.id));
         const missingDocs = envelopeExps.filter(e => !e.documentUrl && !coveredIds.has(e.id));
         return (
-          <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
-            onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }}>
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-xl flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 flex-shrink-0">
-                <div>
-                  <h3 className="text-[14px] font-semibold text-slate-900">Importar recibos</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Los archivos se emparejan por el ID Pleo en el nombre</p>
+          <Modal open onClose={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }} title={"Importar recibos"} width="max-w-xl" footer={<>
+<p className="text-xs text-slate-400">{envelopeExps.filter(e => !e.documentUrl).length} gastos sin documento</p>
+                <div className="flex gap-3">
+                  <button onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }} className={buttonClass("ghost")}>Cancelar</button>
+                  <button onClick={handleImportReceipts} disabled={uploadingReceipts || matched === 0}
+                    className={buttonClass("primary")}>
+                    {uploadingReceipts ? <><RotateCcw size={14} className="animate-spin" /> Subiendo...</> : <><Upload size={14} /> Vincular {matched} recibo{matched !== 1 ? "s" : ""}</>}
+                  </button>
                 </div>
-                <button onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }} className="p-2 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
-              </div>
-              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+</>}>
+<p className="-mt-1 mb-3 text-[13px] text-slate-500">Los archivos se emparejan por el ID Pleo en el nombre</p>
+<div className="flex-1 overflow-y-auto space-y-4">
                 <label className={`flex flex-col items-center justify-center gap-2 w-full py-8 border-2 border-dashed rounded-md cursor-pointer transition-colors ${receiptFiles.length > 0 ? "border-slate-200 bg-[#F7F7F8]" : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"}`}>
                   <FileText size={28} className={receiptFiles.length > 0 ? "text-slate-400" : "text-slate-300"} />
                   <div className="text-center">
@@ -3730,31 +3727,27 @@ export default function BoxesPage() {
                   </>
                 )}
               </div>
-              <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
-                <p className="text-xs text-slate-400">{envelopeExps.filter(e => !e.documentUrl).length} gastos sin documento</p>
-                <div className="flex gap-3">
-                  <button onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-200">Cancelar</button>
-                  <button onClick={handleImportReceipts} disabled={uploadingReceipts || matched === 0}
-                    className="flex items-center gap-2 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
-                    {uploadingReceipts ? <><RotateCcw size={14} className="animate-spin" /> Subiendo...</> : <><Upload size={14} /> Vincular {matched} recibo{matched !== 1 ? "s" : ""}</>}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+</Modal>
         );
       })()}
 
       {/* Create Transfer Envelope Modal */}
-      {showCreateTransferEnvelopeModal && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
-          onClick={() => setShowCreateTransferEnvelopeModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-visible" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-              <h3 className="text-[14px] font-semibold text-slate-900">Nuevo sobre de Petty Cash</h3>
-              <button onClick={() => setShowCreateTransferEnvelopeModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-md"><X size={18} /></button>
-            </div>
-            <div className="p-6 flex-1 space-y-5 overflow-visible">
+            <Modal
+        open={!!(showCreateTransferEnvelopeModal)}
+        onClose={() => setShowCreateTransferEnvelopeModal(false)}
+        title={"Nuevo sobre de Petty Cash"}
+        width="max-w-lg"
+        footer={(showCreateTransferEnvelopeModal) ? <>
+<button onClick={() => setShowCreateTransferEnvelopeModal(false)} className={buttonClass("ghost")}>Cancelar</button>
+              <button onClick={handleCreateTransferEnvelope} disabled={saving || !transferEnvelopeForm.personName.trim()}
+                className={buttonClass("primary")}>
+                {saving ? "Creando..." : "Crear sobre"}
+              </button>
+        </> : undefined}
+        >
+        {(showCreateTransferEnvelopeModal) && (
+          <>
+<div className="flex-1 space-y-5 overflow-visible">
               <div className="p-3 bg-slate-50 rounded-md text-center">
                 <p className="text-slate-900 font-medium">PC-{String(nextTransferNumber).padStart(3, "0")}</p>
               </div>
@@ -3796,50 +3789,54 @@ export default function BoxesPage() {
                   className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 resize-none text-[13px]" />
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 flex-shrink-0">
-              <button onClick={() => setShowCreateTransferEnvelopeModal(false)} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
-              <button onClick={handleCreateTransferEnvelope} disabled={saving || !transferEnvelopeForm.personName.trim()}
-                className="px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
-                {saving ? "Creando..." : "Crear sobre"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
       {/* Delete Transfer Envelope Confirm */}
-      {showDeleteTransferEnvelopeModal && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
-          onClick={() => setShowDeleteTransferEnvelopeModal(null)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
-            <div className="p-6">
-              <div className="w-12 h-12 bg-red-50 rounded-md flex items-center justify-center mb-4"><AlertTriangle size={22} className="text-red-500" /></div>
-              <h3 className="text-lg font-semibold text-slate-900 mb-1">Eliminar sobre</h3>
-              <p className="text-[13px] text-slate-500 mb-6">Se eliminará <strong>{showDeleteTransferEnvelopeModal.displayNumber}</strong> y todos sus gastos.</p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowDeleteTransferEnvelopeModal(null)} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-50">Cancelar</button>
-                <button onClick={() => handleDeleteTransferEnvelope(showDeleteTransferEnvelopeModal)} disabled={saving} className="flex-1 px-4 py-2 bg-red-500 text-white rounded-md text-[13px] font-medium hover:bg-red-600 disabled:opacity-50">
+            <Modal
+        open={!!(showDeleteTransferEnvelopeModal)}
+        onClose={() => setShowDeleteTransferEnvelopeModal(null)}
+        title={"Eliminar sobre"}
+        width="max-w-sm"
+        footer={(showDeleteTransferEnvelopeModal) ? <>
+<button onClick={() => setShowDeleteTransferEnvelopeModal(null)} className={buttonClass("secondary")}>Cancelar</button>
+                <button onClick={() => handleDeleteTransferEnvelope(showDeleteTransferEnvelopeModal)} disabled={saving} className={buttonClass("danger")}>
                   {saving ? "Eliminando..." : "Eliminar"}
                 </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+        </> : undefined}
+        >
+        {(showDeleteTransferEnvelopeModal) && (
+          <>
+<p className="text-[13px] text-slate-600">Se eliminará <strong>{showDeleteTransferEnvelopeModal.displayNumber}</strong> y todos sus gastos.</p>
+          </>
+        )}
+      </Modal>
 
       {/* Add Transfer Expense Modal */}
-      {showAddExpenseModal && selectedTransferEnvelope && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
-          onClick={() => setShowAddExpenseModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-              <div>
-                <h3 className="text-[14px] font-semibold text-slate-900">Añadir gastos</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Contra el sobre de {selectedTransferEnvelope.personName}</p>
+            <Modal
+        open={!!(showAddExpenseModal && selectedTransferEnvelope)}
+        onClose={() => setShowAddExpenseModal(false)}
+        title={"Añadir gastos"}
+        width="max-w-5xl"
+        footer={(showAddExpenseModal && selectedTransferEnvelope) ? <>
+<div className="text-[13px] text-slate-500">
+                Total: <strong className="text-slate-900 font-mono">{fmt(expensesList.reduce((sum, exp) => sum + computeExpenseTotal(exp).totalAmount, 0))} €</strong>
               </div>
-              <button onClick={() => setShowAddExpenseModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-md"><X size={18} /></button>
-            </div>
-            <div className="p-6 flex-1 overflow-y-auto space-y-6">
+              <div className="flex gap-3">
+                <button onClick={() => setShowAddExpenseModal(false)} className={buttonClass("ghost")}>Cancelar</button>
+                <button onClick={handleAddAllExpenses}
+                  disabled={saving || expensesList.filter(e => e.supplier.trim() && e.items.some(item => item.baseAmount > 0 && item.subAccountCode)).length === 0}
+                  className={buttonClass("primary")}>
+                  {saving ? "Guardando..." : `Añadir ${expensesList.filter(e => e.supplier.trim() && e.items.some(item => item.baseAmount > 0 && item.subAccountCode)).length} gasto${expensesList.filter(e => e.supplier.trim() && e.items.some(item => item.baseAmount > 0 && item.subAccountCode)).length !== 1 ? "s" : ""}`}
+                </button>
+              </div>
+        </> : undefined}
+        >
+        {(showAddExpenseModal && selectedTransferEnvelope) && (
+          <>
+            <p className="-mt-1 mb-3 text-[13px] text-slate-500">Contra el sobre de {selectedTransferEnvelope.personName}</p>
+<div className="flex-1 overflow-y-auto space-y-6">
               {/* Gastos */}
               <div>
                 <div className="flex items-center justify-between mb-3">
@@ -3993,35 +3990,22 @@ export default function BoxesPage() {
                 </div>
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between flex-shrink-0 bg-white">
-              <div className="text-[13px] text-slate-500">
-                Total: <strong className="text-slate-900 font-mono">{fmt(expensesList.reduce((sum, exp) => sum + computeExpenseTotal(exp).totalAmount, 0))} €</strong>
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => setShowAddExpenseModal(false)} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
-                <button onClick={handleAddAllExpenses}
-                  disabled={saving || expensesList.filter(e => e.supplier.trim() && e.items.some(item => item.baseAmount > 0 && item.subAccountCode)).length === 0}
-                  className="px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
-                  {saving ? "Guardando..." : `Añadir ${expensesList.filter(e => e.supplier.trim() && e.items.some(item => item.baseAmount > 0 && item.subAccountCode)).length} gasto${expensesList.filter(e => e.supplier.trim() && e.items.some(item => item.baseAmount > 0 && item.subAccountCode)).length !== 1 ? "s" : ""}`}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
       {/* Mark Transferred Modal */}
       {showSettleModal && selectedTransferEnvelope && (() => {
         const preview = getSettlementPreview(selectedTransferEnvelope);
         return (
-          <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
-            onClick={() => setShowSettleModal(false)}>
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-              <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-                <h3 className="text-[14px] font-semibold text-slate-900">Liquidación</h3>
-                <button onClick={() => setShowSettleModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-md"><X size={18} /></button>
-              </div>
-              <div className="p-6 space-y-4">
+          <Modal open onClose={() => setShowSettleModal(false)} title={"Liquidación"} width="max-w-md" footer={<>
+<button onClick={() => setShowSettleModal(false)} className={buttonClass("ghost")}>Cancelar</button>
+                <button onClick={handleSettleEnvelope} disabled={saving || (preview.direction !== "none" && !settleForm.proofFile)}
+                  className={buttonClass("primary")}>
+                  <Scale size={14} /> {saving ? "Liquidando..." : "Confirmar liquidación"}
+                </button>
+</>}>
+<div className="space-y-4">
                 <div className="p-4 bg-slate-50 rounded-md space-y-1.5 text-[13px]">
                   <div className="flex justify-between"><span className="text-slate-500">Anticipo{selectedTransferEnvelope.advances.length > 1 ? "s" : ""}</span><span className="font-mono text-slate-900">{fmt(getTotalAdvance(selectedTransferEnvelope))} €</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">Total gastos</span><span className="font-mono text-slate-900">{fmt(selectedTransferEnvelope.totalAmount)} €</span></div>
@@ -4051,35 +4035,30 @@ export default function BoxesPage() {
                   </>
                 )}
               </div>
-              <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-                <button onClick={() => setShowSettleModal(false)} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
-                <button onClick={handleSettleEnvelope} disabled={saving || (preview.direction !== "none" && !settleForm.proofFile)}
-                  className="flex items-center gap-2 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
-                  <Scale size={14} /> {saving ? "Liquidando..." : "Confirmar liquidación"}
-                </button>
-              </div>
-            </div>
-          </div>
+</Modal>
         );
       })()}
 
       {/* Add Advance Modal */}
-      {showAddAdvanceModal && selectedTransferEnvelope && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
-          onClick={() => setShowAddAdvanceModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-              <div>
-                <h3 className="text-[14px] font-semibold text-slate-900">Añadir anticipo</h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {selectedTransferEnvelope.advances.length > 0
+            <Modal
+        open={!!(showAddAdvanceModal && selectedTransferEnvelope)}
+        onClose={() => setShowAddAdvanceModal(false)}
+        title={"Añadir anticipo"}
+        width="max-w-md"
+        footer={(showAddAdvanceModal && selectedTransferEnvelope) ? <>
+<button onClick={() => setShowAddAdvanceModal(false)} className={buttonClass("ghost")}>Cancelar</button>
+              <button onClick={handleAddAdvance} disabled={addingAdvance}
+                className={buttonClass("primary")}>
+                <Banknote size={14} /> {addingAdvance ? "Añadiendo..." : "Añadir anticipo"}
+              </button>
+        </> : undefined}
+        >
+        {(showAddAdvanceModal && selectedTransferEnvelope) && (
+          <>
+            <p className="-mt-1 mb-3 text-[13px] text-slate-500">{selectedTransferEnvelope.advances.length > 0
                     ? `Ya hay ${fmt(getTotalAdvance(selectedTransferEnvelope))} € anticipados en este sobre`
-                    : `Sobre ${selectedTransferEnvelope.displayNumber} · ${selectedTransferEnvelope.personName}`}
-                </p>
-              </div>
-              <button onClick={() => setShowAddAdvanceModal(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-md"><X size={18} /></button>
-            </div>
-            <div className="p-6 space-y-4">
+                    : `Sobre ${selectedTransferEnvelope.displayNumber} · ${selectedTransferEnvelope.personName}`}</p>
+<div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-slate-600">Importe *</label>
@@ -4128,16 +4107,9 @@ export default function BoxesPage() {
                 </label>
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-              <button onClick={() => setShowAddAdvanceModal(false)} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
-              <button onClick={handleAddAdvance} disabled={addingAdvance}
-                className="flex items-center gap-2 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
-                <Banknote size={14} /> {addingAdvance ? "Añadiendo..." : "Añadir anticipo"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
       {/* Account Selector (Transfer modal) */}
       {showAccountSelector && accountSelectorPos && editingExpenseIndex !== null && (
@@ -4224,16 +4196,8 @@ export default function BoxesPage() {
 
       {/* ── Send Box Form Modal ────────────────────────────────────────────── */}
       {showSendBoxFormModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/20 p-4" onClick={() => { setShowSendBoxFormModal(false); setGeneratedBoxResult(null); }}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100">
-              <h3 className="text-base font-semibold text-slate-900">Enviar solicitud de caja</h3>
-              <button onClick={() => { setShowSendBoxFormModal(false); setGeneratedBoxResult(null); }} className="text-slate-400 hover:text-slate-600">
-                <X size={20} />
-              </button>
-            </div>
-
-            {!generatedBoxResult ? (
+        <Modal open onClose={() => { setShowSendBoxFormModal(false); setGeneratedBoxResult(null); }} title={"Enviar solicitud de caja"} width="max-w-md">
+{!generatedBoxResult ? (
               <div className="px-6 py-5 space-y-4">
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre del solicitante</label>
@@ -4292,8 +4256,7 @@ export default function BoxesPage() {
                 </button>
               </div>
             )}
-          </div>
-        </div>
+</Modal>
       )}
 
       {/* ── Volcar a sobre Modal ───────────────────────────────────────────── */}
@@ -4320,20 +4283,21 @@ export default function BoxesPage() {
         const IRPF_RATES = [0, 7, 15, 19];
 
         return (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/20 p-4"
-            onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); setShowVolcarSupplierDropdown(null); }}>
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-
-              {/* Header */}
-              <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 flex-shrink-0">
-                <div>
-                  <h3 className="text-base font-semibold text-slate-900">Volcar a sobre de Petty Cash</h3>
-                  {fs && <p className="text-xs text-slate-500 mt-0.5">{fs.requesterName} · {fs.expenseCount} gasto{fs.expenseCount !== 1 ? "s" : ""} · <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(fs.totalAmount)} €</strong></p>}
-                </div>
-                <button onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); }} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"><X size={18} /></button>
-              </div>
-
-              {/* Scrollable body */}
+          <Modal open onClose={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); setShowVolcarSupplierDropdown(null); }} title={"Volcar a sobre de Petty Cash"} width="max-w-4xl" footer={<>
+<button onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); }}
+                  className={buttonClass("secondary")}>
+                  Cancelar
+                </button>
+                <button onClick={() => handleVolcarToEnvelope(showVolcarModal!)}
+                  disabled={!volcarTargetEnvelopeId || volcandoFormId === showVolcarModal}
+                  className={buttonClass("primary")}>
+                  {volcandoFormId === showVolcarModal
+                    ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Volcando</>
+                    : "Volcar al sobre"}
+                </button>
+</>}>
+<p className="-mt-1 mb-3 text-[13px] text-slate-500">{fs?.requesterName} · {fs?.expenseCount} gasto{fs?.expenseCount !== 1 ? "s" : ""} · <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(fs?.totalAmount ?? 0)} €</strong></p>
+{/* Scrollable body */}
               <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
 
                 {/* Sobre de destino */}
@@ -4575,49 +4539,35 @@ export default function BoxesPage() {
               </div>
 
               {/* Footer */}
-              <div className="flex gap-2 px-6 py-4 border-t border-slate-100 flex-shrink-0">
-                <button onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); }}
-                  className="flex-1 py-1.5 rounded-md text-[13px] font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
-                  Cancelar
-                </button>
-                <button onClick={() => handleVolcarToEnvelope(showVolcarModal!)}
-                  disabled={!volcarTargetEnvelopeId || volcandoFormId === showVolcarModal}
-                  className="flex-1 py-1.5 rounded-md text-[13px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
-                  {volcandoFormId === showVolcarModal
-                    ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Volcando</>
-                    : "Volcar al sobre"}
-                </button>
-              </div>
-            </div>
-          </div>
+</Modal>
         );
       })()}
 
       {/* ── Configurar exportación (DEMO / vista previa) ──────────────────── */}
-      {showExportConfigModal && (
-        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4" onClick={() => setShowExportConfigModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[85vh] overflow-y-auto border border-slate-200" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="hidden">
-                  <Settings size={18} className="text-white" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-[14px] font-semibold text-slate-900">Exportación a servicio de tarjetas</h2>
-                    <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                      <Sparkles size={10} /> DEMO
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500">Vista previa · aún no conectado a ningún proveedor</p>
-                </div>
-              </div>
-              <button onClick={() => setShowExportConfigModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors">
-                <X size={20} />
+            <Modal
+        open={!!(showExportConfigModal)}
+        onClose={() => setShowExportConfigModal(false)}
+        title={"Exportación a servicio de tarjetas"}
+        width="max-w-lg"
+        footer={(showExportConfigModal) ? <>
+<button
+                onClick={() => setShowExportConfigModal(false)}
+                className={buttonClass("secondary")}
+              >
+                Cerrar
               </button>
-            </div>
-
-            <div className="p-6 space-y-5">
+              <button
+                onClick={() => { setShowExportConfigModal(false); showToast("success", "Vista previa · esta configuración aún no está conectada"); }}
+                className={buttonClass("primary")}
+              >
+                Guardar configuración
+              </button>
+        </> : undefined}
+        >
+        {(showExportConfigModal) && (
+          <>
+            <p className="-mt-1 mb-3 text-[13px] text-slate-500">Vista previa · aún no conectado a ningún proveedor</p>
+<div className="space-y-5">
               <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-md flex gap-2.5">
                 <Info size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-amber-800 leading-relaxed">
@@ -4720,24 +4670,9 @@ export default function BoxesPage() {
                 </div>
               </div>
             </div>
-
-            <div className="flex gap-3 px-6 py-4 border-t border-slate-100 flex-shrink-0">
-              <button
-                onClick={() => setShowExportConfigModal(false)}
-                className="flex-1 py-1.5 rounded-md text-[13px] font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                Cerrar
-              </button>
-              <button
-                onClick={() => { setShowExportConfigModal(false); showToast("success", "Vista previa · esta configuración aún no está conectada"); }}
-                className="flex-1 py-1.5 rounded-md text-[13px] font-semibold border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] transition-opacity"
-              >
-                Guardar configuración
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </div>
   );
 }

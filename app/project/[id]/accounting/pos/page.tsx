@@ -298,12 +298,14 @@ export default function POsPage() {
     }
   };
 
+  // Limpia los campos de los modales. No toca la PO seleccionada: los
+  // handlers la asignan justo antes de llamar aquí (antes se borraba y los
+  // modales de cerrar/reabrir/anular/modificar no llegaban a abrirse).
   const resetModalState = () => {
     setPasswordInput("");
     setPasswordError("");
     setCancellationReason("");
     setModificationReason("");
-    setSelectedPO(null);
   };
 
   const getPOPermissions = (po: PO) => {
