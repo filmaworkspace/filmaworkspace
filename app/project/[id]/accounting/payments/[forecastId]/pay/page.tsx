@@ -62,10 +62,10 @@ import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
 const PAYMENT_TYPES = {
   invoice: { label: "Factura", icon: Receipt, bgColor: "bg-emerald-50", textColor: "text-emerald-600" },
-  partial: { label: "Pago parcial", icon: CircleDollarSign, bgColor: "bg-blue-50", textColor: "text-blue-600" },
-  proforma: { label: "Proforma", icon: FileText, bgColor: "bg-violet-50", textColor: "text-violet-600" },
+  partial: { label: "Pago parcial", icon: CircleDollarSign, bgColor: "bg-[#F7F7F8]", textColor: "text-slate-700" },
+  proforma: { label: "Proforma", icon: FileText, bgColor: "bg-[#F7F7F8]", textColor: "text-slate-700" },
   budget: { label: "Presupuesto", icon: Wallet, bgColor: "bg-amber-50", textColor: "text-amber-600" },
-  deposit: { label: "Depósito", icon: PiggyBank, bgColor: "bg-indigo-50", textColor: "text-indigo-600" },
+  deposit: { label: "Depósito", icon: PiggyBank, bgColor: "bg-[#F7F7F8]", textColor: "text-slate-700" },
   guarantee: { label: "Fianza", icon: Shield, bgColor: "bg-slate-100", textColor: "text-slate-600" },
 };
 
@@ -593,7 +593,7 @@ export default function PaymentPayPage() {
 
   return (
     <div className={`min-h-screen bg-slate-100 ${inter.className}`}>
-      {toast && <div className="fixed bottom-4 left-4 z-[60]"><div className={`flex items-center gap-2 px-4 py-3 rounded-md shadow-lg text-white text-[13px] font-medium ${toast.type === "success" ? "bg-emerald-600" : toast.type === "error" ? "bg-red-600" : "bg-amber-500"}`}>{toast.type === "success" ? <CheckCircle2 size={16} /> : toast.type === "error" ? <AlertCircle size={16} /> : <AlertTriangle size={16} />}{toast.message}</div></div>}
+      {toast && <div className="fixed bottom-4 left-4 z-[60]"><div className={`flex items-center gap-2 px-4 py-3 rounded-md shadow-lg text-white text-[13px] font-medium ${toast.type === "success" ? "bg-slate-900" : toast.type === "error" ? "bg-red-600" : "bg-amber-500"}`}>{toast.type === "success" ? <CheckCircle2 size={16} /> : toast.type === "error" ? <AlertCircle size={16} /> : <AlertTriangle size={16} />}{toast.message}</div></div>}
 
       {/* Header */}
       <div className="bg-white border-b border-slate-200 text-slate-900 px-5 h-[53px] flex items-center justify-between fixed top-0 left-0 right-0 z-50">
@@ -666,25 +666,12 @@ export default function PaymentPayPage() {
 
         {/* Right: Payment List & Form */}
         <div className="w-1/2 overflow-y-auto p-6">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-3 gap-3 mb-6">
-            <div className="bg-white rounded-md p-4 border border-slate-200">
-              <div className="flex items-center gap-2 mb-2"><Clock size={16} className="text-amber-500" /><span className="text-xs text-slate-500">Pendiente</span></div>
-              <p className="text-lg font-bold text-slate-900">{formatCurrency(totalPending)} €</p>
-              <p className="text-xs text-slate-400">{pendingItems.length} pagos</p>
-            </div>
-            <div className="bg-white rounded-md p-4 border border-slate-200">
-              <div className="flex items-center gap-2 mb-2"><CheckCircle2 size={16} className="text-emerald-500" /><span className="text-xs text-slate-500">Completado</span></div>
-              <p className="text-lg font-bold text-emerald-600">{formatCurrency(totalCompleted)} €</p>
-              <p className="text-xs text-slate-400">{completedItems.length} pagos</p>
-            </div>
-            <div className="bg-white rounded-md p-4 border border-slate-200">
-              <div className="flex items-center gap-2 mb-2"><Euro size={16} className="text-slate-500" /><span className="text-xs text-slate-500">Total</span></div>
-              <p className="text-lg font-bold text-slate-900">{formatCurrency(totalPending + totalCompleted)} €</p>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${((totalCompleted / (totalPending + totalCompleted)) * 100) || 0}%` }} />
-              </div>
-            </div>
+          {/* Progreso de la remesa */}
+          <div className="mb-5 flex items-center gap-3 text-xs text-slate-600">
+            <span aria-hidden="true" className="flex h-[3px] flex-1 overflow-hidden rounded-full bg-[#F1F1F3]">
+              <span className="bg-emerald-500" style={{ width: `${((totalCompleted / (totalPending + totalCompleted)) * 100) || 0}%` }} />
+            </span>
+            <span className="tabular-nums">{completedItems.length} de {pendingItems.length + completedItems.length} pagados</span>
           </div>
 
           {/* Bulk Upload */}
@@ -787,7 +774,7 @@ export default function PaymentPayPage() {
                               )}
                             </div>
 
-                            <button onClick={() => handleMarkAsPaid([item.id])} disabled={!hasReceipt || saving} className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-md text-[13px] font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <button onClick={() => handleMarkAsPaid([item.id])} disabled={!hasReceipt || saving} className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50 disabled:cursor-not-allowed">
                               {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <CheckCircle size={16} />}
                               Marcar como pagado
                             </button>
@@ -995,7 +982,7 @@ export default function PaymentPayPage() {
               })()}
               <div className="flex gap-3">
                 <button onClick={() => setShowSepaModal(false)} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">Cancelar</button>
-                <button onClick={generateSepaXml} disabled={!selectedBankAccount} className="flex-1 px-4 py-1.5 bg-emerald-600 text-white rounded-md text-[13px] font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"><Download size={16} />Descargar XML</button>
+                <button onClick={generateSepaXml} disabled={!selectedBankAccount} className="flex-1 px-4 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50 flex items-center justify-center gap-2"><Download size={16} />Descargar XML</button>
               </div>
             </div>
           </div>

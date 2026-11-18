@@ -1704,7 +1704,7 @@ export default function AccountingConfigPage() {
       {projectType === "serie" && (
         <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-            <Layers size={18} className="text-violet-500" />
+            <Layers size={18} className="text-slate-500" />
             <div>
               <h2 className="font-semibold text-slate-900">Asignación por capítulos</h2>
               <p className="text-[13px] text-slate-500">{projectEpisodes} capítulos configurados</p>

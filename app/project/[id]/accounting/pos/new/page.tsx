@@ -1677,12 +1677,12 @@ export default function NewPOPage() {
                               onClick={() => openEpisodeModal(index)}
                               className={cx(
                                 "w-full px-4 py-2 border rounded-md text-[13px] text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white",
-                                item.episodeAssignment === "general" ? "border-slate-200" : "border-violet-200 bg-violet-50"
+                                item.episodeAssignment === "general" ? "border-slate-200" : "border-slate-200 bg-[#F7F7F8]"
                               )}
                             >
                               {item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 0 ? (
                                 <div className="flex items-center gap-2">
-                                  <Layers size={14} className="text-violet-600" />
+                                  <Layers size={14} className="text-slate-700" />
                                   <span className="text-slate-900">
                                     {item.episodes.length === 1 
                                       ? `${item.episodes[0].episode}`
@@ -1701,7 +1701,7 @@ export default function NewPOPage() {
                             {item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 1 && (
                               <div className="mt-2 flex flex-wrap gap-1">
                                 {item.episodes.map((ep) => (
-                                  <span key={ep.episode} className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-lg">
+                                  <span key={ep.episode} className="text-xs bg-[#F1F1F3] text-slate-900 px-2 py-0.5 rounded-lg">
                                     {ep.episode}: {formatCurrency(ep.amount)} €
                                   </span>
                                 ))}
@@ -1844,7 +1844,7 @@ export default function NewPOPage() {
                   onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
                   className={cx(
                     "border-2 border-dashed rounded-md p-8 text-center transition-all",
-                    isDragging ? "border-blue-400 bg-blue-50" : uploadedFile ? "border-emerald-300 bg-emerald-50" : "border-slate-200 hover:border-slate-300"
+                    isDragging ? "border-slate-400 bg-[#F7F7F8]" : uploadedFile ? "border-emerald-300 bg-emerald-50" : "border-slate-200 hover:border-slate-300"
                   )}
                   style={isDragging ? { borderColor: "#2F52E0", backgroundColor: "rgba(47, 82, 224, 0.05)" } : {}}
                 >
@@ -2308,8 +2308,8 @@ export default function NewPOPage() {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden">
             <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-violet-100 rounded-md flex items-center justify-center">
-                  <Layers size={20} className="text-violet-600" />
+                <div className="w-10 h-10 bg-[#F1F1F3] rounded-md flex items-center justify-center">
+                  <Layers size={20} className="text-slate-700" />
                 </div>
                 <div>
                   <h2 className="font-semibold text-slate-900">Asignar capítulos</h2>
@@ -2328,13 +2328,13 @@ export default function NewPOPage() {
                 className={cx(
                   "w-full px-4 py-4 rounded-md text-[13px] font-medium transition-colors flex items-center gap-3 border-2",
                   tempEpisodeDistribution.length === 0
-                    ? "bg-violet-50 border-violet-500 text-violet-700" 
+                    ? "bg-[#F7F7F8] border-slate-400 text-slate-900" 
                     : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
                 )}
               >
                 <div className={cx(
                   "w-5 h-5 rounded-full border-2 flex items-center justify-center",
-                  tempEpisodeDistribution.length === 0 ? "border-violet-500 bg-violet-500" : "border-slate-300"
+                  tempEpisodeDistribution.length === 0 ? "border-slate-400 bg-slate-700" : "border-slate-300"
                 )}>
                   {tempEpisodeDistribution.length === 0 && <CheckCircle2 size={12} className="text-white" />}
                 </div>
@@ -2356,13 +2356,13 @@ export default function NewPOPage() {
                 className={cx(
                   "w-full px-4 py-4 rounded-md text-[13px] font-medium transition-colors flex items-center gap-3 border-2",
                   tempEpisodeDistribution.length > 0
-                    ? "bg-violet-50 border-violet-500 text-violet-700" 
+                    ? "bg-[#F7F7F8] border-slate-400 text-slate-900" 
                     : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
                 )}
               >
                 <div className={cx(
                   "w-5 h-5 rounded-full border-2 flex items-center justify-center",
-                  tempEpisodeDistribution.length > 0 ? "border-violet-500 bg-violet-500" : "border-slate-300"
+                  tempEpisodeDistribution.length > 0 ? "border-slate-400 bg-slate-700" : "border-slate-300"
                 )}>
                   {tempEpisodeDistribution.length > 0 && <CheckCircle2 size={12} className="text-white" />}
                 </div>
@@ -2383,7 +2383,7 @@ export default function NewPOPage() {
                         onClick={() => { setEpisodeDistributionMode("equal"); applyEqualDistribution(); }}
                         className={cx(
                           "flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors",
-                          episodeDistributionMode === "equal" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          episodeDistributionMode === "equal" ? "bg-[#F1F1F3] text-slate-900" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                         )}
                       >
                         Partes iguales
@@ -2392,7 +2392,7 @@ export default function NewPOPage() {
                         onClick={() => setEpisodeDistributionMode("amount")}
                         className={cx(
                           "flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors",
-                          episodeDistributionMode === "amount" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          episodeDistributionMode === "amount" ? "bg-[#F1F1F3] text-slate-900" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                         )}
                       >
                         Por importe
@@ -2401,7 +2401,7 @@ export default function NewPOPage() {
                         onClick={() => setEpisodeDistributionMode("percentage")}
                         className={cx(
                           "flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors",
-                          episodeDistributionMode === "percentage" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          episodeDistributionMode === "percentage" ? "bg-[#F1F1F3] text-slate-900" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                         )}
                       >
                         Por porcentaje
@@ -2421,7 +2421,7 @@ export default function NewPOPage() {
                             onClick={() => toggleEpisodeInDistribution(epNum)}
                             className={cx(
                               "px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors",
-                              isSelected ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                              isSelected ? "border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                             )}
                           >
                             {epNum}
@@ -2510,7 +2510,7 @@ export default function NewPOPage() {
               <button
                 onClick={saveEpisodeDistribution}
                 disabled={tempEpisodeDistribution.length > 0 && Math.abs(getTotalDistributedPercentage() - 100) >= 0.1}
-                className="flex-1 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-md text-[13px] font-medium transition-colors disabled:opacity-50"
+                className="flex-1 py-1.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
               >
                 Guardar
               </button>

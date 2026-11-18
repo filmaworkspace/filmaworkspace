@@ -57,9 +57,9 @@ const DOCUMENT_TYPES = {
     code: "PRF",
     label: "Proforma",
     icon: FileText,
-    bgColor: "bg-violet-50",
-    textColor: "text-violet-700",
-    borderColor: "border-violet-200",
+    bgColor: "bg-[#F7F7F8]",
+    textColor: "text-slate-900",
+    borderColor: "border-slate-200",
   },
   budget: {
     code: "PRS",
@@ -88,8 +88,8 @@ const TYPE_OPTIONS = [
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; icon: typeof Clock }> = {
   pending: { label: "Pendiente", bg: "bg-amber-50", text: "text-amber-700", icon: Clock },
   approved: { label: "Aprobada", bg: "bg-emerald-50", text: "text-emerald-700", icon: CheckCircle },
-  accounted: { label: "Codificada", bg: "bg-violet-50", text: "text-violet-700", icon: BookCheck },
-  paid: { label: "Pagada", bg: "bg-blue-50", text: "text-blue-700", icon: Wallet },
+  accounted: { label: "Codificada", bg: "bg-[#F7F7F8]", text: "text-slate-900", icon: BookCheck },
+  paid: { label: "Pagada", bg: "bg-[#F7F7F8]", text: "text-slate-900", icon: Wallet },
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -373,7 +373,7 @@ export default function ReplaceDocumentPage() {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
                 <h1 className="text-xl font-semibold tracking-tight text-slate-900">Sustituir documento</h1>
-                <span className="px-2.5 py-1 bg-violet-100 text-violet-700 rounded-lg text-xs font-medium">
+                <span className="px-2.5 py-1 bg-[#F1F1F3] text-slate-900 rounded-lg text-xs font-medium">
                   Proformas y presupuestos
                 </span>
               </div>
@@ -455,7 +455,7 @@ export default function ReplaceDocumentPage() {
         {/* Lista de documentos */}
         <div className="bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-white">
-            <h2 className="font-semibold text-slate-900">Documentos pendientes de sustitución</h2>
+            <h2 className="text-[13px] font-semibold text-slate-900">Documentos pendientes de sustitución</h2>
             <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">
               {filteredDocs.length}
             </span>

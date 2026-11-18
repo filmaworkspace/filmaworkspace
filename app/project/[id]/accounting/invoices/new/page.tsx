@@ -101,9 +101,9 @@ const DOCUMENT_TYPES = {
     label: "Proforma",
     article: "de la",
     icon: FileText,
-    bgColor: "bg-violet-50",
-    textColor: "text-violet-700",
-    borderColor: "border-violet-200",
+    bgColor: "bg-[#F7F7F8]",
+    textColor: "text-slate-900",
+    borderColor: "border-slate-200",
     requiresReplacement: true,
   },
   budget: {
@@ -1636,7 +1636,7 @@ export default function NewInvoicePage() {
                   {replaceMode ? "Factura definitiva" : "Subir " + currentDocType.label.toLowerCase()}
                 </h1>
                 {replaceMode && (
-                  <span className="px-2.5 py-1 bg-violet-100 text-violet-700 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                  <span className="px-2.5 py-1 bg-[#F1F1F3] text-slate-900 rounded-lg text-xs font-medium flex items-center gap-1.5">
                     <RefreshCw size={12} />
                     Sustitución
                   </span>
@@ -1760,14 +1760,14 @@ export default function NewInvoicePage() {
 
         {/* Replace Mode Banner */}
         {replaceMode && selectedPendingDoc && (
-          <div className="mb-6 p-4 bg-violet-50 border border-violet-200 rounded-lg">
+          <div className="mb-6 p-4 bg-[#F7F7F8] border border-slate-200 rounded-lg">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-violet-100 rounded-md flex items-center justify-center flex-shrink-0">
-                <RefreshCw size={18} className="text-violet-600" />
+              <div className="w-10 h-10 bg-[#F1F1F3] rounded-md flex items-center justify-center flex-shrink-0">
+                <RefreshCw size={18} className="text-slate-700" />
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-violet-800">Sustituyendo {selectedPendingDoc.displayNumber}</p>
-                <p className="text-[13px] text-violet-700 mt-0.5">
+                <p className="font-semibold text-slate-900">Sustituyendo {selectedPendingDoc.displayNumber}</p>
+                <p className="text-[13px] text-slate-900 mt-0.5">
                   Esta factura definitiva reemplazará al documento original de {formatCurrency(selectedPendingDoc.totalAmount)} €
                 </p>
               </div>
@@ -1830,21 +1830,21 @@ export default function NewInvoicePage() {
             {!replaceMode && pendingDocuments.length > 0 && documentType === "invoice" && (
               <button
                 onClick={() => setShowReplaceModal(true)}
-                className="w-full p-4 border border-dashed border-violet-300 rounded-lg bg-violet-50/50 hover:bg-violet-50 hover:border-violet-400 transition-all text-left group"
+                className="w-full p-4 border border-dashed border-slate-200 rounded-lg bg-[#F7F7F8] hover:bg-[#F4F4F5] hover:border-slate-400 transition-all text-left group"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-violet-100 rounded-md flex items-center justify-center group-hover:bg-violet-200 transition-colors">
-                      <RefreshCw size={18} className="text-violet-600" />
+                    <div className="w-10 h-10 bg-[#F1F1F3] rounded-md flex items-center justify-center group-hover:bg-slate-200 transition-colors">
+                      <RefreshCw size={18} className="text-slate-700" />
                     </div>
                     <div>
-                      <p className="text-[13px] font-medium text-violet-800">¿Tienes la factura definitiva?</p>
-                      <p className="text-xs text-violet-600">
+                      <p className="text-[13px] font-medium text-slate-900">¿Tienes la factura definitiva?</p>
+                      <p className="text-xs text-slate-700">
                         {pendingDocuments.length} documento{pendingDocuments.length !== 1 ? "s" : ""} pendiente{pendingDocuments.length !== 1 ? "s" : ""}
                       </p>
                     </div>
                   </div>
-                  <ArrowRight size={18} className="text-violet-400 group-hover:text-violet-600" />
+                  <ArrowRight size={18} className="text-slate-400 group-hover:text-slate-700" />
                 </div>
               </button>
             )}
@@ -2070,7 +2070,7 @@ export default function NewInvoicePage() {
                   className={cx(
                     "border-2 border-dashed rounded-md p-8 text-center transition-all",
                     isDragging
-                      ? "border-blue-400 bg-blue-50"
+                      ? "border-slate-400 bg-[#F7F7F8]"
                       : uploadedFile
                       ? "border-emerald-300 bg-emerald-50"
                       : hasError("file")
@@ -2175,7 +2175,7 @@ export default function NewInvoicePage() {
                         className={cx(
                           "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
                           multipleDueDates
-                            ? "bg-violet-100 text-violet-700 border border-violet-200"
+                            ? "bg-[#F1F1F3] text-slate-900 border border-slate-200"
                             : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                         )}
                       >
@@ -2273,7 +2273,7 @@ export default function NewInvoicePage() {
                           <button
                             type="button"
                             onClick={addDueDate}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-violet-600 hover:bg-violet-50 rounded-lg text-xs font-medium transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-slate-700 hover:bg-[#F4F4F5] rounded-lg text-xs font-medium transition-colors"
                           >
                             <Plus size={14} />
                             Añadir vencimiento
@@ -2326,15 +2326,15 @@ export default function NewInvoicePage() {
                       <p className="text-lg font-bold text-emerald-700">{formatCurrency(totals.totalAmount)} €</p>
                       <p className="text-xs text-emerald-500 mt-1">Este documento</p>
                     </div>
-                    <div className={cx("p-4 rounded-md", Math.abs(amountDifference) < 0.01 ? "bg-slate-50" : amountDifference > 0 ? "bg-amber-50" : "bg-blue-50")}>
-                      <p className={cx("text-xs mb-1", Math.abs(amountDifference) < 0.01 ? "text-slate-500" : amountDifference > 0 ? "text-amber-600" : "text-blue-600")}>
+                    <div className={cx("p-4 rounded-md", Math.abs(amountDifference) < 0.01 ? "bg-slate-50" : amountDifference > 0 ? "bg-amber-50" : "bg-[#F7F7F8]")}>
+                      <p className={cx("text-xs mb-1", Math.abs(amountDifference) < 0.01 ? "text-slate-500" : amountDifference > 0 ? "text-amber-600" : "text-slate-700")}>
                         Diferencia
                       </p>
-                      <p className={cx("text-lg font-bold", Math.abs(amountDifference) < 0.01 ? "text-slate-400" : amountDifference > 0 ? "text-amber-700" : "text-blue-700")}>
+                      <p className={cx("text-lg font-bold", Math.abs(amountDifference) < 0.01 ? "text-slate-400" : amountDifference > 0 ? "text-amber-700" : "text-slate-900")}>
                         {amountDifference > 0 ? "+" : ""}
                         {formatCurrency(amountDifference)} €
                       </p>
-                      <p className={cx("text-xs mt-1", Math.abs(amountDifference) < 0.01 ? "text-slate-400" : amountDifference > 0 ? "text-amber-500" : "text-blue-500")}>
+                      <p className={cx("text-xs mt-1", Math.abs(amountDifference) < 0.01 ? "text-slate-400" : amountDifference > 0 ? "text-amber-500" : "text-slate-500")}>
                         {Math.abs(amountDifference) < 0.01 ? "Sin diferencia" : amountDifference > 0 ? "Pendiente cobro" : "Pendiente devolución"}
                       </p>
                     </div>
@@ -2467,7 +2467,7 @@ export default function NewInvoicePage() {
                                 Item {index + 1}
                               </span>
                               {item.isNewItem ? (
-                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg font-medium">Nuevo</span>
+                                <span className="text-xs bg-[#F1F1F3] text-slate-900 px-2 py-0.5 rounded-lg font-medium">Nuevo</span>
                               ) : (
                                 <span className="text-xs px-2 py-0.5 rounded-lg font-medium" style={{ backgroundColor: "rgba(47, 82, 224, 0.1)", color: "#2F52E0" }}>
                                   De PO
@@ -2545,12 +2545,12 @@ export default function NewInvoicePage() {
                                   onClick={() => openEpisodeModal(index)}
                                   className={cx(
                                     "w-full px-4 py-1.5 border rounded-md text-[13px] text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white",
-                                    item.episodeAssignment === "general" ? "border-slate-200" : "border-violet-200 bg-violet-50"
+                                    item.episodeAssignment === "general" ? "border-slate-200" : "border-slate-200 bg-[#F7F7F8]"
                                   )}
                                 >
                                   {item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 0 ? (
                                     <div className="flex items-center gap-2">
-                                      <Layers size={14} className="text-violet-600" />
+                                      <Layers size={14} className="text-slate-700" />
                                       <span className="text-slate-900">
                                         {item.episodes.length === 1 
                                           ? `${item.episodes[0].episode}`
@@ -2569,7 +2569,7 @@ export default function NewInvoicePage() {
                                 {item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 1 && (
                                   <div className="mt-2 flex flex-wrap gap-1">
                                     {item.episodes.map((ep) => (
-                                      <span key={ep.episode} className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-lg">
+                                      <span key={ep.episode} className="text-xs bg-[#F1F1F3] text-slate-900 px-2 py-0.5 rounded-lg">
                                         {ep.episode}: {formatCurrency(ep.amount)} €
                                       </span>
                                     ))}
@@ -2913,7 +2913,7 @@ export default function NewInvoicePage() {
                           </div>
                           <div className="text-right flex-shrink-0">
                             <p className="font-bold text-slate-900 text-lg">{formatCurrency(pd.totalAmount)} €</p>
-                            <p className="text-xs text-violet-600 mt-1 flex items-center gap-1 justify-end">
+                            <p className="text-xs text-slate-700 mt-1 flex items-center gap-1 justify-end">
                               <ArrowRight size={12} />
                               Sustituir
                             </p>
@@ -3323,8 +3323,8 @@ export default function NewInvoicePage() {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-violet-100 rounded-md flex items-center justify-center">
-                  <Layers size={20} className="text-violet-600" />
+                <div className="w-10 h-10 bg-[#F1F1F3] rounded-md flex items-center justify-center">
+                  <Layers size={20} className="text-slate-700" />
                 </div>
                 <div>
                   <h2 className="font-semibold text-slate-900">Asignar capítulos</h2>
@@ -3343,13 +3343,13 @@ export default function NewInvoicePage() {
                 className={cx(
                   "w-full px-4 py-4 rounded-md text-[13px] font-medium transition-colors flex items-center gap-3 border-2",
                   tempEpisodeDistribution.length === 0
-                    ? "bg-violet-50 border-violet-500 text-violet-700" 
+                    ? "bg-[#F7F7F8] border-slate-400 text-slate-900" 
                     : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
                 )}
               >
                 <div className={cx(
                   "w-5 h-5 rounded-full border-2 flex items-center justify-center",
-                  tempEpisodeDistribution.length === 0 ? "border-violet-500 bg-violet-500" : "border-slate-300"
+                  tempEpisodeDistribution.length === 0 ? "border-slate-400 bg-slate-700" : "border-slate-300"
                 )}>
                   {tempEpisodeDistribution.length === 0 && <CheckCircle2 size={12} className="text-white" />}
                 </div>
@@ -3370,13 +3370,13 @@ export default function NewInvoicePage() {
                 className={cx(
                   "w-full px-4 py-4 rounded-md text-[13px] font-medium transition-colors flex items-center gap-3 border-2",
                   tempEpisodeDistribution.length > 0
-                    ? "bg-violet-50 border-violet-500 text-violet-700" 
+                    ? "bg-[#F7F7F8] border-slate-400 text-slate-900" 
                     : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
                 )}
               >
                 <div className={cx(
                   "w-5 h-5 rounded-full border-2 flex items-center justify-center",
-                  tempEpisodeDistribution.length > 0 ? "border-violet-500 bg-violet-500" : "border-slate-300"
+                  tempEpisodeDistribution.length > 0 ? "border-slate-400 bg-slate-700" : "border-slate-300"
                 )}>
                   {tempEpisodeDistribution.length > 0 && <CheckCircle2 size={12} className="text-white" />}
                 </div>
@@ -3396,7 +3396,7 @@ export default function NewInvoicePage() {
                         onClick={() => { setEpisodeDistributionMode("equal"); applyEqualDistribution(); }}
                         className={cx(
                           "flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors",
-                          episodeDistributionMode === "equal" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          episodeDistributionMode === "equal" ? "bg-[#F1F1F3] text-slate-900" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                         )}
                       >
                         Partes iguales
@@ -3405,7 +3405,7 @@ export default function NewInvoicePage() {
                         onClick={() => setEpisodeDistributionMode("amount")}
                         className={cx(
                           "flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors",
-                          episodeDistributionMode === "amount" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          episodeDistributionMode === "amount" ? "bg-[#F1F1F3] text-slate-900" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                         )}
                       >
                         Por importe
@@ -3414,7 +3414,7 @@ export default function NewInvoicePage() {
                         onClick={() => setEpisodeDistributionMode("percentage")}
                         className={cx(
                           "flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors",
-                          episodeDistributionMode === "percentage" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          episodeDistributionMode === "percentage" ? "bg-[#F1F1F3] text-slate-900" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                         )}
                       >
                         Por porcentaje
@@ -3433,7 +3433,7 @@ export default function NewInvoicePage() {
                             onClick={() => toggleEpisodeInDistribution(epNum)}
                             className={cx(
                               "px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors",
-                              isSelected ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                              isSelected ? "border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                             )}
                           >
                             {epNum}
@@ -3520,7 +3520,7 @@ export default function NewInvoicePage() {
               <button
                 onClick={saveEpisodeDistribution}
                 disabled={tempEpisodeDistribution.length > 0 && Math.abs(getTotalDistributedPercentage() - 100) >= 0.1}
-                className="flex-1 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-md text-[13px] font-medium transition-colors disabled:opacity-50"
+                className="flex-1 py-1.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
               >
                 Guardar
               </button>

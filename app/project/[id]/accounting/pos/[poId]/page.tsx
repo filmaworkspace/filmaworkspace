@@ -198,7 +198,7 @@ const STATUS_CONFIG: Record<POStatus, { bg: string; text: string; label: string;
   pending: { bg: "bg-amber-50", text: "text-amber-700", label: "Pendiente", icon: Clock, gradient: "from-amber-500 to-orange-500" },
   approved: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Aprobada", icon: CheckCircle, gradient: "from-emerald-500 to-teal-500" },
   rejected: { bg: "bg-red-50", text: "text-red-700", label: "Rechazada", icon: XCircle, gradient: "from-red-500 to-rose-500" },
-  closed: { bg: "bg-blue-50", text: "text-blue-700", label: "Cerrada", icon: Archive, gradient: "from-blue-500 to-indigo-500" },
+  closed: { bg: "bg-[#F7F7F8]", text: "text-slate-900", label: "Cerrada", icon: Archive, gradient: "" },
   cancelled: { bg: "bg-red-50", text: "text-red-700", label: "Anulada", icon: Ban, gradient: "from-red-500 to-rose-500" },
 };
 
@@ -822,7 +822,7 @@ export default function PODetailPage() {
                     PO-{po.number}
                   </span>
                   {po.version > 1 && (
-                    <span className="px-2 py-1 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium">
+                    <span className="px-2 py-1 bg-[#F7F7F8] text-slate-900 rounded-lg text-xs font-medium">
                       V{String(po.version).padStart(2, "0")}
                     </span>
                   )}
@@ -971,14 +971,14 @@ export default function PODetailPage() {
           <div className="col-span-2 space-y-6">
             {po.generalDescription && (
               <div className="bg-white border border-slate-200 rounded-lg p-6">
-                <h3 className="font-semibold text-slate-900 mb-3">Descripción</h3>
+                <h3 className="text-[13px] font-semibold text-slate-900 mb-3">Descripción</h3>
                 <p className="text-slate-600">{po.generalDescription}</p>
               </div>
             )}
 
             <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
               <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="font-semibold text-slate-900">Items</h3>
+                <h3 className="text-[13px] font-semibold text-slate-900">Items</h3>
                 <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">{po.items.length}</span>
               </div>
               <div className="divide-y divide-slate-100">
@@ -1000,7 +1000,7 @@ export default function PODetailPage() {
                           <div className="flex items-center gap-2">
                             <p className="font-medium text-slate-900">{item.description}</p>
                             {item.isClosed && (
-                              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-lg text-xs font-medium flex items-center gap-1">
+                              <span className="px-2 py-0.5 bg-[#F1F1F3] text-slate-900 rounded-lg text-xs font-medium flex items-center gap-1">
                                 <Lock size={10} />
                                 Cerrado
                               </span>
@@ -1015,7 +1015,7 @@ export default function PODetailPage() {
                                   }}
                                   className={`p-1 rounded-full transition-colors ${
                                     item.isClosed 
-                                      ? "text-blue-500 hover:bg-blue-100" 
+                                      ? "text-slate-500 hover:bg-[#F4F4F5]" 
                                       : itemRemaining > 0 
                                         ? "text-amber-500 hover:bg-amber-100" 
                                         : "text-emerald-500 hover:bg-emerald-100"
@@ -1030,8 +1030,8 @@ export default function PODetailPage() {
                                   <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowItemInfoPopover(null)}>
                                     <div className="absolute inset-0 bg-black/20" />
                                     <div className="relative w-80 bg-white rounded-md shadow-xl border border-slate-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                      <div className={`px-4 py-3 ${item.isClosed ? "bg-blue-50" : itemRemaining > 0 ? "bg-amber-50" : "bg-emerald-50"}`}>
-                                        <p className={`font-semibold text-[13px] ${item.isClosed ? "text-blue-800" : itemRemaining > 0 ? "text-amber-800" : "text-emerald-800"}`}>
+                                      <div className={`px-4 py-3 ${item.isClosed ? "bg-[#F7F7F8]" : itemRemaining > 0 ? "bg-amber-50" : "bg-emerald-50"}`}>
+                                        <p className={`font-semibold text-[13px] ${item.isClosed ? "text-slate-900" : itemRemaining > 0 ? "text-amber-800" : "text-emerald-800"}`}>
                                           {item.isClosed ? "Item cerrado" : itemRemaining > 0 ? "Pendiente de facturar" : "Completamente facturado"}
                                         </p>
                                         <p className="text-xs text-slate-600 mt-0.5">{item.description}</p>
@@ -1047,9 +1047,9 @@ export default function PODetailPage() {
                                             <p className={`font-semibold ${isOverInvoiced ? "text-amber-600" : "text-emerald-600"}`}>{formatCurrency(itemInvoiced)} {getCurrencySymbol()}</p>
                                           </div>
                                         </div>
-                                        <div className={`p-3 rounded-lg ${item.isClosed ? "bg-blue-50" : itemRemaining > 0 ? "bg-amber-50" : "bg-slate-50"}`}>
+                                        <div className={`p-3 rounded-lg ${item.isClosed ? "bg-[#F7F7F8]" : itemRemaining > 0 ? "bg-amber-50" : "bg-slate-50"}`}>
                                           <p className="text-xs text-slate-500 mb-1">Pendiente</p>
-                                          <p className={`font-bold text-lg ${item.isClosed ? "text-blue-700" : itemRemaining > 0 ? "text-amber-700" : "text-slate-600"}`}>
+                                          <p className={`font-bold text-lg ${item.isClosed ? "text-slate-900" : itemRemaining > 0 ? "text-amber-700" : "text-slate-600"}`}>
                                             {item.isClosed ? "0,00" : formatCurrency(itemRemaining)} {getCurrencySymbol()}
                                           </p>
                                           {!item.isClosed && itemRemaining > 0 && (
@@ -1093,7 +1093,7 @@ export default function PODetailPage() {
                                                   setPasswordInput("");
                                                   setPasswordError("");
                                                 }}
-                                                className="w-full flex items-center justify-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[13px] font-medium transition-colors"
+                                                className="w-full flex items-center justify-center gap-2 px-4 py-1.5 rounded-md text-[13px] font-medium transition-colors border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
                                               >
                                                 <Lock size={14} />
                                                 Cerrar item {itemRemaining > 0 && `(liberar ${formatCurrency(itemRemaining)} ${getCurrencySymbol()})`}
@@ -1117,7 +1117,7 @@ export default function PODetailPage() {
                         {item.vatRate > 0 && <span>IVA {item.vatRate}%</span>}
                         {item.irpfRate > 0 && <span className="text-red-500">IRPF {item.irpfRate}%</span>}
                         {item.episodeAssignment && (
-                          <span className="flex items-center gap-1 text-violet-600">
+                          <span className="flex items-center gap-1 text-slate-700">
                             <Layers size={12} />
                             {episodeLabel}
                           </span>
@@ -1126,7 +1126,7 @@ export default function PODetailPage() {
                       {item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 1 && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {item.episodes.map((ep) => (
-                            <span key={ep.episode} className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-lg">
+                            <span key={ep.episode} className="text-xs bg-[#F1F1F3] text-slate-900 px-2 py-0.5 rounded-lg">
                               {ep.episode}: {formatCurrency(ep.amount)} {getCurrencySymbol()}
                             </span>
                           ))}
@@ -1146,9 +1146,9 @@ export default function PODetailPage() {
                                 <p className={`mb-0.5 ${isOverInvoiced ? "text-amber-600" : "text-emerald-600"}`}>Realizado</p>
                                 <p className={`font-semibold ${isOverInvoiced ? "text-amber-700" : "text-emerald-700"}`}>{formatCurrency(itemInvoiced)} {getCurrencySymbol()}</p>
                               </div>
-                              <div className={`rounded-lg px-3 py-2 ${item.isClosed ? "bg-blue-50" : itemRemaining > 0 ? "bg-amber-50" : "bg-slate-50"}`}>
-                                <p className={`mb-0.5 ${item.isClosed ? "text-blue-600" : itemRemaining > 0 ? "text-amber-600" : "text-slate-500"}`}>Pendiente</p>
-                                <p className={`font-semibold ${item.isClosed ? "text-blue-700" : itemRemaining > 0 ? "text-amber-700" : "text-slate-600"}`}>
+                              <div className={`rounded-lg px-3 py-2 ${item.isClosed ? "bg-[#F7F7F8]" : itemRemaining > 0 ? "bg-amber-50" : "bg-slate-50"}`}>
+                                <p className={`mb-0.5 ${item.isClosed ? "text-slate-700" : itemRemaining > 0 ? "text-amber-600" : "text-slate-500"}`}>Pendiente</p>
+                                <p className={`font-semibold ${item.isClosed ? "text-slate-900" : itemRemaining > 0 ? "text-amber-700" : "text-slate-600"}`}>
                                   {item.isClosed ? "0,00" : formatCurrency(itemRemaining)} {getCurrencySymbol()}
                                 </p>
                               </div>
@@ -1181,7 +1181,7 @@ export default function PODetailPage() {
                               ) : (
                                 <button
                                   onClick={() => { setShowCloseItemModal(index); setPasswordInput(""); setPasswordError(""); }}
-                                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-[#F4F4F5] rounded-lg transition-colors"
                                 >
                                   <Lock size={12} />
                                   Cerrar item
@@ -1200,7 +1200,7 @@ export default function PODetailPage() {
             {invoices.length > 0 && (
               <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                 <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-                  <h3 className="font-semibold text-slate-900">Facturas vinculadas</h3>
+                  <h3 className="text-[13px] font-semibold text-slate-900">Facturas vinculadas</h3>
                   <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium">{invoices.length}</span>
                 </div>
                 <div className="divide-y divide-slate-100">
@@ -1222,7 +1222,7 @@ export default function PODetailPage() {
                               <span className="flex items-center gap-1 px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium line-through">✕ Anulada</span>
                             )}
                             {!isCancelled && (invoice.status === "accounted" || invoice.status === "paid") && (
-                              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded text-xs" title="Codificada">
+                              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-[#F1F1F3] text-slate-900 rounded text-xs" title="Codificada">
                                 <BookCheck size={12} />
                               </span>
                             )}
@@ -1247,7 +1247,7 @@ export default function PODetailPage() {
             {po.modificationHistory && po.modificationHistory.length > 0 && (
               <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                 <div className="px-5 py-3 border-b border-slate-100">
-                  <h3 className="font-semibold text-slate-900">Historial de modificaciones</h3>
+                  <h3 className="text-[13px] font-semibold text-slate-900">Historial de modificaciones</h3>
                 </div>
                 <div className="divide-y divide-slate-100">
                   {po.modificationHistory.map((entry, index) => (
@@ -1267,7 +1267,7 @@ export default function PODetailPage() {
 
           <div className="space-y-6">
             <div className="bg-white border border-slate-200 rounded-lg p-6">
-              <h3 className="font-semibold text-slate-900 mb-4">Resumen</h3>
+              <h3 className="text-[13px] font-semibold text-slate-900 mb-4">Resumen</h3>
               <div className="space-y-3">
                 <div className="flex justify-between text-[13px]">
                   <span className="text-slate-500">Base imponible</span>
@@ -1291,7 +1291,7 @@ export default function PODetailPage() {
             </div>
 
             <div className="bg-white border border-slate-200 rounded-lg p-6">
-              <h3 className="font-semibold text-slate-900 mb-4">Detalles</h3>
+              <h3 className="text-[13px] font-semibold text-slate-900 mb-4">Detalles</h3>
               <div className="space-y-4 text-[13px]">
                 <div className="flex items-center gap-3">
                   <Building2 size={16} className="text-slate-400" />
@@ -1339,10 +1339,10 @@ export default function PODetailPage() {
 
             {po.attachmentUrl && (
               <div className="bg-white border border-slate-200 rounded-lg p-6">
-                <h3 className="font-semibold text-slate-900 mb-4">Adjunto</h3>
+                <h3 className="text-[13px] font-semibold text-slate-900 mb-4">Adjunto</h3>
                 <a href={po.attachmentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-slate-50 rounded-md hover:bg-slate-100 transition-colors">
-                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                    <FileUp size={18} className="text-indigo-600" />
+                  <div className="w-10 h-10 bg-[#F1F1F3] rounded-lg flex items-center justify-center">
+                    <FileUp size={18} className="text-slate-700" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-medium text-slate-900 truncate">{po.attachmentFileName}</p>
@@ -1355,7 +1355,7 @@ export default function PODetailPage() {
 
             {po.notes && (
               <div className="bg-white border border-slate-200 rounded-lg p-6">
-                <h3 className="font-semibold text-slate-900 mb-3">Notas</h3>
+                <h3 className="text-[13px] font-semibold text-slate-900 mb-3">Notas</h3>
                 <p className="text-[13px] text-slate-600">{po.notes}</p>
               </div>
             )}
@@ -1374,7 +1374,7 @@ export default function PODetailPage() {
         {po.approvalSteps && po.approvalSteps.length > 0 && (
           <div className="mt-8 bg-white border border-slate-200 rounded-lg overflow-hidden">
             <div className="px-6 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-semibold text-slate-900">Firmas</h3>
+              <h3 className="text-[13px] font-semibold text-slate-900">Firmas</h3>
               {po.status === "approved" && (
                 <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
                   <CheckCircle size={12} />
@@ -1498,8 +1498,8 @@ export default function PODetailPage() {
         <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowCloseModal(false); resetModals(); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-md flex items-center justify-center">
-                <Lock size={20} className="text-blue-600" />
+              <div className="w-10 h-10 bg-[#F1F1F3] rounded-md flex items-center justify-center">
+                <Lock size={20} className="text-slate-700" />
               </div>
               <div>
                 <h3 className="text-[14px] font-semibold text-slate-900">Cerrar PO-{po.number}</h3>
@@ -1538,7 +1538,7 @@ export default function PODetailPage() {
                 <button onClick={() => { setShowCloseModal(false); resetModals(); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">
                   Cancelar
                 </button>
-                <button onClick={handleClosePO} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[13px] font-medium disabled:opacity-50">
+                <button onClick={handleClosePO} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-1.5 rounded-md text-[13px] font-medium disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                   {processing ? "Cerrando..." : "Cerrar PO"}
                 </button>
               </div>
@@ -1552,8 +1552,8 @@ export default function PODetailPage() {
         <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowCloseItemModal(null); resetModals(); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-md flex items-center justify-center">
-                <Lock size={20} className="text-blue-600" />
+              <div className="w-10 h-10 bg-[#F1F1F3] rounded-md flex items-center justify-center">
+                <Lock size={20} className="text-slate-700" />
               </div>
               <div>
                 <h3 className="text-[14px] font-semibold text-slate-900">Cerrar item</h3>
@@ -1597,7 +1597,7 @@ export default function PODetailPage() {
                 <button onClick={() => { setShowCloseItemModal(null); resetModals(); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">
                   Cancelar
                 </button>
-                <button onClick={() => handleCloseItem(showCloseItemModal)} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[13px] font-medium disabled:opacity-50">
+                <button onClick={() => handleCloseItem(showCloseItemModal)} disabled={processing || !passwordInput.trim()} className="flex-1 px-4 py-1.5 rounded-md text-[13px] font-medium disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                   {processing ? "Cerrando..." : "Cerrar item"}
                 </button>
               </div>
@@ -1884,7 +1884,7 @@ export default function PODetailPage() {
                   } />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-slate-900">Nota del aprobador</h3>
+                  <h3 className="text-[13px] font-semibold text-slate-900">Nota del aprobador</h3>
                   <p className="text-[13px] text-slate-500">{showApprovalNoteModal.userName}</p>
                 </div>
               </div>

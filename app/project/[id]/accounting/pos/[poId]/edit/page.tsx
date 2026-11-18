@@ -936,7 +936,7 @@ export default function EditPOPage() {
                   PO-{poNumber}
                 </span>
                 {poVersion > 1 && (
-                  <span className="px-2 py-1 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium">
+                  <span className="px-2 py-1 bg-[#F7F7F8] text-slate-900 rounded-lg text-xs font-medium">
                     V{String(poVersion).padStart(2, "0")}
                   </span>
                 )}
@@ -944,7 +944,7 @@ export default function EditPOPage() {
                   {poStatus === "draft" ? "Borrador" : poStatus === "rejected" ? "Rechazada" : "Pendiente"}
                 </span>
                 {permissions.fixedDepartment && (
-                  <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium">
+                  <span className="px-2 py-1 bg-[#F7F7F8] text-slate-900 rounded-lg text-xs font-medium">
                     {permissions.fixedDepartment}
                   </span>
                 )}
@@ -1223,7 +1223,7 @@ export default function EditPOPage() {
                               }}
                               disabled={!canEdit() || itemInvoiceStatus[index]?.hasAccountedInvoices}
                               className={`w-full px-4 py-2 border rounded-md text-[13px] text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white disabled:bg-slate-50 disabled:cursor-not-allowed ${
-                                itemInvoiceStatus[index]?.hasAccountedInvoices ? "border-red-200 bg-red-50" : item.episodeAssignment === "general" ? "border-slate-200" : "border-violet-200 bg-violet-50"
+                                itemInvoiceStatus[index]?.hasAccountedInvoices ? "border-red-200 bg-red-50" : item.episodeAssignment === "general" ? "border-slate-200" : "border-slate-200 bg-[#F7F7F8]"
                               }`}
                             >
                               {item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 0 ? (
@@ -1231,7 +1231,7 @@ export default function EditPOPage() {
                                   {itemInvoiceStatus[index]?.hasAccountedInvoices ? (
                                     <Lock size={14} className="text-red-500" />
                                   ) : (
-                                    <Layers size={14} className="text-violet-600" />
+                                    <Layers size={14} className="text-slate-700" />
                                   )}
                                   <span className="text-slate-900">
                                     {item.episodes.length === 1 ? `Cap. ${item.episodes[0].episode}` : `${item.episodes.length} capítulos`}
@@ -1252,7 +1252,7 @@ export default function EditPOPage() {
                             {item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 1 && (
                               <div className="mt-2 flex flex-wrap gap-1">
                                 {item.episodes.map((ep) => (
-                                  <span key={ep.episode} className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-lg">
+                                  <span key={ep.episode} className="text-xs bg-[#F1F1F3] text-slate-900 px-2 py-0.5 rounded-lg">
                                     {ep.episode}: {formatCurrency(ep.amount)} {getCurrencySymbol()}
                                   </span>
                                 ))}
@@ -1373,12 +1373,12 @@ export default function EditPOPage() {
                 {existingFileUrl && !uploadedFile && (
                   <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-md p-4 mb-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                        <FileText size={18} className="text-indigo-600" />
+                      <div className="w-10 h-10 bg-[#F1F1F3] rounded-lg flex items-center justify-center">
+                        <FileText size={18} className="text-slate-700" />
                       </div>
                       <div>
                         <p className="text-[13px] font-medium text-slate-900">{existingFileName}</p>
-                        <a href={existingFileUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 hover:underline">Ver archivo actual</a>
+                        <a href={existingFileUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-slate-700 hover:underline">Ver archivo actual</a>
                       </div>
                     </div>
                     {canEdit() && (
@@ -1390,7 +1390,7 @@ export default function EditPOPage() {
                 )}
 
                 {canEdit() && (
-                  <div onDrop={handleDrop} onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }} onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }} className={`border-2 border-dashed rounded-md p-8 text-center transition-all ${isDragging ? "border-indigo-400 bg-indigo-50" : uploadedFile ? "border-emerald-300 bg-emerald-50" : "border-slate-200 hover:border-slate-300"}`}>
+                  <div onDrop={handleDrop} onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }} onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }} className={`border-2 border-dashed rounded-md p-8 text-center transition-all ${isDragging ? "border-slate-400 bg-[#F7F7F8]" : uploadedFile ? "border-emerald-300 bg-emerald-50" : "border-slate-200 hover:border-slate-300"}`}>
                     {uploadedFile ? (
                       <div className="flex items-center justify-between bg-white border border-slate-200 rounded-md p-4">
                         <div className="flex items-center gap-3">
@@ -1452,7 +1452,7 @@ export default function EditPOPage() {
                   <span className={`text-[13px] font-bold ${completionPercentage === 100 ? "text-emerald-600" : "text-slate-900"}`}>{completionPercentage}%</span>
                 </div>
                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className={`h-full transition-all duration-300 ${completionPercentage === 100 ? "bg-emerald-500" : "bg-indigo-500"}`} style={{ width: `${completionPercentage}%` }} />
+                  <div className={`h-full transition-all duration-300 ${completionPercentage === 100 ? "bg-emerald-500" : "bg-slate-700"}`} style={{ width: `${completionPercentage}%` }} />
                 </div>
                 <div className="mt-3 space-y-1.5">
                   <div className="flex items-center gap-2 text-xs">
@@ -1707,8 +1707,8 @@ export default function EditPOPage() {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-violet-100 rounded-md flex items-center justify-center">
-                  <Layers size={20} className="text-violet-600" />
+                <div className="w-10 h-10 bg-[#F1F1F3] rounded-md flex items-center justify-center">
+                  <Layers size={20} className="text-slate-700" />
                 </div>
                 <div>
                   <h2 className="font-semibold text-slate-900">Asignar capítulos</h2>
@@ -1721,8 +1721,8 @@ export default function EditPOPage() {
             </div>
 
             <div className="p-6 space-y-4 overflow-y-auto max-h-[60vh]">
-              <button onClick={() => setTempEpisodeDistribution([])} className={`w-full px-4 py-4 rounded-md text-[13px] font-medium transition-colors flex items-center gap-3 border-2 ${tempEpisodeDistribution.length === 0 ? "bg-violet-50 border-violet-500 text-violet-700" : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"}`}>
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${tempEpisodeDistribution.length === 0 ? "border-violet-500 bg-violet-500" : "border-slate-300"}`}>
+              <button onClick={() => setTempEpisodeDistribution([])} className={`w-full px-4 py-4 rounded-md text-[13px] font-medium transition-colors flex items-center gap-3 border-2 ${tempEpisodeDistribution.length === 0 ? "bg-[#F7F7F8] border-slate-400 text-slate-900" : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"}`}>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${tempEpisodeDistribution.length === 0 ? "border-slate-400 bg-slate-700" : "border-slate-300"}`}>
                   {tempEpisodeDistribution.length === 0 && <CheckCircle2 size={12} className="text-white" />}
                 </div>
                 <div className="text-left">
@@ -1731,8 +1731,8 @@ export default function EditPOPage() {
                 </div>
               </button>
 
-              <button onClick={() => { if (tempEpisodeDistribution.length === 0) { const item = items[episodeItemIndex]; setTempEpisodeDistribution([{ episode: 1, amount: item.baseAmount, percentage: 100 }]); }}} className={`w-full px-4 py-4 rounded-md text-[13px] font-medium transition-colors flex items-center gap-3 border-2 ${tempEpisodeDistribution.length > 0 ? "bg-violet-50 border-violet-500 text-violet-700" : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"}`}>
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${tempEpisodeDistribution.length > 0 ? "border-violet-500 bg-violet-500" : "border-slate-300"}`}>
+              <button onClick={() => { if (tempEpisodeDistribution.length === 0) { const item = items[episodeItemIndex]; setTempEpisodeDistribution([{ episode: 1, amount: item.baseAmount, percentage: 100 }]); }}} className={`w-full px-4 py-4 rounded-md text-[13px] font-medium transition-colors flex items-center gap-3 border-2 ${tempEpisodeDistribution.length > 0 ? "bg-[#F7F7F8] border-slate-400 text-slate-900" : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"}`}>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${tempEpisodeDistribution.length > 0 ? "border-slate-400 bg-slate-700" : "border-slate-300"}`}>
                   {tempEpisodeDistribution.length > 0 && <CheckCircle2 size={12} className="text-white" />}
                 </div>
                 <div className="text-left">
@@ -1746,9 +1746,9 @@ export default function EditPOPage() {
                   <div>
                     <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Distribución</label>
                     <div className="flex gap-2">
-                      <button onClick={() => { setEpisodeDistributionMode("equal"); applyEqualDistribution(); }} className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${episodeDistributionMode === "equal" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Partes iguales</button>
-                      <button onClick={() => setEpisodeDistributionMode("amount")} className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${episodeDistributionMode === "amount" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Por importe</button>
-                      <button onClick={() => setEpisodeDistributionMode("percentage")} className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${episodeDistributionMode === "percentage" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Por porcentaje</button>
+                      <button onClick={() => { setEpisodeDistributionMode("equal"); applyEqualDistribution(); }} className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${episodeDistributionMode === "equal" ? "bg-[#F1F1F3] text-slate-900" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Partes iguales</button>
+                      <button onClick={() => setEpisodeDistributionMode("amount")} className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${episodeDistributionMode === "amount" ? "bg-[#F1F1F3] text-slate-900" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Por importe</button>
+                      <button onClick={() => setEpisodeDistributionMode("percentage")} className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${episodeDistributionMode === "percentage" ? "bg-[#F1F1F3] text-slate-900" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Por porcentaje</button>
                     </div>
                   </div>
 
@@ -1758,7 +1758,7 @@ export default function EditPOPage() {
                       {Array.from({ length: totalEpisodes }, (_, i) => i + 1).map((epNum) => {
                         const isSelected = tempEpisodeDistribution.some(e => e.episode === epNum);
                         return (
-                          <button key={epNum} onClick={() => toggleEpisodeInDistribution(epNum)} className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${isSelected ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{epNum}</button>
+                          <button key={epNum} onClick={() => toggleEpisodeInDistribution(epNum)} className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${isSelected ? "border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{epNum}</button>
                         );
                       })}
                     </div>
@@ -1804,7 +1804,7 @@ export default function EditPOPage() {
 
             <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3">
               <button onClick={() => setShowEpisodeModal(false)} className="flex-1 py-1.5 text-slate-600 hover:bg-slate-200 rounded-md text-[13px] font-medium transition-colors">Cancelar</button>
-              <button onClick={saveEpisodeDistribution} disabled={tempEpisodeDistribution.length > 0 && Math.abs(getTotalDistributedPercentage() - 100) >= 0.1} className="flex-1 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-md text-[13px] font-medium transition-colors disabled:opacity-50">Guardar</button>
+              <button onClick={saveEpisodeDistribution} disabled={tempEpisodeDistribution.length > 0 && Math.abs(getTotalDistributedPercentage() - 100) >= 0.1} className="flex-1 py-1.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">Guardar</button>
             </div>
           </div>
         </div>

@@ -69,7 +69,7 @@ import { realizeInvoice, unrealizeInvoice } from "@/lib/budgetOperations";
 
 const DOCUMENT_TYPES = {
   invoice: { code: "FRA", label: "Factura", icon: Receipt, bgColor: "bg-emerald-50", textColor: "text-emerald-700" },
-  proforma: { code: "PRF", label: "Proforma", icon: FileText, bgColor: "bg-violet-50", textColor: "text-violet-700" },
+  proforma: { code: "PRF", label: "Proforma", icon: FileText, bgColor: "bg-[#F7F7F8]", textColor: "text-slate-900" },
   budget: { code: "PRS", label: "Presupuesto", icon: FileCheck, bgColor: "bg-amber-50", textColor: "text-amber-700" },
   guarantee: { code: "FNZ", label: "Fianza", icon: Shield, bgColor: "bg-slate-100", textColor: "text-slate-700" },
 };
@@ -931,7 +931,7 @@ export default function EditInvoicePage() {
                   {invoiceDisplayNumber}
                 </span>
                 {invoiceVersion > 1 && (
-                  <span className="px-2 py-1 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium">
+                  <span className="px-2 py-1 bg-[#F7F7F8] text-slate-900 rounded-lg text-xs font-medium">
                     V{String(invoiceVersion).padStart(2, "0")}
                   </span>
                 )}
@@ -943,7 +943,7 @@ export default function EditInvoicePage() {
                   {invoiceStatus === "draft" ? "Borrador" : invoiceStatus === "rejected" ? "Rechazada" : "Pendiente"}
                 </span>
                 {linkedPO && (
-                  <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium">
+                  <span className="px-2 py-1 bg-[#F7F7F8] text-slate-900 rounded-lg text-xs font-medium">
                     PO-{linkedPO.number}
                   </span>
                 )}
@@ -1114,7 +1114,7 @@ export default function EditInvoicePage() {
                             Item {index + 1}
                           </span>
                           {itemComplete && <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-lg font-medium">Completo</span>}
-                          {!item.isNewItem && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg font-medium">De PO</span>}
+                          {!item.isNewItem && <span className="text-xs bg-[#F1F1F3] text-slate-900 px-2 py-0.5 rounded-lg font-medium">De PO</span>}
                         </div>
                         {items.length > 1 && (
                           <button onClick={() => removeItem(index)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
@@ -1153,11 +1153,11 @@ export default function EditInvoicePage() {
                         {/* Episodios */}
                         {episodesEnabled && totalEpisodes > 1 && (
                           <button onClick={() => openEpisodeModal(index)} className={cx("w-full px-4 py-1.5 border rounded-md text-[13px] text-left flex items-center justify-between hover:border-slate-300 transition-colors bg-white",
-                            item.episodeAssignment === "general" ? "border-slate-200" : "border-violet-200 bg-violet-50"
+                            item.episodeAssignment === "general" ? "border-slate-200" : "border-slate-200 bg-[#F7F7F8]"
                           )}>
                             {item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 0 ? (
                               <div className="flex items-center gap-2">
-                                <Layers size={14} className="text-violet-600" />
+                                <Layers size={14} className="text-slate-700" />
                                 <span className="text-slate-900">{item.episodes.length === 1 ? `Ep. ${item.episodes[0].episode}` : `${item.episodes.length} capítulos`}</span>
                               </div>
                             ) : (
@@ -1370,7 +1370,7 @@ export default function EditInvoicePage() {
                 <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-md mb-3">
                   <FileText size={18} className="text-slate-400" />
                   <span className="text-[13px] text-slate-600 flex-1 truncate">{existingFileName}</span>
-                  <a href={existingFileUrl} target="_blank" rel="noopener noreferrer" className="text-[13px] text-blue-600 hover:underline">Ver</a>
+                  <a href={existingFileUrl} target="_blank" rel="noopener noreferrer" className="text-[13px] text-slate-700 hover:underline">Ver</a>
                 </div>
               )}
               <label className={cx("flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-md cursor-pointer transition-colors",

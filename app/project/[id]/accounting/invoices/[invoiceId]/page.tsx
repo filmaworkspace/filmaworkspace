@@ -269,9 +269,9 @@ const STATUS_CONFIG: Record<InvoiceDisplayState, { bg: string; text: string; lab
   draft: { bg: "bg-slate-100", text: "text-slate-700", label: "Borrador", icon: Edit },
   submitted: { bg: "bg-amber-50", text: "text-amber-700", label: "En sistema", icon: Clock },
   approved: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Aprobada", icon: CheckCircle },
-  coded: { bg: "bg-violet-50", text: "text-violet-700", label: "Codificada", icon: Code },
+  coded: { bg: "bg-[#F7F7F8]", text: "text-slate-900", label: "Codificada", icon: Code },
   accounted: { bg: "bg-teal-50", text: "text-teal-700", label: "Contabilizada", icon: Lock },
-  paid: { bg: "bg-blue-50", text: "text-blue-700", label: "Pagada", icon: CreditCard },
+  paid: { bg: "bg-[#F7F7F8]", text: "text-slate-900", label: "Pagada", icon: CreditCard },
   overdue: { bg: "bg-red-50", text: "text-red-700", label: "Vencida", icon: AlertTriangle },
   rejected: { bg: "bg-red-50", text: "text-red-700", label: "Rechazada", icon: XCircle },
   cancelled: { bg: "bg-red-50", text: "text-red-700", label: "Anulada", icon: Ban },
@@ -281,8 +281,8 @@ const STATUS_CONFIG: Record<InvoiceDisplayState, { bg: string; text: string; lab
 };
 
 const DOC_TYPE_CONFIG: Record<DocumentType, { label: string; code: string; color: string }> = {
-  invoice: { label: "Factura", code: "FRA", color: "text-indigo-600" },
-  proforma: { label: "Proforma", code: "PRF", color: "text-violet-600" },
+  invoice: { label: "Factura", code: "FRA", color: "text-slate-700" },
+  proforma: { label: "Proforma", code: "PRF", color: "text-slate-700" },
   autonomo: { label: "Autónomo", code: "AUT", color: "text-amber-600" },
   ticket: { label: "Ticket", code: "TKT", color: "text-emerald-600" },
   budget: { label: "Presupuesto", code: "PRS", color: "text-cyan-600" },
@@ -907,18 +907,18 @@ export default function InvoiceDetailPage() {
         {toast && <div className="fixed bottom-4 left-4 z-50"><div className={`flex items-center gap-2 px-4 py-3 rounded-md shadow-lg ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"} text-white text-[13px] font-medium`}>{toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}{toast.message}</div></div>}
         
         {/* Coding Header */}
-        <div className="bg-violet-600 text-white px-6 py-3 flex items-center justify-between fixed top-0 left-0 right-0 z-50">
+        <div className="px-6 py-3 flex items-center justify-between fixed top-0 left-0 right-0 z-50 bg-slate-900 text-white">
           <div className="flex items-center gap-4">
-            <button onClick={() => setCodingMode(false)} className="p-2 hover:bg-violet-700 rounded-lg"><X size={20} /></button>
+            <button onClick={() => setCodingMode(false)} className="p-2 hover:bg-slate-800 rounded-lg"><X size={20} /></button>
             <div className="flex items-center gap-3">
               <Code size={20} />
               <span className="font-semibold">Codificar</span>
-              <span className="bg-violet-500 px-2 py-0.5 rounded text-[13px]">{invoice.displayNumber}</span>
+              <span className="bg-slate-700 px-2 py-0.5 rounded text-[13px]">{invoice.displayNumber}</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-violet-200 text-[13px]">Total: <span className="font-bold text-white">{formatCurrency(totals.total)} €</span></span>
-            <button onClick={handleSaveCoding} disabled={saving} className="flex items-center gap-2 px-3 py-1.5 bg-white text-violet-700 rounded-md text-[13px] font-semibold hover:bg-violet-50 disabled:opacity-50 shadow-lg">
+            <span className="text-slate-400 text-[13px]">Total: <span className="font-bold text-white">{formatCurrency(totals.total)} €</span></span>
+            <button onClick={handleSaveCoding} disabled={saving} className="flex items-center gap-2 px-3 py-1.5 bg-white text-slate-900 rounded-md text-[13px] font-semibold hover:bg-[#F4F4F5] disabled:opacity-50 shadow-lg">
               {saving ? <RefreshCw size={16} className="animate-spin" /> : <FileCheck size={16} />}
               {saving ? "Guardando..." : "Completar codificación"}
             </button>
@@ -934,7 +934,7 @@ export default function InvoiceDetailPage() {
                 {invoice.replacedFromType && invoice.originalAttachmentUrl && (
                   <button
                     onClick={() => setShowOriginalDoc(!showOriginalDoc)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${showOriginalDoc ? "bg-violet-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"}`}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${showOriginalDoc ? "border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]" : "bg-slate-700 text-slate-300 hover:bg-slate-600"}`}
                   >
                     {showOriginalDoc ? "Ver factura" : `Ver ${invoice.replacedFromType === "proforma" ? "proforma" : "presupuesto"} original`}
                   </button>
@@ -950,9 +950,9 @@ export default function InvoiceDetailPage() {
               </div>
             </div>
             {showOriginalDoc && invoice.originalAttachmentUrl && (
-              <div className="bg-violet-600/20 border border-violet-500/30 rounded-lg px-3 py-2 mb-3 flex items-center gap-2">
-                <FileText size={14} className="text-violet-400" />
-                <span className="text-violet-300 text-xs">
+              <div className="bg-slate-700 border border-slate-400 rounded-lg px-3 py-2 mb-3 flex items-center gap-2">
+                <FileText size={14} className="text-slate-400" />
+                <span className="text-slate-400 text-xs">
                   Mostrando {invoice.replacedFromType === "proforma" ? "proforma" : "presupuesto"} original
                 </span>
               </div>
@@ -980,33 +980,33 @@ export default function InvoiceDetailPage() {
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs text-slate-500 block mb-1">Nº Factura proveedor</label>
-                  <input value={codingForm.supplierNumber} onChange={(e) => setCodingForm({ ...codingForm, supplierNumber: e.target.value })} placeholder="Número de proveedor" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none" />
+                  <input value={codingForm.supplierNumber} onChange={(e) => setCodingForm({ ...codingForm, supplierNumber: e.target.value })} placeholder="Número de proveedor" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none" />
                 </div>
                 <div>
                   <label className="text-xs text-slate-500 block mb-1">Fecha factura</label>
-                  <input type="date" value={codingForm.invoiceDate} onChange={(e) => setCodingForm({ ...codingForm, invoiceDate: e.target.value })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none" />
+                  <input type="date" value={codingForm.invoiceDate} onChange={(e) => setCodingForm({ ...codingForm, invoiceDate: e.target.value })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none" />
                 </div>
                 <div>
                   <label className="text-xs text-slate-500 block mb-1">Fecha vencimiento</label>
-                  <input type="date" value={codingForm.dueDate} onChange={(e) => setCodingForm({ ...codingForm, dueDate: e.target.value })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none" />
+                  <input type="date" value={codingForm.dueDate} onChange={(e) => setCodingForm({ ...codingForm, dueDate: e.target.value })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none" />
                 </div>
               </div>
               <div className="mt-4">
                 <label className="text-xs text-slate-500 block mb-1">Descripción</label>
-                <input value={codingForm.description} onChange={(e) => setCodingForm({ ...codingForm, description: e.target.value })} placeholder="Descripción de la factura" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none" />
+                <input value={codingForm.description} onChange={(e) => setCodingForm({ ...codingForm, description: e.target.value })} placeholder="Descripción de la factura" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none" />
               </div>
             </div>
 
             {/* Supplier Info */}
             <div className="bg-white rounded-lg p-5 mb-4 shadow-sm">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-slate-900 flex items-center gap-2"><Building2 size={16} className="text-slate-400" />Proveedor: {invoice.supplier}</h3>
-                <button onClick={loadSupplierData} className="text-xs text-violet-600 hover:underline flex items-center gap-1"><RefreshCw size={12} />Cargar datos</button>
+                <h3 className="text-[13px] font-semibold text-slate-900 flex items-center gap-2"><Building2 size={16} className="text-slate-400" />Proveedor: {invoice.supplier}</h3>
+                <button onClick={loadSupplierData} className="text-xs text-slate-700 hover:underline flex items-center gap-1"><RefreshCw size={12} />Cargar datos</button>
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs text-slate-500 block mb-1">CIF/NIF</label>
-                  <input value={codingForm.supplierTaxId} onChange={(e) => setCodingForm({ ...codingForm, supplierTaxId: e.target.value })} placeholder="B12345678" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none font-mono" />
+                  <input value={codingForm.supplierTaxId} onChange={(e) => setCodingForm({ ...codingForm, supplierTaxId: e.target.value })} placeholder="B12345678" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none font-mono" />
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs text-slate-500 block mb-1">IBAN / BIC</label>
@@ -1015,8 +1015,8 @@ export default function InvoiceDetailPage() {
                     bic={codingForm.supplierBic}
                     onIBANChange={(v) => setCodingForm({ ...codingForm, supplierIban: v })}
                     onBICChange={(v) => setCodingForm({ ...codingForm, supplierBic: v })}
-                    ibanClassName="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none"
-                    bicClassName="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none"
+                    ibanClassName="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-900/10 outline-none"
+                    bicClassName="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-900/10 outline-none"
                   />
                 </div>
               </div>
@@ -1025,7 +1025,7 @@ export default function InvoiceDetailPage() {
             {/* Items */}
             <div className="bg-white rounded-lg p-5 mb-4 shadow-sm">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-slate-900">Líneas de codificación</h3>
+                <h3 className="text-[13px] font-semibold text-slate-900">Líneas de codificación</h3>
                 <div className="flex items-center gap-2">
                   {linkedPO && linkedPO.items && linkedPO.items.length > 0 && (
                     <button 
@@ -1044,19 +1044,19 @@ export default function InvoiceDetailPage() {
                         }));
                         setCodingItems(poItems);
                       }} 
-                      className="flex items-center gap-1 px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-200"
+                      className="flex items-center gap-1 px-3 py-1.5 bg-[#F1F1F3] text-slate-900 rounded-lg text-xs font-medium hover:bg-[#F4F4F5]"
                     >
                       <LinkIcon size={14} />Importar de PO
                     </button>
                   )}
-                  <button onClick={addCodingItem} className="flex items-center gap-1 px-3 py-1.5 bg-violet-100 text-violet-700 rounded-lg text-xs font-medium hover:bg-violet-200"><Plus size={14} />Añadir línea</button>
+                  <button onClick={addCodingItem} className="flex items-center gap-1 px-3 py-1.5 bg-[#F1F1F3] text-slate-900 rounded-lg text-xs font-medium hover:bg-[#F4F4F5]"><Plus size={14} />Añadir línea</button>
                 </div>
               </div>
 
               {/* PO Items selector */}
               {linkedPO && linkedPO.items && linkedPO.items.length > 0 && (
-                <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-md">
-                  <p className="text-xs font-medium text-indigo-800 mb-2">Añadir línea desde PO-{linkedPO.number}:</p>
+                <div className="mb-4 p-3 bg-[#F7F7F8] border border-slate-200 rounded-md">
+                  <p className="text-xs font-medium text-slate-900 mb-2">Añadir línea desde PO-{linkedPO.number}:</p>
                   <div className="flex flex-wrap gap-2">
                     {linkedPO.items.map((poItem: any, idx: number) => (
                       <button
@@ -1075,9 +1075,9 @@ export default function InvoiceDetailPage() {
                             isNewItem: false,
                           }]);
                         }}
-                        className="flex items-center gap-2 px-3 py-2 bg-white border border-indigo-200 rounded-lg text-xs hover:bg-indigo-100 transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs hover:bg-[#F4F4F5] transition-colors"
                       >
-                        <span className="font-medium text-indigo-700">#{idx + 1}</span>
+                        <span className="font-medium text-slate-900">#{idx + 1}</span>
                         <span className="text-slate-600 truncate max-w-[150px]">{poItem.description || "Sin descripción"}</span>
                         <span className="font-mono text-slate-500">{formatCurrency(poItem.unitPrice || 0)}€</span>
                       </button>
@@ -1088,7 +1088,7 @@ export default function InvoiceDetailPage() {
 
               <div className="space-y-4">
                 {codingItems.map((item, idx) => (
-                  <div key={idx} className={`border rounded-md p-4 relative ${item.isNewItem ? "border-amber-200 bg-amber-50/30" : "border-indigo-200 bg-indigo-50/30"}`}>
+                  <div key={idx} className={`border rounded-md p-4 relative ${item.isNewItem ? "border-amber-200 bg-amber-50/30" : "border-slate-200 bg-[#F7F7F8]"}`}>
                     <div className="absolute -top-2 left-3 flex items-center gap-2">
                       <span className="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-500 font-medium">Línea {idx + 1}</span>
                       {item.isNewItem ? (
@@ -1096,7 +1096,7 @@ export default function InvoiceDetailPage() {
                           <Plus size={10} />Nuevo
                         </span>
                       ) : (
-                        <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-xs font-medium flex items-center gap-1">
+                        <span className="bg-[#F1F1F3] text-slate-900 px-2 py-0.5 rounded text-xs font-medium flex items-center gap-1">
                           <LinkIcon size={10} />De PO
                         </span>
                       )}
@@ -1106,27 +1106,27 @@ export default function InvoiceDetailPage() {
                     <div className="grid grid-cols-12 gap-3 mt-2">
                       <div className="col-span-12">
                         <label className="text-xs text-slate-500 block mb-1">Descripción</label>
-                        <input value={item.description} onChange={(e) => updateCodingItem(idx, "description", e.target.value)} placeholder="Descripción del concepto" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none" />
+                        <input value={item.description} onChange={(e) => updateCodingItem(idx, "description", e.target.value)} placeholder="Descripción del concepto" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none" />
                       </div>
                       
                       <div className="col-span-6">
                         <label className="text-xs text-slate-500 block mb-1">Cuenta / Partida</label>
                         <div className="relative">
                           {item.subAccountId ? (
-                            <div className="flex items-center gap-2 px-3 py-2 bg-violet-50 border border-violet-200 rounded-lg">
-                              <span className="font-mono text-[13px] text-violet-700">{item.subAccountCode}</span>
+                            <div className="flex items-center gap-2 px-3 py-2 bg-[#F7F7F8] border border-slate-200 rounded-lg">
+                              <span className="font-mono text-[13px] text-slate-900">{item.subAccountCode}</span>
                               <span className="text-xs text-slate-600 truncate flex-1">{item.subAccountDescription}</span>
                               <button onClick={() => { updateCodingItem(idx, "subAccountId", ""); updateCodingItem(idx, "subAccountCode", ""); updateCodingItem(idx, "subAccountDescription", ""); }} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
                             </div>
                           ) : (
                             <div className="relative">
                               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                              <input placeholder="Buscar cuenta" value={searchSubAccount} onChange={(e) => setSearchSubAccount(e.target.value)} onFocus={() => setSearchSubAccount("")} className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none" />
+                              <input placeholder="Buscar cuenta" value={searchSubAccount} onChange={(e) => setSearchSubAccount(e.target.value)} onFocus={() => setSearchSubAccount("")} className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none" />
                               {searchSubAccount && (
                                 <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-xl max-h-48 overflow-y-auto" match="width">
                                   {subAccounts.filter((s) => s.code.toLowerCase().includes(searchSubAccount.toLowerCase()) || s.description.toLowerCase().includes(searchSubAccount.toLowerCase())).slice(0, 10).map((s) => (
                                     <button key={s.id} onClick={() => selectSubAccount(idx, s)} className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-[13px]">
-                                      <span className="font-mono text-violet-600">{s.code}</span>
+                                      <span className="font-mono text-slate-700">{s.code}</span>
                                       <span className="text-slate-600 truncate">{s.description}</span>
                                     </button>
                                   ))}
@@ -1154,7 +1154,7 @@ export default function InvoiceDetailPage() {
                             <button
                               type="button"
                               onClick={() => updateCodingItem(idx, "isNewItem", false)}
-                              className={`flex-1 px-2 py-2 rounded-lg text-xs font-medium transition-colors ${!item.isNewItem ? "bg-indigo-100 text-indigo-700 border border-indigo-200" : "bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200"}`}
+                              className={`flex-1 px-2 py-2 rounded-lg text-xs font-medium transition-colors ${!item.isNewItem ? "bg-[#F1F1F3] text-slate-900 border border-slate-200" : "bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200"}`}
                             >
                               De PO
                             </button>
@@ -1169,7 +1169,7 @@ export default function InvoiceDetailPage() {
                             <button
                               type="button"
                               onClick={() => setOpenDropdown(openDropdown === `poitem-${idx}` ? null : `poitem-${idx}`)}
-                              className="w-full px-3 py-2 border border-indigo-200 bg-indigo-50 rounded-lg text-[13px] text-left flex items-center justify-between gap-2 hover:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors"
+                              className="w-full px-3 py-2 border border-slate-200 bg-[#F7F7F8] rounded-lg text-[13px] text-left flex items-center justify-between gap-2 hover:border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-colors"
                             >
                               <span className="text-slate-900 truncate">
                                 {item.poItemIndex !== undefined && item.poItemIndex !== null
@@ -1209,7 +1209,7 @@ export default function InvoiceDetailPage() {
                           <button
                             type="button"
                             onClick={() => setOpenDropdown(openDropdown === `vat-${idx}` ? null : `vat-${idx}`)}
-                            className="w-full px-2 py-2 border border-slate-200 rounded-lg text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors"
+                            className="w-full px-2 py-2 border border-slate-200 rounded-lg text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-colors"
                           >
                             <span className="text-slate-900 truncate">{item.vatRate}%</span>
                             <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `vat-${idx}` ? "rotate-180" : ""}`} />
@@ -1237,7 +1237,7 @@ export default function InvoiceDetailPage() {
                           <button
                             type="button"
                             onClick={() => setOpenDropdown(openDropdown === `irpf-${idx}` ? null : `irpf-${idx}`)}
-                            className="w-full px-2 py-2 border border-slate-200 rounded-lg text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors"
+                            className="w-full px-2 py-2 border border-slate-200 rounded-lg text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-colors"
                           >
                             <span className="text-slate-900 truncate">{item.irpfRate}%</span>
                             <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `irpf-${idx}` ? "rotate-180" : ""}`} />
@@ -1261,13 +1261,13 @@ export default function InvoiceDetailPage() {
 
                       <div className="col-span-2">
                         <label className="text-xs text-slate-500 block mb-1">Cantidad</label>
-                        <input type="number" step="0.01" min="0" value={item.quantity || ""} onChange={(e) => updateCodingItem(idx, "quantity", parseFloat(e.target.value) || 0)} placeholder="1" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none text-right font-mono" />
+                        <input type="number" step="0.01" min="0" value={item.quantity || ""} onChange={(e) => updateCodingItem(idx, "quantity", parseFloat(e.target.value) || 0)} placeholder="1" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none text-right font-mono" />
                       </div>
 
                       <div className="col-span-3">
                         <label className="text-xs text-slate-500 block mb-1">Precio unit.</label>
                         <div className="relative">
-                          <input type="number" step="0.01" value={item.unitPrice || ""} onChange={(e) => updateCodingItem(idx, "unitPrice", parseFloat(e.target.value) || 0)} placeholder="0.00" className="w-full px-2.5 py-1.5 pr-8 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none text-right font-mono" />
+                          <input type="number" step="0.01" value={item.unitPrice || ""} onChange={(e) => updateCodingItem(idx, "unitPrice", parseFloat(e.target.value) || 0)} placeholder="0.00" className="w-full px-2.5 py-1.5 pr-8 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none text-right font-mono" />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[13px]">€</span>
                         </div>
                       </div>
@@ -1285,18 +1285,18 @@ export default function InvoiceDetailPage() {
             </div>
 
             {/* Totals */}
-            <div className="bg-violet-50 border border-violet-200 rounded-lg p-5 mb-4">
+            <div className="bg-[#F7F7F8] border border-slate-200 rounded-lg p-5 mb-4">
               <div className="grid grid-cols-4 gap-4 text-[13px]">
-                <div className="text-center"><p className="text-violet-600 text-xs mb-1">Base imponible</p><p className="font-bold text-slate-900">{formatCurrency(totals.base)} €</p></div>
-                <div className="text-center"><p className="text-violet-600 text-xs mb-1">IVA</p><p className="font-bold text-emerald-600">+{formatCurrency(totals.vat)} €</p></div>
-                <div className="text-center"><p className="text-violet-600 text-xs mb-1">IRPF</p><p className="font-bold text-red-600">-{formatCurrency(totals.irpf)} €</p></div>
-                <div className="text-center bg-white rounded-md p-3"><p className="text-violet-600 text-xs mb-1">TOTAL</p><p className="font-bold text-xl text-violet-700">{formatCurrency(totals.total)} €</p></div>
+                <div className="text-center"><p className="text-slate-700 text-xs mb-1">Base imponible</p><p className="font-bold text-slate-900">{formatCurrency(totals.base)} €</p></div>
+                <div className="text-center"><p className="text-slate-700 text-xs mb-1">IVA</p><p className="font-bold text-emerald-600">+{formatCurrency(totals.vat)} €</p></div>
+                <div className="text-center"><p className="text-slate-700 text-xs mb-1">IRPF</p><p className="font-bold text-red-600">-{formatCurrency(totals.irpf)} €</p></div>
+                <div className="text-center bg-white rounded-md p-3"><p className="text-slate-700 text-xs mb-1">TOTAL</p><p className="font-bold text-xl text-slate-900">{formatCurrency(totals.total)} €</p></div>
               </div>
             </div>
 
             {/* Extra Info */}
             <div className="bg-white rounded-lg p-5 shadow-sm">
-              <h3 className="font-semibold text-slate-900 mb-4">Información adicional</h3>
+              <h3 className="text-[13px] font-semibold text-slate-900 mb-4">Información adicional</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="text-xs text-slate-500 block mb-1">Método de pago</label>
@@ -1304,7 +1304,7 @@ export default function InvoiceDetailPage() {
                     <button
                       type="button"
                       onClick={() => setOpenDropdown(openDropdown === "paymentMethod" ? null : "paymentMethod")}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-colors"
                     >
                       <span className="text-slate-900 truncate">{PAYMENT_METHODS.find(m => m.value === codingForm.paymentMethod)?.label ?? codingForm.paymentMethod}</span>
                       <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === "paymentMethod" ? "rotate-180" : ""}`} />
@@ -1327,19 +1327,19 @@ export default function InvoiceDetailPage() {
                 </div>
                 <div className="col-span-2">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={codingForm.isAsset} onChange={(e) => setCodingForm({ ...codingForm, isAsset: e.target.checked })} className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500 text-[13px]" />
+                    <input type="checkbox" checked={codingForm.isAsset} onChange={(e) => setCodingForm({ ...codingForm, isAsset: e.target.checked })} className="w-4 h-4 rounded border-slate-300 text-slate-700 focus:ring-slate-900/10 text-[13px]" />
                     <span className="text-[13px] text-slate-700">Es un activo / inventario</span>
                   </label>
                 </div>
                 {codingForm.isAsset && (
                   <div className="col-span-2">
                     <label className="text-xs text-slate-500 block mb-1">Categoría de activo</label>
-                    <input value={codingForm.assetCategory} onChange={(e) => setCodingForm({ ...codingForm, assetCategory: e.target.value })} placeholder="Categoría del activo" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none" />
+                    <input value={codingForm.assetCategory} onChange={(e) => setCodingForm({ ...codingForm, assetCategory: e.target.value })} placeholder="Categoría del activo" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none" />
                   </div>
                 )}
                 <div className="col-span-2">
                   <label className="text-xs text-slate-500 block mb-1">Notas internas</label>
-                  <textarea value={codingForm.notes} onChange={(e) => setCodingForm({ ...codingForm, notes: e.target.value })} rows={2} placeholder="Notas para el equipo de contabilidad" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-violet-500 focus:outline-none resize-none" />
+                  <textarea value={codingForm.notes} onChange={(e) => setCodingForm({ ...codingForm, notes: e.target.value })} rows={2} placeholder="Notas para el equipo de contabilidad" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none resize-none" />
                 </div>
               </div>
             </div>
@@ -1372,7 +1372,7 @@ export default function InvoiceDetailPage() {
                     </span>
                   )}
                   {invoice.codedAt && displayState !== "coded" && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-violet-100 text-violet-700 rounded-lg font-medium text-[13px]">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#F1F1F3] text-slate-900 rounded-lg font-medium text-[13px]">
                       <FileCheck size={14} />Codificada
                     </span>
                   )}
@@ -1382,11 +1382,11 @@ export default function InvoiceDetailPage() {
                     </span>
                   )}
                   {invoice.paidAt && displayState !== "paid" && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-700 rounded-lg font-medium text-[13px]">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#F1F1F3] text-slate-900 rounded-lg font-medium text-[13px]">
                       <CreditCard size={14} />Pagada
                     </span>
                   )}
-                  {invoice.poNumber && <Link href={`/project/${projectId}/accounting/pos/${invoice.poId}`} className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-100"><LinkIcon size={12} />PO-{invoice.poNumber}</Link>}
+                  {invoice.poNumber && <Link href={`/project/${projectId}/accounting/pos/${invoice.poId}`} className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#F7F7F8] text-slate-900 rounded-lg text-xs font-medium hover:bg-[#F4F4F5]"><LinkIcon size={12} />PO-{invoice.poNumber}</Link>}
                 </div>
               </div>
             </div>
@@ -1399,7 +1399,7 @@ export default function InvoiceDetailPage() {
               </div>
 
               {canCode() && invoice.status !== "cancelled" && (
-                <button onClick={() => setCodingMode(true)} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-[13px] font-medium ${invoice.codedAt ? "bg-violet-100 text-violet-700 hover:bg-violet-200" : "bg-violet-600 text-white hover:bg-violet-700"}`}>
+                <button onClick={() => setCodingMode(true)} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-[13px] font-medium ${invoice.codedAt ? "bg-[#F1F1F3] text-slate-900 hover:bg-[#F4F4F5]" : "border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"}`}>
                   <Code size={16} />
                   {invoice.codedAt ? "Editar codificación" : "Codificar"}
                 </button>
@@ -1491,7 +1491,7 @@ export default function InvoiceDetailPage() {
         {invoice.codedAt && (
           <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-slate-500">
             <span className="flex items-center gap-1.5">
-              <FileCheck size={12} className="text-violet-500" />
+              <FileCheck size={12} className="text-slate-500" />
               <span>Codificada por {invoice.codedByName}</span>
             </span>
             {invoice.supplierNumber && (
@@ -1513,7 +1513,7 @@ export default function InvoiceDetailPage() {
               </>
             )}
             {canCode() && (
-              <button onClick={() => setCodingMode(true)} className="text-violet-600 hover:text-violet-800 font-medium">
+              <button onClick={() => setCodingMode(true)} className="text-slate-700 hover:text-slate-900 font-medium">
                 Editar
               </button>
             )}
@@ -1527,11 +1527,11 @@ export default function InvoiceDetailPage() {
             <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
               <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <h3 className="font-semibold text-slate-900">Documento</h3>
+                  <h3 className="text-[13px] font-semibold text-slate-900">Documento</h3>
                   {invoice.replacedFromType && invoice.originalAttachmentUrl && (
                     <button
                       onClick={() => setShowOriginalDoc(!showOriginalDoc)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${showOriginalDoc ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${showOriginalDoc ? "bg-[#F1F1F3] text-slate-900" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
                     >
                       {showOriginalDoc ? "Ver factura" : `Ver ${invoice.replacedFromType === "proforma" ? "proforma" : "presupuesto"}`}
                     </button>
@@ -1556,9 +1556,9 @@ export default function InvoiceDetailPage() {
                 </div>
               </div>
               {showOriginalDoc && invoice.originalAttachmentUrl && (
-                <div className="bg-violet-50 border-b border-violet-100 px-6 py-2 flex items-center gap-2">
-                  <FileText size={14} className="text-violet-600" />
-                  <span className="text-violet-700 text-xs font-medium">
+                <div className="bg-[#F7F7F8] border-b border-slate-200 px-6 py-2 flex items-center gap-2">
+                  <FileText size={14} className="text-slate-700" />
+                  <span className="text-slate-900 text-xs font-medium">
                     Mostrando {invoice.replacedFromType === "proforma" ? "proforma" : "presupuesto"} original
                   </span>
                 </div>
@@ -1591,7 +1591,7 @@ export default function InvoiceDetailPage() {
               </div>
             </div>
 
-            {invoice.notes && <div className="bg-white border border-slate-200 rounded-lg p-6"><h3 className="font-semibold text-slate-900 mb-3">Notas</h3><p className="text-[13px] text-slate-600">{invoice.notes}</p></div>}
+            {invoice.notes && <div className="bg-white border border-slate-200 rounded-lg p-6"><h3 className="text-[13px] font-semibold text-slate-900 mb-3">Notas</h3><p className="text-[13px] text-slate-600">{invoice.notes}</p></div>}
           </div>
 
           {/* Right: Info */}
@@ -1599,7 +1599,7 @@ export default function InvoiceDetailPage() {
             {/* Items FIRST */}
             <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
               <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="font-semibold text-slate-900">Líneas de factura</h3>
+                <h3 className="text-[13px] font-semibold text-slate-900">Líneas de factura</h3>
                 <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">{invoice.items.length} {invoice.items.length === 1 ? 'línea' : 'líneas'}</span>
               </div>
               <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
@@ -1618,7 +1618,7 @@ export default function InvoiceDetailPage() {
                             {item.isNewItem ? (
                               <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-medium flex items-center gap-0.5"><Plus size={8} />Nuevo</span>
                             ) : item.poItemIndex !== undefined && item.poItemIndex !== null ? (
-                              <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-medium flex items-center gap-0.5"><LinkIcon size={8} />PO #{item.poItemIndex + 1}</span>
+                              <span className="bg-[#F1F1F3] text-slate-900 px-1.5 py-0.5 rounded text-[10px] font-medium flex items-center gap-0.5"><LinkIcon size={8} />PO #{item.poItemIndex + 1}</span>
                             ) : null}
                           </div>
                           <p className="text-[13px] text-slate-500">{item.subAccountCode} · {item.subAccountDescription}</p>
@@ -1629,7 +1629,7 @@ export default function InvoiceDetailPage() {
                         {item.vatRate > 0 && <span>IVA {item.vatRate}%</span>}
                         {item.irpfRate > 0 && <span className="text-red-500">IRPF {item.irpfRate}%</span>}
                         {item.episodeAssignment && (
-                          <span className="flex items-center gap-1 text-violet-600">
+                          <span className="flex items-center gap-1 text-slate-700">
                             <Layers size={10} />
                             {episodeLabel}
                           </span>
@@ -1638,7 +1638,7 @@ export default function InvoiceDetailPage() {
                       {item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 1 && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {item.episodes.map((ep) => (
-                            <span key={ep.episode} className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-lg">
+                            <span key={ep.episode} className="text-xs bg-[#F1F1F3] text-slate-900 px-2 py-0.5 rounded-lg">
                               {ep.episode}: {formatCurrency(ep.amount)} €
                             </span>
                           ))}
@@ -1652,7 +1652,7 @@ export default function InvoiceDetailPage() {
 
             {/* Summary AFTER items */}
             <div className="bg-white border border-slate-200 rounded-lg p-6">
-              <h3 className="font-semibold text-slate-900 mb-4">Resumen</h3>
+              <h3 className="text-[13px] font-semibold text-slate-900 mb-4">Resumen</h3>
               <div className="space-y-3">
                 <div className="flex justify-between text-[13px]"><span className="text-slate-500">Base imponible</span><span className="font-medium">{formatCurrency(invoice.baseAmount)} €</span></div>
                 <div className="flex justify-between text-[13px]"><span className="text-slate-500">IVA</span><span className="font-medium text-emerald-600">+{formatCurrency(invoice.vatAmount)} €</span></div>
@@ -1665,16 +1665,16 @@ export default function InvoiceDetailPage() {
             {!invoice.codedAt && canCode() && invoice.status !== "cancelled" ? (
               <button 
                 onClick={() => setCodingMode(true)} 
-                className="w-full bg-violet-50 border border-violet-200 rounded-lg p-4 flex items-center gap-3 hover:bg-violet-100 transition-colors text-left"
+                className="w-full bg-[#F7F7F8] border border-slate-200 rounded-lg p-4 flex items-center gap-3 hover:bg-[#F4F4F5] transition-colors text-left"
               >
-                <div className="w-10 h-10 bg-violet-100 rounded-md flex items-center justify-center">
-                  <Code size={20} className="text-violet-600" />
+                <div className="w-10 h-10 bg-[#F1F1F3] rounded-md flex items-center justify-center">
+                  <Code size={20} className="text-slate-700" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold text-violet-900">Codificar factura</p>
-                  <p className="text-xs text-violet-700">Añadir datos fiscales y contables</p>
+                  <p className="font-semibold text-slate-900">Codificar factura</p>
+                  <p className="text-xs text-slate-900">Añadir datos fiscales y contables</p>
                 </div>
-                <ChevronRight size={20} className="text-violet-400" />
+                <ChevronRight size={20} className="text-slate-400" />
               </button>
             ) : !invoice.codedAt && (
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 flex items-center gap-3">
@@ -1733,7 +1733,7 @@ export default function InvoiceDetailPage() {
                         <div className="text-right">
                           <p className="font-semibold text-slate-900">{formatCurrency(payment.amount)} €</p>
                           {payment.receiptUrl && (
-                            <a href={payment.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center justify-end gap-1">
+                            <a href={payment.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-slate-700 hover:underline flex items-center justify-end gap-1">
                               <FileText size={10} />Justificante
                             </a>
                           )}
@@ -1812,36 +1812,36 @@ export default function InvoiceDetailPage() {
 
             {/* Linked PO */}
             {linkedPO && (
-              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-5">
+              <div className="bg-[#F7F7F8] border border-slate-200 rounded-lg p-5">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <LinkIcon size={16} className="text-indigo-600" />
-                    <span className="font-semibold text-indigo-900">PO-{linkedPO.number}</span>
+                    <LinkIcon size={16} className="text-slate-700" />
+                    <span className="font-semibold text-slate-900">PO-{linkedPO.number}</span>
                   </div>
-                  <Link href={`/project/${projectId}/accounting/pos/${linkedPO.id}`} className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1">Ver PO <ExternalLink size={10} /></Link>
+                  <Link href={`/project/${projectId}/accounting/pos/${linkedPO.id}`} className="text-xs text-slate-700 hover:text-slate-900 flex items-center gap-1">Ver PO <ExternalLink size={10} /></Link>
                 </div>
                 <div className="flex items-center gap-4 text-[13px]">
                   <div>
-                    <p className="text-indigo-600 text-xs">Base</p>
+                    <p className="text-slate-700 text-xs">Base</p>
                     <p className="font-medium text-slate-900">{formatCurrency(linkedPO.baseAmount)} €</p>
                   </div>
                   <div>
-                    <p className="text-indigo-600 text-xs">Facturado</p>
+                    <p className="text-slate-700 text-xs">Facturado</p>
                     <p className="font-medium text-slate-900">{formatCurrency(linkedPO.invoicedAmount)} €</p>
                   </div>
                   <div className="flex-1">
-                    <div className="w-full h-2 bg-indigo-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min(100, (linkedPO.invoicedAmount / linkedPO.baseAmount) * 100)}%` }} />
+                    <div className="w-full h-2 bg-[#F1F1F3] rounded-full overflow-hidden">
+                      <div className="h-full bg-slate-700 rounded-full" style={{ width: `${Math.min(100, (linkedPO.invoicedAmount / linkedPO.baseAmount) * 100)}%` }} />
                     </div>
                   </div>
-                  <span className="text-xs text-indigo-600 font-medium">{Math.round((linkedPO.invoicedAmount / linkedPO.baseAmount) * 100)}%</span>
+                  <span className="text-xs text-slate-700 font-medium">{Math.round((linkedPO.invoicedAmount / linkedPO.baseAmount) * 100)}%</span>
                 </div>
               </div>
             )}
 
             {/* Details - More compact */}
             <div className="bg-white border border-slate-200 rounded-lg p-5">
-              <h3 className="font-semibold text-slate-900 mb-4">Detalles</h3>
+              <h3 className="text-[13px] font-semibold text-slate-900 mb-4">Detalles</h3>
               <div className="grid grid-cols-2 gap-4 text-[13px]">
                 <div className="flex items-center gap-2">
                   <Building2 size={14} className="text-slate-400" />
@@ -1899,7 +1899,7 @@ export default function InvoiceDetailPage() {
                   ) : invoice.status === "partial_return" ? (
                     <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-lg font-medium">Devolución parcial</span>
                   ) : (invoice.paidAt || invoice.status === "paid") ? (
-                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-lg font-medium">Depositada</span>
+                    <span className="text-xs bg-[#F1F1F3] text-slate-900 px-2 py-1 rounded-lg font-medium">Depositada</span>
                   ) : (
                     <span className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-lg font-medium">Pendiente</span>
                   )}
@@ -1968,7 +1968,7 @@ export default function InvoiceDetailPage() {
         {invoice.approvalSteps && invoice.approvalSteps.length > 0 && (
           <div className="mt-8 bg-white border border-slate-200 rounded-lg overflow-hidden">
             <div className="px-6 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-semibold text-slate-900">Firmas</h3>
+              <h3 className="text-[13px] font-semibold text-slate-900">Firmas</h3>
               {invoice.approvedAt ? (
                 <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
                   <CheckCircle size={12} />
@@ -2100,7 +2100,7 @@ export default function InvoiceDetailPage() {
                   } />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-slate-900">Nota del aprobador</h3>
+                  <h3 className="text-[13px] font-semibold text-slate-900">Nota del aprobador</h3>
                   <p className="text-[13px] text-slate-500">{showApprovalNoteModal.userName}</p>
                 </div>
               </div>
