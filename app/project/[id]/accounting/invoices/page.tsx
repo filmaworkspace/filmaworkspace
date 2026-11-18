@@ -2,10 +2,12 @@
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
-import { AnchoredPanel } from "@/components/ds";
+import { Button, Checkbox, EmptyState, IconButton, Menu, MenuItem, MenuSeparator, Modal, Page, PageHeader, PageLoading, Select, buttonClass } from "@/components/ds";
+import SearchBar, { type SearchField } from "@/components/SearchBar";
+import { matchAmount, matchCode, matchWords } from "@/lib/search";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
@@ -50,7 +52,7 @@ import {
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
-import { getInvoiceDisplayState } from "@/lib/invoiceHelpers";
+import { getInvoiceDisplayState, inInvoiceView, type InvoiceView } from "@/lib/invoiceHelpers";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -159,6 +161,22 @@ export default function InvoicesPage() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
+  const searchParams = useSearchParams();
+  const supplierParam = searchParams?.get("supplier") || "";
+  const viewParam = searchParams?.get("vista") || "";
+  const [view, setViewState] = useState<"all" | InvoiceView>(
+    (["recibidas", "aprobadas", "pagadas", "semana"].includes(viewParam) ? viewParam : "all") as "all" | InvoiceView,
+  );
+  const [searchField, setSearchField] = useState<"all" | "number" | "supplier" | "concept" | "account" | "amount">("all");
+  const [onlyPendingReplacement, setOnlyPendingReplacement] = useState(false);
+  // La vista queda en la URL (?vista=…) para poder compartir el enlace o volver atrás.
+  const setView = (v: "all" | InvoiceView) => {
+    setViewState(v);
+    const qs = new URLSearchParams(searchParams?.toString() || "");
+    if (v === "all") qs.delete("vista"); else qs.set("vista", v);
+    const str = qs.toString();
+    router.replace(`/project/${id}/accounting/invoices${str ? `?${str}` : ""}`, { scroll: false });
+  };
 
   const { loading: permissionsLoading, error: permissionsError, permissions } = useAccountingPermissions(id);
 
@@ -566,598 +584,318 @@ export default function InvoicesPage() {
   };
 
   const formatDate = (date: Date) => (date ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" }).format(date) : "-");
-  const formatCurrency = (amount: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
+  const formatCurrency = (amount: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(amount || 0);
   const getDaysUntilDue = (dueDate: Date) => Math.ceil((dueDate.getTime() - Date.now()) / 86400000);
 
-  const exportInvoices = () => {
-    const rows = [["TIPO", "NÚMERO", "PROVEEDOR", "PO", "IMPORTE", "ESTADO", "VENCIMIENTO"]];
-    filteredInvoices.forEach((inv) => {
+  const exportInvoices = (list: Invoice[]) => {
+    const rows = [["TIPO", "NÚMERO", "PROVEEDOR", "CONCEPTO", "PO", "BASE", "TOTAL", "ESTADO", "VENCIMIENTO"]];
+    list.forEach((inv) => {
       const docType = DOCUMENT_TYPES[inv.documentType] || DOCUMENT_TYPES.invoice;
-      rows.push([docType.code, inv.displayNumber, inv.supplier, inv.poNumber ? `PO-${inv.poNumber}` : "-", inv.totalAmount.toString(), inv.status, formatDate(inv.dueDate)]);
+      rows.push([docType.code, inv.displayNumber, inv.supplier, inv.description || "", inv.poNumber ? `PO-${inv.poNumber}` : "", formatCurrency(inv.baseAmount), formatCurrency(inv.totalAmount), getInvoiceDisplayState(inv), formatDate(inv.dueDate)]);
     });
-    const blob = new Blob(["\uFEFF" + rows.map((r) => r.join(",")).join("\n")], { type: "text/csv;charset=utf-8;" });
+    const q = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const blob = new Blob(["\uFEFF" + rows.map((r) => r.map(q).join(";")).join("\n")], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = `Documentos_${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
   };
 
-  const stats = {
-    total: invoices.length,
-    invoices: invoices.filter((i) => i.documentType === "invoice").length,
-    proformas: invoices.filter((i) => i.documentType === "proforma").length,
-    budgets: invoices.filter((i) => i.documentType === "budget").length,
-    guarantees: invoices.filter((i) => i.documentType === "guarantee").length,
+  // ── Vistas, búsqueda avanzada y filtros ───────────────────────────────────
+  type InvField = "all" | "number" | "supplier" | "concept" | "account" | "amount";
+  const INV_FIELDS: SearchField<InvField>[] = [
+    { value: "all", label: "Buscar en todo", placeholder: "Número, proveedor, concepto o cuenta" },
+    { value: "number", label: "Nº documento o PO", placeholder: "Ej. FAC-0012 o PO-0003", mono: true },
+    { value: "supplier", label: "Proveedor", placeholder: "Ej. Rental Norte" },
+    { value: "concept", label: "Concepto", placeholder: "Ej. alquiler cámara" },
+    { value: "account", label: "Cuenta", placeholder: "Ej. 04.01 o iluminación", mono: true },
+    { value: "amount", label: "Importe", placeholder: "1500 · >1000 · 500-2000", mono: true },
+  ];
+  const VIEWS: { value: "all" | InvoiceView; label: string }[] = [
+    { value: "all", label: "Todas" },
+    { value: "recibidas", label: "Recibidas" },
+    { value: "aprobadas", label: "Aprobadas" },
+    { value: "pagadas", label: "Pagadas" },
+    { value: "semana", label: "Vencen esta semana" },
+  ];
+  const invMatches = (inv: Invoice) => {
+    const q = searchTerm.trim();
+    if (!q) return true;
+    const byNumber = matchCode(q, inv.displayNumber, inv.number, inv.poNumber ? `PO-${inv.poNumber}` : "");
+    const bySupplier = matchWords(q, inv.supplier);
+    const byConcept = matchWords(q, inv.description, ...(inv.items || []).map((i) => i.description));
+    const byAccount = (inv.items || []).some((i) => matchCode(q, i.subAccountCode) || matchWords(q, i.subAccountDescription));
+    const byAmount = matchAmount(q, inv.totalAmount, inv.baseAmount);
+    if (searchField === "number") return byNumber;
+    if (searchField === "supplier") return bySupplier;
+    if (searchField === "concept") return byConcept;
+    if (searchField === "account") return byAccount;
+    if (searchField === "amount") return byAmount === true;
+    return byNumber || bySupplier || byConcept || byAccount || byAmount === true;
+  };
+  const rows = invoices
+    .filter((inv) => view === "all" || inInvoiceView(view, getInvoiceDisplayState(inv), inv.dueDate))
+    .filter((inv) => !supplierParam || inv.supplierId === supplierParam)
+    .filter(invMatches)
+    .filter((inv) => statusFilter === "all" || getInvoiceDisplayState(inv) === statusFilter)
+    .filter((inv) => typeFilter === "all" || inv.documentType === typeFilter)
+    .filter((inv) => !showUncodedOnly || !inv.codedAt)
+    .filter((inv) => !onlyPendingReplacement || (inv.requiresReplacement && !inv.replacedByInvoiceId && !inv.replacedBy))
+    .sort((a, b) => view === "semana" ? a.dueDate.getTime() - b.dueDate.getTime() : 0);
+  const viewCount = (v: "all" | InvoiceView) => v === "all" ? invoices.length : invoices.filter((inv) => inInvoiceView(v, getInvoiceDisplayState(inv), inv.dueDate)).length;
+  const filtersActive = statusFilter !== "all" || typeFilter !== "all" || showUncodedOnly || !!supplierParam;
+  const supplierName = supplierParam ? invoices.find((i) => i.supplierId === supplierParam)?.supplier : null;
+  const active = rows.filter((r) => !["cancelled", "void", "rejected"].includes(r.status));
+  const totals = { base: active.reduce((s, r) => s + (r.baseAmount || 0), 0), total: active.reduce((s, r) => s + (r.totalAmount || 0), 0) };
+
+  const STATE: Record<string, { label: string; dot: string; text: string }> = {
+    draft: { label: "Borrador", dot: "bg-slate-300", text: "text-slate-600" },
+    submitted: { label: "Pend. aprobación", dot: "bg-amber-500", text: "text-amber-800" },
+    approved: { label: "Aprobada", dot: "bg-emerald-500", text: "text-emerald-800" },
+    coded: { label: "Codificada", dot: "bg-violet-500", text: "text-violet-800" },
+    accounted: { label: "Contabilizada", dot: "bg-teal-500", text: "text-teal-800" },
+    paid: { label: "Pagada", dot: "bg-[#2F52E0]", text: "text-blue-800" },
+    overdue: { label: "Vencida", dot: "bg-red-500", text: "text-red-700" },
+    rejected: { label: "Rechazada", dot: "bg-red-500", text: "text-red-700" },
+    cancelled: { label: "Anulada", dot: "bg-slate-300", text: "text-slate-500 line-through" },
+    void: { label: "Anulada", dot: "bg-slate-300", text: "text-slate-500 line-through" },
+    returned: { label: "Devuelta", dot: "bg-teal-500", text: "text-teal-800" },
+    partial_return: { label: "Dev. parcial", dot: "bg-cyan-500", text: "text-cyan-800" },
+  };
+  const dueLabel = (inv: Invoice, state: string) => {
+    if (inv.paidAt || ["paid", "cancelled", "void", "rejected"].includes(state)) return null;
+    const d = getDaysUntilDue(inv.dueDate);
+    if (d < 0) return { text: `hace ${-d} d`, cls: "text-red-700" };
+    if (d === 0) return { text: "hoy", cls: "text-red-700" };
+    if (d <= 7) return { text: `en ${d} d`, cls: "text-amber-800" };
+    return null;
   };
 
-  const getStatusLabel = () => {
-    const opt = STATUS_OPTIONS.find((o) => o.value === statusFilter);
-    return opt?.label || "Todos los estados";
-  };
-
-  if (permissionsLoading || loading) {
-    return (
-      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
-      </div>
-    );
-  }
+  if (permissionsLoading || loading) return <PageLoading />;
 
   if (permissionsError || !permissions.hasAccountingAccess) {
     return (
-      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-        <div className="text-center max-w-md">
-          <div className="hidden">
-            <ShieldAlert size={28} className="text-red-500" />
-          </div>
-          <h2 className="text-[14px] font-semibold text-slate-900 mb-2">Acceso denegado</h2>
-          <p className="text-slate-500 mb-6">{permissionsError || "No tienes permisos para ver facturas"}</p>
-          <Link 
-            href={`/project/${id}/accounting`} 
-            className="inline-flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity"
-          >
-            Volver al panel
-          </Link>
+      <div className={`flex min-h-screen items-center justify-center bg-white px-6 ${inter.className}`}>
+        <div className="text-center">
+          <p className="text-[15px] font-semibold text-slate-900">Sin acceso</p>
+          <p className="mt-1 text-[13px] text-slate-500">{permissionsError || "No tienes acceso a contabilidad en este proyecto."}</p>
+          <Link href="/dashboard" className={`${buttonClass("primary")} mt-5`}>Volver a proyectos</Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen bg-white ${inter.className}`}>
-      <div className="mt-[53px]">
-        <div className="px-6 pt-8 sm:px-10">
-          {/* Page header */}
-          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
-            <div className="flex items-center gap-4">
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-2">
-                  <h1 className="text-xl font-semibold tracking-tight text-slate-900">Facturas</h1>
-                  {/* Company Info Tooltip */}
-                  <div className="relative">
-                    <button
-                      onMouseEnter={() => setShowCompanyTooltip(true)}
-                      onMouseLeave={() => setShowCompanyTooltip(false)}
-                      className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${companyData ? "bg-slate-100 text-slate-500 hover:bg-slate-200" : "bg-slate-100 text-slate-400"}`}
-                    >
-                      <Building2 size={14} />
-                    </button>
-                    {showCompanyTooltip && (
-                      <AnchoredPanel className="w-72 bg-white rounded-md shadow-xl border border-slate-200 p-4" align="center" gap={8}>
-                        <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100">
-                          <div className="hidden">
-                            <Building2 size={16} className="text-slate-600" />
-                          </div>
-                          <p className="text-xs font-medium text-slate-500">Datos fiscales del proyecto</p>
-                        </div>
-                        {companyData ? (
-                          <div className="space-y-2">
-                            <div>
-                              <p className="text-[13px] font-semibold text-slate-900">{companyData.fiscalName}</p>
-                              <p className="text-xs font-mono text-slate-600">{companyData.taxId}</p>
-                            </div>
-                            <div className="text-xs text-slate-600">
-                              <p>{companyData.address}</p>
-                              <p>{companyData.postalCode} {companyData.city}</p>
-                              {companyData.province && <p>{companyData.province}, {companyData.country}</p>}
-                            </div>
-                            {(companyData.email || companyData.phone) && (
-                              <div className="pt-2 border-t border-slate-100 text-xs text-slate-500">
-                                {companyData.email && <p>{companyData.email}</p>}
-                                {companyData.phone && <p>{companyData.phone}</p>}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-slate-500 text-center py-2">No hay datos fiscales configurados</p>
-                        )}
-                      </AnchoredPanel>
-                    )}
-                  </div>
-                </div>
-                {!permissions.canViewAllPOs && (
-                  <p className="text-[13px] text-slate-500 mt-0.5">
-                    {permissions.canViewDepartmentPOs ? `Mostrando documentos de ${permissions.department}` : "Mostrando tus documentos"}
-                  </p>
-                )}
-              </div>
-            </div>
-            <div className="absolute right-0 flex items-center gap-3">
-              {permissions.canCreatePO && (
-                <Link
-                  href={`/project/${id}/accounting/invoices/new`}
-                  className="flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity"
-                >
-                  <Upload size={16} strokeWidth={2.5} />
-                  Subir documento
-                </Link>
+    <Page>
+      <PageHeader
+        title={
+          <>
+            Facturas <span className="text-[15px] font-normal text-slate-400">{invoices.length}</span>
+            {!permissions.canViewAllPOs && (
+              <span className="text-xs font-normal text-slate-500">· {permissions.canViewDepartmentPOs ? permissions.department : "solo tus documentos"}</span>
+            )}
+          </>
+        }
+        actions={
+          <>
+            <Menu trigger={(toggle) => <IconButton label="Más acciones" onClick={toggle}><MoreHorizontal size={15} /></IconButton>}>
+              {(close) => (
+                <>
+                  <MenuItem onClick={() => { close(); exportInvoices(rows); }}>Exportar lo filtrado (CSV)</MenuItem>
+                  <MenuItem onClick={() => { close(); setShowCompanyTooltip(true); }}>Datos fiscales del proyecto</MenuItem>
+                </>
               )}
-            </div>
-          </div>
+            </Menu>
+            {permissions.canCreatePO && (
+              <Link href={`/project/${id}/accounting/invoices/new`} className={buttonClass("primary")}><Upload size={14} /> Subir documento</Link>
+            )}
+          </>
+        }
+      />
 
-          {/* Type Stats */}
-          <div className="grid grid-cols-4 gap-3 mt-6">
-            {(Object.entries(DOCUMENT_TYPES) as [DocumentType, typeof DOCUMENT_TYPES.invoice][]).map(([key, config]) => {
-              const Icon = config.icon;
-              const count = key === "invoice" ? stats.invoices : key === "proforma" ? stats.proformas : key === "budget" ? stats.budgets : stats.guarantees;
-              return (
-                <button
-                  key={key}
-                  onClick={() => setTypeFilter(typeFilter === key ? "all" : key)}
-                  className={`p-3 rounded-md border transition-all ${typeFilter === key ? `${config.borderColor} ${config.bgColor}` : "border-slate-200 hover:border-slate-300"}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Icon size={16} className={typeFilter === key ? config.textColor : "text-slate-400"} />
-                    <span className={`text-[13px] font-medium ${typeFilter === key ? config.textColor : "text-slate-700"}`}>{config.label}</span>
-                    <span className={`ml-auto text-[13px] font-semibold ${typeFilter === key ? config.textColor : "text-slate-900"}`}>{count}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+      {pendingReplacementCount > 0 && (
+        <button
+          onClick={() => { setStatusFilter("all"); setView("all"); setSearchField("all"); setSearchTerm(""); setOnlyPendingReplacement(!onlyPendingReplacement); }}
+          className={`mt-5 flex w-full items-center justify-between rounded-md border px-3.5 py-2 text-left text-[13px] ${onlyPendingReplacement ? "border-slate-900 bg-[#F7F7F8]" : "border-amber-200 bg-amber-50 hover:bg-amber-100/60"}`}
+        >
+          <span className="text-amber-900">{pendingReplacementCount} {pendingReplacementCount === 1 ? "proforma pagada espera" : "proformas pagadas esperan"} su factura definitiva</span>
+          <span className="text-xs font-medium text-slate-900">{onlyPendingReplacement ? "Ver todas" : "Ver"}</span>
+        </button>
+      )}
+
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <div className="flex gap-0.5 rounded-md border border-slate-200 bg-[#F7F7F8] p-0.5" role="tablist" aria-label="Vista">
+          {VIEWS.map((v) => (
+            <button
+              key={v.value}
+              role="tab"
+              aria-selected={view === v.value}
+              onClick={() => setView(v.value)}
+              className={`flex h-7 items-center gap-1.5 rounded-[5px] px-2.5 text-xs transition-colors ${view === v.value ? "bg-white font-medium text-slate-900 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900"} ${v.value === "semana" && view !== v.value ? "text-red-700" : ""}`}
+            >
+              {v.label}
+              <span className="tabular-nums text-slate-400">{viewCount(v.value)}</span>
+            </button>
+          ))}
         </div>
       </div>
 
-      <main className="px-6 sm:px-10 py-8">
-        {pendingReplacementCount > 0 && (
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-amber-100 rounded-md flex items-center justify-center flex-shrink-0">
-                <AlertTriangle size={20} className="text-amber-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-amber-900">
-                  {pendingReplacementCount} documento{pendingReplacementCount > 1 ? "s" : ""} pendiente{pendingReplacementCount > 1 ? "s" : ""} de factura definitiva
-                </h3>
-                <p className="text-[13px] text-amber-700 mt-1">Hay proformas o presupuestos que necesitan ser sustituidos por su factura definitiva.</p>
-              </div>
-              {permissions.canCreatePO && (
-                <Link href={`/project/${id}/accounting/invoices/replace`} className="px-4 py-2 bg-amber-600 text-white text-[13px] rounded-lg hover:bg-amber-700 flex-shrink-0 flex items-center gap-2">
-                  <RefreshCw size={14} />
-                  Sustituir
-                </Link>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="flex flex-row gap-3 items-center mb-4">
-          <div className="flex-1 relative">
-            <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar facturas"
-              className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]"
-            />
-          </div>
-          <div className="flex gap-2 flex-shrink-0">
-            {/* Status Dropdown */}
-            <div className="relative" ref={statusDropdownRef}>
-              <button
-                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded-md text-[13px] hover:border-slate-300 bg-white min-w-[180px]"
-              >
-                <Filter size={14} className="text-slate-400" />
-                <span className="flex-1 text-left text-xs text-slate-700">{getStatusLabel()}</span>
-                <ChevronDown size={14} className={`text-slate-400 transition-transform ${showStatusDropdown ? "rotate-180" : ""}`} />
-              </button>
-              {showStatusDropdown && (
-                <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 overflow-hidden" match="min" gap={8}>
-                  {STATUS_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => {
-                        setStatusFilter(option.value);
-                        setShowStatusDropdown(false);
-                      }}
-                      className={`w-full text-left px-4 py-1.5 text-[13px] transition-colors whitespace-nowrap ${
-                        statusFilter === option.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </AnchoredPanel>
-              )}
-            </div>
-
-            {/* Uncoded Filter Button - Solo para usuarios de contabilidad */}
-            {canCodeInvoices && (
-              <button
-                onClick={() => setShowUncodedOnly(!showUncodedOnly)}
-                className={`flex items-center gap-2 px-3 py-1.5 border rounded-md text-xs font-medium transition-colors ${
-                  showUncodedOnly 
-                    ? "border-violet-300 bg-violet-50 text-violet-700" 
-                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                }`}
-              >
-                <Code size={14} className={showUncodedOnly ? "text-violet-600" : "text-slate-400"} />
-                Sin codificar
-              </button>
-            )}
-          </div>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <SearchBar fields={INV_FIELDS} field={searchField} onField={setSearchField} value={searchTerm} onChange={setSearchTerm} count={rows.length} />
+        <div className="w-44">
+          <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <option value="all">Todos los tipos</option>
+            {(Object.entries(DOCUMENT_TYPES) as [DocumentType, typeof DOCUMENT_TYPES.invoice][]).map(([k, t]) => <option key={k} value={k}>{t.label}</option>)}
+          </Select>
         </div>
+        <div className="w-44">
+          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </Select>
+        </div>
+        {canCodeInvoices && <Checkbox label="Sin codificar" checked={showUncodedOnly} onChange={setShowUncodedOnly} />}
+      </div>
 
-        {filteredInvoices.length === 0 ? (
-          <div className="border-2 border-dashed border-slate-200 rounded-lg p-16 text-center">
-            <div className="hidden">
-              <Receipt size={28} className="text-slate-400" />
-            </div>
-            <h3 className="text-[14px] font-semibold text-slate-900 mb-2">{searchTerm || statusFilter !== "all" || typeFilter !== "all" || showUncodedOnly ? "No se encontraron resultados" : "Sin documentos"}</h3>
-          </div>
+      {(supplierName || filtersActive) && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+          {supplierName && (
+            <button onClick={() => router.replace(`/project/${id}/accounting/invoices${view !== "all" ? `?vista=${view}` : ""}`)} className="inline-flex items-center gap-1 rounded border border-slate-200 bg-[#F7F7F8] px-1.5 py-0.5 text-slate-700 hover:border-slate-300">
+              Proveedor: {supplierName} <X size={11} />
+            </button>
+          )}
+          <button onClick={() => { setStatusFilter("all"); setTypeFilter("all"); setShowUncodedOnly(false); if (supplierParam) router.replace(`/project/${id}/accounting/invoices`); }} className="text-slate-500 hover:text-slate-900">Quitar filtros</button>
+        </div>
+      )}
+
+      <div className="mt-4">
+        {rows.length === 0 ? (
+          <EmptyState title={invoices.length ? "Sin resultados" : "Sin documentos"} action={!invoices.length && permissions.canCreatePO ? <Link href={`/project/${id}/accounting/invoices/new`} className={buttonClass("primary", "sm")}>Subir documento</Link> : undefined} />
         ) : (
-          <div className="bg-white border border-slate-200 rounded-lg">
-            <div className="overflow-x-auto rounded-lg">
-              <table className="w-full">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Documento</th>
-                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Proveedor</th>
-                    <th className="text-right px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Importe</th>
-                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Estado</th>
-                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Vencimiento</th>
-                    <th className="w-16"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredInvoices.map((invoice) => {
-                    const daysUntilDue = getDaysUntilDue(invoice.dueDate);
-                    const dispState = getInvoiceDisplayState(invoice);
-                    const isDueSoon = daysUntilDue <= 7 && daysUntilDue > 0 && !invoice.paidAt && invoice.approvedAt;
-                    const needsReplacement = invoice.requiresReplacement && (invoice.paidAt || invoice.status === "paid") && !invoice.replacedByInvoiceId;
-                    return (
-                      <tr
-                        key={invoice.id}
-                        className={`transition-colors cursor-pointer ${
-                          (dispState === "cancelled" || dispState === "void")
-                            ? "bg-red-50/40 opacity-60 hover:opacity-80"
-                            : needsReplacement
-                            ? "bg-amber-50/50 hover:bg-amber-50"
-                            : "hover:bg-slate-50"
-                        }`}
-                        onClick={() => router.push(`/project/${id}/accounting/invoices/${invoice.id}`)}
-                      >
-                        <td className="px-4 py-3">
-                          <div className="text-left group/inv">
-                            <div className="flex items-center gap-2">
-                              {getDocumentTypeBadge(invoice.documentType)}
-                              <p className={`font-semibold font-mono transition-colors ${(dispState === "cancelled" || dispState === "void") ? "line-through text-slate-400" : "text-slate-900 group-hover/inv:text-[#2F52E0]"}`}>{invoice.displayNumber}</p>
-                              {(invoice.accounted || invoice.accountedAt) && (
-                                <span className="flex items-center gap-1 text-xs text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded" title={`Contabilizada - Asiento: ${invoice.accountingEntryNumber}`}>
-                                  <Lock size={10} />
-                                </span>
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full min-w-[1000px] border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
+                  <th scope="col" className="px-4 py-2 text-left font-medium">Documento</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">Base</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">Total</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Estado</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Vencimiento</th>
+                  <th scope="col" className="w-12 py-2 pr-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((invoice) => {
+                  const state = getInvoiceDisplayState(invoice);
+                  const st = STATE[state] || STATE.submitted;
+                  const docType = DOCUMENT_TYPES[invoice.documentType] || DOCUMENT_TYPES.invoice;
+                  const href = `/project/${id}/accounting/invoices/${invoice.id}`;
+                  const dead = state === "cancelled" || state === "void";
+                  const due = dueLabel(invoice, state);
+                  const needsReplacement = invoice.requiresReplacement && (invoice.paidAt || invoice.status === "paid") && !invoice.replacedByInvoiceId;
+                  const progress = !invoice.approvedAt && (invoice.status === "submitted" || invoice.status === "pending_approval") && invoice.approvalSteps?.length
+                    ? `${invoice.currentApprovalStep ?? 0}/${invoice.approvalSteps.length}` : null;
+                  return (
+                    <tr key={invoice.id} className={`cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA] ${dead ? "text-slate-400" : ""}`} onClick={() => router.push(href)}>
+                      <td className="whitespace-nowrap px-4 py-1.5">
+                        <span className="flex items-center gap-2">
+                          <span className="w-8 font-mono text-[10px] text-slate-500" title={docType.label}>{docType.code}</span>
+                          <Link href={href} onClick={(e) => e.stopPropagation()} className={`font-mono text-xs font-medium hover:underline ${dead ? "line-through" : ""}`}>{invoice.displayNumber}</Link>
+                          {(invoice.accounted || invoice.accountedAt) && <span title={`Contabilizada${invoice.accountingEntryNumber ? ` · asiento ${invoice.accountingEntryNumber}` : ""}`}><Lock size={11} className="text-slate-400" /></span>}
+                          {needsReplacement && <span className="rounded border border-amber-200 bg-amber-50 px-1 text-[10px] text-amber-800">falta factura</span>}
+                        </span>
+                        {invoice.poNumber && <span className="ml-10 block font-mono text-[11px] text-slate-500">PO-{invoice.poNumber}</span>}
+                      </td>
+                      <td className="max-w-[320px] px-3 py-1.5">
+                        <span className="block truncate font-medium text-slate-900">{invoice.supplier}</span>
+                        {invoice.description && <span className="block truncate text-xs text-slate-500">{invoice.description}</span>}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs text-slate-600">{formatCurrency(invoice.baseAmount)}</td>
+                      <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs font-medium">{formatCurrency(invoice.totalAmount)}</td>
+                      <td className="whitespace-nowrap px-3 py-1.5">
+                        <span className={`inline-flex items-center gap-1.5 text-xs ${st.text}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />
+                          {st.label}
+                          {progress && <span className="font-mono text-[10px] text-slate-400">{progress}</span>}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-1.5 tabular-nums text-slate-600">
+                        {formatDate(invoice.dueDate)}
+                        {due && <span className={`ml-1.5 text-xs ${due.cls}`}>{due.text}</span>}
+                      </td>
+                      <td className="py-1.5 pr-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        <Menu trigger={(toggle) => <IconButton label="Acciones" onClick={toggle} className="-my-1"><MoreHorizontal size={15} /></IconButton>}>
+                          {(close) => (
+                            <>
+                              <MenuItem onClick={() => { close(); router.push(href); }}>Abrir</MenuItem>
+                              {invoice.attachmentUrl && <MenuItem onClick={() => { close(); window.open(invoice.attachmentUrl, "_blank", "noopener"); }}>Ver adjunto</MenuItem>}
+                              <MenuItem onClick={() => { close(); navigator.clipboard?.writeText(invoice.displayNumber); }}>Copiar número</MenuItem>
+                              {needsReplacement && permissions.canCreatePO && (
+                                <MenuItem onClick={() => { close(); router.push(`/project/${id}/accounting/invoices/new?linkTo=${invoice.id}`); }}>Subir factura definitiva</MenuItem>
                               )}
-                              {invoice.codedAt && !invoice.accounted && !invoice.accountedAt && (
-                                <span className="flex items-center gap-1 text-xs text-violet-600 bg-violet-100 px-1.5 py-0.5 rounded" title={`Codificada por ${invoice.codedByName}`}>
-                                  <FileCheck size={10} />
-                                </span>
+                              {canEditInvoice(invoice) && !invoice.paidAt && !["cancelled", "rejected", "void"].includes(invoice.status) && (
+                                <>
+                                  <MenuSeparator />
+                                  <MenuItem onClick={() => { close(); handleCancelInvoice(invoice.id); }}>Anular</MenuItem>
+                                </>
                               )}
-                              {needsReplacement && (
-                                <span className="flex items-center gap-1 text-xs text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">
-                                  <Clock size={10} />
-                                  Pte. factura
-                                </span>
-                              )}
-                            </div>
-                            {invoice.poNumber && <p className="text-xs text-slate-500 mt-0.5 font-mono">PO-{invoice.poNumber}</p>}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="text-[13px] text-slate-900 font-medium">{invoice.supplier}</p>
-                          <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{invoice.description}</p>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <p className="text-[13px] font-semibold text-slate-900">{formatCurrency(invoice.totalAmount)} €</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-col">
-                            {getStatusBadge(invoice)}
-                            {!invoice.approvedAt && (invoice.status === "submitted" || invoice.status === "pending_approval") && getApprovalProgress(invoice)}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">
-                            <Calendar size={12} className="text-slate-400" />
-                            <span className={`text-xs ${dispState === "overdue" ? "text-red-600 font-semibold" : isDueSoon ? "text-amber-600 font-semibold" : "text-slate-600"}`}>
-                              {formatDate(invoice.dueDate)}
-                            </span>
-                            {isDueSoon && <span className="text-xs text-amber-600">({daysUntilDue}d)</span>}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="relative menu-container">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (openMenuId === invoice.id) {
-                                  setOpenMenuId(null);
-                                  setMenuPosition(null);
-                                } else {
-                                  const rect = e.currentTarget.getBoundingClientRect();
-                                  setMenuPosition({ top: rect.bottom + 4, left: rect.right - 208 });
-                                  setOpenMenuId(invoice.id);
-                                }
-                              }}
-                              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                            >
-                              <MoreHorizontal size={18} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                              {canDeleteInvoice(invoice) && <MenuItem danger onClick={() => { close(); handleDeleteInvoice(invoice.id); }}>Eliminar</MenuItem>}
+                            </>
+                          )}
+                        </Menu>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-slate-200 bg-[#F4F4F5] text-xs">
+                  <td className="px-4 py-2 font-semibold" colSpan={2}>Total {rows.length === invoices.length ? "" : "filtrado "}sin anuladas</td>
+                  <td className="px-3 py-2 text-right font-mono font-semibold">{formatCurrency(totals.base)}</td>
+                  <td className="px-3 py-2 text-right font-mono font-semibold">{formatCurrency(totals.total)}</td>
+                  <td colSpan={3} />
+                </tr>
+              </tfoot>
+            </table>
           </div>
         )}
+      </div>
 
-        {/* Floating menu */}
-        {openMenuId && menuPosition && (
-          <div className="fixed w-52 bg-white border border-slate-200 rounded-md shadow-xl z-[9999] py-1" style={{ top: menuPosition.top, left: menuPosition.left }}>
-            {(() => {
-              const invoice = filteredInvoices.find((i) => i.id === openMenuId);
-              if (!invoice) return null;
-              const needsReplacement = invoice.requiresReplacement && (invoice.paidAt || invoice.status === "paid") && !invoice.replacedByInvoiceId;
-              return (
-                <>
-                  <Link
-                    href={`/project/${id}/accounting/invoices/${invoice.id}`}
-                    onClick={closeMenu}
-                    className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3"
-                  >
-                    <Eye size={15} className="text-slate-400" />
-                    Ver detalles
-                  </Link>
-                  {invoice.attachmentUrl && (
-                    <a href={invoice.attachmentUrl} target="_blank" rel="noopener noreferrer" onClick={closeMenu} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3">
-                      <FileText size={15} className="text-slate-400" />
-                      Ver adjunto
-                    </a>
-                  )}
-                  {needsReplacement && permissions.canCreatePO && (
-                    <>
-                      <div className="border-t border-slate-100 my-1" />
-                      <Link href={`/project/${id}/accounting/invoices/new?linkTo=${invoice.id}`} onClick={closeMenu} className="w-full px-4 py-1.5 text-left text-[13px] text-violet-600 hover:bg-violet-50 flex items-center gap-3">
-                        <Upload size={15} />
-                        Subir documento
-                      </Link>
-                    </>
-                  )}
-                  {canEditInvoice(invoice) && !invoice.paidAt && !["cancelled", "rejected", "void"].includes(invoice.status) && (
-                    <>
-                      <div className="border-t border-slate-100 my-1" />
-                      <button onClick={() => handleCancelInvoice(invoice.id)} className="w-full px-4 py-1.5 text-left text-[13px] text-amber-600 hover:bg-amber-50 flex items-center gap-3">
-                        <XCircle size={15} />
-                        Cancelar
-                      </button>
-                    </>
-                  )}
-                  {canDeleteInvoice(invoice) && (
-                    <>
-                      <div className="border-t border-slate-100 my-1" />
-                      <button onClick={() => handleDeleteInvoice(invoice.id)} className="w-full px-4 py-1.5 text-left text-[13px] text-red-600 hover:bg-red-50 flex items-center gap-3">
-                        <Trash2 size={15} />
-                        Eliminar
-                      </button>
-                    </>
-                  )}
-                </>
-              );
-            })()}
-          </div>
+      {/* Datos fiscales del proyecto */}
+      <Modal open={showCompanyTooltip} onClose={() => setShowCompanyTooltip(false)} title="Datos fiscales del proyecto">
+        {companyData ? (
+          <dl className="text-[13px]">
+            {[
+              ["Razón social", companyData.fiscalName],
+              ["NIF", companyData.taxId],
+              ["Dirección", [companyData.address, [companyData.postalCode, companyData.city].filter(Boolean).join(" "), companyData.province, companyData.country].filter(Boolean).join(", ")],
+              ["Email", companyData.email],
+              ["Teléfono", companyData.phone],
+            ].filter(([, v]) => v).map(([k, v]) => (
+              <div key={k} className="grid grid-cols-[100px_1fr] gap-3 border-b border-slate-100 py-2 last:border-0">
+                <dt className="text-slate-500">{k}</dt>
+                <dd className={k === "NIF" ? "font-mono text-xs" : ""}>{v}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="text-[13px] text-slate-500">No hay datos fiscales configurados.</p>
         )}
-      </main>
+      </Modal>
 
-      {/* Detail Modal */}
-      {showDetailModal && selectedInvoice && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowDetailModal(false); setSelectedInvoice(null); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  {getDocumentTypeBadge(selectedInvoice.documentType)}
-                  <h2 className="text-lg font-semibold text-slate-900 font-mono">{selectedInvoice.displayNumber}</h2>
-                </div>
-                <p className="text-[13px] text-slate-500">{selectedInvoice.supplier}</p>
-              </div>
-              <button onClick={() => { setShowDetailModal(false); setSelectedInvoice(null); }} className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-              {selectedInvoice.requiresReplacement && (selectedInvoice.paidAt || selectedInvoice.status === "paid") && !selectedInvoice.replacedByInvoiceId && (
-                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-md">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-[13px] font-semibold text-amber-800">Pendiente de factura definitiva</p>
-                      <p className="text-[13px] text-amber-700 mt-1">Este documento ha sido pagado. Recuerda subir la factura definitiva del proveedor.</p>
-                    </div>
-                    {permissions.canCreatePO && (
-                      <Link href={`/project/${id}/accounting/invoices/new?linkTo=${selectedInvoice.id}`} className="px-3 py-1.5 bg-amber-600 text-white text-[13px] rounded-lg hover:bg-amber-700 flex items-center gap-1.5">
-                        <Upload size={14} />
-                        Subir documento
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              )}
-              {selectedInvoice.linkedDocumentId && (
-                <div className="mb-6 p-4 bg-violet-50 border border-violet-200 rounded-md">
-                  <div className="flex items-center gap-3">
-                    <LinkIcon size={18} className="text-violet-600" />
-                    <div>
-                      <p className="text-[13px] font-semibold text-violet-800">Factura vinculada</p>
-                      <p className="text-[13px] text-violet-700">Esta factura sustituye un documento previo.</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="bg-slate-50 rounded-md p-4">
-                  <p className="text-xs text-slate-500 mb-1">Importe total</p>
-                  <p className="text-lg font-bold text-slate-900">{formatCurrency(selectedInvoice.totalAmount)} €</p>
-                </div>
-                <div className="bg-slate-50 rounded-md p-4">
-                  <p className="text-xs text-slate-500 mb-1">Vencimiento</p>
-                  <p className="text-lg font-bold text-slate-900">{formatDate(selectedInvoice.dueDate)}</p>
-                </div>
-                <div className="bg-slate-50 rounded-md p-4">
-                  <p className="text-xs text-slate-500 mb-1">Estado</p>
-                  <div className="mt-1">{getStatusBadge(selectedInvoice)}</div>
-                </div>
-              </div>
-              {selectedInvoice.status === "rejected" && selectedInvoice.rejectionReason && (
-                <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
-                  <div className="flex items-start gap-3">
-                    <XCircle size={18} className="text-red-600 mt-0.5" />
-                    <div>
-                      <p className="text-[13px] font-semibold text-red-800">Motivo de rechazo</p>
-                      <p className="text-[13px] text-red-700 mt-1">{selectedInvoice.rejectionReason}</p>
-                      {selectedInvoice.rejectedByName && (
-                        <p className="text-xs text-red-600 mt-2">
-                          Rechazada por {selectedInvoice.rejectedByName} el {formatDate(selectedInvoice.rejectedAt!)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-              {selectedInvoice.poNumber && (
-                <div className="mb-6 bg-slate-50 rounded-md p-4">
-                  <p className="text-xs text-slate-500 mb-1">PO Asociada</p>
-                  <p className="text-[13px] font-mono text-slate-700">PO-{selectedInvoice.poNumber}</p>
-                </div>
-              )}
-              {selectedInvoice.description && (
-                <div className="mb-6">
-                  <p className="text-xs text-slate-500 uppercase mb-2">Descripción</p>
-                  <p className="text-[13px] text-slate-900 bg-slate-50 p-4 rounded-md">{selectedInvoice.description}</p>
-                </div>
-              )}
-              <div className="mb-6">
-                <p className="text-xs font-semibold text-slate-700 uppercase mb-3">Items ({selectedInvoice.items?.length || 0})</p>
-                <div className="space-y-2">
-                  {selectedInvoice.items?.map((item, index) => (
-                    <div key={item.id || index} className="border border-slate-200 rounded-md p-4 bg-slate-50">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="text-[13px] font-medium text-slate-900">{item.description}</p>
-                          <p className="text-xs text-slate-500 mt-1">
-                            {item.subAccountCode} · {item.quantity} × {formatCurrency(item.unitPrice)} €
-                          </p>
-                        </div>
-                        <p className="text-[13px] font-semibold text-slate-900">{formatCurrency(item.totalAmount)} €</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="mb-6 bg-slate-50 rounded-md p-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-slate-600">Base imponible</span>
-                    <span className="font-semibold text-slate-900">{formatCurrency(selectedInvoice.baseAmount)} €</span>
-                  </div>
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-slate-600">IVA</span>
-                    <span className="font-semibold text-emerald-600">+{formatCurrency(selectedInvoice.vatAmount)} €</span>
-                  </div>
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-slate-600">IRPF</span>
-                    <span className="font-semibold text-red-600">-{formatCurrency(selectedInvoice.irpfAmount)} €</span>
-                  </div>
-                  <div className="flex justify-between text-base font-bold border-t border-slate-200 pt-2 mt-2">
-                    <span>Total</span>
-                    <span className="text-slate-900">{formatCurrency(selectedInvoice.totalAmount)} €</span>
-                  </div>
-                </div>
-              </div>
-              {selectedInvoice.notes && (
-                <div className="mb-6">
-                  <p className="text-xs text-slate-500 uppercase mb-2">Notas</p>
-                  <p className="text-[13px] text-slate-600 bg-slate-50 p-4 rounded-md">{selectedInvoice.notes}</p>
-                </div>
-              )}
-            </div>
-            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2">
-              {canMarkAsPaid(selectedInvoice) && (
-                <button
-                  onClick={() => {
-                    handleMarkAsPaid(selectedInvoice.id);
-                    setShowDetailModal(false);
-                  }}
-                  className="px-4 py-2 text-[13px] bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg transition-colors"
-                >
-                  Marcar como pagada
-                </button>
-              )}
-              {selectedInvoice.attachmentUrl && (
-                <a 
-                  href={selectedInvoice.attachmentUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="px-4 py-2 text-[13px] border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-lg transition-opacity"
-                >
-                  Ver adjunto
-                </a>
-              )}
-              <button onClick={() => { setShowDetailModal(false); setSelectedInvoice(null); }} className="px-4 py-2 text-[13px] border border-slate-200 text-slate-700 hover:bg-white rounded-lg transition-colors">
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Confirm Dialog */}
-      {confirmDialog && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-[14px] font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
-            <p className="text-[13px] text-slate-600 mb-6">{confirmDialog.message}</p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmDialog(null)}
-                className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 font-medium text-[13px]"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmDialog.onConfirm}
-                className={`flex-1 px-4 py-1.5 rounded-md font-medium text-[13px] text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
-              >
-                {confirmDialog.confirmLabel || "Confirmar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <Modal
+        open={!!confirmDialog}
+        onClose={() => setConfirmDialog(null)}
+        title={confirmDialog?.title || ""}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirmDialog(null)}>Cancelar</Button>
+            <Button variant={confirmDialog?.danger ? "danger" : "primary"} onClick={() => confirmDialog?.onConfirm()}>{confirmDialog?.confirmLabel || "Confirmar"}</Button>
+          </>
+        }
+      >
+        <p className="text-[13px] text-slate-600">{confirmDialog?.message}</p>
+      </Modal>
+    </Page>
   );
 }

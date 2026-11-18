@@ -544,7 +544,7 @@ export default function BoxesPage() {
     setTimeout(() => setToast(null), 3000);
   };
   const fmt = (n: number) =>
-    new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
+    new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(n || 0);
   const fmtDate = (date: Date | any) => {
     if (!date) return "-";
     const d = date.toDate ? date.toDate() : new Date(date);
@@ -2186,7 +2186,7 @@ export default function BoxesPage() {
                             <span className="text-xs text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full flex-shrink-0">Pendiente</span>
                           </div>
                           <p className="text-xs text-slate-500">
-                            {fs.expenseCount} gasto{fs.expenseCount !== 1 ? "s" : ""} · <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(fs.totalAmount)} €</strong>
+                            {fs.expenseCount} gasto{fs.expenseCount !== 1 ? "s" : ""} · <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(fs.totalAmount)} €</strong>
                           </p>
                           <p className="text-xs text-slate-400 mt-0.5">{fs.submittedAt.toLocaleDateString("es-ES")}</p>
                           <button
@@ -2241,7 +2241,7 @@ export default function BoxesPage() {
                               <span className="text-xs text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full flex-shrink-0">Volcado</span>
                             </div>
                             <p className="text-xs text-slate-500">
-                              {fs.expenseCount} gasto{fs.expenseCount !== 1 ? "s" : ""} · <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(fs.totalAmount)} €</strong>
+                              {fs.expenseCount} gasto{fs.expenseCount !== 1 ? "s" : ""} · <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(fs.totalAmount)} €</strong>
                             </p>
                             <p className="text-xs text-slate-400 mt-0.5">{fs.submittedAt.toLocaleDateString("es-ES")}</p>
                           </div>
@@ -3270,7 +3270,7 @@ export default function BoxesPage() {
 
       {/* Create Box Modal */}
       {showCreateBoxModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
           onClick={() => setShowCreateBoxModal(false)}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
@@ -3338,7 +3338,7 @@ export default function BoxesPage() {
 
       {/* Edit Box Modal */}
       {showEditBoxModal && selectedBox && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
           onClick={() => setShowEditBoxModal(false)}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
@@ -3387,7 +3387,7 @@ export default function BoxesPage() {
 
       {/* Delete Box Confirm */}
       {showDeleteBoxModal && selectedBox && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
           onClick={() => setShowDeleteBoxModal(false)}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <div className="p-6">
@@ -3407,7 +3407,7 @@ export default function BoxesPage() {
 
       {/* Create Envelope Modal */}
       {showCreateEnvelopeModal && selectedBox && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
           onClick={() => setShowCreateEnvelopeModal(false)}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
@@ -3430,7 +3430,7 @@ export default function BoxesPage() {
 
       {/* Delete Envelope Confirm */}
       {showDeleteEnvelopeModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
           onClick={() => setShowDeleteEnvelopeModal(null)}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <div className="p-6">
@@ -3450,7 +3450,7 @@ export default function BoxesPage() {
 
       {/* Manual Expense Modal */}
       {showManualExpenseModal && selectedEnvelope && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
           onClick={() => setShowManualExpenseModal(false)}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
@@ -3619,7 +3619,7 @@ export default function BoxesPage() {
 
       {/* Import Excel Modal */}
       {showImportModal && selectedEnvelope && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
           onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview([]); }}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
@@ -3762,7 +3762,7 @@ export default function BoxesPage() {
         const coveredIds = new Set(fileMatches.filter(m => m.expense).map(m => m.expense!.id));
         const missingDocs = envelopeExps.filter(e => !e.documentUrl && !coveredIds.has(e.id));
         return (
-          <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
+          <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
             onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }}>
             <div className="bg-white rounded-lg shadow-xl w-full max-w-xl flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 flex-shrink-0">
@@ -3828,7 +3828,7 @@ export default function BoxesPage() {
 
       {/* Create Transfer Envelope Modal */}
       {showCreateTransferEnvelopeModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
           onClick={() => setShowCreateTransferEnvelopeModal(false)}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-visible" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
@@ -3890,7 +3890,7 @@ export default function BoxesPage() {
 
       {/* Delete Transfer Envelope Confirm */}
       {showDeleteTransferEnvelopeModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
           onClick={() => setShowDeleteTransferEnvelopeModal(null)}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <div className="p-6">
@@ -3910,7 +3910,7 @@ export default function BoxesPage() {
 
       {/* Add Transfer Expense Modal */}
       {showAddExpenseModal && selectedTransferEnvelope && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
           onClick={() => setShowAddExpenseModal(false)}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
@@ -4095,7 +4095,7 @@ export default function BoxesPage() {
       {showSettleModal && selectedTransferEnvelope && (() => {
         const preview = getSettlementPreview(selectedTransferEnvelope);
         return (
-          <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
+          <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
             onClick={() => setShowSettleModal(false)}>
             <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
               <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
@@ -4146,7 +4146,7 @@ export default function BoxesPage() {
 
       {/* Add Advance Modal */}
       {showAddAdvanceModal && selectedTransferEnvelope && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
           onClick={() => setShowAddAdvanceModal(false)}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
@@ -4305,7 +4305,7 @@ export default function BoxesPage() {
 
       {/* ── Send Box Form Modal ────────────────────────────────────────────── */}
       {showSendBoxFormModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/20 backdrop-blur-[2px] p-4" onClick={() => { setShowSendBoxFormModal(false); setGeneratedBoxResult(null); }}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/20 p-4" onClick={() => { setShowSendBoxFormModal(false); setGeneratedBoxResult(null); }}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100">
               <h3 className="text-base font-semibold text-slate-900">Enviar solicitud de caja</h3>
@@ -4401,7 +4401,7 @@ export default function BoxesPage() {
         const IRPF_RATES = [0, 7, 15, 19];
 
         return (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/20 backdrop-blur-[2px] p-4"
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/20 p-4"
             onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); setShowVolcarSupplierDropdown(null); }}>
             <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
 
@@ -4409,7 +4409,7 @@ export default function BoxesPage() {
               <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 flex-shrink-0">
                 <div>
                   <h3 className="text-base font-semibold text-slate-900">Volcar a sobre de Petty Cash</h3>
-                  {fs && <p className="text-xs text-slate-500 mt-0.5">{fs.requesterName} · {fs.expenseCount} gasto{fs.expenseCount !== 1 ? "s" : ""} · <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(fs.totalAmount)} €</strong></p>}
+                  {fs && <p className="text-xs text-slate-500 mt-0.5">{fs.requesterName} · {fs.expenseCount} gasto{fs.expenseCount !== 1 ? "s" : ""} · <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(fs.totalAmount)} €</strong></p>}
                 </div>
                 <button onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); }} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"><X size={18} /></button>
               </div>
@@ -4472,7 +4472,7 @@ export default function BoxesPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] font-medium text-slate-900 truncate">{exp.description || `Gasto ${i + 1}`}</p>
                           <p className="text-xs text-slate-500 mt-0.5">
-                            Total del ticket: <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(totalAmt)} €</strong>
+                            Total del ticket: <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(totalAmt)} €</strong>
                           </p>
                         </div>
                         {exp.fileUrl && (
@@ -4642,9 +4642,9 @@ export default function BoxesPage() {
                             })}
                             <p className={`text-xs ${totalMismatch ? "text-amber-600" : "text-slate-400"}`}>
                               {totalMismatch && <AlertTriangle size={11} className="inline mr-1 -mt-0.5" />}
-                              Codificado: {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(itemsTotal)} €
-                              {" "}(base {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(itemsBase)} € · IVA {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(itemsVat)} €)
-                              {totalMismatch && ` — no coincide con el total del ticket (${new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(totalAmt)} €)`}
+                              Codificado: {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(itemsTotal)} €
+                              {" "}(base {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(itemsBase)} € · IVA {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(itemsVat)} €)
+                              {totalMismatch && ` — no coincide con el total del ticket (${new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(totalAmt)} €)`}
                             </p>
                           </div>
 
@@ -4676,7 +4676,7 @@ export default function BoxesPage() {
 
       {/* ── Configurar exportación (DEMO / vista previa) ──────────────────── */}
       {showExportConfigModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4" onClick={() => setShowExportConfigModal(false)}>
+        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4" onClick={() => setShowExportConfigModal(false)}>
           <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[85vh] overflow-y-auto border border-slate-200" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3">

@@ -754,7 +754,7 @@ export default function PayrollPage() {
 
       {/* ── Period config modal ──────────────────────────────────────────── */}
       {showPeriodCfg && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
             <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -833,7 +833,7 @@ export default function PayrollPage() {
         if (!rfMember) return null;
         const anyType = Object.values(rfTypes).some(Boolean) || rfWorked;
         return (
-          <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
               <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -955,7 +955,7 @@ export default function PayrollPage() {
         const otherTotal = allDays.reduce((s,x) => s + (x.entry.other ? (x.entry.otherAmount||0) : 0), 0);
 
         return (
-          <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-start justify-end">
+          <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-start justify-end">
             <div className="bg-white h-full w-full max-w-xl shadow-xl flex flex-col">
               {/* Header */}
               <div className="px-6 py-4 border-b border-slate-100 flex items-start justify-between flex-shrink-0">
@@ -1244,7 +1244,7 @@ export default function PayrollPage() {
 
       {/* ── (solicitar modal removed) ────────────────────────────────────── */}
       {false && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg flex flex-col" style={{ maxHeight: "92vh" }}>
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex-shrink-0">
@@ -1460,7 +1460,7 @@ export default function PayrollPage() {
 
       {/* ── Day editor modal ─────────────────────────────────────────────── */}
       {editTarget && editMember && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col" style={{ maxHeight: "92vh" }}>
             {/* Modal header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-start justify-between flex-shrink-0">

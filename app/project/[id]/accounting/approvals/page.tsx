@@ -1,6 +1,9 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
+import { Button, EmptyState, Field, IconButton, Modal, Page, PageHeader, PageLoading, Textarea } from "@/components/ds";
+import SearchBar, { type SearchField } from "@/components/SearchBar";
+import { matchAmount, matchCode, matchWords } from "@/lib/search";
 import { useCanSeeBudget } from "@/hooks/useCanSeeBudget";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -236,7 +239,23 @@ export default function ApprovalsPage() {
 
   useEffect(() => { const unsub = onAuthStateChanged(auth, (u) => { if (!u) router.push("/"); else { setUserId(u.uid); setUserName(u.displayName || u.email || "Usuario"); } }); return () => unsub(); }, [router]);
   useEffect(() => { if (userId && id) loadPendingApprovals(); }, [userId, id]);
-  useEffect(() => { let filtered = [...pendingApprovals]; if (typeFilter !== "all") filtered = filtered.filter((a) => a.type === typeFilter); setFilteredApprovals(filtered); setCurrentIndex(0); }, [typeFilter, pendingApprovals]);
+  const [apprSearch, setApprSearch] = useState("");
+  const [apprField, setApprField] = useState<"all" | "number" | "supplier" | "amount">("all");
+  useEffect(() => {
+    let filtered = [...pendingApprovals];
+    if (typeFilter !== "all") filtered = filtered.filter((a) => a.type === typeFilter);
+    const q = apprSearch.trim();
+    if (q) {
+      filtered = filtered.filter((a) => {
+        const byNumber = matchCode(q, a.displayNumber, a.poNumber ? `PO-${a.poNumber}` : "");
+        const bySupplier = matchWords(q, a.supplier, a.description, a.createdByName);
+        const byAmount = matchAmount(q, a.amount, a.baseAmount) === true;
+        return apprField === "number" ? byNumber : apprField === "supplier" ? bySupplier : apprField === "amount" ? byAmount : byNumber || bySupplier || byAmount;
+      });
+    }
+    setFilteredApprovals(filtered);
+    setCurrentIndex(0);
+  }, [typeFilter, pendingApprovals, apprSearch, apprField]);
 
   const toggleSection = (section: string) => { const n = new Set(expandedSections); if (n.has(section)) n.delete(section); else n.add(section); setExpandedSections(n); };
 
@@ -806,270 +825,292 @@ export default function ApprovalsPage() {
   };
 
   const currentApproval = filteredApprovals[currentIndex];
+  const APPROVAL_FIELDS: SearchField<"all" | "number" | "supplier" | "amount">[] = [
+    { value: "all", label: "Buscar en todo", placeholder: "Número, proveedor o importe" },
+    { value: "number", label: "Número", placeholder: "Ej. PO-0012", mono: true },
+    { value: "supplier", label: "Proveedor", placeholder: "Proveedor, concepto o solicitante" },
+    { value: "amount", label: "Importe", placeholder: "1500 · >1000 · 500-2000", mono: true },
+  ];
+
+  // Atajos: J/K para moverse por la cola, A para aprobar, R para rechazar.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (showApprovalModal || showRejectionModal || showInfoRequestModal || !filteredApprovals.length) return;
+      const k = e.key.toLowerCase();
+      if (k === "j") setCurrentIndex((i) => Math.min(filteredApprovals.length - 1, i + 1));
+      else if (k === "k") setCurrentIndex((i) => Math.max(0, i - 1));
+      else if (k === "a" && currentApproval) { setSelectedApproval(currentApproval); setShowApprovalModal(true); }
+      else if (k === "r" && currentApproval) { setSelectedApproval(currentApproval); setShowRejectionModal(true); }
+      else return;
+      e.preventDefault();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [filteredApprovals, currentApproval, showApprovalModal, showRejectionModal, showInfoRequestModal]);
   const formatDate = (date: Date) => new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" }).format(date);
   const formatDateTime = (date: Date) => new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(date);
-  const formatCurrency = (amount: number, currency: string = "EUR") => { const s: Record<string, string> = { EUR: "€", USD: "$", GBP: "£" }; return `${new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0)} ${s[currency] || currency}`; };
+  const formatCurrency = (amount: number, currency: string = "EUR") => { const s: Record<string, string> = { EUR: "€", USD: "$", GBP: "£" }; return `${new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(amount || 0)} ${s[currency] || currency}`; };
   const getCheckIcon = (status: AutoCheck["status"]) => { switch (status) { case "pass": return <CheckCircle size={14} className="text-emerald-500" />; case "warning": return <AlertTriangle size={14} className="text-amber-500" />; case "fail": return <XCircle size={14} className="text-red-500" />; case "info": return <Info size={14} className="text-blue-500" />; } };
   const getCheckBg = (status: AutoCheck["status"]) => { switch (status) { case "pass": return "bg-emerald-50 border-emerald-200"; case "warning": return "bg-amber-50 border-amber-200"; case "fail": return "bg-red-50 border-red-200"; case "info": return "bg-blue-50 border-blue-200"; } };
 
-  if (loading) return (<div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}><div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" /></div>);
+  if (loading) return <PageLoading />;
+
+  const urgentCount = pendingApprovals.filter((a) => a.isUrgent).length;
+  const typeLabel = (t: "all" | "po" | "invoice" | "box") => (t === "all" ? "Todos" : t === "po" ? "POs" : t === "invoice" ? "Facturas" : "Cajas");
+  const checkTone = (s: AutoCheck["status"]) => (s === "pass" ? "bg-emerald-500" : s === "warning" ? "bg-amber-500" : s === "fail" ? "bg-red-500" : "bg-slate-400");
 
   return (
-    <div className={`min-h-screen bg-white ${inter.className}`}>
-      {/* Header */}
-      <div className="mt-[53px]">
-        <div className="px-6 pt-8 sm:px-10">
-          {/* Page header */}
-          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
-            <div className="flex items-center gap-4">
-              <div className="flex items-baseline gap-2.5">
-                <h1 className="text-xl font-semibold tracking-tight text-slate-900">Aprobaciones</h1>
-                {userStats.pendingCount > 0 && <span className="text-[13px] text-slate-400">{userStats.pendingCount}</span>}
-              </div>
-            </div>
+    <Page>
+      <PageHeader
+        title={
+          <>
+            Aprobaciones <span className="text-[15px] font-normal text-slate-400">{pendingApprovals.length}</span>
+            {urgentCount > 0 && <span className="inline-flex items-center gap-1.5 text-xs font-normal text-red-700"><span className="h-1.5 w-1.5 rounded-full bg-red-500" />{urgentCount} {urgentCount === 1 ? "urgente" : "urgentes"}</span>}
+          </>
+        }
+        actions={
+          filteredApprovals.length > 0 ? (
+            <span className="hidden items-center gap-3 text-[11px] text-slate-500 lg:flex">
+              {[["J", "siguiente"], ["K", "anterior"], ["A", "aprobar"], ["R", "rechazar"]].map(([k, l]) => (
+                <span key={k} className="inline-flex items-center gap-1"><kbd className="rounded border border-slate-200 bg-[#F7F7F8] px-1.5 font-mono text-[10px] text-slate-600">{k}</kbd>{l}</span>
+              ))}
+            </span>
+          ) : undefined
+        }
+      />
 
-            {/* Stats */}
-            <div className="absolute right-0 flex items-center gap-4">
-              {pendingApprovals.some(a => a.isUrgent) && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-md">
-                  <Flame size={16} className="text-red-500" />
-                  <span className="text-[13px] font-medium text-red-700">{pendingApprovals.filter(a => a.isUrgent).length} urgente{pendingApprovals.filter(a => a.isUrgent).length > 1 ? "s" : ""}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Filter tabs */}
-          <div className="flex items-center gap-4 pt-4">
-            <div className="flex items-center gap-1 border border-slate-200 rounded-md p-1">
-              {(["all", "po", "invoice", "box"] as const).map((t) => (<button key={t} onClick={() => setTypeFilter(t)} className={`px-4 py-2 rounded-lg text-[13px] font-medium transition-colors ${typeFilter === t ? "bg-[#F1F1F3] text-slate-900" : "text-slate-600 hover:text-slate-900"}`}>{t === "all" ? "Todos" : t === "po" ? "POs" : t === "invoice" ? "Facturas" : "BOX"}<span className="ml-1.5 text-xs opacity-70">({t === "all" ? pendingApprovals.length : pendingApprovals.filter(a => a.type === t).length})</span></button>))}
-            </div>
-          </div>
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <div className="flex gap-0.5 rounded-md border border-slate-200 bg-[#F7F7F8] p-0.5" role="tablist" aria-label="Tipo">
+          {(["all", "po", "invoice", "box"] as const).map((t) => (
+            <button
+              key={t}
+              role="tab"
+              aria-selected={typeFilter === t}
+              onClick={() => setTypeFilter(t)}
+              className={`flex h-7 items-center gap-1.5 rounded-[5px] px-2.5 text-xs transition-colors ${typeFilter === t ? "bg-white font-medium text-slate-900 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900"}`}
+            >
+              {typeLabel(t)}
+              <span className="tabular-nums text-slate-400">{t === "all" ? pendingApprovals.length : pendingApprovals.filter((a) => a.type === t).length}</span>
+            </button>
+          ))}
         </div>
+        <SearchBar fields={APPROVAL_FIELDS} field={apprField} onField={setApprField} value={apprSearch} onChange={setApprSearch} count={filteredApprovals.length} />
       </div>
 
-      <main className="px-6 sm:px-10 py-8">
-
+      <div className="mt-5">
         {filteredApprovals.length === 0 ? (
-          <div className="border-2 border-dashed border-slate-200 rounded-lg p-16 text-center">
-            <div className="hidden"><CheckCircle size={28} className="text-emerald-600" /></div>
-            <h3 className="text-[14px] font-semibold text-slate-900 mb-2">No hay aprobaciones pendientes</h3>
-            <p className="text-slate-500 text-[13px]">{typeFilter !== "all" ? "Prueba a ajustar los filtros" : "¡Estás al día con todas tus aprobaciones!"}</p>
-            {userStats.approvedThisWeek > 0 && (<div className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-md"><Award size={16} className="text-emerald-600" /><span className="text-[13px] text-emerald-700">Has aprobado {userStats.approvedThisWeek} documentos esta semana</span></div>)}
-          </div>
+          <EmptyState title={apprSearch || typeFilter !== "all" ? "Sin resultados" : userStats.approvedThisWeek > 0 ? `Todo al día · ${userStats.approvedThisWeek} aprobados esta semana` : "Todo al día"} />
         ) : (
-          <div className="grid grid-cols-3 gap-6">
-            {/* Sidebar */}
-            <div className="col-span-1">
-              <div className="bg-white border border-slate-200 rounded-lg p-4 sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
-                <p className="text-xs text-slate-500 uppercase tracking-wider mb-3 px-1 font-semibold">Documentos · {filteredApprovals.length}</p>
-                <div className="space-y-2">
-                  {filteredApprovals.map((approval, index) => (
-                    <button key={approval.id} onClick={() => setCurrentIndex(index)} className={`w-full text-left p-3 rounded-md border-2 transition-all ${index === currentIndex ? "border-slate-900 bg-slate-50" : "border-slate-200 hover:border-slate-300"}`}>
-                      <div className="flex items-start gap-2 mb-1">
-                        {approval.type === "po" ? <FileText size={14} className="text-slate-500 mt-0.5" /> : <Receipt size={14} className="text-slate-500 mt-0.5" />}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2"><p className="text-[13px] font-medium text-slate-900 truncate">{approval.displayNumber}</p>{approval.isUrgent && (<span className="flex items-center gap-0.5 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-lg"><Flame size={10} /></span>)}</div>
-                          <p className="text-xs text-slate-500 truncate">{approval.supplier}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between mt-2">
-                        <p className="text-[13px] font-semibold text-slate-900">{formatCurrency(approval.amount, approval.currency)}</p>
-                        <div className="flex items-center gap-1">
-                          {approval.autoChecks.some(c => c.status === "fail") && <XCircle size={12} className="text-red-500" />}
-                          {approval.autoChecks.some(c => c.status === "warning") && !approval.autoChecks.some(c => c.status === "fail") && <AlertTriangle size={12} className="text-amber-500" />}
-                          <div className="flex items-center gap-0.5 ml-1">{approval.approvalSteps.map((s, i) => (<div key={i} className={`w-1.5 h-1.5 rounded-full ${s.status === "approved" ? "bg-emerald-500" : i === approval.currentApprovalStep ? "bg-amber-500" : "bg-slate-200"}`} />))}</div>
-                        </div>
-                      </div>
-                      {approval.daysWaiting > 0 && <p className="text-xs text-slate-400 mt-1">{approval.daysWaiting} día{approval.daysWaiting > 1 ? "s" : ""} esperando</p>}
-                    </button>
-                  ))}
-                </div>
-              </div>
+          <div className="grid items-start gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+            {/* Cola */}
+            <div className="overflow-hidden rounded-lg border border-slate-200 lg:sticky lg:top-[85px] lg:max-h-[calc(100vh-110px)] lg:overflow-y-auto">
+              {filteredApprovals.map((approval, index) => {
+                const worst = approval.autoChecks.some((c) => c.status === "fail") ? "fail" : approval.autoChecks.some((c) => c.status === "warning") ? "warning" : null;
+                const on = index === currentIndex;
+                return (
+                  <button
+                    key={approval.id}
+                    onClick={() => setCurrentIndex(index)}
+                    className={`relative flex w-full flex-col gap-0.5 border-b border-slate-100 px-3.5 py-2.5 text-left last:border-0 ${on ? "bg-[#F4F4F5]" : "hover:bg-[#FAFAFA]"}`}
+                  >
+                    {on && <span className="absolute inset-y-0 left-0 w-[2px] bg-slate-900" />}
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-1.5 font-mono text-xs font-medium">
+                        {approval.displayNumber}
+                        {approval.isUrgent && <span className="h-1.5 w-1.5 rounded-full bg-red-500" title="Urgente" />}
+                      </span>
+                      <span className="font-mono text-xs">{formatCurrency(approval.amount, approval.currency)}</span>
+                    </span>
+                    <span className="flex items-center justify-between gap-2 text-xs text-slate-500">
+                      <span className="truncate">{approval.supplier}</span>
+                      <span className="flex flex-shrink-0 items-center gap-1.5">
+                        {worst && <span className={`h-1.5 w-1.5 rounded-full ${worst === "fail" ? "bg-red-500" : "bg-amber-500"}`} title={worst === "fail" ? "Hay comprobaciones fallidas" : "Hay avisos"} />}
+                        {approval.daysWaiting > 0 ? `${approval.daysWaiting} d` : "hoy"}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Main Card */}
-            <div className="col-span-2">
+            {/* Documento */}
+            <div className="flex min-w-0 flex-col gap-4">
               {currentApproval && (
-                <div className="space-y-4">
-                  <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                    <div className="px-6 py-5 border-b border-slate-200 bg-slate-50">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {currentApproval.type === "po" ? <div className="w-12 h-12 bg-slate-200 rounded-md flex items-center justify-center"><FileText size={20} className="text-slate-600" /></div> : currentApproval.type === "invoice" ? <div className="w-12 h-12 bg-slate-200 rounded-md flex items-center justify-center"><Receipt size={20} className="text-slate-600" /></div> : <div className="w-12 h-12 bg-blue-100 rounded-md flex items-center justify-center"><Package size={20} className="text-blue-600" /></div>}
-                          <div>
-                            <div className="flex items-center gap-2"><h2 className="text-[14px] font-semibold text-slate-900">{currentApproval.displayNumber}</h2>{currentApproval.isUrgent && (<span className="flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg font-medium"><Flame size={10} />Urgente</span>)}</div>
-                            <p className="text-[13px] text-slate-500">{currentApproval.department && `${currentApproval.department} · `}{currentApproval.poType}{currentApproval.poNumber && currentApproval.type === "invoice" && (<span className="inline-flex items-center gap-1 ml-2 text-slate-600"><LinkIcon size={10} />PO-{currentApproval.poNumber}</span>)}</p>
-                          </div>
-                        </div>
-                        <div className="text-right"><p className="text-xs text-slate-500">Coste</p><p className="text-xl font-bold text-slate-900">{formatCurrency(currentApproval.baseAmount, currentApproval.currency)}</p></div>
+                <>
+                  <div className="overflow-hidden rounded-lg border border-slate-200">
+                    <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="flex items-center gap-2">
+                          <span className="font-mono text-[13px] font-semibold">{currentApproval.displayNumber}</span>
+                          <span className="text-xs text-slate-500">{currentApproval.type === "po" ? "Orden de compra" : currentApproval.type === "invoice" ? "Factura" : "Caja"}</span>
+                          {currentApproval.isUrgent && <span className="text-xs text-red-700">· urgente</span>}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          {[currentApproval.department, currentApproval.poType].filter(Boolean).join(" · ")}
+                          {currentApproval.poNumber && currentApproval.type === "invoice" && <> · PO-{currentApproval.poNumber}</>}
+                        </span>
                       </div>
-                      <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
-                        <button onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))} disabled={currentIndex === 0} className="flex items-center gap-1 text-[13px] text-slate-600 hover:text-slate-900 disabled:opacity-30"><ChevronLeft size={16} />Anterior</button>
-                        <span className="text-[13px] text-slate-500">{currentIndex + 1} de {filteredApprovals.length}</span>
-                        <button onClick={() => setCurrentIndex(Math.min(filteredApprovals.length - 1, currentIndex + 1))} disabled={currentIndex === filteredApprovals.length - 1} className="flex items-center gap-1 text-[13px] text-slate-600 hover:text-slate-900 disabled:opacity-30">Siguiente<ChevronRight size={16} /></button>
+                      <div className="text-right">
+                        <span className="block text-xl font-semibold tabular-nums tracking-tight">{formatCurrency(currentApproval.baseAmount, currentApproval.currency)}</span>
+                        <span className="text-xs text-slate-500">base</span>
                       </div>
                     </div>
 
-                    <div className="p-6">
-                      <div className="grid grid-cols-4 gap-4 mb-6">
-                        <div><p className="text-xs text-slate-500 mb-1">Proveedor</p><div className="flex items-center gap-2"><Building2 size={14} className="text-slate-400" /><p className="text-[13px] font-medium text-slate-900">{currentApproval.supplier}</p></div></div>
-                        <div><p className="text-xs text-slate-500 mb-1">Fecha</p><div className="flex items-center gap-2"><Calendar size={14} className="text-slate-400" /><p className="text-[13px] text-slate-900">{formatDate(currentApproval.createdAt)}</p></div></div>
-                        <div><p className="text-xs text-slate-500 mb-1">Creado por</p><div className="flex items-center gap-2"><User size={14} className="text-slate-400" /><p className="text-[13px] text-slate-900">{currentApproval.createdByName}</p></div></div>
-                        <div><p className="text-xs text-slate-500 mb-1">Esperando</p><div className="flex items-center gap-2"><Clock size={14} className={currentApproval.isUrgent ? "text-red-500" : "text-slate-400"} /><p className={`text-[13px] ${currentApproval.isUrgent ? "text-red-600 font-medium" : "text-slate-900"}`}>{currentApproval.daysWaiting} día{currentApproval.daysWaiting !== 1 ? "s" : ""}</p></div></div>
-                      </div>
+                    <div className="flex flex-col gap-5 px-5 py-4 text-[13px]">
+                      <dl className="grid grid-cols-2 gap-x-6 gap-y-2 md:grid-cols-4">
+                        {[
+                          ["Proveedor", currentApproval.supplier],
+                          ["Fecha", formatDate(currentApproval.createdAt)],
+                          ["Creado por", currentApproval.createdByName],
+                          ["Esperando", `${currentApproval.daysWaiting} ${currentApproval.daysWaiting === 1 ? "día" : "días"}`],
+                        ].map(([k, v]) => (
+                          <div key={k} className="flex flex-col">
+                            <dt className="text-xs text-slate-500">{k}</dt>
+                            <dd className={k === "Esperando" && currentApproval.isUrgent ? "text-red-700" : ""}>{v || "—"}</dd>
+                          </div>
+                        ))}
+                      </dl>
 
-                      <div className="mb-6"><p className="text-xs text-slate-500 mb-2">Descripción</p><p className="text-[13px] text-slate-700 bg-slate-50 p-4 rounded-md border border-slate-100">{currentApproval.description || "Sin descripción"}</p></div>
+                      {currentApproval.description && <p className="text-slate-700">{currentApproval.description}</p>}
 
                       {currentApproval.attachmentUrl && (
-                        <div className="mb-6">
-                          <div className="flex items-center justify-between mb-2"><p className="text-xs text-slate-500">Documento adjunto</p><button onClick={() => setShowPreview(!showPreview)} className="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1">{showPreview ? <ChevronUp size={14} /> : <ChevronDown size={14} />}{showPreview ? "Ocultar" : "Ver preview"}</button></div>
-                          {showPreview ? (
-                            <div className="border border-slate-200 rounded-md overflow-hidden bg-slate-100">
-                              {currentApproval.attachmentUrl.toLowerCase().includes(".pdf") ? <iframe src={currentApproval.attachmentUrl} className="w-full h-96" title="Document preview" /> : <img src={currentApproval.attachmentUrl} alt="Document preview" className="w-full max-h-96 object-contain" />}
-                              <div className="px-4 py-2 bg-white border-t border-slate-200 flex items-center justify-between"><span className="text-xs text-slate-500">{currentApproval.attachmentFileName || "Documento"}</span><a href={currentApproval.attachmentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-900"><ExternalLink size={12} />Abrir en nueva pestaña</a></div>
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-slate-500">Documento adjunto</span>
+                            <span className="flex gap-3 text-xs">
+                              <button onClick={() => setShowPreview(!showPreview)} className="font-medium text-slate-900 hover:underline">{showPreview ? "Ocultar" : "Vista previa"}</button>
+                              <a href={currentApproval.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-slate-900">Abrir ↗</a>
+                            </span>
+                          </div>
+                          {showPreview && (
+                            <div className="overflow-hidden rounded-md border border-slate-200 bg-[#F7F7F8]">
+                              {currentApproval.attachmentUrl.toLowerCase().includes(".pdf")
+                                ? <iframe src={currentApproval.attachmentUrl} className="h-[480px] w-full" title="Vista previa del documento" />
+                                // eslint-disable-next-line @next/next/no-img-element
+                                : <img src={currentApproval.attachmentUrl} alt="Vista previa del documento" className="max-h-[480px] w-full object-contain" />}
                             </div>
-                          ) : (
-                            <a href={currentApproval.attachmentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 border border-slate-200 rounded-md hover:bg-slate-50 transition-colors"><div className="hidden"><FileCheck size={18} className="text-slate-500" /></div><div className="flex-1"><p className="text-[13px] font-medium text-slate-900">{currentApproval.attachmentFileName || "Ver documento"}</p><p className="text-xs text-slate-500">Clic para abrir</p></div><Eye size={16} className="text-slate-400" /></a>
                           )}
                         </div>
                       )}
 
                       {currentApproval.items && currentApproval.items.length > 0 && (
-                        <div className="mb-6">
-                          <p className="text-xs text-slate-500 mb-2">Items ({currentApproval.items.length})</p>
-                          <div className="bg-slate-50 rounded-md border border-slate-100 p-4 max-h-48 overflow-y-auto space-y-2">
-                            {currentApproval.items.map((item: any, index: number) => {
-                              const episodeLabel = item.episodeAssignment === "specific" && item.episodes && item.episodes.length > 0
-                                ? item.episodes.length === 1 
-                                  ? item.episodes[0].episode.toString()
-                                  : item.episodes.map((e: any) => e.episode).join(", ")
-                                : null;
-                              return (
-                                <div key={index} className="flex items-start justify-between text-[13px] border-b border-slate-200 pb-2 last:border-0 last:pb-0">
-                                  <div className="flex-1">
-                                    <p className="font-medium text-slate-900">{item.description}</p>
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <p className="text-xs text-slate-500">{item.subAccountCode && `${item.subAccountCode} · `}{item.quantity || 0} × {formatCurrency(item.unitPrice || 0)}</p>
-                                      {item.episodeAssignment && (
-                                        <span className="flex items-center gap-1 text-xs text-violet-600">
-                                          <Layers size={10} />
-                                          {episodeLabel || "General"}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <p className="font-medium text-slate-900">{formatCurrency(item.totalAmount || 0)}</p>
-                                </div>
-                              );
-                            })}
-                          </div>
+                        <div className="overflow-hidden rounded-md border border-slate-200">
+                          <table className="w-full border-collapse">
+                            <thead>
+                              <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
+                                <th scope="col" className="px-3 py-1.5 text-left font-medium">Concepto</th>
+                                <th scope="col" className="px-3 py-1.5 text-left font-medium">Cuenta</th>
+                                <th scope="col" className="px-3 py-1.5 text-right font-medium">Cant. × precio</th>
+                                <th scope="col" className="px-3 py-1.5 text-right font-medium">Base</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {currentApproval.items.map((item: any, index: number) => (
+                                <tr key={index} className="border-b border-slate-100 last:border-0">
+                                  <td className="px-3 py-1.5">{item.description}{item.episodeAssignment === "specific" && item.episodes?.length ? <span className="ml-1.5 text-xs text-slate-500">cap. {item.episodes.map((e: any) => e.episode).join(", ")}</span> : null}</td>
+                                  <td className="px-3 py-1.5 font-mono text-xs text-slate-600">{item.subAccountCode || "—"}</td>
+                                  <td className="px-3 py-1.5 text-right font-mono text-xs text-slate-600">{item.quantity || 0} × {formatCurrency(item.unitPrice || 0)}</td>
+                                  <td className="px-3 py-1.5 text-right font-mono text-xs">{formatCurrency(item.baseAmount ?? ((item.quantity || 0) * (item.unitPrice || 0)))}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
                       )}
 
-                      {/* Vista previa de gastos BOX */}
                       {currentApproval.type === "box" && currentApproval.boxExpenses && currentApproval.boxExpenses.length > 0 && (
-                        <div className="mb-6">
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs text-slate-500">Gastos del sobre ({currentApproval.expenseCount || currentApproval.boxExpenses.length})</p>
-                            {currentApproval.boxType === "transfer" && currentApproval.paymentDate && (
-                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg">Pago: {currentApproval.paymentDate}</span>
-                            )}
+                        <div className="overflow-hidden rounded-md border border-slate-200">
+                          <div className="flex items-center justify-between border-b border-slate-200 bg-[#FAFAFA] px-3 py-1.5 text-xs text-slate-600">
+                            <span>{currentApproval.boxType === "card" ? `Tarjeta ${currentApproval.cardName}` : "Sobre de transferencias"} · {currentApproval.expenseCount || currentApproval.boxExpenses.length} gastos</span>
+                            {currentApproval.boxType === "transfer" && currentApproval.paymentDate && <span>Pago {currentApproval.paymentDate}</span>}
                           </div>
-                          <div className="bg-blue-50 rounded-md border border-blue-100 overflow-hidden">
-                            <div className="max-h-56 overflow-y-auto">
-                              <table className="w-full text-[13px]">
-                                <thead className="bg-blue-100/50 sticky top-0">
-                                  <tr>
-                                    {currentApproval.boxType === "transfer" && <th className="text-left px-3 py-2 text-[11px] font-medium text-blue-700">Persona</th>}
-                                    <th className="text-left px-3 py-2 text-[11px] font-medium text-blue-700">Proveedor</th>
-                                    <th className="text-left px-3 py-2 text-[11px] font-medium text-blue-700">Cuenta</th>
-                                    <th className="text-right px-3 py-2 text-[11px] font-medium text-blue-700">Base</th>
-                                    <th className="text-right px-3 py-2 text-[11px] font-medium text-blue-700">Total</th>
+                          <div className="max-h-56 overflow-y-auto">
+                            <table className="w-full border-collapse">
+                              <tbody>
+                                {currentApproval.boxExpenses.map((exp, idx) => (
+                                  <tr key={exp.id || idx} className="border-b border-slate-100 last:border-0">
+                                    {currentApproval.boxType === "transfer" && <td className="px-3 py-1.5">{exp.personName || "—"}</td>}
+                                    <td className="max-w-[180px] truncate px-3 py-1.5">{exp.supplier}</td>
+                                    <td className="px-3 py-1.5 font-mono text-xs text-slate-600">{exp.subAccountCode}</td>
+                                    <td className="px-3 py-1.5 text-right font-mono text-xs text-slate-600">{formatCurrency(exp.baseAmount)}</td>
+                                    <td className="px-3 py-1.5 text-right font-mono text-xs">{formatCurrency(exp.totalAmount)}</td>
                                   </tr>
-                                </thead>
-                                <tbody className="divide-y divide-blue-100">
-                                  {currentApproval.boxExpenses.map((exp, idx) => (
-                                    <tr key={exp.id || idx} className="hover:bg-blue-100/30">
-                                      {currentApproval.boxType === "transfer" && <td className="px-3 py-2 text-slate-900">{exp.personName || "-"}</td>}
-                                      <td className="px-3 py-2 text-slate-900 truncate max-w-[150px]">{exp.supplier}</td>
-                                      <td className="px-3 py-2 font-mono text-xs text-slate-600">{exp.subAccountCode}</td>
-                                      <td className="px-3 py-2 text-right font-mono text-slate-700">{formatCurrency(exp.baseAmount)}</td>
-                                      <td className="px-3 py-2 text-right font-mono font-medium text-slate-900">{formatCurrency(exp.totalAmount)}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                            <div className="px-3 py-2 bg-blue-100 flex justify-between items-center border-t border-blue-200">
-                              <span className="text-xs text-blue-700 font-medium">{currentApproval.boxType === "card" ? `Tarjeta: ${currentApproval.cardName}` : "Sobre de transferencia"}</span>
-                              <span className="text-[13px] font-bold text-blue-900">{formatCurrency(currentApproval.amount)}</span>
-                            </div>
+                                ))}
+                              </tbody>
+                            </table>
                           </div>
                         </div>
                       )}
 
-                      <div className="mb-6">
-                        <p className="text-xs text-slate-500 mb-3">Progreso de aprobación</p>
-                        <div className="space-y-2">
-                          {currentApproval.approvalSteps.map((step, index) => (
-                            <div key={step.id || index} className={`flex items-center gap-3 p-3 rounded-md border ${index === currentApproval.currentApprovalStep ? "border-amber-200 bg-amber-50" : step.status === "approved" ? "border-emerald-200 bg-emerald-50" : "border-slate-100 bg-slate-50"}`}>
-                              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${step.status === "approved" ? "bg-emerald-500 text-white" : index === currentApproval.currentApprovalStep ? "bg-amber-500 text-white" : "bg-slate-200 text-slate-600"}`}>
-                                {step.status === "approved" ? <Check size={12} /> : step.order}
-                              </div>
-                              <div className="flex-1">
-                                <p className="text-[13px] font-medium text-slate-900">
-                                  Nivel {step.order}
-                                  {step.approverType === "fixed" && (
-                                    <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Usuario específico</span>
-                                  )}
-                                  {step.approverType === "role" && step.roles && (
-                                    <span className="text-slate-500 font-normal"> ({step.roles.join(", ")})</span>
-                                  )}
-                                  {step.approverType === "hod" && (
-                                    <span className="text-slate-500 font-normal"> (HOD{step.department ? ` ${step.department}` : ""})</span>
-                                  )}
-                                  {step.approverType === "coordinator" && (
-                                    <span className="text-slate-500 font-normal"> (Coord.{step.department ? ` ${step.department}` : ""})</span>
-                                  )}
-                                  {step.hasAmountThreshold && step.amountThreshold && (
-                                    <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">&gt;{step.amountThreshold.toLocaleString()}€</span>
-                                  )}
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                  {step.approverNames?.length ? (
-                                    step.approverNames.slice(0, 3).join(", ") + (step.approverNames.length > 3 ? ` +${step.approverNames.length - 3}` : "")
-                                  ) : (
-                                    `${(step.approvedBy || []).length} aprobación${(step.approvedBy || []).length !== 1 ? "es" : ""}`
-                                  )}
-                                  {step.requireAll && " (todos)"}
-                                </p>
-                              </div>
-                              {step.status === "approved" && <CheckCircle size={16} className="text-emerald-500" />}
-                              {index === currentApproval.currentApprovalStep && step.status === "pending" && <Clock size={16} className="text-amber-500" />}
-                            </div>
-                          ))}
-                        </div>
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-xs text-slate-500">Circuito de aprobación</span>
+                        <ol className="flex flex-wrap items-center gap-2">
+                          {currentApproval.approvalSteps.map((step, index) => {
+                            const current = index === currentApproval.currentApprovalStep && step.status === "pending";
+                            const who = step.approverType === "role" && step.roles ? step.roles.join(", ")
+                              : step.approverType === "hod" ? `HOD${step.department ? ` ${step.department}` : ""}`
+                              : step.approverType === "coordinator" ? `Coord.${step.department ? ` ${step.department}` : ""}`
+                              : step.approverNames?.length ? step.approverNames.slice(0, 2).join(", ") + (step.approverNames.length > 2 ? ` +${step.approverNames.length - 2}` : "")
+                              : "Usuario";
+                            return (
+                              <li key={step.id || index} className="flex items-center gap-2">
+                                <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${current ? "border-slate-900 text-slate-900" : step.status === "approved" ? "border-slate-200 text-slate-500" : "border-slate-200 text-slate-400"}`}>
+                                  <span className={`h-1.5 w-1.5 rounded-full ${step.status === "approved" ? "bg-emerald-500" : current ? "bg-amber-500" : "bg-slate-300"}`} />
+                                  <span className="font-mono">{step.order}</span> {who}{step.requireAll ? " (todos)" : ""}
+                                  {step.hasAmountThreshold && step.amountThreshold ? <span className="text-slate-400">&gt;{step.amountThreshold.toLocaleString("es-ES")} €</span> : null}
+                                </span>
+                                {index < currentApproval.approvalSteps.length - 1 && <span className="text-slate-300">→</span>}
+                              </li>
+                            );
+                          })}
+                        </ol>
                       </div>
+                    </div>
 
-                      <div className="pt-6 border-t border-slate-200">
-                        {showCommentInput ? (
-                          <div className="space-y-3"><textarea value={approvalComment} onChange={(e) => setApprovalComment(e.target.value)} placeholder="Añade un comentario (opcional)" rows={2} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-emerald-500 resize-none text-[13px]" /><div className="flex gap-3"><button onClick={() => { setShowCommentInput(false); setApprovalComment(""); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">Cancelar</button><button onClick={() => handleApprove(currentApproval, true)} disabled={processing} className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[13px] font-medium disabled:opacity-50">{processing ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send size={16} />}Aprobar con comentario</button></div></div>
-                        ) : (
-                          <div className="space-y-3"><div className="flex gap-3"><button onClick={() => { setSelectedApproval(currentApproval); setShowApprovalModal(true); }} disabled={processing} className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[13px] font-medium transition-colors disabled:opacity-50">{processing ? (<><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Procesando...</>) : (<><CheckCircle size={18} />Aprobar</>)}</button><button onClick={() => { setSelectedApproval(currentApproval); setShowRejectionModal(true); }} disabled={processing} className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-[13px] font-medium transition-colors disabled:opacity-50"><XCircle size={18} />Rechazar</button></div><div className="flex gap-3"><button onClick={() => setShowCommentInput(true)} className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium"><MessageSquare size={16} />Aprobar con comentario</button><button onClick={() => { setSelectedApproval(currentApproval); setShowInfoRequestModal(true); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium"><HelpCircle size={16} />Solicitar información</button></div></div>
-                        )}
-                      </div>
+                    <div className="flex flex-col gap-3 border-t border-slate-200 bg-[#FAFAFA] px-5 py-3">
+                      {showCommentInput ? (
+                        <div className="flex flex-col gap-2">
+                          <Textarea value={approvalComment} onChange={(e) => setApprovalComment(e.target.value)} placeholder="Comentario" rows={2} autoFocus />
+                          <div className="flex justify-end gap-2">
+                            <Button variant="secondary" onClick={() => { setShowCommentInput(false); setApprovalComment(""); }}>Cancelar</Button>
+                            <Button variant="primary" onClick={() => handleApprove(currentApproval, true)} disabled={processing}><Check size={14} /> Aprobar con comentario</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-1 text-xs text-slate-500">
+                            <IconButton label="Anterior (K)" onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))} disabled={currentIndex === 0}><ChevronLeft size={15} /></IconButton>
+                            <span className="tabular-nums">{currentIndex + 1} / {filteredApprovals.length}</span>
+                            <IconButton label="Siguiente (J)" onClick={() => setCurrentIndex(Math.min(filteredApprovals.length - 1, currentIndex + 1))} disabled={currentIndex === filteredApprovals.length - 1}><ChevronRight size={15} /></IconButton>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button variant="ghost" onClick={() => { setSelectedApproval(currentApproval); setShowInfoRequestModal(true); }}>Pedir información</Button>
+                            <Button variant="ghost" onClick={() => setShowCommentInput(true)}>Aprobar con comentario</Button>
+                            <Button variant="secondary" onClick={() => { setSelectedApproval(currentApproval); setShowRejectionModal(true); }} disabled={processing}><span className="text-red-700">Rechazar</span></Button>
+                            <Button variant="primary" onClick={() => { setSelectedApproval(currentApproval); setShowApprovalModal(true); }} disabled={processing}><Check size={14} /> Aprobar</Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Auto Checks */}
-                  <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                    <button onClick={() => toggleSection("checks")} className="w-full px-3.5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center gap-3"><Shield size={18} className="text-slate-500" /><span className="font-semibold text-slate-900">Verificaciones automáticas</span><div className="flex items-center gap-1.5">{currentApproval.autoChecks.filter(c => c.status === "pass").length > 0 && (<span className="flex items-center gap-1 text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-lg"><CheckCircle size={10} />{currentApproval.autoChecks.filter(c => c.status === "pass").length}</span>)}{currentApproval.autoChecks.filter(c => c.status === "warning").length > 0 && (<span className="flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg"><AlertTriangle size={10} />{currentApproval.autoChecks.filter(c => c.status === "warning").length}</span>)}{currentApproval.autoChecks.filter(c => c.status === "fail").length > 0 && (<span className="flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg"><XCircle size={10} />{currentApproval.autoChecks.filter(c => c.status === "fail").length}</span>)}</div></div>
-                      {expandedSections.has("checks") ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
-                    </button>
-                    {expandedSections.has("checks") && (<div className="px-6 pb-6 space-y-2">{currentApproval.autoChecks.map((check) => (<div key={check.id} className={`flex items-start gap-3 p-3 rounded-md border ${getCheckBg(check.status)}`}>{getCheckIcon(check.status)}<div className="flex-1"><p className="text-[13px] font-medium text-slate-900">{check.label}</p><p className="text-xs text-slate-600">{check.message}</p>{check.details && <p className="text-xs text-slate-500 mt-1">{check.details}</p>}</div></div>))}</div>)}
-                  </div>
+                  {/* Comprobaciones */}
+                  <section className="overflow-hidden rounded-lg border border-slate-200">
+                    <h3 className="border-b border-slate-200 bg-[#FAFAFA] px-4 py-2 text-xs font-medium text-slate-500">Comprobaciones automáticas</h3>
+                    {currentApproval.autoChecks.map((check) => (
+                      <div key={check.id} className="flex items-start gap-2.5 border-b border-slate-100 px-4 py-2 text-[13px] last:border-0">
+                        <span className={`mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full ${checkTone(check.status)}`} />
+                        <span className="flex-1">
+                          <span className="text-slate-900">{check.label}</span>
+                          <span className="text-slate-500"> · {check.message}</span>
+                          {check.details && <span className="block text-xs text-slate-500">{check.details}</span>}
+                        </span>
+                      </div>
+                    ))}
+                  </section>
 
                   {/* Budget Impact */}
                   {canSeeBudgetFigures && currentApproval.budgetImpact && currentApproval.budgetImpact.length > 0 && (
@@ -1077,7 +1118,7 @@ export default function ApprovalsPage() {
                       <button onClick={() => toggleSection("budget")} className="w-full px-3.5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                         <div className="flex items-center gap-3">
                           <PieChart size={18} className="text-slate-500" />
-                          <span className="font-semibold text-slate-900">Impacto en presupuesto</span>
+                          <span className="text-[13px] font-medium text-slate-900">Impacto en presupuesto</span>
                           {currentApproval.budgetImpact.some(i => i.afterApproval < 0) && (
                             <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg">Sin presupuesto</span>
                           )}
@@ -1159,7 +1200,7 @@ export default function ApprovalsPage() {
                   {/* PO Comparison */}
                   {currentApproval.poComparison && (
                     <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                      <button onClick={() => toggleSection("po-comparison")} className="w-full px-3.5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"><div className="flex items-center gap-3"><Target size={18} className="text-slate-500" /><span className="font-semibold text-slate-900">Comparativa con PO-{currentApproval.poComparison.poNumber}</span>{currentApproval.poComparison.percentageUsed > 100 && (<span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg">Excede PO</span>)}</div>{expandedSections.has("po-comparison") ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}</button>
+                      <button onClick={() => toggleSection("po-comparison")} className="w-full px-3.5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"><div className="flex items-center gap-3"><Target size={18} className="text-slate-500" /><span className="text-[13px] font-medium text-slate-900">Comparativa con PO-{currentApproval.poComparison.poNumber}</span>{currentApproval.poComparison.percentageUsed > 100 && (<span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg">Excede PO</span>)}</div>{expandedSections.has("po-comparison") ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}</button>
                       {expandedSections.has("po-comparison") && (<div className="px-6 pb-6"><div className="grid grid-cols-4 gap-4 mb-4"><div className="text-center p-3 bg-slate-50 rounded-md"><p className="text-xs text-slate-500">Base PO</p><p className="text-[13px] font-bold text-slate-900">{formatCurrency(currentApproval.poComparison.poBaseAmount)}</p></div><div className="text-center p-3 bg-emerald-50 rounded-md"><p className="text-xs text-emerald-600">Facturado antes</p><p className="text-[13px] font-bold text-emerald-700">{formatCurrency(currentApproval.poComparison.invoicedBefore)}</p></div><div className="text-center p-3 bg-amber-50 rounded-md"><p className="text-xs text-amber-600">Esta factura</p><p className="text-[13px] font-bold text-amber-700">{formatCurrency(currentApproval.poComparison.thisInvoice)}</p></div><div className={`text-center p-3 rounded-md ${currentApproval.poComparison.remaining < 0 ? "bg-red-50" : "bg-slate-50"}`}><p className={`text-xs ${currentApproval.poComparison.remaining < 0 ? "text-red-600" : "text-slate-500"}`}>Restante</p><p className={`text-[13px] font-bold ${currentApproval.poComparison.remaining < 0 ? "text-red-700" : "text-slate-900"}`}>{formatCurrency(currentApproval.poComparison.remaining)}</p></div></div><div className="mb-4"><div className="flex items-center justify-between text-xs text-slate-500 mb-1"><span>Uso de la PO</span><span className={currentApproval.poComparison.percentageUsed > 100 ? "text-red-600 font-medium" : ""}>{currentApproval.poComparison.percentageUsed.toFixed(1)}%</span></div><div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden"><div className={`h-full ${currentApproval.poComparison.percentageUsed > 100 ? "bg-red-500" : currentApproval.poComparison.percentageUsed > 90 ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: `${Math.min(currentApproval.poComparison.percentageUsed, 100)}%` }} /></div></div>{currentApproval.poComparison.itemDiscrepancies.length > 0 && (<div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-md"><p className="text-xs font-semibold text-amber-800 mb-2 flex items-center gap-2"><AlertTriangle size={12} />Discrepancias en items</p><div className="space-y-2">{currentApproval.poComparison.itemDiscrepancies.map((disc, idx) => (<div key={idx} className="flex items-center justify-between text-xs"><span className="text-slate-700">{disc.description}</span><div className="flex items-center gap-3"><span className="text-slate-500">PO: {formatCurrency(disc.poAmount)}</span><span className="text-slate-900">FRA: {formatCurrency(disc.invoiceAmount)}</span><span className={disc.difference > 0 ? "text-red-600 font-medium" : "text-emerald-600 font-medium"}>{disc.difference > 0 ? "+" : ""}{formatCurrency(disc.difference)}</span></div></div>))}</div></div>)}</div>)}
                     </div>
                   )}
@@ -1167,82 +1208,72 @@ export default function ApprovalsPage() {
                   {/* Supplier Stats */}
                   {currentApproval.supplierStats && (
                     <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                      <button onClick={() => toggleSection("supplier")} className="w-full px-3.5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"><div className="flex items-center gap-3"><Building2 size={18} className="text-slate-500" /><span className="font-semibold text-slate-900">Historial del proveedor</span></div>{expandedSections.has("supplier") ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}</button>
+                      <button onClick={() => toggleSection("supplier")} className="w-full px-3.5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"><div className="flex items-center gap-3"><Building2 size={18} className="text-slate-500" /><span className="text-[13px] font-medium text-slate-900">Historial del proveedor</span></div>{expandedSections.has("supplier") ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}</button>
                       {expandedSections.has("supplier") && (<div className="px-6 pb-6"><div className="grid grid-cols-3 gap-4"><div className="text-center p-4 bg-slate-50 rounded-md"><p className="text-2xl font-bold text-slate-900">{currentApproval.supplierStats.totalPOs}</p><p className="text-xs text-slate-500">POs totales</p></div><div className="text-center p-4 bg-slate-50 rounded-md"><p className="text-2xl font-bold text-slate-900">{currentApproval.supplierStats.totalInvoices}</p><p className="text-xs text-slate-500">Facturas totales</p></div><div className="text-center p-4 bg-amber-50 rounded-md"><p className="text-2xl font-bold text-amber-700">{formatCurrency(currentApproval.supplierStats.pendingAmount)}</p><p className="text-xs text-amber-600">Pendiente</p></div></div>{currentApproval.supplierStats.lastTransaction && (<p className="text-xs text-slate-500 mt-3 text-center">Última transacción: {formatDate(currentApproval.supplierStats.lastTransaction)}</p>)}</div>)}
                     </div>
                   )}
 
                   {/* Timeline */}
                   <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                    <button onClick={() => toggleSection("timeline")} className="w-full px-3.5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"><div className="flex items-center gap-3"><History size={18} className="text-slate-500" /><span className="font-semibold text-slate-900">Historial de actividad</span><span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg">{currentApproval.timeline.length}</span></div>{expandedSections.has("timeline") ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}</button>
+                    <button onClick={() => toggleSection("timeline")} className="w-full px-3.5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"><div className="flex items-center gap-3"><History size={18} className="text-slate-500" /><span className="text-[13px] font-medium text-slate-900">Historial de actividad</span><span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg">{currentApproval.timeline.length}</span></div>{expandedSections.has("timeline") ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}</button>
                     {expandedSections.has("timeline") && (<div className="px-6 pb-6"><div className="space-y-3">{currentApproval.timeline.map((event, idx) => (<div key={event.id} className="flex items-start gap-3"><div className="relative"><div className={`w-8 h-8 rounded-full flex items-center justify-center ${event.type === "created" ? "bg-blue-100" : event.type === "approved" ? "bg-emerald-100" : event.type === "rejected" ? "bg-red-100" : event.type === "comment" ? "bg-slate-100" : "bg-amber-100"}`}>{event.type === "created" && <FileText size={14} className="text-blue-600" />}{event.type === "approved" && <Check size={14} className="text-emerald-600" />}{event.type === "rejected" && <X size={14} className="text-red-600" />}{event.type === "comment" && <MessageSquare size={14} className="text-slate-600" />}{event.type === "info_requested" && <HelpCircle size={14} className="text-amber-600" />}</div>{idx < currentApproval.timeline.length - 1 && (<div className="absolute top-8 left-1/2 -translate-x-1/2 w-0.5 h-8 bg-slate-200" />)}</div><div className="flex-1 pt-1"><p className="text-[13px] text-slate-900"><span className="font-medium">{event.userName}</span>{event.type === "created" && " creó el documento"}{event.type === "approved" && ` aprobó (Nivel ${event.stepOrder})`}{event.type === "rejected" && " rechazó el documento"}{event.type === "comment" && " añadió un comentario"}{event.type === "info_requested" && " solicitó información"}</p>{event.comment && (<p className="text-[13px] text-slate-600 bg-slate-50 p-2 rounded-lg mt-1 italic">&quot;{event.comment}&quot;</p>)}<p className="text-xs text-slate-400 mt-0.5">{formatDateTime(event.date)}</p></div></div>))}</div></div>)}
                   </div>
-                </div>
+                </>
               )}
             </div>
           </div>
         )}
-      </main>
+      </div>
 
-      {/* Modal de confirmación de aprobación */}
-      {showApprovalModal && selectedApproval && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowApprovalModal(false); setSelectedApproval(null); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200">
-              <h3 className="text-[14px] font-semibold text-slate-900">Confirmar aprobación</h3>
-              <p className="text-[13px] text-slate-500">{selectedApproval.displayNumber}</p>
-            </div>
-            <div className="p-6">
-              <div className="flex items-center gap-4 p-4 bg-emerald-50 rounded-md mb-6">
-                <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
-                  <CheckCircle size={24} className="text-emerald-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-slate-900">¿Aprobar este documento?</p>
-                  <p className="text-[13px] text-slate-600">{selectedApproval.supplier} · {formatCurrency(selectedApproval.amount, selectedApproval.currency)}</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => { setShowApprovalModal(false); setSelectedApproval(null); }} 
-                  className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  onClick={() => handleApprove(selectedApproval)} 
-                  disabled={processing} 
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[13px] font-medium disabled:opacity-50"
-                >
-                  {processing ? (
-                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Aprobando...</>
-                  ) : (
-                    <><CheckCircle size={16} />Confirmar aprobación</>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={showApprovalModal && !!selectedApproval}
+        onClose={() => { setShowApprovalModal(false); setSelectedApproval(null); }}
+        title="Aprobar"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setShowApprovalModal(false); setSelectedApproval(null); }}>Cancelar</Button>
+            <Button variant="primary" onClick={() => selectedApproval && handleApprove(selectedApproval)} disabled={processing} autoFocus><Check size={14} /> Aprobar</Button>
+          </>
+        }
+      >
+        {selectedApproval && (
+          <p className="text-[13px] text-slate-700">
+            <span className="font-mono">{selectedApproval.displayNumber}</span> · {selectedApproval.supplier} · <span className="font-mono">{formatCurrency(selectedApproval.amount, selectedApproval.currency)}</span>
+          </p>
+        )}
+      </Modal>
 
-      {showRejectionModal && selectedApproval && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowRejectionModal(false); setRejectionReason(""); setSelectedApproval(null); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200"><h3 className="text-[14px] font-semibold text-slate-900">Rechazar documento</h3><p className="text-[13px] text-slate-500">{selectedApproval.displayNumber}</p></div>
-            <div className="p-6"><label className="mb-1.5 block text-xs font-medium text-slate-600">Motivo del rechazo *</label><textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Explica el motivo del rechazo" rows={4} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 resize-none text-[13px]" /><div className="flex gap-3 mt-6"><button onClick={() => { setShowRejectionModal(false); setRejectionReason(""); setSelectedApproval(null); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">Cancelar</button><button onClick={handleReject} disabled={processing || !rejectionReason.trim()} className="flex-1 px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-[13px] font-medium disabled:opacity-50">{processing ? "Rechazando..." : "Confirmar rechazo"}</button></div></div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={showRejectionModal && !!selectedApproval}
+        onClose={() => { setShowRejectionModal(false); setRejectionReason(""); setSelectedApproval(null); }}
+        title={`Rechazar ${selectedApproval?.displayNumber || ""}`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setShowRejectionModal(false); setRejectionReason(""); setSelectedApproval(null); }}>Cancelar</Button>
+            <Button variant="danger" onClick={handleReject} disabled={processing || !rejectionReason.trim()}>Rechazar</Button>
+          </>
+        }
+      >
+        <Field label="Motivo">
+          <Textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} rows={4} autoFocus />
+        </Field>
+      </Modal>
 
-      {showInfoRequestModal && selectedApproval && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowInfoRequestModal(false); setInfoRequestMessage(""); setSelectedApproval(null); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200"><h3 className="text-[14px] font-semibold text-slate-900">Solicitar información</h3><p className="text-[13px] text-slate-500">{selectedApproval.displayNumber}</p></div>
-            <div className="p-6"><label className="mb-1.5 block text-xs font-medium text-slate-600">¿Qué información necesitas?</label><textarea value={infoRequestMessage} onChange={(e) => setInfoRequestMessage(e.target.value)} placeholder="Describe qué información adicional necesitas" rows={4} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-amber-500 resize-none text-[13px]" /><div className="flex gap-3 mt-6"><button onClick={() => { setShowInfoRequestModal(false); setInfoRequestMessage(""); setSelectedApproval(null); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">Cancelar</button><button onClick={handleRequestInfo} disabled={processing || !infoRequestMessage.trim()} className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-[13px] font-medium disabled:opacity-50"><Send size={16} />{processing ? "Enviando..." : "Enviar solicitud"}</button></div></div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={showInfoRequestModal && !!selectedApproval}
+        onClose={() => { setShowInfoRequestModal(false); setInfoRequestMessage(""); setSelectedApproval(null); }}
+        title={`Pedir información · ${selectedApproval?.displayNumber || ""}`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setShowInfoRequestModal(false); setInfoRequestMessage(""); setSelectedApproval(null); }}>Cancelar</Button>
+            <Button variant="primary" onClick={handleRequestInfo} disabled={processing || !infoRequestMessage.trim()}><Send size={14} /> Enviar</Button>
+          </>
+        }
+      >
+        <Field label="¿Qué necesitas saber?">
+          <Textarea value={infoRequestMessage} onChange={(e) => setInfoRequestMessage(e.target.value)} rows={4} autoFocus />
+        </Field>
+      </Modal>
 
       {successMessage && (
         <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
@@ -1259,6 +1290,6 @@ export default function ApprovalsPage() {
           </button>
         </div>
       )}
-    </div>
+    </Page>
   );
 }

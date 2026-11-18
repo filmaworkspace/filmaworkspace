@@ -860,7 +860,7 @@ export default function EditInvoicePage() {
   };
 
   // Helpers
-  const formatCurrency = (a: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(a || 0);
+  const formatCurrency = (a: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(a || 0);
   const canEdit = () => invoiceStatus === "draft" || invoiceStatus === "rejected";
   const currentDocType = DOCUMENT_TYPES[documentType];
   const DocIcon = currentDocType.icon;

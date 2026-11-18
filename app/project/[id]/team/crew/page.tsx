@@ -1112,7 +1112,7 @@ export default function CrewPage() {
 
       {/* ── Modal ────────────────────────────────────────────────────────────── */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
+        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
 
             {/* Header */}
@@ -1347,7 +1347,7 @@ export default function CrewPage() {
 
       {/* ── Send Form Modal ──────────────────────────────────────────────────── */}
       {formTarget && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4" onClick={closeSendForm}>
+        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4" onClick={closeSendForm}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col" onClick={(e) => e.stopPropagation()}>
 
             {/* Header */}
@@ -1496,7 +1496,7 @@ export default function CrewPage() {
       {/* ── Crew List Modal ──────────────────────────────────────────────────── */}
       {showCrewListModal && (
         <div
-          className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4"
           onClick={() => setShowCrewListModal(false)}
         >
           <div
@@ -1584,7 +1584,7 @@ export default function CrewPage() {
 
       {/* ── Confirm ──────────────────────────────────────────────────────────── */}
       {confirmDialog && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
+        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
             <p className="text-[13px] text-slate-600 mb-6">{confirmDialog.message}</p>

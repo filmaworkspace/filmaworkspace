@@ -744,7 +744,7 @@ export default function ReportsPage() {
 
   // ── helpers ────────────────────────────────────────────────────────────────
   const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
+    new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(amount || 0);
   const formatDate = (date: any) => date?.toDate ? new Date(date.toDate()).toLocaleDateString("es-ES") : "";
   const getCurrentDate = () => new Date().toISOString().split("T")[0];
 

@@ -1544,7 +1544,8 @@ export default function NewInvoicePage() {
     return new Intl.NumberFormat("es-ES", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }).format(a);
+      useGrouping: "always",
+    } as Intl.NumberFormatOptions).format(a);
   };
 
   const formatDate = (d: Date) => {
@@ -2865,7 +2866,7 @@ export default function NewInvoicePage() {
       {/* Modals */}
       {/* Replace Modal */}
       {showReplaceModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4" onClick={() => setShowReplaceModal(false)}>
+        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4" onClick={() => setShowReplaceModal(false)}>
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
               <div>
@@ -2930,7 +2931,7 @@ export default function NewInvoicePage() {
 
       {/* PO Modal */}
       {showPOModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4" onClick={() => { setShowPOModal(false); setPOSearch(""); }}>
+        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4" onClick={() => { setShowPOModal(false); setPOSearch(""); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-[14px] font-semibold text-slate-900">Seleccionar PO</h2>
@@ -2993,7 +2994,7 @@ export default function NewInvoicePage() {
 
       {/* PO Items Modal */}
       {showPOItemsModal && selectedPO && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4" onClick={() => setShowPOItemsModal(false)}>
+        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4" onClick={() => setShowPOItemsModal(false)}>
           <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
               <div>
@@ -3064,7 +3065,7 @@ export default function NewInvoicePage() {
 
       {/* Supplier Modal */}
       {showSupplierModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4" onClick={() => { setShowSupplierModal(false); setSupplierSearch(""); }}>
+        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4" onClick={() => { setShowSupplierModal(false); setSupplierSearch(""); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-[14px] font-semibold text-slate-900">Seleccionar proveedor</h2>
@@ -3155,7 +3156,7 @@ export default function NewInvoicePage() {
 
       {/* Create Supplier Modal */}
       {showCreateSupplierModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[80] p-4" onClick={() => { setShowCreateSupplierModal(false); setNewSupplierData({ fiscalName: "", taxId: "" }); }}>
+        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[80] p-4" onClick={() => { setShowCreateSupplierModal(false); setNewSupplierData({ fiscalName: "", taxId: "" }); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full border border-slate-200" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -3216,7 +3217,7 @@ export default function NewInvoicePage() {
 
       {/* Account Modal */}
       {showAccountModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4" onClick={() => { setShowAccountModal(false); setAccountSearch(""); setCurrentItemIndex(null); }}>
+        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4" onClick={() => { setShowAccountModal(false); setAccountSearch(""); setCurrentItemIndex(null); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-[14px] font-semibold text-slate-900">Seleccionar cuenta</h2>
@@ -3318,7 +3319,7 @@ export default function NewInvoicePage() {
 
       {/* Modal de asignación de capítulos */}
       {showEpisodeModal && episodeItemIndex !== null && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowEpisodeModal(false)}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowEpisodeModal(false)}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">

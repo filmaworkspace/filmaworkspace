@@ -1052,7 +1052,7 @@ export default function CrewMemberPage() {
 
       {/* ── Send form modal ─────────────────────────────────────────────────── */}
       {showFormModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4" onClick={() => setShowFormModal(false)}>
+        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4" onClick={() => setShowFormModal(false)}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
 
             {/* Header */}

@@ -19,7 +19,7 @@ import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } f
 
 import { Page, PageHeader, PageLoading, buttonClass } from "@/components/ds";
 import { PROJECT_ROLES } from "@/hooks/useAccountingPermissions";
-import { getInvoiceDisplayState } from "@/lib/invoiceHelpers";
+import { getInvoiceDisplayState, inInvoiceView, type InvoiceView } from "@/lib/invoiceHelpers";
 import { getCostSettings } from "@/lib/budgetRules";
 import { actualBySubaccount, committedBySubaccount, loadBoxBySubaccount } from "@/lib/budgetTotals";
 
@@ -99,7 +99,6 @@ const STATES: Record<string, { label: string; dot: string; text: string }> = {
   partial_return: { label: "Dev. parcial",     dot: "bg-cyan-500",    text: "text-cyan-800" },
 };
 
-const ACTIVE_INVOICE = (s: string) => !["draft", "cancelled", "void", "rejected", "returned", "partial_return"].includes(s);
 
 // ─── Formato ─────────────────────────────────────────────────────────────────
 
@@ -107,15 +106,6 @@ const money = (n: number, decimals = 2) =>
   `${new Intl.NumberFormat("es-ES", { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: "always" } as Intl.NumberFormatOptions).format(n || 0)} €`;
 const shortDate = (d: Date | null) => (d ? d.toLocaleDateString("es-ES", { day: "numeric", month: "short" }).replace(".", "") : "—");
 const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
-
-/** Domingo de esta semana, 23:59. */
-function endOfWeek() {
-  const d = new Date();
-  const day = d.getDay(); // 0 = domingo
-  d.setDate(d.getDate() + (day === 0 ? 0 : 7 - day));
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
 
 function startOfToday() {
   const d = new Date();
@@ -387,20 +377,17 @@ export default function AccountingPanelPage() {
   };
 
   const flow = useMemo(() => {
-    const active = invoices.filter((i) => ACTIVE_INVOICE(i.state));
     const sum = (list: InvoiceLite[], key: "base" | "total") => list.reduce((s, i) => s + i[key], 0);
-    const received = active.filter((i) => i.state === "submitted" || i.state === "overdue");
-    const approved = active.filter((i) => ["approved", "coded", "accounted"].includes(i.state));
-    const paid = active.filter((i) => i.state === "paid");
-    const weekEnd = endOfWeek();
-    const due = active
-      .filter((i) => i.state !== "paid" && i.dueDate && i.dueDate <= weekEnd)
-      .sort((a, b) => (a.dueDate!.getTime() - b.dueDate!.getTime()));
+    const pick = (v: InvoiceView) => invoices.filter((i) => inInvoiceView(v, i.state, i.dueDate));
+    const received = pick("recibidas");
+    const approved = pick("aprobadas");
+    const paid = pick("pagadas");
+    const due = pick("semana").sort((a, b) => a.dueDate!.getTime() - b.dueDate!.getTime());
     return {
       steps: [
-        { label: "Recibidas", count: received.length, amount: sum(received, "base"), bar: "bg-slate-200" },
-        { label: "Aprobadas", count: approved.length, amount: sum(approved, "base"), bar: "bg-[#AEBDF5]" },
-        { label: "Pagadas", count: paid.length, amount: sum(paid, "base"), bar: "bg-[#2F52E0]" },
+        { label: "Recibidas", view: "recibidas", count: received.length, amount: sum(received, "base"), bar: "bg-slate-200" },
+        { label: "Aprobadas", view: "aprobadas", count: approved.length, amount: sum(approved, "base"), bar: "bg-[#AEBDF5]" },
+        { label: "Pagadas", view: "pagadas", count: paid.length, amount: sum(paid, "base"), bar: "bg-[#2F52E0]" },
       ],
       due,
       dueTotal: sum(due, "total"),
@@ -467,7 +454,7 @@ export default function AccountingPanelPage() {
                 {flow.steps.map((s, i) => (
                   <Link
                     key={s.label}
-                    href={`/project/${id}/accounting/invoices`}
+                    href={`/project/${id}/accounting/invoices?vista=${s.view}`}
                     className="relative flex flex-col gap-1 border-b border-r border-slate-100 px-4 py-3.5 transition-colors hover:bg-[#FAFAFA] md:border-b-0"
                   >
                     <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-slate-500">
@@ -480,7 +467,7 @@ export default function AccountingPanelPage() {
                   </Link>
                 ))}
                 <Link
-                  href={`/project/${id}/accounting/payments`}
+                  href={`/project/${id}/accounting/invoices?vista=semana`}
                   className="relative flex flex-col gap-1 bg-[#FEF7F7] px-4 py-3.5 transition-colors hover:bg-[#FDEFEF]"
                 >
                   <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-red-700">

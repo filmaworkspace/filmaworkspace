@@ -821,7 +821,7 @@ export default function SuppliersPage() {
 
       {/* Create/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4" onClick={() => { setShowModal(false); resetForm(); }}>
+        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4" onClick={() => { setShowModal(false); resetForm(); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <h2 className="text-[14px] font-semibold text-slate-900">{modalMode === "create" ? "Nuevo proveedor" : "Editar proveedor"}</h2>
@@ -843,53 +843,11 @@ export default function SuppliersPage() {
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre comercial</label>
                       <input type="text" value={formData.commercialName} onChange={(e) => setFormData({ ...formData, commercialName: e.target.value })} onBlur={handleCommercialNameBlur} placeholder="Nombre comercial" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
                     </div>
-                    <div ref={countryDropdownRef} className="relative">
+                    <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">País</label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!showCountryDropdown && countryDropdownRef.current) {
-                            const rect = countryDropdownRef.current.getBoundingClientRect();
-                            setCountryDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
-                          }
-                          setShowCountryDropdown(!showCountryDropdown); setCountrySearch("");
-                        }}
-                        className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between hover:border-slate-300 transition-colors text-[13px]"
-                      >
-                        <span className="text-slate-900">{getCountryInfo(formData.country).name}</span>
-                        <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showCountryDropdown ? "rotate-180" : "")} />
-                      </button>
-                      {showCountryDropdown && countryDropdownPos && (
-                        <div className="fixed z-20 bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden"
-                          style={{ top: countryDropdownPos.top, left: countryDropdownPos.left, width: countryDropdownPos.width }}>
-                          <div className="p-2 border-b border-slate-100">
-                            <input
-                              type="text"
-                              value={countrySearch}
-                              onChange={(e) => setCountrySearch(e.target.value)}
-                              placeholder="Buscar país"
-                              className="w-full px-2.5 py-1.5 text-[13px] border border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
-                              autoFocus
-                            />
-                          </div>
-                          <div className="max-h-48 overflow-y-auto py-1">
-                            {COUNTRIES.filter(c => 
-                              c.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
-                              c.code.toLowerCase().includes(countrySearch.toLowerCase())
-                            ).map((country) => (
-                              <button
-                                key={country.code}
-                                type="button"
-                                onClick={() => { handleCountryChange(country.code); setShowCountryDropdown(false); setCountrySearch(""); }}
-                                className={"w-full px-4 py-2 text-left text-sm hover:bg-slate-50 transition-colors flex items-center justify-between " + (formData.country === country.code ? "bg-slate-50 text-slate-900 font-medium" : "text-slate-600")}
-                              >
-                                <span>{country.name}</span>
-                                <span className="text-slate-400">{country.code}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      <Select value={formData.country} onChange={(e) => handleCountryChange(e.target.value)}>
+                        {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+                      </Select>
                     </div>
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">NIF/CIF *</label>
@@ -958,37 +916,11 @@ export default function SuppliersPage() {
                 <div>
                   <h3 className="mb-3 text-xs font-medium text-slate-500">Información de pago</h3>
                   <div className="grid grid-cols-2 gap-4">
-                    <div ref={paymentMethodDropdownRef} className="relative">
+                    <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Método de pago</label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!showPaymentMethodDropdown && paymentMethodDropdownRef.current) {
-                            const rect = paymentMethodDropdownRef.current.getBoundingClientRect();
-                            setPaymentMethodDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
-                          }
-                          setShowPaymentMethodDropdown(!showPaymentMethodDropdown);
-                        }}
-                        className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between hover:border-slate-300 transition-colors text-[13px]"
-                      >
-                        <span className="text-slate-900">{PAYMENT_METHODS.find(m => m.value === formData.paymentMethod)?.label}</span>
-                        <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showPaymentMethodDropdown ? "rotate-180" : "")} />
-                      </button>
-                      {showPaymentMethodDropdown && paymentMethodDropdownPos && (
-                        <div className="fixed z-20 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto"
-                          style={{ top: paymentMethodDropdownPos.top, left: paymentMethodDropdownPos.left, width: paymentMethodDropdownPos.width }}>
-                          {PAYMENT_METHODS.map((method) => (
-                            <button
-                              key={method.value}
-                              type="button"
-                              onClick={() => { setFormData({ ...formData, paymentMethod: method.value }); setShowPaymentMethodDropdown(false); }}
-                              className={"w-full px-4 py-2 text-left text-sm hover:bg-slate-50 transition-colors " + (formData.paymentMethod === method.value ? "bg-slate-50 text-slate-900 font-medium" : "text-slate-600")}
-                            >
-                              {method.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                      <Select value={formData.paymentMethod} onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value as PaymentMethod })}>
+                        {PAYMENT_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                      </Select>
                     </div>
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Cuenta bancaria (IBAN) / BIC</label>

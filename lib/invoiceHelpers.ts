@@ -114,3 +114,32 @@ export function isOverdue(invoice: {
     isActiveInvoiceStatus(invoice.status)
   );
 }
+
+// ─── Circuito de facturas ────────────────────────────────────────────────────
+// Misma clasificación en el Panel (circuito) y en la lista de Facturas (vistas
+// rápidas), para que los números del panel coincidan con lo que se filtra.
+
+export type InvoiceView = "recibidas" | "aprobadas" | "pagadas" | "semana";
+
+/** Estados que no cuentan en el circuito (borradores, anuladas, devoluciones de fianza). */
+export const isActiveInvoiceState = (state: string) =>
+  !["draft", "cancelled", "void", "rejected", "returned", "partial_return"].includes(state);
+
+/** Domingo de esta semana a las 23:59. */
+export function endOfThisWeek(now = new Date()) {
+  const d = new Date(now);
+  const day = d.getDay(); // 0 = domingo
+  d.setDate(d.getDate() + (day === 0 ? 0 : 7 - day));
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+/** ¿Pertenece la factura (por su estado visible y vencimiento) a esta vista del circuito? */
+export function inInvoiceView(view: InvoiceView, state: string, dueDate?: Date | null) {
+  if (!isActiveInvoiceState(state)) return false;
+  if (view === "recibidas") return state === "submitted" || state === "overdue";
+  if (view === "aprobadas") return ["approved", "coded", "accounted"].includes(state);
+  if (view === "pagadas") return state === "paid";
+  // Sin pagar y con vencimiento hasta el domingo (incluye las ya vencidas).
+  return state !== "paid" && !!dueDate && dueDate <= endOfThisWeek();
+}

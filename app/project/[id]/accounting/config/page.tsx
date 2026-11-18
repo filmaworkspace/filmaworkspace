@@ -868,7 +868,7 @@ export default function AccountingConfigPage() {
   const getMembersByRole = (role: string) => members.filter((m) => m.role === role);
 
   const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
+    new Intl.NumberFormat("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 0, useGrouping: "always" } as Intl.NumberFormatOptions).format(amount);
 
   const formatRelativeDate = (timestamp: any): string => {
     if (!timestamp) return "";
@@ -2253,7 +2253,7 @@ export default function AccountingConfigPage() {
 
       {/* Modal para cuenta bancaria */}
       {showBankAccountModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowBankAccountModal(false)}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowBankAccountModal(false)}>
           <div className="bg-white rounded-lg shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -2370,7 +2370,7 @@ export default function AccountingConfigPage() {
 
       {/* Confirm Dialog */}
       {confirmDialog && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-[14px] font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
             <p className="text-[13px] text-slate-600 mb-6">{confirmDialog.message}</p>

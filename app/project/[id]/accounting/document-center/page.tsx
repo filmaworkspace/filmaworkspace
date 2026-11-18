@@ -1,6 +1,10 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
+import { getInvoiceDisplayState } from "@/lib/invoiceHelpers";
+import { Button, Checkbox, EmptyState, IconButton, Input, Page, PageHeader, Select, Spinner } from "@/components/ds";
+import SearchBar, { type SearchField } from "@/components/SearchBar";
+import { matchAmount, matchCode, matchWords } from "@/lib/search";
 import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -80,6 +84,7 @@ interface Invoice {
   totalAmount: number;
   currency: string;
   status: InvoiceStatus;
+  displayState: string;
   dueDate: Date;
   invoiceDate?: Date;
   createdAt: Date;
@@ -141,7 +146,7 @@ const fmtDateTime = (date: Date) =>
 
 const fmtMoney = (amount: number, currency = "EUR") => {
   const symbol = currency === "EUR" ? "€" : currency === "USD" ? "$" : "€";
-  return new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount) + " " + symbol;
+  return new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(amount) + " " + symbol;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -155,6 +160,10 @@ export default function DocumentCenterPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
 
   const [searchTerm, setSearchTerm]         = useState("");
+  const [docField, setDocField] = useState<"all" | "number" | "supplier" | "concept" | "amount">("all");
+  const [supplierFilter, setSupplierFilter] = useState("all");
+  const [missingFiles, setMissingFiles] = useState(false);
+  const [uncodedOnly, setUncodedOnly] = useState(false);
   const [statusFilter, setStatusFilter]     = useState("all");
   const [dateRange, setDateRange]           = useState<{ from: string; to: string }>({ from: "", to: "" });
   const [showStatusDD, setShowStatusDD]     = useState(false);
@@ -202,6 +211,7 @@ export default function DocumentCenterPage() {
           totalAmount: raw.totalAmount || 0,
           currency: raw.currency || "EUR",
           status: raw.status,
+          displayState: getInvoiceDisplayState({ status: raw.status, codedAt: raw.codedAt, approvedAt: raw.approvedAt, accountedAt: raw.accountedAt, paidAt: raw.paidAt, dueDate: raw.dueDate?.toDate() }),
           dueDate: raw.dueDate?.toDate() || new Date(),
           invoiceDate: raw.invoiceDate?.toDate(),
           createdAt: raw.createdAt?.toDate() || new Date(),
@@ -236,21 +246,21 @@ export default function DocumentCenterPage() {
 
   const filteredInvoices = useMemo(() => {
     let f = [...invoices];
-    if (searchTerm) {
-      const s = searchTerm.toLowerCase();
-      f = f.filter(inv =>
-        inv.number.toLowerCase().includes(s) ||
-        inv.displayNumber.toLowerCase().includes(s) ||
-        inv.supplier.toLowerCase().includes(s) ||
-        inv.description?.toLowerCase().includes(s) ||
-        (inv.poNumber && inv.poNumber.toLowerCase().includes(s))
-      );
+    const q = searchTerm.trim();
+    if (q) {
+      f = f.filter(inv => {
+        const byNumber = matchCode(q, inv.displayNumber, inv.number, inv.poNumber ? `PO-${inv.poNumber}` : "");
+        const bySupplier = matchWords(q, inv.supplier) || matchCode(q, inv.supplierTaxId);
+        const byConcept = matchWords(q, inv.description);
+        const byAmount = matchAmount(q, inv.totalAmount) === true;
+        return docField === "number" ? byNumber : docField === "supplier" ? bySupplier : docField === "concept" ? byConcept : docField === "amount" ? byAmount : byNumber || bySupplier || byConcept || byAmount;
+      });
     }
-    if (statusFilter !== "all") f = f.filter(inv => inv.status === statusFilter);
+    if (statusFilter !== "all") f = f.filter(inv => inv.displayState === statusFilter);
     if (dateRange.from) { const d = new Date(dateRange.from); f = f.filter(inv => inv.createdAt >= d); }
     if (dateRange.to)   { const d = new Date(dateRange.to); d.setHours(23,59,59,999); f = f.filter(inv => inv.createdAt <= d); }
     return f;
-  }, [invoices, searchTerm, statusFilter, dateRange]);
+  }, [invoices, searchTerm, statusFilter, dateRange, docField]);
 
   const isAllSelected = filteredInvoices.length > 0 && selectedIds.size === filteredInvoices.length;
   const toggleSelect    = (invId: string) => { const s = new Set(selectedIds); s.has(invId) ? s.delete(invId) : s.add(invId); setSelectedIds(s); };
@@ -430,207 +440,121 @@ export default function DocumentCenterPage() {
     </button>
   );
 
+  const DOC_STATE: Record<string, { label: string; dot: string; text: string }> = {
+    submitted: { label: "Pend. aprobación", dot: "bg-amber-500", text: "text-amber-800" },
+    approved: { label: "Aprobada", dot: "bg-emerald-500", text: "text-emerald-800" },
+    coded: { label: "Codificada", dot: "bg-violet-500", text: "text-violet-800" },
+    accounted: { label: "Contabilizada", dot: "bg-teal-500", text: "text-teal-800" },
+    paid: { label: "Pagada", dot: "bg-[#2F52E0]", text: "text-blue-800" },
+    overdue: { label: "Vencida", dot: "bg-red-500", text: "text-red-700" },
+    rejected: { label: "Rechazada", dot: "bg-red-500", text: "text-red-700" },
+    cancelled: { label: "Anulada", dot: "bg-slate-300", text: "text-slate-500" },
+    draft: { label: "Borrador", dot: "bg-slate-300", text: "text-slate-600" },
+  };
+  const DOC_FIELDS: SearchField<"all" | "number" | "supplier" | "concept" | "amount">[] = [
+    { value: "all", label: "Buscar en todo", placeholder: "Número, proveedor, concepto o importe" },
+    { value: "number", label: "Nº documento o PO", placeholder: "Ej. FAC-0012", mono: true },
+    { value: "supplier", label: "Proveedor", placeholder: "Nombre o NIF" },
+    { value: "concept", label: "Concepto", placeholder: "Ej. alquiler" },
+    { value: "amount", label: "Importe", placeholder: "1500 · >1000 · 500-2000", mono: true },
+  ];
+  const rows = filteredInvoices
+    .filter((inv) => supplierFilter === "all" || (inv.supplierId || inv.supplier) === supplierFilter)
+    .filter((inv) => !missingFiles || !inv.attachmentUrl || (!!inv.paidAt && !inv.receiptUrl))
+    .filter((inv) => !uncodedOnly || !inv.codedAt);
+  const allSelected = rows.length > 0 && rows.every((r) => selectedIds.has(r.id));
+  const toggleAll = () => setSelectedIds(allSelected ? new Set() : new Set(rows.map((r) => r.id)));
+  const filtersOn = !!(hasFilters || supplierFilter !== "all" || missingFiles || uncodedOnly);
+
   return (
-    <div className={cx("min-h-screen bg-white", inter.className)}>
-      <div className="mt-[53px]">
-        <div className="px-6 pt-8 sm:px-10">
-          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Centro de documentación</h1>
-            </div>
-            {selectedIds.size > 0 && (
-              <button onClick={downloadSelected} disabled={downloading}
-                className="absolute right-0 flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity disabled:opacity-50">
-                {downloading
-                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />{dlProgress.current}/{dlProgress.total}</>
-                  : <><Download size={16} />Descargar ({selectedIds.size})</>}
-              </button>
-            )}
-          </div>
+    <Page>
+      <PageHeader
+        title={<>Centro de documentación <span className="text-[15px] font-normal text-slate-400">{invoices.length}</span></>}
+        actions={
+          supplierFilter !== "all" ? (
+            <Button variant="secondary" onClick={() => downloadBySupplier(supplierFilter)} disabled={downloading}><Download size={14} /> Expedientes del proveedor</Button>
+          ) : undefined
+        }
+      />
+
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <SearchBar fields={DOC_FIELDS} field={docField} onField={setDocField} value={searchTerm} onChange={setSearchTerm} count={rows.length} />
+        <div className="w-48">
+          <Select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)}>
+            <option value="all">Todos los proveedores</option>
+            {suppliers.map(([sid, name]) => <option key={sid} value={sid}>{name}</option>)}
+          </Select>
+        </div>
+        <div className="w-40">
+          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="all">Todos los estados</option>
+            {Object.entries(DOC_STATE).map(([key, val]) => <option key={key} value={key}>{val.label}</option>)}
+          </Select>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+          <Input type="date" value={dateRange.from} onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })} className="w-36" aria-label="Desde" />
+          <span>—</span>
+          <Input type="date" value={dateRange.to} onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })} className="w-36" aria-label="Hasta" />
         </div>
       </div>
-
-      <main className="px-6 sm:px-10 py-8 space-y-6">
-
-        {/* Filters */}
-        <div className="bg-white border border-slate-200 rounded-lg p-4">
-          <div className="flex flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Buscar por número, proveedor o descripción"
-                className="w-full pl-11 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]" />
-            </div>
-
-            <FilterDropdown open={showStatusDD}
-              onToggle={() => setShowStatusDD(!showStatusDD)}
-              label={statusFilter === "all" ? "Todos los estados" : (STATUS_CONFIG[statusFilter as InvoiceStatus]?.label || "Estado")}>
-              <DDOpt active={statusFilter === "all"} onClick={() => { setStatusFilter("all"); setShowStatusDD(false); }}>Todos los estados</DDOpt>
-              {Object.entries(STATUS_CONFIG).map(([key, val]) => (
-                <DDOpt key={key} active={statusFilter === key} onClick={() => { setStatusFilter(key); setShowStatusDD(false); }}>{val.label}</DDOpt>
-              ))}
-            </FilterDropdown>
-
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Calendar size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="date" value={dateRange.from} onChange={e => setDateRange({ ...dateRange, from: e.target.value })}
-                  className="pl-9 pr-3 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
-              </div>
-              <span className="text-slate-400">—</span>
-              <div className="relative">
-                <Calendar size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="date" value={dateRange.to} onChange={e => setDateRange({ ...dateRange, to: e.target.value })}
-                  className="pl-9 pr-3 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
-              </div>
-            </div>
-
-            {hasFilters && (
-              <button onClick={() => { setSearchTerm(""); setStatusFilter("all"); setDateRange({ from: "", to: "" }); }}
-                className="px-4 py-1.5 border border-slate-200 rounded-md text-[13px] text-slate-600 hover:bg-slate-50 flex items-center gap-2">
-                <X size={14} /> Limpiar
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Supplier quick-download */}
-        {suppliers.length > 1 && (
-          <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Descargar por proveedor</p>
-            <div className="flex flex-wrap gap-2">
-              {suppliers.map(([sid, sname]) => {
-                const count = filteredInvoices.filter(inv => (inv.supplierId || inv.supplier) === sid).length;
-                if (count === 0) return null;
-                return (
-                  <button key={sid} onClick={() => downloadBySupplier(sid)} disabled={downloading}
-                    className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-md text-[13px] hover:border-slate-300 hover:bg-slate-50 transition-colors disabled:opacity-40 group">
-                    <Building2 size={13} className="text-slate-400" />
-                    <span className="text-slate-700 font-medium">{sname}</span>
-                    <span className="text-xs text-slate-400">{count}</span>
-                    <Download size={12} className="text-slate-300 group-hover:text-slate-500" />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+      <div className="mt-2 flex flex-wrap items-center gap-4">
+        <Checkbox label="Falta algún archivo" checked={missingFiles} onChange={setMissingFiles} />
+        <Checkbox label="Sin codificar" checked={uncodedOnly} onChange={setUncodedOnly} />
+        {filtersOn && (
+          <button onClick={() => { setSearchTerm(""); setStatusFilter("all"); setDateRange({ from: "", to: "" }); setSupplierFilter("all"); setMissingFiles(false); setUncodedOnly(false); }} className="text-xs text-slate-500 hover:text-slate-900">Quitar filtros</button>
         )}
+      </div>
 
-        {/* Selection bar */}
-        {selectedIds.size > 0 && (
-          <div className="bg-slate-900 text-white rounded-lg p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <CheckSquare size={20} />
-              <span className="font-medium">{selectedIds.size} documento{selectedIds.size > 1 ? "s" : ""} seleccionado{selectedIds.size > 1 ? "s" : ""}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <button onClick={() => setSelectedIds(new Set())} className="px-4 py-2 text-[13px] text-slate-300 hover:text-white">Cancelar</button>
-              <button onClick={downloadSelected} disabled={downloading}
-                className="flex items-center gap-2 px-3 py-1.5 bg-white text-slate-900 rounded-md text-[13px] font-medium hover:bg-slate-100 disabled:opacity-50">
-                {downloading
-                  ? <><div className="w-4 h-4 border-2 border-slate-400 border-t-slate-900 rounded-full animate-spin" />Descargando {dlProgress.current}/{dlProgress.total}</>
-                  : <><Download size={16} />Descargar expedientes</>}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Table */}
-        {filteredInvoices.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-lg p-16 text-center">
-            <div className="hidden">
-              <FileText size={28} className="text-slate-400" />
-            </div>
-            <h3 className="text-[14px] font-semibold text-slate-900 mb-2">No hay documentos</h3>
-          </div>
+      <div className="mt-4">
+        {rows.length === 0 ? (
+          <EmptyState title={invoices.length ? "Sin resultados" : "Sin documentos"} />
         ) : (
-          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th className="px-4 py-2.5 text-left">
-                    <button onClick={toggleSelectAll} className="p-1 hover:bg-slate-200 rounded transition-colors">
-                      {isAllSelected ? <CheckSquare size={18} className="text-slate-700" /> : <Square size={18} className="text-slate-400" />}
-                    </button>
-                  </th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-medium text-slate-600 uppercase tracking-wider">Documento</th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-medium text-slate-600 uppercase tracking-wider">Proveedor</th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-medium text-slate-600 uppercase tracking-wider">Importe</th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-medium text-slate-600 uppercase tracking-wider">Estado</th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-medium text-slate-600 uppercase tracking-wider">Archivos</th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-medium text-slate-600 uppercase tracking-wider">Codificación</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-medium text-slate-600 uppercase tracking-wider">Acciones</th>
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full min-w-[1000px] border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
+                  <th scope="col" className="w-10 py-2 pl-4"><input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Seleccionar todo" className="h-3.5 w-3.5 accent-slate-900" /></th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Documento</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">Total</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Estado</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Archivos</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Codificación</th>
+                  <th scope="col" className="w-20 py-2 pr-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredInvoices.map(invoice => {
-                  const DocIcon = DOCUMENT_TYPES[invoice.documentType]?.icon ?? FileText;
-                  const isSelected = selectedIds.has(invoice.id);
-                  const sc = STATUS_CONFIG[invoice.status] ?? STATUS_FALLBACK;
+              <tbody>
+                {rows.map((invoice) => {
+                  const sel = selectedIds.has(invoice.id);
+                  const sc = DOC_STATE[invoice.displayState] ?? DOC_STATE.submitted;
                   return (
-                    <tr key={invoice.id} className={cx("hover:bg-slate-50 transition-colors", isSelected && "bg-blue-50")}>
-                      <td className="px-4 py-3">
-                        <button onClick={() => toggleSelect(invoice.id)} className="p-1 hover:bg-slate-200 rounded transition-colors">
-                          {isSelected ? <CheckSquare size={18} className="text-blue-600" /> : <Square size={18} className="text-slate-400" />}
-                        </button>
+                    <tr key={invoice.id} className={`border-b border-slate-100 last:border-0 ${sel ? "bg-[#F4F4F5]" : "hover:bg-[#FAFAFA]"}`}>
+                      <td className="py-1.5 pl-4"><input type="checkbox" checked={sel} onChange={() => toggleSelect(invoice.id)} aria-label={`Seleccionar ${invoice.displayNumber}`} className="h-3.5 w-3.5 accent-slate-900" /></td>
+                      <td className="whitespace-nowrap px-3 py-1.5">
+                        <span className="block font-mono text-xs font-medium">{invoice.displayNumber}</span>
+                        <span className="block text-xs text-slate-500">{fmtDate(invoice.invoiceDate || invoice.createdAt)}</span>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="hidden">
-                            <DocIcon size={18} className="text-slate-500" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-slate-900 text-[13px]">{invoice.displayNumber}</p>
-                            <p className="text-xs text-slate-500">{fmtDate(invoice.invoiceDate || invoice.createdAt)}</p>
-                          </div>
-                        </div>
+                      <td className="max-w-[280px] px-3 py-1.5">
+                        <span className="block truncate">{invoice.supplier}</span>
+                        {invoice.supplierTaxId && <span className="block font-mono text-[11px] text-slate-500">{invoice.supplierTaxId}</span>}
                       </td>
-                      <td className="px-4 py-3">
-                        <p className="text-[13px] text-slate-900">{invoice.supplier}</p>
-                        {invoice.supplierTaxId && <p className="text-xs text-slate-500">{invoice.supplierTaxId}</p>}
+                      <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs font-medium">{fmtMoney(invoice.totalAmount, invoice.currency)}</td>
+                      <td className="whitespace-nowrap px-3 py-1.5 text-xs">
+                        <span className={`inline-flex items-center gap-1.5 ${sc.text}`}><span className={`h-1.5 w-1.5 rounded-full ${sc.dot}`} />{sc.label}</span>
+                        {invoice.paidAt && <span className="ml-1.5 text-slate-500">{fmtDate(invoice.paidAt)}</span>}
                       </td>
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-slate-900">{fmtMoney(invoice.totalAmount, invoice.currency)}</p>
+                      <td className="whitespace-nowrap px-3 py-1.5 text-xs">
+                        <span className={invoice.attachmentUrl ? "text-slate-700" : "text-red-700"}>{invoice.attachmentUrl ? "Factura" : "Sin factura"}</span>
+                        <span className="text-slate-300"> · </span>
+                        <span className={invoice.receiptUrl ? "text-slate-700" : invoice.paidAt ? "text-amber-800" : "text-slate-400"}>{invoice.receiptUrl ? "Justificante" : "Sin justificante"}</span>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={cx("inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium", sc.bg, sc.text)}>{sc.label}</span>
-                        {invoice.status === "paid" && invoice.paidAt && (
-                          <p className="text-xs text-slate-400 mt-0.5">{fmtDate(invoice.paidAt)}</p>
-                        )}
+                      <td className="whitespace-nowrap px-3 py-1.5 text-xs">
+                        {invoice.codedAt ? <span className="text-slate-700">{[invoice.codedByName, fmtDate(invoice.codedAt)].filter(Boolean).join(" · ")}</span> : <span className="text-slate-400">Sin codificar</span>}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span title={invoice.attachmentUrl ? "Factura adjunta" : "Sin factura"}>
-                            <Paperclip size={14} className={invoice.attachmentUrl ? "text-blue-400" : "text-slate-200"} />
-                          </span>
-                          <span title={invoice.receiptUrl ? "Comprobante adjunto" : "Sin comprobante"}>
-                            <FileImage size={14} className={invoice.receiptUrl ? "text-emerald-400" : "text-slate-200"} />
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {invoice.codedAt ? (
-                          <div className="flex items-center gap-2">
-                            <CheckCircle size={14} className="text-emerald-500" />
-                            <div>
-                              <p className="text-xs text-slate-700">{invoice.codedByName}</p>
-                              <p className="text-xs text-slate-500">{fmtDate(invoice.codedAt)}</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-slate-400">Sin codificar</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => setPreviewInvoice(invoice)}
-                            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="Vista previa">
-                            <Eye size={16} />
-                          </button>
-                          <button onClick={() => downloadSingle(invoice)} disabled={downloading}
-                            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50" title="Descargar expediente">
-                            <Download size={16} />
-                          </button>
+                      <td className="py-1.5 pr-3">
+                        <div className="flex items-center justify-end gap-0.5">
+                          <IconButton label="Vista previa" onClick={() => setPreviewInvoice(invoice)} className="-my-1"><Eye size={14} /></IconButton>
+                          <IconButton label="Descargar expediente" onClick={() => downloadSingle(invoice)} disabled={downloading} className="-my-1"><Download size={14} /></IconButton>
                         </div>
                       </td>
                     </tr>
@@ -640,17 +564,22 @@ export default function DocumentCenterPage() {
             </table>
           </div>
         )}
+      </div>
 
-        {filteredInvoices.length > 0 && (
-          <div className="text-[13px] text-slate-500 text-center">
-            Mostrando {filteredInvoices.length} de {invoices.length} documentos
-          </div>
-        )}
-      </main>
+      {/* Barra de selección */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-[13px] shadow-lg">
+          <span>{selectedIds.size} {selectedIds.size === 1 ? "documento" : "documentos"}</span>
+          <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Deseleccionar</Button>
+          <Button variant="primary" size="sm" onClick={downloadSelected} disabled={downloading}>
+            {downloading ? <><Spinner className="h-3.5 w-3.5" /> {dlProgress.current}/{dlProgress.total}</> : <><Download size={13} /> Descargar expedientes</>}
+          </Button>
+        </div>
+      )}
 
       {/* Preview Modal */}
       {previewInvoice && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
           onClick={() => setPreviewInvoice(null)}>
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-flex flex-col"
             onClick={e => e.stopPropagation()}>
@@ -743,6 +672,6 @@ export default function DocumentCenterPage() {
           </div>
         </div>
       )}
-    </div>
+    </Page>
   );
 }

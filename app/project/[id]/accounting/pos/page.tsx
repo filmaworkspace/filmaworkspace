@@ -2,10 +2,12 @@
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
-import { AnchoredPanel } from "@/components/ds";
+import { AnchoredPanel, Checkbox, EmptyState, IconButton, Menu, MenuItem, MenuSeparator, Page, PageHeader, PageLoading, Segmented, Select, buttonClass } from "@/components/ds";
+import SearchBar, { type SearchField } from "@/components/SearchBar";
+import { matchAmount, matchCode, matchWords } from "@/lib/search";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
@@ -124,6 +126,13 @@ export default function POsPage() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
+  const searchParams = useSearchParams();
+  const supplierParam = searchParams?.get("supplier") || "";
+  const [poField, setPoField] = useState<"all" | "number" | "supplier" | "concept" | "account" | "amount">("all");
+  const [poSort, setPoSort] = useState<"recent" | "old" | "amount">("recent");
+  const [deptFilter, setDeptFilter] = useState("all");
+  const [onlyMine, setOnlyMine] = useState(false);
+  const [nearlyExhausted, setNearlyExhausted] = useState(false);
 
   const {
     loading: permissionsLoading,
@@ -303,7 +312,7 @@ export default function POsPage() {
   };
 
   const formatCurrency = (amount: number): string =>
-    new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
+    new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(amount || 0);
 
   const formatDate = (date: Date) =>
     date ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" }).format(date) : "-";
@@ -738,289 +747,222 @@ export default function POsPage() {
     );
   }
 
+  // ── Búsqueda avanzada, vistas y filtros ───────────────────────────────────
+  type POField = "all" | "number" | "supplier" | "concept" | "account" | "amount";
+  const PO_FIELDS: SearchField<POField>[] = [
+    { value: "all", label: "Buscar en todo", placeholder: "Número, proveedor, concepto o cuenta" },
+    { value: "number", label: "Nº de PO", placeholder: "Ej. 0012", mono: true },
+    { value: "supplier", label: "Proveedor", placeholder: "Ej. Rental Norte" },
+    { value: "concept", label: "Concepto", placeholder: "Ej. alquiler" },
+    { value: "account", label: "Cuenta", placeholder: "Ej. 03.01 o atrezzo", mono: true },
+    { value: "amount", label: "Importe", placeholder: "1500 · >1000 · 500-2000", mono: true },
+  ];
+  const poMatches = (po: PO) => {
+    const q = searchTerm.trim();
+    if (!q) return true;
+    const byNumber = matchCode(q, `PO-${po.number}`, po.number);
+    const bySupplier = matchWords(q, po.supplier);
+    const byConcept = matchWords(q, po.generalDescription, po.description, ...(po.items || []).map((i) => i.description));
+    const byAccount = (po.items || []).some((i) => matchCode(q, i.subAccountCode) || matchWords(q, (i as any).subAccountDescription));
+    const byAmount = matchAmount(q, po.baseAmount || po.totalAmount || 0, po.totalAmount || 0);
+    if (poField === "number") return byNumber;
+    if (poField === "supplier") return bySupplier;
+    if (poField === "concept") return byConcept;
+    if (poField === "account") return byAccount;
+    if (poField === "amount") return byAmount === true;
+    return byNumber || bySupplier || byConcept || byAccount || byAmount === true;
+  };
+  const departments = Array.from(new Set(pos.map((p) => p.department).filter(Boolean))) as string[];
+  const rows = pos
+    .filter((po) => statusFilter === "all" || po.status === statusFilter)
+    .filter((po) => !supplierParam || po.supplierId === supplierParam)
+    .filter((po) => deptFilter === "all" || po.department === deptFilter)
+    .filter((po) => !onlyMine || po.createdBy === permissions.userId)
+    .filter((po) => !nearlyExhausted || (po.status === "approved" && (po.baseAmount || po.totalAmount) > 0 && po.invoicedAmount / (po.baseAmount || po.totalAmount) >= 0.9))
+    .filter(poMatches)
+    .sort((a, b) => {
+      if (poSort === "amount") return (b.baseAmount || b.totalAmount || 0) - (a.baseAmount || a.totalAmount || 0);
+      const d = (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
+      return poSort === "old" ? -d : d;
+    });
+  const statusCount = (s: "all" | POStatus) => (s === "all" ? pos.length : pos.filter((p) => p.status === s).length);
+  const supplierName = supplierParam ? pos.find((p) => p.supplierId === supplierParam)?.supplier : null;
+  const filtersActive = deptFilter !== "all" || onlyMine || nearlyExhausted || !!supplierParam;
+  const live = rows.filter((p) => p.status !== "cancelled");
+  const totals = {
+    base: live.reduce((s, p) => s + (p.baseAmount || p.totalAmount || 0), 0),
+    invoiced: live.reduce((s, p) => s + (p.invoicedAmount || 0), 0),
+  };
+  const PO_STATE: Record<POStatus, { label: string; dot: string; text: string }> = {
+    draft: { label: "Borrador", dot: "bg-slate-300", text: "text-slate-600" },
+    pending: { label: "Pend. aprobación", dot: "bg-amber-500", text: "text-amber-800" },
+    approved: { label: "Aprobada", dot: "bg-emerald-500", text: "text-emerald-800" },
+    closed: { label: "Cerrada", dot: "bg-slate-400", text: "text-slate-600" },
+    cancelled: { label: "Anulada", dot: "bg-slate-300", text: "text-slate-500 line-through" },
+  };
+
   return (
-    <div className={`min-h-screen bg-white ${inter.className}`}>
-      {/* Header */}
-      <div className="mt-[53px]">
-        <div className="px-6 pt-8 sm:px-10">
-          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl font-semibold tracking-tight text-slate-900">Órdenes de compra</h1>
-                {getRoleBadge()}
-              </div>
-            </div>
-            {permissions.canCreatePO && (
-              <Link
-                href={`/project/${id}/accounting/pos/new`}
-                className="absolute right-0 flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity"
-              >
-                <Plus size={16} strokeWidth={2.5} />
-                Nueva PO
-              </Link>
+    <Page>
+      <PageHeader
+        title={
+          <>
+            Órdenes de compra <span className="text-[15px] font-normal text-slate-400">{pos.length}</span>
+            {!permissions.canViewAllPOs && (
+              <span className="text-xs font-normal text-slate-500">· {permissions.canViewDepartmentPOs ? permissions.department : "solo tus POs"}</span>
             )}
-          </div>
+          </>
+        }
+        actions={
+          permissions.canCreatePO ? (
+            <Link href={`/project/${id}/accounting/pos/new`} className={buttonClass("primary")}><Plus size={14} /> Nueva PO</Link>
+          ) : undefined
+        }
+      />
+
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <div className="flex gap-0.5 rounded-md border border-slate-200 bg-[#F7F7F8] p-0.5" role="tablist" aria-label="Estado">
+          {(["all", "draft", "pending", "approved", "closed", "cancelled"] as const).map((s) => (
+            <button
+              key={s}
+              role="tab"
+              aria-selected={statusFilter === s}
+              onClick={() => setStatusFilter(s)}
+              className={`flex h-7 items-center gap-1.5 rounded-[5px] px-2.5 text-xs transition-colors ${statusFilter === s ? "bg-white font-medium text-slate-900 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900"}`}
+            >
+              {s === "all" ? "Todas" : PO_STATE[s].label.replace("Pend. aprobación", "Pendientes")}
+              <span className="tabular-nums text-slate-400">{statusCount(s)}</span>
+            </button>
+          ))}
         </div>
       </div>
 
-      <main className="px-6 sm:px-10 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-5 gap-3 mb-8">
-          {(["draft", "pending", "approved", "closed", "cancelled"] as POStatus[]).map((status) => {
-            const config = STATUS_CONFIG[status];
-            const Icon = config.icon;
-            const count = stats[status];
-            const isActive = statusFilter === status;
-            return (
-              <button
-                key={status}
-                onClick={() => setStatusFilter(isActive ? "all" : status)}
-                className={`relative rounded-lg border px-4 py-3 text-left transition-colors ${isActive ? "border-slate-900 bg-white" : "border-slate-200 bg-white hover:border-slate-300"} text-[13px]`}
-              >
-                <p className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <span className={`h-1.5 w-1.5 rounded-full bg-current ${config.text}`} />
-                  {config.label}
-                </p>
-                <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{count}</p>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Filters & Controls */}
-        <div className="flex flex-row gap-3 items-center mb-4">
-          <div className="flex-1 relative">
-            <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar órdenes de compra"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]"
-            />
-          </div>
-          <div className="flex gap-2 flex-shrink-0">
-            {/* Sort Dropdown */}
-            <div className="relative" ref={sortDropdownRef}>
-              <button
-                onClick={() => setShowSortDropdown(!showSortDropdown)}
-                className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded-md text-[13px] hover:border-slate-300 bg-white min-w-[180px]"
-              >
-                <ArrowUpDown size={14} className="text-slate-400" />
-                <span className="flex-1 text-left text-xs text-slate-700">{getSortLabel()}</span>
-                <ChevronDown size={14} className={`text-slate-400 transition-transform ${showSortDropdown ? "rotate-180" : ""}`} />
-              </button>
-              {showSortDropdown && (
-                <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 overflow-hidden" match="min" gap={8}>
-                  {SORT_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => { setSortOrder(option.value as SortOrder); setShowSortDropdown(false); }}
-                      className={`w-full text-left px-4 py-1.5 text-[13px] transition-colors whitespace-nowrap ${
-                        sortOrder === option.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </AnchoredPanel>
-              )}
-            </div>
-
-            {(statusFilter !== "all" || searchTerm) && (
-              <button onClick={() => { setStatusFilter("all"); setSearchTerm(""); }} className="px-3 py-1.5 border border-slate-200 rounded-md text-xs text-slate-600 hover:bg-slate-50 flex items-center gap-1.5 font-medium">
-                <X size={14} />Limpiar
-              </button>
-            )}
-          </div>
-        </div>
-
-        {(statusFilter !== "all" || searchTerm) && filteredPOs.length > 0 && (
-          <div className="mb-4 text-[13px] text-slate-500">
-            Mostrando {filteredPOs.length} de {stats.total} órdenes
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <SearchBar fields={PO_FIELDS} field={poField} onField={setPoField} value={searchTerm} onChange={setSearchTerm} count={rows.length} />
+        {departments.length > 1 && (
+          <div className="w-44">
+            <Select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
+              <option value="all">Todos los dptos.</option>
+              {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+            </Select>
           </div>
         )}
+        <Segmented value={poSort} onChange={setPoSort} options={[{ value: "recent", label: "Recientes" }, { value: "old", label: "Antiguas" }, { value: "amount", label: "Importe" }]} />
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-4">
+        <Checkbox label="Solo mías" checked={onlyMine} onChange={setOnlyMine} />
+        <Checkbox label="Casi agotadas (≥ 90 % facturado)" checked={nearlyExhausted} onChange={setNearlyExhausted} />
+        {supplierName && (
+          <button onClick={() => router.replace(`/project/${id}/accounting/pos`)} className="inline-flex items-center gap-1 rounded border border-slate-200 bg-[#F7F7F8] px-1.5 py-0.5 text-xs text-slate-700 hover:border-slate-300">
+            Proveedor: {supplierName} <X size={11} />
+          </button>
+        )}
+        {filtersActive && (
+          <button onClick={() => { setDeptFilter("all"); setOnlyMine(false); setNearlyExhausted(false); if (supplierParam) router.replace(`/project/${id}/accounting/pos`); }} className="text-xs text-slate-500 hover:text-slate-900">Quitar filtros</button>
+        )}
+      </div>
 
-        {/* Content */}
-        {filteredPOs.length === 0 ? (
-          <div className="border-2 border-dashed border-slate-200 rounded-lg p-16 text-center">
-            <div className="hidden">
-              <FileText size={28} className="text-slate-400" />
-            </div>
-            <h3 className="text-[14px] font-semibold text-slate-900 mb-2">
-              {searchTerm || statusFilter !== "all" ? "No se encontraron resultados" : "Sin órdenes de compra"}
-            </h3>
-          </div>
+      <div className="mt-4">
+        {rows.length === 0 ? (
+          <EmptyState
+            title={pos.length ? "Sin resultados" : "Sin órdenes de compra"}
+            action={!pos.length && permissions.canCreatePO ? <Link href={`/project/${id}/accounting/pos/new`} className={buttonClass("primary", "sm")}>Nueva PO</Link> : undefined}
+          />
         ) : (
-          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-                    <div className="flex items-center gap-2">Número</div>
-                  </th>
-                  <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-                    <div className="flex items-center gap-2">Proveedor / Descripción</div>
-                  </th>
-                  <th className="text-right px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Importe</th>
-                  <th className="text-center px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Estado</th>
-                  <th className="text-center px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-                    <div className="flex items-center justify-center gap-2">Fecha</div>
-                  </th>
-                  <th className="w-12"></th>
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full min-w-[1000px] border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
+                  <th scope="col" className="px-4 py-2 text-left font-medium">Nº</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Departamento</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">Base</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Facturado</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Estado</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">Fecha</th>
+                  <th scope="col" className="w-12 py-2 pr-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredPOs.map((po) => {
-                  const baseAmount = po.baseAmount || po.totalAmount || 0;
-                  const invoiceProgress = po.status === "approved" && baseAmount > 0 ? Math.min(100, (po.invoicedAmount / baseAmount) * 100) : 0;
+              <tbody>
+                {rows.map((po) => {
+                  const base = po.baseAmount || po.totalAmount || 0;
+                  const pct = base > 0 ? Math.round((po.invoicedAmount / base) * 100) : 0;
+                  const st = PO_STATE[po.status] || PO_STATE.draft;
+                  const href = `/project/${id}/accounting/pos/${po.id}`;
                   const poPerms = getPOPermissions(po);
+                  const dead = po.status === "cancelled";
                   return (
-                    <tr key={po.id} className={`transition-colors group ${po.status === "cancelled" ? "bg-red-50/40 opacity-60 hover:opacity-80" : "hover:bg-slate-50/50"}`}>
-                      <td className="px-4 py-3">
-                        <button onClick={() => setPreviewPO(po)} className="text-left transition-colors group/po">
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold font-mono" style={{ color: undefined }}>
-                              <span className={po.status === "cancelled" ? "line-through text-slate-400" : "text-slate-900 group-hover/po:text-[#2F52E0] transition-colors"}>PO-{po.number}</span>
-                            </p>
-                            {po.version > 1 && <span className="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-md font-medium">V{String(po.version).padStart(2, "0")}</span>}
-                            {!permissions.isProjectRole && poPerms.isOwn && <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">Mía</span>}
-                          </div>
-                        </button>
+                    <tr key={po.id} className={`cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA] ${dead ? "text-slate-400" : ""}`} onClick={() => router.push(href)}>
+                      <td className="whitespace-nowrap px-4 py-1.5">
+                        <span className="flex items-center gap-1.5">
+                          <Link href={href} onClick={(e) => e.stopPropagation()} className={`font-mono text-xs font-medium hover:underline ${dead ? "line-through" : ""}`}>PO-{po.number}</Link>
+                          {po.version > 1 && <span className="font-mono text-[10px] text-slate-500">v{po.version}</span>}
+                        </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <p className={"text-sm font-medium " + (po.supplier ? "text-slate-900" : "text-slate-400 italic")}>
-                          {po.supplier || "Sin proveedor asignado"}
-                        </p>
-                        <p className="text-[13px] text-slate-500 line-clamp-2 mt-0.5 max-w-[300px]">{po.generalDescription || po.description}</p>
+                      <td className="max-w-[320px] px-3 py-1.5">
+                        <span className={`block truncate font-medium ${po.supplier ? "text-slate-900" : "italic text-slate-400"}`}>{po.supplier || "Sin proveedor"}</span>
+                        {(po.generalDescription || po.description) && <span className="block truncate text-xs text-slate-500">{po.generalDescription || po.description}</span>}
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <p className="text-[13px] font-semibold text-slate-900">{formatCurrency(baseAmount)} €</p>
-                        {po.status === "approved" && po.invoicedAmount > 0 && (
-                          <div className="mt-1.5">
-                            <div className="flex items-center justify-end gap-2">
-                              <div className="w-16 h-1 bg-slate-100 rounded-full overflow-hidden">
-                                <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${invoiceProgress}%` }} />
-                              </div>
-                              <span className="text-xs text-emerald-600 font-medium">{Math.round(invoiceProgress)}%</span>
-                            </div>
-                          </div>
-                        )}
+                      <td className="whitespace-nowrap px-3 py-1.5 text-slate-600">{po.department || "—"}</td>
+                      <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs font-medium">{formatCurrency(base)}</td>
+                      <td className="px-3 py-1.5">
+                        {po.status === "approved" || po.status === "closed" ? (
+                          <span className="flex items-center gap-2">
+                            <span aria-hidden="true" className="flex h-[3px] w-16 overflow-hidden rounded-full bg-[#F1F1F3]">
+                              <span className={pct >= 100 ? "bg-slate-500" : pct >= 90 ? "bg-amber-600" : "bg-[#2F52E0]"} style={{ width: `${Math.min(pct, 100)}%` }} />
+                            </span>
+                            <span className={`w-9 text-right text-xs tabular-nums ${pct >= 90 && pct < 100 ? "text-amber-800" : "text-slate-600"}`}>{pct} %</span>
+                          </span>
+                        ) : <span className="text-slate-400">—</span>}
                       </td>
-                      <td className="px-4 py-3 text-center">{getStatusBadge(po.status)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <p className="text-[13px] text-slate-600">{formatDateRelative(po.createdAt)}</p>
+                      <td className="whitespace-nowrap px-3 py-1.5">
+                        <span className={`inline-flex items-center gap-1.5 text-xs ${st.text}`}><span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />{st.label}</span>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="relative menu-container">
-                          <button
-                            ref={(el) => { if (el) menuButtonRefs.current.set(po.id, el); }}
-                            onClick={(e) => handleMenuToggle(po.id, e)}
-                            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                          >
-                            <MoreHorizontal size={18} />
-                          </button>
-                        </div>
+                      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-slate-500" title={formatDateTime(po.createdAt)}>{formatDateRelative(po.createdAt)}</td>
+                      <td className="py-1.5 pr-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        <Menu trigger={(toggle) => <IconButton label="Acciones" onClick={toggle} className="-my-1"><MoreHorizontal size={15} /></IconButton>}>
+                          {(close) => (
+                            <>
+                              <MenuItem onClick={() => { close(); setPreviewPO(po); }}>Vista rápida</MenuItem>
+                              <MenuItem onClick={() => { close(); router.push(href); }}>Abrir</MenuItem>
+                              <MenuItem onClick={() => { close(); generatePDF(po); }}>Descargar PDF</MenuItem>
+                              {po.status === "draft" && poPerms.canEdit && <MenuItem onClick={() => { close(); handleEditDraft(po); }}>Editar borrador</MenuItem>}
+                              {po.status === "approved" && poPerms.canCreateInvoice && <MenuItem onClick={() => { close(); handleCreateInvoice(po); }}>Subir factura de esta PO</MenuItem>}
+                              {po.status === "approved" && (permissions.isProjectRole || poPerms.canClose || poPerms.canCancel) && <MenuSeparator />}
+                              {po.status === "approved" && permissions.isProjectRole && <MenuItem onClick={() => { close(); handleModifyPO(po); }}>Modificar</MenuItem>}
+                              {po.status === "approved" && poPerms.canClose && <MenuItem onClick={() => { close(); handleClosePO(po); }}>Cerrar</MenuItem>}
+                              {po.status === "approved" && poPerms.canCancel && (po.invoicedAmount || 0) === 0 && <MenuItem danger onClick={() => { close(); handleCancelPO(po); }}>Anular</MenuItem>}
+                              {po.status === "closed" && poPerms.canReopen && <MenuItem onClick={() => { close(); handleReopenPO(po); }}>Reabrir</MenuItem>}
+                            </>
+                          )}
+                        </Menu>
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
+              <tfoot>
+                <tr className="border-t border-slate-200 bg-[#F4F4F5] text-xs">
+                  <td className="px-4 py-2 font-semibold" colSpan={3}>Total {rows.length === pos.length ? "" : "filtrado "}sin anuladas</td>
+                  <td className="px-3 py-2 text-right font-mono font-semibold">{formatCurrency(totals.base)}</td>
+                  <td className="px-3 py-2 font-mono text-slate-600">{formatCurrency(totals.invoiced)} facturado</td>
+                  <td colSpan={3} />
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}
-
-        {/* Floating Menu */}
-        {openMenuId && (
-          <div
-            ref={menuRef}
-            className="fixed w-48 bg-white border border-slate-200 rounded-md shadow-xl z-[9999] py-1 menu-container"
-            style={{
-              top: menuPosition.top,
-              left: menuPosition.left,
-            }}
-          >
-            {(() => {
-              const po = filteredPOs.find((p) => p.id === openMenuId);
-              if (!po) return null;
-              const poPerms = getPOPermissions(po);
-              return (
-                <>
-                  <Link href={`/project/${id}/accounting/pos/${po.id}`} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3" onClick={closeMenu}>
-                    <Eye size={15} className="text-slate-400" />
-                    Ver detalle
-                  </Link>
-                  <button onClick={() => generatePDF(po)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3">
-                    <Download size={15} className="text-slate-400" />
-                    Descargar PDF
-                  </button>
-
-                  {po.status === "draft" && poPerms.canEdit && (
-                    <>
-                      <div className="border-t border-slate-100 my-1" />
-                      <button onClick={() => handleEditDraft(po)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3">
-                        <Edit size={15} className="text-slate-400" />
-                        Editar borrador
-                      </button>
-                    </>
-                  )}
-
-                  {po.status === "approved" && (
-                    <>
-                      <div className="border-t border-slate-100 my-1" />
-                      {poPerms.canCreateInvoice && (
-                        <button onClick={() => handleCreateInvoice(po)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3">
-                          <Receipt size={15} className="text-slate-400" />
-                          Crear factura
-                        </button>
-                      )}
-                      {permissions.isProjectRole && (
-                        <button onClick={() => handleModifyPO(po)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3">
-                          <FileEdit size={15} className="text-slate-400" />
-                          Modificar PO
-                        </button>
-                      )}
-                      {poPerms.canClose && (
-                        <button onClick={() => handleClosePO(po)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3">
-                          <Lock size={15} className="text-slate-400" />
-                          Cerrar PO
-                        </button>
-                      )}
-                      {poPerms.canCancel && (po.invoicedAmount || 0) === 0 && (
-                        <button onClick={() => handleCancelPO(po)} className="w-full px-4 py-1.5 text-left text-[13px] text-red-600 hover:bg-red-50 flex items-center gap-3">
-                          <XCircle size={15} />
-                          Anular PO
-                        </button>
-                      )}
-                    </>
-                  )}
-
-                  {po.status === "closed" && poPerms.canReopen && (
-                    <>
-                      <div className="border-t border-slate-100 my-1" />
-                      <button onClick={() => handleReopenPO(po)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3">
-                        <Unlock size={15} className="text-slate-400" />
-                        Reabrir PO
-                      </button>
-                    </>
-                  )}
-                </>
-              );
-            })()}
-          </div>
-        )}
-      </main>
+      </div>
 
       {/* Quick Preview Modal */}
       {previewPO && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setPreviewPO(null)}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setPreviewPO(null)}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full border border-slate-200 overflow-hidden max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className={`bg-gradient-to-r ${STATUS_CONFIG[previewPO.status].gradient} px-5 py-4 flex-shrink-0`}>
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-bold text-white text-lg font-mono">PO-{previewPO.number}</h3>
-                    {previewPO.version > 1 && <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-lg backdrop-blur-[2px]">V{String(previewPO.version).padStart(2, "0")}</span>}
+                    {previewPO.version > 1 && <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-lg">V{String(previewPO.version).padStart(2, "0")}</span>}
                   </div>
                   <p className="text-white/80 text-[13px] mt-0.5">{previewPO.supplier}</p>
                 </div>
@@ -1110,7 +1052,7 @@ export default function POsPage() {
 
       {/* Close PO Modal */}
       {showCloseModal && selectedPO && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowCloseModal(false); resetModalState(); }}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowCloseModal(false); resetModalState(); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
               <div className="hidden">
@@ -1169,7 +1111,7 @@ export default function POsPage() {
 
       {/* Reopen PO Modal */}
       {showReopenModal && selectedPO && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowReopenModal(false); resetModalState(); }}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowReopenModal(false); resetModalState(); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
               <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center">
@@ -1221,7 +1163,7 @@ export default function POsPage() {
 
       {/* Cancel PO Modal */}
       {showCancelModal && selectedPO && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowCancelModal(false); resetModalState(); }}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowCancelModal(false); resetModalState(); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
               <div className="w-10 h-10 bg-red-100 rounded-md flex items-center justify-center">
@@ -1284,7 +1226,7 @@ export default function POsPage() {
 
       {/* Modify Modal */}
       {showModifyModal && selectedPO && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowModifyModal(false); resetModalState(); }}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowModifyModal(false); resetModalState(); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
               <div className="w-10 h-10 bg-amber-100 rounded-md flex items-center justify-center">
@@ -1331,6 +1273,6 @@ export default function POsPage() {
           </div>
         </div>
       )}
-    </div>
+    </Page>
   );
 }

@@ -158,7 +158,7 @@ export default function PaymentPayPage() {
   const bulkFileInputRef = useRef<HTMLInputElement>(null);
 
   const showToast = (type: "success" | "error" | "warning", message: string) => { setToast({ type, message }); setTimeout(() => setToast(null), 4000); };
-  const formatCurrency = (a: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(a || 0);
+  const formatCurrency = (a: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(a || 0);
   const formatDate = (d: Date) => d ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" }).format(d) : "-";
 
   useEffect(() => {
@@ -935,7 +935,7 @@ export default function PaymentPayPage() {
 
       {/* SEPA Modal */}
       {showSepaModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowSepaModal(false)}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowSepaModal(false)}>
           <div className="bg-white rounded-lg shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3"><Landmark size={24} className="text-slate-400" /><div><h3 className="text-[14px] font-semibold text-slate-900">Generar SEPA</h3><p className="text-xs text-slate-500">XML pain.001.001.03</p></div></div>

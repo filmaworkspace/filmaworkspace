@@ -446,7 +446,7 @@ export function Modal({
   useDismiss(open, onClose, panel);
   if (!open) return null;
   return (
-    <div className={cx("fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/20 p-4 backdrop-blur-[2px]", inter.className)}>
+    <div className={cx("fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/20 p-4", inter.className)}>
       <div ref={panel} role="dialog" aria-modal="true" aria-label={title} className={cx("flex max-h-[85vh] w-full flex-col rounded-xl border border-slate-200 bg-white shadow-xl", width)}>
         <div className="flex h-12 flex-shrink-0 items-center justify-between border-b border-slate-100 pl-5 pr-3">
           <h3 className="text-[14px] font-semibold text-slate-900">{title}</h3>

@@ -16,6 +16,7 @@ import { doc, getDoc } from "firebase/firestore";
 import {
   ArrowLeftRight,
   Banknote,
+  ClipboardList,
   Briefcase,
   Building2,
   Calendar,
@@ -234,7 +235,10 @@ export default function Header() {
     : null;
 
   const accountingPage = isAccountingSection
-    ? pathname.includes("/suppliers")  ? "suppliers"
+    ? pathname.includes("/accounting/pos")      ? "pos"
+    : pathname.includes("/accounting/invoices") ? "invoices"
+    : pathname.includes("/accounting/payments") ? "payments"
+    : pathname.includes("/suppliers")  ? "suppliers"
     : pathname.includes("/budget")     ? "budget"
     : pathname.includes("/users") && !pathname.includes("/config/users") ? "users"
     : pathname.includes("/reports")    ? "reports"
@@ -365,6 +369,9 @@ export default function Header() {
           {isAccountingSection && projectId && (
             <>
               {accountingAccess.panel     && <NavLink href={`/project/${projectId}/accounting`} isActive={accountingPage === "panel"}><LayoutDashboard size={14} /> Panel</NavLink>}
+              {accountingAccess.panel     && <NavLink href={`/project/${projectId}/accounting/pos`} isActive={accountingPage === "pos"}><ClipboardList size={14} /> POs</NavLink>}
+              {accountingAccess.panel     && <NavLink href={`/project/${projectId}/accounting/invoices`} isActive={accountingPage === "invoices"}><Receipt size={14} /> Facturas</NavLink>}
+              {accountingAccess.budget    && <NavLink href={`/project/${projectId}/accounting/payments`} isActive={accountingPage === "payments"}><Banknote size={14} /> Pagos</NavLink>}
               {accountingAccess.suppliers && <NavLink href={`/project/${projectId}/accounting/suppliers`} isActive={accountingPage === "suppliers"}><Building2 size={14} /> Proveedores</NavLink>}
               {accountingAccess.budget    && <NavLink href={`/project/${projectId}/accounting/budget`} isActive={accountingPage === "budget"}><Wallet size={14} /> Presupuesto</NavLink>}
               {accountingAccess.users     && <NavLink href={`/project/${projectId}/accounting/users`} isActive={accountingPage === "users"}><Users size={14} /> Usuarios</NavLink>}

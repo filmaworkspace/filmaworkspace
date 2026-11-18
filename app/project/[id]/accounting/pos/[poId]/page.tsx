@@ -431,7 +431,7 @@ export default function PODetailPage() {
     }
   };
 
-  const formatCurrency = (amount: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
+  const formatCurrency = (amount: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(amount || 0);
   const formatDate = (date: Date) => (date ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "long", year: "numeric" }).format(date) : "-");
   const formatDateTime = (date: Date) => (date ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(date) : "-");
   const getCurrencySymbol = () => ({ EUR: "€", USD: "$", GBP: "£" }[po?.currency || "EUR"] || "€");
@@ -1495,7 +1495,7 @@ export default function PODetailPage() {
 
       {/* Close Modal */}
       {showCloseModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowCloseModal(false); resetModals(); }}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowCloseModal(false); resetModals(); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-100 rounded-md flex items-center justify-center">
@@ -1549,7 +1549,7 @@ export default function PODetailPage() {
 
       {/* Close Item Modal */}
       {showCloseItemModal !== null && po && po.items[showCloseItemModal] && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowCloseItemModal(null); resetModals(); }}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowCloseItemModal(null); resetModals(); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-100 rounded-md flex items-center justify-center">
@@ -1608,7 +1608,7 @@ export default function PODetailPage() {
 
       {/* Reopen Item Modal */}
       {showReopenItemModal !== null && po && po.items[showReopenItemModal] && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowReopenItemModal(null); resetModals(); }}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowReopenItemModal(null); resetModals(); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
               <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center">
@@ -1667,7 +1667,7 @@ export default function PODetailPage() {
 
       {/* Reopen Modal */}
       {showReopenModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowReopenModal(false); resetModals(); }}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowReopenModal(false); resetModals(); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
               <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center">
@@ -1718,7 +1718,7 @@ export default function PODetailPage() {
 
       {/* Cancel Modal */}
       {showCancelModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowCancelModal(false); resetModals(); }}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowCancelModal(false); resetModals(); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
               <div className="w-10 h-10 bg-red-100 rounded-md flex items-center justify-center">
@@ -1780,7 +1780,7 @@ export default function PODetailPage() {
 
       {/* Modify Modal */}
       {showModifyModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowModifyModal(false); resetModals(); }}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowModifyModal(false); resetModals(); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
               <div className="w-10 h-10 bg-amber-100 rounded-md flex items-center justify-center">
@@ -1826,7 +1826,7 @@ export default function PODetailPage() {
 
       {/* Modal Eliminar Borrador */}
       {showDeleteModal && po && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowDeleteModal(false)}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowDeleteModal(false)}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="p-6">
               <div className="hidden">
@@ -1868,7 +1868,7 @@ export default function PODetailPage() {
 
       {/* Modal Nota del Aprobador */}
       {showApprovalNoteModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowApprovalNoteModal(null)}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowApprovalNoteModal(null)}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">

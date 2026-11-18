@@ -1,6 +1,9 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
+import { Button, IconButton, Input, Menu, MenuItem, PageHeader, Segmented, Select } from "@/components/ds";
+import SearchBar, { type SearchField } from "@/components/SearchBar";
+import { matchAmount, matchCode, matchWords } from "@/lib/search";
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { inter } from "@/lib/fonts";
@@ -179,6 +182,14 @@ export default function PaymentsPage() {
   const [availableInvoices, setAvailableInvoices] = useState<Invoice[]>([]);
   const [invoiceIbans, setInvoiceIbans] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState("");
+  const [payField, setPayField] = useState<"all" | "name" | "supplier" | "invoice" | "amount">("all");
+  const PAY_FIELDS: SearchField<"all" | "name" | "supplier" | "invoice" | "amount">[] = [
+    { value: "all", label: "Buscar en todo", placeholder: "Previsión, proveedor, factura o importe" },
+    { value: "name", label: "Previsión", placeholder: "Ej. Remesa 15 nov" },
+    { value: "supplier", label: "Proveedor", placeholder: "Ej. Rental Norte" },
+    { value: "invoice", label: "Nº factura", placeholder: "Ej. FAC-0001", mono: true },
+    { value: "amount", label: "Importe", placeholder: "1500 · >1000 · 500-2000", mono: true },
+  ];
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateRange, setDateRange] = useState("all");
@@ -396,7 +407,12 @@ export default function PaymentsPage() {
   const getDaysUntilPayment = (date: Date) => Math.ceil((date.getTime() - Date.now()) / 86400000);
 
   const filteredForecasts = forecasts.filter((f) => {
-    const matchesSearch = f.name.toLowerCase().includes(searchTerm.toLowerCase()) || f.items.some((item) => item.supplier.toLowerCase().includes(searchTerm.toLowerCase()));
+    const q = searchTerm.trim();
+    const byName = matchWords(q, f.name);
+    const bySupplier = f.items.some((item) => matchWords(q, item.supplier));
+    const byInvoice = f.items.some((item: any) => matchCode(q, item.invoiceNumber));
+    const byAmount = matchAmount(q, f.totalAmount, ...f.items.map((i: any) => i.amount || 0)) === true;
+    const matchesSearch = !q || (payField === "name" ? byName : payField === "supplier" ? bySupplier : payField === "invoice" ? byInvoice : payField === "amount" ? byAmount : byName || bySupplier || byInvoice || byAmount);
     const matchesStatus = statusFilter === "all" || f.status === statusFilter;
     const { start, end } = getDateRangeFilter();
     const matchesDate = (!start || f.paymentDate >= start) && (!end || f.paymentDate <= end);
@@ -405,13 +421,8 @@ export default function PaymentsPage() {
 
   const filteredInvoices = availableInvoices
     .filter((inv) => {
-      const searchLower = invoiceSearch.toLowerCase().trim();
-      if (searchLower) {
-        const matchesNumber = (inv.displayNumber || inv.number || "").toLowerCase().includes(searchLower);
-        const matchesSupplier = inv.supplier.toLowerCase().includes(searchLower);
-        const matchesDescription = (inv.description || "").toLowerCase().includes(searchLower);
-        if (!matchesNumber && !matchesSupplier && !matchesDescription) return false;
-      }
+      const q = invoiceSearch.trim();
+      if (q && !(matchCode(q, inv.displayNumber, inv.number) || matchWords(q, inv.supplier, inv.description) || matchAmount(q, inv.totalAmount) === true)) return false;
       if (invoiceDueDateFilter === "all") return true;
       const days = getDaysUntilPayment(inv.dueDate);
       if (invoiceDueDateFilter === "overdue") return days < 0;
@@ -579,7 +590,7 @@ export default function PaymentsPage() {
   const handleDragLeave = () => setDragOverForecast(null);
   const handleDrop = async (e: React.DragEvent, forecastId: string) => { e.preventDefault(); setDragOverForecast(null); if (draggedInvoice) { await handleAddPaymentToForecast(forecastId, draggedInvoice); setDraggedInvoice(null); } };
 
-  const formatCurrency = (amount: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
+  const formatCurrency = (amount: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(amount || 0);
   const formatDate = (date: Date) => date ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" }).format(date) : "-";
   const formatDateShort = (date: Date) => date ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short" }).format(date) : "-";
   const formatDateTime = (date: Date) => date ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(date) : "-";
@@ -696,205 +707,108 @@ export default function PaymentsPage() {
         </div>
       )}
 
-      <div className="mt-[53px]">
-        <div className="px-6 pt-8 sm:px-10">
-          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Previsiones de pago</h1>
-            </div>
-            <div className="absolute right-0 flex items-center gap-2">
-              <button 
-                onClick={() => { setShowInvoiceStatusSearch(true); setInvoiceStatusSearchTerm(""); setInvoiceStatusResult(null); }}
-                className="flex items-center gap-2 px-4 py-1.5 border border-slate-200 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-              >
-                <HelpCircle size={16} />
-                Consultar factura
-              </button>
-              <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity">
-                <Plus size={16} strokeWidth={2.5} />
-                Nueva previsión
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <main className="px-6 pb-24 pt-[85px] sm:px-10">
+        <PageHeader
+          title={<>Pagos <span className="text-[15px] font-normal text-slate-400">{forecasts.length}</span></>}
+          actions={
+            <>
+              <Button variant="ghost" onClick={() => { setShowInvoiceStatusSearch(true); setInvoiceStatusSearchTerm(""); setInvoiceStatusResult(null); }}>Consultar factura</Button>
+              <Button variant="primary" onClick={() => setShowCreateModal(true)}><Plus size={14} /> Nueva previsión</Button>
+            </>
+          }
+        />
 
-      <main className="px-6 sm:px-10 py-8">
-        {invoiceStats.overdue > 0 && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-100 rounded-md flex items-center justify-center flex-shrink-0"><AlertTriangle size={20} className="text-red-600" /></div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-red-900">{invoiceStats.overdue} factura{invoiceStats.overdue > 1 ? "s" : ""} vencida{invoiceStats.overdue > 1 ? "s" : ""} sin asignar</h3>
-                <p className="text-[13px] text-red-700">Asígnalas a una previsión de pago para evitar retrasos.</p>
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <SearchBar fields={PAY_FIELDS} field={payField} onField={setPayField} value={searchTerm} onChange={setSearchTerm} count={filteredForecasts.length} />
+          <div className="w-44">
+            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </Select>
+          </div>
+          <div className="w-44">
+            <Select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
+              {DATE_RANGE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </Select>
+          </div>
+          <Segmented value={viewMode} onChange={setViewMode} options={[{ value: "kanban", label: "Tablero" }, { value: "list", label: "Lista" }]} />
+        </div>
+
+        <div className="mt-5 flex flex-col items-start gap-6 lg:flex-row">
+          {/* Facturas por asignar */}
+          <aside className="w-full flex-shrink-0 overflow-hidden rounded-lg border border-slate-200 lg:sticky lg:top-[85px] lg:w-80">
+            <div className="flex flex-col gap-2 border-b border-slate-200 bg-[#FAFAFA] px-3 py-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-600">Por asignar <span className="font-normal text-slate-400">{invoiceStats.total}</span></span>
+                <div className="w-32">
+                  <Select value={invoiceSortBy} onChange={(e) => setInvoiceSortBy(e.target.value as "dueDate" | "amount" | "supplier")}>
+                    {INVOICE_SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </Select>
+                </div>
               </div>
-              <button onClick={() => setInvoicesPanelExpanded(true)} className="px-4 py-2 bg-red-600 text-white text-[13px] rounded-lg hover:bg-red-700 flex-shrink-0">Ver facturas</button>
+              <Input value={invoiceSearch} onChange={(e) => setInvoiceSearch(e.target.value)} placeholder="Número, proveedor o importe" />
+              <div className="flex gap-0.5 rounded-md border border-slate-200 bg-white p-0.5 text-xs">
+                {([["all", "Todas", invoiceStats.total], ["overdue", "Vencidas", invoiceStats.overdue], ["week", "7 días", invoiceStats.dueSoon]] as const).map(([v, l, n]) => (
+                  <button
+                    key={v}
+                    onClick={() => setInvoiceDueDateFilter(v)}
+                    className={`flex h-6 flex-1 items-center justify-center gap-1 rounded-[5px] ${invoiceDueDateFilter === v ? "bg-[#F4F4F5] font-medium text-slate-900" : "text-slate-600 hover:text-slate-900"} ${v === "overdue" && n > 0 && invoiceDueDateFilter !== v ? "text-red-700" : ""}`}
+                  >
+                    {l} <span className="tabular-nums text-slate-400">{n}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-
-        <div className="flex flex-row gap-3 items-center mb-6">
-          <div className="flex-1 relative">
-            <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-            <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar previsión o proveedor" className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]" />
-          </div>
-          <div className="flex gap-2 flex-shrink-0">
-            <div className="relative" ref={statusDropdownRef}>
-              <button onClick={() => setShowStatusDropdown(!showStatusDropdown)} className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded-md text-[13px] hover:border-slate-300 bg-white min-w-[160px]">
-                <Filter size={14} className="text-slate-400" />
-                <span className="flex-1 text-left text-xs text-slate-700">{STATUS_OPTIONS.find(o => o.value === statusFilter)?.label}</span>
-                <ChevronDown size={14} className={cx("text-slate-400 transition-transform", showStatusDropdown && "rotate-180")} />
-              </button>
-              {showStatusDropdown && (
-                <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1" match="min" gap={8}>
-                  {STATUS_OPTIONS.map((option) => (
-                    <button key={option.value} onClick={() => { setStatusFilter(option.value); setShowStatusDropdown(false); }} className={cx("w-full text-left px-4 py-1.5 text-[13px] transition-colors", statusFilter === option.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50")}>{option.label}</button>
-                  ))}
-                </AnchoredPanel>
-              )}
-            </div>
-
-            <div className="relative" ref={dateDropdownRef}>
-              <button onClick={() => setShowDateDropdown(!showDateDropdown)} className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded-md text-[13px] hover:border-slate-300 bg-white min-w-[160px]">
-                <Calendar size={14} className="text-slate-400" />
-                <span className="flex-1 text-left text-xs text-slate-700">{DATE_RANGE_OPTIONS.find(o => o.value === dateRange)?.label}</span>
-                <ChevronDown size={14} className={cx("text-slate-400 transition-transform", showDateDropdown && "rotate-180")} />
-              </button>
-              {showDateDropdown && (
-                <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1" match="min" gap={8}>
-                  {DATE_RANGE_OPTIONS.map((option) => (
-                    <button key={option.value} onClick={() => { setDateRange(option.value); setShowDateDropdown(false); }} className={cx("w-full text-left px-4 py-1.5 text-[13px] transition-colors", dateRange === option.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50")}>{option.label}</button>
-                  ))}
-                </AnchoredPanel>
-              )}
-            </div>
-
-            <div className="flex border border-slate-200 rounded-md overflow-hidden bg-white">
-              <button onClick={() => setViewMode("kanban")} className={cx("px-3 py-1.5 text-[13px] transition-colors", viewMode === "kanban" ? "bg-[#F1F1F3] text-slate-900" : "text-slate-600 hover:bg-slate-50")}><LayoutGrid size={16} /></button>
-              <button onClick={() => setViewMode("list")} className={cx("px-3 py-1.5 text-[13px] transition-colors border-l border-slate-200", viewMode === "list" ? "bg-[#F1F1F3] text-slate-900" : "text-slate-600 hover:bg-slate-50")}><List size={16} /></button>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-6">
-          <div className={cx("flex-shrink-0 transition-all duration-300", invoicesPanelExpanded ? "w-80" : "w-20")}>
-            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden sticky top-24">
-              {!invoicesPanelExpanded ? (
-                <button onClick={() => setInvoicesPanelExpanded(true)} className="w-full p-4 flex flex-col items-center gap-2 hover:bg-slate-50 transition-colors">
-                  <div className="hidden"><Receipt size={16} className="text-slate-600" /></div>
-                  <div className="flex flex-col items-center">
-                    <span className="text-lg font-bold text-slate-900">{invoiceStats.total}</span>
-                    <span className="text-[10px] text-slate-500 text-center leading-tight">Facturas<br/>pendientes</span>
-                  </div>
-                  {invoiceStats.overdue > 0 && (<span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px] font-bold">{invoiceStats.overdue} vencidas</span>)}
-                  <ChevronRight size={14} className="text-slate-400 mt-1" />
-                </button>
+            <div className="max-h-[calc(100vh-280px)] overflow-y-auto">
+              {filteredInvoices.length === 0 ? (
+                <p className="px-4 py-10 text-center text-xs text-slate-500">{hasActiveInvoiceFilters ? "Sin resultados" : "Todo asignado"}</p>
               ) : (
-                <>
-                  <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-slate-200 rounded-lg flex items-center justify-center"><Receipt size={16} className="text-slate-600" /></div>
-                        <div>
-                          <h3 className="font-semibold text-slate-900 text-[13px]">Facturas pendientes</h3>
-                          <p className="text-xs text-slate-500">{invoiceStats.filtered} de {invoiceStats.total}</p>
+                filteredInvoices.slice(0, 60).map((invoice) => {
+                  const days = getDaysUntilPayment(invoice.dueDate);
+                  const hasIban = invoice.supplierId ? invoiceIbans[invoice.supplierId] ?? true : true;
+                  const targets = forecasts.filter((f) => f.status === "draft" || f.status === "pending");
+                  return (
+                    <div
+                      key={invoice.id}
+                      draggable
+                      onDragStart={() => handleDragStart(invoice)}
+                      onDragEnd={() => setDraggedInvoice(null)}
+                      className={`group flex cursor-grab items-start gap-2 border-b border-slate-100 px-3 py-2 last:border-0 hover:bg-[#FAFAFA] active:cursor-grabbing ${draggedInvoice?.id === invoice.id ? "opacity-40" : ""}`}
+                    >
+                      <GripVertical size={12} className="mt-1 flex-shrink-0 text-slate-300" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="truncate font-mono text-xs font-medium">{invoice.displayNumber || `FRA-${invoice.number}`}</span>
+                          <span className="font-mono text-xs">{formatCurrency(invoice.totalAmount)}</span>
                         </div>
+                        <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                          <span className="truncate">{invoice.supplier || "—"}</span>
+                          <span className={`flex-shrink-0 ${days < 0 ? "text-red-700" : days <= 7 ? "text-amber-800" : ""}`}>
+                            {days < 0 ? `vencida ${-days} d` : days === 0 ? "hoy" : days <= 7 ? `en ${days} d` : formatDateShort(invoice.dueDate)}
+                          </span>
+                        </div>
+                        {!hasIban && <span className="text-[10px] text-amber-800">Proveedor sin IBAN</span>}
                       </div>
-                      <button onClick={() => setInvoicesPanelExpanded(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"><X size={14} /></button>
+                      {targets.length > 0 && (
+                        <Menu trigger={(toggle) => <IconButton label="Añadir a una previsión" onClick={toggle} className="-my-1 opacity-0 group-hover:opacity-100 focus:opacity-100"><Plus size={14} /></IconButton>}>
+                          {(close) => (
+                            <>
+                              {targets.map((f) => (
+                                <MenuItem key={f.id} onClick={() => { close(); handleAddPaymentToForecast(f.id, invoice); }}>
+                                  {f.name} <span className="ml-1 text-slate-400">{formatDateShort(f.paymentDate)}</span>
+                                </MenuItem>
+                              ))}
+                            </>
+                          )}
+                        </Menu>
+                      )}
                     </div>
-                    <div className="flex gap-2 mt-3">
-                      <button onClick={() => setInvoiceDueDateFilter(invoiceDueDateFilter === "overdue" ? "all" : "overdue")} className={cx("flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all", invoiceDueDateFilter === "overdue" ? "bg-red-100 text-red-700 ring-1 ring-red-200" : "bg-white text-slate-600 hover:bg-slate-100")}><span className="text-red-600 font-bold">{invoiceStats.overdue}</span> vencidas</button>
-                      <button onClick={() => setInvoiceDueDateFilter(invoiceDueDateFilter === "week" ? "all" : "week")} className={cx("flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all", invoiceDueDateFilter === "week" ? "bg-amber-100 text-amber-700 ring-1 ring-amber-200" : "bg-white text-slate-600 hover:bg-slate-100")}><span className="text-amber-600 font-bold">{invoiceStats.dueSoon}</span> próximas</button>
-                    </div>
-                  </div>
-                  <div className="p-3 border-b border-slate-100">
-                    <div className="relative mb-2">
-                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input type="text" value={invoiceSearch} onChange={(e) => setInvoiceSearch(e.target.value)} placeholder="Buscar factura" className="w-full pl-8 pr-8 py-1.5 text-[13px] border border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white" />
-                      {invoiceSearch && (<button onClick={() => setInvoiceSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600"><X size={12} /></button>)}
-                    </div>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1" ref={invoiceFilterRef}>
-                        <button onClick={() => setShowInvoiceFilterDropdown(!showInvoiceFilterDropdown)} className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white hover:border-slate-300">
-                          <span className="text-slate-600">{INVOICE_FILTER_OPTIONS.find(o => o.value === invoiceDueDateFilter)?.label}</span>
-                          <ChevronDown size={12} className="text-slate-400" />
-                        </button>
-                        {showInvoiceFilterDropdown && (
-                          <AnchoredPanel className="bg-white border border-slate-200 rounded-lg shadow-lg py-1" match="width">
-                            {INVOICE_FILTER_OPTIONS.map((option) => (
-                              <button key={option.value} onClick={() => { setInvoiceDueDateFilter(option.value); setShowInvoiceFilterDropdown(false); }} className={cx("w-full text-left px-3 py-2 text-xs transition-colors", invoiceDueDateFilter === option.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50")}>{option.label}</button>
-                            ))}
-                          </AnchoredPanel>
-                        )}
-                      </div>
-                      <div className="relative flex-1" ref={invoiceSortRef}>
-                        <button onClick={() => setShowInvoiceSortDropdown(!showInvoiceSortDropdown)} className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white hover:border-slate-300">
-                          <span className="text-slate-600">{INVOICE_SORT_OPTIONS.find(o => o.value === invoiceSortBy)?.label}</span>
-                          <ChevronDown size={12} className="text-slate-400" />
-                        </button>
-                        {showInvoiceSortDropdown && (
-                          <AnchoredPanel className="bg-white border border-slate-200 rounded-lg shadow-lg py-1" match="width">
-                            {INVOICE_SORT_OPTIONS.map((option) => (
-                              <button key={option.value} onClick={() => { setInvoiceSortBy(option.value as "dueDate" | "amount" | "supplier"); setShowInvoiceSortDropdown(false); }} className={cx("w-full text-left px-3 py-2 text-xs transition-colors", invoiceSortBy === option.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50")}>{option.label}</button>
-                            ))}
-                          </AnchoredPanel>
-                        )}
-                      </div>
-                    </div>
-                    {hasActiveInvoiceFilters && (<button onClick={clearInvoiceFilters} className="w-full mt-2 px-2 py-1.5 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-lg flex items-center justify-center gap-1"><X size={10} />Limpiar filtros</button>)}
-                  </div>
-                  <div className="max-h-[400px] overflow-y-auto">
-                    {filteredInvoices.length === 0 ? (
-                      <div className="text-center py-10 px-4">
-                        <div className="hidden">{hasActiveInvoiceFilters ? <Search size={20} className="text-slate-400" /> : <CheckCircle2 size={20} className="text-emerald-500" />}</div>
-                        <p className="text-[13px] font-medium text-slate-700">{hasActiveInvoiceFilters ? "Sin resultados" : "¡Todo al día!"}</p>
-                        {hasActiveInvoiceFilters && <p className="text-xs text-slate-500 mt-1">Prueba con otros filtros</p>}
-                      </div>
-                    ) : (
-                      <div className="p-2 space-y-1">
-                        {filteredInvoices.slice(0, 30).map((invoice) => {
-                          const days = getDaysUntilPayment(invoice.dueDate);
-                          const isOverdue = days < 0;
-                          const isDueSoon = days >= 0 && days <= 7;
-                          const hasIban = invoice.supplierId
-                            ? invoiceIbans[invoice.supplierId] ?? true
-                            : true;
-                          return (
-                            <div key={invoice.id} draggable onDragStart={() => handleDragStart(invoice)} onDragEnd={() => setDraggedInvoice(null)} className={cx("p-3 rounded-md cursor-grab active:cursor-grabbing transition-all border group", draggedInvoice?.id === invoice.id ? "opacity-50 scale-95 border-slate-400" : "border-transparent", isOverdue ? "bg-red-50 hover:bg-red-100" : "bg-slate-50 hover:bg-slate-100")}>
-                              <div className="flex items-start gap-2">
-                                <div className={cx("w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5", isOverdue ? "bg-red-100" : "bg-slate-200")}><GripVertical size={10} className={isOverdue ? "text-red-400" : "text-slate-400"} /></div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="min-w-0">
-                                      <p className="text-xs font-semibold text-slate-900 truncate font-mono">{invoice.displayNumber || ("FRA-" + invoice.number)}</p>
-                                      <p className="text-[11px] text-slate-600 truncate">{invoice.supplier || "—"}</p>
-                                    </div>
-                                    <p className="text-xs font-bold text-slate-900 flex-shrink-0">{formatCurrency(invoice.totalAmount)} €</p>
-                                  </div>
-                                  <div className="flex items-center justify-between mt-1.5">
-                                    <span className={cx("text-[10px] px-1.5 py-0.5 rounded-full font-medium", isOverdue ? "bg-red-100 text-red-700" : isDueSoon ? "bg-amber-100 text-amber-700" : "bg-slate-200 text-slate-600")}>{isOverdue ? ("Vencida " + Math.abs(days) + "d") : isDueSoon ? (days + "d") : formatDateShort(invoice.dueDate)}</span>
-                                    <div className="flex items-center gap-1.5">
-                                      {!hasIban && (
-                                        <span className="text-[9px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded font-medium">Sin IBAN</span>
-                                      )}
-                                      <span className="text-[9px] text-slate-400 opacity-0 group-hover:opacity-100">Arrastra →</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                        {filteredInvoices.length > 30 && (<div className="text-center py-2"><p className="text-[10px] text-slate-500">+{filteredInvoices.length - 30} facturas más</p></div>)}
-                      </div>
-                    )}
-                  </div>
-                </>
+                  );
+                })
               )}
             </div>
-          </div>
+          </aside>
 
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             {filteredForecasts.length === 0 ? (
               <div className="bg-white border-2 border-dashed border-slate-200 rounded-lg p-16 text-center">
                 <div className="hidden"><Banknote size={28} className="text-slate-400" /></div>
@@ -1076,7 +990,7 @@ export default function PaymentsPage() {
       </main>
 
       {showCreateModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowCreateModal(false)}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowCreateModal(false)}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <h3 className="text-[14px] font-semibold text-slate-900">Nueva previsión de pago</h3>
@@ -1113,7 +1027,7 @@ export default function PaymentsPage() {
       )}
 
       {showAddPaymentModal && selectedForecastId && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowAddPaymentModal(false); setSelectedForecastId(null); }}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowAddPaymentModal(false); setSelectedForecastId(null); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <h3 className="text-[14px] font-semibold text-slate-900">Añadir pago</h3>
@@ -1138,45 +1052,18 @@ export default function PaymentsPage() {
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-slate-600">Seleccionar factura</label>
                   <div className="relative custom-dropdown">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        if (openDropdown === "invoiceSelect") { setOpenDropdown(null); return; }
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        setOpenDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
-                        setOpenDropdown("invoiceSelect");
+                    <Select
+                      value={newPayment.invoiceId}
+                      onChange={(e) => {
+                        const inv = availableInvoices.find((i) => i.id === e.target.value);
+                        setNewPayment(inv ? { ...newPayment, invoiceId: inv.id, supplier: inv.supplier, description: inv.description, amount: inv.totalAmount } : { ...newPayment, invoiceId: "" });
                       }}
-                      className="w-full px-4 py-2 border border-slate-200 rounded-md text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors"
                     >
-                      <span className="text-slate-900 truncate">
-                        {newPayment.invoiceId
-                          ? (() => { const inv = availableInvoices.find(i => i.id === newPayment.invoiceId); return inv ? `${inv.displayNumber || "FRA-" + inv.number} · ${inv.supplier} · ${formatCurrency(inv.totalAmount)} €` : "Seleccionar..."; })()
-                          : "Seleccionar..."}
-                      </span>
-                      <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === "invoiceSelect" ? "rotate-180" : ""}`} />
-                    </button>
-                    {openDropdown === "invoiceSelect" && openDropdownPos && (
-                      <div className="fixed z-30 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto"
-                        style={{ top: openDropdownPos.top, left: openDropdownPos.left, width: openDropdownPos.width }}>
-                        <button
-                          type="button"
-                          onClick={() => { setNewPayment({ ...newPayment, invoiceId: "" }); setOpenDropdown(null); }}
-                          className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${!newPayment.invoiceId ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
-                        >
-                          Seleccionar...
-                        </button>
-                        {availableInvoices.map((inv) => (
-                          <button
-                            key={inv.id}
-                            type="button"
-                            onClick={() => { setNewPayment({ ...newPayment, invoiceId: inv.id, supplier: inv.supplier, description: inv.description, amount: inv.totalAmount }); setOpenDropdown(null); }}
-                            className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${newPayment.invoiceId === inv.id ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
-                          >
-                            {inv.displayNumber || ("FRA-" + inv.number)} · {inv.supplier} · {formatCurrency(inv.totalAmount)} €
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                      <option value="">Seleccionar…</option>
+                      {availableInvoices.map((inv) => (
+                        <option key={inv.id} value={inv.id}>{inv.displayNumber || ("FRA-" + inv.number)} · {inv.supplier} · {formatCurrency(inv.totalAmount)} €</option>
+                      ))}
+                    </Select>
                   </div>
                 </div>
               )}
@@ -1209,7 +1096,7 @@ export default function PaymentsPage() {
       )}
 
       {showForecastDetail && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowForecastDetail(null)}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowForecastDetail(null)}>
           <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <div>
@@ -1297,7 +1184,7 @@ export default function PaymentsPage() {
 
       {/* Modal de consulta de estado de factura */}
       {showInvoiceStatusSearch && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowInvoiceStatusSearch(false)}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowInvoiceStatusSearch(false)}>
           <div className="bg-white rounded-lg max-w-md w-full shadow-xl border border-slate-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -1398,7 +1285,7 @@ export default function PaymentsPage() {
 
       {/* Confirm Dialog */}
       {confirmDialog && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-[14px] font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
             <p className="text-[13px] text-slate-600 mb-6">{confirmDialog.message}</p>

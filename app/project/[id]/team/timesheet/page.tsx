@@ -1007,7 +1007,7 @@ export default function ControlHorarioPage() {
 
       {/* ── Config Modal ───────────────────────────────────────────────────── */}
       {showConfig && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100 flex-shrink-0">
               <h3 className="text-base font-semibold text-slate-900">Configuración</h3>
@@ -1098,7 +1098,7 @@ export default function ControlHorarioPage() {
 
       {/* ── Schedules Modal ───────────────────────────────────────────────── */}
       {showSchedules && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100 flex-shrink-0">
               <h3 className="text-base font-semibold text-slate-900">Jornadas</h3>
@@ -1197,7 +1197,7 @@ export default function ControlHorarioPage() {
 
       {/* ── Add member Modal ───────────────────────────────────────────────── */}
       {showAddMember && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm max-h-[70vh] flex flex-col">
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
               <h3 className="text-[13px] font-semibold text-slate-900">Añadir persona</h3>
@@ -1234,7 +1234,7 @@ export default function ControlHorarioPage() {
 
       {/* ── Groups Modal ───────────────────────────────────────────────────── */}
       {showGroups && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
 
             {/* Header */}
@@ -1383,7 +1383,7 @@ export default function ControlHorarioPage() {
 
       {/* ── Form detail Modal ──────────────────────────────────────────────── */}
       {showFormDetail && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
               <div>

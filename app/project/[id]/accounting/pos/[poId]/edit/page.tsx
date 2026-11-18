@@ -865,7 +865,7 @@ export default function EditPOPage() {
 
   const canEdit = () => poStatus === "draft" || poStatus === "rejected";
   const getCurrencySymbol = () => CURRENCIES.find((c) => c.value === formData.currency)?.symbol || "€";
-  const formatCurrency = (amount: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+  const formatCurrency = (amount: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(amount);
 
   const getApprovalPreview = () => {
     if (approvalConfig.length === 0) return { autoApprove: true, message: "Se aprobará automáticamente", steps: [] };
@@ -1584,7 +1584,7 @@ export default function EditPOPage() {
 
       {/* Supplier Modal */}
       {showSupplierModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4" onClick={() => { setShowSupplierModal(false); setSupplierSearch(""); }}>
+        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4" onClick={() => { setShowSupplierModal(false); setSupplierSearch(""); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-[14px] font-semibold text-slate-900">Seleccionar proveedor</h2>
@@ -1647,7 +1647,7 @@ export default function EditPOPage() {
 
       {/* Account Modal */}
       {showAccountModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4" onClick={() => { setShowAccountModal(false); setAccountSearch(""); setCurrentItemIndex(null); }}>
+        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4" onClick={() => { setShowAccountModal(false); setAccountSearch(""); setCurrentItemIndex(null); }}>
           <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-[14px] font-semibold text-slate-900">Seleccionar cuenta presupuestaria</h2>
@@ -1703,7 +1703,7 @@ export default function EditPOPage() {
 
       {/* Modal de asignación de capítulos */}
       {showEpisodeModal && episodeItemIndex !== null && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowEpisodeModal(false)}>
+        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowEpisodeModal(false)}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">

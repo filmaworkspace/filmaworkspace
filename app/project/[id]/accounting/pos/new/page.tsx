@@ -1105,7 +1105,8 @@ export default function NewPOPage() {
     new Intl.NumberFormat("es-ES", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }).format(amount);
+      useGrouping: "always",
+    } as Intl.NumberFormatOptions).format(amount);
 
   const getApprovalPreview = () => {
     if (approvalConfig.length === 0)
@@ -2085,7 +2086,7 @@ export default function NewPOPage() {
       {/* Supplier Modal */}
       {showSupplierModal && (
         <div
-          className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4"
+          className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowSupplierModal(false); setSupplierSearch(""); } }}
         >
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden border border-slate-200">
@@ -2183,7 +2184,7 @@ export default function NewPOPage() {
       {/* Create Supplier Modal */}
       {showCreateSupplierModal && (
         <div
-          className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[80] p-4"
+          className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[80] p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowCreateSupplierModal(false); setNewSupplierData({ fiscalName: "", taxId: "" }); } }}
         >
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full border border-slate-200">
@@ -2247,7 +2248,7 @@ export default function NewPOPage() {
       {/* Account Modal */}
       {showAccountModal && (
         <div
-          className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4"
+          className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowAccountModal(false); setAccountSearch(""); setCurrentItemIndex(null); } }}
         >
           <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden border border-slate-200">
@@ -2301,7 +2302,7 @@ export default function NewPOPage() {
       {/* Modal de asignación de capítulos */}
       {showEpisodeModal && episodeItemIndex !== null && (
         <div
-          className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) setShowEpisodeModal(false); }}
         >
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden">

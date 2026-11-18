@@ -236,7 +236,7 @@ export default function ReplaceDocumentPage() {
   };
 
   const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
+    new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(amount || 0);
 
   const formatDate = (date: Date | undefined) => {
     if (!date) return "-";
@@ -548,7 +548,7 @@ export default function ReplaceDocumentPage() {
 
       {/* Modal de sustitución */}
       {showReplaceModal && selectedDoc && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4" onClick={closeReplaceModal}>
+        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4" onClick={closeReplaceModal}>
           <div className="bg-white rounded-lg shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
