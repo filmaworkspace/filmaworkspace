@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
-import { AnchoredPanel, Button, Checkbox, Field, Input, Modal } from "@/components/ds";
+import { Button, Checkbox, EmptyState, Field, IconButton, Input, Menu, MenuItem, MenuSeparator, Modal, Page, PageHeader, PageLoading, Segmented, Select, buttonClass } from "@/components/ds";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
@@ -31,6 +31,7 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
+  MoreHorizontal,
   Briefcase,
   Building2,
   CheckCircle2,
@@ -933,1323 +934,395 @@ export default function AccountingConfigPage() {
     );
   };
 
-  const renderApprovalStep = (step: ApprovalStep, type: "po" | "invoice" | "box", index: number) => {
-    const currentSteps = type === "po" ? poApprovals : type === "invoice" ? invoiceApprovals : boxApprovals;
-    const isExpanded = expandedSteps.has(step.id);
-    const Icon = APPROVER_TYPE_ICONS[step.approverType] || Users;
+  // ─── Interfaz ────────────────────────────────────────────────────────────
 
-    return (
-      <div
-        key={step.id}
-        className={`border rounded-lg overflow-hidden transition-all ${
-          isExpanded ? "border-slate-300 bg-white shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"
-        }`}
-      >
-        {/* Header colapsado */}
-        <div
-          className="flex items-center gap-3 px-5 py-4 cursor-pointer"
-          onClick={() => toggleExpanded(step.id)}
-        >
-          <button className="p-1 text-slate-400 hover:text-slate-600 transition-colors">
-            {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-          </button>
+  type FlowKey = "po" | "invoice" | "box";
+  const FLOWS: { key: FlowKey; label: string }[] = [
+    { key: "po", label: "Órdenes de compra" },
+    { key: "invoice", label: "Facturas" },
+    { key: "box", label: "Cajas" },
+  ];
+  const stepsOf = (k: FlowKey) => (k === "po" ? poApprovals : k === "invoice" ? invoiceApprovals : boxApprovals);
 
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-bold ${
-            step.hasAmountThreshold ? "bg-amber-500 text-white" : "bg-[#F1F1F3] text-slate-900"
-          }`}>
-            {step.order}
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Icon size={14} className="text-slate-500" />
-              <span className="text-[13px] font-medium text-slate-900">
-                {APPROVER_TYPE_LABELS[step.approverType]}
-              </span>
-              {getThresholdBadge(step)}
-              <span className="text-slate-300">•</span>
-              <span className="text-[13px] text-slate-500 truncate">{getStepSummary(step)}</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => moveStep(type, step.id, "up")}
-              disabled={index === 0}
-              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-30 transition-colors"
-            >
-              <ArrowUp size={14} />
-            </button>
-            <button
-              onClick={() => moveStep(type, step.id, "down")}
-              disabled={index === currentSteps.length - 1}
-              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-30 transition-colors"
-            >
-              <ArrowDown size={14} />
-            </button>
-            <button
-              onClick={() => removeApprovalStep(type, step.id)}
-              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        </div>
-
-        {/* Contenido expandido */}
-        {isExpanded && (
-          <div className="px-5 pb-5 pt-2 border-t border-slate-100 space-y-5">
-            {/* Umbral por importe */}
-            <div className={`p-4 rounded-md border-2 transition-all ${
-              step.hasAmountThreshold ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-slate-50"
-            }`}>
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={step.hasAmountThreshold}
-                  onChange={(e) => updateStep(type, step.id, "hasAmountThreshold", e.target.checked)}
-                  className="w-4 h-4 mt-0.5 text-amber-600 border-slate-300 rounded focus:ring-amber-500 text-[13px]"
-                />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp size={16} className={step.hasAmountThreshold ? "text-amber-600" : "text-slate-400"} />
-                    <span className={`text-[13px] font-medium ${step.hasAmountThreshold ? "text-amber-800" : "text-slate-700"}`}>
-                      Activar solo por importe
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Este nivel solo se activará cuando el documento cumpla la condición de importe
-                  </p>
-                </div>
-              </label>
-
-              {step.hasAmountThreshold && (
-                <div className="mt-4 space-y-4 pl-7">
-                  {/* Condición */}
-                  <div>
-                    <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">
-                      Condición
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(Object.entries(AMOUNT_CONDITIONS) as [string, { label: string; description: string }][]).map(
-                        ([key, { label }]) => (
-                          <button
-                            key={key}
-                            onClick={() => updateStep(type, step.id, "amountCondition", key)}
-                            className={`px-3 py-2 rounded-lg text-[13px] font-medium border-2 transition-all ${
-                              step.amountCondition === key
-                                ? "border-amber-500 bg-amber-100 text-amber-800"
-                                : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        )
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Importe */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">
-                        {step.amountCondition === "between" ? "Importe mínimo" : "Importe"}
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          value={step.amountThreshold || ""}
-                          onChange={(e) => updateStep(type, step.id, "amountThreshold", parseFloat(e.target.value) || 0)}
-                          placeholder="5000"
-                          className="w-full pl-8 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-amber-500 bg-white text-[13px]"
-                        />
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[13px]">€</span>
-                      </div>
-                    </div>
-
-                    {step.amountCondition === "between" && (
-                      <div>
-                        <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">
-                          Importe máximo
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            value={step.amountThresholdMax || ""}
-                            onChange={(e) => updateStep(type, step.id, "amountThresholdMax", parseFloat(e.target.value) || 0)}
-                            placeholder="10000"
-                            className="w-full pl-8 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-amber-500 bg-white text-[13px]"
-                          />
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[13px]">€</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Presets */}
-                  <div>
-                    <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">
-                      Importes predefinidos
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {PRESET_THRESHOLDS.map((amount) => (
-                        <button
-                          key={amount}
-                          onClick={() => updateStep(type, step.id, "amountThreshold", amount)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                            step.amountThreshold === amount
-                              ? "bg-amber-500 text-white"
-                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                          }`}
-                        >
-                          {formatCurrency(amount)} €
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Preview */}
-                  <div className="p-3 bg-amber-100 rounded-lg border border-amber-200">
-                    <div className="flex items-start gap-2">
-                      <Zap size={14} className="text-amber-600 mt-0.5" />
-                      <p className="text-xs text-amber-800">
-                        {step.amountCondition === "above" && step.amountThreshold && (
-                          <>Este nivel se activará para {type === "po" ? "POs" : "facturas"} con importe <strong>superior a {formatCurrency(step.amountThreshold)} €</strong></>
-                        )}
-                        {step.amountCondition === "below" && step.amountThreshold && (
-                          <>Este nivel se activará para {type === "po" ? "POs" : "facturas"} con importe <strong>inferior a {formatCurrency(step.amountThreshold)} €</strong></>
-                        )}
-                        {step.amountCondition === "between" && step.amountThreshold && step.amountThresholdMax && (
-                          <>Este nivel se activará para {type === "po" ? "POs" : "facturas"} con importe <strong>entre {formatCurrency(step.amountThreshold)} € y {formatCurrency(step.amountThresholdMax)} €</strong></>
-                        )}
-                        {!step.amountThreshold && "Configura un importe para activar este nivel"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Tipo de aprobador */}
-            <div>
-              <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">
-                Tipo de aprobador
-              </label>
-              <div className="grid grid-cols-4 gap-2">
-                {(["fixed", "role", "hod", "coordinator"] as const).map((t) => {
-                  const TIcon = APPROVER_TYPE_ICONS[t];
-                  return (
-                    <button
-                      key={t}
-                      onClick={() => updateStep(type, step.id, "approverType", t)}
-                      className={`flex items-center gap-2 p-3 rounded-md border-2 transition-all text-left ${
-                        step.approverType === t
-                          ? "border-slate-900 bg-slate-50"
-                          : "border-slate-200 hover:border-slate-300"
-                      }`}
-                    >
-                      <TIcon
-                        size={16}
-                        className={step.approverType === t ? "text-slate-900" : "text-slate-400"}
-                      />
-                      <span
-                        className={`text-[13px] ${
-                          step.approverType === t ? "font-medium text-slate-900" : "text-slate-600"
-                        }`}
-                      >
-                        {APPROVER_TYPE_LABELS[t]}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Por rol */}
-            {step.approverType === "role" && (
-              <div>
-                <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">
-                  Roles que pueden aprobar
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {PROJECT_ROLES.map((role) => {
-                    const count = getMembersByRole(role).length;
-                    return (
-                      <label
-                        key={role}
-                        className={`flex items-center gap-3 p-3 rounded-md border-2 cursor-pointer transition-all ${
-                          step.roles?.includes(role)
-                            ? "border-slate-900 bg-slate-50"
-                            : "border-slate-200 hover:border-slate-300"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={step.roles?.includes(role) || false}
-                          onChange={() => toggleRole(type, step.id, role)}
-                          className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500 text-[13px]"
-                        />
-                        <div>
-                          <p className="text-[13px] font-medium text-slate-900">{role}</p>
-                          <p className="text-xs text-slate-500">
-                            {count} usuario{count !== 1 ? "s" : ""}
-                          </p>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-                {step.roles && step.roles.length > 0 && (
-                  <div className="mt-3 bg-slate-50 rounded-md p-4 border border-slate-200">
-                    <p className="text-xs text-slate-500 mb-2">Usuarios que podrán aprobar:</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {step.roles.flatMap((r) =>
-                        getMembersByRole(r).map((m) => (
-                          <span
-                            key={m.userId}
-                            className="text-xs bg-slate-200 text-slate-700 px-2 py-1 rounded-lg"
-                          >
-                            {m.name} ({r})
-                          </span>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Usuarios específicos */}
-            {step.approverType === "fixed" && (
-              <div>
-                <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">
-                  Seleccionar aprobadores
-                </label>
-                <div className="border border-slate-200 rounded-md p-3 max-h-48 overflow-y-auto space-y-1 bg-slate-50">
-                  {members.length === 0 ? (
-                    <p className="text-[13px] text-slate-500 text-center py-4">No hay miembros</p>
-                  ) : (
-                    members.map((m) => (
-                      <label
-                        key={m.userId}
-                        className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all ${
-                          step.approvers?.includes(m.userId)
-                            ? "bg-white border border-slate-200"
-                            : "hover:bg-white"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={step.approvers?.includes(m.userId) || false}
-                          onChange={() => toggleApprover(type, step.id, m.userId)}
-                          className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500 text-[13px]"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-slate-900 truncate">{m.name}</p>
-                          <p className="text-xs text-slate-500 truncate">
-                            {m.role || m.position || "Sin rol"}
-                          </p>
-                        </div>
-                      </label>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* HOD / Coordinator */}
-            {(step.approverType === "hod" || step.approverType === "coordinator") && (
-              <div>
-                <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">
-                  Departamento
-                </label>
-                <div className="relative custom-dropdown">
-                  <button
-                    type="button"
-                    onClick={() => setOpenDropdown(openDropdown === `dept-${step.id}` ? null : `dept-${step.id}`)}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-md text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors"
-                  >
-                    <span className="text-slate-900 truncate">{step.department || "Departamento del solicitante"}</span>
-                    <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `dept-${step.id}` ? "rotate-180" : ""}`} />
-                  </button>
-                  {openDropdown === `dept-${step.id}` && (
-                    <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
-                      <button
-                        type="button"
-                        onClick={() => { updateStep(type, step.id, "department", ""); setOpenDropdown(null); }}
-                        className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${!step.department ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
-                      >
-                        Departamento del solicitante
-                      </button>
-                      {departments.map((d) => (
-                        <button
-                          key={d}
-                          type="button"
-                          onClick={() => { updateStep(type, step.id, "department", d); setOpenDropdown(null); }}
-                          className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${step.department === d ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
-                        >
-                          {d}
-                        </button>
-                      ))}
-                    </AnchoredPanel>
-                  )}
-                </div>
-                <p className="text-xs text-slate-500 mt-2">
-                  {step.department
-                    ? `El ${step.approverType === "hod" ? "HOD" : "Coordinator"} de "${step.department}" aprobará`
-                    : `Se asignará automáticamente según el departamento del solicitante`}
-                </p>
-              </div>
-            )}
-
-            {/* Require All */}
-            {(step.approverType === "fixed" || step.approverType === "role") && (
-              <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-md border border-slate-200 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={step.requireAll}
-                  onChange={(e) => updateStep(type, step.id, "requireAll", e.target.checked)}
-                  className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500 text-[13px]"
-                />
-                <div>
-                  <p className="text-[13px] font-medium text-slate-900">Requiere aprobación de todos</p>
-                  <p className="text-xs text-slate-500">
-                    {step.requireAll
-                      ? "Todos deben aprobar para pasar al siguiente nivel"
-                      : "Con una aprobación es suficiente"}
-                  </p>
-                </div>
-              </label>
-            )}
-          </div>
-        )}
-      </div>
-    );
+  const memberName = (uid: string) => {
+    const m = members.find((x) => x.userId === uid);
+    return m?.name || m?.email || "Usuario";
+  };
+  const approverText = (s: ApprovalStep) => {
+    if (s.approverType === "role") return s.roles?.length ? s.roles.join(", ") : "Sin roles";
+    if (s.approverType === "fixed") return s.approvers?.length ? s.approvers.map(memberName).join(", ") : "Sin personas";
+    if (s.approverType === "hod") return s.department ? `HOD de ${s.department}` : "HOD del departamento de la PO";
+    return s.department ? `Coordinator de ${s.department}` : "Coordinator del departamento de la PO";
+  };
+  const conditionText = (s: ApprovalStep) => {
+    if (!s.hasAmountThreshold || !s.amountThreshold) return "Siempre";
+    const f = (n?: number) => `${formatCurrency(n || 0)} €`;
+    if (s.amountCondition === "below") return `Base < ${f(s.amountThreshold)}`;
+    if (s.amountCondition === "between") return `Base entre ${f(s.amountThreshold)} y ${f(s.amountThresholdMax)}`;
+    return `Base > ${f(s.amountThreshold)}`;
   };
 
-  // Render de la sección de datos de empresa
-  const renderCompanySection = () => (
-    <div className="space-y-6">
-      {/* Datos fiscales */}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h2 className="font-semibold text-slate-900">Datos fiscales de la empresa</h2>
-          </div>
-          {!editingCompany && companyData.fiscalName && (
-            <button
-              onClick={() => setEditingCompany(true)}
-              className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-            >
-              <Edit2 size={14} />
-              Editar
-            </button>
-          )}
-        </div>
+  const snapshot = JSON.stringify({ costSettings, poApprovals, invoiceApprovals, boxApprovals, projectSettings });
+  const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
+  useEffect(() => { if (!loading && savedSnapshot === null) setSavedSnapshot(snapshot); }, [loading, savedSnapshot, snapshot]);
+  const dirty = savedSnapshot !== null && savedSnapshot !== snapshot;
+  const companyDirty = JSON.stringify(companyForm) !== JSON.stringify(companyData);
 
-        <div className="p-6">
-          {!editingCompany ? (
-            companyData.fiscalName ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Razón social</p>
-                    <p className="text-base font-medium text-slate-900">{companyData.fiscalName}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">NIF/CIF</p>
-                    <p className="text-base font-mono text-slate-900">{companyData.taxId}</p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Dirección</p>
-                  <p className="text-[13px] text-slate-700">{companyData.address}</p>
-                  <p className="text-[13px] text-slate-500">{companyData.postalCode} {companyData.city}, {companyData.province}</p>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <div className="hidden">
-                  <Building2 size={20} className="text-slate-400" />
-                </div>
-                <p className="text-[13px] text-slate-500 mb-4">No hay datos fiscales configurados</p>
-                <button
-                  onClick={() => setEditingCompany(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-[13px] font-medium transition-colors border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
-                >
-                  <Plus size={14} />
-                  Añadir datos fiscales
-                </button>
-              </div>
-            )
-          ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Razón social *</label>
-                  <input
-                    type="text"
-                    value={companyForm.fiscalName}
-                    onChange={(e) => setCompanyForm({ ...companyForm, fiscalName: e.target.value })}
-                    placeholder="Nombre de la empresa"
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">NIF/CIF *</label>
-                  <input
-                    type="text"
-                    value={companyForm.taxId}
-                    onChange={(e) => setCompanyForm({ ...companyForm, taxId: e.target.value.toUpperCase() })}
-                    placeholder="B12345678"
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px] font-mono"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Dirección *</label>
-                <input
-                  type="text"
-                  value={companyForm.address}
-                  onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })}
-                  placeholder="Calle, número, piso"
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px]"
-                />
-              </div>
-              <div className="grid grid-cols-4 gap-4">
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">C.P. *</label>
-                  <input
-                    type="text"
-                    value={companyForm.postalCode}
-                    onChange={(e) => setCompanyForm({ ...companyForm, postalCode: e.target.value })}
-                    placeholder="28001"
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Ciudad *</label>
-                  <input
-                    type="text"
-                    value={companyForm.city}
-                    onChange={(e) => setCompanyForm({ ...companyForm, city: e.target.value })}
-                    placeholder="Madrid"
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Provincia</label>
-                  <input
-                    type="text"
-                    value={companyForm.province}
-                    onChange={(e) => setCompanyForm({ ...companyForm, province: e.target.value })}
-                    placeholder="Madrid"
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">País</label>
-                  <input
-                    type="text"
-                    value={companyForm.country}
-                    onChange={(e) => setCompanyForm({ ...companyForm, country: e.target.value })}
-                    placeholder="España"
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px]"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={handleSaveCompany}
-                  disabled={savingCompany || !companyForm.fiscalName || !companyForm.taxId || !companyForm.address || !companyForm.postalCode || !companyForm.city}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
-                >
-                  <Save size={16} />
-                  {savingCompany ? "Guardando..." : "Guardar"}
-                </button>
-                <button
-                  onClick={() => { setEditingCompany(false); setCompanyForm(companyData); }}
-                  className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-md text-[13px] font-medium transition-colors"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+  const saveAll = async () => {
+    await handleSave();
+    if (projectType === "serie") await handleSaveProjectSettings();
+    setSavedSnapshot(snapshot);
+  };
 
-      {/* Cuentas bancarias */}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h2 className="font-semibold text-slate-900">Cuentas bancarias</h2>
-            <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">{bankAccounts.length}</span>
-          </div>
-          <button
-            onClick={openNewBankAccount}
-            className="flex items-center gap-2 px-3 py-1.5 text-[13px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
-          >
-            <Plus size={14} />
-            Añadir
-          </button>
-        </div>
+  const [tab, setTab] = useState<"company" | "cost" | "approvals">("company");
+  const [flow, setFlow] = useState<FlowKey>("po");
+  const [editingStep, setEditingStep] = useState<{ flow: FlowKey; id: string } | null>(null);
+  const [memberQuery, setMemberQuery] = useState("");
+  const editStep = editingStep ? stepsOf(editingStep.flow).find((s) => s.id === editingStep.id) || null : null;
+  // Al añadir un nivel se abre su editor (cuando el estado ya incluye el nuevo nivel)
+  const [openLast, setOpenLast] = useState<FlowKey | null>(null);
+  useEffect(() => {
+    if (!openLast) return;
+    const list = stepsOf(openLast);
+    if (list.length) setEditingStep({ flow: openLast, id: list[list.length - 1].id });
+    setOpenLast(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openLast, poApprovals, invoiceApprovals, boxApprovals]);
 
-        <div className="p-6">
-          {bankAccounts.length > 0 ? (
-            <div className="space-y-3">
-              {bankAccounts.map((account) => (
-                <div
-                  key={account.id}
-                  className="flex items-center justify-between p-4 bg-slate-50 rounded-md hover:bg-slate-100 transition-colors group"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-white rounded-md flex items-center justify-center border border-slate-200">
-                      <CreditCard size={18} className="text-slate-500" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-slate-900">{account.alias}</p>
-                        {account.isDefault && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-lg">
-                            <Star size={10} />
-                            Principal
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5">{account.fiscalName} · {account.taxId}</p>
-                      <p className="text-[13px] font-mono text-slate-600 mt-1">{formatIBAN(account.iban)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => openEditBankAccount(account)}
-                      className="p-2 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors"
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteBankAccount(account.id)}
-                      className="p-2 text-slate-400 hover:text-red-600 hover:bg-white rounded-lg transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <div className="hidden">
-                <Landmark size={20} className="text-slate-400" />
-              </div>
-              <p className="text-[13px] text-slate-500 mb-4">No hay cuentas bancarias configuradas</p>
-              <button
-                onClick={openNewBankAccount}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-[13px] font-medium transition-colors border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
-              >
-                <Plus size={14} />
-                Añadir cuenta
-              </button>
-            </div>
-          )}
-          <p className="text-xs text-slate-400 mt-4">
-            Estas cuentas se usan para generar ficheros de remesa SEPA en la sección de Pagos
-          </p>
-        </div>
-      </div>
+  const lastSaved = auditLog.approvals || auditLog.permissions;
+  const H2 = ({ children, count, action }: { children: React.ReactNode; count?: number; action?: React.ReactNode }) => (
+    <div className="mb-2 flex items-center justify-between">
+      <h2 className="text-[13px] font-semibold text-slate-900">{children}{count !== undefined && <span className="ml-1.5 font-normal text-slate-400">{count}</span>}</h2>
+      {action}
     </div>
   );
+  const TH = "border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500";
 
-  // Render de la sección de coste
-  const renderCostSection = () => (
-    <div className="space-y-6">
-      {/* Comprometido - POs */}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-900">Comprometido (POs)</h2>
-        </div>
+  if (loading) return <PageLoading />;
 
-        <div className="p-6">
-          <div className="space-y-3">
-            {COMMITMENT_TRIGGERS.map((trigger) => {
-              const needsApprovals = trigger.value === "on_approve";
-              const hasApprovals = poApprovals.length > 0;
-              const isDisabled = needsApprovals && !hasApprovals;
-              const isSelected = costSettings.poCommitmentTrigger === trigger.value;
-              return (
-                <label
-                  key={trigger.value}
-                  className={`flex items-start gap-4 p-4 rounded-md border-2 transition-all ${
-                    isDisabled
-                      ? "border-slate-100 bg-slate-50 opacity-50 cursor-not-allowed"
-                      : isSelected
-                      ? "border-slate-900 bg-slate-50 cursor-pointer"
-                      : "border-slate-200 hover:border-slate-300 cursor-pointer"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="poCommitmentTrigger"
-                    value={trigger.value}
-                    checked={isSelected}
-                    disabled={isDisabled}
-                    onChange={(e) => !isDisabled && setCostSettings({ ...costSettings, poCommitmentTrigger: e.target.value as any })}
-                    className="mt-1 w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-500 text-[13px]"
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className={`font-medium ${isDisabled ? "text-slate-400" : "text-slate-900"}`}>{trigger.label}</p>
-                      {isDisabled && (
-                        <span className="text-[10px] font-medium px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">Sin aprobaciones configuradas</span>
-                      )}
-                    </div>
-                  </div>
-                </label>
-              );
-            })}
-          </div>
-          {costSettings.poCommitmentTrigger === "on_approve" && poApprovals.length === 0 && (
-            <div className="mt-3 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
-              <AlertCircle size={15} className="text-amber-600 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-700">No hay pasos de aprobación configurados para POs. Se usará <strong>Al enviar</strong> hasta que se configuren aprobaciones.</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Realizado - Facturas */}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-900">Realizado (Facturas)</h2>
-        </div>
-
-        <div className="p-6">
-          <div className="space-y-3">
-            {ACTUAL_TRIGGERS.map((trigger) => {
-              const isDisabled = trigger.value === "on_approve" && invoiceApprovals.length === 0;
-              const isSelected = costSettings.invoiceActualTrigger === trigger.value;
-              return (
-                <label
-                  key={trigger.value}
-                  className={`flex items-start gap-4 p-4 rounded-md border-2 transition-all ${
-                    isDisabled
-                      ? "border-slate-100 bg-slate-50 opacity-50 cursor-not-allowed"
-                      : isSelected
-                      ? "border-slate-900 bg-slate-50 cursor-pointer"
-                      : "border-slate-200 hover:border-slate-300 cursor-pointer"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="invoiceActualTrigger"
-                    value={trigger.value}
-                    checked={isSelected}
-                    disabled={isDisabled}
-                    onChange={(e) => !isDisabled && setCostSettings({ ...costSettings, invoiceActualTrigger: e.target.value as any })}
-                    className="mt-1 w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-500 text-[13px]"
-                  />
-                  <div className="flex-1">
-                    <p className={`font-medium ${isDisabled ? "text-slate-400" : "text-slate-900"}`}>{trigger.label}</p>
-                  </div>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Realizado - BOX */}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-900">Realizado (BOX)</h2>
-        </div>
-
-        <div className="p-6">
-          <div className="space-y-3">
-            {BOX_TRIGGERS.map((trigger) => {
-              const isDisabled = false;
-              const isSelected = costSettings.boxActualTrigger === trigger.value;
-              return (
-                <label
-                  key={trigger.value}
-                  className={`flex items-start gap-4 p-4 rounded-md border-2 transition-all ${
-                    isDisabled
-                      ? "border-slate-100 bg-slate-50 opacity-50 cursor-not-allowed"
-                      : isSelected
-                      ? "border-slate-900 bg-slate-50 cursor-pointer"
-                      : "border-slate-200 hover:border-slate-300 cursor-pointer"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="boxActualTrigger"
-                    value={trigger.value}
-                    checked={isSelected}
-                    disabled={isDisabled}
-                    onChange={(e) => !isDisabled && setCostSettings({ ...costSettings, boxActualTrigger: e.target.value as any })}
-                    className="mt-1 w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-500 text-[13px]"
-                  />
-                  <div className="flex-1">
-                    <p className={`font-medium ${isDisabled ? "text-slate-400" : "text-slate-900"}`}>{trigger.label}</p>
-                  </div>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Asignación por capítulos - Solo para series */}
-      {projectType === "serie" && (
-        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-            <Layers size={18} className="text-slate-500" />
-            <div>
-              <h2 className="font-semibold text-slate-900">Asignación por capítulos</h2>
-              <p className="text-[13px] text-slate-500">{projectEpisodes} capítulos configurados</p>
-            </div>
-          </div>
-          <div className="p-6 space-y-4">
-            <label className="flex items-center justify-between p-4 bg-slate-50 rounded-md cursor-pointer hover:bg-slate-100 transition-colors">
-              <div>
-                <p className="text-[13px] font-medium text-slate-900">Habilitar asignación a capítulos</p>
-                <p className="text-xs text-slate-500">Permite asignar POs y facturas a capítulos específicos de la serie</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={projectSettings.enableEpisodes}
-                onChange={(e) => setProjectSettings({ ...projectSettings, enableEpisodes: e.target.checked })}
-                className="w-5 h-5 text-slate-900 border-slate-300 rounded focus:ring-slate-500 text-[13px]"
-              />
-            </label>
-            
-            {projectSettings.enableEpisodes && (
-              <label className="flex items-center justify-between p-4 bg-amber-50 rounded-md cursor-pointer border border-amber-200">
-                <div>
-                  <p className="text-[13px] font-medium text-amber-900">Requerir asignación obligatoria</p>
-                  <p className="text-xs text-amber-700">No se podrán crear POs o facturas sin asignar un capítulo</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={projectSettings.requireEpisodeAssignment}
-                  onChange={(e) => setProjectSettings({ ...projectSettings, requireEpisodeAssignment: e.target.checked })}
-                  className="w-5 h-5 text-amber-600 border-amber-300 rounded focus:ring-amber-500 text-[13px]"
-                />
-              </label>
-            )}
-          </div>
-          
-          {/* Botón guardar */}
-          <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
-            <button
-              onClick={handleSaveProjectSettings}
-              disabled={saving}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
-            >
-              <Save size={16} />
-              {saving ? "Guardando..." : "Guardar capítulos"}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  // Render de la sección de aprobaciones
-  const renderApprovalsSection = () => (
-    <div className="space-y-6">
-      {/* Tabs PO/Invoice/BOX */}
-      <div className="flex gap-1 border-b border-slate-200">
-        <button
-          onClick={() => setActiveTab("po")}
-          className={`flex items-center gap-2 px-4 py-2 text-[13px] font-medium border-b-2 transition-colors ${
-            activeTab === "po"
-              ? "border-slate-900 text-slate-900"
-              : "border-transparent text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          <FileText size={16} />
-          Órdenes de compra
-          {poApprovals.length > 0 && (
-            <span className="px-2 py-0.5 rounded-lg text-xs bg-slate-100 text-slate-600">
-              {poApprovals.length}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab("invoice")}
-          className={`flex items-center gap-2 px-4 py-2 text-[13px] font-medium border-b-2 transition-colors ${
-            activeTab === "invoice"
-              ? "border-slate-900 text-slate-900"
-              : "border-transparent text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          <Receipt size={16} />
-          Facturas
-          {invoiceApprovals.length > 0 && (
-            <span className="px-2 py-0.5 rounded-lg text-xs bg-slate-100 text-slate-600">
-              {invoiceApprovals.length}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab("box")}
-          className={`flex items-center gap-2 px-4 py-2 text-[13px] font-medium border-b-2 transition-colors ${
-            activeTab === "box"
-              ? "border-slate-900 text-slate-900"
-              : "border-transparent text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          <Package size={16} />
-          BOX
-          {boxApprovals.length > 0 && (
-            <span className="px-2 py-0.5 rounded-lg text-xs bg-slate-100 text-slate-600">
-              {boxApprovals.length}
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* Content */}
-      <div className="space-y-3">
-        {activeTab === "po" ? (
-          <>
-            {poApprovals.length === 0 ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-8 text-center">
-                <AlertCircle size={28} className="text-amber-600 mx-auto mb-3" />
-                <p className="text-amber-800 font-medium">Sin niveles de aprobación</p>
-                <p className="text-amber-700 text-[13px] mt-1">Las POs se aprobarán automáticamente</p>
-              </div>
-            ) : (
-              poApprovals.map((step, i) => renderApprovalStep(step, "po", i))
-            )}
-            
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => addApprovalStep("po", false)}
-                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-slate-300 rounded-lg hover:border-slate-400 hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors text-[13px]"
-              >
-                <Plus size={18} />
-                Añadir nivel de aprobación
-              </button>
-              <button
-                onClick={() => addApprovalStep("po", true)}
-                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-amber-300 rounded-lg hover:border-amber-400 hover:bg-amber-50 text-amber-600 hover:text-amber-700 transition-colors text-[13px]"
-              >
-                <DollarSign size={18} />
-                Añadir nivel por importe
-              </button>
-            </div>
-          </>
-        ) : activeTab === "invoice" ? (
-          <>
-            {invoiceApprovals.length === 0 ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-8 text-center">
-                <AlertCircle size={28} className="text-amber-600 mx-auto mb-3" />
-                <p className="text-amber-800 font-medium">Sin niveles de aprobación</p>
-                <p className="text-amber-700 text-[13px] mt-1">Las facturas se aprobarán automáticamente</p>
-              </div>
-            ) : (
-              invoiceApprovals.map((step, i) => renderApprovalStep(step, "invoice", i))
-            )}
-            
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => addApprovalStep("invoice", false)}
-                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-slate-300 rounded-lg hover:border-slate-400 hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors text-[13px]"
-              >
-                <Plus size={18} />
-                Añadir nivel de aprobación
-              </button>
-              <button
-                onClick={() => addApprovalStep("invoice", true)}
-                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-amber-300 rounded-lg hover:border-amber-400 hover:bg-amber-50 text-amber-600 hover:text-amber-700 transition-colors text-[13px]"
-              >
-                <DollarSign size={18} />
-                Añadir nivel por importe
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            {boxApprovals.length === 0 ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-8 text-center">
-                <AlertCircle size={28} className="text-amber-600 mx-auto mb-3" />
-                <p className="text-amber-800 font-medium">Sin niveles de aprobación</p>
-                <p className="text-amber-700 text-[13px] mt-1">Los sobres se cerrarán sin aprobación</p>
-              </div>
-            ) : (
-              boxApprovals.map((step, i) => renderApprovalStep(step, "box", i))
-            )}
-            
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => addApprovalStep("box", false)}
-                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-slate-300 rounded-lg hover:border-slate-400 hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors text-[13px]"
-              >
-                <Plus size={18} />
-                Añadir nivel de aprobación
-              </button>
-              <button
-                onClick={() => addApprovalStep("box", true)}
-                className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-amber-300 rounded-lg hover:border-amber-400 hover:bg-amber-50 text-amber-600 hover:text-amber-700 transition-colors text-[13px]"
-              >
-                <DollarSign size={18} />
-                Añadir nivel por importe
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-
-  // Funciones para permisos
-  const togglePermissionRole = (permissionId: string, role: string) => {
-    setPermissionSettings((prev) => {
-      const current = prev[permissionId] || { roles: [], users: [] };
-      const roles = current.roles.includes(role)
-        ? current.roles.filter((r) => r !== role)
-        : [...current.roles, role];
-      return { ...prev, [permissionId]: { ...current, roles } };
-    });
-  };
-
-  const togglePermissionUser = (permissionId: string, usrId: string) => {
-    setPermissionSettings((prev) => {
-      const current = prev[permissionId] || { roles: [], users: [] };
-      const users = current.users.includes(usrId)
-        ? current.users.filter((u) => u !== usrId)
-        : [...current.users, usrId];
-      return { ...prev, [permissionId]: { ...current, users } };
-    });
-  };
-
-  const resetPermissionToDefault = (permissionId: string) => {
-    const config = PERMISSION_CONFIGS.find((c) => c.id === permissionId);
-    if (!config) return;
-    setPermissionSettings((prev) => ({
-      ...prev,
-      [permissionId]: { roles: [...config.defaultRoles], users: [] },
-    }));
-  };
-
-  const toggleExpandedPermission = (permissionId: string) => {
-    setExpandedPermissions((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(permissionId)) newSet.delete(permissionId);
-      else newSet.add(permissionId);
-      return newSet;
-    });
-  };
-
-  const getPermissionSummary = (permissionId: string): string => {
-    const setting = permissionSettings[permissionId];
-    if (!setting) return "Sin configurar";
-    
-    const parts: string[] = [];
-    if (setting.roles.length > 0) {
-      parts.push(setting.roles.join(", "));
-    }
-    if (setting.users.length > 0) {
-      parts.push(`+${setting.users.length} usuario${setting.users.length > 1 ? "s" : ""}`);
-    }
-    return parts.length > 0 ? parts.join(" · ") : "Ninguno";
-  };
-
-  // Render de la sección de permisos
-  const renderPermissionsSection = () => {
-    const poPermissions = PERMISSION_CONFIGS.filter((p) => p.category === "po");
-    const invoicePermissions = PERMISSION_CONFIGS.filter((p) => p.category === "invoice");
-    const generalPermissions = PERMISSION_CONFIGS.filter((p) => p.category === "general");
-
-    const renderPermissionItem = (config: PermissionConfig) => {
-      const setting = permissionSettings[config.id] || { roles: [], users: [] };
-      const isExpanded = expandedPermissions.has(config.id);
-      const isDefault = JSON.stringify(setting.roles.sort()) === JSON.stringify([...config.defaultRoles].sort()) && setting.users.length === 0;
-
-      return (
-        <div
-          key={config.id}
-          className={`border rounded-md overflow-hidden transition-all ${
-            isExpanded ? "border-slate-300 bg-white shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"
-          }`}
-        >
-          <div
-            className="flex items-center gap-3 px-4 py-3 cursor-pointer"
-            onClick={() => toggleExpandedPermission(config.id)}
-          >
-            <button className="p-1 text-slate-400 hover:text-slate-600 transition-colors">
-              {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            </button>
-
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-[13px] font-medium text-slate-900">{config.label}</span>
-                {isDefault && (
-                  <span className="text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">Por defecto</span>
-                )}
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">{getPermissionSummary(config.id)}</p>
-            </div>
-          </div>
-
-          {isExpanded && (
-            <div className="px-4 pb-4 pt-2 border-t border-slate-100 space-y-4">
-              <p className="text-xs text-slate-500">{config.description}</p>
-
-              {/* Roles */}
-              <div>
-                <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">
-                  Roles con este permiso
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {PROJECT_ROLES.map((role) => {
-                    const isSelected = setting.roles.includes(role);
-                    const count = getMembersByRole(role).length;
-                    return (
-                      <button
-                        key={role}
-                        onClick={() => togglePermissionRole(config.id, role)}
-                        className={`px-3 py-2 rounded-lg text-[13px] font-medium border-2 transition-all ${
-                          isSelected
-                            ? "border-slate-900 bg-slate-900 text-white"
-                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                        }`}
-                      >
-                        {role}
-                        <span className={`ml-1.5 text-xs ${isSelected ? "text-slate-300" : "text-slate-400"}`}>
-                          ({count})
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Usuarios adicionales */}
-              {config.allowCustomUsers && (
-                <div>
-                  <label className="block text-xs text-slate-500 uppercase tracking-wider mb-2">
-                    Usuarios adicionales (sin el rol requerido)
-                  </label>
-                  <div className="border border-slate-200 rounded-md p-2 max-h-36 overflow-y-auto space-y-1 bg-slate-50">
-                    {members
-                      .filter((m) => !setting.roles.includes(m.role || ""))
-                      .map((m) => (
-                        <label
-                          key={m.userId}
-                          className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${
-                            setting.users.includes(m.userId) ? "bg-white border border-slate-200" : "hover:bg-white"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={setting.users.includes(m.userId)}
-                            onChange={() => togglePermissionUser(config.id, m.userId)}
-                            className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-slate-500 text-[13px]"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-medium text-slate-900 truncate">{m.name}</p>
-                            <p className="text-xs text-slate-500">{m.role || "Sin rol"}</p>
-                          </div>
-                        </label>
-                      ))}
-                    {members.filter((m) => !setting.roles.includes(m.role || "")).length === 0 && (
-                      <p className="text-xs text-slate-400 text-center py-3">
-                        Todos los usuarios ya tienen permiso por su rol
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Botón restaurar */}
-              {!isDefault && (
-                <button
-                  onClick={() => resetPermissionToDefault(config.id)}
-                  className="text-xs text-slate-500 hover:text-slate-700 underline"
-                >
-                  Restaurar valores por defecto
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      );
-    };
-
+  if (errorMessage && !hasAccess) {
     return (
-      <div className="space-y-8">
-        {/* PO Permissions */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <h3 className="font-semibold text-slate-900">Órdenes de compra</h3>
-          </div>
-          <div className="space-y-2">
-            {poPermissions.map(renderPermissionItem)}
-          </div>
-        </div>
-
-        {/* Invoice Permissions */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <h3 className="font-semibold text-slate-900">Facturas</h3>
-          </div>
-          <div className="space-y-2">
-            {invoicePermissions.map(renderPermissionItem)}
-          </div>
-        </div>
-
-        {/* General Permissions */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <h3 className="font-semibold text-slate-900">General</h3>
-          </div>
-          <div className="space-y-2">
-            {generalPermissions.map(renderPermissionItem)}
-          </div>
-        </div>
-      </div>
+      <Page>
+        <PageHeader title="Configuración" />
+        <div className="mt-6"><EmptyState title={errorMessage} action={<Link href={`/project/${id}/accounting`} className={buttonClass("secondary", "sm")}>Volver al panel</Link>} /></div>
+      </Page>
     );
-  };
-
-  if (loading)
-    return (
-      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
-      </div>
-    );
-
-  if (errorMessage && !hasAccess)
-    return (
-      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-        <div className="text-center max-w-md">
-          <div className="hidden">
-            <AlertCircle size={28} className="text-red-600" />
-          </div>
-          <p className="text-slate-700 mb-6">{errorMessage}</p>
-          <Link
-            href={`/project/${id}/accounting`}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
-          >
-            <ArrowLeft size={16} />
-            Volver al Panel
-          </Link>
-        </div>
-      </div>
-    );
+  }
 
   return (
-    <div className={`min-h-screen bg-white ${inter.className}`}>
-      {/* Header */}
-      <div className="mt-[53px]">
-        <div className="px-6 pt-8 sm:px-10">
-          {/* Page header */}
-          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Configuración de contabilidad</h1>
-            </div>
-
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="absolute right-0 flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
-            >
-              {saving ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Save size={16} />
-                  Guardar
-                </>
+    <Page>
+      <PageHeader
+        title="Configuración"
+        actions={
+          tab !== "company" ? (
+            <>
+              {lastSaved?.updatedAt && !dirty && (
+                <span className="text-xs text-slate-400">Guardado {formatRelativeDate(lastSaved.updatedAt)}{lastSaved.updatedByName ? ` por ${lastSaved.updatedByName}` : ""}</span>
               )}
-            </button>
-          </div>
-        </div>
+              {dirty && <span className="text-xs text-amber-800">Cambios sin guardar</span>}
+              <Button variant="primary" onClick={saveAll} disabled={saving || !dirty}>{saving ? "Guardando…" : "Guardar cambios"}</Button>
+            </>
+          ) : undefined
+        }
+      />
+
+      <div className="mt-6">
+        <Segmented
+          value={tab}
+          onChange={setTab}
+          options={[{ value: "company", label: "Empresa" }, { value: "cost", label: "Costes" }, { value: "approvals", label: "Aprobaciones" }]}
+        />
       </div>
 
-      {/* Toast */}
-      {successMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
-          <CheckCircle2 size={16} />
-          {successMessage}
-        </div>
+      {(successMessage || (errorMessage && hasAccess)) && (
+        <p className={`mt-4 text-[13px] ${errorMessage ? "text-red-700" : "text-slate-600"}`}>{errorMessage || successMessage}</p>
       )}
-      {errorMessage && hasAccess && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
-          <AlertCircle size={16} />
-          {errorMessage}
+
+      {/* ── Empresa ─────────────────────────────────────────────────────── */}
+      {tab === "company" && (
+        <div className="mt-6 flex flex-col gap-8">
+          <section>
+            <H2
+              action={companyDirty ? (
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setCompanyForm(companyData)}>Descartar</Button>
+                  <Button variant="primary" size="sm" onClick={handleSaveCompany} disabled={savingCompany}>{savingCompany ? "Guardando…" : "Guardar datos fiscales"}</Button>
+                </div>
+              ) : undefined}
+            >
+              Datos fiscales
+            </H2>
+            <p className="mb-3 text-xs text-slate-500">Aparecen en las POs y en los ficheros de remesa.</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-6">
+              <Field label="Razón social" className="sm:col-span-4"><Input value={companyForm.fiscalName} onChange={(e) => setCompanyForm({ ...companyForm, fiscalName: e.target.value })} /></Field>
+              <Field label="NIF" className="sm:col-span-2"><Input value={companyForm.taxId} onChange={(e) => setCompanyForm({ ...companyForm, taxId: e.target.value.toUpperCase() })} className="font-mono" /></Field>
+              <Field label="Dirección" className="sm:col-span-4"><Input value={companyForm.address} onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })} /></Field>
+              <Field label="Código postal" className="sm:col-span-2"><Input value={companyForm.postalCode} onChange={(e) => setCompanyForm({ ...companyForm, postalCode: e.target.value })} className="font-mono" /></Field>
+              <Field label="Ciudad" className="sm:col-span-2"><Input value={companyForm.city} onChange={(e) => setCompanyForm({ ...companyForm, city: e.target.value })} /></Field>
+              <Field label="Provincia" className="sm:col-span-2"><Input value={companyForm.province} onChange={(e) => setCompanyForm({ ...companyForm, province: e.target.value })} /></Field>
+              <Field label="País" className="sm:col-span-2"><Input value={companyForm.country} onChange={(e) => setCompanyForm({ ...companyForm, country: e.target.value })} /></Field>
+            </div>
+          </section>
+
+          <section>
+            <H2 count={bankAccounts.length} action={<Button variant="secondary" size="sm" onClick={openNewBankAccount}><Plus size={13} /> Añadir cuenta</Button>}>
+              Cuentas bancarias
+            </H2>
+            <p className="mb-3 text-xs text-slate-500">Cuentas ordenantes para generar las remesas SEPA en Pagos.</p>
+            {bankAccounts.length === 0 ? (
+              <p className="border-y border-slate-200 py-8 text-center text-[13px] text-slate-500">Sin cuentas bancarias</p>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-slate-200">
+                <table className="tbl w-full min-w-[720px] border-collapse text-[13px]">
+                  <thead>
+                    <tr className={TH}>
+                      <th scope="col" className="px-4 py-2 text-left font-medium">Cuenta</th>
+                      <th scope="col" className="px-3 py-2 text-left font-medium">Titular</th>
+                      <th scope="col" className="w-[30%] px-3 py-2 text-left font-medium">IBAN</th>
+                      <th scope="col" className="w-28 px-3 py-2 text-left font-medium">BIC</th>
+                      <th scope="col" className="w-12 py-2 pr-3" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bankAccounts.map((acc) => (
+                      <tr key={acc.id} className="border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA]">
+                        <td className="px-4 py-1.5">
+                          <span className="font-medium text-slate-900">{acc.alias}</span>
+                          {acc.isDefault && <span className="ml-2 text-xs text-slate-400">principal</span>}
+                        </td>
+                        <td className="px-3 py-1.5">{acc.fiscalName || "—"}<span className="ml-2 font-mono text-xs text-slate-400">{acc.taxId}</span></td>
+                        <td className="px-3 py-1.5 font-mono text-xs">{formatIBAN(acc.iban)}</td>
+                        <td className="px-3 py-1.5 font-mono text-xs text-slate-500">{acc.bic || "—"}</td>
+                        <td className="py-1.5 pr-3 text-right">
+                          <Menu trigger={(toggle) => <IconButton label="Acciones" onClick={toggle}><MoreHorizontal size={15} /></IconButton>}>
+                            {(close) => (
+                              <>
+                                <MenuItem onClick={() => { close(); openEditBankAccount(acc); }}>Editar</MenuItem>
+                                <MenuSeparator />
+                                <MenuItem danger onClick={() => { close(); handleDeleteBankAccount(acc.id); }}>Eliminar</MenuItem>
+                              </>
+                            )}
+                          </Menu>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
         </div>
       )}
 
-      <main className="px-6 sm:px-10 py-8">
-        {/* Layout con sidebar de secciones */}
-        <div className="flex flex-row gap-6">
-          {/* Sidebar de secciones - sticky que se mueve con el scroll */}
-          <div className="w-52 flex-shrink-0">
-            <div className="sticky top-20">
-              <nav className="flex flex-col gap-1 overflow-x-auto overflow-x-visible pb-2 pb-0 bg-white bg-transparent">
-                {CONFIG_SECTIONS.map((section) => {
-                  const Icon = section.icon;
-                  const isActive = activeSection === section.id;
-                  
-                  return (
-                    <button
-                      key={section.id}
-                      onClick={() => setActiveSection(section.id)}
-                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all whitespace-nowrap ${
-                        isActive
-                          ? "bg-[#F1F1F3] text-slate-900"
-                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                      } text-[13px]`}
-                    >
-                      <Icon size={16} className={isActive ? "text-slate-900" : "text-slate-400"} />
-                      <span className={`text-[13px] font-medium ${isActive ? "text-slate-900" : ""}`}>{section.label}</span>
-                    </button>
-                  );
-                })}
-              </nav>
-              
-              {/* Auditoría - Solo visible en desktop */}
-              {(auditLog.approvals || auditLog.permissions) && (
-                <div className="block mt-6 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock size={12} className="text-slate-400" />
-                    <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Últimos cambios</p>
-                  </div>
-                  <div className="space-y-2">
-                    {auditLog.approvals && (
-                      <div className="text-[11px]">
-                        <p className="text-slate-600 font-medium">Aprobaciones</p>
-                        <p className="text-slate-400">{formatRelativeDate(auditLog.approvals.updatedAt)}</p>
-                      </div>
-                    )}
-                    {auditLog.permissions && (
-                      <div className="text-[11px]">
-                        <p className="text-slate-600 font-medium">Permisos</p>
-                        <p className="text-slate-400">{formatRelativeDate(auditLog.permissions.updatedAt)}</p>
-                      </div>
-                    )}
+      {/* ── Costes ──────────────────────────────────────────────────────── */}
+      {tab === "cost" && (
+        <div className="mt-6">
+          <p className="mb-3 text-xs text-slate-500">En qué momento cada documento empieza a contar en el presupuesto.</p>
+          <div className="overflow-hidden rounded-lg border border-slate-200">
+            {[
+              {
+                label: "Comprometido de las POs", hint: "Lo que una PO reserva del presupuesto.",
+                control: <Segmented value={costSettings.poCommitmentTrigger} onChange={(v) => setCostSettings({ ...costSettings, poCommitmentTrigger: v as CostSettings["poCommitmentTrigger"] })} options={[{ value: "on_create", label: "Al enviarla" }, { value: "on_approve", label: "Al aprobarla" }]} />,
+              },
+              {
+                label: "Realizado de las facturas", hint: "Cuándo una factura pasa a gasto real.",
+                control: <Segmented value={costSettings.invoiceActualTrigger as "on_code" | "on_account"} onChange={(v) => setCostSettings({ ...costSettings, invoiceActualTrigger: v })} options={[{ value: "on_code", label: "Al codificarla" }, { value: "on_account", label: "Al contabilizarla" }]} />,
+              },
+              {
+                label: "Realizado de las cajas", hint: "Gastos de tarjeta y transferencias.",
+                control: <Segmented value={costSettings.boxActualTrigger as "on_create" | "on_account"} onChange={(v) => setCostSettings({ ...costSettings, boxActualTrigger: v })} options={[{ value: "on_create", label: "Al codificar el sobre" }, { value: "on_account", label: "Al contabilizarlo" }]} />,
+              },
+            ].map((r) => (
+              <div key={r.label} className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 last:border-0">
+                <div>
+                  <p className="text-[13px] font-medium text-slate-900">{r.label}</p>
+                  <p className="text-xs text-slate-500">{r.hint}</p>
+                </div>
+                {r.control}
+              </div>
+            ))}
+            {projectType === "serie" && (
+              <div className="flex flex-wrap items-start justify-between gap-3 border-t border-slate-100 px-4 py-3">
+                <div>
+                  <p className="text-[13px] font-medium text-slate-900">Capítulos</p>
+                  <p className="text-xs text-slate-500">Serie de {projectEpisodes} capítulos.</p>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Checkbox checked={projectSettings.enableEpisodes} onChange={(v) => setProjectSettings({ ...projectSettings, enableEpisodes: v, requireEpisodeAssignment: v ? projectSettings.requireEpisodeAssignment : false })} label="Repartir POs y facturas por capítulo" />
+                  {projectSettings.enableEpisodes && (
+                    <Checkbox checked={projectSettings.requireEpisodeAssignment} onChange={(v) => setProjectSettings({ ...projectSettings, requireEpisodeAssignment: v })} label="Obligatorio en cada línea" />
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Aprobaciones ────────────────────────────────────────────────── */}
+      {tab === "approvals" && (
+        <div className="mt-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Segmented value={flow} onChange={setFlow} options={FLOWS.map((f) => ({ value: f.key, label: `${f.label} · ${stepsOf(f.key).length}` }))} />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => { addApprovalStep(flow, false); setOpenLast(flow); }}
+            >
+              <Plus size={13} /> Añadir nivel
+            </Button>
+          </div>
+          <p className="mb-3 mt-3 text-xs text-slate-500">
+            Los niveles se recorren en orden. Un nivel con condición de importe solo se aplica si el documento la cumple. Sin niveles, se aprueba automáticamente.
+          </p>
+          {stepsOf(flow).length === 0 ? (
+            <p className="border-y border-slate-200 py-8 text-center text-[13px] text-slate-500">Sin niveles: los documentos se aprueban automáticamente</p>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-slate-200">
+              <table className="tbl w-full min-w-[720px] border-collapse text-[13px]">
+                <thead>
+                  <tr className={TH}>
+                    <th scope="col" className="w-20 px-4 py-2 text-left font-medium">Nivel</th>
+                    <th scope="col" className="px-3 py-2 text-left font-medium">Aprueba</th>
+                    <th scope="col" className="w-56 px-3 py-2 text-left font-medium">Cuándo</th>
+                    <th scope="col" className="w-28 px-3 py-2 text-left font-medium">Firma</th>
+                    <th scope="col" className="w-12 py-2 pr-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {stepsOf(flow).map((s, i, list) => (
+                    <tr key={s.id} onClick={() => setEditingStep({ flow, id: s.id })} className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA]">
+                      <td className="px-4 py-1.5 font-mono text-xs text-slate-500">{i + 1}</td>
+                      <td className="px-3 py-1.5">
+                        <span className="text-slate-900">{approverText(s)}</span>
+                        <span className="ml-2 text-xs text-slate-400">{APPROVER_TYPE_LABELS[s.approverType]}</span>
+                      </td>
+                      <td className={`px-3 py-1.5 text-xs ${s.hasAmountThreshold ? "text-slate-800" : "text-slate-500"}`}>{conditionText(s)}</td>
+                      <td className="px-3 py-1.5 text-xs text-slate-600">{s.requireAll ? "Todos" : "Uno cualquiera"}</td>
+                      <td className="py-1.5 pr-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        <Menu trigger={(toggle) => <IconButton label="Acciones" onClick={toggle}><MoreHorizontal size={15} /></IconButton>}>
+                          {(close) => (
+                            <>
+                              <MenuItem onClick={() => { close(); setEditingStep({ flow, id: s.id }); }}>Editar</MenuItem>
+                              {i > 0 && <MenuItem onClick={() => { close(); moveStep(flow, s.id, "up"); }}>Subir</MenuItem>}
+                              {i < list.length - 1 && <MenuItem onClick={() => { close(); moveStep(flow, s.id, "down"); }}>Bajar</MenuItem>}
+                              <MenuSeparator />
+                              <MenuItem danger onClick={() => { close(); removeApprovalStep(flow, s.id); }}>Eliminar nivel</MenuItem>
+                            </>
+                          )}
+                        </Menu>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Editor de un nivel de aprobación (los cambios se guardan con "Guardar cambios") */}
+      <Modal
+        open={!!editStep}
+        onClose={() => { setEditingStep(null); setMemberQuery(""); }}
+        title={editStep && editingStep ? `Nivel ${stepsOf(editingStep.flow).findIndex((s) => s.id === editStep.id) + 1} · ${FLOWS.find((f) => f.key === editingStep.flow)?.label}` : ""}
+        width="max-w-lg"
+        footer={<Button variant="primary" onClick={() => { setEditingStep(null); setMemberQuery(""); }}>Hecho</Button>}
+      >
+        {editStep && editingStep && (() => {
+          const k = editingStep.flow;
+          const s = editStep;
+          const q = memberQuery.trim().toLowerCase();
+          const people = members.filter((m) => !q || (m.name || "").toLowerCase().includes(q) || (m.email || "").toLowerCase().includes(q));
+          return (
+            <div className="flex flex-col gap-4">
+              <Field label="Quién aprueba">
+                <Select value={s.approverType} onChange={(e) => updateStep(k, s.id, "approverType", e.target.value)}>
+                  <option value="role">Por rol del proyecto</option>
+                  <option value="fixed">Personas concretas</option>
+                  <option value="hod">HOD del departamento</option>
+                  <option value="coordinator">Coordinator del departamento</option>
+                </Select>
+              </Field>
+
+              {s.approverType === "role" && (
+                <div>
+                  <p className="mb-1.5 text-xs font-medium text-slate-600">Roles</p>
+                  <div className="flex flex-wrap gap-x-5">
+                    {PROJECT_ROLES.map((r) => (
+                      <Checkbox key={r} checked={(s.roles || []).includes(r)} onChange={() => toggleRole(k, s.id, r)} label={`${r} · ${getMembersByRole(r).length}`} />
+                    ))}
                   </div>
                 </div>
               )}
-            </div>
-          </div>
 
-          {/* Contenido principal */}
-          <div className="flex-1 min-w-0">
-            {activeSection === "company" && renderCompanySection()}
-            {activeSection === "cost" && renderCostSection()}
-            {activeSection === "approvals" && renderApprovalsSection()}
-            {activeSection === "permissions" && renderPermissionsSection()}
-          </div>
-        </div>
-      </main>
+              {s.approverType === "fixed" && (
+                <div>
+                  <p className="mb-1.5 text-xs font-medium text-slate-600">Personas <span className="font-normal text-slate-400">{(s.approvers || []).length} seleccionadas</span></p>
+                  <Input value={memberQuery} onChange={(e) => setMemberQuery(e.target.value)} placeholder="Buscar por nombre o email" className="mb-2" />
+                  <div className="max-h-56 overflow-y-auto rounded-md border border-slate-200 px-3 py-1">
+                    {people.map((m) => (
+                      <Checkbox
+                        key={m.userId}
+                        checked={(s.approvers || []).includes(m.userId)}
+                        onChange={() => toggleApprover(k, s.id, m.userId)}
+                        label={m.name || m.email}
+                        hint={[m.role, m.position, m.department].filter(Boolean).join(" · ") || undefined}
+                      />
+                    ))}
+                    {people.length === 0 && <p className="py-3 text-center text-xs text-slate-500">Sin resultados</p>}
+                  </div>
+                </div>
+              )}
+
+              {(s.approverType === "hod" || s.approverType === "coordinator") && (
+                <Field label="Departamento">
+                  <Select value={s.department || ""} onChange={(e) => updateStep(k, s.id, "department", e.target.value || undefined)}>
+                    <option value="">El del documento</option>
+                    {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </Select>
+                </Field>
+              )}
+
+              <Field label="Firma">
+                <Segmented
+                  value={s.requireAll ? "all" : "any"}
+                  onChange={(v) => updateStep(k, s.id, "requireAll", v === "all")}
+                  options={[{ value: "any", label: "Basta con uno" }, { value: "all", label: "Tienen que aprobar todos" }]}
+                />
+              </Field>
+
+              <div className="border-t border-slate-100 pt-4">
+                <Checkbox
+                  checked={s.hasAmountThreshold}
+                  onChange={(v) => { updateStep(k, s.id, "hasAmountThreshold", v); if (v && !s.amountThreshold) updateStep(k, s.id, "amountThreshold", 5000); }}
+                  label="Solo según el importe"
+                  hint="Se aplica según la base imponible del documento."
+                />
+                {s.hasAmountThreshold && (
+                  <div className="mt-3 grid grid-cols-3 gap-3">
+                    <Field label="Condición">
+                      <Select value={s.amountCondition || "above"} onChange={(e) => updateStep(k, s.id, "amountCondition", e.target.value)}>
+                        <option value="above">Mayor que</option>
+                        <option value="below">Menor que</option>
+                        <option value="between">Entre</option>
+                      </Select>
+                    </Field>
+                    <Field label={s.amountCondition === "between" ? "Desde (€)" : "Importe (€)"}>
+                      <Input type="number" min="0" value={s.amountThreshold ?? ""} onChange={(e) => updateStep(k, s.id, "amountThreshold", e.target.value ? Number(e.target.value) : undefined)} className="text-right font-mono" />
+                    </Field>
+                    {s.amountCondition === "between" && (
+                      <Field label="Hasta (€)">
+                        <Input type="number" min="0" value={s.amountThresholdMax ?? ""} onChange={(e) => updateStep(k, s.id, "amountThresholdMax", e.target.value ? Number(e.target.value) : undefined)} className="text-right font-mono" />
+                      </Field>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
 
       {/* Cuenta bancaria de la productora (remesas SEPA) */}
       <Modal
@@ -2300,6 +1373,6 @@ export default function AccountingConfigPage() {
       >
         <p className="text-[13px] text-slate-600">{confirmDialog?.message}</p>
       </Modal>
-    </div>
+    </Page>
   );
 }
