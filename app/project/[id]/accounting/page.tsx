@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ClipboardCheck, Plus, Upload } from "lucide-react";
+import { ClipboardCheck, FolderDown, Plus, Settings, Upload } from "lucide-react";
 
 import { auth, db } from "@/lib/firebase";
 import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } from "firebase/firestore";
@@ -431,7 +431,7 @@ export default function AccountingPanelPage() {
                 href={`/project/${id}/accounting/approvals`}
                 title="Aprobaciones"
                 aria-label="Aprobaciones"
-                className="relative flex h-9 w-9 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-[#F1F1F3] hover:text-slate-900"
+                className="relative flex h-9 w-8 items-center justify-center text-slate-400 transition-colors hover:text-slate-900"
               >
                 <ClipboardCheck size={17} />
                 {pendingApprovals > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-500" />}
@@ -439,11 +439,11 @@ export default function AccountingPanelPage() {
             )}
             {showDocsAndConfig && (
               <>
-                <Link href={`/project/${id}/accounting/document-center`} className="px-2 text-[13px] font-semibold text-slate-900 transition-colors hover:text-slate-500">
-                  Documentos
+                <Link href={`/project/${id}/accounting/document-center`} title="Centro de documentación" aria-label="Centro de documentación" className="flex h-9 w-8 items-center justify-center text-slate-400 transition-colors hover:text-slate-900">
+                  <FolderDown size={17} />
                 </Link>
-                <Link href={`/project/${id}/accounting/config`} className="mr-2 px-2 text-[13px] font-semibold text-slate-900 transition-colors hover:text-slate-500">
-                  Configuración
+                <Link href={`/project/${id}/accounting/config`} title="Configuración" aria-label="Configuración" className="mr-1 flex h-9 w-8 items-center justify-center text-slate-400 transition-colors hover:text-slate-900">
+                  <Settings size={17} />
                 </Link>
               </>
             )}
