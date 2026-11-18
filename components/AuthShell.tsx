@@ -72,7 +72,7 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="flex flex-1 items-center justify-center py-10">
-          <div className="w-full max-w-[400px]">{children}</div>
+          <div className="w-full max-w-[360px]">{children}</div>
         </div>
       </main>
 
