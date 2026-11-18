@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
-import { AnchoredPanel } from "@/components/ds";
+import { AnchoredPanel, Button, Checkbox, Field, Input, Modal } from "@/components/ds";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
@@ -2251,146 +2251,55 @@ export default function AccountingConfigPage() {
         </div>
       </main>
 
-      {/* Modal para cuenta bancaria */}
-      {showBankAccountModal && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowBankAccountModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="hidden">
-                  <CreditCard size={20} className="text-slate-600" />
-                </div>
-                <div>
-                  <h3 className="text-[14px] font-semibold text-slate-900">
-                    {editingBankAccount ? "Editar cuenta" : "Nueva cuenta bancaria"}
-                  </h3>
-                  <p className="text-xs text-slate-500">Para remesas SEPA</p>
-                </div>
-              </div>
-              <button onClick={() => setShowBankAccountModal(false)} className="p-2 hover:bg-slate-100 rounded-lg">
-                <X size={18} className="text-slate-500" />
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Alias *</label>
-                <input
-                  type="text"
-                  value={bankAccountForm.alias}
-                  onChange={(e) => setBankAccountForm({ ...bankAccountForm, alias: e.target.value })}
-                  placeholder="Alias de la cuenta"
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Razón social titular</label>
-                  <input
-                    type="text"
-                    value={bankAccountForm.fiscalName}
-                    onChange={(e) => setBankAccountForm({ ...bankAccountForm, fiscalName: e.target.value })}
-                    placeholder="Nombre empresa"
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">NIF/CIF titular</label>
-                  <input
-                    type="text"
-                    value={bankAccountForm.taxId}
-                    onChange={(e) => setBankAccountForm({ ...bankAccountForm, taxId: e.target.value.toUpperCase() })}
-                    placeholder="B12345678"
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px] font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">IBAN *</label>
-                <input
-                  type="text"
-                  value={bankAccountForm.iban}
-                  onChange={(e) => handleBankAccountIbanChange(e.target.value)}
-                  placeholder="Pega 20 dígitos o IBAN completo"
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px] font-mono"
-                />
-                <p className="text-xs text-slate-400 mt-1">Pega 20 dígitos y se calcula ESXX automáticamente</p>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">BIC/SWIFT <span className="font-normal text-slate-400">(opcional)</span></label>
-                <input
-                  type="text"
-                  value={bankAccountForm.bic || ""}
-                  onChange={(e) => setBankAccountForm({ ...bankAccountForm, bic: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11) })}
-                  placeholder="Código BIC"
-                  maxLength={11}
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none text-[13px] font-mono uppercase"
-                />
-              </div>
-
-              <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-md cursor-pointer hover:bg-slate-100 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={bankAccountForm.isDefault || false}
-                  onChange={(e) => setBankAccountForm({ ...bankAccountForm, isDefault: e.target.checked })}
-                  className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 text-[13px]"
-                />
-                <div>
-                  <p className="text-[13px] font-medium text-slate-700 flex items-center gap-2">
-                    <Star size={14} className="text-amber-500" />
-                    Cuenta principal
-                  </p>
-                  <p className="text-xs text-slate-500">Se usará por defecto en las remesas</p>
-                </div>
-              </label>
-            </div>
-
-            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-              <button
-                onClick={() => setShowBankAccountModal(false)}
-                className="px-4 py-1.5 text-slate-600 hover:bg-slate-100 rounded-md text-[13px] font-medium transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveBankAccount}
-                disabled={savingBankAccount || !bankAccountForm.alias || !bankAccountForm.iban}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
-              >
-                <Save size={16} />
-                {savingBankAccount ? "Guardando..." : editingBankAccount ? "Guardar cambios" : "Añadir cuenta"}
-              </button>
-            </div>
+      {/* Cuenta bancaria de la productora (remesas SEPA) */}
+      <Modal
+        open={showBankAccountModal}
+        onClose={() => setShowBankAccountModal(false)}
+        title={editingBankAccount ? "Editar cuenta bancaria" : "Nueva cuenta bancaria"}
+        width="max-w-lg"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowBankAccountModal(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={handleSaveBankAccount} disabled={savingBankAccount || !bankAccountForm.alias || !bankAccountForm.iban}>
+              {savingBankAccount ? "Guardando…" : editingBankAccount ? "Guardar cambios" : "Añadir cuenta"}
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <Field label="Alias"><Input value={bankAccountForm.alias} onChange={(e) => setBankAccountForm({ ...bankAccountForm, alias: e.target.value })} placeholder="Ej. Cuenta de producción" autoFocus /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Titular"><Input value={bankAccountForm.fiscalName} onChange={(e) => setBankAccountForm({ ...bankAccountForm, fiscalName: e.target.value })} placeholder="Razón social" /></Field>
+            <Field label="NIF del titular"><Input value={bankAccountForm.taxId} onChange={(e) => setBankAccountForm({ ...bankAccountForm, taxId: e.target.value.toUpperCase() })} placeholder="B12345678" className="font-mono" /></Field>
           </div>
+          <Field label="IBAN" hint="Si pegas los 20 dígitos de la cuenta, se calcula el ESxx automáticamente.">
+            <Input value={bankAccountForm.iban} onChange={(e) => handleBankAccountIbanChange(e.target.value)} placeholder="ES00 0000 0000 0000 0000 0000" className="font-mono" />
+          </Field>
+          <Field label="BIC / SWIFT (opcional)">
+            <Input value={bankAccountForm.bic || ""} onChange={(e) => setBankAccountForm({ ...bankAccountForm, bic: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11) })} maxLength={11} className="font-mono uppercase" />
+          </Field>
+          <Checkbox
+            checked={bankAccountForm.isDefault || false}
+            onChange={(v) => setBankAccountForm({ ...bankAccountForm, isDefault: v })}
+            label="Cuenta principal"
+            hint="Se propone por defecto al generar las remesas."
+          />
         </div>
-      )}
+      </Modal>
 
-      {/* Confirm Dialog */}
-      {confirmDialog && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-[14px] font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
-            <p className="text-[13px] text-slate-600 mb-6">{confirmDialog.message}</p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmDialog(null)}
-                className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 font-medium text-[13px]"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmDialog.onConfirm}
-                className={`flex-1 px-4 py-1.5 rounded-md font-medium text-[13px] text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
-              >
-                {confirmDialog.confirmLabel || "Confirmar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={!!confirmDialog}
+        onClose={() => setConfirmDialog(null)}
+        title={confirmDialog?.title || ""}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmDialog(null)}>Cancelar</Button>
+            <Button variant={confirmDialog?.danger ? "danger" : "primary"} onClick={() => confirmDialog?.onConfirm()}>{confirmDialog?.confirmLabel || "Confirmar"}</Button>
+          </>
+        }
+      >
+        <p className="text-[13px] text-slate-600">{confirmDialog?.message}</p>
+      </Modal>
     </div>
   );
 }

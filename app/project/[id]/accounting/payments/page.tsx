@@ -1,7 +1,7 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
-import { Button, IconButton, Input, Menu, MenuItem, PageHeader, Segmented, Select } from "@/components/ds";
+import { Button, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, Segmented, Select } from "@/components/ds";
 import SearchBar, { type SearchField } from "@/components/SearchBar";
 import { matchAmount, matchCode, matchWords } from "@/lib/search";
 import React, { useState, useEffect, useRef } from "react";
@@ -992,323 +992,205 @@ export default function PaymentsPage() {
         </div>
       </main>
 
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowCreateModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-[14px] font-semibold text-slate-900">Nueva previsión de pago</h3>
-              <button onClick={() => setShowCreateModal(false)} className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre de la previsión</label>
-                <input type="text" value={newForecast.name} onChange={(e) => setNewForecast({ ...newForecast, name: e.target.value })} placeholder="Nombre de la remesa" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Fecha de pago</label>
-                <input type="date" value={newForecast.paymentDate} onChange={(e) => setNewForecast({ ...newForecast, paymentDate: e.target.value })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Tipo de pago</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button type="button" onClick={() => setNewForecast({ ...newForecast, type: "remesa" })} className={cx("p-4 rounded-md border-2 transition-all text-left", newForecast.type === "remesa" ? "border-slate-900 bg-slate-50" : "border-slate-200 hover:border-slate-300")}>
-                    <Landmark size={20} className={newForecast.type === "remesa" ? "text-slate-900" : "text-slate-400"} />
-                    <p className="font-semibold text-slate-900 mt-2">Remesa</p>
-                    <p className="text-xs text-slate-500 mt-1">Pago bancario agrupado</p>
-                  </button>
-                  <button type="button" onClick={() => setNewForecast({ ...newForecast, type: "fuera_remesa" })} className={cx("p-4 rounded-md border-2 transition-all text-left", newForecast.type === "fuera_remesa" ? "border-slate-900 bg-slate-50" : "border-slate-200 hover:border-slate-300")}>
-                    <Banknote size={20} className={newForecast.type === "fuera_remesa" ? "text-slate-900" : "text-slate-400"} />
-                    <p className="font-semibold text-slate-900 mt-2">Fuera de remesa</p>
-                    <p className="text-xs text-slate-500 mt-1">Transferencia individual</p>
-                  </button>
-                </div>
-              </div>
-              <button onClick={handleCreateForecast} disabled={!newForecast.name.trim() || !newForecast.paymentDate} className="w-full mt-4 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md font-medium transition-opacity disabled:opacity-50 text-[13px]">Crear previsión</button>
-            </div>
-          </div>
+      {/* Nueva previsión */}
+      <Modal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="Nueva previsión de pago"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowCreateModal(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={handleCreateForecast} disabled={!newForecast.name.trim() || !newForecast.paymentDate}>Crear previsión</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <Field label="Nombre"><Input value={newForecast.name} onChange={(e) => setNewForecast({ ...newForecast, name: e.target.value })} placeholder="Ej. Remesa 15 de diciembre" autoFocus /></Field>
+          <Field label="Fecha de pago"><Input type="date" value={newForecast.paymentDate} onChange={(e) => setNewForecast({ ...newForecast, paymentDate: e.target.value })} /></Field>
+          <Field label="Tipo">
+            <Segmented
+              value={newForecast.type}
+              onChange={(v) => setNewForecast({ ...newForecast, type: v })}
+              options={[{ value: "remesa", label: "Remesa bancaria" }, { value: "fuera_remesa", label: "Fuera de remesa" }]}
+            />
+          </Field>
         </div>
-      )}
+      </Modal>
 
-      {showAddPaymentModal && selectedForecastId && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => { setShowAddPaymentModal(false); setSelectedForecastId(null); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-[14px] font-semibold text-slate-900">Añadir pago</h3>
-              <button onClick={() => { setShowAddPaymentModal(false); setSelectedForecastId(null); }} className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
-            </div>
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)] space-y-4">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Tipo de pago</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(PAYMENT_TYPES).map(([key, value]) => {
-                    const Icon = value.icon;
-                    return (
-                      <button key={key} type="button" onClick={() => setNewPayment({ ...newPayment, type: key as PaymentType })} className={cx("p-3 rounded-md border-2 transition-all text-left", newPayment.type === key ? "border-slate-900 bg-slate-50" : "border-slate-200 hover:border-slate-300")}>
-                        <Icon size={16} className={newPayment.type === key ? "text-slate-900" : "text-slate-400"} />
-                        <p className="font-medium text-slate-900 text-[13px] mt-1">{value.label}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              {(newPayment.type === "invoice" || newPayment.type === "partial") && availableInvoices.length > 0 && (
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Seleccionar factura</label>
-                  <div className="relative custom-dropdown">
-                    <Select
-                      value={newPayment.invoiceId}
-                      onChange={(e) => {
-                        const inv = availableInvoices.find((i) => i.id === e.target.value);
-                        setNewPayment(inv ? { ...newPayment, invoiceId: inv.id, supplier: inv.supplier, description: inv.description, amount: inv.totalAmount } : { ...newPayment, invoiceId: "" });
-                      }}
-                    >
-                      <option value="">Seleccionar…</option>
-                      {availableInvoices.map((inv) => (
-                        <option key={inv.id} value={inv.id}>{inv.displayNumber || ("FRA-" + inv.number)} · {inv.supplier} · {formatCurrency(inv.totalAmount)} €</option>
-                      ))}
-                    </Select>
-                  </div>
-                </div>
-              )}
-              {newPayment.type === "partial" && newPayment.invoiceId && (
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Importe parcial (de {formatCurrency(newPayment.amount)} €)</label>
-                  <input type="number" value={newPayment.partialAmount || ""} onChange={(e) => setNewPayment({ ...newPayment, partialAmount: parseFloat(e.target.value) || 0 })} placeholder="0.00" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
-                </div>
-              )}
-              {newPayment.type !== "invoice" && newPayment.type !== "partial" && (
-                <>
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium text-slate-600">Proveedor</label>
-                    <input type="text" value={newPayment.supplier} onChange={(e) => setNewPayment({ ...newPayment, supplier: e.target.value })} placeholder="Nombre del proveedor" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium text-slate-600">Descripción</label>
-                    <input type="text" value={newPayment.description} onChange={(e) => setNewPayment({ ...newPayment, description: e.target.value })} placeholder="Concepto del pago" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium text-slate-600">Importe</label>
-                    <input type="number" value={newPayment.amount || ""} onChange={(e) => setNewPayment({ ...newPayment, amount: parseFloat(e.target.value) || 0 })} placeholder="0.00" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
-                  </div>
-                </>
-              )}
-              <button onClick={() => handleAddPaymentToForecast(selectedForecastId)} disabled={(newPayment.type === "invoice" && !newPayment.invoiceId) || (newPayment.type === "partial" && (!newPayment.invoiceId || !newPayment.partialAmount)) || (newPayment.type !== "invoice" && newPayment.type !== "partial" && (!newPayment.supplier || !newPayment.amount))} className="w-full mt-4 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md font-medium transition-opacity disabled:opacity-50 text-[13px]">Añadir pago</button>
-            </div>
-          </div>
+      {/* Añadir pago a una previsión */}
+      <Modal
+        open={showAddPaymentModal && !!selectedForecastId}
+        onClose={() => { setShowAddPaymentModal(false); setSelectedForecastId(null); }}
+        title="Añadir pago"
+        width="max-w-lg"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => { setShowAddPaymentModal(false); setSelectedForecastId(null); }}>Cancelar</Button>
+            <Button
+              variant="primary"
+              onClick={() => selectedForecastId && handleAddPaymentToForecast(selectedForecastId)}
+              disabled={(newPayment.type === "invoice" && !newPayment.invoiceId) || (newPayment.type === "partial" && (!newPayment.invoiceId || !newPayment.partialAmount)) || (newPayment.type !== "invoice" && newPayment.type !== "partial" && (!newPayment.supplier || !newPayment.amount))}
+            >
+              Añadir pago
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <Field label="Tipo de pago">
+            <Select value={newPayment.type} onChange={(e) => setNewPayment({ ...newPayment, type: e.target.value as PaymentType })}>
+              {Object.entries(PAYMENT_TYPES).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}
+            </Select>
+          </Field>
+          {(newPayment.type === "invoice" || newPayment.type === "partial") && (
+            availableInvoices.length > 0 ? (
+              <Field label="Factura">
+                <Select
+                  value={newPayment.invoiceId}
+                  onChange={(e) => {
+                    const inv = availableInvoices.find((i) => i.id === e.target.value);
+                    setNewPayment(inv ? { ...newPayment, invoiceId: inv.id, supplier: inv.supplier, description: inv.description, amount: inv.totalAmount } : { ...newPayment, invoiceId: "" });
+                  }}
+                >
+                  <option value="">Seleccionar…</option>
+                  {availableInvoices.map((inv) => (
+                    <option key={inv.id} value={inv.id}>{inv.displayNumber || ("FRA-" + inv.number)} · {inv.supplier} · {formatCurrency(inv.totalAmount)} €</option>
+                  ))}
+                </Select>
+              </Field>
+            ) : <p className="text-[13px] text-slate-500">No hay facturas aprobadas pendientes de pago.</p>
+          )}
+          {newPayment.type === "partial" && newPayment.invoiceId && (
+            <Field label={`Importe parcial (de ${formatCurrency(newPayment.amount)} €)`}>
+              <Input type="number" step="0.01" value={newPayment.partialAmount || ""} onChange={(e) => setNewPayment({ ...newPayment, partialAmount: parseFloat(e.target.value) || 0 })} className="text-right font-mono" />
+            </Field>
+          )}
+          {newPayment.type !== "invoice" && newPayment.type !== "partial" && (
+            <>
+              <Field label="Proveedor o beneficiario"><Input value={newPayment.supplier} onChange={(e) => setNewPayment({ ...newPayment, supplier: e.target.value })} /></Field>
+              <Field label="Concepto"><Input value={newPayment.description} onChange={(e) => setNewPayment({ ...newPayment, description: e.target.value })} /></Field>
+              <Field label="Importe (€)"><Input type="number" step="0.01" value={newPayment.amount || ""} onChange={(e) => setNewPayment({ ...newPayment, amount: parseFloat(e.target.value) || 0 })} className="text-right font-mono" /></Field>
+            </>
+          )}
         </div>
-      )}
+      </Modal>
 
-      {showForecastDetail && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowForecastDetail(null)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-[14px] font-semibold text-slate-900">{showForecastDetail.name}</h3>
-                  {(() => { const config = getStatusConfig(showForecastDetail.status); const Icon = config.icon; return (<span className={cx("inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg font-medium", config.bg, config.text)}><Icon size={12} />{config.label}</span>); })()}
+      {/* Detalle de una previsión */}
+      {(() => {
+        const fc = showForecastDetail;
+        const st = fc ? getStatusConfig(fc.status) : null;
+        const prog = fc ? getCompletionProgress(fc) : null;
+        return (
+          <Modal
+            open={!!fc}
+            onClose={() => setShowForecastDetail(null)}
+            title={fc ? fc.name : ""}
+            width="max-w-3xl"
+            footer={fc ? (
+              <>
+                <Button variant="ghost" className="mr-auto" onClick={() => exportForecastPDF(fc)}><Download size={13} /> PDF</Button>
+                {fc.status === "draft" && <Button variant="secondary" onClick={() => { setSelectedForecastId(fc.id); setShowAddPaymentModal(true); setShowForecastDetail(null); }}>Añadir pago</Button>}
+                {fc.status === "draft" && fc.items.length > 0 && <Button variant="primary" onClick={() => { handleSendForecast(fc.id); setShowForecastDetail(null); }}>Enviar a pago</Button>}
+                {(fc.status === "pending" || fc.status === "completed") && (
+                  <Button variant="primary" onClick={() => router.push("/project/" + id + "/accounting/payments/" + fc.id + "/pay")}>{fc.status === "pending" ? "Ir a pagar" : "Ver pagos"}</Button>
+                )}
+              </>
+            ) : undefined}
+          >
+            {fc && st && prog && (
+              <div className="flex flex-col gap-4 text-[13px]">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-slate-600">
+                  <span className={cx("inline-flex items-center gap-1.5 text-xs font-medium", st.text)}>{st.label}</span>
+                  <span>Pago el <b className="font-medium text-slate-900">{formatDate(fc.paymentDate)}</b></span>
+                  <span>Total <b className="font-mono font-medium text-slate-900">{formatCurrency(fc.totalAmount)} €</b></span>
+                  <span>Pagados <b className="font-mono font-medium text-slate-900">{prog.completed}/{prog.total}</b></span>
+                  <span className="text-xs text-slate-400">Creada por {fc.createdByName} · {formatDate(fc.createdAt)}</span>
                 </div>
-                <p className="text-[13px] text-slate-500">Creada por {showForecastDetail.createdByName} · {formatDate(showForecastDetail.createdAt)}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => exportForecastPDF(showForecastDetail)} className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg" title="Exportar PDF"><Download size={18} /></button>
-                <button onClick={() => setShowForecastDetail(null)} className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
-              </div>
-            </div>
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="bg-slate-50 rounded-md p-4"><p className="text-xs text-slate-500 mb-1">Fecha de pago</p><p className="text-lg font-bold text-slate-900">{formatDate(showForecastDetail.paymentDate)}</p></div>
-                <div className="bg-slate-50 rounded-md p-4"><p className="text-xs text-slate-500 mb-1">Total</p><p className="text-lg font-bold text-slate-900">{formatCurrency(showForecastDetail.totalAmount)} €</p></div>
-                <div className="bg-slate-50 rounded-md p-4"><p className="text-xs text-slate-500 mb-1">Progreso</p>{(() => { const progress = getCompletionProgress(showForecastDetail); return (<div className="flex items-center gap-2"><div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{ width: progress.percent + "%" }} /></div><span className="text-[13px] font-bold text-slate-900">{progress.completed}/{progress.total}</span></div>); })()}</div>
-              </div>
-              <div>
-                <h4 className="text-[13px] font-semibold text-slate-700 uppercase mb-3">Pagos ({showForecastDetail.items.length})</h4>
-                {showForecastDetail.items.length === 0 ? (
-                  <div className="text-center py-8 bg-slate-50 rounded-md"><FolderOpen size={24} className="text-slate-400 mx-auto mb-2" /><p className="text-[13px] text-slate-500">Sin pagos añadidos</p></div>
+                {fc.items.length === 0 ? (
+                  <p className="border-y border-slate-200 py-8 text-center text-slate-500">Sin pagos añadidos</p>
                 ) : (
-                  <div className="space-y-2">
-                    {showForecastDetail.items.map((item) => {
-                      const typeInfo = PAYMENT_TYPES[item.type];
-                      const ItemIcon = typeInfo.icon;
-                      return (
-                        <div key={item.id} className="p-4 bg-slate-50 rounded-md border border-slate-200">
-                          <div className="flex items-start gap-3">
-                            <div className={cx("w-10 h-10 rounded-md flex items-center justify-center flex-shrink-0", item.status === "completed" ? "bg-emerald-100" : "bg-slate-100")}>{item.status === "completed" ? <CheckCircle2 size={18} className="text-emerald-600" /> : <ItemIcon size={18} className="text-slate-500" />}</div>
-                            <div className="flex-1">
-                              <div className="flex items-start justify-between">
-                                <div>
-                                  <p className="font-semibold text-slate-900 font-mono">{item.invoiceNumber ? ("FRA-" + item.invoiceNumber) : item.description}</p>
-                                  <p className="text-[13px] text-slate-600">{item.supplier}</p>
-                                  <p className="text-xs text-slate-400 mt-1">{typeInfo.label} · Añadido por {item.addedByName}</p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-lg font-bold text-slate-900">{formatCurrency(item.partialAmount || item.amount)} €</p>
-                                  <span className={cx("text-xs px-2 py-1 rounded-lg", item.status === "completed" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>{item.status === "completed" ? "Completado" : "Pendiente"}</span>
-                                </div>
-                              </div>
-                              <div className="mt-3 pt-3 border-t border-slate-200">
-                                {item.status === "completed" && item.receiptUrl ? (
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-[13px] text-emerald-700"><FileCheck size={14} /><span>{item.receiptName || "Justificante"}</span></div>
-                                    <a href={item.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1">Ver <ExternalLink size={12} /></a>
-                                  </div>
-                                ) : item.status === "completed" ? (
-                                  <p className="text-xs text-emerald-600">✓ Completado el {formatDate(item.completedAt!)} por {item.completedByName}</p>
-                                ) : (
-                                  <p className="text-xs text-slate-400">Pendiente de pago</p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="overflow-hidden rounded-lg border border-slate-200">
+                    <table className="tbl w-full border-collapse text-[13px]">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
+                          <th scope="col" className="px-3 py-2 text-left font-medium">Pago</th>
+                          <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor</th>
+                          <th scope="col" className="px-3 py-2 text-right font-medium">Importe</th>
+                          <th scope="col" className="w-28 px-3 py-2 text-left font-medium">Estado</th>
+                          <th scope="col" className="w-20 px-3 py-2 text-left font-medium">Justificante</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {fc.items.map((item) => (
+                          <tr key={item.id} className="border-b border-slate-100 last:border-0">
+                            <td className="px-3 py-1.5">
+                              <span className="font-mono text-xs font-medium">{item.invoiceNumber ? "FRA-" + item.invoiceNumber : item.description}</span>
+                              <span className="ml-2 text-xs text-slate-400">{PAYMENT_TYPES[item.type]?.label}</span>
+                            </td>
+                            <td className="px-3 py-1.5">{item.supplier}</td>
+                            <td className="px-3 py-1.5 text-right font-mono text-xs">{formatCurrency(item.partialAmount || item.amount)}</td>
+                            <td className="px-3 py-1.5">
+                              <span className="inline-flex items-center gap-1.5 text-xs text-slate-700">
+                                <span className={cx("h-1.5 w-1.5 rounded-full", item.status === "completed" ? "bg-emerald-500" : "bg-amber-500")} />
+                                {item.status === "completed" ? "Pagado" : "Pendiente"}
+                              </span>
+                            </td>
+                            <td className="px-3 py-1.5 text-xs">
+                              {item.receiptUrl ? <a href={item.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-slate-700 underline hover:text-slate-900">Ver</a> : <span className="text-slate-300">—</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>
-            </div>
-            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2">
-              {showForecastDetail.status === "draft" && showForecastDetail.items.length > 0 && (
-                <button onClick={() => { handleSendForecast(showForecastDetail.id); setShowForecastDetail(null); }} className="px-4 py-2 text-[13px] bg-amber-500 text-white hover:bg-amber-600 rounded-lg flex items-center gap-2"><Send size={14} />Enviar</button>
-              )}
-              {showForecastDetail.status === "draft" && (
-                <button onClick={() => { setSelectedForecastId(showForecastDetail.id); setShowAddPaymentModal(true); setShowForecastDetail(null); }} className="px-4 py-2 text-[13px] border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-lg flex items-center gap-2"><Plus size={14} />Añadir pago</button>
-              )}
-              {showForecastDetail.status === "pending" && (
-                <button onClick={() => router.push("/project/" + id + "/accounting/payments/" + showForecastDetail.id + "/pay")} className="px-4 py-2 text-[13px] bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg flex items-center gap-2"><Banknote size={14} />Ir a pagar</button>
-              )}
-              {showForecastDetail.status === "completed" && (
-                <button onClick={() => router.push("/project/" + id + "/accounting/payments/" + showForecastDetail.id + "/pay")} className="px-4 py-2 text-[13px] bg-slate-700 text-white hover:bg-slate-800 rounded-lg flex items-center gap-2"><Eye size={14} />Ver pagos</button>
-              )}
-              <button onClick={() => setShowForecastDetail(null)} className="px-4 py-2 text-[13px] border border-slate-200 text-slate-700 hover:bg-white rounded-lg">Cerrar</button>
-            </div>
-          </div>
-        </div>
-      )}
+            )}
+          </Modal>
+        );
+      })()}
 
-      {/* Modal de consulta de estado de factura */}
-      {showInvoiceStatusSearch && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowInvoiceStatusSearch(false)}>
-          <div className="bg-white rounded-lg max-w-md w-full shadow-xl border border-slate-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-md flex items-center justify-center" style={{ backgroundColor: 'rgba(47, 82, 224, 0.1)' }}>
-                  <HelpCircle size={20} style={{ color: '#2F52E0' }} />
-                </div>
-                <h3 className="text-[14px] font-semibold text-slate-900">Consultar estado de factura</h3>
-              </div>
-              <button onClick={() => setShowInvoiceStatusSearch(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md"><X size={18} /></button>
-            </div>
-            <div className="p-6">
-              <div className="relative mb-4">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={invoiceStatusSearchTerm}
-                  onChange={(e) => { setInvoiceStatusSearchTerm(e.target.value); setInvoiceStatusResult(null); }}
-                  onKeyDown={(e) => e.key === "Enter" && searchInvoiceStatus()}
-                  placeholder="Número de factura o proveedor"
-                  className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]"
-                  autoFocus
-                />
-              </div>
-              <button
-                onClick={searchInvoiceStatus}
-                disabled={!invoiceStatusSearchTerm.trim()}
-                className="w-full px-4 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity disabled:opacity-50"
-              >
-                Buscar
-              </button>
-
-              {invoiceStatusResult && (
-                <div className="mt-6">
-                  {!invoiceStatusResult.found ? (
-                    <div className="text-center py-6">
-                      <div className="hidden">
-                        <Search size={20} className="text-slate-400" />
-                      </div>
-                      <p className="text-[13px] text-slate-500">No se encontró ninguna factura con ese criterio</p>
-                    </div>
-                  ) : (
-                    <div className="bg-slate-50 rounded-md p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-slate-400 uppercase">Factura</span>
-                        <span className="text-[13px] font-semibold text-slate-900">{invoiceStatusResult.invoice?.invoiceNumber || invoiceStatusResult.invoice?.displayNumber || invoiceStatusResult.invoice?.number}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-slate-400 uppercase">Proveedor</span>
-                        <span className="text-[13px] text-slate-700">{invoiceStatusResult.invoice?.supplier}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-slate-400 uppercase">Importe</span>
-                        <span className="text-[13px] font-semibold text-slate-900">{formatCurrency(invoiceStatusResult.invoice?.totalAmount || invoiceStatusResult.invoice?.amount || 0)} €</span>
-                      </div>
-                      <div className="border-t border-slate-200 pt-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-slate-400 uppercase">Estado</span>
-                          {invoiceStatusResult.status === "paid" && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-semibold">
-                              <CheckCircle2 size={12} />
-                              Pagada
-                            </span>
-                          )}
-                          {invoiceStatusResult.status === "scheduled" && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 text-amber-700 rounded-lg text-xs font-semibold">
-                              <Clock size={12} />
-                              Programada
-                            </span>
-                          )}
-                          {invoiceStatusResult.status === "pending_assignment" && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold">
-                              <Receipt size={12} />
-                              Sin asignar
-                            </span>
-                          )}
-                        </div>
-                        {invoiceStatusResult.forecast && (
-                          <div className="mt-3 p-3 bg-white rounded-lg border border-slate-200">
-                            <p className="text-xs text-slate-500 mb-1">Asignada a previsión:</p>
-                            <p className="text-[13px] font-medium text-slate-900">{invoiceStatusResult.forecast.name}</p>
-                            <p className="text-xs text-slate-500 mt-1">
-                              Fecha de pago: {formatDate(invoiceStatusResult.forecast.paymentDate)}
-                            </p>
-                          </div>
-                        )}
-                        {invoiceStatusResult.status === "pending_assignment" && (
-                          <p className="text-xs text-slate-500 mt-3">Esta factura aún no ha sido asignada a ninguna previsión de pago.</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+      {/* Consultar estado de una factura */}
+      <Modal open={showInvoiceStatusSearch} onClose={() => setShowInvoiceStatusSearch(false)} title="Consultar estado de factura">
+        <div className="flex flex-col gap-3 text-[13px]">
+          <div className="flex gap-2">
+            <Input
+              value={invoiceStatusSearchTerm}
+              onChange={(e) => { setInvoiceStatusSearchTerm(e.target.value); setInvoiceStatusResult(null); }}
+              onKeyDown={(e) => e.key === "Enter" && searchInvoiceStatus()}
+              placeholder="Número de factura o proveedor"
+              autoFocus
+            />
+            <Button variant="primary" onClick={searchInvoiceStatus} disabled={!invoiceStatusSearchTerm.trim()}>Buscar</Button>
           </div>
+          {invoiceStatusResult && (!invoiceStatusResult.found ? (
+            <p className="py-4 text-center text-slate-500">No hay ninguna factura que coincida</p>
+          ) : (
+            <dl className="grid grid-cols-[110px_1fr] gap-y-1.5 rounded-md border border-slate-200 px-3 py-2.5">
+              <dt className="text-slate-500">Factura</dt><dd className="font-mono text-xs font-medium">{invoiceStatusResult.invoice?.invoiceNumber || invoiceStatusResult.invoice?.displayNumber || invoiceStatusResult.invoice?.number}</dd>
+              <dt className="text-slate-500">Proveedor</dt><dd>{invoiceStatusResult.invoice?.supplier}</dd>
+              <dt className="text-slate-500">Importe</dt><dd className="font-mono">{formatCurrency(invoiceStatusResult.invoice?.totalAmount || invoiceStatusResult.invoice?.amount || 0)} €</dd>
+              <dt className="text-slate-500">Estado</dt>
+              <dd className="font-medium">{invoiceStatusResult.status === "paid" ? "Pagada" : invoiceStatusResult.status === "scheduled" ? "Programada para pago" : "Sin asignar a ninguna previsión"}</dd>
+              {invoiceStatusResult.forecast && (<><dt className="text-slate-500">Previsión</dt><dd>{invoiceStatusResult.forecast.name} · {formatDate(invoiceStatusResult.forecast.paymentDate)}</dd></>)}
+            </dl>
+          ))}
         </div>
-      )}
+      </Modal>
 
-      {/* Confirm Dialog */}
-      {confirmDialog && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-[14px] font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
-            <p className="text-[13px] text-slate-600 mb-6">{confirmDialog.message}</p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmDialog(null)}
-                className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 font-medium text-[13px]"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmDialog.onConfirm}
-                className={`flex-1 px-4 py-1.5 rounded-md font-medium text-[13px] text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
-              >
-                {confirmDialog.confirmLabel || "Confirmar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={!!confirmDialog}
+        onClose={() => setConfirmDialog(null)}
+        title={confirmDialog?.title || ""}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmDialog(null)}>Cancelar</Button>
+            <Button variant={confirmDialog?.danger ? "danger" : "primary"} onClick={() => confirmDialog?.onConfirm()}>{confirmDialog?.confirmLabel || "Confirmar"}</Button>
+          </>
+        }
+      >
+        <p className="text-[13px] text-slate-600">{confirmDialog?.message}</p>
+      </Modal>
     </div>
   );
 }

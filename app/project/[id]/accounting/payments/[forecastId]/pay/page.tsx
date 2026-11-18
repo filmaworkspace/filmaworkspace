@@ -9,6 +9,7 @@ import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
+import { Button, Field, Input, Modal } from "@/components/ds";
 import {
   collection,
   doc,
@@ -930,74 +931,60 @@ export default function PaymentPayPage() {
         </div>
       </div>
 
-      {/* SEPA Modal */}
-      {showSepaModal && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowSepaModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-3"><Landmark size={24} className="text-slate-400" /><div><h3 className="text-[14px] font-semibold text-slate-900">Generar SEPA</h3><p className="text-xs text-slate-500">XML pain.001.001.03</p></div></div>
-              <button onClick={() => setShowSepaModal(false)} className="p-2 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
-            </div>
-            <div className="p-6 space-y-5">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Cuenta ordenante</label>
-                {bankAccounts.length > 0 ? (
-                  <div className="space-y-2">
-                    {bankAccounts.map((acc) => (
-                      <label key={acc.id} className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer ${selectedBankAccount?.id === acc.id ? "border-emerald-500 bg-emerald-50" : "border-slate-200 hover:border-slate-300"}`}>
-                        <input type="radio" name="bankAccount" checked={selectedBankAccount?.id === acc.id} onChange={() => setSelectedBankAccount(acc)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 text-[13px]" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2"><p className="text-[13px] font-medium text-slate-900">{acc.alias}</p>{acc.isDefault && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Principal</span>}</div>
-                          <p className="text-xs font-mono text-slate-400 mt-0.5">{acc.iban.replace(/(.{4})/g, "$1 ").trim()}</p>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="bg-amber-50 border border-amber-200 rounded-md p-4"><p className="text-[13px] font-medium text-amber-800">Sin cuentas bancarias</p><p className="text-xs text-amber-700 mt-0.5">Añade una en Configuración</p></div>
-                )}
+      {/* Fichero SEPA (pain.001.001.03) */}
+      <Modal
+        open={showSepaModal}
+        onClose={() => setShowSepaModal(false)}
+        title="Generar fichero SEPA"
+        width="max-w-lg"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowSepaModal(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={generateSepaXml} disabled={!selectedBankAccount}><Download size={13} /> Descargar XML</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4 text-[13px]">
+          <div>
+            <p className="mb-1.5 text-xs font-medium text-slate-600">Cuenta ordenante</p>
+            {bankAccounts.length > 0 ? (
+              <div className="overflow-hidden rounded-lg border border-slate-200">
+                {bankAccounts.map((acc) => (
+                  <label key={acc.id} className={`flex cursor-pointer items-center gap-3 border-b border-slate-100 px-3 py-2 last:border-0 ${selectedBankAccount?.id === acc.id ? "bg-[#F4F4F5]" : "hover:bg-[#FAFAFA]"}`}>
+                    <input type="radio" name="bankAccount" checked={selectedBankAccount?.id === acc.id} onChange={() => setSelectedBankAccount(acc)} className="h-3.5 w-3.5 accent-slate-900" />
+                    <span className="min-w-0 flex-1">
+                      <span className="font-medium text-slate-900">{acc.alias}</span>
+                      {acc.isDefault && <span className="ml-2 text-xs text-slate-400">principal</span>}
+                      <span className="block font-mono text-xs text-slate-500">{acc.iban.replace(/(.{4})/g, "$1 ").trim()}</span>
+                    </span>
+                  </label>
+                ))}
               </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Fecha de ejecución</label>
-                <input type="date" value={sepaDate} onChange={(e) => setSepaDate(e.target.value)} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:ring-4 focus:ring-emerald-500 focus:outline-none text-[13px]" />
-              </div>
-              <div className="bg-slate-50 rounded-md p-4">
-                <div className="flex justify-between text-[13px] mb-2"><span className="text-slate-600">Pagos</span><span className="font-semibold">{pendingItems.length}</span></div>
-                <div className="flex justify-between"><span className="text-slate-600">Total</span><span className="font-bold text-lg">{formatCurrency(totalPending)} €</span></div>
-              </div>
-              {(() => {
-                const missing = pendingItems.filter(item => {
-                  const s = item.supplierId ? suppliers[item.supplierId] : null;
-                  return !s?.iban && !item.iban;
-                });
-                if (missing.length === 0) return null;
-                return (
-                  <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-[13px] font-medium text-amber-900">{missing.length} pago{missing.length > 1 ? "s" : ""} sin IBAN</p>
-                        <ul className="mt-1 space-y-0.5">
-                          {missing.map(item => (
-                            <li key={item.id} className="text-xs text-amber-700 truncate">
-                              · {(item.supplierId ? suppliers[item.supplierId]?.name : null) || item.supplier || "—"}
-                            </li>
-                          ))}
-                        </ul>
-                        <p className="text-xs text-amber-600 mt-1">Añade el IBAN en la ficha del proveedor antes de generar el XML.</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-              <div className="flex gap-3">
-                <button onClick={() => setShowSepaModal(false)} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">Cancelar</button>
-                <button onClick={generateSepaXml} disabled={!selectedBankAccount} className="flex-1 px-4 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50 flex items-center justify-center gap-2"><Download size={16} />Descargar XML</button>
-              </div>
-            </div>
+            ) : (
+              <p className="rounded-md border border-amber-200 bg-[#FFFBEB] px-3 py-2.5 text-xs text-amber-900">No hay cuentas bancarias. Añádelas en Configuración de contabilidad.</p>
+            )}
           </div>
+          <Field label="Fecha de ejecución"><Input type="date" value={sepaDate} onChange={(e) => setSepaDate(e.target.value)} /></Field>
+          <div className="flex items-baseline justify-between rounded-md border border-slate-200 px-3 py-2.5">
+            <span className="text-slate-600">{pendingItems.length} {pendingItems.length === 1 ? "pago" : "pagos"}</span>
+            <span className="font-mono font-semibold">{formatCurrency(totalPending)} €</span>
+          </div>
+          {(() => {
+            const missing = pendingItems.filter((item) => {
+              const sup = item.supplierId ? suppliers[item.supplierId] : null;
+              return !sup?.iban && !item.iban;
+            });
+            if (missing.length === 0) return null;
+            return (
+              <div className="rounded-md border border-amber-200 bg-[#FFFBEB] px-3 py-2.5 text-xs text-amber-900">
+                <p className="font-medium">{missing.length} {missing.length === 1 ? "pago sin IBAN" : "pagos sin IBAN"}: no entrarán en el fichero.</p>
+                <p className="mt-1">{missing.map((item) => (item.supplierId ? suppliers[item.supplierId]?.name : null) || item.supplier || "—").join(" · ")}</p>
+                <p className="mt-1 text-amber-800">Añade el IBAN en la ficha del proveedor.</p>
+              </div>
+            );
+          })()}
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

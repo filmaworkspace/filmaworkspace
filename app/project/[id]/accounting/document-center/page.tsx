@@ -2,7 +2,7 @@
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { getInvoiceDisplayState } from "@/lib/invoiceHelpers";
-import { Button, Checkbox, EmptyState, IconButton, Input, Page, PageHeader, Select, Spinner } from "@/components/ds";
+import { Button, Checkbox, EmptyState, IconButton, Input, Page, PageHeader, Select, Spinner, Modal } from "@/components/ds";
 import SearchBar, { type SearchField } from "@/components/SearchBar";
 import { matchAmount, matchCode, matchWords } from "@/lib/search";
 import { useState, useEffect, useMemo } from "react";
@@ -579,101 +579,66 @@ export default function DocumentCenterPage() {
         </div>
       )}
 
-      {/* Preview Modal */}
-      {previewInvoice && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4"
-          onClick={() => setPreviewInvoice(null)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-flex flex-col"
-            onClick={e => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-md flex items-center justify-center" style={{ backgroundColor: "#2F52E0" }}>
-                  <FileText size={20} className="text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-slate-900">{previewInvoice.displayNumber}</h3>
-                  <p className="text-xs text-slate-500">Vista previa del expediente</p>
-                </div>
-              </div>
-              <button onClick={() => setPreviewInvoice(null)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"><X size={20} /></button>
+      {/* Vista previa del expediente */}
+      <Modal
+        open={!!previewInvoice}
+        onClose={() => setPreviewInvoice(null)}
+        title={previewInvoice ? `Expediente ${previewInvoice.displayNumber}` : ""}
+        width="max-w-2xl"
+        footer={previewInvoice ? (
+          <>
+            <Button variant="ghost" onClick={() => setPreviewInvoice(null)}>Cerrar</Button>
+            <Button variant="primary" onClick={() => { downloadSingle(previewInvoice); setPreviewInvoice(null); }} disabled={downloading}><Download size={13} /> Descargar expediente</Button>
+          </>
+        ) : undefined}
+      >
+        {previewInvoice && (
+          <div className="flex flex-col gap-4 text-[13px]">
+            <div>
+              <p className="font-medium text-slate-900">{previewInvoice.supplier}</p>
+              {previewInvoice.supplierTaxId && <p className="font-mono text-xs text-slate-500">{previewInvoice.supplierTaxId}</p>}
             </div>
-
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              <div>
-                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Proveedor</h4>
-                <p className="font-medium text-slate-900">{previewInvoice.supplier}</p>
-                {previewInvoice.supplierTaxId && <p className="text-[13px] text-slate-500">NIF/CIF: {previewInvoice.supplierTaxId}</p>}
-              </div>
-
-              {previewInvoice.items?.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Líneas de detalle</h4>
-                  <div className="space-y-2">
+            {previewInvoice.items?.length > 0 && (
+              <div className="overflow-hidden rounded-lg border border-slate-200">
+                <table className="tbl w-full border-collapse text-[13px]">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
+                      <th scope="col" className="w-20 px-3 py-2 text-left font-medium">Cuenta</th>
+                      <th scope="col" className="px-3 py-2 text-left font-medium">Concepto</th>
+                      <th scope="col" className="w-16 px-3 py-2 text-right font-medium">IVA</th>
+                      <th scope="col" className="px-3 py-2 text-right font-medium">Base</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {previewInvoice.items.map((item, i) => (
-                      <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                        <div>
-                          <p className="text-[13px] font-medium text-slate-900">{item.subAccountCode}</p>
-                          <p className="text-xs text-slate-500">{item.description || item.subAccountDescription}</p>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-medium text-slate-900">{fmtMoney(item.baseAmount, previewInvoice.currency)}</span>
-                          <p className="text-xs text-slate-500">IVA {item.vatRate}%</p>
-                        </div>
-                      </div>
+                      <tr key={i} className="border-b border-slate-100 last:border-0">
+                        <td className="px-3 py-1.5 font-mono text-xs">{item.subAccountCode || "—"}</td>
+                        <td className="px-3 py-1.5">{item.description || item.subAccountDescription}</td>
+                        <td className="px-3 py-1.5 text-right font-mono text-xs text-slate-500">{item.vatRate} %</td>
+                        <td className="px-3 py-1.5 text-right font-mono text-xs">{fmtMoney(item.baseAmount, previewInvoice.currency)}</td>
+                      </tr>
                     ))}
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Importes</h4>
-                <div className="bg-slate-50 rounded-md p-4 space-y-2">
-                  <div className="flex justify-between text-[13px]"><span className="text-slate-600">Base imponible</span><span>{fmtMoney(previewInvoice.baseAmount, previewInvoice.currency)}</span></div>
-                  <div className="flex justify-between text-[13px]"><span className="text-slate-600">IVA</span><span>{fmtMoney(previewInvoice.vatAmount, previewInvoice.currency)}</span></div>
-                  {previewInvoice.irpfAmount > 0 && <div className="flex justify-between text-[13px]"><span className="text-slate-600">IRPF</span><span>-{fmtMoney(previewInvoice.irpfAmount, previewInvoice.currency)}</span></div>}
-                  <div className="border-t border-slate-200 pt-2 flex justify-between font-semibold">
-                    <span className="text-slate-900">Total</span>
-                    <span className="text-slate-900">{fmtMoney(previewInvoice.totalAmount, previewInvoice.currency)}</span>
-                  </div>
-                </div>
+                  </tbody>
+                </table>
               </div>
-
-              {previewInvoice.status === "paid" && previewInvoice.paidAt && (
-                <div>
-                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Información de pago</h4>
-                  <div className="bg-emerald-50 rounded-md p-4 space-y-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <CheckCircle size={15} className="text-emerald-600" />
-                      <span className="text-[13px] font-medium text-emerald-800">Pagada el {fmtDateTime(previewInvoice.paidAt)}</span>
-                    </div>
-                    {previewInvoice.paymentMethod && <p className="text-[13px] text-emerald-700">{PAYMENT_METHODS[previewInvoice.paymentMethod] || previewInvoice.paymentMethod}</p>}
-                    {previewInvoice.paymentReference && <p className="text-[13px] text-emerald-700">Ref: {previewInvoice.paymentReference}</p>}
-                  </div>
-                </div>
-              )}
-
-              {previewInvoice.codedAt && (
-                <div>
-                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Codificación contable</h4>
-                  <div className="bg-blue-50 rounded-md p-4 space-y-1">
-                    <p className="text-[13px] text-blue-700">Por {previewInvoice.codedByName} el {fmtDateTime(previewInvoice.codedAt)}</p>
-                    {previewInvoice.accountingEntry && <p className="text-[13px] text-blue-700">Asiento: {previewInvoice.accountingEntry}</p>}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-              <button onClick={() => setPreviewInvoice(null)}
-                className="px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">Cerrar</button>
-              <button onClick={() => { downloadSingle(previewInvoice); setPreviewInvoice(null); }} disabled={downloading}
-                className="flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
-                <Download size={16} /> Descargar expediente
-              </button>
-            </div>
+            )}
+            <dl className="ml-auto grid w-64 grid-cols-2 gap-y-1">
+              <dt className="text-slate-500">Base</dt><dd className="text-right font-mono">{fmtMoney(previewInvoice.baseAmount, previewInvoice.currency)}</dd>
+              <dt className="text-slate-500">IVA</dt><dd className="text-right font-mono">{fmtMoney(previewInvoice.vatAmount, previewInvoice.currency)}</dd>
+              {previewInvoice.irpfAmount > 0 && (<><dt className="text-slate-500">IRPF</dt><dd className="text-right font-mono">−{fmtMoney(previewInvoice.irpfAmount, previewInvoice.currency)}</dd></>)}
+              <dt className="border-t border-slate-200 pt-1 font-medium">Total</dt><dd className="border-t border-slate-200 pt-1 text-right font-mono font-semibold">{fmtMoney(previewInvoice.totalAmount, previewInvoice.currency)}</dd>
+            </dl>
+            {(previewInvoice.codedAt || (previewInvoice.status === "paid" && previewInvoice.paidAt)) && (
+              <div className="flex flex-col gap-1 border-t border-slate-100 pt-3 text-xs text-slate-600">
+                {previewInvoice.codedAt && <p>Codificada por {previewInvoice.codedByName} el {fmtDateTime(previewInvoice.codedAt)}{previewInvoice.accountingEntry ? ` · asiento ${previewInvoice.accountingEntry}` : ""}</p>}
+                {previewInvoice.status === "paid" && previewInvoice.paidAt && (
+                  <p>Pagada el {fmtDateTime(previewInvoice.paidAt)}{previewInvoice.paymentMethod ? ` · ${PAYMENT_METHODS[previewInvoice.paymentMethod] || previewInvoice.paymentMethod}` : ""}{previewInvoice.paymentReference ? ` · ref. ${previewInvoice.paymentReference}` : ""}</p>
+                )}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </Page>
   );
 }

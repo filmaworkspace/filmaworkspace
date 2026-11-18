@@ -5,7 +5,8 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
-import { AnchoredPanel } from "@/components/ds";
+import { AnchoredPanel, Button, Field, Input, Modal, Textarea } from "@/components/ds";
+import { ActionModal } from "@/components/accounting/ActionModal";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
@@ -1418,7 +1419,7 @@ export default function InvoiceDetailPage() {
               
               {/* Botón de devolución para fianzas */}
               {canRegisterReturn() && (
-                <button onClick={openReturnModal} className="flex items-center gap-2 px-4 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 text-[13px] font-medium">
+                <button onClick={openReturnModal} className="flex items-center gap-2 px-4 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium">
                   <RefreshCw size={16} />Registrar devolución
                 </button>
               )}
@@ -2086,222 +2087,89 @@ export default function InvoiceDetailPage() {
         )}
       </main>
 
-      {/* Modal Nota del Aprobador */}
-      {showApprovalNoteModal && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowApprovalNoteModal(null)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className={`w-12 h-12 rounded-md flex items-center justify-center ${
-                  showApprovalNoteModal.type === "approval" ? "bg-emerald-100" :
-                  showApprovalNoteModal.type === "rejection" ? "bg-red-100" :
-                  "bg-slate-100"
-                }`}>
-                  <Glasses size={24} className={
-                    showApprovalNoteModal.type === "approval" ? "text-emerald-600" :
-                    showApprovalNoteModal.type === "rejection" ? "text-red-600" :
-                    "text-slate-600"
-                  } />
-                </div>
-                <div>
-                  <h3 className="text-[13px] font-semibold text-slate-900">Nota del aprobador</h3>
-                  <p className="text-[13px] text-slate-500">{showApprovalNoteModal.userName}</p>
-                </div>
+      {(() => {
+        const note = showApprovalNoteModal;
+        const NOTE_LABEL: Record<string, string> = { approval: "Aprobación", rejection: "Rechazo", info_request: "Solicitud de información", comment: "Comentario" };
+        return (
+          <Modal
+            open={!!note}
+            onClose={() => setShowApprovalNoteModal(null)}
+            title={note ? `${NOTE_LABEL[note.type] || "Nota"} · ${note.userName}` : ""}
+            footer={<Button variant="secondary" onClick={() => setShowApprovalNoteModal(null)}>Cerrar</Button>}
+          >
+            {note && (
+              <div className="flex flex-col gap-3">
+                <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-slate-800">{note.text}</p>
+                <p className="text-xs text-slate-400">{formatDateTime(note.createdAt)}</p>
               </div>
-              
-              <div className={`p-4 rounded-md border ${
-                showApprovalNoteModal.type === "approval" ? "bg-emerald-50 border-emerald-200" :
-                showApprovalNoteModal.type === "rejection" ? "bg-red-50 border-red-200" :
-                "bg-slate-50 border-slate-200"
-              }`}>
-                <p className="text-[13px] text-slate-700 italic">&quot;{showApprovalNoteModal.text}&quot;</p>
-              </div>
-              
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
-                <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <Calendar size={12} />
-                  {formatDateTime(showApprovalNoteModal.createdAt)}
-                </div>
-                <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                  showApprovalNoteModal.type === "approval" ? "bg-emerald-100 text-emerald-700" :
-                  showApprovalNoteModal.type === "rejection" ? "bg-red-100 text-red-700" :
-                  showApprovalNoteModal.type === "info_request" ? "bg-amber-100 text-amber-700" :
-                  "bg-slate-100 text-slate-700"
-                }`}>
-                  {showApprovalNoteModal.type === "approval" && "Aprobación"}
-                  {showApprovalNoteModal.type === "rejection" && "Rechazo"}
-                  {showApprovalNoteModal.type === "info_request" && "Solicitud de info"}
-                  {showApprovalNoteModal.type === "comment" && "Comentario"}
-                </span>
-              </div>
-              
-              <button 
-                onClick={() => setShowApprovalNoteModal(null)}
-                className="w-full mt-4 px-4 py-1.5 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            )}
+          </Modal>
+        );
+      })()}
 
-      {/* Cancel Modal */}
-      {showCancelModal && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowCancelModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-100 rounded-md flex items-center justify-center"><XCircle size={20} className="text-red-600" /></div>
-              <div><h3 className="text-lg font-semibold">Anular {invoice.displayNumber}</h3><p className="text-xs text-slate-500">Esta acción no se puede deshacer</p></div>
-            </div>
-            <div className="p-6">
-              <div className="mb-4"><label className="mb-1.5 block text-xs font-medium text-slate-600">Motivo *</label><textarea value={cancellationReason} onChange={(e) => setCancellationReason(e.target.value)} rows={3} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] resize-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none" /></div>
-              <div className="mb-6"><label className="block text-[13px] font-medium text-slate-700 mb-2 flex items-center gap-2"><KeyRound size={14} />Contraseña</label><input type="password" value={passwordInput} onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }} className={`w-full px-2.5 py-1.5 border rounded-md text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none ${passwordError ? "border-red-300 bg-red-50" : "border-slate-200"}`} />{passwordError && <p className="text-xs text-red-600 mt-1 flex items-center gap-1"><AlertCircle size={12} />{passwordError}</p>}</div>
-              <div className="flex gap-3"><button onClick={() => { setShowCancelModal(false); setPasswordInput(""); setCancellationReason(""); }} className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">Cancelar</button><button onClick={handleCancelInvoice} disabled={processing || !cancellationReason.trim() || !passwordInput.trim()} className="flex-1 px-4 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 text-[13px] font-medium disabled:opacity-50">{processing ? "Anulando..." : "Anular"}</button></div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ActionModal
+        open={showCancelModal}
+        onClose={() => { setShowCancelModal(false); setPasswordInput(""); setCancellationReason(""); }}
+        title={`Anular ${invoice.displayNumber}`}
+        subtitle="No se puede deshacer."
+        reason={{ label: "Motivo de la anulación", value: cancellationReason, onChange: setCancellationReason, placeholder: "Por qué se anula" }}
+        password={{ value: passwordInput, onChange: (v) => { setPasswordInput(v); setPasswordError(""); }, error: passwordError }}
+        confirmLabel="Anular"
+        processingLabel="Anulando…"
+        processing={processing}
+        danger
+        onConfirm={handleCancelInvoice}
+      />
 
-      {/* Guarantee Return Modal */}
-      {showReturnModal && invoice && (
-        <div className="fixed inset-0 bg-slate-900/20 z-[70] flex items-center justify-center p-4" onClick={() => setShowReturnModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center">
-                <RefreshCw size={20} className="text-emerald-600" />
+      <Modal
+        open={showReturnModal && !!invoice}
+        onClose={() => setShowReturnModal(false)}
+        title="Registrar devolución de fianza"
+        width="max-w-lg"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowReturnModal(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={handleRegisterReturn} disabled={processingReturn || !returnForm.amount || !returnForm.date}>
+              {processingReturn ? "Registrando…" : "Registrar devolución"}
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <p className="-mt-1 text-[13px] text-slate-500">{invoice.displayNumber} · {invoice.supplier}</p>
+          <dl className="grid grid-cols-3 gap-3 rounded-md border border-slate-200 px-3 py-2.5 text-[13px]">
+            <div><dt className="text-xs text-slate-500">Fianza</dt><dd className="font-mono">{formatCurrency(invoice.totalAmount)} €</dd></div>
+            <div><dt className="text-xs text-slate-500">Devuelto</dt><dd className="font-mono">{formatCurrency(invoice.totalReturned || 0)} €</dd></div>
+            <div><dt className="text-xs text-slate-500">Pendiente</dt><dd className="font-mono font-semibold">{formatCurrency(getRemainingGuarantee())} €</dd></div>
+          </dl>
+          <Field label="Importe devuelto (€)">
+            <Input type="number" step="0.01" value={returnForm.amount || ""} onChange={(e) => setReturnForm({ ...returnForm, amount: parseFloat(e.target.value) || 0 })} className="text-right font-mono" />
+            <span className="mt-1.5 flex gap-3 text-xs">
+              <button type="button" onClick={() => setReturnForm({ ...returnForm, amount: getRemainingGuarantee() })} className="text-slate-600 hover:text-slate-900 hover:underline">Todo lo pendiente</button>
+              <button type="button" onClick={() => setReturnForm({ ...returnForm, amount: Math.round(getRemainingGuarantee() * 50) / 100 })} className="text-slate-600 hover:text-slate-900 hover:underline">50 %</button>
+            </span>
+          </Field>
+          <Field label="Fecha de devolución">
+            <Input type="date" value={returnForm.date} onChange={(e) => setReturnForm({ ...returnForm, date: e.target.value })} />
+          </Field>
+          <div>
+            <p className="mb-1.5 text-xs font-medium text-slate-600">Extracto bancario (opcional)</p>
+            <input type="file" ref={returnFileInputRef} onChange={handleReturnFileSelect} accept=".pdf,.jpg,.jpeg,.png" className="hidden" />
+            {returnFile ? (
+              <div className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-[13px]">
+                <FileText size={14} className="text-slate-400" />
+                <span className="min-w-0 flex-1 truncate">{returnFile.name}</span>
+                <button type="button" onClick={() => setReturnFile(null)} className="text-slate-400 hover:text-slate-900" aria-label="Quitar archivo"><X size={14} /></button>
               </div>
-              <div>
-                <h3 className="text-[14px] font-semibold text-slate-900">Registrar devolución de fianza</h3>
-                <p className="text-xs text-slate-500">{invoice.displayNumber} · {invoice.supplier}</p>
-              </div>
-            </div>
-            
-            <div className="p-6 space-y-5">
-              {/* Resumen de fianza */}
-              <div className="bg-slate-50 rounded-md p-4">
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Importe total</p>
-                    <p className="font-semibold text-slate-900">{formatCurrency(invoice.totalAmount)} €</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Devuelto</p>
-                    <p className="font-semibold text-emerald-600">{formatCurrency(invoice.totalReturned || 0)} €</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Pendiente</p>
-                    <p className="font-semibold text-amber-600">{formatCurrency(getRemainingGuarantee())} €</p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Importe a devolver */}
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Importe devuelto *</label>
-                <div className="relative">
-                  <input 
-                    type="number" 
-                    step="0.01"
-                    value={returnForm.amount || ""} 
-                    onChange={(e) => setReturnForm({ ...returnForm, amount: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-2.5 py-1.5 pr-10 border border-slate-200 rounded-md text-[13px] focus:ring-4 focus:ring-emerald-500 focus:outline-none"
-                    placeholder="0.00"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">€</span>
-                </div>
-                <div className="flex gap-2 mt-2">
-                  <button 
-                    onClick={() => setReturnForm({ ...returnForm, amount: getRemainingGuarantee() })}
-                    className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
-                  >
-                    Devolución completa
-                  </button>
-                  <span className="text-slate-300">·</span>
-                  <button 
-                    onClick={() => setReturnForm({ ...returnForm, amount: getRemainingGuarantee() / 2 })}
-                    className="text-xs text-slate-500 hover:text-slate-700"
-                  >
-                    50%
-                  </button>
-                </div>
-              </div>
-              
-              {/* Fecha de devolución */}
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Fecha de devolución *</label>
-                <input 
-                  type="date" 
-                  value={returnForm.date} 
-                  onChange={(e) => setReturnForm({ ...returnForm, date: e.target.value })}
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:ring-4 focus:ring-emerald-500 focus:outline-none"
-                />
-              </div>
-              
-              {/* Extracto bancario */}
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Extracto bancario</label>
-                <input 
-                  type="file" 
-                  ref={returnFileInputRef}
-                  onChange={handleReturnFileSelect}
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  className="hidden"
-                />
-                {returnFile ? (
-                  <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-md">
-                    <FileText size={18} className="text-emerald-600" />
-                    <span className="flex-1 text-[13px] text-emerald-700 truncate">{returnFile.name}</span>
-                    <button onClick={() => setReturnFile(null)} className="p-1 hover:bg-emerald-100 rounded">
-                      <X size={16} className="text-emerald-600" />
-                    </button>
-                  </div>
-                ) : (
-                  <button 
-                    onClick={() => returnFileInputRef.current?.click()}
-                    className="w-full px-4 py-2 border-2 border-dashed border-slate-200 rounded-md text-[13px] text-slate-500 hover:border-slate-300 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Upload size={16} />
-                    Subir extracto (opcional)
-                  </button>
-                )}
-              </div>
-              
-              {/* Observaciones */}
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Observaciones</label>
-                <textarea 
-                  value={returnForm.notes} 
-                  onChange={(e) => setReturnForm({ ...returnForm, notes: e.target.value })}
-                  rows={2}
-                  placeholder="Notas adicionales sobre la devolución"
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] resize-none focus:ring-4 focus:ring-emerald-500 focus:outline-none"
-                />
-              </div>
-            </div>
-            
-            <div className="px-6 py-4 border-t border-slate-200 flex gap-3">
-              <button 
-                onClick={() => setShowReturnModal(false)} 
-                className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={handleRegisterReturn} 
-                disabled={processingReturn || !returnForm.amount || !returnForm.date}
-                className="flex-1 px-4 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 text-[13px] font-medium disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {processingReturn ? (
-                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Registrando...</>
-                ) : (
-                  <><CheckCircle size={16} />Registrar devolución</>
-                )}
-              </button>
-            </div>
+            ) : (
+              <Button variant="secondary" size="sm" onClick={() => returnFileInputRef.current?.click()}><Upload size={13} /> Subir extracto</Button>
+            )}
           </div>
+          <Field label="Observaciones">
+            <Textarea value={returnForm.notes} onChange={(e) => setReturnForm({ ...returnForm, notes: e.target.value })} rows={2} />
+          </Field>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

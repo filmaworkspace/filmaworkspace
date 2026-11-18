@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
-import { AnchoredPanel } from "@/components/ds";
+import { AnchoredPanel, Button, Modal } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
@@ -546,125 +546,60 @@ export default function ReplaceDocumentPage() {
       </main>
 
       {/* Modal de sustitución */}
-      {showReplaceModal && selectedDoc && (
-        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-[70] p-4" onClick={closeReplaceModal}>
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center">
-                  <Receipt size={20} className="text-emerald-600" />
-                </div>
-                <div>
-                  <h2 className="text-[14px] font-semibold text-slate-900">Sustituir por factura</h2>
-                  <p className="text-xs text-slate-500">{selectedDoc.displayNumber} → FRA-{selectedDoc.number}</p>
-                </div>
+      <Modal
+        open={showReplaceModal && !!selectedDoc}
+        onClose={closeReplaceModal}
+        title={selectedDoc ? `Sustituir ${selectedDoc.displayNumber} por FRA-${selectedDoc.number}` : ""}
+        width="max-w-lg"
+        footer={
+          <>
+            <Button variant="ghost" onClick={closeReplaceModal}>Cancelar</Button>
+            <Button variant="primary" onClick={handleReplace} disabled={processing || !uploadedFile}>{processing ? "Procesando…" : "Sustituir documento"}</Button>
+          </>
+        }
+      >
+        {selectedDoc && (
+          <div className="flex flex-col gap-4 text-[13px]">
+            <div className="flex items-baseline justify-between gap-3 rounded-md border border-slate-200 px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="font-medium text-slate-900">{selectedDoc.supplierName}</p>
+                {selectedDoc.description && <p className="truncate text-xs text-slate-500">{selectedDoc.description}</p>}
               </div>
-              <button onClick={closeReplaceModal} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md">
-                <X size={20} />
-              </button>
+              <p className="flex-shrink-0 font-mono">{formatCurrency(selectedDoc.totalAmount)} {getCurrencySymbol(selectedDoc.currency)}</p>
             </div>
 
-            <div className="p-6 space-y-4">
-              {/* Resumen del documento original */}
-              <div className="bg-slate-50 rounded-md p-4">
-                <p className="text-xs text-slate-500 mb-2">Documento original</p>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-slate-900">{selectedDoc.supplierName}</p>
-                    <p className="text-[13px] text-slate-500">{selectedDoc.description}</p>
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-slate-600">Factura definitiva</p>
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                className={`rounded-md border border-dashed px-4 py-5 text-center transition-colors ${isDragging ? "border-slate-400 bg-[#F7F7F8]" : "border-slate-300"}`}
+              >
+                {uploadedFile ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <FileText size={14} className="text-slate-400" />
+                    <span className="truncate">{uploadedFile.name}</span>
+                    <button type="button" onClick={() => setUploadedFile(null)} className="text-slate-400 hover:text-slate-900" aria-label="Quitar archivo"><X size={14} /></button>
                   </div>
-                  <p className="font-bold text-slate-900">
-                    {formatCurrency(selectedDoc.totalAmount)} {getCurrencySymbol(selectedDoc.currency)}
-                  </p>
-                </div>
+                ) : (
+                  <label className="cursor-pointer text-slate-600">
+                    Arrastra el archivo o <span className="font-medium text-slate-900 underline">selecciónalo</span>
+                    <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} />
+                    <span className="mt-1 block text-xs text-slate-400">PDF, JPG o PNG · máx. 10 MB</span>
+                  </label>
+                )}
               </div>
+            </div>
 
-              {/* Subir archivo */}
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">
-                  Adjuntar factura definitiva *
-                </label>
-                <div
-                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                  onDragLeave={() => setIsDragging(false)}
-                  onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-md p-6 text-center transition-colors ${
-                    isDragging ? "border-slate-400 bg-slate-50" : uploadedFile ? "border-emerald-300 bg-emerald-50" : "border-slate-200"
-                  }`}
-                >
-                  {uploadedFile ? (
-                    <div className="flex items-center justify-center gap-3">
-                      <CheckCircle size={20} className="text-emerald-600" />
-                      <span className="text-[13px] text-slate-700">{uploadedFile.name}</span>
-                      <button
-                        onClick={() => setUploadedFile(null)}
-                        className="p-1 text-slate-400 hover:text-red-500"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <Upload size={24} className="text-slate-400 mx-auto mb-2" />
-                      <p className="text-[13px] text-slate-500 mb-1">Arrastra el archivo o</p>
-                      <label className="text-[13px] text-slate-900 font-medium cursor-pointer hover:underline">
-                        selecciona desde tu equipo
-                        <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} />
-                      </label>
-                      <p className="text-xs text-slate-400 mt-2">PDF, JPG o PNG (máx. 10MB)</p>
-                    </>
-                  )}
-                </div>
-              </div>
+            {error && <p className="text-xs text-red-700">{error}</p>}
 
-              {/* Error */}
-              {error && (
-                <div className="flex items-center gap-2 text-red-600 text-[13px]">
-                  <AlertCircle size={14} />
-                  {error}
-                </div>
-              )}
-
-              {/* Aviso */}
-              <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle size={14} className="text-amber-600 mt-0.5" />
-                  <p className="text-xs text-amber-800">
-                    Al sustituir, el documento pasará a estado &quot;Aprobado&quot; y deberá ser codificado de nuevo.
-                  </p>
-                </div>
-              </div>
-
-              {/* Botones */}
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={closeReplaceModal}
-                  className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleReplace}
-                  disabled={processing || !uploadedFile}
-                  className="flex-1 px-4 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 text-[13px] font-medium disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {processing ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Procesando...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle size={16} />
-                      Sustituir documento
-                    </>
-                  )}
-                </button>
-              </div>
+            <div className="rounded-md border border-amber-200 bg-[#FFFBEB] px-3 py-2.5 text-xs text-amber-900">
+              Al sustituir, el documento pasa a «Aprobado» y hay que volver a codificarlo.
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }
