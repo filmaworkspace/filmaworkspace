@@ -2122,13 +2122,17 @@ export default function BoxesPage() {
                 className="p-1.5 text-slate-400 rounded-md hover:bg-[#F4F4F5] hover:text-slate-900 transition-colors">
                 <Settings size={16} />
               </button>
-              {mainTab !== "cash" && <button
+              {/* En Efectivo el botón se oculta pero conserva su hueco, para que la
+                  cabecera no cambie de altura al cambiar de pestaña. */}
+              <button
+                aria-hidden={mainTab === "cash"}
+                tabIndex={mainTab === "cash" ? -1 : 0}
                 onClick={() => mainTab === "tarjetas"
                   ? (setBoxForm({ name: "", code: "", department: "" }), setShowCreateBoxModal(true))
                   : (setTransferEnvelopeForm(emptyTransferEnvelopeForm), setShowCreateTransferEnvelopeModal(true))}
-                className="flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium">
+                className={`flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium ${mainTab === "cash" ? "invisible" : ""}`}>
                 <Plus size={16} /> {mainTab === "tarjetas" ? "Nueva tarjeta" : "Nuevo sobre"}
-              </button>}
+              </button>
             </div>
           </div>
         </div>
