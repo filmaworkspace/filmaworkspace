@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ClipboardCheck, FolderDown, Plus, Settings, Upload } from "lucide-react";
+import { ClipboardCheck, Plus, Upload } from "lucide-react";
 
 import { auth, db } from "@/lib/firebase";
 import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } from "firebase/firestore";
@@ -439,11 +439,11 @@ export default function AccountingPanelPage() {
             )}
             {showDocsAndConfig && (
               <>
-                <Link href={`/project/${id}/accounting/document-center`} title="Documentos" aria-label="Documentos" className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-[#F1F1F3] hover:text-slate-900">
-                  <FolderDown size={17} />
+                <Link href={`/project/${id}/accounting/document-center`} className="px-2 text-[13px] font-semibold text-slate-900 transition-colors hover:text-slate-500">
+                  Documentos
                 </Link>
-                <Link href={`/project/${id}/accounting/config`} title="Configuración" aria-label="Configuración" className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-[#F1F1F3] hover:text-slate-900">
-                  <Settings size={17} />
+                <Link href={`/project/${id}/accounting/config`} className="mr-2 px-2 text-[13px] font-semibold text-slate-900 transition-colors hover:text-slate-500">
+                  Configuración
                 </Link>
               </>
             )}
