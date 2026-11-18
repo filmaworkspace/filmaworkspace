@@ -47,7 +47,8 @@ import { ScheduleType, ScheduleTimes, SCHEDULE_LABELS, DEFAULT_SCHEDULE_TIMES, n
 
 const SCHEDULE_TYPES: ScheduleType[] = ["rodaje", "oficina", "general"];
 
-const G = "#6BA319";
+const G = "#0F172A";
+const OK = "#10B981"; // estado "respondido"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -657,7 +658,7 @@ export default function ControlHorarioPage() {
   };
 
   const dotColor = (status: string) => {
-    if (status === "complete") return G;
+    if (status === "complete") return OK;
     if (status === "partial")  return "#EF9F27";
     if (status === "draft")    return "#b4b2a9";
     return "transparent";
@@ -864,7 +865,7 @@ export default function ControlHorarioPage() {
                     return (
                       <div key={r.uid} className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50">
                         <div className="w-2 h-2 rounded-full flex-shrink-0" style={{
-                          background: submitted ? G : currentDay.status === "sent" ? "#fac775" : "#d3d1c7",
+                          background: submitted ? OK : currentDay.status === "sent" ? "#fac775" : "#d3d1c7",
                         }} />
                         <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-semibold text-slate-600 flex-shrink-0">
                           {r.name.charAt(0).toUpperCase()}
@@ -965,7 +966,7 @@ export default function ControlHorarioPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[13px] text-slate-600">Respondieron</span>
-                  <span className="text-[13px] font-semibold" style={{ color: G }}>{responded.length}</span>
+                  <span className="text-[13px] font-semibold" style={{ color: OK }}>{responded.length}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[13px] text-slate-600">Pendientes</span>
@@ -975,7 +976,7 @@ export default function ControlHorarioPage() {
                   <div className="pt-2 border-t border-slate-100">
                     <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                       <div className="h-full rounded-full transition-all" style={{
-                        background: G,
+                        background: OK,
                         width: `${(responded.length / currentDay.recipients.length) * 100}%`,
                       }} />
                     </div>
@@ -988,7 +989,7 @@ export default function ControlHorarioPage() {
             <div className="bg-white border border-slate-200 rounded-lg p-5">
               <div className="space-y-2.5">
                 {[
-                  { color: G,        label: "Todos respondieron" },
+                  { color: OK,       label: "Todos respondieron" },
                   { color: "#EF9F27", label: "Respuestas parciales" },
                   { color: "#b4b2a9", label: "Enviado / sin respuestas" },
                   { color: "transparent", label: "Sin enviar", border: "1px solid #d3d1c7" },

@@ -97,9 +97,9 @@ const CATEGORY_CONFIG: Record<EventCategory, {
 }> = {
   crew_join:  { label: "Alta crew",     color: "#22c55e", bg: "bg-emerald-50",  text: "text-emerald-700", border: "border-emerald-200", icon: LogIn,      dotColor: "bg-emerald-500" },
   crew_leave: { label: "Baja crew",     color: "#ef4444", bg: "bg-red-50",      text: "text-red-700",     border: "border-red-200",     icon: LogOut,     dotColor: "bg-red-500"     },
-  scene:      { label: "Escena",        color: "#8b5cf6", bg: "bg-violet-50",   text: "text-violet-700",  border: "border-violet-200",  icon: Clapperboard, dotColor: "bg-violet-500" },
+  scene:      { label: "Escena",        color: "#8b5cf6", bg: "bg-[#F7F7F8]",   text: "text-slate-900",  border: "border-slate-200",  icon: Clapperboard, dotColor: "bg-slate-700" },
   location:   { label: "Localización",  color: "#f59e0b", bg: "bg-amber-50",    text: "text-amber-700",   border: "border-amber-200",   icon: MapPin,     dotColor: "bg-amber-500"   },
-  note:       { label: "Nota",          color: "#6BA319", bg: "bg-lime-50",     text: "text-lime-700",    border: "border-lime-200",    icon: StickyNote, dotColor: "bg-lime-500"    },
+  note:       { label: "Nota",          color: "#0F172A", bg: "bg-lime-50",     text: "text-lime-700",    border: "border-lime-200",    icon: StickyNote, dotColor: "bg-lime-500"    },
   milestone:  { label: "Hito",          color: "#0ea5e9", bg: "bg-sky-50",      text: "text-sky-700",     border: "border-sky-200",     icon: Flag,       dotColor: "bg-sky-500"     },
 };
 
@@ -549,7 +549,7 @@ export default function CalendarPage() {
                   onClick={() => setShowFilterMenu(!showFilterMenu)}
                   className={`flex items-center gap-2 px-3 py-2 border rounded-md text-[13px] transition-colors ${
                     filterCategory !== "all"
-                      ? "border-[#6BA319] bg-[rgba(107,163,25,0.06)] text-[#6BA319]"
+                      ? "border-slate-900 bg-[#F4F4F5] text-slate-900"
                       : "border-slate-200 text-slate-600 hover:border-slate-300"
                   }`}
                 >
@@ -636,7 +636,7 @@ export default function CalendarPage() {
                     }}
                     className={`min-h-[110px] border-r border-b border-slate-100 p-2 cursor-pointer transition-colors group ${!ymd ? "bg-slate-50/60" : ""}
                       ${isWeekend && ymd ? "bg-slate-50/40" : ""}
-                      ${isSelected ? "bg-[rgba(107,163,25,0.05)] ring-1 ring-inset ring-[#6BA319]/30" : "hover:bg-slate-50/70"}
+                      ${isSelected ? "bg-[#F4F4F5] ring-1 ring-inset ring-slate-900/10" : "hover:bg-slate-50/70"}
                     `}
                   >
                     {ymd && (
@@ -644,7 +644,7 @@ export default function CalendarPage() {
                         <div className="flex items-center justify-between mb-1">
                           <span className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
                             isToday
-                              ? "bg-[#6BA319] text-white"
+                              ? "border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
                               : "text-slate-700 group-hover:bg-slate-100"
                           }`}>
                             {new Date(ymd + "T12:00:00").getDate()}
@@ -702,7 +702,7 @@ export default function CalendarPage() {
                       {DAYS_ES[(d.getDay() + 6) % 7]}
                     </p>
                     <span className={`text-[13px] font-bold w-8 h-8 mx-auto flex items-center justify-center rounded-full ${
-                      isToday ? "bg-[#6BA319] text-white" : "text-slate-800"
+                      isToday ? "border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]" : "text-slate-800"
                     }`}>
                       {d.getDate()}
                     </span>
@@ -723,7 +723,7 @@ export default function CalendarPage() {
                     key={ymd}
                     onClick={() => { setSelectedDate(isSelected ? null : ymd); setSidebarEvent(null); }}
                     className={`min-h-[300px] border-r border-slate-100 last:border-r-0 p-3 cursor-pointer transition-colors group ${isWeekend ? "bg-slate-50/40" : ""}
-                      ${isSelected ? "bg-[rgba(107,163,25,0.05)] ring-1 ring-inset ring-[#6BA319]/30" : "hover:bg-slate-50/60"}
+                      ${isSelected ? "bg-[#F4F4F5] ring-1 ring-inset ring-slate-900/10" : "hover:bg-slate-50/60"}
                     `}
                   >
                     <div className="flex justify-end mb-3">
@@ -823,7 +823,7 @@ export default function CalendarPage() {
                             </span>
                           )}
                           {ev.sceneNumber && (
-                            <span className="flex items-center gap-1 text-xs text-violet-600">
+                            <span className="flex items-center gap-1 text-xs text-slate-700">
                               <Clapperboard size={10} /> Esc. {ev.sceneNumber}
                             </span>
                           )}
@@ -914,8 +914,8 @@ export default function CalendarPage() {
                       </div>
                     )}
                     {ev.sceneNumber && (
-                      <div className="flex items-center gap-2 text-[13px] text-violet-700">
-                        <Clapperboard size={13} className="text-violet-500" />
+                      <div className="flex items-center gap-2 text-[13px] text-slate-900">
+                        <Clapperboard size={13} className="text-slate-500" />
                         Escena {ev.sceneNumber}
                       </div>
                     )}
@@ -926,7 +926,7 @@ export default function CalendarPage() {
                         {ev.crewSection && (
                           <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${
                             ev.crewSection === "technical" ? "bg-sky-50 text-sky-600"
-                            : ev.crewSection === "cast" ? "bg-violet-50 text-violet-600"
+                            : ev.crewSection === "cast" ? "bg-[#F7F7F8] text-slate-700"
                             : "bg-amber-50 text-amber-600"
                           }`}>
                             {ev.crewSection === "technical" ? "Técnico" : ev.crewSection === "cast" ? "Cast" : "Especialista"}
@@ -1029,7 +1029,7 @@ export default function CalendarPage() {
                   value={formData.title}
                   onChange={(e) => setFormData((f) => ({ ...f, title: e.target.value }))}
                   placeholder="Descripción breve del evento"
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]"
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
                   autoFocus
                 />
               </div>
@@ -1044,7 +1044,7 @@ export default function CalendarPage() {
                     type="date"
                     value={formData.date}
                     onChange={(e) => setFormData((f) => ({ ...f, date: e.target.value }))}
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] bg-white"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 bg-white"
                   />
                 </div>
                 <div>
@@ -1056,7 +1056,7 @@ export default function CalendarPage() {
                     value={formData.endDate}
                     onChange={(e) => setFormData((f) => ({ ...f, endDate: e.target.value }))}
                     min={formData.date}
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] bg-white"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 bg-white"
                   />
                 </div>
               </div>
@@ -1068,7 +1068,7 @@ export default function CalendarPage() {
                     type="checkbox"
                     checked={formData.allDay}
                     onChange={(e) => setFormData((f) => ({ ...f, allDay: e.target.checked }))}
-                    className="w-4 h-4 accent-[#6BA319] rounded text-[13px]"
+                    className="w-4 h-4 accent-slate-900 rounded text-[13px]"
                   />
                   <span className="text-[13px] font-medium text-slate-700">Todo el día</span>
                 </label>
@@ -1078,14 +1078,14 @@ export default function CalendarPage() {
                       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Hora inicio</label>
                       <input type="time" value={formData.startTime}
                         onChange={(e) => setFormData((f) => ({ ...f, startTime: e.target.value }))}
-                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] bg-white"
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 bg-white"
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Hora fin</label>
                       <input type="time" value={formData.endTime}
                         onChange={(e) => setFormData((f) => ({ ...f, endTime: e.target.value }))}
-                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] bg-white"
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 bg-white"
                       />
                     </div>
                   </div>
@@ -1104,7 +1104,7 @@ export default function CalendarPage() {
                       value={formData.sceneNumber}
                       onChange={(e) => setFormData((f) => ({ ...f, sceneNumber: e.target.value }))}
                       placeholder="p.ej. 12A"
-                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]"
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
                     />
                   </div>
                   <div>
@@ -1116,7 +1116,7 @@ export default function CalendarPage() {
                       value={formData.location}
                       onChange={(e) => setFormData((f) => ({ ...f, location: e.target.value }))}
                       placeholder="Nombre o dirección"
-                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]"
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
                     />
                   </div>
                 </div>
@@ -1133,7 +1133,7 @@ export default function CalendarPage() {
                     value={formData.location}
                     onChange={(e) => setFormData((f) => ({ ...f, location: e.target.value }))}
                     placeholder="Lugar del evento"
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
                   />
                 </div>
               ) : null}
@@ -1152,7 +1152,7 @@ export default function CalendarPage() {
                       value={crewSearch}
                       onChange={(e) => { setCrewSearch(e.target.value); setFormData((f) => ({ ...f, crewMemberId: "", crewMemberName: "", crewSection: "" })); }}
                       placeholder="Buscar por nombre o cargo"
-                      className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]"
+                      className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
                     />
                   </div>
                   {crewSearch && !formData.crewMemberId && filteredCrew.length > 0 && (
@@ -1179,7 +1179,7 @@ export default function CalendarPage() {
                     </div>
                   )}
                   {formData.crewMemberId && (
-                    <p className="mt-1 text-xs text-[#6BA319] flex items-center gap-1">
+                    <p className="mt-1 text-xs text-slate-900 flex items-center gap-1">
                       <Users size={10} /> Seleccionado: {formData.crewMemberName}
                     </p>
                   )}
@@ -1196,7 +1196,7 @@ export default function CalendarPage() {
                   onChange={(e) => setFormData((f) => ({ ...f, description: e.target.value }))}
                   placeholder="Detalles adicionales, instrucciones, observaciones"
                   rows={3}
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] resize-none"
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 resize-none"
                 />
               </div>
             </div>

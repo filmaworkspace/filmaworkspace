@@ -68,11 +68,11 @@ interface PendingMember {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const TEAM_COLOR = "#6BA319";
+const TEAM_COLOR = "#0F172A";
 
 const SECTION_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
   technical:   { label: "Técnico",      bg: "bg-sky-50",    text: "text-sky-700"    },
-  cast:        { label: "Cast",          bg: "bg-violet-50", text: "text-violet-700" },
+  cast:        { label: "Cast",          bg: "bg-[#F7F7F8]", text: "text-slate-900" },
   specialists: { label: "Especialistas", bg: "bg-amber-50",  text: "bg-amber-700"    },
 };
 
@@ -288,7 +288,7 @@ export default function TeamApprovalsPage() {
                   className={`w-full text-left p-4 rounded-lg border transition-all ${isActive
                     ? "shadow-lg scale-[1.01]"
                     : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"}`}
-                  style={isActive ? { borderColor: TEAM_COLOR, backgroundColor: "rgba(107,163,25,0.04)" } : {}}>
+                  style={isActive ? { borderColor: TEAM_COLOR, backgroundColor: "rgba(15,23,42,0.04)" } : {}}>
 
                   <div className="flex items-start gap-3">
                     {/* Avatar */}

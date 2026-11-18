@@ -21,7 +21,6 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 import {
-  ArrowLeft,
   Camera,
   Check,
   ChevronDown,
@@ -46,9 +45,9 @@ import { useUser } from "@/contexts/UserContext";
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const CREW_SECTIONS = {
-  technical:   { label: "Equipo técnico", textColor: "text-sky-700",    bgColor: "bg-sky-50",    borderColor: "border-sky-200"    },
-  cast:        { label: "Cast",           textColor: "text-violet-700", bgColor: "bg-violet-50", borderColor: "border-violet-200" },
-  specialists: { label: "Especialistas",  textColor: "text-amber-700",  bgColor: "bg-amber-50",  borderColor: "border-amber-200"  },
+  technical:   { label: "Equipo técnico", textColor: "text-slate-700", bgColor: "bg-[#F4F4F5]", borderColor: "border-slate-200" },
+  cast:        { label: "Cast",           textColor: "text-slate-700", bgColor: "bg-[#F4F4F5]", borderColor: "border-slate-200" },
+  specialists: { label: "Especialistas",  textColor: "text-slate-700", bgColor: "bg-[#F4F4F5]", borderColor: "border-slate-200" },
 } as const;
 
 type CrewSection = keyof typeof CREW_SECTIONS;
@@ -163,7 +162,7 @@ function Field({
       {editing ? (
         <input type={type} value={value ?? ""} onChange={(e) => onChange?.(e.target.value)}
           placeholder={placeholder}
-          className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] bg-white" />
+          className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 bg-white" />
       ) : (
         <div className="flex items-center gap-2">
           <p className={`text-[13px] font-medium ${display ? "text-slate-900" : "text-slate-300"}`}>
@@ -189,8 +188,8 @@ function SectionCard({
 }) {
   return (
     <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-      <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider">{title}</p>
+      <div className="px-4 py-2.5 border-b border-slate-100 bg-[#FAFAFA] flex items-center justify-between">
+        <p className="text-[13px] font-semibold text-slate-900">{title}</p>
         <div className="flex items-center gap-2">
           {action}
           {onEdit && !editing && (
@@ -200,7 +199,7 @@ function SectionCard({
           )}
         </div>
       </div>
-      <div className="p-5">{children}</div>
+      <div className="px-4 py-3.5">{children}</div>
     </div>
   );
 }
@@ -670,24 +669,22 @@ export default function CrewMemberPage() {
   const isCastOrSpec  = member.section === "cast" || member.section === "specialists";
 
   return (
-    <div className={`min-h-screen bg-slate-50 ${inter.className}`}>
+    <div className={`min-h-screen bg-white ${inter.className}`}>
 
       {/* ── Top bar ────────────────────────────────────────────────────────── */}
       <div className="mt-[53px]">
-        <div className="bg-white border-b border-slate-200 px-6 sm:px-10 py-4">
-          <div className="flex items-center justify-between">
+        <div className="px-6 pt-8 sm:px-10">
+          <div className="flex min-h-[44px] items-center justify-between border-b border-slate-200 pb-4">
             {/* Breadcrumb */}
-            <div className="flex items-center gap-2 text-[13px]">
+            <div className="flex items-center gap-2">
               <Link href={`/project/${projectId}/team/crew`}
-                className="flex items-center gap-1.5 text-slate-500 hover:text-slate-900 transition-colors">
-                <ArrowLeft size={14} />Crew
+                className="text-xl font-semibold tracking-tight text-slate-400 hover:text-slate-900 transition-colors">
+                Crew
               </Link>
-              <span className="text-slate-300">/</span>
-              <span className="text-slate-900 font-medium">{member.name}</span>
+              <span className="text-xl text-slate-300">/</span>
+              <span className="text-xl font-semibold tracking-tight text-slate-900">{member.name}</span>
               {member.crewNumber && (
-                <span className="text-xs font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                  #{member.crewNumber}
-                </span>
+                <span className="ml-1 font-mono text-xs text-slate-400">{member.crewNumber}</span>
               )}
             </div>
 
@@ -697,14 +694,14 @@ export default function CrewMemberPage() {
               <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg">
                 <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden">
                   <div className="h-full rounded-full transition-all"
-                    style={{ width: `${completeness}%`, backgroundColor: completeness >= 80 ? "#6BA319" : completeness >= 50 ? "#F59E0B" : "#EF4444" }} />
+                    style={{ width: `${completeness}%`, backgroundColor: completeness >= 80 ? "#0F172A" : completeness >= 50 ? "#F59E0B" : "#EF4444" }} />
                 </div>
                 <span className="text-xs text-slate-500 font-medium">{completeness}% completado</span>
               </div>
 
               {/* PDF download */}
               <button onClick={downloadPdf} disabled={exportingPdf}
-                className="flex items-center gap-2 px-3 py-2 text-[13px] font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors">
+                className="flex items-center gap-2 px-3 py-1.5 text-[13px] font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors">
                 {exportingPdf ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
                 <span className="inline">Ficha PDF</span>
               </button>
@@ -720,8 +717,7 @@ export default function CrewMemberPage() {
                     </span>
                     {(member.approvalStatus === "draft" || member.approvalStatus === "rejected") && (
                       <button onClick={submitForApproval} disabled={submittingApproval}
-                        className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium rounded-md border text-white disabled:opacity-50 transition-colors"
-                        style={{ backgroundColor: "#6BA319", borderColor: "#6BA319" }}>
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium rounded-md border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] disabled:opacity-50 transition-colors">
                         {submittingApproval ? <RefreshCw size={13} className="animate-spin" /> : <Send size={13} />}
                         <span className="inline">Enviar para aprobación</span>
                       </button>
@@ -732,9 +728,9 @@ export default function CrewMemberPage() {
 
               {/* Send form */}
               <button onClick={() => setShowFormModal(true)} disabled={!member.email}
-                className="flex items-center gap-2 px-4 py-2 text-[13px] font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 text-[13px] font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 title={!member.email ? "Añade un email para enviar el formulario" : "Enviar formulario de alta"}>
-                {formSent ? <MailCheck size={14} className="text-[#6BA319]" /> : <Send size={14} />}
+                {formSent ? <MailCheck size={14} className="text-slate-900" /> : <Send size={14} />}
                 {formSent ? "Enviado" : <span className="inline">Enviar formulario</span>}
               </button>
 
@@ -753,7 +749,7 @@ export default function CrewMemberPage() {
                         className={`w-full px-3 py-1.5 text-left text-xs flex items-center gap-2 transition-colors ${member.status === key ? "bg-slate-50 font-semibold" : "text-slate-700 hover:bg-slate-50"}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${conf.dot}`} />
                         {conf.label}
-                        {member.status === key && <Check size={11} className="ml-auto text-[#6BA319]" />}
+                        {member.status === key && <Check size={11} className="ml-auto text-slate-900" />}
                       </button>
                     ))}
                   </AnchoredPanel>
@@ -765,11 +761,11 @@ export default function CrewMemberPage() {
       </div>
 
       {/* ── Content ──────────────────────────────────────────────────────────── */}
-      <div className="px-6 sm:px-10 py-8">
-        <div className="max-w-5xl mx-auto grid grid-cols-3 gap-6">
+      <div className="px-6 sm:px-10 pt-6 pb-10">
+        <div className="grid items-start gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
 
           {/* ── LEFT ────────────────────────────────────────────────────────── */}
-          <div className="col-span-1 flex flex-col gap-6">
+          <div className="flex flex-col gap-6">
 
             {/* Identity card */}
             <div className="bg-white border border-slate-200 rounded-lg p-6 flex flex-col items-center text-center">
@@ -808,7 +804,7 @@ export default function CrewMemberPage() {
                 <div className="mt-3 pt-3 border-t border-slate-100 w-full">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-400">Salario {member.salaryType === "weekly" ? "semanal" : "mensual"}</span>
-                    <span className="font-semibold text-[#6BA319]">{fmtCurrency(member.salaryAmount)}</span>
+                    <span className="font-semibold text-slate-900">{fmtCurrency(member.salaryAmount)}</span>
                   </div>
                 </div>
               )}
@@ -817,7 +813,7 @@ export default function CrewMemberPage() {
                   {member.section === "cast" && member.character && (
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-slate-400">Personaje</span>
-                      <span className="font-medium text-violet-700">{member.character}</span>
+                      <span className="font-medium text-slate-900">{member.character}</span>
                     </div>
                   )}
                   {member.sessions !== undefined && (
@@ -829,7 +825,7 @@ export default function CrewMemberPage() {
                   {member.salaryPerSession !== undefined && (
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-slate-400">Salario / sesión</span>
-                      <span className="font-semibold text-[#6BA319]">{fmtCurrency(member.salaryPerSession)}</span>
+                      <span className="font-semibold text-slate-900">{fmtCurrency(member.salaryPerSession)}</span>
                     </div>
                   )}
                 </div>
@@ -879,7 +875,7 @@ export default function CrewMemberPage() {
                   <div className="space-y-3">
                     <textarea value={get("notes") || ""} onChange={(e) => setField("notes", e.target.value)}
                       rows={4} placeholder="Observaciones…"
-                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] resize-none" />
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 resize-none" />
                     <EditActions saving={saving} onSave={saveEdit} onCancel={cancelEdit} />
                   </div>
                 ) : (
@@ -890,7 +886,7 @@ export default function CrewMemberPage() {
           </div>
 
           {/* ── RIGHT ───────────────────────────────────────────────────────── */}
-          <div className="col-span-2 flex flex-col gap-6">
+          <div className="flex min-w-0 flex-col gap-6">
 
             {/* Contacto */}
             <SectionCard title="Contacto" editing={isEdit("contact")} onEdit={() => startEdit("contact")}>
@@ -950,7 +946,7 @@ export default function CrewMemberPage() {
                             onClick={() => setField("salaryType", t)}
                             className={`py-2 rounded-md border text-xs font-medium transition-all ${
                               get("salaryType") === t
-                                ? "border-[#6BA319] bg-[rgba(107,163,25,0.08)] text-[#6BA319]"
+                                ? "border-slate-900 bg-[#F4F4F5] text-slate-900"
                                 : "border-slate-200 text-slate-600 hover:border-slate-300"
                             }`}>
                             {t === "weekly" ? "Semanal" : "Mensual"}
@@ -965,7 +961,7 @@ export default function CrewMemberPage() {
                       <input type="number" min={0} value={get("salaryAmount") ?? ""}
                         onChange={(e) => setField("salaryAmount", e.target.value ? Number(e.target.value) : undefined)}
                         placeholder="0.00"
-                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5" />
                     </div>
                   </>
                 )}
@@ -1016,7 +1012,7 @@ export default function CrewMemberPage() {
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                             url
                               ? "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700"
-                              : "border-[#6BA319] text-[#6BA319] hover:bg-[rgba(107,163,25,0.05)]"
+                              : "border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
                           } disabled:opacity-50`}
                         >
                           {uploading
@@ -1102,7 +1098,7 @@ export default function CrewMemberPage() {
                   <button onClick={handleCopyLink}
                     className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors flex-shrink-0 border"
                     style={linkCopied
-                      ? { backgroundColor: "rgba(107,163,25,0.08)", borderColor: "rgba(107,163,25,0.3)", color: "#6BA319" }
+                      ? { backgroundColor: "rgba(15,23,42,0.08)", borderColor: "rgba(15,23,42,0.3)", color: "#0F172A" }
                       : { borderColor: "#e2e8f0", color: "#64748b" }}>
                     {linkCopied ? <><Check size={11} />Copiado</> : <><ClipboardCopy size={11} />Copiar</>}
                   </button>

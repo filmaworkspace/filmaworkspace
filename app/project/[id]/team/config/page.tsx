@@ -151,7 +151,7 @@ function genCode(): string {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const TEAM_COLOR = "#6BA319";
+const TEAM_COLOR = "#0F172A";
 
 const CONFIG_SECTIONS = [
   { id: "approvals",    label: "Aprobaciones",  icon: FileCheck,     description: "Flujo de aprobación para altas de crew" },
@@ -873,33 +873,33 @@ const renderAccesos = () => (
       {
         label: "Media dieta nacional", description: "Nacional — media dieta por día", icon: <Plane size={15} className="text-sky-300" />,
         fields: [
-          { key: "halfPerDiemRate", badge: "Técnicos", badgeColor: "bg-blue-50 text-blue-600" },
-          { key: "halfPerDiemRateArtistic", badge: "Actores", badgeColor: "bg-violet-50 text-violet-600" },
+          { key: "halfPerDiemRate", badge: "Técnicos", badgeColor: "bg-[#F7F7F8] text-slate-700" },
+          { key: "halfPerDiemRateArtistic", badge: "Actores", badgeColor: "bg-[#F7F7F8] text-slate-700" },
         ],
       },
       {
         label: "Dieta nacional", description: "Nacional — dieta completa/día", icon: <Plane size={15} className="text-sky-500" />,
         fields: [
-          { key: "perDiemRate", badge: "Técnicos", badgeColor: "bg-blue-50 text-blue-600" },
-          { key: "perDiemRateArtistic", badge: "Actores", badgeColor: "bg-violet-50 text-violet-600" },
+          { key: "perDiemRate", badge: "Técnicos", badgeColor: "bg-[#F7F7F8] text-slate-700" },
+          { key: "perDiemRateArtistic", badge: "Actores", badgeColor: "bg-[#F7F7F8] text-slate-700" },
         ],
       },
       {
-        label: "Media dieta internacional", description: "Internacional — media dieta/día", icon: <Globe size={15} className="text-indigo-300" />,
+        label: "Media dieta internacional", description: "Internacional — media dieta/día", icon: <Globe size={15} className="text-slate-400" />,
         fields: [
-          { key: "halfIntlPerDiemRate", badge: "Técnicos", badgeColor: "bg-blue-50 text-blue-600" },
-          { key: "halfIntlPerDiemRateArtistic", badge: "Actores", badgeColor: "bg-violet-50 text-violet-600" },
+          { key: "halfIntlPerDiemRate", badge: "Técnicos", badgeColor: "bg-[#F7F7F8] text-slate-700" },
+          { key: "halfIntlPerDiemRateArtistic", badge: "Actores", badgeColor: "bg-[#F7F7F8] text-slate-700" },
         ],
       },
       {
-        label: "Dieta internacional", description: "Internacional — dieta completa", icon: <Globe size={15} className="text-indigo-500" />,
+        label: "Dieta internacional", description: "Internacional — dieta completa", icon: <Globe size={15} className="text-slate-500" />,
         fields: [
-          { key: "intlPerDiemRate", badge: "Técnicos", badgeColor: "bg-blue-50 text-blue-600" },
-          { key: "intlPerDiemRateArtistic", badge: "Actores", badgeColor: "bg-violet-50 text-violet-600" },
+          { key: "intlPerDiemRate", badge: "Técnicos", badgeColor: "bg-[#F7F7F8] text-slate-700" },
+          { key: "intlPerDiemRateArtistic", badge: "Actores", badgeColor: "bg-[#F7F7F8] text-slate-700" },
         ],
       },
       {
-        label: "Alojamiento", description: "Por noche", icon: <Home size={15} className="text-purple-500" />,
+        label: "Alojamiento", description: "Por noche", icon: <Home size={15} className="text-slate-500" />,
         fields: [{ key: "accommodationRate", badge: "Todos", badgeColor: "bg-slate-100 text-slate-500" }],
       },
       {
@@ -1204,7 +1204,7 @@ const renderAccesos = () => (
                   value={accessDraftName}
                   onChange={e => setAccessDraftName(e.target.value)}
                   placeholder="Título del evento"
-                  className="w-full text-[13px] border border-slate-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
+                  className="w-full text-[13px] border border-slate-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 focus:border-slate-900"
                 />
               </div>
 
@@ -1281,7 +1281,7 @@ const renderAccesos = () => (
                     value={accessDraftPIN}
                     onChange={e => setAccessDraftPIN(e.target.value.replace(/\D/g, ""))}
                     placeholder="PIN numérico"
-                    className="w-full text-[13px] font-mono tracking-widest border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white"
+                    className="w-full text-[13px] font-mono tracking-widest border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 focus:border-slate-900 bg-white"
                   />
                 )}
               </div>

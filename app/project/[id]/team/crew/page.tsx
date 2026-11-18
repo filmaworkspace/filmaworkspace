@@ -3,9 +3,11 @@
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { inter } from "@/lib/fonts";
-import { AnchoredPanel } from "@/components/ds";
+import { Button, EmptyState, IconButton, Menu, MenuItem, MenuSeparator, Page, PageHeader, Segmented, Select } from "@/components/ds";
+import SearchBar, { type SearchField } from "@/components/SearchBar";
+import { matchWords, norm } from "@/lib/search";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
@@ -53,7 +55,7 @@ import { useUser } from "@/contexts/UserContext";
 
 const CREW_SECTIONS = {
   technical:   { key: "technical",   label: "Equipo técnico", bgColor: "bg-sky-50",    textColor: "text-sky-700",    borderColor: "border-sky-200"    },
-  cast:        { key: "cast",        label: "Cast",           bgColor: "bg-violet-50", textColor: "text-violet-700", borderColor: "border-violet-200" },
+  cast:        { key: "cast",        label: "Cast",           bgColor: "bg-[#F7F7F8]", textColor: "text-slate-900", borderColor: "border-slate-200" },
   specialists: { key: "specialists", label: "Especialistas",  bgColor: "bg-amber-50",  textColor: "text-amber-700",  borderColor: "border-amber-200"  },
 } as const;
 
@@ -83,6 +85,18 @@ const STATUS_MEMBER_OPTIONS = [
   { value: "pending",  label: "Pendiente" },
   { value: "inactive", label: "Inactivo"  },
 ];
+
+type CrewSearchField = "all" | "name" | "role" | "department" | "contact" | "character";
+const CREW_FIELDS: SearchField<CrewSearchField>[] = [
+  { value: "all",        label: "Buscar en todo",   placeholder: "Nombre, cargo, dpto., teléfono…" },
+  { value: "name",       label: "Nombre",           placeholder: "Nombre o nombre artístico" },
+  { value: "role",       label: "Cargo",            placeholder: "Ej. ayudante de cámara" },
+  { value: "department", label: "Departamento",     placeholder: "Ej. arte" },
+  { value: "contact",    label: "Teléfono o email", placeholder: "600… o @", mono: true },
+  { value: "character",  label: "Personaje",        placeholder: "Personaje (cast)" },
+];
+// Documentos de la ficha (ver crew/[memberId]: REQUIRED_DOCS)
+const REQUIRED_DOC_COUNT = 6;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -115,6 +129,7 @@ interface CrewMember {
   endDateApprox?: string;
   contractReason?: string;
   notes?: string;
+  documents?: Record<string, string>;
   createdAt: Date;
   createdBy: string;
   createdByName: string;
@@ -166,7 +181,7 @@ function CustomSelect({
       <button
         type="button"
         onClick={toggle}
-        className="w-full flex items-center justify-between px-3 py-1.5 border border-slate-200 rounded-md text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[#6BA319] hover:border-slate-300 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-1.5 border border-slate-200 rounded-md text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 hover:border-slate-300 transition-colors"
       >
         <span className={selected ? "text-slate-900" : "text-slate-400"}>
           {selected?.label || placeholder}
@@ -183,11 +198,11 @@ function CustomSelect({
               key={o.value} type="button"
               onMouseDown={() => { onChange(o.value); setOpen(false); }}
               className={`w-full text-left px-4 py-1.5 text-[13px] flex items-center justify-between transition-colors ${
-                value === o.value ? "bg-[rgba(107,163,25,0.08)] text-[#6BA319] font-medium" : "text-slate-700 hover:bg-slate-50"
+                value === o.value ? "bg-[#F4F4F5] text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"
               }`}
             >
               {o.label}
-              {value === o.value && <Check size={13} className="text-[#6BA319]" />}
+              {value === o.value && <Check size={13} className="text-slate-900" />}
             </button>
           ))}
         </div>,
@@ -240,7 +255,7 @@ function DepartmentSelect({
         type="text" value={q} placeholder={placeholder}
         onFocus={openDropdown}
         onChange={(e) => { setQ(e.target.value); onChange(e.target.value); openDropdown(); }}
-        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] pr-8 bg-white"
+        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 pr-8 bg-white"
       />
       <ChevronDown size={14} className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
       {open && filtered.length > 0 && pos && typeof document !== "undefined" && createPortal(
@@ -253,11 +268,11 @@ function DepartmentSelect({
               key={opt} type="button"
               onMouseDown={() => { onChange(opt); setQ(opt); setOpen(false); }}
               className={`w-full text-left px-4 py-1.5 text-[13px] flex items-center justify-between transition-colors ${
-                value === opt ? "bg-[rgba(107,163,25,0.08)] text-[#6BA319] font-medium" : "text-slate-700 hover:bg-slate-50"
+                value === opt ? "bg-[#F4F4F5] text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"
               }`}
             >
               {opt}
-              {value === opt && <Check size={13} className="text-[#6BA319]" />}
+              {value === opt && <Check size={13} className="text-slate-900" />}
             </button>
           ))}
         </div>,
@@ -288,7 +303,7 @@ function SalarySection({
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Remuneración</span>
           {formData.salaryAmount && (
-            <span className="text-xs font-medium text-[#6BA319] bg-[rgba(107,163,25,0.1)] px-2 py-0.5 rounded-md">
+            <span className="text-xs font-medium text-slate-900 bg-[#F4F4F5] px-2 py-0.5 rounded-md">
               {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(formData.salaryAmount)} € /
               {formData.salaryType === "weekly" ? " sem." : " mes"}
             </span>
@@ -313,7 +328,7 @@ function SalarySection({
                   onClick={() => setFormData({ ...formData, salaryType: opt.value })}
                   className={`py-1.5 rounded-md border text-xs font-medium transition-all ${
                     formData.salaryType === opt.value
-                      ? "border-[#6BA319] bg-[rgba(107,163,25,0.08)] text-[#6BA319]"
+                      ? "border-slate-900 bg-[#F4F4F5] text-slate-900"
                       : "border-slate-200 text-slate-600 hover:border-slate-300"
                   }`}
                 >
@@ -333,7 +348,7 @@ function SalarySection({
               value={formData.salaryAmount ?? ""}
               onChange={(e) => setFormData({ ...formData, salaryAmount: e.target.value ? Number(e.target.value) : undefined })}
               placeholder="0.00"
-              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]"
+              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
             />
           </div>
         </div>
@@ -356,6 +371,9 @@ export default function CrewPage() {
   const [searchTerm, setSearchTerm]       = useState("");
   const [statusFilter, setStatusFilter]   = useState("all");
   const [sectionFilter, setSectionFilter] = useState<CrewSection | "all">("all");
+  const [searchField, setSearchField]     = useState<CrewSearchField>("all");
+  const [deptFilter, setDeptFilter]       = useState("all");
+  const [docsFilter, setDocsFilter]       = useState<"all" | "missing" | "ending" | "starting">("all");
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [openMenuId, setOpenMenuId]       = useState<string | null>(null);
   const [menuPosition, setMenuPosition]   = useState<{ top: number; left: number } | null>(null);
@@ -385,7 +403,15 @@ export default function CrewPage() {
   const userName = user?.name || "Usuario";
 
   useEffect(() => { if (userId && id) loadData(); }, [userId, id]);
-  useEffect(() => { filterCrew(); }, [searchTerm, statusFilter, sectionFilter, crew]);
+
+  // Filtro que llega desde el panel de coordinación (?f=pending|missing|ending|starting)
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const f = searchParams?.get("f");
+    if (f === "pending") setStatusFilter("pending");
+    else if (f === "missing" || f === "ending" || f === "starting") setDocsFilter(f);
+  }, [searchParams]);
+  useEffect(() => { filterCrew(); }, [searchTerm, searchField, statusFilter, sectionFilter, deptFilter, docsFilter, crew]);
   useEffect(() => {
     const h = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
@@ -450,6 +476,7 @@ export default function CrewPage() {
           endDateApprox:    v.endDateApprox    || "",
           contractReason:   v.contractReason   || "",
           notes:            v.notes            || "",
+          documents:        v.documents        || {},
           createdAt:        v.createdAt?.toDate() || new Date(),
           createdBy:        v.createdBy        || "",
           createdByName:    v.createdByName    || "",
@@ -477,16 +504,33 @@ export default function CrewPage() {
     let f = [...crew];
     if (sectionFilter !== "all") f = f.filter((m) => m.section === sectionFilter);
     if (statusFilter  !== "all") f = f.filter((m) => m.status  === statusFilter);
-    if (searchTerm) {
-      const s = searchTerm.toLowerCase();
-      f = f.filter((m) =>
-        fullName(m).toLowerCase().includes(s) ||
-        m.role.toLowerCase().includes(s) ||
-        m.department.toLowerCase().includes(s) ||
-        m.email?.toLowerCase().includes(s) ||
-        m.character?.toLowerCase().includes(s)
-      );
+    if (deptFilter    !== "all") f = f.filter((m) => (m.department || "") === deptFilter);
+    const inDays = (iso: string | undefined, max: number) => {
+      if (!iso) return false;
+      const d = new Date(iso + "T00:00:00"); const t = new Date(); t.setHours(0, 0, 0, 0);
+      const n = Math.round((d.getTime() - t.getTime()) / 86400000);
+      return n >= 0 && n <= max;
+    };
+    if (docsFilter === "missing")  f = f.filter((m) => Object.values(m.documents || {}).filter(Boolean).length < REQUIRED_DOC_COUNT);
+    if (docsFilter === "ending")   f = f.filter((m) => m.status !== "inactive" && inDays(m.endDateApprox, 14));
+    if (docsFilter === "starting") f = f.filter((m) => inDays(m.startDate, 14));
+    if (searchTerm.trim()) {
+      const q = searchTerm;
+      const digits = q.replace(/\D/g, "");
+      f = f.filter((m) => {
+        const contact = () => matchWords(q, m.email || "") || (digits.length >= 3 && (m.phone || "").replace(/\D/g, "").includes(digits));
+        switch (searchField) {
+          case "name":       return matchWords(q, fullName(m), m.artisticName || "");
+          case "role":       return matchWords(q, m.role);
+          case "department": return matchWords(q, m.department);
+          case "contact":    return contact();
+          case "character":  return matchWords(q, m.character || "");
+          default:           return matchWords(q, fullName(m), m.artisticName || "", m.role, m.department, m.email || "", m.character || "", m.crewNumber) || contact();
+        }
+      });
     }
+    // Orden: departamento y número de crew, como en una crew list
+    f.sort((a, b) => (a.department || "~").localeCompare(b.department || "~") || a.crewNumber.localeCompare(b.crewNumber));
     setFilteredCrew(f);
   };
 
@@ -841,6 +885,8 @@ export default function CrewPage() {
 
   const deptOptions = formData.section === "cast" ? [] : formData.section === "specialists" ? DEPARTMENTS_SPECIALISTS : DEPARTMENTS_TECHNICAL;
 
+  const departments = Array.from(new Set(crew.map((m) => m.department).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+
   const stats = {
     technical:   crew.filter((m) => m.section === "technical").length,
     cast:        crew.filter((m) => m.section === "cast").length,
@@ -861,254 +907,182 @@ export default function CrewPage() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
+  const sectionCount = (s: CrewSection | "all") => (s === "all" ? crew.length : crew.filter((m) => m.section === s).length);
+  const docsOf = (m: CrewMember) => Object.values(m.documents || {}).filter(Boolean).length;
+  const daysTo = (iso?: string) => {
+    if (!iso) return null;
+    const d = new Date(iso + "T00:00:00");
+    if (isNaN(d.getTime())) return null;
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    return Math.round((d.getTime() - t.getTime()) / 86400000);
+  };
+  const shortDate = (iso?: string) => {
+    if (!iso) return "";
+    const d = new Date(iso + "T00:00:00");
+    return isNaN(d.getTime()) ? iso : new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short" }).format(d);
+  };
+  const STATUS_DOT: Record<CrewMember["status"], { c: string; l: string; t: string }> = {
+    active:   { c: "bg-emerald-500", l: "Activo",    t: "text-slate-700" },
+    pending:  { c: "bg-amber-500",   l: "Pendiente", t: "text-amber-800" },
+    inactive: { c: "bg-slate-300",   l: "Inactivo",  t: "text-slate-500" },
+  };
+
+  const exportCsv = () => {
+    const q = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const head = ["Nº", "Nombre", "Nombre artístico", "Sección", "Departamento", "Cargo", "Personaje", "Teléfono", "Email", "Alta", "Baja aprox.", "Estado", "Documentos"];
+    const lines = filteredCrew.map((m) => [
+      m.crewNumber, fullName(m), m.artisticName, CREW_SECTIONS[m.section].label, m.department, m.role, m.character,
+      m.phone, m.email, m.startDate, m.endDateApprox, STATUS_DOT[m.status].l, `${docsOf(m)}/${REQUIRED_DOC_COUNT}`,
+    ].map(q).join(";"));
+    const blob = new Blob(["﻿" + [head.map(q).join(";"), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `crew_${(projectName || "proyecto").replace(/\s+/g, "-").toLowerCase()}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const filtersActive = statusFilter !== "all" || deptFilter !== "all" || docsFilter !== "all";
+
   return (
-    <div className={`min-h-screen bg-white ${inter.className}`}>
+    <Page>
+      <PageHeader
+        title={<>Crew <span className="text-base font-normal text-slate-400">{crew.filter((m) => m.status !== "inactive").length}</span></>}
+        actions={
+          <>
+            <Menu trigger={(toggle) => <IconButton label="Más acciones" onClick={toggle}><MoreHorizontal size={16} /></IconButton>}>
+              {(close) => (
+                <>
+                  <MenuItem onClick={() => { close(); openCrewListModal(); }}>Crew list (PDF)</MenuItem>
+                  <MenuItem onClick={() => { close(); exportCsv(); }}>Exportar CSV</MenuItem>
+                </>
+              )}
+            </Menu>
+            <Button variant="primary" onClick={openCreate}><Plus size={14} /> Añadir miembro</Button>
+          </>
+        }
+      />
 
-      {/* ── Header ───────────────────────────────────────────────────────────── */}
-      <div className="mt-[53px]">
-        <div className="px-6 pt-8 sm:px-10">
-          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
+      <div className="mt-6">
+        <Segmented
+          value={sectionFilter}
+          onChange={(v) => setSectionFilter(v as CrewSection | "all")}
+          options={[
+            { value: "all", label: `Todos · ${sectionCount("all")}` },
+            ...Object.values(CREW_SECTIONS).map((s) => ({ value: s.key, label: `${s.label} · ${sectionCount(s.key as CrewSection)}` })),
+          ]}
+        />
+      </div>
 
-            {/* Left: título solo */}
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Crew</h1>
-            </div>
-
-            {/* Right: botones */}
-            <div className="absolute right-0 flex items-center gap-4">
-              <button
-                onClick={openCrewListModal}
-                disabled={crew.length === 0}
-                className="flex items-center gap-2 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50 disabled:opacity-40 transition-colors"
-              >
-                <FileDown size={15} className="text-slate-500" />
-                Crew List
-              </button>
-
-              <button
-                onClick={openCreate}
-                className="flex items-center gap-2 px-4 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity"
-              >
-                <Plus size={15} />
-                Añadir miembro
-              </button>
-            </div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <SearchBar fields={CREW_FIELDS} field={searchField} onField={setSearchField} value={searchTerm} onChange={setSearchTerm} count={filteredCrew.length} />
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="w-44">
+            <Select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
+              <option value="all">Todos los dptos.</option>
+              {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+            </Select>
           </div>
-
-          {/* Section tabs */}
-          <div className="grid grid-cols-3 gap-3 mt-6">
-            {Object.values(CREW_SECTIONS).map((section) => {
-              const count  = stats[section.key as keyof typeof stats] as number;
-              const active = sectionFilter === section.key;
-              return (
-                <button
-                  key={section.key}
-                  onClick={() => setSectionFilter(active ? "all" : section.key)}
-                  className={`px-4 py-3 rounded-md border transition-all text-left ${
-                    active ? `${section.borderColor} ${section.bgColor}` : "border-slate-200 hover:border-slate-300 bg-white"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className={`text-[13px] font-medium ${active ? section.textColor : "text-slate-700"}`}>
-                      {section.label}
-                    </span>
-                    <span className={`text-[13px] font-semibold ${active ? section.textColor : "text-slate-900"}`}>
-                      {count}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
+          <div className="w-40">
+            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </Select>
           </div>
+          <div className="w-48">
+            <Select value={docsFilter} onChange={(e) => setDocsFilter(e.target.value as typeof docsFilter)}>
+              <option value="all">Todas las fichas</option>
+              <option value="missing">Falta documentación</option>
+              <option value="ending">Terminan en 14 días</option>
+              <option value="starting">Se incorporan en 14 días</option>
+            </Select>
+          </div>
+          {filtersActive && <Button variant="ghost" size="sm" onClick={() => { setStatusFilter("all"); setDeptFilter("all"); setDocsFilter("all"); }}>Quitar filtros</Button>}
         </div>
       </div>
 
-      {/* ── Main ─────────────────────────────────────────────────────────────── */}
-      <main className="px-6 sm:px-10 py-8">
-
-        {/* Filters */}
-        <div className="flex flex-row flex-wrap gap-3 items-center mb-6">
-          <div className="relative w-72 flex-none">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar por nombre, cargo, departamento"
-              className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-[#6BA319] bg-white text-[13px]"
-            />
-          </div>
-          <div className="relative ml-auto flex-shrink-0" ref={statusDropdownRef}>
-            <button
-              onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-              className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded-md text-[13px] hover:border-slate-300 bg-white min-w-[170px]"
-            >
-              <Filter size={13} className="text-slate-400" />
-              <span className="flex-1 text-left text-xs text-slate-700">{getStatusLabel()}</span>
-              <ChevronDown size={13} className={`text-slate-400 transition-transform ${showStatusDropdown ? "rotate-180" : ""}`} />
-            </button>
-            {showStatusDropdown && (
-              <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1" align="right" match="min" gap={8}>
-                {STATUS_OPTIONS.map((o) => (
-                  <button key={o.value} onClick={() => { setStatusFilter(o.value); setShowStatusDropdown(false); }}
-                    className={`w-full text-left px-4 py-1.5 text-[13px] whitespace-nowrap ${statusFilter === o.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"}`}
-                  >{o.label}</button>
-                ))}
-              </AnchoredPanel>
-            )}
-          </div>
-        </div>
-
-        {/* Empty */}
+      <div className="mt-4">
         {filteredCrew.length === 0 ? (
-          <div className="border-2 border-dashed border-slate-200 rounded-lg p-16 text-center">
-            <div className="hidden">
-              <Users size={24} className="text-slate-400" />
-            </div>
-            <h3 className="text-base font-semibold text-slate-900 mb-1">
-              {searchTerm || statusFilter !== "all" || sectionFilter !== "all" ? "Sin resultados" : "Sin miembros aún"}
-            </h3>
-            {(searchTerm || statusFilter !== "all" || sectionFilter !== "all") && (
-              <p className="text-slate-500 text-[13px]">Prueba a ajustar los filtros</p>
-            )}
-          </div>
+          <EmptyState
+            title={crew.length ? "Sin resultados" : "Aún no hay nadie en el equipo"}
+            action={!crew.length ? <Button variant="primary" size="sm" onClick={openCreate}>Añadir miembro</Button> : undefined}
+          />
         ) : (
-          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="tbl w-full">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider w-12">#</th>
-                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Miembro</th>
-                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Sección</th>
-                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Cargo · Depto.</th>
-                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Contacto</th>
-                    <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Estado</th>
-                    <th className="w-14" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredCrew.map((member) => {
-                    const sc  = CREW_SECTIONS[member.section];
-                    const dim = member.status === "inactive";
-                    return (
-                      <tr
-                        key={member.id}
-                        onClick={() => router.push(`/project/${id}/team/crew/${member.id}`)}
-                        className={`transition-colors cursor-pointer ${dim ? "opacity-50 hover:opacity-70" : "hover:bg-slate-50"}`}
-                      >
-                        {/* Número */}
-                        <td className="px-4 py-3">
-                          <span className="text-xs font-mono text-slate-400">{member.crewNumber}</span>
-                        </td>
-                        {/* Miembro */}
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-slate-600">
-                              {member.firstName.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="text-[13px] font-semibold text-slate-900">{fullName(member)}</p>
-                              {member.artisticName && <p className="text-xs text-slate-400 italic mt-0.5">&quot;{member.artisticName}&quot;</p>}
-                              {member.section === "cast" && member.character && <p className="text-xs text-violet-500 mt-0.5">{member.character}</p>}
-                            </div>
-                          </div>
-                        </td>
-                        {/* Sección */}
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${sc.bgColor} ${sc.textColor}`}>
-                            {sc.label}
-                          </span>
-                        </td>
-                        {/* Cargo */}
-                        <td className="px-4 py-3">
-                          <p className="text-[13px] text-slate-900 font-medium">{member.role}</p>
-                          {member.department && <p className="text-xs text-slate-500 mt-0.5">{member.department}</p>}
-                          {/* Salario resumido */}
-                          {member.section === "technical" && member.salaryAmount && (
-                            <p className="text-xs text-[#6BA319] mt-0.5 font-medium">
-                              {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(member.salaryAmount)} €
-                              <span className="text-slate-400 font-normal"> / {member.salaryType === "weekly" ? "sem." : "mes"}</span>
-                            </p>
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="tbl w-full min-w-[1080px] border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
+                  <th scope="col" className="w-16 px-4 py-2 text-left font-medium">Nº</th>
+                  <th scope="col" className="w-[24%] px-3 py-2 text-left font-medium">Nombre</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Cargo</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Contacto</th>
+                  <th scope="col" className="w-44 px-3 py-2 text-left font-medium">Contrato</th>
+                  <th scope="col" className="w-20 px-3 py-2 text-left font-medium">Docs</th>
+                  <th scope="col" className="w-28 px-3 py-2 text-left font-medium">Estado</th>
+                  <th scope="col" className="w-12 py-2 pr-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCrew.map((member) => {
+                  const st = STATUS_DOT[member.status] || STATUS_DOT.active;
+                  const docs = docsOf(member);
+                  const toEnd = daysTo(member.endDateApprox);
+                  const toStart = daysTo(member.startDate);
+                  return (
+                    <tr
+                      key={member.id}
+                      onClick={() => router.push(`/project/${id}/team/crew/${member.id}`)}
+                      className={`cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA] ${member.status === "inactive" ? "text-slate-400" : ""}`}
+                    >
+                      <td className="px-4 py-1.5 font-mono text-xs text-slate-400">{member.crewNumber}</td>
+                      <td className="px-3 py-1.5">
+                        <span className="font-medium text-slate-900">{fullName(member)}</span>
+                        {(member.artisticName || member.character) && (
+                          <span className="ml-2 text-xs text-slate-400">{member.section === "cast" && member.character ? member.character : member.artisticName}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <span className="text-slate-800">{member.role || "—"}</span>
+                        {member.department && <span className="ml-2 text-xs text-slate-400">{member.department}</span>}
+                      </td>
+                      <td className="px-3 py-1.5">
+                        {member.phone && <a href={`tel:${member.phone}`} onClick={(e) => e.stopPropagation()} className="font-mono text-xs text-slate-700 hover:text-slate-900">{member.phone}</a>}
+                        {member.email && <a href={`mailto:${member.email}`} onClick={(e) => e.stopPropagation()} className={`${member.phone ? "ml-2 " : ""}text-xs text-slate-400 hover:text-slate-900`}>{member.email}</a>}
+                        {!member.phone && !member.email && <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className="px-3 py-1.5 text-xs tabular-nums text-slate-600">
+                        {member.startDate || member.endDateApprox ? (
+                          <>
+                            {shortDate(member.startDate) || "…"} → {shortDate(member.endDateApprox) || "…"}
+                            {toStart !== null && toStart > 0 && toStart <= 14 ? <span className="ml-1.5 text-slate-500">entra en {toStart} d</span>
+                              : toEnd !== null && toEnd >= 0 && toEnd <= 14 && member.status !== "inactive" ? <span className="ml-1.5 text-amber-800">sale en {toEnd} d</span> : null}
+                          </>
+                        ) : <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className={`px-3 py-1.5 font-mono text-xs ${docs < REQUIRED_DOC_COUNT ? "text-amber-800" : "text-slate-500"}`}>{docs}/{REQUIRED_DOC_COUNT}</td>
+                      <td className="px-3 py-1.5">
+                        <span className={`inline-flex items-center gap-1.5 text-xs ${st.t}`}><span className={`h-1.5 w-1.5 rounded-full ${st.c}`} />{st.l}</span>
+                      </td>
+                      <td className="py-1.5 pr-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        <Menu trigger={(toggle) => <IconButton label="Acciones" onClick={toggle}><MoreHorizontal size={15} /></IconButton>}>
+                          {(close) => (
+                            <>
+                              <MenuItem onClick={() => { close(); openEdit(member); }}>Editar datos</MenuItem>
+                              <MenuItem onClick={() => { close(); openSendForm(member); }}>Enviar ficha de alta</MenuItem>
+                              <MenuItem onClick={() => { close(); handleToggleStatus(member); }}>{member.status === "active" ? "Marcar inactivo" : "Marcar activo"}</MenuItem>
+                              <MenuSeparator />
+                              <MenuItem danger onClick={() => { close(); handleDelete(member); }}>Eliminar</MenuItem>
+                            </>
                           )}
-                          {(member.section === "cast" || member.section === "specialists") && member.salaryPerSession && (
-                            <p className="text-xs text-[#6BA319] mt-0.5 font-medium">
-                              {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(member.salaryPerSession)} €
-                              <span className="text-slate-400 font-normal"> / sesión{member.sessions ? ` · ${member.sessions} ses.` : ""}</span>
-                            </p>
-                          )}
-                        </td>
-                        {/* Contacto */}
-                        <td className="px-4 py-3">
-                          <div className="space-y-0.5">
-                            {member.email && (
-                              <a href={`mailto:${member.email}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900">
-                                <MailPlus size={11} className="text-slate-400" />{member.email}
-                              </a>
-                            )}
-                            {member.phone && (
-                              <a href={`tel:${member.phone}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900">
-                                <Phone size={11} className="text-slate-400" />{member.phone}
-                              </a>
-                            )}
-                            {!member.email && !member.phone && <span className="text-xs text-slate-400">—</span>}
-                          </div>
-                        </td>
-                        {/* Estado */}
-                        <td className="px-4 py-3">{getStatusBadge(member.status)}</td>
-                        {/* Menú */}
-                        <td className="px-4 py-3">
-                          <div className="relative menu-container">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (openMenuId === member.id) { closeMenu(); return; }
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                setMenuPosition({ top: rect.bottom + 4, left: rect.right - 208 });
-                                setOpenMenuId(member.id);
-                              }}
-                              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                            >
-                              <MoreHorizontal size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        </Menu>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
-
-        {/* Floating context menu */}
-        {openMenuId && menuPosition && (
-          <div className="fixed w-52 bg-white border border-slate-200 rounded-md shadow-xl z-[9999] py-1" style={{ top: menuPosition.top, left: menuPosition.left }}>
-            {(() => {
-              const member = filteredCrew.find((m) => m.id === openMenuId);
-              if (!member) return null;
-              return (
-                <>
-                  <button onClick={() => openEdit(member)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3">
-                    <Pencil size={14} className="text-slate-400" />Editar datos
-                  </button>
-                  <button onClick={() => openSendForm(member)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3">
-                    <Link2 size={14} className="text-slate-400" />Enviar ficha
-                  </button>
-                  <button onClick={() => handleToggleStatus(member)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3">
-                    {member.status === "active"
-                      ? <><UserMinus size={14} className="text-slate-400" />Marcar inactivo</>
-                      : <><UserCheck size={14} className="text-slate-400" />Marcar activo</>}
-                  </button>
-                  <div className="border-t border-slate-100 my-1" />
-                  <button onClick={() => handleDelete(member)} className="w-full px-4 py-1.5 text-left text-[13px] text-red-600 hover:bg-red-50 flex items-center gap-3">
-                    <Trash2 size={14} />Eliminar
-                  </button>
-                </>
-              );
-            })()}
-          </div>
-        )}
-      </main>
+      </div>
 
       {/* ── Modal ────────────────────────────────────────────────────────────── */}
       {showModal && (
@@ -1159,7 +1133,7 @@ export default function CrewPage() {
                   <input type="text" value={formData.firstName}
                     onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                     placeholder="Nombre"
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
@@ -1168,14 +1142,14 @@ export default function CrewPage() {
                   <input type="text" value={formData.lastName1}
                     onChange={(e) => setFormData({ ...formData, lastName1: e.target.value })}
                     placeholder="Primer apellido"
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Apellido 2</label>
                   <input type="text" value={formData.lastName2 || ""}
                     onChange={(e) => setFormData({ ...formData, lastName2: e.target.value })}
                     placeholder="Segundo apellido"
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5" />
                 </div>
               </div>
 
@@ -1185,7 +1159,7 @@ export default function CrewPage() {
                 <input type="text" value={formData.artisticName || ""}
                   onChange={(e) => setFormData({ ...formData, artisticName: e.target.value })}
                   placeholder="Alias o nombre de cartel"
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5" />
               </div>
 
               {/* Cargo + Empresa */}
@@ -1197,14 +1171,14 @@ export default function CrewPage() {
                   <input type="text" value={formData.role}
                     onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                     placeholder="p.ej. Director de fotografía"
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Empresa</label>
                   <input type="text" value={formData.company || ""}
                     onChange={(e) => setFormData({ ...formData, company: e.target.value })}
                     placeholder="Razón social"
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5" />
                 </div>
               </div>
 
@@ -1226,7 +1200,7 @@ export default function CrewPage() {
                     <input type="text" value={formData.character || ""}
                       onChange={(e) => setFormData({ ...formData, character: e.target.value })}
                       placeholder="Nombre del personaje"
-                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -1234,14 +1208,14 @@ export default function CrewPage() {
                       <input type="number" min={0} value={formData.sessions ?? ""}
                         onChange={(e) => setFormData({ ...formData, sessions: e.target.value ? Number(e.target.value) : undefined })}
                         placeholder="0"
-                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5" />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Salario / sesión (€)</label>
                       <input type="number" min={0} value={formData.salaryPerSession ?? ""}
                         onChange={(e) => setFormData({ ...formData, salaryPerSession: e.target.value ? Number(e.target.value) : undefined })}
                         placeholder="0.00"
-                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5" />
                     </div>
                   </div>
                 </>
@@ -1255,14 +1229,14 @@ export default function CrewPage() {
                     <input type="number" min={0} value={formData.sessions ?? ""}
                       onChange={(e) => setFormData({ ...formData, sessions: e.target.value ? Number(e.target.value) : undefined })}
                       placeholder="0"
-                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Salario / sesión (€)</label>
                     <input type="number" min={0} value={formData.salaryPerSession ?? ""}
                       onChange={(e) => setFormData({ ...formData, salaryPerSession: e.target.value ? Number(e.target.value) : undefined })}
                       placeholder="0.00"
-                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5" />
                   </div>
                 </div>
               )}
@@ -1279,14 +1253,14 @@ export default function CrewPage() {
                   <input type="email" value={formData.email || ""}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     placeholder="correo@ejemplo.com"
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Teléfono</label>
                   <input type="tel" value={formData.phone || ""}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="+34 600 000 000"
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319]" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5" />
                 </div>
               </div>
 
@@ -1296,13 +1270,13 @@ export default function CrewPage() {
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Fecha alta</label>
                   <input type="date" value={formData.startDate || ""}
                     onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] bg-white" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 bg-white" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Baja aprox.</label>
                   <input type="date" value={formData.endDateApprox || ""}
                     onChange={(e) => setFormData({ ...formData, endDateApprox: e.target.value })}
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] bg-white" />
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 bg-white" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Estado</label>
@@ -1319,7 +1293,7 @@ export default function CrewPage() {
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   placeholder="Observaciones, disponibilidad, condiciones especiales"
                   rows={2}
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] resize-none" />
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 resize-none" />
               </div>
 
               <p className="text-xs text-slate-400 bg-slate-50 rounded-md px-3 py-2.5">
@@ -1353,8 +1327,8 @@ export default function CrewPage() {
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(107,163,25,0.1)" }}>
-                  <Link2 size={16} style={{ color: "#6BA319" }} />
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(15,23,42,0.1)" }}>
+                  <Link2 size={16} style={{ color: "#0F172A" }} />
                 </div>
                 <div>
                   <h2 className="text-base font-semibold text-slate-900">Enviar ficha de alta</h2>
@@ -1397,7 +1371,7 @@ export default function CrewPage() {
                       onChange={(e) => setFormMessage(e.target.value)}
                       placeholder={`Hola ${formTarget.firstName}, adjunto la ficha de alta para ${projectName || "la producción"}. Rellena todos los campos y adjunta los documentos indicados. ¡Gracias!`}
                       rows={3}
-                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-[#6BA319] resize-none"
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 resize-none"
                     />
                   </div>
 
@@ -1409,8 +1383,8 @@ export default function CrewPage() {
                 /* Result */
                 <div className="space-y-4">
                   <div className="text-center py-2">
-                    <div className="w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: "rgba(107,163,25,0.1)" }}>
-                      <Check size={22} style={{ color: "#6BA319" }} />
+                    <div className="w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: "rgba(15,23,42,0.1)" }}>
+                      <Check size={22} style={{ color: "#0F172A" }} />
                     </div>
                     <h3 className="text-base font-semibold text-slate-900">¡Ficha generada!</h3>
                     <p className="text-xs text-slate-500 mt-1">Comparte el enlace y el código con {formTarget.firstName}</p>
@@ -1507,8 +1481,8 @@ export default function CrewPage() {
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(107,163,25,0.1)" }}>
-                  <FileDown size={16} style={{ color: "#6BA319" }} />
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(15,23,42,0.1)" }}>
+                  <FileDown size={16} style={{ color: "#0F172A" }} />
                 </div>
                 <div>
                   <h2 className="text-base font-semibold text-slate-900">Exportar Crew List</h2>
@@ -1540,7 +1514,7 @@ export default function CrewPage() {
 
                       <div
                         className="w-0.5 h-8 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: "#6BA319" }}
+                        style={{ backgroundColor: "#0F172A" }}
                       />
 
                       <div className="flex-1 min-w-0">
@@ -1599,6 +1573,6 @@ export default function CrewPage() {
           </div>
         </div>
       )}
-    </div>
+    </Page>
   );
 }
