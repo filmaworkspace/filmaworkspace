@@ -1,6 +1,7 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
+import CashBox from "@/components/box/CashBox";
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -351,7 +352,7 @@ const CONFLICT_CONFIG: Record<ConflictType, {
   missing_document:        { icon: "missing", label: "Documento ausente",           description: "No hay factura ni ticket adjunto en Pleo para este gasto",          color: "slate",  resolvable: true  },
 };
 
-type MainTab = "tarjetas" | "transfers";
+type MainTab = "tarjetas" | "transfers" | "cash";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2090,10 +2091,15 @@ export default function BoxesPage() {
                 <button
                   onClick={() => { setMainTab("transfers"); setSelectedBox(null); setSelectedEnvelope(null); setSelectedTransferEnvelope(null); setSearchTerm(""); }}
                   className={`flex items-center gap-2 px-2.5 py-1 rounded-md text-[13px] transition-colors ${mainTab === "transfers" ? "font-medium text-slate-900 bg-[#F1F1F3]" : "text-slate-500 hover:text-slate-700"}`}>
-                  <Banknote size={15} /> Petty Cash
+                  <Send size={15} /> Transferencias
                   {pendingFormSubmissions > 0 && (
                     <span className="bg-amber-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{pendingFormSubmissions}</span>
                   )}
+                </button>
+                <button
+                  onClick={() => { setMainTab("cash"); setSelectedBox(null); setSelectedEnvelope(null); setSelectedTransferEnvelope(null); setSearchTerm(""); }}
+                  className={`flex items-center gap-2 px-2.5 py-1 rounded-md text-[13px] transition-colors ${mainTab === "cash" ? "font-medium text-slate-900 bg-[#F1F1F3]" : "text-slate-500 hover:text-slate-700"}`}>
+                  <Banknote size={15} /> Efectivo
                 </button>
               </div>
             </div>
@@ -2104,19 +2110,30 @@ export default function BoxesPage() {
                 className="p-1.5 text-slate-400 rounded-md hover:bg-[#F4F4F5] hover:text-slate-900 transition-colors">
                 <Settings size={16} />
               </button>
-              <button
+              {mainTab !== "cash" && <button
                 onClick={() => mainTab === "tarjetas"
                   ? (setBoxForm({ name: "", code: "", department: "" }), setShowCreateBoxModal(true))
                   : (setTransferEnvelopeForm(emptyTransferEnvelopeForm), setShowCreateTransferEnvelopeModal(true))}
                 className="flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium">
                 <Plus size={16} /> {mainTab === "tarjetas" ? "Nueva tarjeta" : "Nuevo sobre"}
-              </button>
+              </button>}
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
+      {mainTab === "cash" ? (
+        <CashBox
+          projectId={projectId}
+          projectName={projectName}
+          userId={userId}
+          userName={userName}
+          subAccounts={subAccounts.map((s) => ({ code: s.code, description: s.description }))}
+          departments={departments}
+          onToast={showToast}
+        />
+      ) : (
       <div className="px-6 sm:px-10 pb-8">
         <div className="flex gap-6">
 
@@ -2787,6 +2804,8 @@ export default function BoxesPage() {
           </div>
         </div>
       </div>
+
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {/* EXPENSE DRAWER                                                          */}

@@ -58,13 +58,21 @@ export function actualBySubaccount(invoices: any[], config: CostSettings): Total
   return out;
 }
 
-/** Caja: gastos de tarjeta contabilizados y todas las transferencias. */
+/** Caja: gastos de tarjeta contabilizados, todas las transferencias y los
+ *  gastos de efectivo (pagos con ticket y justificaciones) contabilizados. */
 export async function loadBoxBySubaccount(projectId: string): Promise<Totals> {
   const out: Totals = {};
-  const [cards, transfers] = await Promise.all([
+  const [cards, transfers, cash] = await Promise.all([
     getDocs(collection(db, `projects/${projectId}/cardExpenses`)),
     getDocs(collection(db, `projects/${projectId}/transferExpenses`)),
+    getDocs(collection(db, `projects/${projectId}/cashMovements`)).catch(() => null),
   ]);
+  cash?.docs.forEach((d) => {
+    const m = d.data();
+    if ((m.type === "expense" || m.type === "settlement") && m.status === "accounted") {
+      (m.lines || []).forEach((l: any) => { if (l.subAccountCode) add(out, l.subAccountCode, l.baseAmount || 0); });
+    }
+  });
   cards.docs.forEach((d) => {
     const e = d.data();
     if (e.status === "accounted" && e.subAccountCode) add(out, e.subAccountCode, e.baseAmount || 0);

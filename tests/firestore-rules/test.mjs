@@ -27,6 +27,12 @@ await env.withSecurityRulesDisabled(async (c) => {
   await setDoc(doc(db, "supportArchive/a1"), { userId: "alice", status: "resolved" });
   await setDoc(doc(db, "supportArchive/a1/messages/m1"), { text: "hola" });
   await setDoc(doc(db, "meta/featureFlags"), { x: { enabledGlobally: false } });
+  await setDoc(doc(db, "users/crew"), { role: "user", name: "Crew" });
+  await setDoc(doc(db, "projects/p1/members/crew"), { role: null, position: "Crew", permissions: { config: false, team: false, accounting: false } });
+  await setDoc(doc(db, "userProjects/crew/projects/p1"), { permissions: { config: false, team: false, accounting: false } });
+  await setDoc(doc(db, "projects/p1/cashFloats/cf1"), { name: "Caja", code: "CP", nextNumber: 3, status: "open" });
+  await setDoc(doc(db, "projects/p1/cashMovements/m1"), { floatId: "cf1", type: "expense", amount: 10, status: "accounted" });
+  await setDoc(doc(db, "projects/p1/cashMovements/m2"), { floatId: "cf1", type: "expense", amount: 5, status: "pending" });
 });
 
 const anon = env.unauthenticatedContext().firestore();
@@ -126,6 +132,16 @@ await t("chat activo: el usuario abre conversación", true, () => setDoc(doc(ali
 await t("contador de tickets", true, () => setDoc(doc(alice, "meta/supportTicketCounter"), { count: 1 }, { merge: true }));
 await t("usuario edita featureFlags", false, () => setDoc(doc(mallory, "meta/featureFlags"), { x: { enabledGlobally: true } }));
 await t("usuario edita mantenimiento", false, () => setDoc(doc(mallory, "meta/maintenance"), { enabled: true }));
+
+console.log("caja de efectivo");
+const crew = env.authenticatedContext("crew", { email: "c@x.com" }).firestore();
+await t("contabilidad lee el libro de caja", true, () => getDocs(collection(alice, "projects/p1/cashMovements")));
+await t("miembro sin contabilidad no lee la caja", false, () => getDocs(collection(crew, "projects/p1/cashMovements")));
+await t("miembro sin contabilidad no lee las cajas", false, () => getDoc(doc(crew, "projects/p1/cashFloats/cf1")));
+await t("contabilidad registra un movimiento", true, () => setDoc(doc(alice, "projects/p1/cashMovements/m3"), { floatId: "cf1", type: "advance", amount: 50, status: "reviewed" }));
+await t("no se borra un movimiento contabilizado", false, () => deleteDoc(doc(alice, "projects/p1/cashMovements/m1")));
+await t("se borra uno sin contabilizar", true, () => deleteDoc(doc(alice, "projects/p1/cashMovements/m2")));
+await t("ajeno no registra movimientos", false, () => setDoc(doc(mallory, "projects/p1/cashMovements/m4"), { type: "advance", amount: 1 }));
 
 console.log(`\n${pass} ok, ${fail} fallos`);
 await env.cleanup();

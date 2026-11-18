@@ -438,6 +438,25 @@ service cloud.firestore {
                          hasAccountingExtendedAccess(projectId);
       }
 
+      // ── Caja de efectivo (Petty Cash) ─────────────────────────────────────
+      // Solo quien tiene acceso a contabilidad (incluye al cajero-pagador).
+      match /cashFloats/{floatId} {
+        allow read, create, update: if isAdmin() || hasAccountingAccess(projectId) || isEPorPM(projectId);
+        allow delete: if isAdmin() || isEPorPM(projectId) || hasAccountingExtendedAccess(projectId);
+      }
+
+      match /cashMovements/{movementId} {
+        allow read, create, update: if isAdmin() || hasAccountingAccess(projectId) || isEPorPM(projectId);
+        // Un movimiento contabilizado ya no se puede borrar.
+        allow delete: if (isAdmin() || hasAccountingAccess(projectId) || isEPorPM(projectId)) &&
+                         resource.data.status != 'accounted';
+      }
+
+      match /cashCounts/{countId} {
+        allow read, create: if isAdmin() || hasAccountingAccess(projectId) || isEPorPM(projectId);
+        allow update, delete: if isAdmin() || isEPorPM(projectId) || hasAccountingExtendedAccess(projectId);
+      }
+
       match /crew/{crewId} {
         allow read: if isSignedIn() && (
           isAdmin() ||
