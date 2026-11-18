@@ -729,8 +729,9 @@ export default function SuppliersPage() {
         }
       />
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <SearchBar fields={SEARCH_FIELDS} field={searchField} onField={setSearchField} value={searchTerm} onChange={setSearchTerm} count={rows.length} />
+        <div className="flex flex-wrap items-center justify-end gap-3">
         <div className="w-44">
           <Select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}>
             {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -746,6 +747,7 @@ export default function SuppliersPage() {
         {filtersActive && (
           <Button variant="ghost" size="sm" onClick={() => { setFilterStatus("all"); setFilterPayment("all"); }}>Quitar filtros</Button>
         )}
+        </div>
       </div>
 
       <div className="mt-4">
@@ -756,7 +758,7 @@ export default function SuppliersPage() {
           />
         ) : (
           <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full min-w-[1000px] border-collapse text-[13px]">
+            <table className="tbl w-full min-w-[1000px] border-collapse text-[13px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
                   <th scope="col" className="px-4 py-2 text-left font-medium">Proveedor</th>

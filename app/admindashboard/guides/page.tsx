@@ -292,7 +292,7 @@ export default function GuidesListPage() {
               </div>
             ) : (
               <div className="bg-white border border-slate-200 rounded-xl">
-                <table className="w-full text-sm">
+                <table className="tbl w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
                       <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider rounded-tl-xl">Guía</th>

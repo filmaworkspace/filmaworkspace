@@ -477,8 +477,9 @@ export default function DocumentCenterPage() {
         }
       />
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <SearchBar fields={DOC_FIELDS} field={docField} onField={setDocField} value={searchTerm} onChange={setSearchTerm} count={rows.length} />
+        <div className="flex flex-wrap items-center justify-end gap-3">
         <div className="w-48">
           <Select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)}>
             <option value="all">Todos los proveedores</option>
@@ -496,8 +497,9 @@ export default function DocumentCenterPage() {
           <span>—</span>
           <Input type="date" value={dateRange.to} onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })} className="w-36" aria-label="Hasta" />
         </div>
+        </div>
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-4">
+      <div className="mt-2 flex flex-wrap items-center justify-end gap-4">
         <Checkbox label="Falta algún archivo" checked={missingFiles} onChange={setMissingFiles} />
         <Checkbox label="Sin codificar" checked={uncodedOnly} onChange={setUncodedOnly} />
         {filtersOn && (
@@ -510,7 +512,7 @@ export default function DocumentCenterPage() {
           <EmptyState title={invoices.length ? "Sin resultados" : "Sin documentos"} />
         ) : (
           <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full min-w-[1000px] border-collapse text-[13px]">
+            <table className="tbl w-full min-w-[1000px] border-collapse text-[13px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
                   <th scope="col" className="w-10 py-2 pl-4"><input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Seleccionar todo" className="h-3.5 w-3.5 accent-slate-900" /></th>

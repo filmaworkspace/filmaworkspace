@@ -664,7 +664,7 @@ export default function JournalPage() {
                   <button onClick={() => setMLines(p => [...p, { id: uid(), code: "400", name: "", debe: 0, haber: 0 }])} className="flex items-center gap-1 text-xs border border-slate-200 rounded px-2 py-0.5 hover:bg-slate-50"><Plus size={10} />Línea</button>
                 </div>
                 <div className="border border-slate-200 rounded-lg overflow-hidden">
-                  <table className="w-full text-xs">
+                  <table className="tbl w-full text-xs">
                     <thead className="bg-slate-50 border-b border-slate-200"><tr><th className="px-2 py-1.5 text-left text-[10px] font-mono text-slate-400 uppercase w-32">Cuenta</th><th className="px-2 py-1.5 text-left text-[10px] font-mono text-slate-400 uppercase">Descripción</th><th className="px-2 py-1.5 text-right text-[10px] font-mono text-slate-400 uppercase w-24">Debe</th><th className="px-2 py-1.5 text-right text-[10px] font-mono text-slate-400 uppercase w-24">Haber</th><th className="w-7" /></tr></thead>
                     <tbody className="divide-y divide-slate-100">
                       {mLines.map(line => (
@@ -754,7 +754,7 @@ export default function JournalPage() {
                   <button onClick={addWorker} className="flex items-center gap-1 text-xs border border-slate-200 rounded px-2 py-0.5 hover:bg-slate-50"><Plus size={10} />Añadir trabajador</button>
                 </div>
                 <div className="border border-slate-200 rounded-lg overflow-x-auto">
-                  <table className="w-full text-xs" style={{ minWidth: 900 }}>
+                  <table className="tbl w-full text-xs" style={{ minWidth: 900 }}>
                     <thead className="bg-slate-50 border-b border-slate-200">
                       <tr>
                         <th className="px-2 py-2 text-left text-[10px] font-mono text-slate-400 uppercase">Nombre / NIF</th>

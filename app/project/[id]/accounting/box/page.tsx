@@ -2329,7 +2329,7 @@ export default function BoxesPage() {
                     <EmptyState title="Esta tarjeta aún no tiene sobres" />
                   ) : (
                     <div className="overflow-x-auto rounded-lg border border-slate-200">
-                      <table className="w-full min-w-[720px] border-collapse text-[13px]">
+                      <table className="tbl w-full min-w-[720px] border-collapse text-[13px]">
                         <thead>
                           <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
                             <th scope="col" className="px-4 py-2 text-left font-medium">Sobre</th>
@@ -2435,7 +2435,7 @@ export default function BoxesPage() {
                         />
                       ) : (
                         <>
-                          <div className="flex flex-wrap items-center gap-3">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
                             <SearchBar fields={ENV_FIELDS} field={envField} onField={setEnvField} value={envSearch} onChange={setEnvSearch} count={visible.length} />
                             <Segmented
                               value={envStatus}
@@ -2450,7 +2450,7 @@ export default function BoxesPage() {
                             />
                           </div>
                           <div className="overflow-x-auto rounded-lg border border-slate-200">
-                            <table className="w-full min-w-[900px] border-collapse text-[13px]">
+                            <table className="tbl w-full min-w-[900px] border-collapse text-[13px]">
                               <thead>
                                 <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
                                   <th scope="col" className="px-4 py-2 text-left font-medium">Nº</th>
@@ -2645,7 +2645,7 @@ export default function BoxesPage() {
                           />
                         </div>
                         <div className="overflow-x-auto rounded-lg border border-slate-200">
-                          <table className="w-full min-w-[760px] border-collapse text-[13px]">
+                          <table className="tbl w-full min-w-[760px] border-collapse text-[13px]">
                             <thead>
                               <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
                                 <th scope="col" className="px-4 py-2 text-left font-medium">Fecha</th>
@@ -3575,7 +3575,7 @@ export default function BoxesPage() {
                   </div>
                   {importPreview.length > 0 && (
                     <div className="border border-slate-200 rounded-md overflow-hidden">
-                      <table className="w-full text-[13px]">
+                      <table className="tbl w-full text-[13px]">
                         <thead className="bg-slate-50 border-b border-slate-200">
                           <tr>
                             <th className="text-left px-3 py-2 font-medium text-slate-600 w-[80px]">Tipo</th>

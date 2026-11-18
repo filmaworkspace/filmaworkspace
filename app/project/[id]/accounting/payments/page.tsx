@@ -719,8 +719,9 @@ export default function PaymentsPage() {
           }
         />
 
-        <div className="mt-6 flex flex-wrap items-center gap-3">
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
           <SearchBar fields={PAY_FIELDS} field={payField} onField={setPayField} value={searchTerm} onChange={setSearchTerm} count={filteredForecasts.length} />
+          <div className="flex flex-wrap items-center justify-end gap-3">
           <div className="w-44">
             <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -732,6 +733,7 @@ export default function PaymentsPage() {
             </Select>
           </div>
           <Segmented value={viewMode} onChange={setViewMode} options={[{ value: "kanban", label: "Tablero" }, { value: "list", label: "Lista" }]} />
+          </div>
         </div>
 
         <div className="mt-5 flex flex-col items-start gap-6 lg:flex-row">
@@ -920,7 +922,7 @@ export default function PaymentsPage() {
               </div>
             ) : (
               <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                <table className="w-full">
+                <table className="tbl w-full">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
                       <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase">Previsión</th>

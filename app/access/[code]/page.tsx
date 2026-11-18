@@ -388,7 +388,7 @@ const allowances = access
 
       {/* ── Grid ─────────────────────────────────────────────────────────── */}
       <div className="overflow-x-auto">
-        <table className="border-collapse w-full" style={{ minWidth:`${220 + numDays * 42}px` }}>
+        <table className="tbl border-collapse w-full" style={{ minWidth:`${220 + numDays * 42}px` }}>
           <thead>
             <tr className="bg-white border-b border-stone-200">
               <th className="sticky left-0 z-10 bg-white border-r border-stone-100 px-4 py-3 text-left" style={{ minWidth:200 }}>

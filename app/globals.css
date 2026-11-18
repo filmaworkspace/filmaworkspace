@@ -21,3 +21,114 @@
 .animate-fadeIn {
   animation: fadeIn 0.2s ease-out;
 }
+/* ─── Tablas de datos ─────────────────────────────────────────────────────────
+   Estilo técnico común a todas las tablas (clase "tbl" en <table>): sin caja
+   redondeada, cabecera en versalitas sin fondo, filas bajas de una sola línea
+   y totales separados por una regla. Usa selectores con más peso que las
+   utilidades de Tailwind para imponerse a las clases sueltas de cada tabla. */
+div:has(> table.tbl) {
+  border-radius: 0;
+  border-left-width: 0;
+  border-right-width: 0;
+  border-top: 1px solid #cbd5e1;
+  border-bottom: 1px solid #cbd5e1;
+}
+table.tbl {
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+table.tbl thead tr {
+  background: transparent;
+  border-bottom: 1px solid #cbd5e1;
+}
+table.tbl thead th {
+  padding-top: 7px;
+  padding-bottom: 7px;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+  white-space: nowrap;
+}
+table.tbl tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+}
+table.tbl tbody tr:last-child {
+  border-bottom: 0;
+}
+table.tbl tbody td {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  white-space: nowrap;
+  line-height: 1.45;
+}
+/* Celdas con ancho máximo: cortan con puntos suspensivos en vez de crecer. */
+table.tbl td[class*="max-w"] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* El texto secundario (descripción, NIF, email…) va en la misma línea, en gris. */
+table.tbl td span.block,
+table.tbl td a.block > span.block {
+  display: inline;
+}
+table.tbl td span.block + span.block,
+table.tbl td a.block > span.block + span.block {
+  margin-left: 0.5rem;
+  color: #94a3b8;
+}
+table.tbl tfoot tr {
+  background: transparent;
+  border-top: 1px solid #cbd5e1;
+}
+table.tbl tfoot td {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+/* Tablas antiguas que apilan párrafos en la celda: todo en una línea. */
+table.tbl td > p,
+table.tbl td > div > p,
+table.tbl td > div > div > p {
+  display: inline;
+  margin: 0;
+}
+table.tbl td > p + p,
+table.tbl td > div > p + p,
+table.tbl td > div > div > p + p {
+  margin-left: 0.5rem;
+  color: #94a3b8;
+}
+/* Contenedor redondeado un nivel por encima de la tabla. */
+div:has(> div > table.tbl).rounded-lg,
+div:has(> div > table.tbl).rounded-md,
+div:has(> div > table.tbl).rounded-xl {
+  border-radius: 0;
+  border-left-width: 0;
+  border-right-width: 0;
+  border-color: #cbd5e1;
+}
+table.tbl td .w-8.h-8,
+table.tbl td .w-9.h-9 {
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 11px;
+}
+
+/* Anchos de columna fijos: no cambian según lo que haya en las filas (al
+   buscar o filtrar la tabla no "baila"). Lo que no cabe se corta con "…". */
+table.tbl {
+  table-layout: fixed;
+}
+table.tbl th,
+table.tbl td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Columnas de acciones (cabecera vacía) e importes: ancho fijo propio. */
+table.tbl thead th:empty:not([class*="w-"]) {
+  width: 3.5rem;
+}
+table.tbl thead th.text-right:not([class*="w-"]) {
+  width: 8.5rem;
+}

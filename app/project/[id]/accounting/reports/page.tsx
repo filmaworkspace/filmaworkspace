@@ -1244,8 +1244,9 @@ export default function ReportsPage() {
     <Page>
       <PageHeader title="Informes" />
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <SearchBar fields={REPORT_FIELDS} field={reportField} onField={setReportField} value={reportSearch} onChange={setReportSearch} count={reportRows.length} />
+        <div className="flex flex-wrap items-center justify-end gap-3">
         <div className="w-48">
           <Select value={sectionFilter} onChange={(e) => setSectionFilter(e.target.value)}>
             <option value="all">Todas las secciones</option>
@@ -1255,6 +1256,7 @@ export default function ReportsPage() {
         {episodesEnabled && totalEpisodes > 0 && (
           <Checkbox label="Desglosar por capítulo" checked={splitByEpisode} onChange={setSplitByEpisode} />
         )}
+        </div>
       </div>
 
       <div className="mt-4">
@@ -1262,7 +1264,7 @@ export default function ReportsPage() {
           <EmptyState title="Sin resultados" />
         ) : (
           <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full min-w-[760px] border-collapse text-[13px]">
+            <table className="tbl w-full min-w-[760px] border-collapse text-[13px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
                   <th scope="col" className="px-4 py-2 text-left font-medium">Informe</th>

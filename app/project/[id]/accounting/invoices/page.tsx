@@ -740,8 +740,9 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-3">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <SearchBar fields={INV_FIELDS} field={searchField} onField={setSearchField} value={searchTerm} onChange={setSearchTerm} count={rows.length} />
+        <div className="flex flex-wrap items-center justify-end gap-3">
         <div className="w-44">
           <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
             <option value="all">Todos los tipos</option>
@@ -754,6 +755,7 @@ export default function InvoicesPage() {
           </Select>
         </div>
         {canCodeInvoices && <Checkbox label="Sin codificar" checked={showUncodedOnly} onChange={setShowUncodedOnly} />}
+        </div>
       </div>
 
       {(supplierName || filtersActive) && (
@@ -772,7 +774,7 @@ export default function InvoicesPage() {
           <EmptyState title={invoices.length ? "Sin resultados" : "Sin documentos"} action={!invoices.length && permissions.canCreatePO ? <Link href={`/project/${id}/accounting/invoices/new`} className={buttonClass("primary", "sm")}>Subir documento</Link> : undefined} />
         ) : (
           <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full min-w-[1000px] border-collapse text-[13px]">
+            <table className="tbl w-full min-w-[1000px] border-collapse text-[13px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
                   <th scope="col" className="px-4 py-2 text-left font-medium">Documento</th>
@@ -798,13 +800,13 @@ export default function InvoicesPage() {
                   return (
                     <tr key={invoice.id} className={`cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA] ${dead ? "text-slate-400" : ""}`} onClick={() => router.push(href)}>
                       <td className="whitespace-nowrap px-4 py-1.5">
-                        <span className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-2">
                           <span className="w-8 font-mono text-[10px] text-slate-500" title={docType.label}>{docType.code}</span>
                           <Link href={href} onClick={(e) => e.stopPropagation()} className={`font-mono text-xs font-medium hover:underline ${dead ? "line-through" : ""}`}>{invoice.displayNumber}</Link>
                           {(invoice.accounted || invoice.accountedAt) && <span title={`Contabilizada${invoice.accountingEntryNumber ? ` · asiento ${invoice.accountingEntryNumber}` : ""}`}><Lock size={11} className="text-slate-400" /></span>}
                           {needsReplacement && <span className="rounded border border-amber-200 bg-amber-50 px-1 text-[10px] text-amber-800">falta factura</span>}
                         </span>
-                        {invoice.poNumber && <span className="ml-10 block font-mono text-[11px] text-slate-500">PO-{invoice.poNumber}</span>}
+                        {invoice.poNumber && <span className="ml-2 font-mono text-[11px] text-slate-400">PO-{invoice.poNumber}</span>}
                       </td>
                       <td className="max-w-[320px] px-3 py-1.5">
                         <span className="block truncate font-medium text-slate-900">{invoice.supplier}</span>

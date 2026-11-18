@@ -495,7 +495,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* Fase */}
-                <div className="relative" ref={phaseDropdownRef}>
+                <div className="relative sm:ml-auto" ref={phaseDropdownRef}>
                   <button
                     onClick={() => { setShowPhaseDropdown(!showPhaseDropdown); setShowSortDropdown(false); }}
                     className={`${control} ${selectedPhase !== "all" ? "!border-slate-900 font-medium text-slate-900" : ""}`}

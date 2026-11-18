@@ -658,7 +658,7 @@ export default function CompanyAccountsPage() {
               </div>
             ) : (
               <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
+                <table className="tbl w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                       <th className="px-3 py-2 w-8" /><th className="px-3 py-2">Nº Factura</th>
@@ -850,7 +850,7 @@ export default function CompanyAccountsPage() {
 
                   {/* Lines table */}
                   <div className="border border-slate-200 rounded-lg overflow-hidden">
-                    <table className="w-full text-xs">
+                    <table className="tbl w-full text-xs">
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>
                           <th className="px-3 py-2 text-left text-[10px] font-mono text-slate-400 uppercase w-[40%]">Cuenta</th>

@@ -326,7 +326,7 @@ export function DataList({ items, columns = 3 }: { items: { label: string; value
 export function Table({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={cx("overflow-x-auto rounded-lg border border-slate-200", className)}>
-      <table className="w-full border-collapse text-[13px]">{children}</table>
+      <table className="tbl w-full border-collapse text-[13px]">{children}</table>
     </div>
   );
 }

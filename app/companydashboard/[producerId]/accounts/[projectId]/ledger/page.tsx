@@ -622,7 +622,7 @@ export default function LedgerPage() {
             ) : viewMode === "table" ? (
               /* ── TABLE VIEW ── */
               <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                <table className="w-full text-xs">
+                <table className="tbl w-full text-xs">
                   <thead className="bg-slate-900 text-white sticky top-0">
                     <tr>
                       <th className="px-4 py-2.5 text-left text-[10px] font-mono uppercase tracking-wider">Cuenta</th>
@@ -702,7 +702,7 @@ export default function LedgerPage() {
 
                     {/* Progressive balance table (Sage-style) */}
                     <div className="overflow-x-auto">
-                      <table className="w-full text-xs" style={{ minWidth: 640 }}>
+                      <table className="tbl w-full text-xs" style={{ minWidth: 640 }}>
                         <thead className="border-b border-slate-100">
                           <tr className="bg-slate-50">
                             <th className="px-4 py-2 text-left text-[10px] font-mono text-slate-400 uppercase w-24">Fecha</th>
@@ -808,7 +808,7 @@ export default function LedgerPage() {
               <div className="px-5 py-3 border-b border-slate-100">
                 <p className="text-[9px] font-mono font-semibold text-slate-400 uppercase tracking-widest">Saldo progresivo — {selected.movimientos.length} movimientos</p>
               </div>
-              <table className="w-full text-xs">
+              <table className="tbl w-full text-xs">
                 <thead className="sticky top-0 bg-white border-b border-slate-200">
                   <tr>
                     <th className="px-4 py-2 text-left text-[10px] font-medium text-slate-500">Fecha · Asiento</th>

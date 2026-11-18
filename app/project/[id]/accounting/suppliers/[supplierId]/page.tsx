@@ -1215,7 +1215,8 @@ export default function SupplierDetailPage() {
       <div className="mt-6 grid items-start gap-8 text-[13px] xl:grid-cols-[minmax(0,1fr)_340px]">
         {/* ── Documentos ─────────────────────────────────────────────────── */}
         <section aria-label="Documentos" className="flex min-w-0 flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <SearchBar fields={DOC_FIELDS} field={docField} onField={setDocField} value={docSearch} onChange={setDocSearch} count={docTab === "invoices" ? invoiceRows.length : poRows.length} />
             <Segmented
               value={docTab}
               onChange={setDocTab}
@@ -1224,14 +1225,13 @@ export default function SupplierDetailPage() {
                 { value: "pos", label: `POs · ${pos.length}` },
               ]}
             />
-            <SearchBar fields={DOC_FIELDS} field={docField} onField={setDocField} value={docSearch} onChange={setDocSearch} count={docTab === "invoices" ? invoiceRows.length : poRows.length} />
           </div>
 
           <div className="overflow-x-auto rounded-lg border border-slate-200">
             {(docTab === "invoices" ? invoiceRows : poRows).length === 0 ? (
               <p className="px-4 py-12 text-center text-slate-500">{docSearch ? "Sin resultados" : docTab === "invoices" ? "Sin facturas" : "Sin órdenes de compra"}</p>
             ) : (
-              <table className="w-full min-w-[640px] border-collapse">
+              <table className="tbl w-full min-w-[640px] border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
                     <th scope="col" className="px-4 py-2 text-left font-medium">Nº</th>

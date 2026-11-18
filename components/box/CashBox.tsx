@@ -622,7 +622,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
               <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
                 {/* Libro de caja */}
                 <section className="flex min-w-0 flex-col gap-3">
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <SearchBar fields={LEDGER_FIELDS} field={field} onField={setField} value={search} onChange={setSearch} count={rows.length} />
                     <div className="w-44">
                       <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}>
@@ -631,7 +631,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
                       </Select>
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex flex-wrap items-center justify-end gap-4">
                     <Checkbox label="Por contabilizar" checked={onlyPending} onChange={setOnlyPending} />
                     <Checkbox label="Sin justificante" checked={onlyNoReceipt} onChange={setOnlyNoReceipt} />
                   </div>
@@ -640,7 +640,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
                     <EmptyState title={floatMovements.length ? "Sin resultados" : "Sin movimientos"} />
                   ) : (
                     <div className="overflow-x-auto rounded-lg border border-slate-200">
-                      <table className="w-full min-w-[920px] border-collapse text-[13px]">
+                      <table className="tbl w-full min-w-[920px] border-collapse text-[13px]">
                         <thead>
                           <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
                             <th scope="col" className="px-4 py-2 text-left font-medium">Fecha</th>

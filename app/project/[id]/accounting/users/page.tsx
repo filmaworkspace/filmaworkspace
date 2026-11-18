@@ -497,7 +497,7 @@ export default function AccountingUsersPage() {
         <section aria-labelledby="inv-title" className="mt-6 flex flex-col gap-2">
           <h2 id="inv-title" className="text-xs font-medium text-slate-500">Invitaciones pendientes · {pendingInvitations.length}</h2>
           <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full min-w-[640px] border-collapse text-[13px]">
+            <table className="tbl w-full min-w-[640px] border-collapse text-[13px]">
               <tbody>
                 {pendingInvitations.map((inv) => (
                   <tr key={inv.id} className="border-b border-slate-100 last:border-0">
@@ -516,8 +516,9 @@ export default function AccountingUsersPage() {
         </section>
       )}
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <SearchBar fields={USER_FIELDS} field={searchField} onField={setSearchField} value={searchTerm} onChange={setSearchTerm} count={tableRows.length} />
+        <div className="flex flex-wrap items-center justify-end gap-3">
         <div className="w-48">
           <Select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)}>
             <option value="all">Cualquier nivel</option>
@@ -531,6 +532,7 @@ export default function AccountingUsersPage() {
           </Select>
         </div>
         {filtersActive && <Button variant="ghost" size="sm" onClick={() => { setLevelFilter("all"); setGroupFilter("all"); }}>Quitar filtros</Button>}
+        </div>
       </div>
 
       <div className="mt-4">
@@ -538,7 +540,7 @@ export default function AccountingUsersPage() {
           <EmptyState title={searchTerm || filtersActive ? "Sin resultados" : "Nadie tiene acceso a contabilidad"} />
         ) : (
           <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full min-w-[860px] border-collapse text-[13px]">
+            <table className="tbl w-full min-w-[860px] border-collapse text-[13px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
                   <th scope="col" className="px-4 py-2 text-left font-medium">Usuario</th>

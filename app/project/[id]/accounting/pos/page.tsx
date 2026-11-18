@@ -836,8 +836,9 @@ export default function POsPage() {
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-3">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <SearchBar fields={PO_FIELDS} field={poField} onField={setPoField} value={searchTerm} onChange={setSearchTerm} count={rows.length} />
+        <div className="flex flex-wrap items-center justify-end gap-3">
         {departments.length > 1 && (
           <div className="w-44">
             <Select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
@@ -847,8 +848,9 @@ export default function POsPage() {
           </div>
         )}
         <Segmented value={poSort} onChange={setPoSort} options={[{ value: "recent", label: "Recientes" }, { value: "old", label: "Antiguas" }, { value: "amount", label: "Importe" }]} />
+        </div>
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-4">
+      <div className="mt-2 flex flex-wrap items-center justify-end gap-4">
         <Checkbox label="Solo mías" checked={onlyMine} onChange={setOnlyMine} />
         <Checkbox label="Casi agotadas (≥ 90 % facturado)" checked={nearlyExhausted} onChange={setNearlyExhausted} />
         {supplierName && (
@@ -869,7 +871,7 @@ export default function POsPage() {
           />
         ) : (
           <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full min-w-[1000px] border-collapse text-[13px]">
+            <table className="tbl w-full min-w-[1000px] border-collapse text-[13px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
                   <th scope="col" className="px-4 py-2 text-left font-medium">Nº</th>

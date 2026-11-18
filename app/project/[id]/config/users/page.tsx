@@ -336,9 +336,8 @@ export default function ConfigUsers() {
         actions={<Button variant="primary" onClick={() => setShowInviteModal(true)}>Invitar</Button>}
       />
 
-      <div className="mb-3 mt-6 flex items-center justify-between gap-3">
-        <h2 className="text-[13px] font-semibold text-slate-900">Miembros</h2>
-        <Input placeholder="Buscar" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="!w-56" />
+      <div className="mb-3 mt-6 flex items-center gap-3">
+        <Input placeholder="Buscar por nombre o email" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="!w-72" />
       </div>
 
       {sortedMembers.length === 0 ? (

@@ -927,8 +927,8 @@ export default function CrewPage() {
       <main className="px-6 sm:px-10 py-8">
 
         {/* Filters */}
-        <div className="flex flex-row gap-3 items-center mb-6">
-          <div className="flex-1 relative">
+        <div className="flex flex-row flex-wrap gap-3 items-center mb-6">
+          <div className="relative w-72 flex-none">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
@@ -936,7 +936,7 @@ export default function CrewPage() {
               className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-[#6BA319] bg-white text-[13px]"
             />
           </div>
-          <div className="relative flex-shrink-0" ref={statusDropdownRef}>
+          <div className="relative ml-auto flex-shrink-0" ref={statusDropdownRef}>
             <button
               onClick={() => setShowStatusDropdown(!showStatusDropdown)}
               className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded-md text-[13px] hover:border-slate-300 bg-white min-w-[170px]"
@@ -973,7 +973,7 @@ export default function CrewPage() {
         ) : (
           <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="tbl w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
                     <th className="text-left px-4 py-2.5 text-[11px] font-medium text-slate-500 uppercase tracking-wider w-12">#</th>

@@ -882,7 +882,8 @@ export default function ApprovalsPage() {
         }
       />
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <SearchBar fields={APPROVAL_FIELDS} field={apprField} onField={setApprField} value={apprSearch} onChange={setApprSearch} count={filteredApprovals.length} />
         <div className="flex gap-0.5 rounded-md border border-slate-200 bg-[#F7F7F8] p-0.5" role="tablist" aria-label="Tipo">
           {(["all", "po", "invoice", "box"] as const).map((t) => (
             <button
@@ -897,7 +898,6 @@ export default function ApprovalsPage() {
             </button>
           ))}
         </div>
-        <SearchBar fields={APPROVAL_FIELDS} field={apprField} onField={setApprField} value={apprSearch} onChange={setApprSearch} count={filteredApprovals.length} />
       </div>
 
       <div className="mt-5">
@@ -998,7 +998,7 @@ export default function ApprovalsPage() {
 
                       {currentApproval.items && currentApproval.items.length > 0 && (
                         <div className="overflow-hidden rounded-md border border-slate-200">
-                          <table className="w-full border-collapse">
+                          <table className="tbl w-full border-collapse">
                             <thead>
                               <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
                                 <th scope="col" className="px-3 py-1.5 text-left font-medium">Concepto</th>
@@ -1028,7 +1028,7 @@ export default function ApprovalsPage() {
                             {currentApproval.boxType === "transfer" && currentApproval.paymentDate && <span>Pago {currentApproval.paymentDate}</span>}
                           </div>
                           <div className="max-h-56 overflow-y-auto">
-                            <table className="w-full border-collapse">
+                            <table className="tbl w-full border-collapse">
                               <tbody>
                                 {currentApproval.boxExpenses.map((exp, idx) => (
                                   <tr key={exp.id || idx} className="border-b border-slate-100 last:border-0">

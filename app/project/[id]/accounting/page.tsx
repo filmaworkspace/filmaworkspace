@@ -508,7 +508,7 @@ export default function AccountingPanelPage() {
               {visibleRows.length === 0 ? (
                 <p className="px-4 py-12 text-center text-[13px] text-slate-500">Sin movimientos</p>
               ) : (
-                <table className="w-full min-w-[760px] border-collapse text-[13px]">
+                <table className="tbl w-full min-w-[760px] border-collapse text-[13px]">
                   <thead>
                     <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
                       <th scope="col" className="px-4 py-2 text-left font-medium">Nº</th>

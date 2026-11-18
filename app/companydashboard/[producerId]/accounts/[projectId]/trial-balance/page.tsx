@@ -209,7 +209,7 @@ export default function TrialBalancePage() {
         </div>
 
         <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
+          <table className="tbl w-full text-sm">
             <thead>
               <tr className="bg-slate-900 text-white">
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 w-24">Código</th>

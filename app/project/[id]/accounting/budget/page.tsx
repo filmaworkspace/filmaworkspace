@@ -1088,7 +1088,7 @@ export default function BudgetPage() {
       />
 
       {/* Barra de herramientas */}
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <SearchBar
           fields={[
             { value: "all", label: "Buscar en todo", placeholder: "Código o descripción" },
@@ -1101,6 +1101,7 @@ export default function BudgetPage() {
           onChange={setSearchTerm}
           count={matchCount}
         />
+        <div className="flex flex-wrap items-center justify-end gap-3">
         <Segmented
           value={view}
           onChange={setView}
@@ -1112,6 +1113,7 @@ export default function BudgetPage() {
         <Button variant="ghost" size="sm" onClick={allExpanded ? collapseAll : expandAll}>
           {allExpanded ? "Contraer todo" : "Desplegar todo"}
         </Button>
+        </div>
       </div>
 
       {/* Tabla */}
@@ -1128,11 +1130,11 @@ export default function BudgetPage() {
           />
         ) : (
           <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full min-w-[1080px] border-collapse text-[13px]">
+            <table className="tbl w-full min-w-[1080px] border-collapse text-[13px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
                   <th scope="col" className="w-8 py-2 pl-3" />
-                  <th scope="col" className="px-2 py-2 text-left font-medium">Código</th>
+                  <th scope="col" className="w-28 px-2 py-2 text-left font-medium">Código</th>
                   <th scope="col" className="px-2 py-2 text-left font-medium">Descripción</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Presupuesto</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Comprometido</th>
