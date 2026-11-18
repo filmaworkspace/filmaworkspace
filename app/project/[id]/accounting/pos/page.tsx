@@ -881,13 +881,10 @@ export default function POsPage() {
               <thead>
                 <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
                   <th scope="col" className="w-28 px-4 py-2 text-left font-medium">Nº</th>
-                  <th scope="col" className="w-[30%] px-3 py-2 text-left font-medium">Concepto</th>
-                  <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor</th>
-                  <th scope="col" className="w-32 px-3 py-2 text-left font-medium">Departamento</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor y concepto</th>
+                  <th scope="col" className="w-36 px-3 py-2 text-left font-medium">Departamento</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Base</th>
                   <th scope="col" className="px-3 py-2 text-left font-medium">Facturado</th>
-                  <th scope="col" className="w-40 px-3 py-2 text-left font-medium">Estado</th>
-                  <th scope="col" className="w-28 px-3 py-2 text-right font-medium">Fecha</th>
                   <th scope="col" className="w-12 py-2 pr-3" />
                 </tr>
               </thead>
@@ -901,18 +898,18 @@ export default function POsPage() {
                   const dead = po.status === "cancelled";
                   return (
                     <tr key={po.id} className={`cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA] ${dead ? "text-slate-400" : ""}`} onClick={() => router.push(href)}>
-                      <td className="whitespace-nowrap px-4 py-1.5">
+                      <td className="relative whitespace-nowrap px-4 py-1.5" title={st.label}>
+                        <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${st.dot}`} />
+                        <span className="sr-only">{st.label}</span>
                         <span className="flex items-center gap-1.5">
-                          <Link href={href} onClick={(e) => e.stopPropagation()} className={`font-mono text-xs font-medium hover:underline ${dead ? "line-through" : ""}`}>PO-{po.number}</Link>
+                          <span className={`font-mono text-xs font-medium ${dead ? "line-through" : ""}`}>PO-{po.number}</span>
                           {po.version > 1 && <span className="font-mono text-[10px] text-slate-500">v{po.version}</span>}
                         </span>
                       </td>
-                      <td className="px-3 py-1.5" title={po.generalDescription || po.description || undefined}>
-                        {po.generalDescription || po.description
-                          ? <span className={`font-medium ${dead ? "" : "text-slate-900"}`}>{po.generalDescription || po.description}</span>
-                          : <span className="text-slate-300">Sin concepto</span>}
+                      <td className="px-3 py-1.5" title={[po.supplier, po.generalDescription || po.description].filter(Boolean).join(" · ")}>
+                        <div className={`truncate font-medium ${dead ? "" : po.supplier ? "text-slate-900" : "text-slate-400"}`}>{po.supplier || "Sin proveedor"}</div>
+                        <div className="truncate text-xs text-slate-500">{po.generalDescription || po.description || <span className="text-slate-300">Sin concepto</span>}</div>
                       </td>
-                      <td className={`px-3 py-1.5 ${po.supplier ? "text-slate-600" : "text-slate-400"}`} title={po.supplier || undefined}>{po.supplier || "Sin proveedor"}</td>
                       <td className="whitespace-nowrap px-3 py-1.5 text-slate-600">{po.department || "—"}</td>
                       <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs font-medium">{formatCurrency(base)}</td>
                       <td className="px-3 py-1.5">
@@ -925,10 +922,6 @@ export default function POsPage() {
                           </span>
                         ) : <span className="text-slate-400">—</span>}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-1.5">
-                        <span className={`inline-flex items-center gap-1.5 text-xs ${st.text}`}><span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />{st.label}</span>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-slate-500" title={formatDateTime(po.createdAt)}>{formatDateRelative(po.createdAt)}</td>
                       <td className="py-1.5 pr-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <Menu trigger={(toggle) => <IconButton label="Acciones" onClick={toggle} className="-my-1"><MoreHorizontal size={15} /></IconButton>}>
                           {(close) => (
@@ -953,10 +946,10 @@ export default function POsPage() {
               </tbody>
               <tfoot>
                 <tr className="border-t border-slate-200 bg-[#F4F4F5] text-xs">
-                  <td className="px-4 py-2 font-semibold" colSpan={4}>Total {rows.length === pos.length ? "" : "filtrado "}sin anuladas</td>
+                  <td className="px-4 py-2 font-semibold" colSpan={3}>Total {rows.length === pos.length ? "" : "filtrado "}sin anuladas</td>
                   <td className="px-3 py-2 text-right font-mono font-semibold">{formatCurrency(totals.base)}</td>
                   <td className="px-3 py-2 font-mono text-slate-600">{formatCurrency(totals.invoiced)} facturado</td>
-                  <td colSpan={3} />
+                  <td />
                 </tr>
               </tfoot>
             </table>

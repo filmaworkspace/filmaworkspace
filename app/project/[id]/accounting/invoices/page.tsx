@@ -194,8 +194,6 @@ export default function InvoicesPage() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [pendingReplacementCount, setPendingReplacementCount] = useState(0);
-  const [companyData, setCompanyData] = useState<CompanyData | null>(null);
-  const [showCompanyTooltip, setShowCompanyTooltip] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
     message: string;
@@ -243,8 +241,6 @@ export default function InvoicesPage() {
       const projectDoc = await getDoc(doc(db, "projects", id));
       if (projectDoc.exists()) setProjectName(projectDoc.data().name || "Proyecto");
 
-      const companyDoc = await getDoc(doc(db, `projects/${id}/config`, "company"));
-      if (companyDoc.exists()) setCompanyData(companyDoc.data() as CompanyData);
 
       // Solo lo que este usuario puede leer (ver lib/accountingScope)
       const invoiceDocs = sortByTime(await getScopedDocs(collection(db, `projects/${id}/invoices`), scopeFromPermissions(permissions)));
@@ -704,7 +700,6 @@ export default function InvoicesPage() {
               {(close) => (
                 <>
                   <MenuItem onClick={() => { close(); exportInvoices(rows); }}>Exportar lo filtrado (CSV)</MenuItem>
-                  <MenuItem onClick={() => { close(); setShowCompanyTooltip(true); }}>Datos fiscales del proyecto</MenuItem>
                 </>
               )}
             </Menu>
@@ -780,11 +775,9 @@ export default function InvoicesPage() {
               <thead>
                 <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
                   <th scope="col" className="w-44 px-4 py-2 text-left font-medium">Documento</th>
-                  <th scope="col" className="w-[30%] px-3 py-2 text-left font-medium">Concepto</th>
-                  <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor y concepto</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Base</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Total</th>
-                  <th scope="col" className="w-32 px-3 py-2 text-left font-medium">Estado</th>
                   <th scope="col" className="w-44 px-3 py-2 text-left font-medium">Vencimiento</th>
                   <th scope="col" className="w-12 py-2 pr-3" />
                 </tr>
@@ -802,30 +795,25 @@ export default function InvoicesPage() {
                     ? `${invoice.currentApprovalStep ?? 0}/${invoice.approvalSteps.length}` : null;
                   return (
                     <tr key={invoice.id} className={`cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA] ${dead ? "text-slate-400" : ""}`} onClick={() => router.push(href)}>
-                      <td className="whitespace-nowrap px-4 py-1.5">
+                      <td className="relative whitespace-nowrap px-4 py-1.5" title={`${st.label}${progress ? ` · ${progress}` : ""}`}>
+                        <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${st.dot}`} />
+                        <span className="sr-only">{st.label}</span>
                         <span className="inline-flex items-center gap-2">
                           <span className="w-8 font-mono text-[10px] text-slate-500" title={docType.label}>{docType.code}</span>
-                          <Link href={href} onClick={(e) => e.stopPropagation()} className={`font-mono text-xs font-medium hover:underline ${dead ? "line-through" : ""}`}>{invoice.displayNumber}</Link>
+                          <span className={`font-mono text-xs font-medium ${dead ? "line-through" : ""}`}>{invoice.displayNumber}</span>
                           {(invoice.accounted || invoice.accountedAt) && <span title={`Contabilizada${invoice.accountingEntryNumber ? ` · asiento ${invoice.accountingEntryNumber}` : ""}`}><Lock size={11} className="text-slate-400" /></span>}
                           {needsReplacement && <span className="rounded border border-amber-200 bg-amber-50 px-1 text-[10px] text-amber-800">falta factura</span>}
                         </span>
                       </td>
-                      <td className="px-3 py-1.5" title={invoice.description || undefined}>
-                        {invoice.description
-                          ? <span className={`font-medium ${dead ? "" : "text-slate-900"}`}>{invoice.description}</span>
-                          : <span className="text-slate-300">Sin concepto</span>}
-                        {invoice.poNumber && <span className="ml-2 font-mono text-[11px] text-slate-400">PO-{invoice.poNumber}</span>}
+                      <td className="px-3 py-1.5" title={[invoice.supplier, invoice.description].filter(Boolean).join(" · ")}>
+                        <div className={`truncate font-medium ${dead ? "" : "text-slate-900"}`}>
+                          {invoice.supplier}
+                          {invoice.poNumber && <span className="ml-2 font-mono text-[11px] font-normal text-slate-400">PO-{invoice.poNumber}</span>}
+                        </div>
+                        <div className="truncate text-xs text-slate-500">{invoice.description || <span className="text-slate-300">Sin concepto</span>}</div>
                       </td>
-                      <td className="px-3 py-1.5 text-slate-600" title={invoice.supplier}>{invoice.supplier}</td>
                       <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs text-slate-600">{formatCurrency(invoice.baseAmount)}</td>
                       <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs font-medium">{formatCurrency(invoice.totalAmount)}</td>
-                      <td className="whitespace-nowrap px-3 py-1.5">
-                        <span className={`inline-flex items-center gap-1.5 text-xs ${st.text}`}>
-                          <span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />
-                          {st.label}
-                          {progress && <span className="font-mono text-[10px] text-slate-400">{progress}</span>}
-                        </span>
-                      </td>
                       <td className="whitespace-nowrap px-3 py-1.5 tabular-nums text-slate-600">
                         {formatDate(invoice.dueDate)}
                         {due && <span className={`ml-1.5 text-xs ${due.cls}`}>{due.text}</span>}
@@ -857,38 +845,16 @@ export default function InvoicesPage() {
               </tbody>
               <tfoot>
                 <tr className="border-t border-slate-200 bg-[#F4F4F5] text-xs">
-                  <td className="px-4 py-2 font-semibold" colSpan={3}>Total {rows.length === invoices.length ? "" : "filtrado "}sin anuladas</td>
+                  <td className="px-4 py-2 font-semibold" colSpan={2}>Total {rows.length === invoices.length ? "" : "filtrado "}sin anuladas</td>
                   <td className="px-3 py-2 text-right font-mono font-semibold">{formatCurrency(totals.base)}</td>
                   <td className="px-3 py-2 text-right font-mono font-semibold">{formatCurrency(totals.total)}</td>
-                  <td colSpan={3} />
+                  <td colSpan={2} />
                 </tr>
               </tfoot>
             </table>
           </div>
         )}
       </div>
-
-      {/* Datos fiscales del proyecto */}
-      <Modal open={showCompanyTooltip} onClose={() => setShowCompanyTooltip(false)} title="Datos fiscales del proyecto">
-        {companyData ? (
-          <dl className="text-[13px]">
-            {[
-              ["Razón social", companyData.fiscalName],
-              ["NIF", companyData.taxId],
-              ["Dirección", [companyData.address, [companyData.postalCode, companyData.city].filter(Boolean).join(" "), companyData.province, companyData.country].filter(Boolean).join(", ")],
-              ["Email", companyData.email],
-              ["Teléfono", companyData.phone],
-            ].filter(([, v]) => v).map(([k, v]) => (
-              <div key={k} className="grid grid-cols-[100px_1fr] gap-3 border-b border-slate-100 py-2 last:border-0">
-                <dt className="text-slate-500">{k}</dt>
-                <dd className={k === "NIF" ? "font-mono text-xs" : ""}>{v}</dd>
-              </div>
-            ))}
-          </dl>
-        ) : (
-          <p className="text-[13px] text-slate-500">No hay datos fiscales configurados.</p>
-        )}
-      </Modal>
 
       <Modal
         open={!!confirmDialog}

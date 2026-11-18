@@ -10,7 +10,7 @@
 //   · Usuario: sus propios documentos y sus POs abiertas.
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ClipboardCheck, FolderDown, Plus, Settings, Upload } from "lucide-react";
 
@@ -167,6 +167,7 @@ function invoiceRow(id: string, data: any): Row {
 
 export default function AccountingPanelPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
 
   const [userId, setUserId] = useState<string | null>(null);
@@ -520,13 +521,10 @@ export default function AccountingPanelPage() {
                 <table className="tbl w-full min-w-[760px] border-collapse text-[13px]">
                   <thead>
                     <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
-                      <th scope="col" className="w-24 px-4 py-2 text-left font-medium">Nº</th>
-                      <th scope="col" className="px-3 py-2 text-left font-medium">Concepto</th>
-                      <th scope="col" className="w-36 px-3 py-2 text-left font-medium">Proveedor</th>
-                      <th scope="col" className="w-28 px-3 py-2 text-left font-medium">{thirdColumn}</th>
-                      <th scope="col" className="w-28 px-3 py-2 text-right font-medium">Base</th>
-                      <th scope="col" className="w-36 px-3 py-2 text-left font-medium">Estado</th>
-                      <th scope="col" className="w-20 px-4 py-2 text-right font-medium">Fecha</th>
+                      <th scope="col" className="w-28 px-4 py-2 text-left font-medium">Nº</th>
+                      <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor y concepto</th>
+                      <th scope="col" className="w-32 px-3 py-2 text-left font-medium">{thirdColumn}</th>
+                      <th scope="col" className="w-32 px-4 py-2 text-right font-medium">Base</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -535,25 +533,18 @@ export default function AccountingPanelPage() {
                       const href = `/project/${id}/accounting/${r.kind === "po" ? "pos" : "invoices"}/${r.id}`;
                       const third = profile === "accounting" ? r.department : profile === "head" ? r.requester : r.account;
                       return (
-                        <tr key={`${r.kind}-${r.id}`} className="border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA]">
-                          <td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs font-medium">
-                            <Link href={href} className="hover:underline">{r.number}</Link>
+                        <tr key={`${r.kind}-${r.id}`} onClick={() => router.push(href)} className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA]">
+                          <td className="relative whitespace-nowrap px-4 py-1.5 font-mono text-xs font-medium" title={st.label}>
+                            <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${st.dot}`} />
+                            <span className="sr-only">{st.label}</span>
+                            {r.number}
                           </td>
-                          <td className="px-3 py-2.5" title={r.concept || undefined}>
-                            <Link href={href} className="hover:underline">
-                              {r.concept ? <span className="font-medium text-slate-900">{r.concept}</span> : <span className="text-slate-300">Sin concepto</span>}
-                            </Link>
+                          <td className="px-3 py-1.5" title={[r.supplier, r.concept].filter(Boolean).join(" · ")}>
+                            <div className="truncate font-medium text-slate-900">{r.supplier}</div>
+                            <div className="truncate text-xs text-slate-500">{r.concept || <span className="text-slate-300">Sin concepto</span>}</div>
                           </td>
-                          <td className="px-3 py-2.5 text-slate-600" title={r.supplier}>{r.supplier}</td>
-                          <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{third || "—"}</td>
-                          <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-xs">{money(r.base)}</td>
-                          <td className="whitespace-nowrap px-3 py-2.5">
-                            <span className={`inline-flex items-center gap-1.5 text-xs ${st.text}`}>
-                              <span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />
-                              {st.label}
-                            </span>
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-500">{shortDate(r.createdAt)}</td>
+                          <td className="whitespace-nowrap px-3 py-1.5 text-slate-600">{third || "—"}</td>
+                          <td className="whitespace-nowrap px-4 py-1.5 text-right font-mono text-xs">{money(r.base)}</td>
                         </tr>
                       );
                     })}

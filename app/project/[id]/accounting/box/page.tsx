@@ -1701,7 +1701,7 @@ export default function BoxesPage() {
   // ─── Volcar solicitud a sobre ─────────────────────────────────────────────────
 
   const handleVolcarToEnvelope = async (formId: string) => {
-    if (!volcarTargetEnvelopeId) return showToast("error", "Selecciona un sobre de Petty Cash");
+    if (!volcarTargetEnvelopeId) return showToast("error", "Selecciona un sobre de transferencias");
     const submission = formSubmissions.find((f) => f.id === formId);
     if (!submission) return;
     setVolcandoFormId(formId);
@@ -3735,7 +3735,7 @@ export default function BoxesPage() {
             <Modal
         open={!!(showCreateTransferEnvelopeModal)}
         onClose={() => setShowCreateTransferEnvelopeModal(false)}
-        title={"Nuevo sobre de Petty Cash"}
+        title={"Nuevo sobre de transferencias"}
         width="max-w-lg"
         footer={(showCreateTransferEnvelopeModal) ? <>
 <button onClick={() => setShowCreateTransferEnvelopeModal(false)} className={buttonClass("ghost")}>Cancelar</button>
@@ -4059,23 +4059,14 @@ export default function BoxesPage() {
                     ? `Ya hay ${fmt(getTotalAdvance(selectedTransferEnvelope))} € anticipados en este sobre`
                     : `Sobre ${selectedTransferEnvelope.displayNumber} · ${selectedTransferEnvelope.personName}`}</p>
 <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Importe *</label>
-                  <input type="number" min="0" step="0.01" value={advanceForm.amount}
-                    onChange={e => setAdvanceForm({ ...advanceForm, amount: e.target.value })}
-                    placeholder="500,00"
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 font-mono text-[13px]" />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Método</label>
-                  <div className="flex border border-slate-200 rounded-md overflow-hidden h-[42px]">
-                    <button type="button" onClick={() => setAdvanceForm({ ...advanceForm, method: "bank" })}
-                      className={`flex-1 text-xs font-medium transition-colors ${advanceForm.method === "bank" ? "bg-[#F1F1F3] text-slate-900" : "text-slate-600 hover:bg-slate-50"}`}>Transferencia</button>
-                    <button type="button" onClick={() => setAdvanceForm({ ...advanceForm, method: "cash" })}
-                      className={`flex-1 text-xs font-medium transition-colors border-l border-slate-200 ${advanceForm.method === "cash" ? "bg-[#F1F1F3] text-slate-900" : "text-slate-600 hover:bg-slate-50"}`}>Efectivo</button>
-                  </div>
-                </div>
+              {/* Las transferencias siempre se hacen por banco: el efectivo va por
+                  las cajas de Efectivo (Petty Cash), que funcionan aparte. */}
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">Importe transferido *</label>
+                <input type="number" min="0" step="0.01" value={advanceForm.amount}
+                  onChange={e => setAdvanceForm({ ...advanceForm, amount: e.target.value, method: "bank" })}
+                  placeholder="500,00"
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 font-mono text-[13px]" />
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">Fecha</label>
@@ -4083,7 +4074,7 @@ export default function BoxesPage() {
                   onChange={e => setAdvanceForm({ ...advanceForm, date: e.target.value })}
                   className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]" />
               </div>
-              {advanceForm.method === "bank" && (
+              {(
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-slate-600">IBAN de {selectedTransferEnvelope.personName} (opcional)</label>
                   <input type="text" value={advanceForm.iban}
@@ -4098,7 +4089,7 @@ export default function BoxesPage() {
               )}
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">
-                  {advanceForm.method === "cash" ? "Recibí firmado *" : "Comprobante de transferencia *"}
+                  Comprobante de transferencia *
                 </label>
                 <label className="flex items-center gap-2 px-4 py-1.5 border border-dashed border-slate-300 rounded-md cursor-pointer hover:border-slate-400 text-[13px] text-slate-500">
                   <Upload size={15} />
@@ -4283,7 +4274,7 @@ export default function BoxesPage() {
         const IRPF_RATES = [0, 7, 15, 19];
 
         return (
-          <Modal open onClose={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); setShowVolcarSupplierDropdown(null); }} title={"Volcar a sobre de Petty Cash"} width="max-w-4xl" footer={<>
+          <Modal open onClose={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); setShowVolcarSupplierDropdown(null); }} title={"Volcar a sobre de transferencias"} width="max-w-4xl" footer={<>
 <button onClick={() => { setShowVolcarModal(null); setShowVolcarEnvDropdown(false); }}
                   className={buttonClass("secondary")}>
                   Cancelar
@@ -4305,7 +4296,7 @@ export default function BoxesPage() {
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Sobre de destino</label>
                   {openEnvelopes.length === 0 ? (
                     <div className="border border-amber-200 bg-amber-50 rounded-md px-4 py-3 text-[13px] text-amber-700">
-                      No hay sobres abiertos. Crea uno en la pestaña de Petty Cash primero.
+                      No hay sobres abiertos. Crea uno en la pestaña Transferencias primero.
                     </div>
                   ) : (
                     <div className="relative">
