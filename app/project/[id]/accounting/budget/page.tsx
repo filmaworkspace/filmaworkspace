@@ -46,6 +46,7 @@ import {
 import { strToU8, unzipSync, zipSync } from "fflate";
 
 import { committedBySubaccount as computeCommitted, actualBySubaccount as computeActual, loadBoxBySubaccount } from "@/lib/budgetTotals";
+import { Button, Checkbox, Modal } from "@/components/ds";
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { CostSettings, getCostSettings } from "@/lib/budgetRules";
 import { parseFwbText, flattenFwbToAccountRows, FwbSubaccountLevel } from "@/lib/budgetingExport";
@@ -73,6 +74,8 @@ interface Account {
   code: string;
   description: string;
   subAccounts: SubAccount[];
+  /** Departamentos (HOD/coordinación) que pueden seguir comprometido y realizado de esta cuenta. */
+  trackingDepartments: string[];
   createdAt: Date;
 }
 
@@ -94,6 +97,9 @@ export default function BudgetPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasAccess, setHasAccess] = useState(false);
+  const [projectDepartments, setProjectDepartments] = useState<string[]>([]);
+  const [trackingAccount, setTrackingAccount] = useState<Account | null>(null);
+  const [trackingSel, setTrackingSel] = useState<string[]>([]);
   const [accessError, setAccessError] = useState("");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
@@ -183,7 +189,10 @@ export default function BudgetPage() {
       setHasAccess(true);
       
       const projectDoc = await getDoc(doc(db, "projects", id));
-      if (projectDoc.exists()) setProjectName(projectDoc.data().name || "Proyecto");
+      if (projectDoc.exists()) {
+        setProjectName(projectDoc.data().name || "Proyecto");
+        setProjectDepartments(projectDoc.data().departments || []);
+      }
 
       // Cargar configuración de costes usando budgetRules
       const loadedCostConfig = await getCostSettings(id);
@@ -228,6 +237,7 @@ export default function BudgetPage() {
             code: accountDoc.data().code || "",
             description: accountDoc.data().description || "",
             subAccounts,
+            trackingDepartments: accountDoc.data().trackingDepartments || [],
             createdAt: accountDoc.data().createdAt?.toDate() || new Date(),
           } as Account;
         })
@@ -377,6 +387,25 @@ export default function BudgetPage() {
   const resetForm = () => { setFormData({ code: "", description: "", budgeted: 0 }); setSelectedAccount(null); setSelectedSubAccount(null); setEditMode(false); setErrorMessage(""); };
 
   const openCreateAccountModal = () => { resetForm(); setModalMode("account"); setEditMode(false); setShowModal(true); };
+  // ── Seguimiento de cuenta ──────────────────────────────────────────────────
+  // Da a HOD y coordinación de los departamentos elegidos acceso al comprometido
+  // y realizado de esta cuenta (nunca al presupuestado ni al disponible).
+  const openTracking = (account: Account) => { setTrackingAccount(account); setTrackingSel(account.trackingDepartments); };
+  const saveTracking = async () => {
+    if (!trackingAccount) return;
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, `projects/${id}/accounts`, trackingAccount.id), { trackingDepartments: trackingSel });
+      setAccounts((prev) => prev.map((a) => (a.id === trackingAccount.id ? { ...a, trackingDepartments: trackingSel } : a)));
+      setTrackingAccount(null);
+      setSuccessMessage("Seguimiento actualizado"); setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (error: any) {
+      setErrorMessage(`Error guardando el seguimiento: ${error.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const openEditAccountModal = (account: Account) => { setSelectedAccount(account); setFormData({ code: account.code, description: account.description, budgeted: 0 }); setModalMode("account"); setEditMode(true); setShowModal(true); };
   const openCreateSubAccountModal = (account: Account) => { resetForm(); setSelectedAccount(account); setFormData({ code: "", description: "", budgeted: 0 }); setModalMode("subaccount"); setEditMode(false); setShowModal(true); };
   const openEditSubAccountModal = (account: Account, subAccount: SubAccount) => { setSelectedAccount(account); setSelectedSubAccount(subAccount); setFormData({ code: subAccount.code, description: subAccount.description, budgeted: subAccount.budgeted }); setModalMode("subaccount"); setEditMode(true); setShowModal(true); };
@@ -1076,6 +1105,15 @@ export default function BudgetPage() {
                         </td>
                         <td className="px-4 py-2">
                           <div className="flex items-center justify-end gap-0.5">
+                            <button
+                              onClick={() => openTracking(account)}
+                              className={`flex items-center gap-1 rounded p-1 hover:bg-slate-100 ${account.trackingDepartments.length ? "text-slate-900" : "text-slate-400 hover:text-slate-900"}`}
+                              title={account.trackingDepartments.length ? `Seguimiento: ${account.trackingDepartments.join(", ")}` : "Seguimiento de cuenta"}
+                              aria-label="Seguimiento de cuenta"
+                            >
+                              <Eye size={14} />
+                              {account.trackingDepartments.length > 0 && <span className="text-[10px] font-medium tabular-nums">{account.trackingDepartments.length}</span>}
+                            </button>
                             <button onClick={() => openCreateSubAccountModal(account)} className="p-1 text-slate-400 hover:text-[#2F52E0] hover:bg-blue-50 rounded" title="Añadir subcuenta"><Plus size={14} /></button>
                             <button onClick={() => openEditAccountModal(account)} className="p-1 text-slate-400 hover:text-[#2F52E0] hover:bg-blue-50 rounded" title="Editar"><Edit size={14} /></button>
                             <button onClick={() => handleDeleteAccount(account.id)} className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded" title="Eliminar"><Trash2 size={14} /></button>
@@ -1591,6 +1629,40 @@ export default function BudgetPage() {
           </button>
         </div>
       )}
+      <Modal
+        open={!!trackingAccount}
+        onClose={() => setTrackingAccount(null)}
+        title="Seguimiento de cuenta"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setTrackingAccount(null)}>Cancelar</Button>
+            <Button variant="primary" onClick={saveTracking} disabled={saving}>Guardar</Button>
+          </>
+        }
+      >
+        {trackingAccount && (
+          <div className="flex flex-col gap-3">
+            <p className="text-[13px] text-slate-900">
+              <span className="font-mono text-slate-500">{trackingAccount.code}</span> {trackingAccount.description}
+            </p>
+            <p className="text-xs text-slate-500">HOD y coordinación de estos departamentos verán el comprometido y el realizado de la cuenta en su panel. Nunca el presupuesto.</p>
+            {projectDepartments.length === 0 ? (
+              <p className="text-[13px] text-slate-500">El proyecto no tiene departamentos.</p>
+            ) : (
+              <div className="flex max-h-72 flex-col overflow-y-auto border-t border-slate-100 pt-2">
+                {projectDepartments.map((d) => (
+                  <Checkbox
+                    key={d}
+                    label={d}
+                    checked={trackingSel.includes(d)}
+                    onChange={(v) => setTrackingSel((prev) => (v ? [...prev, d] : prev.filter((x) => x !== d)))}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

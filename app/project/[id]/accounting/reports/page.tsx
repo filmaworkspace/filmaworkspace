@@ -1,6 +1,7 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
+import { useCanSeeBudget } from "@/hooks/useCanSeeBudget";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -465,6 +466,7 @@ export default function ReportsPage() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
+  const canSeeBudgetFigures = useCanSeeBudget(id);
   const [projectName, setProjectName] = useState("");
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState<string | null>(null);
@@ -1243,7 +1245,7 @@ export default function ReportsPage() {
 
       <main className="px-6 sm:px-10 py-6">
         <div className="space-y-8">
-          {REPORT_SECTIONS.map((section) => (
+          {REPORT_SECTIONS.filter((section) => section.id !== "presupuesto" || canSeeBudgetFigures).map((section) => (
             <div key={section.id}>
               <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">{section.title}</h2>
               <div className="space-y-2">

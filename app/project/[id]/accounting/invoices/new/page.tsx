@@ -1,6 +1,7 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
+import { useCanSeeBudget } from "@/hooks/useCanSeeBudget";
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -283,6 +284,7 @@ export default function NewInvoicePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = params?.id as string;
+  const canSeeBudgetFigures = useCanSeeBudget(id);
   const linkToId = searchParams.get("linkTo");
   const preselectedPoId = searchParams.get("poId");
   const { loading: permissionsLoading, error: permissionsError, permissions } = useAccountingPermissions(id);
@@ -3251,8 +3253,8 @@ export default function NewInvoicePage() {
                   </div>
                 ) : (
                   filteredSubAccounts.map((sub) => {
-                    const isLow = sub.available < sub.budgeted * 0.1;
-                    const isOver = sub.available < 0;
+                    const isLow = canSeeBudgetFigures && sub.available < sub.budgeted * 0.1;
+                    const isOver = canSeeBudgetFigures && sub.available < 0;
                     return (
                       <button
                         key={sub.id}
@@ -3282,6 +3284,7 @@ export default function NewInvoicePage() {
                             <p className="text-[13px] text-slate-700">{sub.description}</p>
                           </div>
                         </div>
+                        {canSeeBudgetFigures && (
                         <div className="grid grid-cols-4 gap-3 text-xs">
                           <div className="bg-slate-50 rounded-lg p-2">
                             <p className="text-slate-500">Presupuestado</p>
@@ -3302,6 +3305,7 @@ export default function NewInvoicePage() {
                             </p>
                           </div>
                         </div>
+                        )}
                       </button>
                     );
                   })

@@ -1,6 +1,7 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
+import { useCanSeeBudget } from "@/hooks/useCanSeeBudget";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -186,6 +187,7 @@ export default function EditPOPage() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
+  const canSeeBudgetFigures = useCanSeeBudget(id);
   const poId = params?.poId as string;
 
   const {
@@ -1190,7 +1192,7 @@ export default function EditPOPage() {
                             )}
                             <Search size={14} className="text-slate-400" />
                           </button>
-                          {permissions.isProjectRole && selectedAccount && (
+                          {canSeeBudgetFigures && selectedAccount && (
                             <div className="mt-2 p-2 bg-slate-50 rounded-lg flex items-center justify-between text-xs">
                               <span className="text-slate-500">Disponible:</span>
                               <span className={`font-medium ${
@@ -1666,8 +1668,8 @@ export default function EditPOPage() {
                   </div>
                 ) : (
                   filteredSubAccounts.map((subAccount) => {
-                    const isLowBudget = subAccount.available < subAccount.budgeted * 0.1;
-                    const isOverBudget = subAccount.available < 0;
+                    const isLowBudget = canSeeBudgetFigures && subAccount.available < subAccount.budgeted * 0.1;
+                    const isOverBudget = canSeeBudgetFigures && subAccount.available < 0;
                     return (
                       <button key={subAccount.id} onClick={() => selectAccount(subAccount)} className={`w-full text-left p-4 border rounded-md hover:bg-slate-50 transition-all ${isOverBudget ? "border-red-200 bg-red-50/50" : isLowBudget ? "border-amber-200 bg-amber-50/50" : "border-slate-200"}`}>
                         <div className="flex items-start justify-between mb-3">
@@ -1681,7 +1683,7 @@ export default function EditPOPage() {
                             <p className="text-xs text-slate-500 mt-1">{subAccount.accountCode} - {subAccount.accountDescription}</p>
                           </div>
                         </div>
-                        {permissions.isProjectRole && (
+                        {canSeeBudgetFigures && (
                           <div className="grid grid-cols-4 gap-3 text-xs">
                             <div className="bg-slate-50 rounded-lg p-2"><p className="text-slate-500">Presupuestado</p><p className="font-semibold text-slate-900">{formatCurrency(subAccount.budgeted)} €</p></div>
                             <div className="bg-amber-50 rounded-lg p-2"><p className="text-amber-600">Comprometido</p><p className="font-semibold text-amber-700">{formatCurrency(subAccount.committed)} €</p></div>

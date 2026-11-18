@@ -1,6 +1,7 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
+import { useCanSeeBudget } from "@/hooks/useCanSeeBudget";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -201,6 +202,7 @@ export default function ApprovalsPage() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
+  const canSeeBudgetFigures = useCanSeeBudget(id);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState("");
@@ -1070,7 +1072,7 @@ export default function ApprovalsPage() {
                   </div>
 
                   {/* Budget Impact */}
-                  {currentApproval.budgetImpact && currentApproval.budgetImpact.length > 0 && (
+                  {canSeeBudgetFigures && currentApproval.budgetImpact && currentApproval.budgetImpact.length > 0 && (
                     <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                       <button onClick={() => toggleSection("budget")} className="w-full px-3.5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                         <div className="flex items-center gap-3">

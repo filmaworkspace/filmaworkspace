@@ -66,6 +66,13 @@ interface BudgetLine {
   executed: number;
 }
 
+interface TrackedAccount {
+  code: string;
+  name: string;
+  committed: number;
+  actual: number;
+}
+
 interface Budget {
   budgeted: number;
   actual: number;
@@ -184,6 +191,7 @@ export default function AccountingPanelPage() {
   const [invoices, setInvoices] = useState<InvoiceLite[]>([]);
   const [openPOs, setOpenPOs] = useState<OpenPO[]>([]);
   const [budget, setBudget] = useState<Budget | null>(null);
+  const [tracked, setTracked] = useState<TrackedAccount[]>([]);
   const [tab, setTab] = useState<"all" | Kind>("all");
 
   const extended = accessLevel === "accounting_extended";
@@ -275,6 +283,37 @@ export default function AccountingPanelPage() {
             }))
             .sort((a, b) => pct(b.invoiced, b.base) - pct(a.invoiced, a.base)),
         );
+
+        // Seguimiento de cuentas: HOD/coordinación ven comprometido y realizado
+        // de las cuentas que contabilidad avanzada ha abierto a su departamento.
+        if (p === "head" && mDept) {
+          const trackedSnap = await getDocs(
+            query(collection(db, `projects/${id}/accounts`), where("trackingDepartments", "array-contains", mDept)),
+          );
+          if (!trackedSnap.empty) {
+            const [costCfg, box, allPos, allInv] = await Promise.all([
+              getCostSettings(id),
+              loadBoxBySubaccount(id),
+              getDocs(posRef),
+              getDocs(invRef),
+            ]);
+            const committed = committedBySubaccount(allPos.docs.map((d) => d.data()), costCfg);
+            const actual = actualBySubaccount(allInv.docs.map((d) => d.data()), costCfg);
+            const list = await Promise.all(
+              trackedSnap.docs.map(async (acc) => {
+                const subs = await getDocs(collection(db, `projects/${id}/accounts/${acc.id}/subaccounts`));
+                let c = 0, a = 0;
+                subs.docs.forEach((sd) => {
+                  const code = sd.data().code || "";
+                  c += committed[code] || 0;
+                  a += (actual[code] || 0) + (box[code] || 0);
+                });
+                return { code: acc.data().code || "", name: acc.data().description || "", committed: c, actual: a };
+              }),
+            );
+            setTracked(list.sort((x, y) => x.code.localeCompare(y.code)));
+          }
+        }
 
         // Presupuesto: solo con acceso ampliado (igual que la pestaña Presupuesto)
         if (p === "accounting" && mLevel === "accounting_extended") {
@@ -377,7 +416,8 @@ export default function AccountingPanelPage() {
   const showBudget = profile === "accounting" && extended;
   const showDue = profile === "accounting" && extended;
   const showOpenPOs = profile !== "accounting";
-  const hasAside = showBudget || showDue || showOpenPOs;
+  const showTracked = profile === "head" && tracked.length > 0;
+  const hasAside = showBudget || showDue || showOpenPOs || showTracked;
   const today = startOfToday();
 
   return (
@@ -588,6 +628,29 @@ export default function AccountingPanelPage() {
                     </div>
                   </div>
                 )}
+              </section>
+            )}
+
+            {showTracked && (
+              <section aria-labelledby="tracked-title" className="flex flex-col gap-2.5">
+                <h2 id="tracked-title" className="text-xs font-medium text-slate-500">Seguimiento de cuentas</h2>
+                <div className="overflow-hidden rounded-lg border border-slate-200">
+                  <div className="grid grid-cols-[minmax(0,1fr)_96px_96px] gap-2 border-b border-slate-200 bg-[#FAFAFA] px-3.5 py-2 text-[11px] text-slate-500">
+                    <span>Cuenta</span>
+                    <span className="text-right">Comprometido</span>
+                    <span className="text-right">Realizado</span>
+                  </div>
+                  {tracked.map((t) => (
+                    <div key={t.code} className="grid grid-cols-[minmax(0,1fr)_96px_96px] items-baseline gap-2 border-b border-slate-100 px-3.5 py-2.5 last:border-0">
+                      <span className="flex min-w-0 items-baseline gap-2">
+                        <span className="font-mono text-[11px] text-slate-500">{t.code}</span>
+                        <span className="truncate">{t.name}</span>
+                      </span>
+                      <span className="text-right font-mono text-xs">{money(t.committed, 0)}</span>
+                      <span className="text-right font-mono text-xs">{money(t.actual, 0)}</span>
+                    </div>
+                  ))}
+                </div>
               </section>
             )}
 

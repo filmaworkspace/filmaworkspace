@@ -1,6 +1,7 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
+import { useCanSeeBudget } from "@/hooks/useCanSeeBudget";
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -215,6 +216,7 @@ export default function EditInvoicePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = params?.id as string;
+  const canSeeBudgetFigures = useCanSeeBudget(id);
   const invoiceId = params?.invoiceId as string;
   const isAdminCorrection = searchParams.get("mode") === "correction";
 
@@ -1506,9 +1508,11 @@ export default function EditInvoicePage() {
                       <p className="font-medium text-slate-900 font-mono">{s.code}</p>
                       <p className="text-[13px] text-slate-500">{s.description}</p>
                     </div>
+                    {canSeeBudgetFigures && (
                     <div className="text-right text-xs">
                       <p className={cx("font-medium", s.available >= 0 ? "text-emerald-600" : "text-red-600")}>Disp: {formatCurrency(s.available)} €</p>
                     </div>
+                    )}
                   </div>
                 </button>
               ))}
