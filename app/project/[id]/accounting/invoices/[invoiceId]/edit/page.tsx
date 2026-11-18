@@ -10,6 +10,7 @@ import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db, storage } from "@/lib/firebase";
+import { documentTotals, lineAmounts } from "@/lib/amounts";
 import { getScopedDocs, scopeFromPermissions } from "@/lib/accountingScope";
 import { approverIdsOf } from "@/lib/approvers";
 import { loadBudgetFigures } from "@/lib/budgetFigures";
@@ -445,20 +446,11 @@ export default function EditInvoicePage() {
   };
 
   // Cálculos
-  const calculateItemTotal = (item: InvoiceItem) => {
-    const base = item.quantity * item.unitPrice;
-    const vat = base * (item.vatRate / 100);
-    const irpf = base * (item.irpfRate / 100);
-    return { baseAmount: base, vatAmount: vat, irpfAmount: irpf, totalAmount: base + vat - irpf };
-  };
+  // Importes redondeados a céntimos (lib/amounts)
+  const calculateItemTotal = (item: InvoiceItem) => lineAmounts(item);
 
   const calculateTotals = () => {
-    const newTotals = {
-      baseAmount: items.reduce((s, i) => s + i.baseAmount, 0),
-      vatAmount: items.reduce((s, i) => s + i.vatAmount, 0),
-      irpfAmount: items.reduce((s, i) => s + i.irpfAmount, 0),
-      totalAmount: items.reduce((s, i) => s + i.totalAmount, 0),
-    };
+    const newTotals = documentTotals(items);
     setTotals(newTotals);
 
     // Recalcular vencimientos si están activos

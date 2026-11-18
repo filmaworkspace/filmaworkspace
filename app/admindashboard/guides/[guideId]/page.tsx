@@ -488,7 +488,7 @@ function BlockEditor({
             contentEditable
             suppressContentEditableWarning
             onBlur={(e) => onChange({ html: e.currentTarget.innerHTML } as Partial<GuideBlock>)}
-            dangerouslySetInnerHTML={{ __html: block.html }}
+            dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(block.html) }}
             data-placeholder="Escribe el texto..."
             className="min-h-[2.5rem] text-sm text-slate-700 leading-relaxed outline-none [&_a]:text-blue-600 [&_a]:underline empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300"
           />

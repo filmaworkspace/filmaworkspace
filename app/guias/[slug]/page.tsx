@@ -15,7 +15,7 @@ import { collection, doc, getDocs, increment, query, updateDoc, where } from "fi
 import { ArrowRight, BookOpen, ExternalLink } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
-import { Guide } from "@/lib/guides";
+import { Guide, sanitizeInlineHtml } from "@/lib/guides";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -118,7 +118,7 @@ export default function GuidePublicPage() {
                 <div
                   key={block.id}
                   className="text-[15px] text-slate-700 leading-relaxed [&_a]:text-blue-600 [&_a]:underline"
-                  dangerouslySetInnerHTML={{ __html: block.html }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(block.html) }}
                 />
               );
             }

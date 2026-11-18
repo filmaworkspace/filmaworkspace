@@ -26,6 +26,18 @@ export async function rateLimit(key: string, limit: number, windowMs: number): P
   });
 }
 
+/**
+ * IP del cliente para limitar peticiones. En Vercel se usa la cabecera que
+ * pone la propia plataforma (x-vercel-forwarded-for / x-real-ip), que el
+ * cliente no puede falsear; x-forwarded-for solo como último recurso.
+ */
 export function clientIp(req: NextRequest): string {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+  const first = (h: string | null) => h?.split(",")[0]?.trim() || "";
+  return (
+    first(req.headers.get("x-vercel-forwarded-for")) ||
+    first(req.headers.get("x-real-ip")) ||
+    (req as unknown as { ip?: string }).ip ||
+    first(req.headers.get("x-forwarded-for")) ||
+    "unknown"
+  );
 }

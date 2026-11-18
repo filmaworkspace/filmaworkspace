@@ -8,6 +8,7 @@ import { inter } from "@/lib/fonts";
 import { Button, EmptyState, IconButton, Menu, MenuItem, MenuSeparator, Page, PageHeader, Segmented, Select } from "@/components/ds";
 import SearchBar, { type SearchField } from "@/components/SearchBar";
 import { matchWords, norm } from "@/lib/search";
+import { nextDocNumber } from "@/lib/docCounter";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
@@ -427,15 +428,9 @@ export default function CrewPage() {
   const fullName = (m: CrewMember) =>
     [m.firstName, m.lastName1, m.lastName2].filter(Boolean).join(" ");
 
-  // Genera el siguiente número correlativo 0001, 0002…
-  const getNextCrewNumber = async (): Promise<string> => {
-    const snap = await getDocs(collection(db, `projects/${id}/crew`));
-    const numbers = snap.docs
-      .map((d) => parseInt(d.data().crewNumber || "0", 10))
-      .filter((n) => !isNaN(n));
-    const next = numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
-    return String(next).padStart(4, "0");
-  };
+  // Siguiente número correlativo 0001, 0002… reservado en transacción
+  // (lib/docCounter): dos altas a la vez no pueden recibir el mismo número.
+  const getNextCrewNumber = (): Promise<string> => nextDocNumber(id, "crew");
 
   // ── Data ─────────────────────────────────────────────────────────────────────
 

@@ -182,13 +182,14 @@ service cloud.firestore {
     function myDepartment(projectId) {
       return accMember(projectId).get('department', '');
     }
-    // PO/factura: la ve quien lo ve todo, quien la creó, quien la aprueba y el
+    // PO/factura: la ve quien lo ve todo, quien la creó (o creó su PO), quien la aprueba y el
     // HOD/Coordinator de su departamento. Se escribe con resource.data.campo
     // (no .get) para que las consultas acotadas de la app se puedan validar.
     function canReadAccDoc(projectId) {
       return accSeesAll(projectId) || (
         inAccounting(projectId) && (
           resource.data.createdBy == request.auth.uid ||
+          resource.data.poCreatedBy == request.auth.uid ||
           request.auth.uid in resource.data.approverIds ||
           (isDeptLead(projectId) && myDepartment(projectId) != '' && resource.data.department == myDepartment(projectId))
         )
@@ -212,6 +213,10 @@ service cloud.firestore {
                .hasOnly(['permissions', 'accountingAccessLevel', 'boxAccess']) &&
              request.resource.data.get('permissions', {}).diff(resource.data.get('permissions', {}))
                .affectedKeys().hasOnly(['accounting']);
+    }
+    function counterUser(projectId, kind) {
+      return (kind == 'crew' && (isAdmin() || hasTeamAccess(projectId))) ||
+             (kind != 'crew' && (inAccounting(projectId) || accSeesAll(projectId)));
     }
     function isAccountingConfigDoc(configId) {
       return configId in ['project', 'company', 'approvals', 'permissions', 'cost', 'planCuentas'];
@@ -340,14 +345,14 @@ service cloud.firestore {
         allow write: if canWriteBudget(projectId);
       }
 
-      // Numeración correlativa de POs y facturas (lib/docCounter.ts)
+      // Numeración correlativa de POs, facturas (contabilidad) y crew (equipo).
       match /counters/{kind} {
-        allow read: if inAccounting(projectId) || accSeesAll(projectId);
-        allow create: if (inAccounting(projectId) || accSeesAll(projectId)) &&
-                         kind in ['pos', 'invoices'] &&
+        allow read: if counterUser(projectId, kind);
+        allow create: if counterUser(projectId, kind) &&
+                         kind in ['pos', 'invoices', 'crew'] &&
                          request.resource.data.keys().hasOnly(['last']) &&
                          request.resource.data.last is int;
-        allow update: if (inAccounting(projectId) || accSeesAll(projectId)) &&
+        allow update: if counterUser(projectId, kind) &&
                          request.resource.data.keys().hasOnly(['last']) &&
                          request.resource.data.last is int &&
                          request.resource.data.last > resource.data.last;
@@ -579,7 +584,7 @@ service cloud.firestore {
       // favorito, notificaciones), nunca sus permisos ni darse de alta.
       allow update: if isSignedIn() && request.auth.uid == userId &&
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(["archived", "favorite", "notifications"]);
+          .hasOnly(["archived", "favorite"]);
     }
 
     match /companyProjects/{companyId}/projects/{projectId} {

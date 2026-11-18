@@ -16,7 +16,6 @@ import {
 } from "firebase/auth";
 import {
   collection,
-  deleteDoc,
   doc,
   getDocs,
   getDoc,
@@ -255,10 +254,22 @@ export default function ConfigGeneral() {
     }
   };
 
+  // Borrado en el servidor: elimina el proyecto con todas sus subcolecciones,
+  // archivos y accesos (un deleteDoc desde aquí dejaba todo eso huérfano).
   const deleteProject = async () => {
     if (!id) return;
     try {
-      await deleteDoc(doc(db, "projects", id as string));
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/delete-project", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ projectId: id }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showToast("error", data.error || "Error al eliminar");
+        return;
+      }
       router.push("/dashboard");
     } catch {
       showToast("error", "Error al eliminar");

@@ -10,6 +10,7 @@ import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db, storage } from "@/lib/firebase";
+import { documentTotals, lineAmounts } from "@/lib/amounts";
 import { getScopedDocs, scopeFromPermissions } from "@/lib/accountingScope";
 import { nextDocNumber } from "@/lib/docCounter";
 import { approverIdsOf } from "@/lib/approvers";
@@ -143,6 +144,7 @@ interface EpisodeDistribution {
 
 interface PO {
   id: string;
+  createdBy?: string;
   number: string;
   supplier: string;
   supplierId: string;
@@ -582,6 +584,7 @@ export default function NewInvoicePage() {
         };
         const allPOs = posSnap.docs.map((d) => ({
           id: d.id,
+          createdBy: d.data().createdBy || "",
           number: d.data().number,
           supplier: d.data().supplier,
           supplierId: d.data().supplierId,
@@ -852,25 +855,11 @@ export default function NewInvoicePage() {
   };
 
   // Funciones de cálculo
-  const calculateItemTotal = (item: InvoiceItem) => {
-    const base = item.quantity * item.unitPrice;
-    const vat = base * (item.vatRate / 100);
-    const irpf = base * (item.irpfRate / 100);
-    return {
-      baseAmount: base,
-      vatAmount: vat,
-      irpfAmount: irpf,
-      totalAmount: base + vat - irpf,
-    };
-  };
+  // Importes redondeados a céntimos (lib/amounts)
+  const calculateItemTotal = (item: InvoiceItem) => lineAmounts(item);
 
   const calculateTotals = () => {
-    setTotals({
-      baseAmount: items.reduce((s, i) => s + i.baseAmount, 0),
-      vatAmount: items.reduce((s, i) => s + i.vatAmount, 0),
-      irpfAmount: items.reduce((s, i) => s + i.irpfAmount, 0),
-      totalAmount: items.reduce((s, i) => s + i.totalAmount, 0),
-    });
+    setTotals(documentTotals(items));
   };
 
   const calculatePOStats = async () => {
@@ -1418,6 +1407,8 @@ export default function NewInvoicePage() {
         department: formData.department || selectedPO?.department || permissions.fixedDepartment || "",
         poId: selectedPO?.id || null,
         poNumber: selectedPO?.number || null,
+        // Quien creó la PO puede ver todas sus facturas (reglas de Firestore)
+        poCreatedBy: selectedPO?.createdBy || null,
         description: (formData.description || "").trim(),
         notes: (formData.notes || "").trim(),
         items: itemsData,

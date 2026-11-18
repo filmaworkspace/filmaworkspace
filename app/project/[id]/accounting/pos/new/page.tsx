@@ -9,6 +9,7 @@ import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
+import { documentTotals, lineAmounts } from "@/lib/amounts";
 import { nextDocNumber } from "@/lib/docCounter";
 import { approverIdsOf } from "@/lib/approvers";
 import { loadBudgetFigures } from "@/lib/budgetFigures";
@@ -653,12 +654,8 @@ export default function NewPOPage() {
     return steps.length === 0 || steps.every((step) => step.approvers.length === 0);
   };
 
-  const calculateItemTotal = (item: POItem) => {
-    const baseAmount = item.quantity * item.unitPrice;
-    const vatAmount = baseAmount * (item.vatRate / 100);
-    const irpfAmount = baseAmount * (item.irpfRate / 100);
-    return { baseAmount, vatAmount, irpfAmount, totalAmount: baseAmount + vatAmount - irpfAmount };
-  };
+  // Importes redondeados a céntimos (lib/amounts)
+  const calculateItemTotal = (item: POItem) => lineAmounts(item);
 
   const updateItem = (index: number, field: keyof POItem, value: any) => {
     const newItems = [...items];
@@ -698,12 +695,7 @@ export default function NewPOPage() {
   };
 
   const calculateTotals = () => {
-    setTotals({
-      baseAmount: items.reduce((sum, item) => sum + item.baseAmount, 0),
-      vatAmount: items.reduce((sum, item) => sum + item.vatAmount, 0),
-      irpfAmount: items.reduce((sum, item) => sum + item.irpfAmount, 0),
-      totalAmount: items.reduce((sum, item) => sum + item.totalAmount, 0),
-    });
+    setTotals(documentTotals(items));
   };
 
   const selectSupplier = (supplier: Supplier) => {

@@ -2,7 +2,7 @@
 // Las reglas de Firestore solo dejan leer a cada uno lo que le corresponde:
 //   · contabilidad (nivel contabilidad / ampliado) y roles de proyecto: todo
 //   · HOD y Coordinator: lo de su departamento
-//   · resto: lo que han creado ellos
+//   · resto: lo que han creado ellos y las facturas de sus POs
 //   · y, además, cualquiera puede leer lo que tiene que aprobar (approverIds)
 // Una consulta sobre toda la colección fallaría para quien no lo ve todo, así
 // que aquí se lanzan consultas acotadas y se juntan los resultados.
@@ -50,6 +50,8 @@ export async function getScopedDocs(
   const queries = [
     query(col, where("createdBy", "==", scope.uid)),
     query(col, where("approverIds", "array-contains", scope.uid)),
+    // Facturas de sus POs aunque las haya subido otra persona (contabilidad)
+    query(col, where("poCreatedBy", "==", scope.uid)),
   ];
   if (scope.department) queries.push(query(col, where("department", "==", scope.department)));
   const results = await Promise.allSettled(queries.map((q) => getDocs(q)));

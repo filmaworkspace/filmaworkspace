@@ -28,7 +28,6 @@ import {
   AlertCircle,
   Archive,
   ArchiveRestore,
-  Bell,
   CheckCircle,
   ExternalLink,
   Eye,
@@ -57,7 +56,6 @@ interface ProjectMembership {
   department?: string;
   position?: string;
   permissions: { config: boolean; accounting: boolean; team: boolean };
-  notifications: { approvals: boolean; payments: boolean; invoices: boolean; team: boolean };
   archived: boolean;
   favorite: boolean;
   joinedAt: Date;
@@ -67,13 +65,6 @@ interface ProjectMembership {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-// Keys match the Spanish values stored in Firestore
-const NOTIFICATION_TYPES: { id: string; label: string; description: string; entorno: "accounting" | "team" }[] = [
-  { id: "approvals", label: "Aprobaciones", description: "POs y facturas pendientes de aprobación", entorno: "accounting" },
-  { id: "payments",  label: "Pagos",        description: "Vencimientos y pagos realizados",         entorno: "accounting" },
-  { id: "invoices",  label: "Facturas",     description: "Nuevas facturas y cambios de estado",     entorno: "accounting" },
-  { id: "team",      label: "Equipo",       description: "Altas y cambios en el equipo",            entorno: "team"       },
-];
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -93,7 +84,6 @@ export default function ProfilePage() {
   const [projects, setProjects]           = useState<ProjectMembership[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [projectFilter, setProjectFilter] = useState<"all" | "active" | "archived" | "favorites">("active");
-  const [expandedProject, setExpandedProject] = useState<string | null>(null);
   const [projectMenuOpen, setProjectMenuOpen] = useState<string | null>(null);
 
   const showToast = (type: "success" | "error", message: string) => {
@@ -141,7 +131,6 @@ export default function ProfilePage() {
               accounting: upData.permissions?.accounting || false,
               team:       upData.permissions?.team       || false,
             },
-            notifications: upData.notifications || { approvals: true, payments: true, invoices: true, team: true },
             archived:  upData.archived  || pData.archived || false,
             favorite:  upData.favorite  || false,
             joinedAt:  upData.joinedAt?.toDate() || new Date(),
@@ -238,30 +227,6 @@ export default function ProfilePage() {
     }
   };
 
-  const updateProjectNotification = async (projectId: string, notificationType: string, value: boolean) => {
-    if (!user?.uid) return;
-    const project = projects.find(p => p.projectId === projectId);
-    if (!project) return;
-    try {
-      const newNotifications = { ...project.notifications, [notificationType]: value };
-      await updateDoc(doc(db, `userProjects/${user.uid}/projects`, projectId), { notifications: newNotifications });
-      setProjects(projects.map(p => p.projectId === projectId ? { ...p, notifications: newNotifications } : p));
-    } catch {
-      showToast("error", "Error al actualizar");
-    }
-  };
-
-  const toggleAllNotifications = async (projectId: string, enable: boolean) => {
-    if (!user?.uid) return;
-    try {
-      const newNotifications = { approvals: enable, payments: enable, invoices: enable, team: enable };
-      await updateDoc(doc(db, `userProjects/${user.uid}/projects`, projectId), { notifications: newNotifications });
-      setProjects(projects.map(p => p.projectId === projectId ? { ...p, notifications: newNotifications } : p));
-      showToast("success", enable ? "Notificaciones activadas" : "Notificaciones silenciadas");
-    } catch {
-      showToast("error", "Error al actualizar");
-    }
-  };
 
   const handleLogout = async () => {
     try {
@@ -305,12 +270,6 @@ export default function ProfilePage() {
         {showPassword[field] ? <EyeOff size={16} /> : <Eye size={16} />}
       </button>
     </div>
-  );
-
-  const Switch = ({ on }: { on: boolean }) => (
-    <span className={`relative h-5 w-9 flex-shrink-0 rounded-full transition-colors ${on ? "bg-slate-900" : "bg-slate-300"}`}>
-      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all ${on ? "left-[18px]" : "left-0.5"}`} />
-    </span>
   );
 
   if (isLoading) {
@@ -450,14 +409,6 @@ export default function ProfilePage() {
             ) : (
               <div className="space-y-3">
                 {filteredProjects.map((project) => {
-                  const isExpanded = expandedProject === project.projectId;
-                  const allNotifOn = Object.values(project.notifications).every(Boolean);
-                  const allNotifOff = Object.values(project.notifications).every((v) => !v);
-                  const groups = [
-                    project.permissions.accounting && { key: "accounting" as const, label: "Contabilidad" },
-                    project.permissions.team && { key: "team" as const, label: "Equipo" },
-                  ].filter(Boolean) as { key: "accounting" | "team"; label: string }[];
-
                   return (
                     <div key={project.projectId} className={`${ui.card} ${project.archived ? "opacity-70" : ""}`}>
                       <div className="flex items-center gap-4 p-3 pr-4">
@@ -500,13 +451,6 @@ export default function ProfilePage() {
                           >
                             <Star size={16} fill={project.favorite ? "currentColor" : "none"} />
                           </button>
-                          <button
-                            onClick={() => setExpandedProject(isExpanded ? null : project.projectId)}
-                            className={`${ui.iconButton} ${isExpanded ? "bg-[#F1F1F3] !text-slate-900" : ""}`}
-                            title="Notificaciones"
-                          >
-                            <Bell size={16} />
-                          </button>
                           <div className="relative">
                             <button
                               onClick={() => setProjectMenuOpen(projectMenuOpen === project.projectId ? null : project.projectId)}
@@ -532,54 +476,6 @@ export default function ProfilePage() {
                         </div>
                       </div>
 
-                      {/* Notificaciones */}
-                      {isExpanded && (
-                        <div className="border-t border-slate-100 px-4 py-4">
-                          <div className="mb-3 flex items-center justify-between">
-                            <p className="text-[13px] font-medium text-slate-900">Notificaciones</p>
-                            {groups.length > 0 && (
-                              <button
-                                onClick={() => toggleAllNotifications(project.projectId, allNotifOff ? true : !allNotifOn)}
-                                className="text-xs text-slate-500 hover:text-slate-900"
-                              >
-                                {allNotifOn ? "Silenciar todo" : "Activar todo"}
-                              </button>
-                            )}
-                          </div>
-                          {groups.length === 0 ? (
-                            <p className="py-2 text-xs text-slate-400">No tienes acceso a ningún módulo de este proyecto.</p>
-                          ) : (
-                            <div className="space-y-4">
-                              {groups.map((g) => (
-                                <div key={g.key}>
-                                  <p className="mb-1.5 flex items-center gap-1.5 text-xs text-slate-500">
-                                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: MODULE_COLORS[g.key] }} />
-                                    {g.label}
-                                  </p>
-                                  <div className="divide-y divide-slate-100 rounded-xl border border-slate-200">
-                                    {NOTIFICATION_TYPES.filter((nt) => nt.entorno === g.key).map((nt) => {
-                                      const enabled = project.notifications[nt.id as keyof typeof project.notifications];
-                                      return (
-                                        <button
-                                          key={nt.id}
-                                          onClick={() => updateProjectNotification(project.projectId, nt.id, !enabled)}
-                                          className="flex w-full items-center justify-between gap-4 px-3.5 py-2.5 text-left transition-colors hover:bg-[#F7F7F8]"
-                                        >
-                                          <span>
-                                            <span className="block text-[13px] text-slate-900">{nt.label}</span>
-                                            <span className="block text-xs text-slate-400">{nt.description}</span>
-                                          </span>
-                                          <Switch on={enabled} />
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                   );
                 })}

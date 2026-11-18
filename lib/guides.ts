@@ -48,9 +48,11 @@ export function slugify(input: string): string {
 // producir realmente, para evitar que un <script> o un atributo on* se cuele
 // si el HTML se ha manipulado fuera del editor antes de guardarse.
 export function sanitizeInlineHtml(html: string): string {
-  const div = typeof document !== "undefined" ? document.createElement("div") : null;
-  if (!div) return html;
-  div.innerHTML = html;
+  // Sin DOM (servidor): solo texto, nunca HTML sin revisar.
+  if (typeof DOMParser === "undefined") return String(html || "").replace(/<[^>]*>/g, "");
+  // DOMParser crea un documento inerte: al analizarlo no se cargan imágenes
+  // ni se ejecutan atributos on* (a diferencia de innerHTML en un <div>).
+  const div = new DOMParser().parseFromString(`<div>${html || ""}</div>`, "text/html").body.firstElementChild as HTMLElement;
 
   const ALLOWED_TAGS = new Set(["B", "STRONG", "I", "EM", "U", "A", "BR", "DIV", "SPAN"]);
 
@@ -59,7 +61,7 @@ export function sanitizeInlineHtml(html: string): string {
       if (child.nodeType === Node.ELEMENT_NODE) {
         const el = child as HTMLElement;
         if (!ALLOWED_TAGS.has(el.tagName)) {
-          const text = document.createTextNode(el.textContent || "");
+          const text = el.ownerDocument.createTextNode(el.textContent || "");
           node.replaceChild(text, el);
           return;
         }
@@ -72,6 +74,10 @@ export function sanitizeInlineHtml(html: string): string {
           }
           el.removeAttribute(attr.name);
         });
+        if (el.tagName === "A" && el.getAttribute("href")) {
+          el.setAttribute("target", "_blank");
+          el.setAttribute("rel", "noopener noreferrer nofollow");
+        }
         clean(el);
       } else if (child.nodeType !== Node.TEXT_NODE) {
         node.removeChild(child);

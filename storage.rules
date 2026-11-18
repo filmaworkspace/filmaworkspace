@@ -1,0 +1,136 @@
+rules_version = '2';
+
+// ─── Reglas de Firebase Storage ──────────────────────────────────────────────
+// Publicar con: firebase deploy --only storage
+// Pruebas: tests/firestore-rules (npm test)
+//
+// Carpetas bajo projects/{projectId}/:
+//   · crew/        fichas del equipo (DNI, certificados, fotos) → solo equipo
+//   · cover/       portada del proyecto → la ven todos los miembros
+//   · contabilidad (invoices, pos, receipts, cardExpenses, transferExpenses,
+//                  transferEnvelopes, cash) → solo contabilidad y EP/PM
+// forms/{formId}/  subidas desde enlaces públicos (ficha de alta, tickets de
+//                  caja): sin login, solo mientras el formulario está pendiente.
+// guides/          imágenes de las guías públicas → lectura libre, escribe admin.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userProject(projectId) {
+      return /databases/(default)/documents/userProjects/$(request.auth.uid)/projects/$(projectId);
+    }
+
+    function member(projectId) {
+      return /databases/(default)/documents/projects/$(projectId)/members/$(request.auth.uid);
+    }
+
+    function isAdmin() {
+      let docPath = /databases/(default)/documents/users/$(request.auth.uid);
+      return isSignedIn() &&
+             firestore.exists(docPath) &&
+             firestore.get(docPath).data.get('role', '') == "admin";
+    }
+
+    function hasProjectAccess(projectId) {
+      return isSignedIn() && (
+        firestore.exists(userProject(projectId)) ||
+        firestore.exists(member(projectId))
+      );
+    }
+
+    function hasPermission(projectId, permission) {
+      return isSignedIn() && (
+        (firestore.exists(userProject(projectId)) &&
+         firestore.get(userProject(projectId)).data.get('permissions', {}).get(permission, false) == true) ||
+        (firestore.exists(member(projectId)) &&
+         firestore.get(member(projectId)).data.get('permissions', {}).get(permission, false) == true)
+      );
+    }
+
+    function memberRole(projectId) {
+      return firestore.exists(member(projectId)) ? firestore.get(member(projectId)).data.get('role', '') : '';
+    }
+
+    function isEPorPM(projectId) {
+      return isSignedIn() && memberRole(projectId) in ['EP', 'PM'];
+    }
+
+    function hasTeamAccess(projectId) {
+      return hasPermission(projectId, 'team') || memberRole(projectId) in ['EP', 'PM', 'PC'];
+    }
+
+    function hasAccounting(projectId) {
+      return hasPermission(projectId, 'accounting') || isEPorPM(projectId);
+    }
+
+    // Documentos: imágenes y PDF de hasta 20 MB.
+    function isDocument() {
+      return request.resource.size < 20 * 1024 * 1024 &&
+             (request.resource.contentType.matches('image/.*') ||
+              request.resource.contentType == 'application/pdf');
+    }
+
+    // ── Proyectos ──────────────────────────────────────────────────────────
+    match /projects/{projectId}/crew/{allPaths=**} {
+      allow read: if isAdmin() || hasTeamAccess(projectId);
+      allow write: if isAdmin() || hasTeamAccess(projectId);
+    }
+
+    match /projects/{projectId}/cover/{allPaths=**} {
+      allow read: if isAdmin() || hasProjectAccess(projectId);
+      allow write: if isAdmin() || hasPermission(projectId, 'config') || isEPorPM(projectId);
+    }
+
+    match /projects/{projectId}/{folder}/{allPaths=**} {
+      allow read, write: if folder in ['invoices', 'pos', 'receipts', 'cardExpenses', 'transferExpenses', 'transferEnvelopes', 'cash'] &&
+                            (isAdmin() || hasAccounting(projectId));
+    }
+
+    // Otras carpetas de proyecto que pueda haber: como antes (lee el
+    // proyecto, escribe contabilidad o configuración).
+    match /projects/{projectId}/{folder}/{allPaths=**} {
+      allow read: if !(folder in ['crew', 'cover', 'invoices', 'pos', 'receipts', 'cardExpenses', 'transferExpenses', 'transferEnvelopes', 'cash']) &&
+                     (isAdmin() || hasProjectAccess(projectId));
+      allow write: if !(folder in ['crew', 'cover', 'invoices', 'pos', 'receipts', 'cardExpenses', 'transferExpenses', 'transferEnvelopes', 'cash']) &&
+                      (isAdmin() || hasPermission(projectId, 'accounting') || hasPermission(projectId, 'config'));
+    }
+
+    // ── Formularios públicos (enlace con id secreto) ─────────────────────
+    match /forms/{formId}/{allPaths=**} {
+      function form() {
+        return firestore.get(/databases/(default)/documents/forms/$(formId)).data;
+      }
+      function isPendingForm() {
+        return firestore.exists(/databases/(default)/documents/forms/$(formId)) &&
+               form().get('status', '') == 'pending';
+      }
+      // Quien rellena el formulario sube y obtiene la URL mientras está pendiente;
+      // después, solo el equipo del proyecto.
+      allow create: if resource == null && isPendingForm() && isDocument();
+      allow read: if isPendingForm() ||
+                     isAdmin() ||
+                     (isSignedIn() && hasProjectAccess(form().get('projectId', '')));
+      allow update, delete: if false;
+    }
+
+    // ── Guías (públicas) ─────────────────────────────────────────────────
+    match /guides/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── Archivos de usuario ──────────────────────────────────────────────
+    match /users/{userId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

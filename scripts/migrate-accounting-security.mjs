@@ -3,8 +3,9 @@
 // nuevas de Firestore. Para cada proyecto:
 //   1. Traslada el presupuestado de cada subcuenta (campo `budgeted`) a
 //      projects/{id}/budgetLines/{subId} y lo borra de la subcuenta.
-//   2. Rellena `approverIds` en POs y facturas a partir de `approvalSteps`.
-//   3. Crea los contadores de numeración (projects/{id}/counters/pos|invoices).
+//   2. Rellena `approverIds` en POs y facturas a partir de `approvalSteps`, y
+//      `poCreatedBy` en las facturas vinculadas a una PO.
+//   3. Crea los contadores de numeración (projects/{id}/counters/pos|invoices|crew).
 //
 // Uso (con las mismas variables que .env.local):
 //   node --env-file=.env.local scripts/migrate-accounting-security.mjs          (simulación)
@@ -59,12 +60,30 @@ for (const p of projects.docs) {
     }
   }
 
-  // 2. approverIds + 3. contadores
+  // 3b. Contador del número de crew
+  {
+    const crewSnap = await p.ref.collection("crew").get();
+    const max = crewSnap.docs.reduce((m, d) => Math.max(m, parseInt(d.data().crewNumber || "0", 10) || 0), 0);
+    const counterRef = p.ref.collection("counters").doc("crew");
+    const counter = await counterRef.get();
+    if (!counter.exists || (counter.data().last || 0) < max) {
+      totals.counters++;
+      await write((b) => b.set(counterRef, { last: max }));
+    }
+  }
+
+  // 2. approverIds + 3. contadores (+ poCreatedBy en facturas con PO)
+  const poOwner = {};
   for (const kind of ["pos", "invoices"]) {
     const snap = await p.ref.collection(kind).get();
     let max = 0;
     for (const d of snap.docs) {
       const data = d.data();
+      if (kind === "pos") poOwner[d.id] = data.createdBy || null;
+      if (kind === "invoices" && data.poId && poOwner[data.poId] && data.poCreatedBy !== poOwner[data.poId]) {
+        filled++;
+        await write((b) => b.update(d.ref, { poCreatedBy: poOwner[data.poId] }));
+      }
       const n = parseInt(data.number || "0", 10);
       if (n > max) max = n;
       const ids = approverIdsOf(data.approvalSteps);

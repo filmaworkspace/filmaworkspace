@@ -5,12 +5,13 @@ import { doc, getDoc, setDoc, updateDoc, getDocs, collection, query, where, dele
 import fs from "fs";
 
 const env = await initializeTestEnvironment({
-  projectId: "demo-filma-acc",
+  projectId: `demo-acc-${Date.now()}`, // base de datos nueva en cada ejecución
   firestore: { rules: fs.readFileSync(new URL("../../firestore.rules", import.meta.url), "utf8"), host: "127.0.0.1", port: 8085 },
 });
-await env.clearFirestore();
 
-const P = "projects/p1";
+// Proyecto nuevo en cada ejecución: el emulador conserva los datos entre pruebas.
+const PID = `acc${Date.now()}`;
+const P = `projects/${PID}`;
 // uid → miembro del proyecto
 const MEMBERS = {
   pm:      { role: "PM", accounting: true, level: "user" },
@@ -34,7 +35,7 @@ await env.withSecurityRulesDisabled(async (c) => {
       role: m.role ?? null, position: m.position ?? null, department: m.department ?? "",
       accountingAccessLevel: m.level, permissions: { accounting: m.accounting, config: false, team: false },
     });
-    await setDoc(doc(db, `userProjects/${uid}/projects/p1`), {
+    await setDoc(doc(db, `userProjects/${uid}/projects/${PID}`), {
       permissions: { accounting: m.accounting, config: false, team: false }, accountingAccessLevel: m.level,
     });
   }
@@ -46,6 +47,7 @@ await env.withSecurityRulesDisabled(async (c) => {
   await setDoc(doc(db, `${P}/pos/poCrew`), { number: "0002", department: "Arte", createdBy: "crew", status: "draft", approverIds: [] });
   await setDoc(doc(db, `${P}/pos/poFoto`), { number: "0003", department: "Foto", createdBy: "crew2", status: "pending", approverIds: ["approver"] });
   await setDoc(doc(db, `${P}/invoices/iArte`), { number: "0001", department: "Arte", createdBy: "acct", status: "approved", approverIds: [] });
+  await setDoc(doc(db, `${P}/invoices/iCrewPO`), { number: "0003", department: "Arte", createdBy: "acct", poId: "poCrew", poCreatedBy: "crew", status: "pending" });
   await setDoc(doc(db, `${P}/invoices/iFoto`), { number: "0002", department: "Foto", createdBy: "crew2", status: "pending_approval", approverIds: ["approver"] });
   await setDoc(doc(db, `${P}/suppliers/sup1`), { fiscalName: "Proveedor", bankAccount: "ES00" });
   await setDoc(doc(db, `${P}/paymentForecasts/f1`), { name: "Remesa", status: "draft", items: [] });
@@ -108,6 +110,9 @@ await t("crew NO crea una PO a nombre de otro", false, () => setDoc(doc(as("crew
 await t("crew borra su borrador", true, () => deleteDoc(doc(as("crew"), `${P}/pos/new1`)));
 await t("cajero (visitor) NO crea POs", false, () => setDoc(doc(as("cajero"), `${P}/pos/new3`), { createdBy: "cajero" }));
 await t("sin contabilidad NO lee POs propias", false, () => getDocs(query(col(as("noacc"), "pos"), where("createdBy", "==", "noacc"))));
+await t("crew lee la factura que contabilidad subió a su PO", true, () => getDoc(doc(as("crew"), `${P}/invoices/iCrewPO`)));
+await t("crew lista las facturas de sus POs", true, () => getDocs(query(col(as("crew"), "invoices"), where("poCreatedBy", "==", "crew"))));
+await t("crew2 NO lee facturas de POs ajenas", false, () => getDoc(doc(as("crew2"), `${P}/invoices/iCrewPO`)));
 await t("crew NO lista todas las facturas", false, () => getDocs(col(as("crew"), "invoices")));
 await t("contabilidad lista todas las facturas", true, () => getDocs(col(as("acct"), "invoices")));
 
@@ -115,6 +120,10 @@ console.log("numeración");
 await t("crew reserva número", true, () => updateDoc(doc(as("crew"), `${P}/counters/pos`), { last: 4 }));
 await t("NO se puede bajar el contador", false, () => updateDoc(doc(as("crew"), `${P}/counters/pos`), { last: 1 }));
 await t("ajeno NO toca el contador", false, () => updateDoc(doc(outsider, `${P}/counters/pos`), { last: 9 }));
+
+await t("crew de contabilidad NO toca el contador de crew", false, () => setDoc(doc(as("crew"), `${P}/counters/crew`), { last: 1 }));
+await t("PM (equipo) crea el contador de crew", true, () => setDoc(doc(as("pm"), `${P}/counters/crew`), { last: 1 }));
+await t("NO se crean contadores desconocidos", false, () => setDoc(doc(as("pm"), `${P}/counters/otro`), { last: 1 }));
 
 console.log("proveedores y pagos");
 await t("crew lee proveedores", true, () => getDocs(col(as("crew"), "suppliers")));
@@ -136,8 +145,8 @@ console.log("escalada de privilegios");
 await t("ampliada cambia el nivel de contabilidad", true, () => updateDoc(doc(as("ext"), `${P}/members/crew`), { accountingAccessLevel: "accounting", boxAccess: true }));
 await t("ampliada NO cambia el rol de nadie", false, () => updateDoc(doc(as("ext"), `${P}/members/crew`), { role: "EP" }));
 await t("ampliada NO se da permiso de configuración", false, () => updateDoc(doc(as("ext"), `${P}/members/ext`), { "permissions.config": true }));
-await t("ampliada NO se da config en userProjects", false, () => updateDoc(doc(as("ext"), `userProjects/ext/projects/p1`), { "permissions.config": true }));
-await t("ampliada da acceso a contabilidad (userProjects)", true, () => updateDoc(doc(as("ext"), `userProjects/noacc/projects/p1`), { "permissions.accounting": true, accountingAccessLevel: "user" }));
+await t("ampliada NO se da config en userProjects", false, () => updateDoc(doc(as("ext"), `userProjects/ext/projects/${PID}`), { "permissions.config": true }));
+await t("ampliada da acceso a contabilidad (userProjects)", true, () => updateDoc(doc(as("ext"), `userProjects/noacc/projects/${PID}`), { "permissions.accounting": true, accountingAccessLevel: "user" }));
 await t("ampliada edita config de aprobaciones", true, () => setDoc(doc(as("ext"), `${P}/config/approvals`), { poApprovals: [] }));
 await t("ampliada NO edita config de producción", false, () => setDoc(doc(as("ext"), `${P}/config/production`), { x: 2 }));
 

@@ -9,6 +9,7 @@ import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
+import { documentTotals, lineAmounts } from "@/lib/amounts";
 import { getScopedDocs, scopeFromPermissions, sortByTime } from "@/lib/accountingScope";
 import { loadBudgetFigures } from "@/lib/budgetFigures";
 import {
@@ -508,17 +509,15 @@ export default function InvoiceDetailPage() {
     }
   };
 
+  // Importes redondeados a céntimos (lib/amounts)
   const calculateItemTotals = (item: typeof codingItems[0]) => {
-    const base = item.quantity * item.unitPrice;
-    const vat = base * (item.vatRate / 100);
-    const irpf = base * (item.irpfRate / 100);
-    return { base, vat, irpf, total: base + vat - irpf };
+    const l = lineAmounts(item);
+    return { base: l.baseAmount, vat: l.vatAmount, irpf: l.irpfAmount, total: l.totalAmount };
   };
 
   const calculateTotals = () => {
-    let base = 0, vat = 0, irpf = 0;
-    codingItems.forEach((item) => { const t = calculateItemTotals(item); base += t.base; vat += t.vat; irpf += t.irpf; });
-    return { base, vat, irpf, total: base + vat - irpf };
+    const t = documentTotals(codingItems.map((item) => lineAmounts(item)));
+    return { base: t.baseAmount, vat: t.vatAmount, irpf: t.irpfAmount, total: t.totalAmount };
   };
 
   const addCodingItem = () => {
