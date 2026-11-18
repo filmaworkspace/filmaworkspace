@@ -1158,18 +1158,18 @@ export default function BudgetPage() {
                   return (
                     <Fragment key={account.id}>
                       <tr className="border-b border-slate-100 bg-[#FAFAFA]/60 hover:bg-[#F4F4F5]">
-                        <td className="py-2 pl-3">
+                        <td className="py-1 pl-3">
                           <button
                             onClick={() => toggleAccount(account.id)}
                             aria-label={open ? "Contraer cuenta" : "Desplegar cuenta"}
                             aria-expanded={open}
-                            className="flex h-6 w-6 items-center justify-center rounded text-slate-500 hover:bg-white hover:text-slate-900"
+                            className="flex h-5 w-5 items-center justify-center rounded text-slate-500 hover:bg-white hover:text-slate-900"
                           >
                             {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                           </button>
                         </td>
-                        <td className="px-2 py-2 font-mono text-xs font-semibold"><Hl text={account.code} field="code" /></td>
-                        <td className="px-2 py-2">
+                        <td className="px-2 py-1 font-mono text-xs font-semibold"><Hl text={account.code} field="code" /></td>
+                        <td className="px-2 py-1">
                           <span className="flex items-center gap-2">
                             <span className="font-medium"><Hl text={account.description} field="description" /></span>
                             <span className="text-[11px] text-slate-500">{account.subAccounts.length}</span>
@@ -1180,14 +1180,14 @@ export default function BudgetPage() {
                             )}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-right font-mono text-xs font-semibold">{num(t.budgeted)}</td>
-                        <td className="px-3 py-2 text-right font-mono text-xs">{num(t.committed)}</td>
-                        <td className="px-3 py-2 text-right font-mono text-xs">{num(t.actual)}</td>
-                        <td className="px-3 py-2 text-right font-mono text-xs">{num(t.box)}</td>
-                        <td className={`px-3 py-2 text-right font-mono text-xs font-semibold ${availableClass(t.available, t.budgeted)}`}>{num(t.available)}</td>
-                        <td className="px-3 py-2 text-xs"><ExecCell executed={t.executed} budgeted={t.budgeted} strong /></td>
-                        <td className="py-2 pr-3 text-right">
-                          <Menu trigger={(toggle) => <IconButton label="Acciones de la cuenta" onClick={toggle}><MoreHorizontal size={15} /></IconButton>}>
+                        <td className="px-3 py-1 text-right font-mono text-xs font-semibold">{num(t.budgeted)}</td>
+                        <td className="px-3 py-1 text-right font-mono text-xs">{num(t.committed)}</td>
+                        <td className="px-3 py-1 text-right font-mono text-xs">{num(t.actual)}</td>
+                        <td className="px-3 py-1 text-right font-mono text-xs">{num(t.box)}</td>
+                        <td className={`px-3 py-1 text-right font-mono text-xs font-semibold ${availableClass(t.available, t.budgeted)}`}>{num(t.available)}</td>
+                        <td className="px-3 py-1 text-xs"><ExecCell executed={t.executed} budgeted={t.budgeted} strong /></td>
+                        <td className="py-1 pr-3 text-right">
+                          <Menu trigger={(toggle) => <IconButton label="Acciones de la cuenta" onClick={toggle} className="-my-1"><MoreHorizontal size={15} /></IconButton>}>
                             {(close) => (
                               <>
                                 <MenuItem onClick={() => { close(); openCreateSubAccountModal(account); }}>Añadir subcuenta</MenuItem>
@@ -1206,17 +1206,17 @@ export default function BudgetPage() {
                         const available = sub.budgeted - executed;
                         return (
                           <tr key={sub.id} className="group border-b border-slate-100 hover:bg-[#FAFAFA]">
-                            <td className="py-1.5 pl-3" />
-                            <td className="py-1.5 pl-5 pr-2 font-mono text-xs text-slate-500"><Hl text={sub.code} field="code" /></td>
-                            <td className="px-2 py-1.5 text-slate-700"><Hl text={sub.description} field="description" /></td>
-                            <td className="px-3 py-1.5 text-right font-mono text-xs">{num(sub.budgeted)}</td>
-                            <td className="px-3 py-1.5 text-right font-mono text-xs text-slate-600">{num(sub.committed)}</td>
-                            <td className="px-3 py-1.5 text-right font-mono text-xs text-slate-600">{num(sub.actual)}</td>
-                            <td className="px-3 py-1.5 text-right font-mono text-xs text-slate-600">{num(sub.box)}</td>
-                            <td className={`px-3 py-1.5 text-right font-mono text-xs ${availableClass(available, sub.budgeted)}`}>{num(available)}</td>
-                            <td className="px-3 py-1.5 text-xs"><ExecCell executed={executed} budgeted={sub.budgeted} /></td>
-                            <td className="py-1.5 pr-3 text-right">
-                              <Menu trigger={(toggle) => <IconButton label="Acciones de la subcuenta" onClick={toggle}><MoreHorizontal size={15} /></IconButton>}>
+                            <td className="py-1 pl-3" />
+                            <td className="py-1 pl-5 pr-2 font-mono text-xs text-slate-500"><Hl text={sub.code} field="code" /></td>
+                            <td className="px-2 py-1 text-slate-700"><Hl text={sub.description} field="description" /></td>
+                            <td className="px-3 py-1 text-right font-mono text-xs">{num(sub.budgeted)}</td>
+                            <td className="px-3 py-1 text-right font-mono text-xs text-slate-600">{num(sub.committed)}</td>
+                            <td className="px-3 py-1 text-right font-mono text-xs text-slate-600">{num(sub.actual)}</td>
+                            <td className="px-3 py-1 text-right font-mono text-xs text-slate-600">{num(sub.box)}</td>
+                            <td className={`px-3 py-1 text-right font-mono text-xs ${availableClass(available, sub.budgeted)}`}>{num(available)}</td>
+                            <td className="px-3 py-1 text-xs"><ExecCell executed={executed} budgeted={sub.budgeted} /></td>
+                            <td className="py-1 pr-3 text-right">
+                              <Menu trigger={(toggle) => <IconButton label="Acciones de la subcuenta" onClick={toggle} className="-my-1"><MoreHorizontal size={15} /></IconButton>}>
                                 {(close) => (
                                   <>
                                     <MenuItem onClick={() => { close(); openEditSubAccountModal(account, sub); }}>Editar subcuenta</MenuItem>
