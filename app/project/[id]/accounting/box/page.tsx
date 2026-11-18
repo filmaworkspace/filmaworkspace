@@ -2134,7 +2134,7 @@ export default function BoxesPage() {
           onToast={showToast}
         />
       ) : (
-      <div className="px-6 sm:px-10 pb-8">
+      <div className="px-6 pt-6 sm:px-10 pb-8">
         <div className="flex gap-6">
 
           {/* ── Left Panel ──────────────────────────────────────────────────────── */}

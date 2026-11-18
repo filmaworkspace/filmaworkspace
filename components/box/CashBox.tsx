@@ -462,7 +462,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
       ) : (
         <>
           {/* Selector de caja y acciones */}
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
               {floats.length > 1 && (
                 <div className="w-56">
