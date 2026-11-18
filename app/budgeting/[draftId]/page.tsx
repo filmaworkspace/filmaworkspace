@@ -7,9 +7,11 @@ import Link from "next/link";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db } from "@/lib/firebase";
+import { setBudgetFigure } from "@/lib/budgetFigures";
+import { canSeeBudget } from "@/hooks/useCanSeeBudget";
 import {
   addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, onSnapshot,
-  query, serverTimestamp, setDoc, Timestamp, updateDoc,
+  query, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch,
 } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -891,6 +893,9 @@ export default function BudgetingTopPage() {
       for (const d of upSnap.docs) {
         const data = d.data();
         if (!data.permissions?.accounting) continue;
+        // Solo quien puede escribir presupuesto (contabilidad avanzada, EP, PM).
+        const memberSnap = await getDoc(doc(db, `projects/${d.id}/members`, user.uid));
+        if (!canSeeBudget(memberSnap.exists() ? (memberSnap.data() as any) : null)) continue;
         const projSnap = await getDoc(doc(db, "projects", d.id));
         if (projSnap.exists()) eligible.push({ id: d.id, name: projSnap.data().name || "Proyecto" });
       }
@@ -935,11 +940,15 @@ export default function BudgetingTopPage() {
           const lines = sortByOrder(linesBySubchapter[sub.sub.id] || []).filter((l) => !l.isTextLine && !l.isSubtotal);
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            await addDoc(collection(db, `projects/${selectedProject.id}/accounts/${accountRef.id}/subaccounts`), {
-              code: line.code?.trim() || String(i + 1).padStart(2, "0"), description: line.description,
-              budgeted: Math.round((line.total || 0) * 100) / 100,
+            const subCode = line.code?.trim() || String(i + 1).padStart(2, "0");
+            const subRef = doc(collection(db, `projects/${selectedProject.id}/accounts/${accountRef.id}/subaccounts`));
+            const batch = writeBatch(db);
+            batch.set(subRef, {
+              code: subCode, description: line.description,
               committed: 0, actual: 0, accountId: accountRef.id, createdAt: Timestamp.now(), createdBy: user.uid,
             });
+            setBudgetFigure(batch, selectedProject.id, subRef.id, { budgeted: line.total || 0, accountId: accountRef.id, code: subCode });
+            await batch.commit();
           }
         }
       } else {
@@ -964,11 +973,14 @@ export default function BudgetingTopPage() {
         for (const sub of allSubchapters.filter((s) => !s.sub.isTextLine && !s.sub.isSubtotal)) {
           const accountId = accountIdByChapterId[sub.chapterId];
           if (!accountId) continue;
-          await addDoc(collection(db, `projects/${selectedProject.id}/accounts/${accountId}/subaccounts`), {
+          const subRef = doc(collection(db, `projects/${selectedProject.id}/accounts/${accountId}/subaccounts`));
+          const batch = writeBatch(db);
+          batch.set(subRef, {
             code: sub.sub.code, description: sub.sub.description,
-            budgeted: Math.round((sumBySubId[sub.sub.id] || 0) * 100) / 100,
             committed: 0, actual: 0, accountId, createdAt: Timestamp.now(), createdBy: user.uid,
           });
+          setBudgetFigure(batch, selectedProject.id, subRef.id, { budgeted: sumBySubId[sub.sub.id] || 0, accountId, code: sub.sub.code });
+          await batch.commit();
         }
       }
       const now = serverTimestamp();

@@ -228,6 +228,12 @@ export function useAccountingPermissions(projectId: string | null): UseAccountin
           canEditOwnPOs = true;
         }
 
+        // Contabilidad (nivel contabilidad o ampliado) ve todas las POs y
+        // facturas, igual que las reglas de Firestore.
+        if (accountingAccessLevel === "accounting" || accountingAccessLevel === "accounting_extended") {
+          canViewAllPOs = true;
+        }
+
         // Todos con acceso a accounting pueden crear POs
         const canCreatePO = hasAccountingPermission && accessConfig.suppliers;
 

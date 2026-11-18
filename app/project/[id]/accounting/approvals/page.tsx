@@ -5,7 +5,7 @@ import { Button, EmptyState, Field, IconButton, Modal, Page, PageHeader, PageLoa
 import SearchBar, { type SearchField } from "@/components/SearchBar";
 import { matchAmount, matchCode, matchWords } from "@/lib/search";
 import { useCanSeeBudget } from "@/hooks/useCanSeeBudget";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
@@ -13,6 +13,8 @@ import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
+import { getScopedDocs, scopeFromMember, type DocScope } from "@/lib/accountingScope";
+import { loadBudgetFigures } from "@/lib/budgetFigures";
 import {
   onAuthStateChanged,
 } from "firebase/auth";
@@ -274,20 +276,22 @@ export default function ApprovalsPage() {
 
       let localUserRole = "", localUserDepartment = "", localUserPosition = "";
       const memberDoc = await getDoc(doc(db, `projects/${id}/members`, userId!));
+      scopeRef.current = scopeFromMember(userId!, memberDoc.exists() ? (memberDoc.data() as any) : null);
       if (memberDoc.exists()) { const d = memberDoc.data(); localUserRole = d.role || ""; localUserDepartment = d.department || ""; localUserPosition = d.position || ""; setUserRole(localUserRole); setUserDepartment(localUserDepartment); setUserPosition(localUserPosition); }
 
       const subAccountsMap: Record<string, any> = {};
       const accountsSnap = await getDocs(collection(db, `projects/${id}/accounts`));
+      const figures = await loadBudgetFigures(id as string);
       for (const accDoc of accountsSnap.docs) {
         const accData = accDoc.data();
         const subsSnap = await getDocs(collection(db, `projects/${id}/accounts/${accDoc.id}/subaccounts`));
-        for (const subDoc of subsSnap.docs) { const subData = subDoc.data(); subAccountsMap[subDoc.id] = { id: subDoc.id, code: subData.code, description: subData.description, budgeted: subData.budgeted || 0, committed: subData.committed || 0, actual: subData.actual || 0, available: (subData.budgeted || 0) - (subData.committed || 0) - (subData.actual || 0), accountCode: accData.code, accountDescription: accData.description }; }
+        for (const subDoc of subsSnap.docs) { const subData = subDoc.data(); subAccountsMap[subDoc.id] = { hasFigure: subDoc.id in figures || subData.budgeted !== undefined, id: subDoc.id, code: subData.code, description: subData.description, budgeted: figures[subDoc.id] ?? subData.budgeted ?? 0, committed: subData.committed || 0, actual: subData.actual || 0, available: (figures[subDoc.id] ?? subData.budgeted ?? 0) - (subData.committed || 0) - (subData.actual || 0), accountCode: accData.code, accountDescription: accData.description }; }
       }
 
       await loadUserStats(localUserRole, localUserDepartment, localUserPosition);
 
       // Load POs
-      const posSnap = await getDocs(query(collection(db, `projects/${id}/pos`), where("status", "==", "pending")));
+      const posSnap = await scopedDocs("pos", "status", "==", "pending");
       for (const poDoc of posSnap.docs) {
         const d = poDoc.data();
         if (canUserApprove(d, userId!, localUserRole, localUserDepartment, localUserPosition)) {
@@ -310,7 +314,7 @@ export default function ApprovalsPage() {
 
       // Load Invoices
       try {
-        const invoicesSnap = await getDocs(query(collection(db, `projects/${id}/invoices`), where("status", "in", ["submitted", "pending_approval"])));
+        const invoicesSnap = await scopedDocs("invoices", "status", "in", ["submitted", "pending_approval"]);
         for (const invDoc of invoicesSnap.docs) {
           const d = invDoc.data();
           // Solo facturas pendientes de aprobar (sin track de aprobación completado)
@@ -431,6 +435,15 @@ export default function ApprovalsPage() {
     } catch (error: any) { setErrorMessage(`Error: ${error.message}`); setLoading(false); }
   };
 
+  // POs/facturas que este usuario puede leer (lib/accountingScope). Con alcance
+  // limitado la condición se aplica en el cliente.
+  const scopeRef = useRef<DocScope>({ all: true });
+  const scopedDocs = async (col: "pos" | "invoices", field: string, op: "==" | "in", value: any) => {
+    const docs = (await getScopedDocs(collection(db, `projects/${id}/${col}`), scopeRef.current, [where(field, op, value)]))
+      .filter((d) => (op === "in" ? (value as any[]).includes(d.data()[field]) : d.data()[field] === value));
+    return { docs, size: docs.length, empty: docs.length === 0 };
+  };
+
   const loadUserStats = async (role: string, dept: string, pos: string) => {
     try {
       const now = new Date();
@@ -439,7 +452,7 @@ export default function ApprovalsPage() {
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       let approvedToday = 0, approvedThisWeek = 0, approvedThisMonth = 0;
 
-      const posSnap = await getDocs(query(collection(db, `projects/${id}/pos`), where("status", "==", "approved")));
+      const posSnap = await scopedDocs("pos", "status", "==", "approved");
       for (const poDoc of posSnap.docs) {
         const d = poDoc.data();
         if (d.approvedBy === userId || d.approvalSteps?.some((s: any) => s.approvedBy?.includes(userId))) {
@@ -448,7 +461,7 @@ export default function ApprovalsPage() {
         }
       }
       try {
-        const invSnap = await getDocs(query(collection(db, `projects/${id}/invoices`), where("approvalStatus", "==", "approved")));
+        const invSnap = await scopedDocs("invoices", "approvalStatus", "==", "approved");
         for (const invDoc of invSnap.docs) {
           const d = invDoc.data();
           if (d.approvedBy === userId || d.approvalSteps?.some((s: any) => s.approvedBy?.includes(userId))) {
@@ -466,10 +479,10 @@ export default function ApprovalsPage() {
     try {
       let totalPOs = 0, totalInvoices = 0, pendingAmount = 0;
       let lastTransaction: Date | null = null;
-      const posSnap = await getDocs(query(collection(db, `projects/${id}/pos`), where("supplierId", "==", supplierId)));
+      const posSnap = await scopedDocs("pos", "supplierId", "==", supplierId);
       totalPOs = posSnap.size;
       for (const poDoc of posSnap.docs) { const d = poDoc.data(); if (d.status === "pending") pendingAmount += d.totalAmount || 0; const created = d.createdAt?.toDate(); if (created && (!lastTransaction || created > lastTransaction)) lastTransaction = created; }
-      try { const invSnap = await getDocs(query(collection(db, `projects/${id}/invoices`), where("supplierId", "==", supplierId))); totalInvoices = invSnap.size; for (const invDoc of invSnap.docs) { const d = invDoc.data(); if (d.status === "pending" || d.status === "pending_approval") pendingAmount += d.totalAmount || 0; } } catch (e) {}
+      try { const invSnap = await scopedDocs("invoices", "supplierId", "==", supplierId); totalInvoices = invSnap.size; for (const invDoc of invSnap.docs) { const d = invDoc.data(); if (d.status === "pending" || d.status === "pending_approval") pendingAmount += d.totalAmount || 0; } } catch (e) {}
       return { totalPOs, totalInvoices, pendingAmount, avgApprovalTime: 0, lastTransaction };
     } catch (e) { return undefined; }
   };
@@ -481,7 +494,7 @@ export default function ApprovalsPage() {
       const poData = poDoc.data();
       const poBaseAmount = poData.baseAmount || 0;
       let invoicedBefore = 0;
-      try { const invSnap = await getDocs(query(collection(db, `projects/${id}/invoices`), where("poId", "==", poId))); for (const invDoc of invSnap.docs) { if (invDoc.id !== currentInvoiceId) { const d = invDoc.data(); if (["pending", "pending_approval", "approved", "paid"].includes(d.status)) invoicedBefore += d.baseAmount || 0; } } } catch (e) {}
+      try { const invSnap = await scopedDocs("invoices", "poId", "==", poId); for (const invDoc of invSnap.docs) { if (invDoc.id !== currentInvoiceId) { const d = invDoc.data(); if (["pending", "pending_approval", "approved", "paid"].includes(d.status)) invoicedBefore += d.baseAmount || 0; } } } catch (e) {}
       const remaining = poBaseAmount - invoicedBefore - invoiceBaseAmount;
       const percentageUsed = poBaseAmount > 0 ? ((invoicedBefore + invoiceBaseAmount) / poBaseAmount) * 100 : 0;
       const itemDiscrepancies: POComparison["itemDiscrepancies"] = [];
@@ -520,8 +533,10 @@ export default function ApprovalsPage() {
     const totalAmount = docData.totalAmount || 0;
     checks.push({ id: "attachment", label: "Documento adjunto", status: docData.attachmentUrl ? "pass" : "warning", message: docData.attachmentUrl ? "Archivo adjunto disponible" : "Sin documento adjunto" });
     let hasBudgetIssue = false, budgetMessage = "Todas las cuentas tienen presupuesto";
-    for (const item of items) { if (item.subAccountId && subAccountsMap[item.subAccountId]) { const sub = subAccountsMap[item.subAccountId]; if (sub.available < (item.baseAmount || item.totalAmount || 0)) { hasBudgetIssue = true; budgetMessage = `${sub.code} supera el presupuesto`; break; } } }
-    checks.push({ id: "budget", label: "Presupuesto disponible", status: hasBudgetIssue ? "fail" : "pass", message: budgetMessage });
+    let budgetChecked = false;
+    for (const item of items) { if (item.subAccountId && subAccountsMap[item.subAccountId]?.hasFigure) { budgetChecked = true; const sub = subAccountsMap[item.subAccountId]; if (sub.available < (item.baseAmount || item.totalAmount || 0)) { hasBudgetIssue = true; budgetMessage = `${sub.code} supera el presupuesto`; break; } } }
+    // Sin acceso a las cifras de presupuesto no se puede comprobar: no se muestra.
+    if (budgetChecked) checks.push({ id: "budget", label: "Presupuesto disponible", status: hasBudgetIssue ? "fail" : "pass", message: budgetMessage });
     checks.push({ id: "supplier", label: "Proveedor", status: docData.supplierId ? "pass" : "info", message: docData.supplierId ? "Proveedor registrado" : "Proveedor no vinculado" });
     if (totalAmount > 25000) checks.push({ id: "amount-high", label: "Importe elevado", status: "warning", message: `Superior a 25.000 €`, details: "Puede requerir aprobaciones adicionales" });
     if (type === "invoice") { if (docData.poId) checks.push({ id: "po-link", label: "Vinculación a PO", status: "pass", message: `Vinculada a PO-${docData.poNumber}` }); else checks.push({ id: "po-link", label: "Vinculación a PO", status: "info", message: "Sin PO asociada" }); }

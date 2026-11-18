@@ -9,6 +9,7 @@ import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
+import { getScopedDocs, scopeFromPermissions, sortByTime } from "@/lib/accountingScope";
 import {
   onAuthStateChanged,
 } from "firebase/auth";
@@ -192,9 +193,7 @@ export default function ReplaceDocumentPage() {
     try {
       setLoading(true);
 
-      const invoicesSnapshot = await getDocs(
-        query(collection(db, `projects/${projectId}/invoices`), orderBy("createdAt", "desc"))
-      );
+      const invoicesSnapshot = { docs: sortByTime(await getScopedDocs(collection(db, `projects/${projectId}/invoices`), scopeFromPermissions(permissions))) };
 
       const docsData: PendingDocument[] = [];
 

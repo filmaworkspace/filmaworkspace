@@ -10,6 +10,9 @@ import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
+import { getScopedDocs, scopeFromPermissions } from "@/lib/accountingScope";
+import { approverIdsOf } from "@/lib/approvers";
+import { loadBudgetFigures } from "@/lib/budgetFigures";
 import {
   collection,
   deleteField,
@@ -20,6 +23,7 @@ import {
   query,
   Timestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
@@ -408,6 +412,7 @@ export default function EditPOPage() {
 
       const accountsSnapshot = await getDocs(query(collection(db, `projects/${id}/accounts`), orderBy("code", "asc")));
       const allSubAccounts: SubAccount[] = [];
+      const figures = await loadBudgetFigures(id as string);
       for (const accountDoc of accountsSnapshot.docs) {
         const accountData = accountDoc.data();
         const subAccountsSnapshot = await getDocs(query(collection(db, `projects/${id}/accounts/${accountDoc.id}/subaccounts`), orderBy("code", "asc")));
@@ -415,8 +420,8 @@ export default function EditPOPage() {
           const data = subDoc.data();
           allSubAccounts.push({
             id: subDoc.id, code: data.code, description: data.description,
-            budgeted: data.budgeted || 0, committed: data.committed || 0, actual: data.actual || 0,
-            available: (data.budgeted || 0) - (data.committed || 0) - (data.actual || 0),
+            budgeted: figures[subDoc.id] ?? data.budgeted ?? 0, committed: data.committed || 0, actual: data.actual || 0,
+            available: (figures[subDoc.id] ?? data.budgeted ?? 0) - (data.committed || 0) - (data.actual || 0),
             accountId: accountDoc.id, accountCode: accountData.code, accountDescription: accountData.description,
           });
         });
@@ -424,7 +429,7 @@ export default function EditPOPage() {
       setSubAccounts(allSubAccounts);
 
       // Cargar facturas asociadas a esta PO para verificar items con facturas contabilizadas
-      const invoicesSnapshot = await getDocs(collection(db, `projects/${id}/invoices`));
+      const invoicesSnapshot = { docs: await getScopedDocs(collection(db, `projects/${id}/invoices`), scopeFromPermissions(permissions), [where("poId", "==", poId)]) };
       const invoiceStatusByItem: Record<number, ItemInvoiceStatus> = {};
       
       invoicesSnapshot.docs.forEach((invDoc) => {
@@ -749,6 +754,7 @@ export default function EditPOPage() {
         } else {
           poData.status = "pending";
           poData.approvalSteps = approvalSteps;
+          poData.approverIds = approverIdsOf(approvalSteps);
           poData.currentApprovalStep = 0;
           // Si la configuración es on_create, también comprometer en pending
           if (costSettings.poCommitmentTrigger === "on_create" && !wasApprovedBefore) {
@@ -832,7 +838,7 @@ export default function EditPOPage() {
     if (changedItems.length === 0) return;
 
     // Buscar facturas vinculadas a esta PO
-    const invoicesSnapshot = await getDocs(collection(db, `projects/${id}/invoices`));
+    const invoicesSnapshot = { docs: await getScopedDocs(collection(db, `projects/${id}/invoices`), scopeFromPermissions(permissions), [where("poId", "==", poId)]) };
     
     for (const invDoc of invoicesSnapshot.docs) {
       const invData = invDoc.data();

@@ -9,6 +9,7 @@ import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
+import { getScopedDocs, scopeFromPermissions, sortByTime } from "@/lib/accountingScope";
 import {
   EmailAuthProvider,
   reauthenticateWithCredential,
@@ -292,12 +293,14 @@ export default function PODetailPage() {
       }
       setPO(poData);
 
-      const invoicesSnapshot = await getDocs(query(collection(db, `projects/${projectId}/invoices`), where("poId", "==", poId)));
-      setInvoices(invoicesSnapshot.docs.map((d) => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate() } as Invoice)));
+      const scope = scopeFromPermissions(permissions);
+      const poInvoices = (await getScopedDocs(collection(db, `projects/${projectId}/invoices`), scope, [where("poId", "==", poId)]))
+        .filter((d) => d.data().poId === poId);
+      setInvoices(poInvoices.map((d) => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate() } as Invoice)));
 
       // Cargar solo las POs que el usuario puede ver para navegación
-      const posSnapshot = await getDocs(query(collection(db, `projects/${projectId}/pos`), orderBy("createdAt", "asc")));
-      const accessiblePOs = posSnapshot.docs.filter((d) => {
+      const navPOs = sortByTime(await getScopedDocs(collection(db, `projects/${projectId}/pos`), scope), "createdAt", "asc");
+      const accessiblePOs = navPOs.filter((d) => {
         const data = d.data();
         return canViewPO({
           id: d.id,
@@ -713,6 +716,7 @@ export default function PODetailPage() {
         approvedBy: deleteField(),
         approvedByName: deleteField(),
         approvalSteps: deleteField(),
+        approverIds: [],
         currentApprovalStep: deleteField(),
       });
       setShowModifyModal(false);

@@ -20,6 +20,7 @@ import {
   query,
   Timestamp,
   updateDoc,
+  writeBatch,
 } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -51,6 +52,7 @@ import SearchBar from "@/components/SearchBar";
 import { Badge, Button, Checkbox, EmptyState, Field, IconButton, Input, Menu, MenuItem, MenuSeparator, Modal, Page, PageHeader, PageLoading, Segmented, Select, Spinner, buttonClass } from "@/components/ds";
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { CostSettings, getCostSettings } from "@/lib/budgetRules";
+import { deleteBudgetFigure, loadBudgetFigures, migrateBudgetFigures, setBudgetFigure } from "@/lib/budgetFigures";
 import { parseFwbText, flattenFwbToAccountRows, FwbSubaccountLevel } from "@/lib/budgetingExport";
 import BudgetLevelMappingChoice from "@/components/BudgetLevelMappingChoice";
 
@@ -211,6 +213,11 @@ export default function BudgetPage() {
       const committedBySubaccount = computeCommitted(posSnapshot.docs.map((d) => d.data()), loadedCostConfig);
       const actualBySubaccount = computeActual(invoicesSnapshot.docs.map((d) => d.data()), loadedCostConfig);
 
+      // Cifras de presupuesto: colección protegida (lib/budgetFigures). Antes se
+      // trasladan las que aún queden en subcuentas antiguas.
+      await migrateBudgetFigures(id);
+      const figures = await loadBudgetFigures(id);
+
       // Cargar cuentas y subcuentas
       const accountsRef = collection(db, `projects/${id}/accounts`);
       const accountsQuery = query(accountsRef, orderBy("code", "asc"));
@@ -228,7 +235,7 @@ export default function BudgetPage() {
               id: subDoc.id,
               code: subCode,
               description: subData.description || "",
-              budgeted: subData.budgeted || 0,
+              budgeted: figures[subDoc.id] ?? subData.budgeted ?? 0,
               committed: committedBySubaccount[subCode] || 0,
               actual: actualBySubaccount[subCode] || 0,
               box: boxBySubaccount[subCode] || 0,
@@ -309,10 +316,14 @@ export default function BudgetPage() {
     if (!formData.code.trim() || !formData.description.trim()) { setErrorMessage("El código y la descripción son obligatorios"); return; }
     setSaving(true); setErrorMessage("");
     try {
-      await addDoc(collection(db, `projects/${id}/accounts/${selectedAccount.id}/subaccounts`), {
-        code: formData.code.trim(), description: formData.description.trim(), budgeted: formData.budgeted || 0,
+      const subRef = doc(collection(db, `projects/${id}/accounts/${selectedAccount.id}/subaccounts`));
+      const batch = writeBatch(db);
+      batch.set(subRef, {
+        code: formData.code.trim(), description: formData.description.trim(),
         committed: 0, actual: 0, accountId: selectedAccount.id, createdAt: Timestamp.now(), createdBy: userId || "",
       });
+      setBudgetFigure(batch, id, subRef.id, { budgeted: formData.budgeted || 0, accountId: selectedAccount.id, code: formData.code.trim() });
+      await batch.commit();
       setSuccessMessage("Subcuenta creada correctamente"); setTimeout(() => setSuccessMessage(""), 3000);
       resetForm(); setShowModal(false); await loadData();
     } catch (error: any) { setErrorMessage(`Error creando subcuenta: ${error.message}`); } finally { setSaving(false); }
@@ -322,9 +333,12 @@ export default function BudgetPage() {
     if (!selectedAccount || !selectedSubAccount) { setErrorMessage("Error: No se encontró la subcuenta"); return; }
     setSaving(true); setErrorMessage("");
     try {
-      await updateDoc(doc(db, `projects/${id}/accounts/${selectedAccount.id}/subaccounts`, selectedSubAccount.id), {
-        code: formData.code.trim(), description: formData.description.trim(), budgeted: formData.budgeted || 0,
+      const batch = writeBatch(db);
+      batch.update(doc(db, `projects/${id}/accounts/${selectedAccount.id}/subaccounts`, selectedSubAccount.id), {
+        code: formData.code.trim(), description: formData.description.trim(),
       });
+      setBudgetFigure(batch, id, selectedSubAccount.id, { budgeted: formData.budgeted || 0, accountId: selectedAccount.id, code: formData.code.trim() });
+      await batch.commit();
       setSuccessMessage("Subcuenta actualizada correctamente"); setTimeout(() => setSuccessMessage(""), 3000);
       resetForm(); setShowModal(false); await loadData();
     } catch (error: any) { setErrorMessage(`Error actualizando subcuenta: ${error.message}`); } finally { setSaving(false); }
@@ -380,7 +394,10 @@ export default function BudgetPage() {
       async () => {
         setConfirmDialog(null);
         try {
-          await deleteDoc(doc(db, `projects/${id}/accounts/${accountId}/subaccounts`, subAccountId));
+          const batch = writeBatch(db);
+          batch.delete(doc(db, `projects/${id}/accounts/${accountId}/subaccounts`, subAccountId));
+          deleteBudgetFigure(batch, id, subAccountId);
+          await batch.commit();
           setSuccessMessage("Subcuenta eliminada"); setTimeout(() => setSuccessMessage(""), 3000); await loadData();
         } catch (error: any) { setErrorMessage(`Error eliminando subcuenta: ${error.message}`); }
       },
@@ -878,16 +895,19 @@ export default function BudgetPage() {
             if (existingAccount) accountId = existingAccount.id;
           }
           if (accountId) {
-            await addDoc(collection(db, `projects/${id}/accounts/${accountId}/subaccounts`), {
+            const subRef = doc(collection(db, `projects/${id}/accounts/${accountId}/subaccounts`));
+            const batch = writeBatch(db);
+            batch.set(subRef, {
               code: item.code,
               description: item.description,
-              budgeted: item.budgeted,
               committed: 0,
               actual: 0,
               accountId,
               createdAt: Timestamp.now(),
               createdBy: userId || "",
             });
+            setBudgetFigure(batch, id, subRef.id, { budgeted: item.budgeted, accountId, code: item.code });
+            await batch.commit();
             subAccountsCreated++;
           } else { errors++; }
         } catch { errors++; }

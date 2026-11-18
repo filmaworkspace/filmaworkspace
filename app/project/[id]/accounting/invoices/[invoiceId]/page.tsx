@@ -9,6 +9,8 @@ import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
+import { getScopedDocs, scopeFromPermissions, sortByTime } from "@/lib/accountingScope";
+import { loadBudgetFigures } from "@/lib/budgetFigures";
 import {
   EmailAuthProvider,
   reauthenticateWithCredential,
@@ -430,19 +432,20 @@ export default function InvoiceDetailPage() {
 
       // Load PO
       if (data.poId) {
-        const poDoc = await getDoc(doc(db, `projects/${projectId}/pos`, data.poId));
-        if (poDoc.exists()) {
+        // La PO puede no ser legible para este usuario (es de otro departamento).
+        const poDoc = await getDoc(doc(db, `projects/${projectId}/pos`, data.poId)).catch(() => null);
+        if (poDoc?.exists()) {
           const poData = poDoc.data();
           setLinkedPO({ id: poDoc.id, number: poData.number, supplier: poData.supplier, baseAmount: poData.baseAmount || 0, invoicedAmount: poData.invoicedAmount || 0, status: poData.status, items: poData.items });
         }
       }
 
       // Load invoice IDs for nav - filtrar por permisos
-      const invoicesSnap = await getDocs(query(collection(db, `projects/${projectId}/invoices`), orderBy("createdAt", "asc")));
-      const accessibleInvoices = invoicesSnap.docs.filter((d) => {
+      const navInvoices = sortByTime(await getScopedDocs(collection(db, `projects/${projectId}/invoices`), scopeFromPermissions(permissions)), "createdAt", "asc");
+      const accessibleInvoices = navInvoices.filter((d) => {
         const invData = d.data();
         // Si es rol de proyecto, puede ver todas
-        if (permissions.isProjectRole) return true;
+        if (permissions.canViewAllPOs) return true;
         // Si es jefe de departamento, puede ver las de su departamento
         if (permissions.canViewDepartmentPOs && invData.department === permissions.department) return true;
         // Si solo puede ver las propias
@@ -458,18 +461,20 @@ export default function InvoiceDetailPage() {
 
       // Load subaccounts
       const accountsSnap = await getDocs(collection(db, `projects/${projectId}/accounts`));
+      const figures = await loadBudgetFigures(projectId);
       const subs: SubAccount[] = [];
       for (const acc of accountsSnap.docs) {
         const subSnap = await getDocs(collection(db, `projects/${projectId}/accounts/${acc.id}/subaccounts`));
         subSnap.docs.forEach((s) => {
           const sd = s.data();
-          subs.push({ id: s.id, code: sd.code, description: sd.description, accountId: acc.id, committed: sd.committed || 0, actual: sd.actual || 0, budgeted: sd.budgeted || 0 });
+          subs.push({ id: s.id, code: sd.code, description: sd.description, accountId: acc.id, committed: sd.committed || 0, actual: sd.actual || 0, budgeted: figures[s.id] ?? sd.budgeted ?? 0 });
         });
       }
       setSubAccounts(subs.sort((a, b) => a.code.localeCompare(b.code)));
 
       // Load payments for this invoice
-      const forecastsSnap = await getDocs(collection(db, `projects/${projectId}/paymentForecasts`));
+      // Las previsiones de pago solo las lee contabilidad: para el resto, sin pagos.
+      const forecastsSnap = await getDocs(collection(db, `projects/${projectId}/paymentForecasts`)).catch(() => ({ docs: [] as any[] }));
       const invoicePayments: PaymentRecord[] = [];
       for (const forecastDoc of forecastsSnap.docs) {
         const fData = forecastDoc.data();

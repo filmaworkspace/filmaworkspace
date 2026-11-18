@@ -14,6 +14,7 @@ import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
+import { loadBudgetFigures } from "@/lib/budgetFigures";
 import {
   collection,
   doc,
@@ -773,6 +774,7 @@ export default function ReportsPage() {
     try {
       const accountsSnapshot = await getDocs(query(collection(db, `projects/${id}/accounts`), orderBy("code", "asc")));
       const dataRows: (string | number)[][] = [];
+      const figures = await loadBudgetFigures(id as string);
       
       for (const accountDoc of accountsSnapshot.docs) {
         const accountData = accountDoc.data();
@@ -783,7 +785,7 @@ export default function ReportsPage() {
         
         subAccountsSnapshot.docs.forEach(subDoc => {
           const subData = subDoc.data();
-          const budgeted = subData.budgeted || 0, committed = subData.committed || 0, actual = subData.actual || 0;
+          const budgeted = figures[subDoc.id] ?? subData.budgeted ?? 0, committed = subData.committed || 0, actual = subData.actual || 0;
           accountBudgeted += budgeted; accountCommitted += committed; accountActual += actual;
           subRows.push({
             code: subData.code, description: subData.description, type: "SUBCUENTA",

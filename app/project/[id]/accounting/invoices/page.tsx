@@ -11,6 +11,7 @@ import { matchAmount, matchCode, matchWords } from "@/lib/search";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
+import { getScopedDocs, scopeFromPermissions, sortByTime } from "@/lib/accountingScope";
 import {
   collection,
   deleteDoc,
@@ -245,8 +246,9 @@ export default function InvoicesPage() {
       const companyDoc = await getDoc(doc(db, `projects/${id}/config`, "company"));
       if (companyDoc.exists()) setCompanyData(companyDoc.data() as CompanyData);
 
-      const invoicesSnapshot = await getDocs(query(collection(db, `projects/${id}/invoices`), orderBy("createdAt", "desc")));
-      const allInvoices = invoicesSnapshot.docs.map((docSnap) => {
+      // Solo lo que este usuario puede leer (ver lib/accountingScope)
+      const invoiceDocs = sortByTime(await getScopedDocs(collection(db, `projects/${id}/invoices`), scopeFromPermissions(permissions)));
+      const allInvoices = invoiceDocs.map((docSnap) => {
         const data = docSnap.data();
         return {
           id: docSnap.id,

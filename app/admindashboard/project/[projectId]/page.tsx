@@ -8,6 +8,7 @@ import { inter } from "@/lib/fonts";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
+import { loadBudgetFigures, saveBudgetFigure } from "@/lib/budgetFigures";
 import {
   addDoc,
   collection,
@@ -835,6 +836,7 @@ export default function AdminProjectPage() {
       }
       if (cloneIncludeBudget) {
         const accountsSnap = await getDocs(collection(db, `projects/${projectId}/accounts`));
+        const figures = await loadBudgetFigures(projectId);
         for (const accDoc of accountsSnap.docs) {
           const accData = accDoc.data();
           await setDoc(doc(db, `projects/${newId}/accounts`, accDoc.id), {
@@ -846,10 +848,10 @@ export default function AdminProjectPage() {
           const subSnap = await getDocs(collection(db, `projects/${projectId}/accounts/${accDoc.id}/subaccounts`));
           for (const subDoc of subSnap.docs) {
             const subData = subDoc.data();
+            await saveBudgetFigure(newId, subDoc.id, { budgeted: figures[subDoc.id] ?? subData.budgeted ?? 0, accountId: accDoc.id, code: subData.code });
             await setDoc(doc(db, `projects/${newId}/accounts/${accDoc.id}/subaccounts`, subDoc.id), {
               code: subData.code,
               description: subData.description,
-              budgeted: subData.budgeted || 0,
               committed: 0,
               actual: 0,
               box: 0,
@@ -943,12 +945,14 @@ export default function AdminProjectPage() {
     setSaving(true);
     try {
       const sourceAccountsSnap = await getDocs(collection(db, `projects/${projectId}/accounts`));
+      const figures = await loadBudgetFigures(projectId);
       if (overwrite) {
         const targetAccountsSnap = await getDocs(collection(db, `projects/${copyBudgetTargetId}/accounts`));
         for (const accDoc of targetAccountsSnap.docs) {
           const subSnap = await getDocs(collection(db, `projects/${copyBudgetTargetId}/accounts/${accDoc.id}/subaccounts`));
           for (const subDoc of subSnap.docs) {
             await deleteDoc(doc(db, `projects/${copyBudgetTargetId}/accounts/${accDoc.id}/subaccounts`, subDoc.id));
+            await deleteDoc(doc(db, `projects/${copyBudgetTargetId}/budgetLines`, subDoc.id));
           }
           await deleteDoc(doc(db, `projects/${copyBudgetTargetId}/accounts`, accDoc.id));
         }
@@ -964,10 +968,10 @@ export default function AdminProjectPage() {
         const subSnap = await getDocs(collection(db, `projects/${projectId}/accounts/${accDoc.id}/subaccounts`));
         for (const subDoc of subSnap.docs) {
           const subData = subDoc.data();
+          await saveBudgetFigure(copyBudgetTargetId, subDoc.id, { budgeted: copyBudgetAmounts ? figures[subDoc.id] ?? subData.budgeted ?? 0 : 0, accountId: accDoc.id, code: subData.code });
           await setDoc(doc(db, `projects/${copyBudgetTargetId}/accounts/${accDoc.id}/subaccounts`, subDoc.id), {
             code: subData.code,
             description: subData.description,
-            budgeted: copyBudgetAmounts ? subData.budgeted || 0 : 0,
             committed: 0,
             actual: 0,
             box: 0,

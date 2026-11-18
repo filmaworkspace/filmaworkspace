@@ -22,6 +22,8 @@ import { PROJECT_ROLES } from "@/hooks/useAccountingPermissions";
 import { getInvoiceDisplayState, inInvoiceView, type InvoiceView } from "@/lib/invoiceHelpers";
 import { getCostSettings } from "@/lib/budgetRules";
 import { actualBySubaccount, committedBySubaccount, loadBoxBySubaccount } from "@/lib/budgetTotals";
+import { loadBudgetFigures, migrateBudgetFigures } from "@/lib/budgetFigures";
+import { canSeeBudget } from "@/hooks/useCanSeeBudget";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -305,8 +307,13 @@ export default function AccountingPanelPage() {
           }
         }
 
+        // Quien puede ver presupuesto traslada las cifras antiguas que aún
+        // estén en subcuentas a la colección protegida.
+        if (canSeeBudget(m)) await migrateBudgetFigures(id);
+
         // Presupuesto: solo con acceso ampliado (igual que la pestaña Presupuesto)
         if (p === "accounting" && mLevel === "accounting_extended") {
+          const figures = await loadBudgetFigures(id);
           const [costCfg, box, accountsSnap] = await Promise.all([
             getCostSettings(id),
             loadBoxBySubaccount(id),
@@ -323,7 +330,7 @@ export default function AccountingPanelPage() {
               let b = 0, a = 0, c = 0;
               subs.docs.forEach((s) => {
                 const code = s.data().code || "";
-                b += s.data().budgeted || 0;
+                b += figures[s.id] ?? s.data().budgeted ?? 0;
                 a += (actual[code] || 0) + (box[code] || 0);
                 c += committed[code] || 0;
               });
@@ -350,12 +357,14 @@ export default function AccountingPanelPage() {
       if (!d.approvalSteps || d.currentApprovalStep === undefined) return false;
       return !!d.approvalSteps[d.currentApprovalStep]?.approvers?.includes(userId);
     };
-    const u1 = onSnapshot(query(collection(db, `projects/${id}/pos`), where("status", "==", "pending")), (s) => {
+    // Solo los documentos en los que figura como aprobador (las reglas no dejan
+    // a todos leer toda la colección).
+    const u1 = onSnapshot(query(collection(db, `projects/${id}/pos`), where("approverIds", "array-contains", userId)), (s) => {
       po = s.docs.filter((d) => isMine(d.data())).length;
       setPendingApprovals(po + inv);
     });
     const u2 = onSnapshot(
-      query(collection(db, `projects/${id}/invoices`), where("status", "in", ["submitted", "pending_approval"])),
+      query(collection(db, `projects/${id}/invoices`), where("approverIds", "array-contains", userId)),
       (s) => {
         inv = s.docs.filter((d) => !d.data().approvedAt && isMine(d.data())).length;
         setPendingApprovals(po + inv);

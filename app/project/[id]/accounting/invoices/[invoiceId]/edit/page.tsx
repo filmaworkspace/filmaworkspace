@@ -10,6 +10,9 @@ import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db, storage } from "@/lib/firebase";
+import { getScopedDocs, scopeFromPermissions } from "@/lib/accountingScope";
+import { approverIdsOf } from "@/lib/approvers";
+import { loadBudgetFigures } from "@/lib/budgetFigures";
 import {
   arrayUnion,
   collection,
@@ -386,8 +389,8 @@ export default function EditInvoicePage() {
 
       // Cargar PO vinculada
       if (data.poId) {
-        const poDoc = await getDoc(doc(db, `projects/${id}/pos`, data.poId));
-        if (poDoc.exists()) {
+        const poDoc = await getDoc(doc(db, `projects/${id}/pos`, data.poId)).catch(() => null);
+        if (poDoc?.exists()) {
           const poData = poDoc.data();
           setLinkedPO({ id: poDoc.id, number: poData.number, supplier: poData.supplier, supplierId: poData.supplierId, department: poData.department, totalAmount: poData.totalAmount, baseAmount: poData.baseAmount, items: poData.items || [] });
         }
@@ -409,6 +412,7 @@ export default function EditInvoicePage() {
 
       // Cargar subcuentas
       const accountsSnap = await getDocs(collection(db, `projects/${id}/accounts`));
+      const figures = await loadBudgetFigures(id as string);
       const allSubAccounts: SubAccount[] = [];
       for (const accDoc of accountsSnap.docs) {
         const accData = accDoc.data();
@@ -417,8 +421,8 @@ export default function EditInvoicePage() {
           const subData = subDoc.data();
           allSubAccounts.push({
             id: subDoc.id, code: subData.code || "", description: subData.description || "",
-            budgeted: subData.budgeted || 0, committed: subData.committed || 0, actual: subData.actual || 0,
-            available: (subData.budgeted || 0) - (subData.actual || 0),
+            budgeted: figures[subDoc.id] ?? subData.budgeted ?? 0, committed: subData.committed || 0, actual: subData.actual || 0,
+            available: (figures[subDoc.id] ?? subData.budgeted ?? 0) - (subData.actual || 0),
             accountId: accDoc.id, accountCode: accData.code || "", accountDescription: accData.description || "",
           });
         });
@@ -488,11 +492,12 @@ export default function EditInvoicePage() {
     if (!linkedPO) return;
     try {
       // Obtener todas las facturas de esta PO (excluyendo la actual)
-      const invoicesSnap = await getDocs(query(
-        collection(db, `projects/${id}/invoices`),
-        where("poId", "==", linkedPO.id),
-        where("status", "in", ["pending", "pending_approval", "approved", "paid", "overdue"])
-      ));
+      const LIVE = ["pending", "pending_approval", "approved", "paid", "overdue"];
+      const invoicesSnap = {
+        docs: (await getScopedDocs(collection(db, `projects/${id}/invoices`), scopeFromPermissions(permissions), [
+          where("poId", "==", linkedPO.id), where("status", "in", LIVE),
+        ])).filter((d) => d.data().poId === linkedPO.id && LIVE.includes(d.data().status)),
+      };
       
       // Calcular cuánto está facturado por item
       const itemInvoicedAmounts: Record<number, number> = {};
@@ -805,11 +810,13 @@ export default function EditInvoicePage() {
           updateData.approvedBy = permissions.userId || "";
           updateData.approvedByName = permissions.userName || "";
           updateData.approvalSteps = deleteField();
+          updateData.approverIds = [];
           updateData.currentApprovalStep = deleteField();
         } else {
           updateData.status = "pending_approval";
           updateData.approvalStatus = "pending";
           updateData.approvalSteps = steps;
+          updateData.approverIds = approverIdsOf(steps);
           updateData.currentApprovalStep = 0;
           updateData.approvedAt = deleteField();
           updateData.approvedBy = deleteField();

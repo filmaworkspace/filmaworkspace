@@ -91,7 +91,8 @@ service cloud.firestore {
     }
 
     function getUserCompanyId() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId;
+      let userDoc = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(userDoc) ? get(userDoc).data.get('companyId', null) : null;
     }
 
     function hasCompanyProjectAccess(projectId) {
@@ -122,6 +123,98 @@ service cloud.firestore {
       return isSignedIn() &&
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.budgetingAccess == true;
+    }
+
+    // ── Contabilidad: funciones de acceso ────────────────────────────────────
+    function accMemberPath(projectId) {
+      return /databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid);
+    }
+    function accMember(projectId) {
+      return get(accMemberPath(projectId)).data;
+    }
+    function isMemberOf(projectId) {
+      return isSignedIn() && exists(accMemberPath(projectId));
+    }
+    // Tiene el módulo de contabilidad activado en el proyecto.
+    function inAccounting(projectId) {
+      return isSignedIn() && (hasAccountingAccess(projectId) || hasMemberPermission(projectId, 'accounting'));
+    }
+    function accLevel(projectId) {
+      return isMemberOf(projectId) ? accMember(projectId).get('accountingAccessLevel', 'user') : 'none';
+    }
+    function accRole(projectId) {
+      return isMemberOf(projectId) ? accMember(projectId).get('role', '') : '';
+    }
+    function isAccountant(projectId) {
+      return inAccounting(projectId) && accLevel(projectId) in ['accounting', 'accounting_extended'];
+    }
+    function isAccExtended(projectId) {
+      return inAccounting(projectId) && accLevel(projectId) == 'accounting_extended';
+    }
+    // Ve todas las POs, facturas y pagos del proyecto.
+    function accSeesAll(projectId) {
+      return isAdmin() || isEPorPM(projectId) || hasCompanyProjectAccess(projectId) || (
+        inAccounting(projectId) && (
+          accRole(projectId) in ['Controller', 'PC'] ||
+          accLevel(projectId) in ['accounting', 'accounting_extended']
+        )
+      );
+    }
+    function canSeeBudgetFigures(projectId) {
+      return isAdmin() || isEPorPM(projectId) || isAccExtended(projectId) || hasCompanyProjectAccess(projectId);
+    }
+    function canWriteBudget(projectId) {
+      return isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
+    }
+    function isBoxUser(projectId) {
+      return inAccounting(projectId) && (
+        accLevel(projectId) in ['visitor', 'accounting', 'accounting_extended'] ||
+        accMember(projectId).get('boxAccess', false) == true
+      );
+    }
+    function canUseBox(projectId) {
+      return isAdmin() || isEPorPM(projectId) || hasCompanyProjectAccess(projectId) ||
+             isApproverRole(projectId) || isBoxUser(projectId);
+    }
+    function isDeptLead(projectId) {
+      return isMemberOf(projectId) && accMember(projectId).get('position', '') in ['HOD', 'Coordinator'];
+    }
+    function myDepartment(projectId) {
+      return accMember(projectId).get('department', '');
+    }
+    // PO/factura: la ve quien lo ve todo, quien la creó, quien la aprueba y el
+    // HOD/Coordinator de su departamento. Se escribe con resource.data.campo
+    // (no .get) para que las consultas acotadas de la app se puedan validar.
+    function canReadAccDoc(projectId) {
+      return accSeesAll(projectId) || (
+        inAccounting(projectId) && (
+          resource.data.createdBy == request.auth.uid ||
+          request.auth.uid in resource.data.approverIds ||
+          (isDeptLead(projectId) && myDepartment(projectId) != '' && resource.data.department == myDepartment(projectId))
+        )
+      );
+    }
+    function canTouchAccDoc(projectId) {
+      return inAccounting(projectId) && (
+        resource.data.createdBy == request.auth.uid ||
+        request.auth.uid in resource.data.get('approverIds', []) ||
+        (isDeptLead(projectId) && myDepartment(projectId) != '' && resource.data.get('department', '') == myDepartment(projectId))
+      );
+    }
+    // Quien no lo ve todo no puede cambiar el autor de un documento.
+    function keepsOwner() {
+      return request.resource.data.get('createdBy', null) == resource.data.get('createdBy', null);
+    }
+    // Contabilidad ampliada solo puede tocar el acceso a contabilidad de un
+    // miembro (nivel, cajas y el permiso "accounting"), nunca su rol ni otros permisos.
+    function onlyAccountingAccessChange() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['permissions', 'accountingAccessLevel', 'boxAccess']) &&
+             request.resource.data.get('permissions', {}).diff(resource.data.get('permissions', {}))
+               .affectedKeys().hasOnly(['accounting']);
+    }
+    function isAccountingConfigDoc(configId) {
+      return configId in ['project', 'company', 'approvals', 'permissions', 'cost', 'planCuentas'];
     }
 
     match /users/{userId} {
@@ -185,8 +278,9 @@ service cloud.firestore {
                                   hasUserProjectPermission(projectId, 'config') ||
                                   hasMemberPermission(projectId, 'config') ||
                                   hasUserProjectPermission(projectId, 'team') ||
-                                  hasMemberPermission(projectId, 'team') ||
-                                  hasAccountingExtendedAccess(projectId);
+                                  hasMemberPermission(projectId, 'team');
+        // Contabilidad ampliada gestiona solo el acceso a contabilidad.
+        allow update: if isAccExtended(projectId) && onlyAccountingAccessChange();
       }
 
       match /departments/{departmentId} {
@@ -210,251 +304,174 @@ service cloud.firestore {
         );
         allow write: if isAdmin() ||
                         isEPorPM(projectId) ||
-                        hasAccountingExtendedAccess(projectId) ||
+                        (isAccExtended(projectId) && isAccountingConfigDoc(configId)) ||
                         hasUserProjectPermission(projectId, 'config');
 
+        // Subcolecciones (p. ej. company/bankAccounts: cuentas bancarias de la
+        // productora): solo contabilidad y quien configura el proyecto.
         match /{subCollection}/{docId} {
           allow read: if isSignedIn() && (
-            isAdmin() ||
-            hasProjectAccess(projectId) ||
-            isProjectMember(projectId) ||
-            hasCompanyProjectAccess(projectId)
+            accSeesAll(projectId) ||
+            isBoxUser(projectId) ||
+            hasUserProjectPermission(projectId, 'config')
           );
           allow write: if isAdmin() ||
                           isEPorPM(projectId) ||
-                          hasAccountingExtendedAccess(projectId) ||
+                          (isAccExtended(projectId) && isAccountingConfigDoc(configId)) ||
                           hasUserProjectPermission(projectId, 'config');
         }
       }
 
+      // ════════════════════════════════════════════════════════════════════
+      // CONTABILIDAD
+      // Quién ve qué (mismo criterio que la app, hooks/useAccountingPermissions):
+      //  · accSeesAll: admin, productora, EP/PM, y con acceso a contabilidad
+      //    Controller/PC o nivel "accounting"/"accounting_extended".
+      //  · Resto con acceso a contabilidad: sus POs/facturas, las de su
+      //    departamento si es HOD/Coordinator y las que tiene que aprobar.
+      //  · Cifras de presupuesto (budgetLines): solo admin, EP/PM, contabilidad
+      //    ampliada y productora.
+      //  · BOX (tarjetas, transferencias, efectivo): nivel visitor/contabilidad/
+      //    ampliado o boxAccess, EP/PM y roles aprobadores.
+      // ════════════════════════════════════════════════════════════════════
+
+      match /budgetLines/{subAccountId} {
+        allow read: if canSeeBudgetFigures(projectId);
+        allow write: if canWriteBudget(projectId);
+      }
+
+      // Numeración correlativa de POs y facturas (lib/docCounter.ts)
+      match /counters/{kind} {
+        allow read: if inAccounting(projectId) || accSeesAll(projectId);
+        allow create: if (inAccounting(projectId) || accSeesAll(projectId)) &&
+                         kind in ['pos', 'invoices'] &&
+                         request.resource.data.keys().hasOnly(['last']) &&
+                         request.resource.data.last is int;
+        allow update: if (inAccounting(projectId) || accSeesAll(projectId)) &&
+                         request.resource.data.keys().hasOnly(['last']) &&
+                         request.resource.data.last is int &&
+                         request.resource.data.last > resource.data.last;
+      }
+
       match /accounts/{accountId} {
-        allow read: if isSignedIn() && (
-          isAdmin() ||
-          hasAccountingAccess(projectId) ||
-          hasProjectAccess(projectId) ||
-          isProjectMember(projectId) ||
-          hasCompanyProjectAccess(projectId)
-        );
-        allow create, update, delete: if isAdmin() ||
-                                         hasAccountingAccess(projectId) ||
-                                         isEPorPM(projectId);
+        // Código y descripción: los necesita todo el que codifica POs y facturas.
+        allow read: if inAccounting(projectId) || accSeesAll(projectId);
+        allow create, delete: if canWriteBudget(projectId);
+        allow update: if canWriteBudget(projectId);
 
         match /subaccounts/{subId} {
-          allow read: if isSignedIn() && (
-            isAdmin() ||
-            hasAccountingAccess(projectId) ||
-            hasProjectAccess(projectId) ||
-            isProjectMember(projectId) ||
-            hasCompanyProjectAccess(projectId)
-          );
-          allow create, update, delete: if isAdmin() ||
-                                           hasAccountingAccess(projectId) ||
-                                           isEPorPM(projectId);
+          allow read: if inAccounting(projectId) || accSeesAll(projectId);
+          // El presupuestado nunca se guarda aquí (va en budgetLines).
+          allow create: if canWriteBudget(projectId) &&
+                           !request.resource.data.keys().hasAny(['budgeted']);
+          // Contabilidad ampliada / EP / PM: código, descripción, y quitar el
+          // "budgeted" antiguo al trasladarlo. Nunca añadirlo ni cambiarlo.
+          allow update: if (
+                            canWriteBudget(projectId) &&
+                            !request.resource.data.diff(resource.data).addedKeys().hasAny(['budgeted']) &&
+                            !request.resource.data.diff(resource.data).changedKeys().hasAny(['budgeted'])
+                          ) || (
+                            // Aprobaciones, facturas y cajas mueven comprometido/realizado/caja.
+                            inAccounting(projectId) &&
+                            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['committed', 'actual', 'box'])
+                          );
+          allow delete: if canWriteBudget(projectId);
         }
       }
 
       match /suppliers/{supplierId} {
-        allow read: if isSignedIn() && (
-          isAdmin() ||
-          hasAccountingAccess(projectId) ||
-          hasProjectAccess(projectId) ||
-          isProjectMember(projectId) ||
-          hasCompanyProjectAccess(projectId)
-        );
-        allow create, update: if isAdmin() ||
-                                  hasAccountingAccess(projectId) ||
-                                  isEPorPM(projectId);
-        allow delete: if isAdmin() ||
-                         isEPorPM(projectId) ||
-                         hasAccountingExtendedAccess(projectId);
+        allow read: if inAccounting(projectId) || accSeesAll(projectId);
+        allow create, update: if accSeesAll(projectId) ||
+                                 (inAccounting(projectId) && accLevel(projectId) != 'visitor');
+        allow delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
       }
 
       match /pos/{poId} {
-        allow read: if isSignedIn() && (
-          isAdmin() ||
-          hasAccountingAccess(projectId) ||
-          hasProjectAccess(projectId) ||
-          isProjectMember(projectId) ||
-          hasCompanyProjectAccess(projectId)
-        );
-        allow create: if isAdmin() ||
-                         hasAccountingAccess(projectId) ||
-                         isProjectMember(projectId);
-        allow update: if isAdmin() ||
-                         hasAccountingAccess(projectId) ||
-                         isApproverRole(projectId);
-        allow delete: if isAdmin() || isEPorPM(projectId);
+        allow read: if canReadAccDoc(projectId);
+        allow create: if accSeesAll(projectId) || (
+                           inAccounting(projectId) && accLevel(projectId) != 'visitor' &&
+                           request.resource.data.createdBy == request.auth.uid
+                         );
+        allow update: if accSeesAll(projectId) || isApproverRole(projectId) ||
+                         (canTouchAccDoc(projectId) && keepsOwner());
+        allow delete: if isAdmin() || isEPorPM(projectId) || (
+                           inAccounting(projectId) &&
+                           resource.data.createdBy == request.auth.uid &&
+                           resource.data.status == 'draft'
+                         );
       }
 
       match /invoices/{invoiceId} {
-        allow read: if isSignedIn() && (
-          isAdmin() ||
-          hasAccountingAccess(projectId) ||
-          hasProjectAccess(projectId) ||
-          isProjectMember(projectId) ||
-          hasCompanyProjectAccess(projectId)
-        );
-        allow create: if isAdmin() ||
-                         hasAccountingAccess(projectId) ||
-                         isProjectMember(projectId);
-        allow update: if isAdmin() ||
-                         hasAccountingAccess(projectId) ||
-                         isApproverRole(projectId) ||
-                         hasCompanyProjectAccess(projectId);
+        allow read: if canReadAccDoc(projectId);
+        allow create: if accSeesAll(projectId) || (
+                           inAccounting(projectId) && accLevel(projectId) != 'visitor' &&
+                           request.resource.data.createdBy == request.auth.uid
+                         );
+        allow update: if accSeesAll(projectId) || isApproverRole(projectId) ||
+                         (canTouchAccDoc(projectId) && keepsOwner());
         allow delete: if isAdmin() || isEPorPM(projectId);
       }
 
       match /payments/{paymentId} {
-        allow read: if isSignedIn() && (
-          isAdmin() ||
-          hasAccountingAccess(projectId) ||
-          isEPorPM(projectId) ||
-          hasCompanyProjectAccess(projectId)
-        );
-        allow write: if isAdmin() ||
-                        isEPorPM(projectId) ||
-                        hasAccountingExtendedAccess(projectId);
+        allow read: if accSeesAll(projectId);
+        allow write: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
       }
 
       match /paymentForecasts/{forecastId} {
-        allow read: if isSignedIn() && (
-          isAdmin() ||
-          hasAccountingAccess(projectId) ||
-          isEPorPM(projectId) ||
-          hasCompanyProjectAccess(projectId)
-        );
-        allow create, update: if isAdmin() ||
-                                  hasAccountingAccess(projectId) ||
-                                  isEPorPM(projectId);
-        allow delete: if isAdmin() ||
-                         isEPorPM(projectId) ||
-                         hasAccountingExtendedAccess(projectId);
+        // El cajero (BOX) pide reposiciones de efectivo a tesorería desde aquí.
+        allow read, create, update: if accSeesAll(projectId) || isBoxUser(projectId);
+        allow delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
       }
 
       match /manualEntries/{entryId} {
-        allow read: if isSignedIn() && (
-          isAdmin() ||
-          hasAccountingAccess(projectId) ||
-          hasCompanyProjectAccess(projectId)
-        );
-        allow write: if isAdmin() ||
-                        hasCompanyProjectAccess(projectId) ||
-                        hasAccountingExtendedAccess(projectId);
+        allow read: if isAdmin() || isAccountant(projectId) || hasCompanyProjectAccess(projectId);
+        allow write: if isAdmin() || hasCompanyProjectAccess(projectId) || isAccExtended(projectId);
       }
 
+      // ── BOX: tarjetas y transferencias ──
       match /cards/{boxId} {
-        allow read: if isSignedIn() && (
-          isAdmin() ||
-          hasAccountingAccess(projectId) ||
-          hasProjectAccess(projectId) ||
-          isProjectMember(projectId) ||
-          hasCompanyProjectAccess(projectId)
-        );
-        allow create, update: if isAdmin() ||
-                                  hasAccountingAccess(projectId) ||
-                                  isEPorPM(projectId);
-        allow delete: if isAdmin() ||
-                         isEPorPM(projectId) ||
-                         hasAccountingExtendedAccess(projectId);
+        allow read: if canUseBox(projectId);
+        allow create, update: if isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId);
+        allow delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
       }
-
       match /cardEnvelopes/{envelopeId} {
-        allow read: if isSignedIn() && (
-          isAdmin() ||
-          hasAccountingAccess(projectId) ||
-          hasProjectAccess(projectId) ||
-          isProjectMember(projectId) ||
-          hasCompanyProjectAccess(projectId)
-        );
-        allow create, update: if isAdmin() ||
-                                  hasAccountingAccess(projectId) ||
-                                  isApproverRole(projectId);
-        allow delete: if isAdmin() ||
-                         isEPorPM(projectId) ||
-                         hasAccountingExtendedAccess(projectId);
+        allow read, create, update: if canUseBox(projectId);
+        allow delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
       }
-
       match /cardExpenses/{expenseId} {
-        allow read: if isSignedIn() && (
-          isAdmin() ||
-          hasAccountingAccess(projectId) ||
-          hasProjectAccess(projectId) ||
-          isProjectMember(projectId) ||
-          hasCompanyProjectAccess(projectId)
-        );
-        allow create, update: if isAdmin() ||
-                                  hasAccountingAccess(projectId) ||
-                                  isApproverRole(projectId);
-        allow delete: if isAdmin() ||
-                         isEPorPM(projectId) ||
-                         hasAccountingExtendedAccess(projectId);
+        allow read, create, update: if canUseBox(projectId);
+        allow delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
       }
-
       match /cardSuppliers/{supplierId} {
-        allow read: if isSignedIn() && (
-          isAdmin() ||
-          hasAccountingAccess(projectId) ||
-          hasProjectAccess(projectId) ||
-          isProjectMember(projectId) ||
-          hasCompanyProjectAccess(projectId)
-        );
-        allow create, update: if isAdmin() ||
-                                  hasAccountingAccess(projectId) ||
-                                  isEPorPM(projectId);
-        allow delete: if isAdmin() ||
-                         isEPorPM(projectId) ||
-                         hasAccountingExtendedAccess(projectId);
+        allow read: if canUseBox(projectId);
+        allow create, update: if isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId);
+        allow delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
       }
-
       match /transferEnvelopes/{envelopeId} {
-        allow read: if isSignedIn() && (
-          isAdmin() ||
-          hasAccountingAccess(projectId) ||
-          hasProjectAccess(projectId) ||
-          isProjectMember(projectId) ||
-          hasCompanyProjectAccess(projectId)
-        );
-        allow create, update: if isAdmin() ||
-                                  hasAccountingAccess(projectId) ||
-                                  isApproverRole(projectId);
-        allow delete: if isAdmin() ||
-                         isEPorPM(projectId) ||
-                         hasAccountingExtendedAccess(projectId);
+        allow read, create, update: if canUseBox(projectId);
+        allow delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
       }
-
       match /transferExpenses/{expenseId} {
-        allow read: if isSignedIn() && (
-          isAdmin() ||
-          hasAccountingAccess(projectId) ||
-          hasProjectAccess(projectId) ||
-          isProjectMember(projectId) ||
-          hasCompanyProjectAccess(projectId)
-        );
-        allow create, update: if isAdmin() ||
-                                  hasAccountingAccess(projectId) ||
-                                  isApproverRole(projectId);
-        allow delete: if isAdmin() ||
-                         isEPorPM(projectId) ||
-                         hasAccountingExtendedAccess(projectId);
+        allow read, create, update: if canUseBox(projectId);
+        allow delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
       }
 
-      // ── Caja de efectivo (Petty Cash) ─────────────────────────────────────
-      // Solo quien tiene acceso a contabilidad (incluye al cajero-pagador).
+      // ── BOX: efectivo (Petty Cash) ──
       match /cashFloats/{floatId} {
-        allow read, create, update: if isAdmin() || hasAccountingAccess(projectId) || isEPorPM(projectId);
-        allow delete: if isAdmin() || isEPorPM(projectId) || hasAccountingExtendedAccess(projectId);
+        allow read, create, update: if isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId);
+        allow delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
       }
 
       match /cashMovements/{movementId} {
-        allow read, create, update: if isAdmin() || hasAccountingAccess(projectId) || isEPorPM(projectId);
+        allow read, create, update: if isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId);
         // Un movimiento contabilizado ya no se puede borrar.
-        allow delete: if (isAdmin() || hasAccountingAccess(projectId) || isEPorPM(projectId)) &&
+        allow delete: if (isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId)) &&
                          resource.data.status != 'accounted';
       }
 
       match /cashCounts/{countId} {
-        allow read, create: if isAdmin() || hasAccountingAccess(projectId) || isEPorPM(projectId);
-        allow update, delete: if isAdmin() || isEPorPM(projectId) || hasAccountingExtendedAccess(projectId);
+        allow read, create: if isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId);
+        allow update, delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
       }
 
       match /crew/{crewId} {
@@ -554,9 +571,10 @@ service cloud.firestore {
       allow write: if isSignedIn() && (
         isAdmin() ||
         hasUserProjectPermission(projectId, 'config') ||
-        hasMemberPermission(projectId, 'config') ||
-        hasAccountingExtendedAccess(projectId)
+        hasMemberPermission(projectId, 'config')
       );
+      // Contabilidad ampliada solo puede dar o quitar acceso a contabilidad.
+      allow update: if isSignedIn() && isAccExtended(projectId) && onlyAccountingAccessChange();
       // El propio usuario solo puede cambiar sus preferencias (archivar,
       // favorito, notificaciones), nunca sus permisos ni darse de alta.
       allow update: if isSignedIn() && request.auth.uid == userId &&

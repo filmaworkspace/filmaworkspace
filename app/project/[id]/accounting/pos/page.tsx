@@ -11,6 +11,7 @@ import { matchAmount, matchCode, matchWords } from "@/lib/search";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
+import { getScopedDocs, scopeFromPermissions, sortByTime } from "@/lib/accountingScope";
 import {
   EmailAuthProvider,
   reauthenticateWithCredential,
@@ -205,8 +206,9 @@ export default function POsPage() {
       const projectDoc = await getDoc(doc(db, "projects", id));
       if (projectDoc.exists()) setProjectName(projectDoc.data().name || "Proyecto");
 
-      const posSnapshot = await getDocs(query(collection(db, `projects/${id}/pos`), orderBy("createdAt", "desc")));
-      const allPOs = posSnapshot.docs.map((docSnap) => ({
+      // Solo lo que este usuario puede leer (ver lib/accountingScope)
+      const posDocs = sortByTime(await getScopedDocs(collection(db, `projects/${id}/pos`), scopeFromPermissions(permissions)));
+      const allPOs = posDocs.map((docSnap) => ({
         id: docSnap.id,
         ...docSnap.data(),
         createdAt: docSnap.data().createdAt?.toDate(),
@@ -643,6 +645,7 @@ export default function POsPage() {
         approvedBy: null,
         approvedByName: null,
         approvalSteps: null,
+        approverIds: [],
         currentApprovalStep: null,
       });
       setShowModifyModal(false);

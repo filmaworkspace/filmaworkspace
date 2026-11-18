@@ -10,6 +10,10 @@ import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db, storage } from "@/lib/firebase";
+import { getScopedDocs, scopeFromPermissions } from "@/lib/accountingScope";
+import { nextDocNumber } from "@/lib/docCounter";
+import { approverIdsOf } from "@/lib/approvers";
+import { loadBudgetFigures } from "@/lib/budgetFigures";
 import {
   addDoc,
   collection,
@@ -572,9 +576,10 @@ export default function NewInvoicePage() {
 
       // Cargar POs aprobadas
       try {
-        const posSnap = await getDocs(
-          query(collection(db, "projects/" + id + "/pos"), where("status", "==", "approved"))
-        );
+        const posSnap = {
+          docs: (await getScopedDocs(collection(db, "projects/" + id + "/pos"), scopeFromPermissions(permissions), [where("status", "==", "approved")]))
+            .filter((d) => d.data().status === "approved"),
+        };
         const allPOs = posSnap.docs.map((d) => ({
           id: d.id,
           number: d.data().number,
@@ -628,6 +633,7 @@ export default function NewInvoicePage() {
       // Cargar cuentas
       try {
         const accsSnap = await getDocs(collection(db, "projects/" + id + "/accounts"));
+        const figures = await loadBudgetFigures(id as string);
         const accsList = accsSnap.docs.slice().sort((a, b) => (a.data().code || "").localeCompare(b.data().code || ""));
         const allSubs: SubAccount[] = [];
 
@@ -642,10 +648,10 @@ export default function NewInvoicePage() {
               id: s.id,
               code: d.code,
               description: d.description,
-              budgeted: d.budgeted || 0,
+              budgeted: figures[s.id] ?? d.budgeted ?? 0,
               committed: d.committed || 0,
               actual: d.actual || 0,
-              available: (d.budgeted || 0) - (d.committed || 0) - (d.actual || 0),
+              available: (figures[s.id] ?? d.budgeted ?? 0) - (d.committed || 0) - (d.actual || 0),
               accountId: accDoc.id,
               accountCode: accData.code,
               accountDescription: accData.description,
@@ -659,12 +665,10 @@ export default function NewInvoicePage() {
 
       // Cargar documentos pendientes de sustitución
       try {
-        const pendingSnap = await getDocs(
-          query(
-            collection(db, "projects/" + id + "/invoices"),
-            where("requiresReplacement", "==", true)
-          )
-        );
+        const pendingSnap = {
+          docs: (await getScopedDocs(collection(db, "projects/" + id + "/invoices"), scopeFromPermissions(permissions), [where("requiresReplacement", "==", true)]))
+            .filter((d) => d.data().requiresReplacement === true),
+        };
 
         const pendingDocs = pendingSnap.docs
           // Pagados: nuevo modelo usa paidAt; compat con status "paid".
@@ -733,17 +737,18 @@ export default function NewInvoicePage() {
     }
   };
 
+  // Facturas vigentes de una PO que este usuario puede leer (lib/accountingScope).
+  const invoicesOfPO = async (poId: string) =>
+    (await getScopedDocs(collection(db, "projects/" + id + "/invoices"), scopeFromPermissions(permissions), [
+      where("poId", "==", poId),
+      where("status", "in", ["pending", "pending_approval", "approved", "paid", "overdue"]),
+    ])).filter((d) => d.data().poId === poId && ["pending", "pending_approval", "approved", "paid", "overdue"].includes(d.data().status));
+
   const loadPOItemsInvoiced = async () => {
     if (!selectedPO) return;
 
     try {
-      const invSnap = await getDocs(
-        query(
-          collection(db, "projects/" + id + "/invoices"),
-          where("poId", "==", selectedPO.id),
-          where("status", "in", ["pending", "pending_approval", "approved", "paid", "overdue"])
-        )
-      );
+      const invSnap = { docs: await invoicesOfPO(selectedPO.id) };
 
       const invoicedByItem: Record<string, number> = {};
       invSnap.docs.forEach((invDoc) => {
@@ -872,13 +877,7 @@ export default function NewInvoicePage() {
     if (!selectedPO) return;
 
     try {
-      const invSnap = await getDocs(
-        query(
-          collection(db, "projects/" + id + "/invoices"),
-          where("poId", "==", selectedPO.id),
-          where("status", "in", ["pending", "pending_approval", "approved", "paid", "overdue"])
-        )
-      );
+      const invSnap = { docs: await invoicesOfPO(selectedPO.id) };
 
       const invoiced = invSnap.docs.reduce((s, d) => s + (d.data().totalAmount || 0), 0) + totals.totalAmount;
 
@@ -1377,13 +1376,7 @@ export default function NewInvoicePage() {
     setSaving(true);
     try {
       // Obtener siguiente número correlativo global (para todos los tipos de documento)
-      const invoicesSnap = await getDocs(collection(db, "projects/" + id + "/invoices"));
-      let maxNumber = 0;
-      invoicesSnap.docs.forEach((d) => {
-        const num = parseInt(d.data().number || "0", 10);
-        if (num > maxNumber) maxNumber = num;
-      });
-      const finalNumber = String(maxNumber + 1).padStart(4, "0");
+      const finalNumber = await nextDocNumber(id as string, "invoices");
       const finalDisplayNumber = currentDocType.code + "-" + finalNumber;
 
       // Subir archivo
@@ -1496,6 +1489,7 @@ export default function NewInvoicePage() {
         invoiceData.status = "submitted";
         invoiceData.approvalStatus = "pending";
         invoiceData.approvalSteps = steps;
+        invoiceData.approverIds = approverIdsOf(steps);
         invoiceData.currentApprovalStep = 0;
       }
 

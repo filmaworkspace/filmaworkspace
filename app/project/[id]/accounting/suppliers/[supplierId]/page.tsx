@@ -14,6 +14,7 @@ import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
+import { getScopedDocs, scopeFromMember, sortByTime } from "@/lib/accountingScope";
 import {
   collection,
   deleteDoc,
@@ -280,21 +281,18 @@ export default function SupplierDetailPage() {
       });
 
       // Determinar permisos de visibilidad
-      const isProjectRole = ["admin", "PM", "EP", "LP", "Coordinator", "Accounting"].includes(userRole);
-      const canViewAllPOs = isProjectRole;
-      const canViewDepartmentPOs = !isProjectRole && (
-        userPosition?.toLowerCase().includes("head") || 
-        userPosition?.toLowerCase().includes("jefe") ||
-        userRole === "HOD"
-      );
-      const canViewOwnPOs = !isProjectRole && !canViewDepartmentPOs;
+      // Misma lógica que las reglas de Firestore (lib/accountingScope)
+      const meSnap = await getDoc(doc(db, `projects/${projectId}/members`, userId!));
+      const scope = scopeFromMember(userId!, meSnap.exists() ? (meSnap.data() as any) : null);
+      const canViewAllPOs = scope.all;
+      const canViewDepartmentPOs = !scope.all && !!scope.department;
+      const canViewOwnPOs = !scope.all;
 
       // Cargar facturas
-      const invSnap = await getDocs(query(
-        collection(db, `projects/${projectId}/invoices`), 
-        where("supplierId", "==", supplierId),
-        orderBy("createdAt", "desc")
-      ));
+      const invSnap = {
+        docs: (await getScopedDocs(collection(db, `projects/${projectId}/invoices`), scope, [where("supplierId", "==", supplierId)]))
+          .filter((d) => d.data().supplierId === supplierId),
+      };
       const allInvoices = invSnap.docs.map(d => {
         const invData = d.data();
         return {
@@ -327,11 +325,10 @@ export default function SupplierDetailPage() {
       setInvoices(filteredInvoices);
 
       // Cargar POs
-      const posSnap = await getDocs(query(
-        collection(db, `projects/${projectId}/pos`), 
-        where("supplierId", "==", supplierId),
-        orderBy("createdAt", "desc")
-      ));
+      const posSnap = {
+        docs: sortByTime((await getScopedDocs(collection(db, `projects/${projectId}/pos`), scope, [where("supplierId", "==", supplierId)]))
+          .filter((d) => d.data().supplierId === supplierId)),
+      };
       const allPOs = posSnap.docs.map(d => {
         const poData = d.data();
         return {

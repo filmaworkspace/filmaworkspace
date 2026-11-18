@@ -9,6 +9,9 @@ import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db, storage } from "@/lib/firebase";
+import { nextDocNumber } from "@/lib/docCounter";
+import { approverIdsOf } from "@/lib/approvers";
+import { loadBudgetFigures } from "@/lib/budgetFigures";
 import {
   addDoc,
   collection,
@@ -545,6 +548,7 @@ export default function NewPOPage() {
         query(collection(db, "projects/" + id + "/accounts"), orderBy("code", "asc"))
       );
       const allSubAccounts: SubAccount[] = [];
+      const figures = await loadBudgetFigures(id as string);
       for (const accountDoc of accountsSnapshot.docs) {
         const accountData = accountDoc.data();
         const subAccountsSnapshot = await getDocs(
@@ -559,10 +563,10 @@ export default function NewPOPage() {
             id: subDoc.id,
             code: data.code,
             description: data.description,
-            budgeted: data.budgeted || 0,
+            budgeted: figures[subDoc.id] ?? data.budgeted ?? 0,
             committed: data.committed || 0,
             actual: data.actual || 0,
-            available: (data.budgeted || 0) - (data.committed || 0) - (data.actual || 0),
+            available: (figures[subDoc.id] ?? data.budgeted ?? 0) - (data.committed || 0) - (data.actual || 0),
             accountId: accountDoc.id,
             accountCode: accountData.code,
             accountDescription: accountData.description,
@@ -972,13 +976,7 @@ export default function NewPOPage() {
       const costSettings = await getCostSettings(id);
       
       // Obtener siguiente número correlativo global
-      const posSnapshot = await getDocs(collection(db, "projects/" + id + "/pos"));
-      let maxNumber = 0;
-      posSnapshot.docs.forEach((d) => {
-        const num = parseInt(d.data().number || "0", 10);
-        if (num > maxNumber) maxNumber = num;
-      });
-      const finalNumber = String(maxNumber + 1).padStart(4, "0");
+      const finalNumber = await nextDocNumber(id as string, "pos");
 
       let fileUrl = "";
       if (uploadedFile) {
@@ -1045,6 +1043,7 @@ export default function NewPOPage() {
         } else {
           poData.status = "pending";
           poData.approvalSteps = approvalSteps;
+          poData.approverIds = approverIdsOf(approvalSteps);
           poData.currentApprovalStep = 0;
           // Si la configuración es on_create, también comprometer en pending
           if (costSettings.poCommitmentTrigger === "on_create") {
