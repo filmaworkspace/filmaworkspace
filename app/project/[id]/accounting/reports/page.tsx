@@ -1271,7 +1271,7 @@ export default function ReportsPage() {
                   <th scope="col" className="px-3 py-2 text-left font-medium">Sección</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Registros</th>
                   <th scope="col" className="px-3 py-2 text-left font-medium">Plantillas</th>
-                  <th scope="col" className="py-2 pr-4" />
+                  <th scope="col" className="w-60 py-2 pr-4" />
                 </tr>
               </thead>
               <tbody>

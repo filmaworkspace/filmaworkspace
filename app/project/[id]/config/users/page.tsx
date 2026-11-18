@@ -345,7 +345,7 @@ export default function ConfigUsers() {
       ) : (
         <Table>
           <thead>
-            <tr><Th>Nombre</Th><Th>Rol</Th><Th>Accesos</Th><Th className="w-10" /></tr>
+            <tr><Th className="w-[45%]">Nombre</Th><Th>Rol</Th><Th>Accesos</Th><Th className="w-10" /></tr>
           </thead>
           <tbody>
             {sortedMembers.map((m) => (

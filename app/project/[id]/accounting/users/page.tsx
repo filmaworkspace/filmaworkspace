@@ -543,18 +543,18 @@ export default function AccountingUsersPage() {
             <table className="tbl w-full min-w-[860px] border-collapse text-[13px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
-                  <th scope="col" className="px-4 py-2 text-left font-medium">Usuario</th>
+                  <th scope="col" className="w-[42%] px-4 py-2 text-left font-medium">Usuario</th>
                   <th scope="col" className="px-3 py-2 text-left font-medium">Grupo</th>
                   <th scope="col" className="px-3 py-2 text-left font-medium">Rol o posición</th>
                   <th scope="col" className="px-3 py-2 text-left font-medium">Nivel de acceso</th>
-                  <th scope="col" className="px-3 py-2 text-left font-medium">Cajas</th>
+                  <th scope="col" className="w-24 px-3 py-2 text-left font-medium">Cajas</th>
                   <th scope="col" className="w-12 py-2 pr-3" />
                 </tr>
               </thead>
               <tbody>
                 {tableRows.map((m) => (
                   <tr key={m.userId} className="border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA]">
-                    <td className="max-w-[320px] px-4 py-1.5">
+                    <td className="px-4 py-1.5">
                       <span className="block truncate font-medium text-slate-900">
                         {m.name || m.email}
                         {m.userId === userId && <span className="ml-1.5 text-xs font-normal text-slate-500">(tú)</span>}
