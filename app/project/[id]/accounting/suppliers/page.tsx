@@ -5,7 +5,9 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
-import { AnchoredPanel } from "@/components/ds";
+import { AnchoredPanel, Button, EmptyState, IconButton, Menu, MenuItem, MenuSeparator, Modal, Page, PageHeader, PageLoading, Segmented, Select } from "@/components/ds";
+import SearchBar, { type SearchField } from "@/components/SearchBar";
+import { matchCode, matchWords } from "@/lib/search";
 import { IBANField } from "@/components/IBANField";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
@@ -33,6 +35,7 @@ import {
   Clock,
   CreditCard,
   Download,
+  MoreHorizontal,
   Edit,
   Eye,
   FileCheck,
@@ -217,6 +220,9 @@ export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [filteredSuppliers, setFilteredSuppliers] = useState<Supplier[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchField, setSearchField] = useState<"all" | "name" | "taxId" | "contact" | "iban">("all");
+  const [filterPayment, setFilterPayment] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"recent" | "name">("recent");
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
@@ -644,8 +650,8 @@ export default function SuppliersPage() {
     suppliers.forEach((supplier) => {
       rows.push([supplier.fiscalName, supplier.commercialName, supplier.country, supplier.taxId, supplier.contact?.name || "", supplier.contact?.email || "", supplier.contact?.phone || "", supplier.paymentMethod, supplier.bankAccount, supplier.bic || ""]);
     });
-    const csvContent = rows.map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const csvContent = rows.map((row) => row.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";")).join("\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.setAttribute("href", URL.createObjectURL(blob));
     link.setAttribute("download", `proveedores_${new Date().toISOString().split("T")[0]}.csv`);
@@ -656,147 +662,153 @@ export default function SuppliersPage() {
 
   const formatDate = (date: Date) => date ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" }).format(date) : "-";
 
-  if (loading) {
-    return (<div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}><div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" /></div>);
-  }
+  if (loading) return <PageLoading />;
+
+  // ── Búsqueda avanzada y filtros ───────────────────────────────────────────
+  type SupplierField = "all" | "name" | "taxId" | "contact" | "iban";
+  const SEARCH_FIELDS: SearchField<SupplierField>[] = [
+    { value: "all", label: "Buscar en todo", placeholder: "Nombre, NIF, contacto o IBAN" },
+    { value: "name", label: "Nombre", placeholder: "Nombre fiscal o comercial" },
+    { value: "taxId", label: "NIF/CIF", placeholder: "Ej. B12345678", mono: true },
+    { value: "contact", label: "Contacto", placeholder: "Nombre, email o teléfono" },
+    { value: "iban", label: "IBAN", placeholder: "Ej. ES91 2100", mono: true },
+  ];
+  const supplierMatches = (s: Supplier) => {
+    if (!searchTerm.trim()) return true;
+    const byName = matchWords(searchTerm, s.fiscalName, s.commercialName);
+    const byTax = matchCode(searchTerm, s.taxId);
+    const byContact = matchWords(searchTerm, s.contact?.name, s.contact?.email, s.contact?.phone);
+    const byIban = matchCode(searchTerm, s.bankAccount);
+    if (searchField === "name") return byName;
+    if (searchField === "taxId") return byTax;
+    if (searchField === "contact") return byContact;
+    if (searchField === "iban") return byIban;
+    return byName || byTax || byContact || byIban || matchWords(searchTerm, s.address?.city, s.address?.province);
+  };
+  const rows = suppliers
+    .filter(supplierMatches)
+    .filter((s) => filterStatus === "all" ? true : filterStatus === "closed" ? !!s.closure : !s.closure && getCertificateStatus(s) === filterStatus)
+    .filter((s) => filterPayment === "all" || s.paymentMethod === filterPayment)
+    .sort((a, b) => sortBy === "name"
+      ? a.fiscalName.localeCompare(b.fiscalName)
+      : (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+  const filtersActive = filterStatus !== "all" || filterPayment !== "all";
+
+  const certState = (cert: Certificate): { label: string; dot: string; text: string } => {
+    const now = new Date();
+    const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    if (!cert.uploaded) return { label: "No subido", dot: "bg-red-500", text: "text-red-700" };
+    if (cert.expiryDate && cert.expiryDate < now) return { label: "Caducado", dot: "bg-red-500", text: "text-red-700" };
+    if (cert.expiryDate && cert.expiryDate < soon) return { label: "Por caducar", dot: "bg-amber-500", text: "text-amber-800" };
+    if (cert.verified) return { label: "Verificado", dot: "bg-emerald-500", text: "text-emerald-800" };
+    return { label: "Subido", dot: "bg-slate-400", text: "text-slate-600" };
+  };
+  const STATE_LABEL: Record<string, { label: string; dot: string; text: string }> = {
+    valid: { label: "Al día", dot: "bg-emerald-500", text: "text-emerald-800" },
+    expiring: { label: "Por caducar", dot: "bg-amber-500", text: "text-amber-800" },
+    expired: { label: "Acción requerida", dot: "bg-red-500", text: "text-red-700" },
+    closed: { label: "Cerrado", dot: "bg-slate-300", text: "text-slate-500" },
+  };
+  const Dot = ({ s }: { s: { label: string; dot: string; text: string } }) => (
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs ${s.text}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+      {s.label}
+    </span>
+  );
+  const paymentLabel = (m: string) => PAYMENT_METHODS.find((p) => p.value === m)?.label || m || "—";
 
   return (
-    <div className={`min-h-screen bg-white ${inter.className}`}>
-      {/* Header */}
-      <div className="mt-[53px]">
-        <div className="px-6 pt-8 sm:px-10">
-          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Proveedores</h1>
-            </div>
-            <div className="absolute right-0 flex items-center gap-2">
-              <button onClick={openCreateModal} className="flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity">
-                <Plus size={16} strokeWidth={2.5} />
-                Añadir proveedor
-              </button>
-            </div>
-          </div>
+    <Page>
+      <PageHeader
+        title={<>Proveedores <span className="text-[15px] font-normal text-slate-400">{suppliers.length}</span></>}
+        actions={
+          <>
+            <Button variant="secondary" onClick={exportSuppliers}><Download size={14} /> Exportar</Button>
+            <Button variant="primary" onClick={openCreateModal}><Plus size={14} /> Añadir proveedor</Button>
+          </>
+        }
+      />
+
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <SearchBar fields={SEARCH_FIELDS} field={searchField} onField={setSearchField} value={searchTerm} onChange={setSearchTerm} count={rows.length} />
+        <div className="w-44">
+          <Select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}>
+            {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </Select>
         </div>
+        <div className="w-48">
+          <Select value={filterPayment} onChange={(e) => setFilterPayment(e.target.value)}>
+            <option value="all">Cualquier forma de pago</option>
+            {PAYMENT_METHODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+          </Select>
+        </div>
+        <Segmented value={sortBy} onChange={setSortBy} options={[{ value: "recent", label: "Recientes" }, { value: "name", label: "A–Z" }]} />
+        {filtersActive && (
+          <Button variant="ghost" size="sm" onClick={() => { setFilterStatus("all"); setFilterPayment("all"); }}>Quitar filtros</Button>
+        )}
       </div>
 
-      <main className="px-6 sm:px-10 py-8">
-        {/* Filters */}
-        <div className="flex flex-row gap-3 items-center mb-4">
-          <div className="flex-1 relative">
-            <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-            <input type="text" placeholder="Buscar proveedores" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]" />
-          </div>
-
-          <div className="flex gap-2 flex-shrink-0">
-            {/* Status Dropdown personalizado */}
-            <div className="relative" ref={statusDropdownRef}>
-              <button
-                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                className={`flex items-center gap-2 px-3 py-1.5 border rounded-md text-[13px] transition-colors min-w-[180px] ${
-                  filterStatus !== "all" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 hover:border-slate-300 text-slate-700 bg-white"
-                }`}
-              >
-                <Filter size={14} className={filterStatus !== "all" ? "text-white" : "text-slate-400"} />
-                <span className="flex-1 text-left text-xs">{getStatusLabel()}</span>
-                <ChevronDown size={14} className={`transition-transform ${showStatusDropdown ? "rotate-180" : ""} ${filterStatus !== "all" ? "text-white" : "text-slate-400"}`} />
-              </button>
-              {showStatusDropdown && (
-                <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 overflow-hidden" match="min" gap={8}>
-                  {STATUS_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => { setFilterStatus(option.value as any); setShowStatusDropdown(false); }}
-                      className={`w-full text-left px-4 py-1.5 text-[13px] transition-colors whitespace-nowrap ${
-                        filterStatus === option.value ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </AnchoredPanel>
-              )}
-            </div>
-
-            {(searchTerm || filterStatus !== "all") && (
-              <button onClick={() => { setSearchTerm(""); setFilterStatus("all"); }} className="px-3 py-1.5 border border-slate-200 rounded-md text-xs text-slate-600 hover:bg-slate-50 flex items-center gap-1.5 font-medium">
-                <X size={14} />Limpiar
-              </button>
-            )}
-
-            <button onClick={exportSuppliers} className="px-3 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 transition-colors flex items-center gap-1.5 text-xs font-medium">
-              <Download size={14} />Exportar
-            </button>
-          </div>
-        </div>
-
-        {/* Content */}
-        {filteredSuppliers.length === 0 ? (
-          <div className="border-2 border-dashed border-slate-200 rounded-lg p-16 text-center">
-            <div className="hidden"><Building2 size={28} className="text-slate-400" /></div>
-            <h3 className="text-[14px] font-semibold text-slate-900 mb-2">{searchTerm || filterStatus !== "all" ? "No se encontraron proveedores" : "No hay proveedores registrados"}</h3>
-            {(searchTerm || filterStatus !== "all") && <p className="text-slate-500 text-[13px]">Intenta ajustar los filtros</p>}
-          </div>
+      <div className="mt-4">
+        {rows.length === 0 ? (
+          <EmptyState
+            title={searchTerm || filtersActive ? "Sin resultados" : "Sin proveedores"}
+            action={!searchTerm && !filtersActive ? <Button variant="primary" size="sm" onClick={openCreateModal}>Añadir proveedor</Button> : undefined}
+          />
         ) : (
-          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden overflow-x-auto">
-            <table className="w-full text-[13px]">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th className="text-left px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider min-w-[200px]">Proveedor</th>
-                  <th className="text-left px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider min-w-[100px]">NIF/CIF</th>
-                  <th className="text-left px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider min-w-[180px]">Contacto</th>
-                  <th className="text-center px-3 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider min-w-[120px]">Titularidad</th>
-                  <th className="text-center px-3 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider min-w-[120px]">Contratistas</th>
-                  <th className="text-center px-3 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider min-w-[100px]">Estado</th>
-                  <th className="text-right px-4 py-2.5 min-w-[100px]"></th>
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full min-w-[1000px] border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
+                  <th scope="col" className="px-4 py-2 text-left font-medium">Proveedor</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">NIF/CIF</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Contacto</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Forma de pago</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Titularidad</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Contratistas</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Estado</th>
+                  <th scope="col" className="w-12 py-2 pr-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredSuppliers.map((supplier) => {
-                  const status = getCertificateStatus(supplier);
+              <tbody>
+                {rows.map((s) => {
+                  const href = `/project/${id}/accounting/suppliers/${s.id}`;
+                  const state = STATE_LABEL[s.closure ? "closed" : getCertificateStatus(s)];
                   return (
-                    <tr key={supplier.id} className="hover:bg-slate-50/50 transition-colors group">
-                      <td className="px-4 py-3">
-                        <Link href={`/project/${id}/accounting/suppliers/${supplier.id}`} className="text-left hover:text-[#2F52E0] transition-colors block">
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold text-slate-900 group-hover:text-[#2F52E0] text-xs">{supplier.fiscalName}</p>
-                            {supplier.closure && (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-medium">
-                                <Lock size={10} />
-                                Cerrado
-                              </span>
-                            )}
-                          </div>
-                          {supplier.commercialName && <p className="text-[11px] text-slate-500">{supplier.commercialName}</p>}
+                    <tr key={s.id} className={`border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA] ${s.closure ? "text-slate-500" : ""}`}>
+                      <td className="max-w-[320px] px-4 py-1.5">
+                        <Link href={href} className="block">
+                          <span className="block truncate font-medium text-slate-900 hover:underline">{s.fiscalName}</span>
+                          {s.commercialName && s.commercialName !== s.fiscalName && <span className="block truncate text-xs text-slate-500">{s.commercialName}</span>}
                         </Link>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs font-mono text-slate-700">{supplier.taxId}</span>
+                      <td className="whitespace-nowrap px-3 py-1.5 font-mono text-xs">{s.taxId || "—"}</td>
+                      <td className="max-w-[240px] px-3 py-1.5">
+                        {s.contact?.name || s.contact?.email ? (
+                          <>
+                            <span className="block truncate">{s.contact?.name || "—"}</span>
+                            {s.contact?.email && <span className="block truncate text-xs text-slate-500">{s.contact.email}</span>}
+                          </>
+                        ) : <span className="text-slate-400">—</span>}
                       </td>
-                      <td className="px-4 py-3">
-                        {supplier.contact?.name ? (
-                          <div>
-                            <p className="text-xs text-slate-900">{supplier.contact.name}</p>
-                            {supplier.contact.email && <p className="text-[11px] text-slate-500 truncate max-w-[180px]">{supplier.contact.email}</p>}
-                          </div>
-                        ) : (
-                          <span className="text-[11px] text-slate-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-3 text-center">{getCertificateBadge(supplier.certificates.bankOwnership)}</td>
-                      <td className="px-3 py-3 text-center">{getCertificateBadge(supplier.certificates.contractorsCertificate)}</td>
-                      <td className="px-3 py-3 text-center">
-                        {supplier.closure ? (
-                          <span className="px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap bg-slate-100 text-slate-600">Cerrado</span>
-                        ) : (
-                          getStatusBadge(status)
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-0.5">
-                          <Link href={`/project/${id}/accounting/suppliers/${supplier.id}`} className="p-1.5 text-slate-400 hover:text-[#2F52E0] hover:bg-blue-50 rounded-lg" title="Ver"><Eye size={14} /></Link>
-                          <button onClick={() => openEditModal(supplier)} className="p-1.5 text-slate-400 hover:text-[#2F52E0] hover:bg-blue-50 rounded-lg" title="Editar"><Edit size={14} /></button>
-                          <button onClick={() => handleDeleteSupplier(supplier)} disabled={supplier.hasAssignedPOs || supplier.hasAssignedInvoices} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed" title="Eliminar"><Trash2 size={14} /></button>
-                        </div>
+                      <td className="whitespace-nowrap px-3 py-1.5 text-slate-600">{paymentLabel(s.paymentMethod)}</td>
+                      <td className="px-3 py-1.5"><Dot s={certState(s.certificates.bankOwnership)} /></td>
+                      <td className="px-3 py-1.5"><Dot s={certState(s.certificates.contractorsCertificate)} /></td>
+                      <td className="px-3 py-1.5"><Dot s={state} /></td>
+                      <td className="py-1.5 pr-3 text-right">
+                        <Menu trigger={(toggle) => <IconButton label="Acciones del proveedor" onClick={toggle} className="-my-1"><MoreHorizontal size={15} /></IconButton>}>
+                          {(close) => (
+                            <>
+                              <MenuItem onClick={() => { close(); router.push(href); }}>Abrir ficha</MenuItem>
+                              <MenuItem onClick={() => { close(); openEditModal(s); }}>Editar</MenuItem>
+                              {!(s.hasAssignedPOs || s.hasAssignedInvoices) && (
+                                <>
+                                  <MenuSeparator />
+                                  <MenuItem danger onClick={() => { close(); handleDeleteSupplier(s); }}>Eliminar</MenuItem>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </Menu>
                       </td>
                     </tr>
                   );
@@ -805,7 +817,7 @@ export default function SuppliersPage() {
             </table>
           </div>
         )}
-      </main>
+      </div>
 
       {/* Create/Edit Modal */}
       {showModal && (
@@ -820,7 +832,7 @@ export default function SuppliersPage() {
               <div className="space-y-6">
                 {/* Información básica */}
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-wider flex items-center gap-2"><Building2 size={14} />Información básica</h3>
+                  <h3 className="mb-3 text-xs font-medium text-slate-500">Información básica</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre fiscal *</label>
@@ -889,7 +901,7 @@ export default function SuppliersPage() {
 
                 {/* Persona de contacto */}
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-wider flex items-center gap-2"><User size={14} />Persona de contacto</h3>
+                  <h3 className="mb-3 text-xs font-medium text-slate-500">Persona de contacto</h3>
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre</label>
@@ -917,7 +929,7 @@ export default function SuppliersPage() {
 
                 {/* Dirección */}
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-wider flex items-center gap-2"><MapPin size={14} />Dirección</h3>
+                  <h3 className="mb-3 text-xs font-medium text-slate-500">Dirección</h3>
                   <div className="grid grid-cols-3 gap-4">
                     <div className="col-span-2">
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Calle</label>
@@ -944,7 +956,7 @@ export default function SuppliersPage() {
 
                 {/* Información de pago */}
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-wider flex items-center gap-2"><CreditCard size={14} />Información de pago</h3>
+                  <h3 className="mb-3 text-xs font-medium text-slate-500">Información de pago</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div ref={paymentMethodDropdownRef} className="relative">
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Método de pago</label>
@@ -996,7 +1008,7 @@ export default function SuppliersPage() {
 
                 {/* Certificados */}
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-500 mb-4 uppercase tracking-wider flex items-center gap-2"><FileText size={14} />Certificados</h3>
+                  <h3 className="mb-3 text-xs font-medium text-slate-500">Certificados</h3>
                   <div className="space-y-4">
                     {/* Bank Ownership Certificate */}
                     <div className="border border-slate-200 rounded-md p-4">
@@ -1093,29 +1105,20 @@ export default function SuppliersPage() {
         </div>
       )}
 
-      {/* Confirm Dialog */}
-      {confirmDialog && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-[14px] font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
-            <p className="text-[13px] text-slate-600 mb-6">{confirmDialog.message}</p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmDialog(null)}
-                className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 font-medium text-[13px]"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmDialog.onConfirm}
-                className={`flex-1 px-4 py-1.5 rounded-md font-medium text-[13px] text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
-              >
-                {confirmDialog.confirmLabel || "Confirmar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      {/* Confirmación */}
+      <Modal
+        open={!!confirmDialog}
+        onClose={() => setConfirmDialog(null)}
+        title={confirmDialog?.title || ""}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirmDialog(null)}>Cancelar</Button>
+            <Button variant={confirmDialog?.danger ? "danger" : "primary"} onClick={() => confirmDialog?.onConfirm()}>{confirmDialog?.confirmLabel || "Confirmar"}</Button>
+          </>
+        }
+      >
+        <p className="text-[13px] text-slate-600">{confirmDialog?.message}</p>
+      </Modal>
+    </Page>
   );
 }

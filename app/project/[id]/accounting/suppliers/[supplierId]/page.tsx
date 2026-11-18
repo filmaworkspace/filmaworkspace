@@ -5,7 +5,9 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
-import { AnchoredPanel } from "@/components/ds";
+import { AnchoredPanel, Button, Field, IconButton, Input, Menu, MenuItem, MenuSeparator, Modal, Page, PageHeader, PageLoading, Segmented, Select, Textarea } from "@/components/ds";
+import SearchBar, { type SearchField } from "@/components/SearchBar";
+import { matchCode, matchWords } from "@/lib/search";
 import { getInvoiceDisplayState } from "@/lib/invoiceHelpers";
 import { IBANField } from "@/components/IBANField";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
@@ -50,6 +52,7 @@ import {
   Trash2,
   Upload,
   User,
+  MoreHorizontal,
   X,
 } from "lucide-react";
 
@@ -176,6 +179,9 @@ export default function SupplierDetailPage() {
   } | null>(null);
   const [allSuppliers, setAllSuppliers] = useState<{ id: string; fiscalName: string; taxId: string }[]>([]);
   const [supplierSearch, setSupplierSearch] = useState("");
+  const [docTab, setDocTab] = useState<"invoices" | "pos">("invoices");
+  const [docSearch, setDocSearch] = useState("");
+  const [docField, setDocField] = useState<"all" | "number" | "concept">("all");
   const [showSupplierSearch, setShowSupplierSearch] = useState(false);
 
   // Bloquea el scroll de la página de detrás mientras el modal de cierre o
@@ -558,7 +564,7 @@ export default function SupplierDetailPage() {
   };
 
   const formatDate = (date?: Date) => date ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" }).format(date) : "-";
-  const formatCurrency = (amount: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount);
+  const formatCurrency = (amount: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', useGrouping: 'always' } as Intl.NumberFormatOptions).format(amount);
 
   const getCertStatus = (cert: Certificate) => {
     if (!cert.uploaded) return { label: "No subido", color: "text-red-600", bg: "bg-red-50" };
@@ -1004,7 +1010,7 @@ export default function SupplierDetailPage() {
     setShowActionsMenu(false);
   };
 
-  if (loading) return <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}><div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" /></div>;
+  if (loading) return <PageLoading />;
 
   if (!supplier) return (
     <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
@@ -1037,766 +1043,404 @@ export default function SupplierDetailPage() {
 
   const supplierStatus = getSupplierStatus();
 
-  return (
-    <div className={`min-h-screen bg-white ${inter.className}`}>
-      {/* Header */}
-      <div className="mt-[53px]">
-        <div className="px-6 sm:px-10 py-6">
-          {/* Breadcrumb y acciones */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <Link 
-                href={`/project/${projectId}/accounting/suppliers`} 
-                className="inline-flex items-center gap-2 text-[13px] text-slate-500 hover:text-slate-900 transition-colors"
-              >
-                <ArrowLeft size={16} />
-                Proveedores
-              </Link>
-              
-              {/* Buscador rápido de proveedores */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowSupplierSearch(!showSupplierSearch)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-[13px] text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                >
-                  <Search size={14} />
-                  <span>Buscar proveedores</span>
-                </button>
-                
-                {showSupplierSearch && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => { setShowSupplierSearch(false); setSupplierSearch(""); }} />
-                    <AnchoredPanel className="w-72 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden" gap={8}>
-                      <div className="p-2 border-b border-slate-100">
-                        <div className="relative">
-                          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                          <input
-                            type="text"
-                            value={supplierSearch}
-                            onChange={(e) => setSupplierSearch(e.target.value)}
-                            placeholder="Buscar proveedor"
-                            autoFocus
-                            className="w-full pl-9 pr-3 py-1.5 text-[13px] border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
-                          />
-                        </div>
-                      </div>
-                      <div className="max-h-64 overflow-y-auto">
-                        {allSuppliers
-                          .filter(s => 
-                            s.id !== supplierId && 
-                            (s.fiscalName.toLowerCase().includes(supplierSearch.toLowerCase()) ||
-                             s.taxId.toLowerCase().includes(supplierSearch.toLowerCase()))
-                          )
-                          .slice(0, 8)
-                          .map(s => (
-                            <Link
-                              key={s.id}
-                              href={`/project/${projectId}/accounting/suppliers/${s.id}`}
-                              onClick={() => { setShowSupplierSearch(false); setSupplierSearch(""); }}
-                              className="flex items-center justify-between px-4 py-2 hover:bg-slate-50 transition-colors"
-                            >
-                              <div className="min-w-0">
-                                <p className="text-[13px] font-medium text-slate-900 truncate">{s.fiscalName}</p>
-                                <p className="text-xs text-slate-500 font-mono">{s.taxId}</p>
-                              </div>
-                              <ChevronRight size={14} className="text-slate-300 flex-shrink-0" />
-                            </Link>
-                          ))
-                        }
-                        {allSuppliers.filter(s => 
-                          s.id !== supplierId && 
-                          (s.fiscalName.toLowerCase().includes(supplierSearch.toLowerCase()) ||
-                           s.taxId.toLowerCase().includes(supplierSearch.toLowerCase()))
-                        ).length === 0 && (
-                          <div className="px-4 py-6 text-center">
-                            <p className="text-[13px] text-slate-400">No hay otros proveedores</p>
-                          </div>
-                        )}
-                      </div>
-                    </AnchoredPanel>
-                  </>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              {/* Dropdown de exportación */}
-              <div className="relative">
-                <button 
-                  onClick={() => setShowActionsMenu(!showActionsMenu)}
-                  className="flex items-center gap-2 px-3 py-2 text-[13px] text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
-                >
-                  <Download size={16} />
-                  Exportar
-                  <ChevronDown size={14} className={`transition-transform ${showActionsMenu ? 'rotate-180' : ''}`} />
-                </button>
-                
-                {showActionsMenu && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setShowActionsMenu(false)} />
-                    <AnchoredPanel className="w-64 bg-white border border-slate-200 rounded-lg shadow-xl py-2" align="right" gap={8}>
-                      <button
-                        onClick={generateInvoiceListPdf}
-                        disabled={invoices.length === 0 || generatingPdf === "invoices"}
-                        className="w-full px-4 py-2 text-left text-[13px] hover:bg-slate-50 flex items-center gap-3 disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        <FileText size={16} className="text-slate-400" />
-                        <div>
-                          <p className="font-medium text-slate-900">Listado de facturas</p>
-                          <p className="text-xs text-slate-500">PDF con todas las facturas</p>
-                        </div>
-                      </button>
-                      
-                      <button
-                        onClick={generateEndOfProjectLetter}
-                        disabled={hasPendingInvoices || generatingPdf === "letter"}
-                        className="w-full px-4 py-2 text-left text-[13px] hover:bg-slate-50 flex items-center gap-3 disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        <FileSpreadsheet size={16} className="text-slate-400" />
-                        <div>
-                          <p className="font-medium text-slate-900">Carta fin de proyecto</p>
-                          <p className="text-xs text-slate-500">
-                            {hasPendingInvoices ? "Requiere facturas pagadas" : "Certificado de cierre"}
-                          </p>
-                        </div>
-                      </button>
-                      
-                      <div className="border-t border-slate-100 my-1" />
-                      
-                      <button
-                        onClick={exportToCSV}
-                        disabled={invoices.length === 0}
-                        className="w-full px-4 py-2 text-left text-[13px] hover:bg-slate-50 flex items-center gap-3 disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        <Download size={16} className="text-slate-400" />
-                        <div>
-                          <p className="font-medium text-slate-900">Exportar CSV</p>
-                          <p className="text-xs text-slate-500">Para Excel o Sheets</p>
-                        </div>
-                      </button>
-                    </AnchoredPanel>
-                  </>
-                )}
-              </div>
+  // ── Documentos: búsqueda avanzada ─────────────────────────────────────────
+  type DocField = "all" | "number" | "concept";
+  const DOC_FIELDS: SearchField<DocField>[] = [
+    { value: "all", label: "Buscar en todo", placeholder: "Número o concepto" },
+    { value: "number", label: "Número", placeholder: "Ej. FAC-0012 o 0003", mono: true },
+    { value: "concept", label: "Concepto", placeholder: "Ej. alquiler cámara" },
+  ];
+  const docMatches = (number: string, concept: string) => {
+    if (!docSearch.trim()) return true;
+    if (docField === "number") return matchCode(docSearch, number);
+    if (docField === "concept") return matchWords(docSearch, concept);
+    return matchCode(docSearch, number) || matchWords(docSearch, concept);
+  };
+  const DOC_STATE: Record<string, { label: string; dot: string; text: string }> = {
+    draft: { label: "Borrador", dot: "bg-slate-300", text: "text-slate-600" },
+    pending: { label: "Pend. aprobación", dot: "bg-amber-500", text: "text-amber-800" },
+    submitted: { label: "Pend. aprobación", dot: "bg-amber-500", text: "text-amber-800" },
+    approved: { label: "Aprobada", dot: "bg-emerald-500", text: "text-emerald-800" },
+    coded: { label: "Codificada", dot: "bg-violet-500", text: "text-violet-800" },
+    accounted: { label: "Contabilizada", dot: "bg-teal-500", text: "text-teal-800" },
+    paid: { label: "Pagada", dot: "bg-[#2F52E0]", text: "text-blue-800" },
+    overdue: { label: "Vencida", dot: "bg-red-500", text: "text-red-700" },
+    closed: { label: "Cerrada", dot: "bg-slate-400", text: "text-slate-600" },
+    rejected: { label: "Rechazada", dot: "bg-red-500", text: "text-red-700" },
+    cancelled: { label: "Anulada", dot: "bg-slate-300", text: "text-slate-500 line-through" },
+    void: { label: "Anulada", dot: "bg-slate-300", text: "text-slate-500 line-through" },
+    returned: { label: "Devuelta", dot: "bg-teal-500", text: "text-teal-800" },
+    partial_return: { label: "Dev. parcial", dot: "bg-cyan-500", text: "text-cyan-800" },
+  };
+  const Dot = ({ state }: { state: string }) => {
+    const s = DOC_STATE[state] || DOC_STATE.draft;
+    return (
+      <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs ${s.text}`}>
+        <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+        {s.label}
+      </span>
+    );
+  };
+  const invoiceRows = invoices.filter((inv) => docMatches(inv.number, inv.description));
+  const poRows = pos.filter((po) => docMatches(`PO-${po.number}`, po.description));
+  const rowsBase = docTab === "invoices"
+    ? invoiceRows.filter((i) => !["cancelled", "void"].includes(i.status)).reduce((s, i) => s + i.baseAmount, 0)
+    : poRows.filter((p) => p.status !== "cancelled").reduce((s, p) => s + p.baseAmount, 0);
 
-              <button 
-                onClick={handleDelete} 
-                disabled={invoices.length > 0 || pos.length > 0} 
-                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed" 
-                title="Eliminar"
-              >
-                <Trash2 size={18} />
+  const certRow = (key: "bankOwnership" | "contractorsCertificate", label: string) => {
+    const cert = supplier.certificates[key];
+    const st = getCertStatus(cert);
+    const tone = !cert.uploaded || st.label.toLowerCase().includes("caduc") ? "text-red-700" : cert.verified ? "text-emerald-800" : "text-slate-600";
+    return (
+      <div className="flex flex-col gap-1 border-b border-slate-100 py-2.5 last:border-0">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[13px] text-slate-900">{label}</span>
+          <span className={`text-xs ${tone}`}>{st.label}</span>
+        </div>
+        {(cert.expiryDate || cert.verifiedByName || (canVerify && cert.uploaded)) && (
+          <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
+            <span>
+              {cert.expiryDate && <>Caduca {formatDate(cert.expiryDate)}</>}
+              {cert.expiryDate && cert.verified && cert.verifiedByName && " · "}
+              {cert.verified && cert.verifiedByName && <>Verificado por {cert.verifiedByName}</>}
+            </span>
+            {canVerify && cert.uploaded && (
+              <button onClick={() => handleVerify(key, !cert.verified)} className="font-medium text-slate-900 hover:underline">
+                {cert.verified ? "Quitar verificación" : "Verificar"}
               </button>
-
-              {!supplierClosure && !hasPendingInvoices && (
-                <button
-                  onClick={() => setShowCloseModal(true)}
-                  className="flex items-center gap-2 px-3 py-2 text-[13px] text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50 rounded-md transition-colors"
-                >
-                  <Lock size={16} />
-                  Cerrar
-                </button>
-              )}
-            </div>
+            )}
           </div>
+        )}
+      </div>
+    );
+  };
 
-          {/* Info principal del proveedor */}
-          <div className="flex min-h-[44px] items-center justify-between border-b border-slate-200 pb-4">
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">{supplier.fiscalName}</h1>
-              {supplier.taxId && <span className="rounded border border-slate-200 bg-[#F7F7F8] px-1.5 py-0.5 font-mono text-[11px] text-slate-600">{supplier.taxId}</span>}
-            </div>
-            
-            {/* Badge de estado */}
-            <div className={`px-3 py-1.5 rounded-md text-xs font-medium ${supplierStatus.bg} ${supplierStatus.color} border ${supplierStatus.border} flex items-center gap-1.5`}>
-              {supplierStatus.label === "Verificado" && <ShieldCheck size={14} />}
-              {supplierStatus.label}
-            </div>
-          </div>
+  const otherSuppliers = allSuppliers.filter((s) => s.id !== supplierId && (matchWords(supplierSearch, s.fiscalName) || matchCode(supplierSearch, s.taxId)));
+  const statusTone = supplierStatus.label === "Verificado" ? "bg-emerald-500" : supplierStatus.label.includes("caducados") ? "bg-red-500" : supplierStatus.label.includes("incompleta") ? "bg-amber-500" : "bg-slate-400";
+
+  return (
+    <Page>
+      <div className="mb-3 flex items-center justify-between gap-3 text-[13px]">
+        <Link href={`/project/${projectId}/accounting/suppliers`} className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-900">
+          <ArrowLeft size={14} /> Proveedores
+        </Link>
+        <div className="relative">
+          <button onClick={() => setShowSupplierSearch(!showSupplierSearch)} className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-900">
+            <Search size={13} /> Ir a otro proveedor
+          </button>
+          {showSupplierSearch && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => { setShowSupplierSearch(false); setSupplierSearch(""); }} />
+              <AnchoredPanel className="w-80 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg" align="right" gap={6}>
+                <div className="border-b border-slate-100 p-2">
+                  <Input value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)} placeholder="Nombre o NIF" autoFocus />
+                </div>
+                <div className="max-h-64 overflow-y-auto py-1">
+                  {otherSuppliers.slice(0, 10).map((s) => (
+                    <Link
+                      key={s.id}
+                      href={`/project/${projectId}/accounting/suppliers/${s.id}`}
+                      onClick={() => { setShowSupplierSearch(false); setSupplierSearch(""); }}
+                      className="flex items-center justify-between gap-3 px-3 py-1.5 hover:bg-[#F4F4F5]"
+                    >
+                      <span className="truncate text-[13px]">{s.fiscalName}</span>
+                      <span className="font-mono text-[11px] text-slate-500">{s.taxId}</span>
+                    </Link>
+                  ))}
+                  {otherSuppliers.length === 0 && <p className="px-3 py-4 text-center text-xs text-slate-500">Sin resultados</p>}
+                </div>
+              </AnchoredPanel>
+            </>
+          )}
         </div>
       </div>
 
-      <main className="px-6 sm:px-10 py-8">
-        {/* Banner de proveedor cerrado */}
-        {supplierClosure && (
-          <div className="mb-6 bg-slate-900 rounded-lg p-5 text-white">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-md bg-white/10 flex items-center justify-center flex-shrink-0">
-                  <FileCheck size={24} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg mb-1">Relación cerrada</h3>
-                  <p className="text-white/70 text-[13px]">
-                    Cerrado el {formatDate(supplierClosure.closedAt)} por {supplierClosure.closedByName}
-                  </p>
-                  {supplierClosure.notes && (
-                    <p className="text-white/80 text-[13px] mt-2 bg-white/10 rounded-lg px-3 py-2">
-                      &quot;{supplierClosure.notes}&quot;
-                    </p>
-                  )}
-                  {supplierClosure.signedLetterName && (
-                    <div className="flex items-center gap-2 mt-3">
-                      <FileText size={14} className="text-white/60" />
-                      <span className="text-[13px] text-white/80">{supplierClosure.signedLetterName}</span>
-                      <button className="text-xs text-white/60 hover:text-white underline">
-                        Descargar
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <button
-                onClick={handleReopenProject}
-                disabled={saving}
-                className="flex items-center gap-2 px-3 py-2 text-[13px] bg-white/10 hover:bg-white/20 rounded-md transition-colors"
-              >
-                <RotateCcw size={14} />
-                Reabrir
-              </button>
-            </div>
-          </div>
-        )}
-        <div className="grid grid-cols-3 gap-6">
-          {/* Columna izquierda - Datos y documentos */}
-          <div className="col-span-2 space-y-6">
-            {/* Datos fiscales y dirección - editable inline */}
-            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="font-semibold text-slate-900">Datos fiscales</h2>
-                {!editingFiscal ? (
-                  <button
-                    onClick={() => setEditingFiscal(true)}
-                    className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1"
-                  >
-                    <Edit size={14} />
-                    Editar
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => { setEditingFiscal(false); setEditForm({ ...editForm, address: supplier.address, paymentMethod: supplier.paymentMethod, bankAccount: supplier.bankAccount, bic: supplier.bic || "" }); }}
-                      className="text-xs text-slate-500 hover:text-slate-900"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      onClick={handleSaveFiscal}
-                      disabled={saving}
-                      className="text-xs px-3 py-1.5 rounded-lg font-medium disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
-                    >
-                      {saving ? "Guardando..." : "Guardar"}
-                    </button>
-                  </div>
-                )}
-              </div>
-              
-              <div className="p-5">
-                {!editingFiscal ? (
-                  <div className="grid grid-cols-2 gap-6">
-                    {/* Dirección */}
-                    <div>
-                      <p className="text-xs text-slate-400 uppercase tracking-wide mb-2">Dirección fiscal</p>
-                      {supplier.address?.street ? (
-                        <div className="text-[13px] text-slate-700">
-                          <p>{supplier.address.street} {supplier.address.number}</p>
-                          <p>{supplier.address.postalCode} {supplier.address.city}</p>
-                          {supplier.address.province && <p className="text-slate-500">{supplier.address.province}</p>}
-                          <p className="text-slate-500 mt-1">{COUNTRIES[supplier.country] || supplier.country}</p>
-                        </div>
-                      ) : (
-                        <p className="text-[13px] text-slate-400">Sin dirección</p>
-                      )}
-                    </div>
-                    
-                    {/* Datos bancarios */}
-                    <div>
-                      <p className="text-xs text-slate-400 uppercase tracking-wide mb-2">Datos bancarios</p>
-                      {supplier.bankAccount ? (
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-mono text-[13px] font-medium text-slate-900">{formatIBAN(supplier.bankAccount)}</p>
-                            <button 
-                              onClick={() => copyToClipboard(supplier.bankAccount, "IBAN")}
-                              className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors"
-                              title="Copiar"
-                            >
-                              <Copy size={14} />
-                            </button>
-                          </div>
-                          {supplier.bic && (
-                            <p className="font-mono text-xs text-slate-500 mt-1">BIC: {supplier.bic}</p>
-                          )}
-                          <p className="text-[13px] text-slate-500 mt-1">{PAYMENT_METHODS[supplier.paymentMethod]}</p>
-                        </div>
-                      ) : (
-                        <p className="text-[13px] text-slate-400">Sin cuenta bancaria</p>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {/* Form de edición */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-3">
-                        <p className="text-xs text-slate-400 uppercase tracking-wide">Dirección fiscal</p>
-                        <div className="grid grid-cols-3 gap-2">
-                          <input
-                            type="text"
-                            value={editForm.address.street}
-                            onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, street: e.target.value } })}
-                            placeholder="Calle"
-                            className="col-span-2 px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
-                          />
-                          <input
-                            type="text"
-                            value={editForm.address.number}
-                            onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, number: e.target.value } })}
-                            placeholder="Nº"
-                            className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
-                          />
-                        </div>
-                        <div className="grid grid-cols-3 gap-2">
-                          <input
-                            type="text"
-                            value={editForm.address.postalCode}
-                            onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, postalCode: e.target.value } })}
-                            placeholder="CP"
-                            className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
-                          />
-                          <input
-                            type="text"
-                            value={editForm.address.city}
-                            onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, city: e.target.value } })}
-                            placeholder="Ciudad"
-                            className="col-span-2 px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
-                          />
-                        </div>
-                        <input
-                          type="text"
-                          value={editForm.address.province}
-                          onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, province: e.target.value } })}
-                          placeholder="Provincia"
-                          className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
-                        />
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <p className="text-xs text-slate-400 uppercase tracking-wide">Datos bancarios</p>
-                        <IBANField
-                          iban={editForm.bankAccount}
-                          bic={editForm.bic}
-                          onIBANChange={(v) => setEditForm({ ...editForm, bankAccount: v })}
-                          onBICChange={(v) => setEditForm({ ...editForm, bic: v })}
-                          ibanClassName="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
-                          bicClassName="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
-                          ibanPlaceholder="Pega 20 dígitos o IBAN completo"
-                          bicPlaceholder="BIC/SWIFT"
-                        />
-                        <div className="relative custom-dropdown">
-                          <button
-                            type="button"
-                            onClick={() => setOpenDropdown(openDropdown === "editPaymentMethod" ? null : "editPaymentMethod")}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors"
-                          >
-                            <span className="text-slate-900 truncate">{PAYMENT_METHODS[editForm.paymentMethod as keyof typeof PAYMENT_METHODS] || editForm.paymentMethod}</span>
-                            <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === "editPaymentMethod" ? "rotate-180" : ""}`} />
-                          </button>
-                          {openDropdown === "editPaymentMethod" && (
-                            <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
-                              {Object.entries(PAYMENT_METHODS).map(([value, label]) => (
-                                <button
-                                  key={value}
-                                  type="button"
-                                  onClick={() => { setEditForm({ ...editForm, paymentMethod: value }); setOpenDropdown(null); }}
-                                  className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${editForm.paymentMethod === value ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
-                                >
-                                  {label as string}
-                                </button>
-                              ))}
-                            </AnchoredPanel>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Facturas */}
-            {(() => {
-              const activeInvoices = invoices.filter(inv => !["cancelled","void"].includes(inv.status));
-              const paidCount = activeInvoices.filter(inv => (inv.paidAt || inv.status === "paid")).length;
-              const totalBase = activeInvoices.reduce((s, inv) => s + inv.baseAmount, 0);
-              return (
-                <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                  <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <h2 className="font-semibold text-slate-900">Facturas</h2>
-                      <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">{activeInvoices.length}</span>
-                      {paidCount > 0 && (
-                        <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg">{paidCount} pagadas</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {activeInvoices.length > 0 && (
-                        <span className="text-xs text-slate-500 font-mono">{formatCurrency(totalBase)}</span>
-                      )}
-                      {invoices.length > 0 && (
-                        <Link
-                          href={`/project/${projectId}/accounting/invoices?supplier=${supplierId}`}
-                          className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1"
-                        >
-                          Ver todas <ExternalLink size={12} />
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-
-                  {activeInvoices.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <Receipt size={24} className="text-slate-300 mx-auto mb-2" />
-                      <p className="text-[13px] text-slate-400">Sin facturas registradas</p>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-slate-100">
-                      {activeInvoices.slice(0, 5).map(inv => (
-                        <Link
-                          key={inv.id}
-                          href={`/project/${projectId}/accounting/invoices/${inv.id}`}
-                          className="flex items-center justify-between px-3 py-3.5 hover:bg-slate-50 transition-colors group"
-                        >
-                          <div className="flex-1 min-w-0 mr-3">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <span className="font-mono text-[13px] font-semibold text-slate-900">{inv.number}</span>
-                              <span className="text-xs text-slate-400">{formatDate(inv.issueDate)}</span>
-                            </div>
-                            {inv.description && <p className="text-xs text-slate-500 truncate">{inv.description}</p>}
-                          </div>
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            <span className="font-mono text-[13px] font-semibold text-slate-900">{formatCurrency(inv.totalAmount)}</span>
-                            {getStatusBadge(getInvoiceDisplayState(inv))}
-                            <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-500" />
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* POs */}
-            {pos.length > 0 && (
-              <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <h2 className="font-semibold text-slate-900">Órdenes de compra</h2>
-                    <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">{pos.length}</span>
-                  </div>
-                  <Link 
-                    href={`/project/${projectId}/accounting/pos?supplier=${supplierId}`}
-                    className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1"
-                  >
-                    Ver todas <ExternalLink size={12} />
-                  </Link>
-                </div>
-                <div className="divide-y divide-slate-100">
-                  {pos.slice(0, 5).map(po => {
-                    const isCancelled = po.status === "cancelled";
-                    return (
-                      <Link
-                        key={po.id}
-                        href={`/project/${projectId}/accounting/pos/${po.id}`}
-                        className={`flex items-center justify-between px-3 py-3.5 transition-colors group ${isCancelled ? "bg-red-50/40 opacity-60 hover:opacity-80" : "hover:bg-slate-50"}`}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className={`font-mono text-[13px] font-semibold ${isCancelled ? "line-through text-slate-400" : "text-slate-900"}`}>PO-{po.number}</span>
-                          <span className="text-[13px] text-slate-500 truncate max-w-[200px]">{po.description || "-"}</span>
-                        </div>
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          <span className={`font-mono text-[13px] font-semibold ${isCancelled ? "line-through text-slate-400" : "text-slate-900"}`}>{formatCurrency(po.baseAmount)}</span>
-                          {getStatusBadge(po.status)}
-                          <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-500" />
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
+      <PageHeader
+        title={
+          <>
+            <span className="truncate">{supplier.fiscalName}</span>
+            {supplier.taxId && <span className="rounded border border-slate-200 bg-[#F7F7F8] px-1.5 py-0.5 font-mono text-[11px] font-normal text-slate-600">{supplier.taxId}</span>}
+            <span className="inline-flex items-center gap-1.5 text-xs font-normal text-slate-600">
+              <span className={`h-1.5 w-1.5 rounded-full ${supplierClosure ? "bg-slate-300" : statusTone}`} />
+              {supplierClosure ? "Relación cerrada" : supplierStatus.label}
+            </span>
+          </>
+        }
+        actions={
+          <>
+            <Menu trigger={(toggle) => <Button variant="secondary" onClick={toggle}><Download size={14} /> Exportar</Button>}>
+              {(close) => (
+                <>
+                  <MenuItem onClick={() => { close(); generateInvoiceListPdf(); }}>Listado de facturas (PDF)</MenuItem>
+                  <MenuItem onClick={() => { close(); if (!hasPendingInvoices) generateEndOfProjectLetter(); }}>
+                    <span className={hasPendingInvoices ? "text-slate-400" : ""}>Carta fin de proyecto{hasPendingInvoices ? " · requiere todo pagado" : ""}</span>
+                  </MenuItem>
+                  <MenuSeparator />
+                  <MenuItem onClick={() => { close(); exportToCSV(); }}>Facturas en CSV</MenuItem>
+                </>
+              )}
+            </Menu>
+            {!supplierClosure && !hasPendingInvoices && (
+              <Button variant="secondary" onClick={() => setShowCloseModal(true)}><Lock size={14} /> Cerrar relación</Button>
             )}
+            <Menu trigger={(toggle) => <IconButton label="Más acciones" onClick={toggle}><MoreHorizontal size={15} /></IconButton>}>
+              {(close) => (
+                <>
+                  <MenuItem onClick={() => { close(); setEditingFiscal(true); }}>Editar datos fiscales</MenuItem>
+                  {supplier.contact?.email && <MenuItem onClick={() => { close(); sendEmail(); }}>Enviar email</MenuItem>}
+                  {invoices.length === 0 && pos.length === 0 && (
+                    <>
+                      <MenuSeparator />
+                      <MenuItem danger onClick={() => { close(); handleDelete(); }}>Eliminar proveedor</MenuItem>
+                    </>
+                  )}
+                </>
+              )}
+            </Menu>
+          </>
+        }
+      />
+
+      {supplierClosure && (
+        <div className="mt-6 flex flex-wrap items-start justify-between gap-3 rounded-lg border border-slate-200 bg-[#FAFAFA] px-4 py-3 text-[13px]">
+          <div className="flex flex-col gap-1">
+            <span className="text-slate-900">Relación cerrada el {formatDate(supplierClosure.closedAt)} por {supplierClosure.closedByName}</span>
+            {supplierClosure.notes && <span className="text-slate-600">“{supplierClosure.notes}”</span>}
+            {supplierClosure.signedLetterName && <span className="text-xs text-slate-500">Carta firmada: {supplierClosure.signedLetterName}</span>}
           </div>
-
-          {/* Columna derecha - Contacto y certificados */}
-          <div className="space-y-6">
-            {/* Contacto */}
-            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100">
-                <h2 className="font-semibold text-slate-900">Contacto</h2>
-              </div>
-              <div className="p-5">
-                {supplier.contact?.name ? (
-                  <div className="space-y-4">
-                    <div>
-                      <p className="font-medium text-slate-900">{supplier.contact.name}</p>
-                      <p className="text-xs text-slate-500">Contacto principal</p>
-                    </div>
-                    
-                    {supplier.contact.email && (
-                      <a 
-                        href={`mailto:${supplier.contact.email}`}
-                        className="flex items-center gap-3 p-3 bg-slate-50 rounded-md hover:bg-slate-100 transition-colors group"
-                      >
-                        <Mail size={16} className="text-slate-400 group-hover:text-slate-600" />
-                        <span className="text-[13px] text-slate-700 truncate">{supplier.contact.email}</span>
-                      </a>
-                    )}
-                    
-                    {supplier.contact.phone && (
-                      <a 
-                        href={`tel:${supplier.contact.phone}`}
-                        className="flex items-center gap-3 p-3 bg-slate-50 rounded-md hover:bg-slate-100 transition-colors group"
-                      >
-                        <Phone size={16} className="text-slate-400 group-hover:text-slate-600" />
-                        <span className="text-[13px] text-slate-700">{supplier.contact.phone}</span>
-                      </a>
-                    )}
-
-                    {supplier.contact.email && (
-                      <button
-                        onClick={sendEmail}
-                        className="w-full flex items-center justify-center gap-2 p-3 border border-slate-200 rounded-md text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                      >
-                        <Send size={16} />
-                        Enviar email
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    <User size={24} className="text-slate-300 mx-auto mb-2" />
-                    <p className="text-[13px] text-slate-400">Sin contacto</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Certificados */}
-            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100">
-                <h2 className="font-semibold text-slate-900">Certificados</h2>
-              </div>
-              <div className="p-5 space-y-4">
-                {/* Titularidad bancaria */}
-                <div className={`p-4 rounded-md border ${supplier.certificates.bankOwnership.verified ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-slate-50'}`}>
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <FileText size={16} className={supplier.certificates.bankOwnership.verified ? 'text-emerald-600' : 'text-slate-400'} />
-                      <p className="text-[13px] font-medium text-slate-900">Titularidad bancaria</p>
-                    </div>
-                    <span className={`px-2 py-0.5 rounded-lg text-xs font-medium ${getCertStatus(supplier.certificates.bankOwnership).bg} ${getCertStatus(supplier.certificates.bankOwnership).color}`}>
-                      {getCertStatus(supplier.certificates.bankOwnership).label}
-                    </span>
-                  </div>
-                  
-                  {supplier.certificates.bankOwnership.expiryDate && (
-                    <p className="text-xs text-slate-500 mb-2">
-                      Caduca: {formatDate(supplier.certificates.bankOwnership.expiryDate)}
-                    </p>
-                  )}
-                  
-                  {supplier.certificates.bankOwnership.verified && supplier.certificates.bankOwnership.verifiedByName && (
-                    <p className="text-xs text-emerald-600 flex items-center gap-1">
-                      <ShieldCheck size={12} />
-                      Verificado por {supplier.certificates.bankOwnership.verifiedByName}
-                    </p>
-                  )}
-                  
-                  {canVerify && supplier.certificates.bankOwnership.uploaded && (
-                    <button 
-                      onClick={() => handleVerify("bankOwnership", !supplier.certificates.bankOwnership.verified)} 
-                      className="mt-3 text-xs font-medium text-slate-600 hover:text-slate-900 underline"
-                    >
-                      {supplier.certificates.bankOwnership.verified ? "Quitar verificación" : "Marcar verificado"}
-                    </button>
-                  )}
-                </div>
-
-                {/* Certificado contratistas */}
-                <div className={`p-4 rounded-md border ${supplier.certificates.contractorsCertificate.verified ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-slate-50'}`}>
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <FileText size={16} className={supplier.certificates.contractorsCertificate.verified ? 'text-emerald-600' : 'text-slate-400'} />
-                      <p className="text-[13px] font-medium text-slate-900">Cert. contratistas</p>
-                    </div>
-                    <span className={`px-2 py-0.5 rounded-lg text-xs font-medium ${getCertStatus(supplier.certificates.contractorsCertificate).bg} ${getCertStatus(supplier.certificates.contractorsCertificate).color}`}>
-                      {getCertStatus(supplier.certificates.contractorsCertificate).label}
-                    </span>
-                  </div>
-                  
-                  {supplier.certificates.contractorsCertificate.expiryDate && (
-                    <p className="text-xs text-slate-500 mb-2">
-                      Caduca: {formatDate(supplier.certificates.contractorsCertificate.expiryDate)}
-                    </p>
-                  )}
-                  
-                  {supplier.certificates.contractorsCertificate.verified && supplier.certificates.contractorsCertificate.verifiedByName && (
-                    <p className="text-xs text-emerald-600 flex items-center gap-1">
-                      <ShieldCheck size={12} />
-                      Verificado por {supplier.certificates.contractorsCertificate.verifiedByName}
-                    </p>
-                  )}
-                  
-                  {canVerify && supplier.certificates.contractorsCertificate.uploaded && (
-                    <button 
-                      onClick={() => handleVerify("contractorsCertificate", !supplier.certificates.contractorsCertificate.verified)} 
-                      className="mt-3 text-xs font-medium text-slate-600 hover:text-slate-900 underline"
-                    >
-                      {supplier.certificates.contractorsCertificate.verified ? "Quitar verificación" : "Marcar verificado"}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Footer info */}
-            <div className="text-center text-xs text-slate-400 py-2">
-              <p>Añadido {formatDate(supplier.createdAt)}</p>
-            </div>
-          </div>
-        </div>
-      </main>
-
-      {/* Modal de cierre de proyecto */}
-      {showCloseModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowCloseModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
-              <div>
-                <h3 className="font-semibold text-slate-900">Cerrar relación con proveedor</h3>
-                <p className="text-[13px] text-slate-500 mt-0.5">{supplier.fiscalName}</p>
-              </div>
-              <button 
-                onClick={() => setShowCloseModal(false)} 
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-5 overflow-y-auto flex-1">
-              {/* Info */}
-              <div className="bg-emerald-50 border border-emerald-200 rounded-md p-4">
-                <div className="flex items-start gap-3">
-                  <CheckCircle size={20} className="text-emerald-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-[13px] font-medium text-emerald-900">Todas las facturas están pagadas</p>
-                    <p className="text-xs text-emerald-700 mt-1">
-                      {invoices.length} factura{invoices.length !== 1 ? "s" : ""} · {formatCurrency(invoices.reduce((sum, inv) => sum + inv.totalAmount, 0))} total
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Paso 1: Descargar carta */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="w-6 h-6 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center">1</span>
-                  <p className="text-[13px] font-medium text-slate-900">Descargar carta de fin de proyecto</p>
-                </div>
-                <button
-                  onClick={() => { generateEndOfProjectLetter(); }}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-slate-200 rounded-md text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                >
-                  <Download size={16} />
-                  Descargar carta para firmar
-                </button>
-              </div>
-
-              {/* Paso 2: Notas */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="w-6 h-6 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center">2</span>
-                  <p className="text-[13px] font-medium text-slate-900">Añadir nota (opcional)</p>
-                </div>
-                <textarea
-                  value={closeProjectData.notes}
-                  onChange={(e) => setCloseProjectData({ ...closeProjectData, notes: e.target.value })}
-                  placeholder="Valoración del proveedor"
-                  rows={3}
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] resize-none focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
-                />
-              </div>
-
-              {/* Paso 3: Subir carta firmada */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="w-6 h-6 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center">3</span>
-                  <p className="text-[13px] font-medium text-slate-900">Subir carta firmada (opcional)</p>
-                </div>
-                
-                {!closeProjectData.signedLetterFile ? (
-                  <label className="w-full flex flex-col items-center justify-center gap-2 px-4 py-6 border-2 border-dashed border-slate-200 rounded-md cursor-pointer hover:border-slate-300 hover:bg-slate-50 transition-colors">
-                    <Upload size={24} className="text-slate-400" />
-                    <span className="text-[13px] text-slate-500">Arrastra o haz clic para subir</span>
-                    <span className="text-xs text-slate-400">PDF, JPG o PNG</span>
-                    <input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setCloseProjectData({ 
-                            ...closeProjectData, 
-                            signedLetterFile: file,
-                            signedLetterName: file.name 
-                          });
-                        }
-                      }}
-                    />
-                  </label>
-                ) : (
-                  <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border border-slate-200 rounded-md">
-                    <div className="flex items-center gap-3">
-                      <FileText size={18} className="text-slate-400" />
-                      <span className="text-[13px] text-slate-700">{closeProjectData.signedLetterFile.name}</span>
-                    </div>
-                    <button
-                      onClick={() => setCloseProjectData({ ...closeProjectData, signedLetterFile: null, signedLetterName: "" })}
-                      className="p-1 text-slate-400 hover:text-red-600 transition-colors"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-slate-100 flex gap-3 bg-slate-50 flex-shrink-0">
-              <button
-                onClick={() => setShowCloseModal(false)}
-                className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-white transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleCloseProject}
-                disabled={saving}
-                className="flex-1 px-4 py-1.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
-              >
-                {saving ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Lock size={16} />
-                )}
-                Cerrar relación
-              </button>
-            </div>
-          </div>
+          <Button variant="ghost" size="sm" onClick={handleReopenProject} disabled={saving}><RotateCcw size={13} /> Reabrir</Button>
         </div>
       )}
+
+      <div className="mt-6 grid items-start gap-8 text-[13px] xl:grid-cols-[minmax(0,1fr)_340px]">
+        {/* ── Documentos ─────────────────────────────────────────────────── */}
+        <section aria-label="Documentos" className="flex min-w-0 flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <Segmented
+              value={docTab}
+              onChange={setDocTab}
+              options={[
+                { value: "invoices", label: `Facturas · ${invoices.length}` },
+                { value: "pos", label: `POs · ${pos.length}` },
+              ]}
+            />
+            <SearchBar fields={DOC_FIELDS} field={docField} onField={setDocField} value={docSearch} onChange={setDocSearch} count={docTab === "invoices" ? invoiceRows.length : poRows.length} />
+          </div>
+
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            {(docTab === "invoices" ? invoiceRows : poRows).length === 0 ? (
+              <p className="px-4 py-12 text-center text-slate-500">{docSearch ? "Sin resultados" : docTab === "invoices" ? "Sin facturas" : "Sin órdenes de compra"}</p>
+            ) : (
+              <table className="w-full min-w-[640px] border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
+                    <th scope="col" className="px-4 py-2 text-left font-medium">Nº</th>
+                    <th scope="col" className="px-3 py-2 text-left font-medium">Concepto</th>
+                    <th scope="col" className="px-3 py-2 text-left font-medium">Fecha</th>
+                    <th scope="col" className="px-3 py-2 text-right font-medium">{docTab === "invoices" ? "Total" : "Base"}</th>
+                    <th scope="col" className="px-4 py-2 text-left font-medium">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {docTab === "invoices"
+                    ? invoiceRows.map((inv) => (
+                        <tr key={inv.id} className="border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA]">
+                          <td className="whitespace-nowrap px-4 py-1.5 font-mono text-xs font-medium">
+                            <Link href={`/project/${projectId}/accounting/invoices/${inv.id}`} className="hover:underline">{inv.number}</Link>
+                          </td>
+                          <td className="max-w-[360px] truncate px-3 py-1.5 text-slate-700">{inv.description || "—"}</td>
+                          <td className="whitespace-nowrap px-3 py-1.5 tabular-nums text-slate-500">{formatDate(inv.issueDate)}</td>
+                          <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs">{formatCurrency(inv.totalAmount)}</td>
+                          <td className="px-4 py-1.5"><Dot state={getInvoiceDisplayState(inv)} /></td>
+                        </tr>
+                      ))
+                    : poRows.map((po) => (
+                        <tr key={po.id} className="border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA]">
+                          <td className="whitespace-nowrap px-4 py-1.5 font-mono text-xs font-medium">
+                            <Link href={`/project/${projectId}/accounting/pos/${po.id}`} className="hover:underline">PO-{po.number}</Link>
+                          </td>
+                          <td className="max-w-[360px] truncate px-3 py-1.5 text-slate-700">{po.description || "—"}</td>
+                          <td className="whitespace-nowrap px-3 py-1.5 tabular-nums text-slate-500">{formatDate(po.createdAt)}</td>
+                          <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs">{formatCurrency(po.baseAmount)}</td>
+                          <td className="px-4 py-1.5"><Dot state={po.status} /></td>
+                        </tr>
+                      ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-slate-200 bg-[#F4F4F5] text-xs">
+                    <td className="px-4 py-2 font-semibold" colSpan={3}>Total base</td>
+                    <td className="px-3 py-2 text-right font-mono font-semibold">{formatCurrency(rowsBase)}</td>
+                    <td className="px-4 py-2 text-right">
+                      <Link href={`/project/${projectId}/accounting/${docTab === "invoices" ? "invoices" : "pos"}?supplier=${supplierId}`} className="text-slate-600 hover:text-slate-900">Abrir en {docTab === "invoices" ? "Facturas" : "POs"} →</Link>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            )}
+          </div>
+        </section>
+
+        {/* ── Ficha ──────────────────────────────────────────────────────── */}
+        <aside className="flex min-w-0 flex-col gap-6">
+          <section aria-labelledby="fiscal-title" className="flex flex-col gap-2">
+            <div className="flex items-baseline justify-between">
+              <h2 id="fiscal-title" className="text-xs font-medium text-slate-500">Datos fiscales</h2>
+              <button onClick={() => setEditingFiscal(true)} className="text-xs font-medium text-slate-900 hover:underline">Editar</button>
+            </div>
+            <dl className="rounded-lg border border-slate-200 px-3.5">
+              {[
+                ["Nombre comercial", supplier.commercialName || "—"],
+                ["País", COUNTRIES[supplier.country] || supplier.country || "—"],
+                ["Dirección", supplier.address?.street ? [[supplier.address.street, supplier.address.number].filter(Boolean).join(" "), [supplier.address.postalCode, supplier.address.city].filter(Boolean).join(" "), supplier.address.province].filter(Boolean).join(", ") : "—"],
+                ["Forma de pago", PAYMENT_METHODS[supplier.paymentMethod] || supplier.paymentMethod || "—"],
+              ].map(([k, v]) => (
+                <div key={k} className="grid grid-cols-[110px_1fr] gap-3 border-b border-slate-100 py-2">
+                  <dt className="text-slate-500">{k}</dt>
+                  <dd className="text-slate-900">{v}</dd>
+                </div>
+              ))}
+              <div className="grid grid-cols-[110px_1fr] gap-3 border-b border-slate-100 py-2">
+                <dt className="text-slate-500">IBAN</dt>
+                <dd className="flex items-center gap-1.5">
+                  {supplier.bankAccount ? (
+                    <>
+                      <span className="font-mono text-xs">{formatIBAN(supplier.bankAccount)}</span>
+                      <button onClick={() => copyToClipboard(supplier.bankAccount, "IBAN")} aria-label="Copiar IBAN" title="Copiar" className="text-slate-400 hover:text-slate-900"><Copy size={12} /></button>
+                    </>
+                  ) : "—"}
+                </dd>
+              </div>
+              <div className="grid grid-cols-[110px_1fr] gap-3 py-2">
+                <dt className="text-slate-500">BIC</dt>
+                <dd className="font-mono text-xs">{supplier.bic || "—"}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section aria-labelledby="contact-title" className="flex flex-col gap-2">
+            <h2 id="contact-title" className="text-xs font-medium text-slate-500">Contacto</h2>
+            <dl className="rounded-lg border border-slate-200 px-3.5">
+              <div className="grid grid-cols-[110px_1fr] gap-3 border-b border-slate-100 py-2">
+                <dt className="text-slate-500">Nombre</dt>
+                <dd>{supplier.contact?.name || "—"}</dd>
+              </div>
+              <div className="grid grid-cols-[110px_1fr] gap-3 border-b border-slate-100 py-2">
+                <dt className="text-slate-500">Email</dt>
+                <dd className="truncate">{supplier.contact?.email ? <a href={`mailto:${supplier.contact.email}`} className="hover:underline">{supplier.contact.email}</a> : "—"}</dd>
+              </div>
+              <div className="grid grid-cols-[110px_1fr] gap-3 py-2">
+                <dt className="text-slate-500">Teléfono</dt>
+                <dd>{supplier.contact?.phone ? <a href={`tel:${supplier.contact.phone}`} className="hover:underline">{supplier.contact.phone}</a> : "—"}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section aria-labelledby="certs-title" className="flex flex-col gap-2">
+            <h2 id="certs-title" className="text-xs font-medium text-slate-500">Certificados</h2>
+            <div className="rounded-lg border border-slate-200 px-3.5">
+              {certRow("bankOwnership", "Titularidad bancaria")}
+              {certRow("contractorsCertificate", "Contratistas (AEAT)")}
+            </div>
+          </section>
+
+          <p className="text-xs text-slate-500">Alta {formatDate(supplier.createdAt)}</p>
+        </aside>
+      </div>
+
+      {/* Edición de datos fiscales */}
+      <Modal
+        open={editingFiscal}
+        onClose={() => { setEditingFiscal(false); setEditForm({ ...editForm, address: supplier.address, paymentMethod: supplier.paymentMethod, bankAccount: supplier.bankAccount, bic: supplier.bic || "" }); }}
+        title="Datos fiscales"
+        width="max-w-lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setEditingFiscal(false); setEditForm({ ...editForm, address: supplier.address, paymentMethod: supplier.paymentMethod, bankAccount: supplier.bankAccount, bic: supplier.bic || "" }); }}>Cancelar</Button>
+            <Button variant="primary" onClick={handleSaveFiscal} disabled={saving}>Guardar</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-[1fr_90px] gap-3">
+            <Field label="Calle"><Input value={editForm.address.street} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, street: e.target.value } })} /></Field>
+            <Field label="Número"><Input value={editForm.address.number} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, number: e.target.value } })} /></Field>
+          </div>
+          <div className="grid grid-cols-[110px_1fr_1fr] gap-3">
+            <Field label="CP"><Input value={editForm.address.postalCode} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, postalCode: e.target.value } })} className="font-mono" /></Field>
+            <Field label="Ciudad"><Input value={editForm.address.city} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, city: e.target.value } })} /></Field>
+            <Field label="Provincia"><Input value={editForm.address.province} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, province: e.target.value } })} /></Field>
+          </div>
+          <Field label="Forma de pago">
+            <Select value={editForm.paymentMethod} onChange={(e) => setEditForm({ ...editForm, paymentMethod: e.target.value })}>
+              {Object.entries(PAYMENT_METHODS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </Select>
+          </Field>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-slate-600">IBAN y BIC</span>
+            <IBANField
+              iban={editForm.bankAccount}
+              bic={editForm.bic}
+              onIBANChange={(v) => setEditForm({ ...editForm, bankAccount: v })}
+              onBICChange={(v) => setEditForm({ ...editForm, bic: v })}
+              ibanClassName="h-8 w-full rounded-md border border-slate-200 px-2.5 font-mono text-[13px] focus:border-slate-900 focus:outline-none focus:ring-4 focus:ring-slate-900/10"
+              bicClassName="h-8 w-full rounded-md border border-slate-200 px-2.5 font-mono text-[13px] focus:border-slate-900 focus:outline-none focus:ring-4 focus:ring-slate-900/10"
+              ibanPlaceholder="20 dígitos o IBAN completo"
+              bicPlaceholder="BIC/SWIFT"
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* Cerrar relación con el proveedor */}
+      <Modal
+        open={showCloseModal}
+        onClose={() => setShowCloseModal(false)}
+        title="Cerrar relación"
+        width="max-w-lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowCloseModal(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={handleCloseProject} disabled={saving}><Lock size={14} /> Cerrar relación</Button>
+          </>
+        }
+      >
+        <ol className="flex flex-col gap-5 text-[13px]">
+          <li className="text-slate-600">
+            {invoices.length} {invoices.length === 1 ? "factura" : "facturas"} pagadas · <span className="font-mono text-slate-900">{formatCurrency(invoices.reduce((sum, inv) => sum + inv.totalAmount, 0))}</span>
+          </li>
+          <li className="flex flex-col gap-2">
+            <span className="text-xs font-medium text-slate-500"><span className="font-mono">01</span> Carta de fin de proyecto</span>
+            <Button variant="secondary" onClick={() => generateEndOfProjectLetter()}><Download size={14} /> Descargar para firmar</Button>
+          </li>
+          <li className="flex flex-col gap-2">
+            <span className="text-xs font-medium text-slate-500"><span className="font-mono">02</span> Nota (opcional)</span>
+            <Textarea value={closeProjectData.notes} onChange={(e) => setCloseProjectData({ ...closeProjectData, notes: e.target.value })} rows={3} />
+          </li>
+          <li className="flex flex-col gap-2">
+            <span className="text-xs font-medium text-slate-500"><span className="font-mono">03</span> Carta firmada (opcional)</span>
+            {!closeProjectData.signedLetterFile ? (
+              <label className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-dashed border-slate-300 px-4 py-5 text-center hover:bg-[#FAFAFA]">
+                <span className="text-[13px] text-slate-900">Elegir archivo</span>
+                <span className="text-xs text-slate-500">PDF, JPG o PNG</span>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setCloseProjectData({ ...closeProjectData, signedLetterFile: file, signedLetterName: file.name });
+                  }}
+                />
+              </label>
+            ) : (
+              <div className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2">
+                <span className="truncate">{closeProjectData.signedLetterFile.name}</span>
+                <button onClick={() => setCloseProjectData({ ...closeProjectData, signedLetterFile: null, signedLetterName: "" })} aria-label="Quitar archivo" className="text-slate-400 hover:text-slate-900"><X size={14} /></button>
+              </div>
+            )}
+          </li>
+        </ol>
+      </Modal>
 
       {/* Toast notifications */}
       {successMessage && (
@@ -1815,29 +1459,19 @@ export default function SupplierDetailPage() {
         </div>
       )}
 
-      {/* Confirm Dialog */}
-      {confirmDialog && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-[14px] font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
-            <p className="text-[13px] text-slate-600 mb-6">{confirmDialog.message}</p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmDialog(null)}
-                className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 font-medium text-[13px]"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmDialog.onConfirm}
-                className={`flex-1 px-4 py-1.5 rounded-md font-medium text-[13px] text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
-              >
-                {confirmDialog.confirmLabel || "Confirmar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <Modal
+        open={!!confirmDialog}
+        onClose={() => setConfirmDialog(null)}
+        title={confirmDialog?.title || ""}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirmDialog(null)}>Cancelar</Button>
+            <Button variant={confirmDialog?.danger ? "danger" : "primary"} onClick={() => confirmDialog?.onConfirm()}>{confirmDialog?.confirmLabel || "Confirmar"}</Button>
+          </>
+        }
+      >
+        <p className="text-[13px] text-slate-600">{confirmDialog?.message}</p>
+      </Modal>
+    </Page>
   );
 }

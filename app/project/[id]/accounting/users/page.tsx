@@ -6,6 +6,9 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { Button, Checkbox, EmptyState, Field, IconButton, Input, Menu, MenuItem, MenuSeparator, Modal, Page, PageHeader, PageLoading, Select, buttonClass } from "@/components/ds";
+import SearchBar, { type SearchField } from "@/components/SearchBar";
+import { matchWords } from "@/lib/search";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
@@ -42,6 +45,7 @@ import {
   UserPlus,
   Users,
   UserX,
+  MoreHorizontal,
   X,
 } from "lucide-react";
 
@@ -117,6 +121,9 @@ export default function AccountingUsersPage() {
   const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchField, setSearchField] = useState<"all" | "name" | "email" | "department">("all");
+  const [levelFilter, setLevelFilter] = useState("all");
+  const [groupFilter, setGroupFilter] = useState("all");
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showEditAccessModal, setShowEditAccessModal] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
@@ -395,510 +402,314 @@ export default function AccountingUsersPage() {
   }, {} as Record<string, Member[]>);
   const unassignedMembers = filteredMembers.filter(m => !PROJECT_ROLES.includes(m.role || "") && !m.department);
 
-  const getAccessLevelBadge = (level: string | undefined) => {
-    const accessLevel = ACCOUNTING_ACCESS_LEVELS[level as keyof typeof ACCOUNTING_ACCESS_LEVELS] || ACCOUNTING_ACCESS_LEVELS.user;
-    return <span className={`text-xs px-2 py-0.5 rounded-md font-medium whitespace-nowrap ${accessLevel.color}`}>{accessLevel.label}</span>;
+  // ── Búsqueda avanzada y filtros ───────────────────────────────────────────
+  type UserField = "all" | "name" | "email" | "department";
+  const USER_FIELDS: SearchField<UserField>[] = [
+    { value: "all", label: "Buscar en todo", placeholder: "Nombre, email, rol o departamento" },
+    { value: "name", label: "Nombre", placeholder: "Ej. Marta" },
+    { value: "email", label: "Email", placeholder: "Ej. @productora.com" },
+    { value: "department", label: "Departamento", placeholder: "Ej. Arte" },
+  ];
+  const userMatches = (m: Member) => {
+    if (!searchTerm.trim()) return true;
+    if (searchField === "name") return matchWords(searchTerm, m.name);
+    if (searchField === "email") return matchWords(searchTerm, m.email);
+    if (searchField === "department") return matchWords(searchTerm, m.department);
+    return matchWords(searchTerm, m.name, m.email, m.role, m.department, m.position);
   };
-
-  const getAccessLevelDot = (level: string | undefined) => {
-    const accessLevel = ACCOUNTING_ACCESS_LEVELS[level as keyof typeof ACCOUNTING_ACCESS_LEVELS] || ACCOUNTING_ACCESS_LEVELS.user;
-    return <span className={`w-2 h-2 rounded-full ${accessLevel.dot}`}></span>;
+  const groupOf = (m: Member) => (PROJECT_ROLES.includes(m.role || "") ? "Equipo de proyecto" : m.department || "Sin departamento");
+  const groupOrder = (g: string) => (g === "Equipo de proyecto" ? "0" : g === "Sin departamento" ? "2" : "1" + g);
+  const tableRows = accountingMembers
+    .filter(userMatches)
+    .filter((m) => levelFilter === "all" || (m.accountingAccessLevel || "user") === levelFilter)
+    .filter((m) => groupFilter === "all" || groupOf(m) === groupFilter)
+    .sort((a, b) => groupOrder(groupOf(a)).localeCompare(groupOrder(groupOf(b))) || (a.name || a.email).localeCompare(b.name || b.email));
+  const groups = Array.from(new Set(accountingMembers.map(groupOf))).sort((a, b) => groupOrder(a).localeCompare(groupOrder(b)));
+  const filtersActive = levelFilter !== "all" || groupFilter !== "all";
+  const LevelDot = ({ level }: { level?: string }) => {
+    const l = ACCOUNTING_ACCESS_LEVELS[(level || "user") as keyof typeof ACCOUNTING_ACCESS_LEVELS] || ACCOUNTING_ACCESS_LEVELS.user;
+    return (
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-slate-700">
+        <span className={`h-1.5 w-1.5 rounded-full ${l.dot}`} />
+        {l.label}
+      </span>
+    );
   };
+  const canManage = (m: Member) => (m.userId !== userId ? isProjectRole : isAccountingExtended);
 
-  if (loading) { return (<div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}><div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" /></div>); }
-  if (errorMessage && !hasAccountingAccess) { return (<div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}><div className="text-center max-w-md"><AlertCircle size={48} className="mx-auto text-red-500 mb-4" /><p className="text-slate-700 mb-4">{errorMessage}</p><Link href="/dashboard" className="text-slate-900 hover:underline font-medium">Volver al panel principal</Link></div></div>); }
-
-  return (
-    <div className={`min-h-screen bg-white ${inter.className}`}>
-      {/* Header */}
-      <div className="mt-[53px]">
-        <div className="px-6 pt-8 sm:px-10">
-          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Usuarios</h1>
-            </div>
-            <button onClick={() => setShowInviteModal(true)} className="absolute right-0 flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity">
-              <UserPlus size={16} strokeWidth={2.5} />Dar acceso
-            </button>
-          </div>
+  if (loading) return <PageLoading />;
+  if (errorMessage && !hasAccountingAccess) {
+    return (
+      <div className={`flex min-h-screen items-center justify-center bg-white px-6 ${inter.className}`}>
+        <div className="text-center">
+          <p className="text-[15px] font-semibold text-slate-900">Sin acceso</p>
+          <p className="mt-1 text-[13px] text-slate-500">{errorMessage}</p>
+          <Link href="/dashboard" className={`${buttonClass("primary")} mt-5`}>Volver a proyectos</Link>
         </div>
       </div>
+    );
+  }
 
-      <main className="px-6 sm:px-10 py-6">
-        {/* Pending Invitations */}
-        {pendingInvitations.length > 0 && (
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-md">
-            <div className="flex items-center gap-2 mb-3"><Clock size={16} className="text-amber-600" /><h3 className="text-[13px] font-semibold text-amber-900">Invitaciones pendientes ({pendingInvitations.length})</h3></div>
-            <div className="space-y-2">
-              {pendingInvitations.map((inv) => (
-                <div key={inv.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-amber-200">
-                  <div className="flex-1">
-                    <p className="text-[13px] font-medium text-slate-900">{inv.invitedName}</p>
-                    <p className="text-xs text-slate-500">{inv.invitedEmail}</p>
-                    <div className="flex items-center gap-2 mt-1">{getAccessLevelBadge(inv.accountingAccessLevel)}</div>
-                  </div>
-                  <button onClick={() => handleCancelInvitation(inv.id)} className="ml-3 px-3 py-1.5 text-amber-700 hover:bg-amber-100 rounded-lg text-xs font-medium">Cancelar</button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+  // Modal de nivel de acceso
+  const editModal = (() => {
+    if (!editingMember) return null;
+    const isSelf = editingMember.userId === userId;
+    const selectedLevel = editingMember.accountingAccessLevel || "user";
+    const isDowngrade = isSelf && ACCESS_LEVEL_RANK[selectedLevel] < ACCESS_LEVEL_RANK[currentUserAccessLevel];
+    const currentPerms = ACCOUNTING_ACCESS_LEVELS[currentUserAccessLevel as keyof typeof ACCOUNTING_ACCESS_LEVELS]?.permissions || {};
+    const newPerms = ACCOUNTING_ACCESS_LEVELS[selectedLevel as keyof typeof ACCOUNTING_ACCESS_LEVELS]?.permissions || {};
+    const lostModules = [
+      !newPerms.suppliers && currentPerms.suppliers ? "Proveedores" : null,
+      !newPerms.budget && currentPerms.budget ? "Presupuesto" : null,
+      !newPerms.users && currentPerms.users ? "Gestión de usuarios" : null,
+      !newPerms.reports && currentPerms.reports ? "Informes" : null,
+    ].filter(Boolean) as string[];
+    return { isSelf, isDowngrade, lostModules };
+  })();
+  const closeEdit = () => { setShowEditAccessModal(false); setEditingMember(null); };
+  const closeInvite = () => { setShowInviteModal(false); resetForm(); };
 
-        {/* Search */}
-        <div className="flex flex-row gap-3 items-center mb-4">
-          <div className="flex-1 relative">
-            <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-            <input type="text" placeholder="Buscar usuarios" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]" />
-          </div>
-          {searchTerm && (
-            <button onClick={() => setSearchTerm("")} className="px-3 py-1.5 border border-slate-200 rounded-md text-xs text-slate-600 hover:bg-slate-50 flex items-center gap-1.5 font-medium">
-              <X size={14} />Limpiar
-            </button>
-          )}
-        </div>
-
-        {/* Members Display */}
-        {filteredMembers.length === 0 ? (
-          <div className="border-2 border-dashed border-slate-200 rounded-lg p-12 text-center">
-            <UserCog size={32} className="text-slate-300 mx-auto mb-3" />
-            <h3 className="text-lg font-semibold text-slate-900 mb-1">{searchTerm ? "No se encontraron usuarios" : "No hay usuarios con acceso"}</h3>
-            {searchTerm && <p className="text-slate-500 text-[13px]">Intenta ajustar la búsqueda</p>}
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {/* Project Roles */}
-            {projectRoleMembers.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <h2 className="text-[13px] font-semibold text-slate-900">Equipo de proyecto</h2>
-                  <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{projectRoleMembers.length}</span>
-                </div>
-                <div className="grid grid-cols-4 gap-3">
-                  {projectRoleMembers.map((member) => (
-                    <div key={member.userId} className="bg-white border border-slate-200 rounded-md p-4 hover:border-slate-300 transition-all group">
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-full border border-[#E4E4E7] bg-[#F1F1F3] text-slate-700 flex items-center justify-center text-[13px] font-semibold flex-shrink-0">
-                          {member.name?.[0]?.toUpperCase() || member.email?.[0]?.toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-[13px] font-semibold text-slate-900 truncate">{member.name || member.email}</p>
-                            <span className="text-xs font-medium px-2 py-0.5 rounded border border-slate-200 bg-[#F7F7F8] text-slate-700">{member.role}</span>
-                          </div>
-                          {member.email && member.name && <p className="text-xs text-slate-500 truncate">{member.email}</p>}
-                          <div className="flex items-center gap-2 mt-2">
-                            {getAccessLevelDot(member.accountingAccessLevel)}
-                            {getAccessLevelBadge(member.accountingAccessLevel)}
-                            {member.boxAccess && (
-                              <span className="flex items-center gap-1 text-[10px] font-medium bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
-                                <Package size={10} />BOX
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      {(member.userId !== userId ? isProjectRole : isAccountingExtended) && (
-                        <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => { setEditingMember(member); setShowEditAccessModal(true); }} className="flex-1 flex items-center justify-center gap-1 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50 py-1.5 rounded-lg"><Edit size={12} />{member.userId === userId ? "Mis permisos" : "Cambiar"}</button>
-                          {member.userId !== userId && isProjectRole && (
-                            <button onClick={() => handleRemoveAccountingAccess(member)} disabled={saving} className="flex-1 flex items-center justify-center gap-1 text-xs text-red-600 hover:bg-red-50 py-1.5 rounded-lg disabled:opacity-50"><Trash2 size={12} />Quitar</button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Department Groups */}
-            {Object.entries(departmentGroups).map(([deptName, deptMembers]) => (
-              <div key={deptName}>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="hidden"><Briefcase size={16} className="text-slate-600" /></div>
-                  <h2 className="text-[13px] font-semibold text-slate-900">{deptName}</h2>
-                  <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{deptMembers.length}</span>
-                </div>
-                <div className="grid grid-cols-4 gap-3">
-                  {deptMembers.map((member) => (
-                    <div key={member.userId} className="bg-white border border-slate-200 rounded-md p-4 hover:border-slate-300 transition-all group">
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-[13px] font-semibold flex-shrink-0">
-                          {member.name?.[0]?.toUpperCase() || member.email?.[0]?.toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-semibold text-slate-900 truncate">{member.name || member.email}</p>
-                          {member.position && <p className="text-xs text-slate-600">{member.position}</p>}
-                          {member.email && member.name && <p className="text-xs text-slate-500 truncate">{member.email}</p>}
-                          <div className="flex items-center gap-2 mt-2">
-                            {getAccessLevelDot(member.accountingAccessLevel)}
-                            {getAccessLevelBadge(member.accountingAccessLevel)}
-                            {member.boxAccess && (
-                              <span className="flex items-center gap-1 text-[10px] font-medium bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
-                                <Package size={10} />BOX
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      {(member.userId !== userId ? isProjectRole : isAccountingExtended) && (
-                        <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => { setEditingMember(member); setShowEditAccessModal(true); }} className="flex-1 flex items-center justify-center gap-1 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50 py-1.5 rounded-lg"><Edit size={12} />{member.userId === userId ? "Mis permisos" : "Cambiar"}</button>
-                          {member.userId !== userId && isProjectRole && (
-                            <button onClick={() => handleRemoveAccountingAccess(member)} disabled={saving} className="flex-1 flex items-center justify-center gap-1 text-xs text-red-600 hover:bg-red-50 py-1.5 rounded-lg disabled:opacity-50"><Trash2 size={12} />Quitar</button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-
-            {/* Unassigned */}
-            {unassignedMembers.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="hidden"><Users size={16} className="text-slate-500" /></div>
-                  <h2 className="text-[13px] font-semibold text-slate-900">Sin asignar</h2>
-                  <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{unassignedMembers.length}</span>
-                </div>
-                <div className="grid grid-cols-4 gap-3">
-                  {unassignedMembers.map((member) => (
-                    <div key={member.userId} className="bg-white border border-slate-200 rounded-md p-4 hover:border-slate-300 transition-all group">
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-[13px] font-semibold flex-shrink-0">
-                          {member.name?.[0]?.toUpperCase() || member.email?.[0]?.toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-semibold text-slate-900 truncate">{member.name || member.email}</p>
-                          {member.email && member.name && <p className="text-xs text-slate-500 truncate">{member.email}</p>}
-                          <div className="flex items-center gap-2 mt-2">
-                            {getAccessLevelDot(member.accountingAccessLevel)}
-                            {getAccessLevelBadge(member.accountingAccessLevel)}
-                            {member.boxAccess && (
-                              <span className="flex items-center gap-1 text-[10px] font-medium bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
-                                <Package size={10} />BOX
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      {(member.userId !== userId ? isProjectRole : isAccountingExtended) && (
-                        <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => { setEditingMember(member); setShowEditAccessModal(true); }} className="flex-1 flex items-center justify-center gap-1 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50 py-1.5 rounded-lg"><Edit size={12} />{member.userId === userId ? "Mis permisos" : "Cambiar"}</button>
-                          {member.userId !== userId && isProjectRole && (
-                            <button onClick={() => handleRemoveAccountingAccess(member)} disabled={saving} className="flex-1 flex items-center justify-center gap-1 text-xs text-red-600 hover:bg-red-50 py-1.5 rounded-lg disabled:opacity-50"><Trash2 size={12} />Quitar</button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </main>
-
-      {/* Edit Access Modal */}
-      {showEditAccessModal && editingMember && (() => {
-        const isSelf = editingMember.userId === userId;
-        const selectedLevel = editingMember.accountingAccessLevel || "user";
-        const isDowngrade = isSelf && ACCESS_LEVEL_RANK[selectedLevel] < ACCESS_LEVEL_RANK[currentUserAccessLevel];
-
-        // Calcula qué módulos se perderían al bajar de nivel
-        const currentPerms = ACCOUNTING_ACCESS_LEVELS[currentUserAccessLevel as keyof typeof ACCOUNTING_ACCESS_LEVELS]?.permissions || {};
-        const newPerms = ACCOUNTING_ACCESS_LEVELS[selectedLevel as keyof typeof ACCOUNTING_ACCESS_LEVELS]?.permissions || {};
-        const lostModules = [
-          !newPerms.suppliers && currentPerms.suppliers ? "Proveedores" : null,
-          !newPerms.budget && currentPerms.budget ? "Presupuesto" : null,
-          !newPerms.users && currentPerms.users ? "Gestión de usuarios" : null,
-          !newPerms.reports && currentPerms.reports ? "Informes" : null,
-        ].filter(Boolean);
-
+  const LevelOptions = ({ value, onChange, isDisabled }: { value: string; onChange: (v: string) => void; isDisabled?: (key: string) => boolean }) => (
+    <div className="flex flex-col overflow-hidden rounded-md border border-slate-200">
+      {Object.entries(ACCOUNTING_ACCESS_LEVELS).map(([key, l]) => {
+        const disabled = isDisabled?.(key) || false;
         return (
-          <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowEditAccessModal(false); setEditingMember(null); }}>
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-              <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-                <h3 className="text-[14px] font-semibold text-slate-900">
-                  {isSelf ? "Mis permisos de contabilidad" : "Cambiar nivel de acceso"}
-                </h3>
-                <button onClick={() => { setShowEditAccessModal(false); setEditingMember(null); }} className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
-              </div>
-              <div className="p-6">
-                <div className="mb-6">
-                  <p className="text-[13px] text-slate-500 mb-1">{isSelf ? "Tu cuenta" : "Usuario"}</p>
-                  <p className="text-base font-semibold text-slate-900">{editingMember.name}</p>
-                  <p className="text-xs text-slate-500">{editingMember.email}</p>
-                </div>
-
-                <div className="space-y-3 mb-4">
-                  <p className="text-[13px] font-medium text-slate-700">Nivel de acceso</p>
-                  {Object.entries(ACCOUNTING_ACCESS_LEVELS).map(([key, value]) => {
-                    const isDisabled = isSelf && ACCESS_LEVEL_RANK[key] > ACCESS_LEVEL_RANK[currentUserAccessLevel];
-                    return (
-                      <label
-                        key={key}
-                        className={`flex items-start gap-3 p-4 border rounded-md transition-all ${isDisabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}
-                          ${editingMember.accountingAccessLevel === key ? "border-slate-900 bg-slate-50" : "border-slate-200 hover:border-slate-300"}
-                        `}
-                      >
-                        <input
-                          type="radio"
-                          name="accessLevel"
-                          value={key}
-                          checked={editingMember.accountingAccessLevel === key}
-                          disabled={isDisabled}
-                          onChange={(e) => !isDisabled && setEditingMember({ ...editingMember, accountingAccessLevel: e.target.value as any })}
-                          className="mt-1 text-[13px]"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="text-[13px] font-semibold text-slate-900">{value.label}</p>
-                            {isSelf && key === currentUserAccessLevel && (
-                              <span className="text-[10px] font-medium px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">nivel actual</span>
-                            )}
-                            {isDisabled && (
-                              <span className="text-[10px] font-medium px-1.5 py-0.5 bg-slate-100 text-slate-400 rounded">no disponible</span>
-                            )}
-                          </div>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-
-                <div className="mb-4">
-                  <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-md cursor-pointer hover:border-slate-300 transition-all">
-                    <input
-                      type="checkbox"
-                      checked={editingMember.boxAccess || false}
-                      onChange={(e) => setEditingMember({ ...editingMember, boxAccess: e.target.checked })}
-                      className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 text-[13px]"
-                    />
-                    <div className="flex-1">
-                      <p className="text-[13px] font-semibold text-slate-900">Acceso a BOX</p>
-                    </div>
-                  </label>
-                </div>
-
-                {/* Aviso de degradación — solo visible cuando el usuario baja su propio nivel */}
-                {isDowngrade && lostModules.length > 0 && (
-                  <div className="mb-5 p-4 bg-amber-50 border border-amber-300 rounded-md flex gap-3">
-                    <AlertCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-[13px] font-semibold text-amber-900">Perderás acceso a estos módulos</p>
-                      <ul className="mt-1 space-y-0.5">
-                        {lostModules.map((m) => (
-                          <li key={m} className="text-xs text-amber-800 flex items-center gap-1.5">
-                            <span className="w-1 h-1 rounded-full bg-amber-500 inline-block" />
-                            {m}
-                          </li>
-                        ))}
-                      </ul>
-                      <p className="text-xs text-amber-700 mt-2">Este cambio es inmediato. Necesitarás que otro usuario con permisos amplíe tu acceso de nuevo.</p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => { setShowEditAccessModal(false); setEditingMember(null); }}
-                    className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 font-medium text-[13px]"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleUpdateAccessLevel}
-                    disabled={saving}
-                    className={`flex-1 px-4 py-1.5 rounded-md font-medium disabled:opacity-50 text-white ${isDowngrade ? "bg-amber-600 hover:bg-amber-700" : "bg-slate-900 hover:bg-slate-800"} text-[13px]`}
-                  >
-                    {saving ? "Guardando..." : isDowngrade ? "Confirmar y bajar acceso" : "Guardar"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <label key={key} className={`flex items-start gap-2.5 border-b border-slate-100 px-3 py-2 last:border-0 ${disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:bg-[#FAFAFA]"} ${value === key ? "bg-[#F7F7F8]" : ""}`}>
+            <input type="radio" checked={value === key} disabled={disabled} onChange={() => !disabled && onChange(key)} className="mt-0.5 accent-slate-900" />
+            <span className="flex flex-col">
+              <span className="text-[13px] text-slate-900">{l.label}</span>
+              <span className="text-[11px] text-slate-500">{l.description}</span>
+            </span>
+          </label>
         );
-      })()}
+      })}
+    </div>
+  );
 
-      {/* Invite Modal */}
-      {showInviteModal && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => { setShowInviteModal(false); resetForm(); }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-              <h3 className="text-[14px] font-semibold text-slate-900">Dar acceso a contabilidad</h3>
-              <button onClick={() => { setShowInviteModal(false); resetForm(); }} className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
-            </div>
-            <div className="p-6 overflow-y-auto flex-1">
-              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
-                <div className="flex gap-2"><Info size={18} className="text-blue-600 flex-shrink-0 mt-0.5" /><p className="text-[13px] text-blue-700">Selecciona el nivel de acceso que tendrá el usuario.</p></div>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Email del usuario</label>
-                  <input type="email" value={inviteForm.email} onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })} placeholder="usuario@ejemplo.com" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-slate-50 text-[13px]" />
-                  {userExists === true && foundUser && (<div className="mt-2 p-3 bg-emerald-50 border border-emerald-200 rounded-md flex items-start gap-2"><UserCheck size={18} className="text-emerald-600 mt-0.5" /><div><p className="text-[13px] font-medium text-emerald-900">Usuario registrado</p><p className="text-xs text-emerald-700">{foundUser.name}</p></div></div>)}
-                  {userExists === false && inviteForm.email.length > 3 && (<div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-md flex items-start gap-2"><UserX size={18} className="text-amber-600 mt-0.5" /><div><p className="text-[13px] font-medium text-amber-900">Usuario no registrado</p><p className="text-xs text-amber-700">Se enviará invitación</p></div></div>)}
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Nombre</label>
-                  <input type="text" value={inviteForm.name} onChange={(e) => setInviteForm({ ...inviteForm, name: e.target.value })} placeholder="Nombre completo" disabled={userExists === true} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-slate-50 disabled:bg-slate-100 text-[13px]" />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Nivel de acceso</label>
-                  <div className="space-y-2">
-                    {Object.entries(ACCOUNTING_ACCESS_LEVELS).map(([key, value]) => (
-                      <label key={key} className={`flex items-start gap-3 p-3 border rounded-md cursor-pointer transition-all ${inviteForm.accountingAccessLevel === key ? "border-slate-900 bg-slate-50" : "border-slate-200 hover:border-slate-300"}`}>
-                        <input type="radio" name="accountingAccessLevel" value={key} checked={inviteForm.accountingAccessLevel === key} onChange={(e) => setInviteForm({ ...inviteForm, accountingAccessLevel: e.target.value as any })} className="mt-1 text-[13px]" />
-                        <div className="flex-1">
-                          <p className="text-[13px] font-semibold text-slate-900">{value.label}</p>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-md cursor-pointer hover:border-slate-300 transition-all">
-                    <input
-                      type="checkbox"
-                      checked={inviteForm.boxAccess}
-                      onChange={(e) => setInviteForm({ ...inviteForm, boxAccess: e.target.checked })}
-                      className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 text-[13px]"
-                    />
-                    <div className="flex-1">
-                      <p className="text-[13px] font-semibold text-slate-900">Acceso a BOX</p>
-                    </div>
-                  </label>
-                </div>
-                <div ref={roleTypeDropdownRef} className="relative">
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Tipo de rol</label>
-                  <button
-                    type="button"
-                    onClick={() => openInviteDropdown(roleTypeDropdownRef, setShowRoleTypeDropdown, showRoleTypeDropdown)}
-                    className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between bg-slate-50 hover:border-slate-300 transition-colors text-[13px]"
-                  >
-                    <span className="text-slate-900">{inviteForm.roleType === "project" ? "Rol de proyecto" : "Rol de departamento"}</span>
-                    <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showRoleTypeDropdown ? "rotate-180" : "")} />
-                  </button>
-                  {showRoleTypeDropdown && inviteDropdownPos && (
-                    <div className="fixed z-20 bg-white border border-slate-200 rounded-md shadow-lg py-1"
-                      style={{ top: inviteDropdownPos.top, left: inviteDropdownPos.left, width: inviteDropdownPos.width }}>
-                      <button type="button" onClick={() => { setInviteForm({ ...inviteForm, roleType: "project" }); setShowRoleTypeDropdown(false); }} className={"w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 " + (inviteForm.roleType === "project" ? "bg-slate-50 font-medium" : "")}>Rol de proyecto</button>
-                      <button type="button" onClick={() => { setInviteForm({ ...inviteForm, roleType: "department" }); setShowRoleTypeDropdown(false); }} className={"w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 " + (inviteForm.roleType === "department" ? "bg-slate-50 font-medium" : "")}>Rol de departamento</button>
-                    </div>
-                  )}
-                </div>
-                {inviteForm.roleType === "project" ? (
-                  <div ref={roleDropdownRef} className="relative">
-                    <label className="mb-1.5 block text-xs font-medium text-slate-600">Rol de proyecto</label>
-                    <button
-                      type="button"
-                      onClick={() => openInviteDropdown(roleDropdownRef, setShowRoleDropdown, showRoleDropdown)}
-                      className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between bg-slate-50 hover:border-slate-300 transition-colors text-[13px]"
-                    >
-                      <span className={inviteForm.role ? "text-slate-900" : "text-slate-400"}>{inviteForm.role || "Seleccionar"}</span>
-                      <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showRoleDropdown ? "rotate-180" : "")} />
-                    </button>
-                    {showRoleDropdown && inviteDropdownPos && (
-                      <div className="fixed z-20 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto"
-                        style={{ top: inviteDropdownPos.top, left: inviteDropdownPos.left, width: inviteDropdownPos.width }}>
-                        {PROJECT_ROLES.map((role) => (
-                          <button key={role} type="button" onClick={() => { setInviteForm({ ...inviteForm, role }); setShowRoleDropdown(false); }} className={"w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 " + (inviteForm.role === role ? "bg-slate-50 font-medium" : "")}>{role}</button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    <div ref={departmentDropdownRef} className="relative">
-                      <label className="mb-1.5 block text-xs font-medium text-slate-600">Departamento</label>
-                      <button
-                        type="button"
-                        onClick={() => openInviteDropdown(departmentDropdownRef, setShowDepartmentDropdown, showDepartmentDropdown)}
-                        className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between bg-slate-50 hover:border-slate-300 transition-colors text-[13px]"
-                      >
-                        <span className={inviteForm.department ? "text-slate-900" : "text-slate-400"}>{inviteForm.department || "Seleccionar"}</span>
-                        <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showDepartmentDropdown ? "rotate-180" : "")} />
-                      </button>
-                      {showDepartmentDropdown && inviteDropdownPos && (
-                        <div className="fixed z-20 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto"
-                          style={{ top: inviteDropdownPos.top, left: inviteDropdownPos.left, width: inviteDropdownPos.width }}>
-                          {departments.map((dept) => (
-                            <button key={dept.name} type="button" onClick={() => { setInviteForm({ ...inviteForm, department: dept.name }); setShowDepartmentDropdown(false); }} className={"w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 " + (inviteForm.department === dept.name ? "bg-slate-50 font-medium" : "")}>{dept.name}</button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div ref={positionDropdownRef} className="relative">
-                      <label className="mb-1.5 block text-xs font-medium text-slate-600">Posición</label>
-                      <button
-                        type="button"
-                        onClick={() => openInviteDropdown(positionDropdownRef, setShowPositionDropdown, showPositionDropdown)}
-                        className="w-full px-4 py-1.5 border border-slate-200 rounded-md text-left flex items-center justify-between bg-slate-50 hover:border-slate-300 transition-colors text-[13px]"
-                      >
-                        <span className={inviteForm.position ? "text-slate-900" : "text-slate-400"}>{inviteForm.position || "Seleccionar"}</span>
-                        <ChevronDown size={16} className={"text-slate-400 transition-transform " + (showPositionDropdown ? "rotate-180" : "")} />
-                      </button>
-                      {showPositionDropdown && inviteDropdownPos && (
-                        <div className="fixed z-20 bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto"
-                          style={{ top: inviteDropdownPos.top, left: inviteDropdownPos.left, width: inviteDropdownPos.width }}>
-                          {DEPARTMENT_POSITIONS.map((pos) => (
-                            <button key={pos} type="button" onClick={() => { setInviteForm({ ...inviteForm, position: pos }); setShowPositionDropdown(false); }} className={"w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 " + (inviteForm.position === pos ? "bg-slate-50 font-medium" : "")}>{pos}</button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-                <button onClick={handleSendInvitation} disabled={saving} className="w-full mt-4 px-4 py-1.5 rounded-md font-medium disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] text-[13px]">{saving ? "Enviando..." : "Dar acceso a contabilidad"}</button>
-              </div>
-            </div>
+  return (
+    <Page>
+      <PageHeader
+        title={<>Usuarios <span className="text-[15px] font-normal text-slate-400">{accountingMembers.length}</span></>}
+        actions={<Button variant="primary" onClick={() => setShowInviteModal(true)}><UserPlus size={14} /> Dar acceso</Button>}
+      />
+
+      {pendingInvitations.length > 0 && (
+        <section aria-labelledby="inv-title" className="mt-6 flex flex-col gap-2">
+          <h2 id="inv-title" className="text-xs font-medium text-slate-500">Invitaciones pendientes · {pendingInvitations.length}</h2>
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full min-w-[640px] border-collapse text-[13px]">
+              <tbody>
+                {pendingInvitations.map((inv) => (
+                  <tr key={inv.id} className="border-b border-slate-100 last:border-0">
+                    <td className="px-4 py-1.5">
+                      <span className="block">{inv.invitedName}</span>
+                      <span className="block text-xs text-slate-500">{inv.invitedEmail}</span>
+                    </td>
+                    <td className="px-3 py-1.5 text-slate-600">{inv.roleType === "project" ? inv.role : [inv.department, inv.position].filter(Boolean).join(" · ")}</td>
+                    <td className="px-3 py-1.5"><LevelDot level={inv.accountingAccessLevel} /></td>
+                    <td className="px-4 py-1.5 text-right"><Button variant="ghost" size="sm" onClick={() => handleCancelInvitation(inv.id)}>Cancelar invitación</Button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Toast notifications */}
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <SearchBar fields={USER_FIELDS} field={searchField} onField={setSearchField} value={searchTerm} onChange={setSearchTerm} count={tableRows.length} />
+        <div className="w-48">
+          <Select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)}>
+            <option value="all">Cualquier nivel</option>
+            {Object.entries(ACCOUNTING_ACCESS_LEVELS).map(([k, l]) => <option key={k} value={k}>{l.label}</option>)}
+          </Select>
+        </div>
+        <div className="w-48">
+          <Select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)}>
+            <option value="all">Todos los grupos</option>
+            {groups.map((g) => <option key={g} value={g}>{g}</option>)}
+          </Select>
+        </div>
+        {filtersActive && <Button variant="ghost" size="sm" onClick={() => { setLevelFilter("all"); setGroupFilter("all"); }}>Quitar filtros</Button>}
+      </div>
+
+      <div className="mt-4">
+        {tableRows.length === 0 ? (
+          <EmptyState title={searchTerm || filtersActive ? "Sin resultados" : "Nadie tiene acceso a contabilidad"} />
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full min-w-[860px] border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
+                  <th scope="col" className="px-4 py-2 text-left font-medium">Usuario</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Grupo</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Rol o posición</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Nivel de acceso</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Cajas</th>
+                  <th scope="col" className="w-12 py-2 pr-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {tableRows.map((m) => (
+                  <tr key={m.userId} className="border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA]">
+                    <td className="max-w-[320px] px-4 py-1.5">
+                      <span className="block truncate font-medium text-slate-900">
+                        {m.name || m.email}
+                        {m.userId === userId && <span className="ml-1.5 text-xs font-normal text-slate-500">(tú)</span>}
+                      </span>
+                      {m.name && <span className="block truncate text-xs text-slate-500">{m.email}</span>}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-1.5 text-slate-600">{groupOf(m)}</td>
+                    <td className="whitespace-nowrap px-3 py-1.5">{PROJECT_ROLES.includes(m.role || "") ? <span className="font-mono text-xs">{m.role}</span> : m.position || "—"}</td>
+                    <td className="px-3 py-1.5"><LevelDot level={m.accountingAccessLevel} /></td>
+                    <td className="px-3 py-1.5 text-slate-600">{m.boxAccess ? "Sí" : "—"}</td>
+                    <td className="py-1.5 pr-3 text-right">
+                      {canManage(m) && (
+                        <Menu trigger={(toggle) => <IconButton label="Acciones del usuario" onClick={toggle} className="-my-1"><MoreHorizontal size={15} /></IconButton>}>
+                          {(close) => (
+                            <>
+                              <MenuItem onClick={() => { close(); setEditingMember(m); setShowEditAccessModal(true); }}>{m.userId === userId ? "Mis permisos" : "Cambiar nivel de acceso"}</MenuItem>
+                              {m.userId !== userId && isProjectRole && (
+                                <>
+                                  <MenuSeparator />
+                                  <MenuItem danger onClick={() => { close(); handleRemoveAccountingAccess(m); }}>Quitar acceso</MenuItem>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </Menu>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Nivel de acceso */}
+      <Modal
+        open={showEditAccessModal && !!editingMember}
+        onClose={closeEdit}
+        title={editModal?.isSelf ? "Mis permisos de contabilidad" : "Nivel de acceso"}
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeEdit}>Cancelar</Button>
+            <Button variant={editModal?.isDowngrade ? "danger" : "primary"} onClick={handleUpdateAccessLevel} disabled={saving}>
+              {editModal?.isDowngrade ? "Bajar mi acceso" : "Guardar"}
+            </Button>
+          </>
+        }
+      >
+        {editingMember && editModal && (
+          <div className="flex flex-col gap-4">
+            <p className="text-[13px] text-slate-900">
+              {editingMember.name} <span className="text-slate-500">· {editingMember.email}</span>
+            </p>
+            <LevelOptions
+              value={editingMember.accountingAccessLevel || "user"}
+              onChange={(v) => setEditingMember({ ...editingMember, accountingAccessLevel: v as any })}
+              isDisabled={(key) => editModal.isSelf && ACCESS_LEVEL_RANK[key] > ACCESS_LEVEL_RANK[currentUserAccessLevel]}
+            />
+            <Checkbox label="Acceso a cajas (BOX)" checked={editingMember.boxAccess || false} onChange={(v) => setEditingMember({ ...editingMember, boxAccess: v })} />
+            {editModal.isDowngrade && editModal.lostModules.length > 0 && (
+              <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                Perderás acceso a {editModal.lostModules.join(", ")}. El cambio es inmediato y otra persona con permisos tendrá que devolvértelo.
+              </p>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      {/* Dar acceso */}
+      <Modal
+        open={showInviteModal}
+        onClose={closeInvite}
+        title="Dar acceso a contabilidad"
+        width="max-w-lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeInvite}>Cancelar</Button>
+            <Button variant="primary" onClick={handleSendInvitation} disabled={saving}>Dar acceso</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <Field label="Email">
+            <Input type="email" value={inviteForm.email} onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })} autoFocus />
+          </Field>
+          {userExists === true && foundUser && <p className="-mt-2 text-xs text-emerald-800">Usuario registrado: {foundUser.name}</p>}
+          {userExists === false && inviteForm.email.length > 3 && <p className="-mt-2 text-xs text-slate-500">No está registrado; recibirá una invitación.</p>}
+          <Field label="Nombre">
+            <Input value={inviteForm.name} onChange={(e) => setInviteForm({ ...inviteForm, name: e.target.value })} disabled={userExists === true} />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Tipo de rol">
+              <Select value={inviteForm.roleType} onChange={(e) => setInviteForm({ ...inviteForm, roleType: e.target.value as any })}>
+                <option value="project">Rol de proyecto</option>
+                <option value="department">Rol de departamento</option>
+              </Select>
+            </Field>
+            {inviteForm.roleType === "project" ? (
+              <Field label="Rol">
+                <Select value={inviteForm.role} onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })}>
+                  <option value="">Seleccionar</option>
+                  {PROJECT_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                </Select>
+              </Field>
+            ) : (
+              <Field label="Posición">
+                <Select value={inviteForm.position} onChange={(e) => setInviteForm({ ...inviteForm, position: e.target.value })}>
+                  <option value="">Seleccionar</option>
+                  {DEPARTMENT_POSITIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+                </Select>
+              </Field>
+            )}
+          </div>
+          {inviteForm.roleType === "department" && (
+            <Field label="Departamento">
+              <Select value={inviteForm.department} onChange={(e) => setInviteForm({ ...inviteForm, department: e.target.value })}>
+                <option value="">Seleccionar</option>
+                {departments.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
+              </Select>
+            </Field>
+          )}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-slate-600">Nivel de acceso</span>
+            <LevelOptions value={inviteForm.accountingAccessLevel} onChange={(v) => setInviteForm({ ...inviteForm, accountingAccessLevel: v as any })} />
+          </div>
+          <Checkbox label="Acceso a cajas (BOX)" checked={inviteForm.boxAccess} onChange={(v) => setInviteForm({ ...inviteForm, boxAccess: v })} />
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!confirmDialog}
+        onClose={() => setConfirmDialog(null)}
+        title={confirmDialog?.title || ""}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirmDialog(null)}>Cancelar</Button>
+            <Button variant={confirmDialog?.danger ? "danger" : "primary"} onClick={() => confirmDialog?.onConfirm()}>{confirmDialog?.confirmLabel || "Confirmar"}</Button>
+          </>
+        }
+      >
+        <p className="text-[13px] text-slate-600">{confirmDialog?.message}</p>
+      </Modal>
+
       {successMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
-          <CheckCircle2 size={16} />
+        <div className="fixed bottom-4 left-4 z-[80] flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2.5 text-[13px] text-white shadow-lg">
+          <CheckCircle2 size={15} />
           {successMessage}
         </div>
       )}
       {errorMessage && hasAccountingAccess && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
-          <AlertCircle size={16} />
+        <div className="fixed bottom-4 left-4 z-[80] flex items-center gap-2 rounded-md bg-red-600 px-3.5 py-2.5 text-[13px] text-white shadow-lg">
+          <AlertCircle size={15} />
           {errorMessage}
-          <button onClick={() => setErrorMessage("")} className="ml-2 hover:bg-white/20 rounded p-0.5">
-            <X size={14} />
-          </button>
+          <button onClick={() => setErrorMessage("")} aria-label="Cerrar" className="ml-1 rounded p-0.5 hover:bg-white/20"><X size={13} /></button>
         </div>
       )}
-
-      {/* Confirm Dialog */}
-      {confirmDialog && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-[14px] font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
-            <p className="text-[13px] text-slate-600 mb-6">{confirmDialog.message}</p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmDialog(null)}
-                className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 font-medium text-[13px]"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmDialog.onConfirm}
-                className={`flex-1 px-4 py-1.5 rounded-md font-medium text-[13px] text-white ${confirmDialog.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}
-              >
-                {confirmDialog.confirmLabel || "Confirmar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </Page>
   );
 }

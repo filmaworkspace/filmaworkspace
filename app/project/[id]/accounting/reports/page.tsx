@@ -1,8 +1,11 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
+import { Button, Checkbox, EmptyState, Input, Modal, Page, PageHeader, PageLoading, Select, Spinner, buttonClass } from "@/components/ds";
+import SearchBar, { type SearchField } from "@/components/SearchBar";
+import { matchWords } from "@/lib/search";
 import { useCanSeeBudget } from "@/hooks/useCanSeeBudget";
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
@@ -486,6 +489,9 @@ export default function ReportsPage() {
   const [showSavePreset, setShowSavePreset] = useState(false);
   const [newPresetName, setNewPresetName] = useState("");
   const [expandedReport, setExpandedReport] = useState<ReportType | null>(null);
+  const [reportSearch, setReportSearch] = useState("");
+  const [reportField, setReportField] = useState<"all" | "name" | "preset">("all");
+  const [sectionFilter, setSectionFilter] = useState("all");
 
   const [episodesEnabled, setEpisodesEnabled] = useState(false);
   const [totalEpisodes, setTotalEpisodes] = useState(0);
@@ -1199,343 +1205,202 @@ export default function ReportsPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className={"min-h-screen bg-white flex items-center justify-center " + inter.className}>
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
-      </div>
-    );
-  }
+  if (loading) return <PageLoading />;
 
   if (accessError || !hasAccess) {
     return (
-      <div className={"min-h-screen bg-white flex items-center justify-center " + inter.className}>
-        <div className="text-center max-w-md">
-          <div className="hidden">
-            <ShieldAlert size={28} className="text-red-500" />
-          </div>
-          <h2 className="text-[14px] font-semibold text-slate-900 mb-2">Acceso denegado</h2>
-          <p className="text-slate-500 mb-6">{accessError || "No tienes permisos para acceder a esta página"}</p>
-          <Link href={"/project/" + id + "/accounting"} className="inline-flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium">
-            <ArrowLeft size={16} />
-            Volver al panel
-          </Link>
+      <div className={`flex min-h-screen items-center justify-center bg-white px-6 ${inter.className}`}>
+        <div className="text-center">
+          <p className="text-[15px] font-semibold text-slate-900">Sin acceso</p>
+          <p className="mt-1 text-[13px] text-slate-500">{accessError || "No tienes permiso para ver los informes."}</p>
+          <Link href={`/project/${id}/accounting`} className={`${buttonClass("primary")} mt-5`}>Volver al panel</Link>
         </div>
       </div>
     );
   }
 
+  // ── Catálogo con búsqueda avanzada ─────────────────────────────────────────
+  type ReportField = "all" | "name" | "preset";
+  const REPORT_FIELDS: SearchField<ReportField>[] = [
+    { value: "all", label: "Buscar en todo", placeholder: "Informe, sección o plantilla" },
+    { value: "name", label: "Informe", placeholder: "Ej. facturas" },
+    { value: "preset", label: "Plantilla", placeholder: "Nombre de la plantilla" },
+  ];
+  const sections = REPORT_SECTIONS.filter((s) => s.id !== "presupuesto" || canSeeBudgetFigures);
+  const catalog = sections.flatMap((section) =>
+    section.reports.map((type) => ({ type, section, info: REPORT_INFO[type], presets: presets.filter((p) => p.reportType === type) })),
+  );
+  const reportRows = catalog.filter((r) => {
+    if (sectionFilter !== "all" && r.section.id !== sectionFilter) return false;
+    if (!reportSearch.trim()) return true;
+    const byName = matchWords(reportSearch, r.info.title);
+    const byPreset = r.presets.some((p) => matchWords(reportSearch, p.name));
+    if (reportField === "name") return byName;
+    if (reportField === "preset") return byPreset;
+    return byName || byPreset || matchWords(reportSearch, r.section.title);
+  });
+
   return (
-    <div className={"min-h-screen bg-white " + inter.className}>
-      <div className="mt-[53px]">
-        <div className="px-6 pt-8 sm:px-10">
-          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Informes</h1>
-            </div>
-            {episodesEnabled && totalEpisodes > 0 && (
-              <button onClick={() => setSplitByEpisode(!splitByEpisode)} className={"absolute right-0 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all " + (splitByEpisode ? "bg-violet-100 text-violet-700 border border-violet-200" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}>
-                <Film size={14} />
-                Desglosar por capítulo
-              </button>
-            )}
-          </div>
+    <Page>
+      <PageHeader title="Informes" />
+
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <SearchBar fields={REPORT_FIELDS} field={reportField} onField={setReportField} value={reportSearch} onChange={setReportSearch} count={reportRows.length} />
+        <div className="w-48">
+          <Select value={sectionFilter} onChange={(e) => setSectionFilter(e.target.value)}>
+            <option value="all">Todas las secciones</option>
+            {sections.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
+          </Select>
         </div>
+        {episodesEnabled && totalEpisodes > 0 && (
+          <Checkbox label="Desglosar por capítulo" checked={splitByEpisode} onChange={setSplitByEpisode} />
+        )}
       </div>
 
-      <main className="px-6 sm:px-10 py-6">
-        <div className="space-y-8">
-          {REPORT_SECTIONS.filter((section) => section.id !== "presupuesto" || canSeeBudgetFigures).map((section) => (
-            <div key={section.id}>
-              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">{section.title}</h2>
-              <div className="space-y-2">
-                {section.reports.map((reportType) => {
-                  const info = REPORT_INFO[reportType];
-                  const Icon = info.icon;
-                  const isExpanded = expandedReport === reportType;
-                  const reportPresets = presets.filter(p => p.reportType === reportType);
-                  const count = getReportCount(reportType);
-                  
+      <div className="mt-4">
+        {reportRows.length === 0 ? (
+          <EmptyState title="Sin resultados" />
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full min-w-[760px] border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
+                  <th scope="col" className="px-4 py-2 text-left font-medium">Informe</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Sección</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">Registros</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Plantillas</th>
+                  <th scope="col" className="py-2 pr-4" />
+                </tr>
+              </thead>
+              <tbody>
+                {reportRows.map(({ type, section, info, presets: rp }) => {
+                  const open = expandedReport === type;
                   return (
-                    <div key={reportType} className="bg-white border border-slate-200 rounded-md hover:border-slate-300 transition-all">
-                      <div className="px-4 py-3 flex items-center gap-3">
-                        <div className="hidden">
-                          <Icon size={18} className="text-slate-500" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-medium text-slate-900 text-[13px]">{info.title}</h3>
-                            <span className="text-xs text-slate-400">{count}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <button onClick={() => openConfig(reportType)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Configurar columnas">
-                            <Settings2 size={16} />
-                          </button>
-                          <button
-                            onClick={() => generateReport(reportType)}
-                            disabled={generating !== null}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
-                          >
-                            {generating === reportType
-                              ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /><span>...</span></>
-                              : <><Download size={12} />Excel</>}
-                          </button>
-                          {reportPresets.length > 0 && (
-                            <button onClick={() => setExpandedReport(isExpanded ? null : reportType)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-                              <ChevronDown size={18} className={"transition-transform " + (isExpanded ? "rotate-180" : "")} />
+                    <Fragment key={type}>
+                      <tr className="border-b border-slate-100 hover:bg-[#FAFAFA]">
+                        <td className="px-4 py-1.5 font-medium text-slate-900">{info.title}</td>
+                        <td className="px-3 py-1.5 text-slate-600">{section.title}</td>
+                        <td className="px-3 py-1.5 text-right font-mono text-xs">{getReportCount(type)}</td>
+                        <td className="px-3 py-1.5">
+                          {rp.length > 0 ? (
+                            <button onClick={() => setExpandedReport(open ? null : type)} className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900" aria-expanded={open}>
+                              {rp.length} {rp.length === 1 ? "plantilla" : "plantillas"}
+                              <ChevronDown size={13} className={`transition-transform ${open ? "rotate-180" : ""}`} />
                             </button>
-                          )}
-                        </div>
-                      </div>
-                      {isExpanded && reportPresets.length > 0 && (
-                        <div className="px-4 pb-3 pt-0">
-                          <div className="border-t border-slate-100 pt-3">
-                            <p className="text-xs text-slate-400 mb-2">Plantillas guardadas</p>
-                            <div className="space-y-1">
-                              {reportPresets.map((preset) => (
-                                <div key={preset.id} className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg group">
-                                  <div className="flex-1 min-w-0"><p className="text-xs font-medium text-slate-700 truncate">{preset.name}</p></div>
-                                  <button onClick={() => generateFromPreset(preset)} disabled={generating !== null} className="px-2 py-1 bg-white border border-slate-200 text-slate-600 rounded text-xs hover:bg-slate-50 transition-colors disabled:opacity-50">Usar</button>
-                                  <button onClick={() => deletePreset(preset.id)} className="p-1 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={12} /></button>
-                                </div>
-                              ))}
-                            </div>
+                          ) : <span className="text-slate-400">—</span>}
+                        </td>
+                        <td className="py-1.5 pr-4">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button variant="ghost" size="sm" onClick={() => openConfig(type)}>Columnas…</Button>
+                            <Button variant="secondary" size="sm" onClick={() => generateReport(type)} disabled={generating !== null}>
+                              {generating === type ? <Spinner className="h-3.5 w-3.5" /> : <Download size={13} />} Excel
+                            </Button>
                           </div>
-                        </div>
-                      )}
-                    </div>
+                        </td>
+                      </tr>
+                      {open && rp.map((preset) => (
+                        <tr key={preset.id} className="border-b border-slate-100 bg-[#FCFCFC]">
+                          <td className="py-1.5 pl-8 pr-4 text-slate-700" colSpan={3}>{preset.name}</td>
+                          <td className="px-3 py-1.5 text-xs text-slate-500">{preset.columns?.length ?? 0} columnas</td>
+                          <td className="py-1.5 pr-4">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => deletePreset(preset.id)}>Eliminar</Button>
+                              <Button variant="secondary" size="sm" onClick={() => generateFromPreset(preset)} disabled={generating !== null}><Download size={13} /> Excel</Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </Fragment>
                   );
                 })}
-              </div>
-            </div>
-          ))}
-        </div>
-      </main>
-
-      {/* Column config modal — unchanged */}
-      {showConfig && configReportType && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowConfig(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-              <div>
-                <h3 className="text-[14px] font-semibold text-slate-900">Configurar columnas</h3>
-                <p className="text-[13px] text-slate-500">{REPORT_INFO[configReportType].title}</p>
-              </div>
-              <button onClick={() => setShowConfig(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md"><X size={18} /></button>
-            </div>
-
-            <div className="p-6 overflow-y-auto flex-1">
-              {presets.filter(p => p.reportType === configReportType).length > 0 && (
-                <div className="mb-6">
-                  <p className="text-xs font-medium text-slate-500 mb-2">Cargar plantilla</p>
-                  <div className="flex flex-wrap gap-2">
-                    {presets.filter(p => p.reportType === configReportType).map((preset) => (
-                      <button key={preset.id} onClick={() => loadPreset(preset)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors">{preset.name}</button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Columnas del informe</p>
-                    <span className="text-xs text-slate-400">{selectedColumns.length}</span>
-                  </div>
-                  <div className="space-y-1 min-h-[200px] p-3 bg-slate-50 rounded-md border-2 border-dashed border-slate-200">
-                    {selectedColumns.map((column, index) => {
-                      const isLocked = REPORT_COLUMNS[configReportType].find(c => c.id === column.originalId)?.locked;
-                      return (
-                        <div key={column.id} draggable={!isLocked} onDragStart={() => handleDragStart(index)} onDragOver={(e) => handleDragOver(e, index)} onDrop={(e) => handleDrop(e, index)} onDragEnd={handleDragEnd} className={"flex items-center gap-2 p-2 rounded-lg transition-all border " + (dragOverItem === index ? "bg-slate-200 border-slate-300" : "bg-white border-slate-200") + (draggedItem === index ? " opacity-50" : "") + (column.isBlank ? " border-dashed" : "")}>
-                          <div className={"cursor-grab " + (isLocked ? "opacity-30" : "")}><GripVertical size={14} className="text-slate-400" /></div>
-                          <span className={"flex-1 text-sm " + (column.isBlank ? "text-slate-400 italic" : "text-slate-700")}>{column.label}</span>
-                          {isLocked ? (<span className="text-[10px] text-slate-400">Req.</span>) : (<button onClick={() => removeColumn(column.id, column.originalId)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"><Minus size={12} /></button>)}
-                        </div>
-                      );
-                    })}
-                    <button onClick={addBlankColumn} className="w-full flex items-center justify-center gap-2 p-2 mt-2 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:border-slate-400 hover:text-slate-600 transition-colors">
-                      <Plus size={14} /><span className="text-xs font-medium">Columna vacía</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Disponibles</p>
-                    <span className="text-xs text-slate-400">{availableColumns.length}</span>
-                  </div>
-                  <div className="space-y-1 min-h-[200px] p-3 bg-slate-50 rounded-md">
-                    {availableColumns.length === 0 ? (<p className="text-xs text-slate-400 text-center py-8">Todas las columnas están en uso</p>) : (
-                      availableColumns.map((column) => (
-                        <button key={column.id} onClick={() => addColumn(column)} className="w-full flex items-center gap-2 p-2 bg-white border border-slate-200 rounded-lg hover:border-slate-300 hover:bg-slate-50 transition-colors text-left">
-                          <Plus size={14} className="text-slate-400" /><span className="flex-1 text-[13px] text-slate-600">{column.label}</span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-              <p className="text-xs text-slate-400 mt-4 text-center">Arrastra las columnas para reordenarlas</p>
-            </div>
-
-            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
-              {!showSavePreset ? (
-                <div className="flex items-center justify-end gap-3">
-                  <button onClick={() => setShowConfig(false)} className="px-4 py-1.5 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100 transition-colors">Cancelar</button>
-                  <button onClick={() => setShowSavePreset(true)} className="flex items-center gap-2 px-4 py-1.5 border border-slate-200 bg-white text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50 transition-colors"><Save size={14} />Guardar plantilla</button>
-                  <button onClick={() => { generateReport(configReportType, selectedColumns); setShowConfig(false); }} disabled={generating !== null} className="flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity disabled:opacity-50"><Download size={14} />Exportar</button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <input type="text" value={newPresetName} onChange={(e) => setNewPresetName(e.target.value)} placeholder="Nombre de la plantilla" className="flex-1 px-2.5 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" autoFocus onKeyDown={(e) => e.key === "Enter" && savePreset()} />
-                  <button onClick={() => { setShowSavePreset(false); setNewPresetName(""); }} className="px-4 py-1.5 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100 transition-colors">Cancelar</button>
-                  <button onClick={savePreset} disabled={!newPresetName.trim()} className="flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity disabled:opacity-50"><Check size={14} />Guardar</button>
-                </div>
-              )}
-            </div>
+              </tbody>
+            </table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {false && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4" onClick={() => setShowInvoiceBookModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-100 rounded-md flex items-center justify-center">
-                  <BookMarked size={20} className="text-indigo-600" />
-                </div>
-                <div>
-                  <h3 className="text-[14px] font-semibold text-slate-900">Libro de facturas</h3>
-                  <p className="text-xs text-slate-500">Selecciona los filtros para el informe</p>
-                </div>
-              </div>
-              <button onClick={() => setShowInvoiceBookModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md"><X size={18} /></button>
+      {/* Columnas del informe */}
+      <Modal
+        open={showConfig && !!configReportType}
+        onClose={() => { setShowConfig(false); setShowSavePreset(false); setNewPresetName(""); }}
+        title={configReportType ? `Columnas · ${REPORT_INFO[configReportType].title}` : "Columnas"}
+        width="max-w-2xl"
+        footer={
+          !showSavePreset ? (
+            <>
+              <Button variant="secondary" onClick={() => setShowSavePreset(true)}><Save size={14} /> Guardar como plantilla</Button>
+              <Button variant="primary" onClick={() => { if (configReportType) generateReport(configReportType, selectedColumns); setShowConfig(false); }} disabled={generating !== null}><Download size={14} /> Exportar</Button>
+            </>
+          ) : (
+            <div className="flex w-full items-center gap-2">
+              <Input value={newPresetName} onChange={(e) => setNewPresetName(e.target.value)} placeholder="Nombre de la plantilla" autoFocus onKeyDown={(e) => e.key === "Enter" && savePreset()} />
+              <Button variant="secondary" onClick={() => { setShowSavePreset(false); setNewPresetName(""); }}>Cancelar</Button>
+              <Button variant="primary" onClick={savePreset} disabled={!newPresetName.trim()}>Guardar</Button>
             </div>
-
-            <div className="p-6 space-y-5">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Proveedor</label>
-                <div className="relative">
-                  <div className="relative">
-                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      value={supplierSearch}
-                      onChange={(e) => {
-                        setSupplierSearch(e.target.value);
-                        setShowSupplierDropdown(true);
-                        if (e.target.value !== invoiceBookFilters.supplierName)
-                          setInvoiceBookFilters({ ...invoiceBookFilters, supplierId: "", supplierName: "" });
-                      }}
-                      onFocus={() => setShowSupplierDropdown(true)}
-                      placeholder="Buscar proveedor (mín. 2 caracteres)"
-                      className="w-full pl-10 pr-10 py-1.5 border border-slate-200 rounded-md text-[13px] focus:ring-4 focus:ring-indigo-500 focus:outline-none"
-                    />
-                    {invoiceBookFilters.supplierId && (
-                      <button onClick={clearSupplier} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600"><X size={14} /></button>
-                    )}
-                  </div>
-                  {showSupplierDropdown && supplierSearch.length >= 2 && (
-                    <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg max-h-48 overflow-y-auto" match="width">
-                      {loadingSuppliers ? (
-                        <div className="px-4 py-3 text-[13px] text-slate-500 text-center">Cargando...</div>
-                      ) : filteredSuppliers.length === 0 ? (
-                        <div className="px-4 py-3 text-[13px] text-slate-500 text-center">No se encontraron proveedores</div>
-                      ) : (
-                        filteredSuppliers.map(supplier => (
-                          <button key={supplier.id} onClick={() => selectSupplier(supplier)} className="w-full px-4 py-1.5 text-left hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
-                            <p className="text-[13px] font-medium text-slate-900">{supplier.fiscalName}</p>
-                            {(supplier.commercialName || supplier.taxId) && (
-                              <p className="text-xs text-slate-500">{[supplier.commercialName, supplier.taxId].filter(Boolean).join(" · ")}</p>
-                            )}
-                          </button>
-                        ))
-                      )}
-                    </AnchoredPanel>
-                  )}
-                </div>
-                {invoiceBookFilters.supplierId && (
-                  <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1"><Check size={12} />Proveedor seleccionado</p>
-                )}
+          )
+        }
+      >
+        {configReportType && (
+          <div className="flex flex-col gap-4">
+            {presets.filter((p) => p.reportType === configReportType).length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-slate-500">Cargar plantilla</span>
+                {presets.filter((p) => p.reportType === configReportType).map((preset) => (
+                  <Button key={preset.id} variant="secondary" size="sm" onClick={() => loadPreset(preset)}>{preset.name}</Button>
+                ))}
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Desde</label>
-                  <div className="relative">
-                    <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="date" value={invoiceBookFilters.dateFrom} onChange={(e) => setInvoiceBookFilters({ ...invoiceBookFilters, dateFrom: e.target.value })} className="w-full pl-10 pr-4 py-1.5 border border-slate-200 rounded-md text-[13px] focus:ring-4 focus:ring-indigo-500 focus:outline-none" />
-                  </div>
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Hasta</label>
-                  <div className="relative">
-                    <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="date" value={invoiceBookFilters.dateTo} onChange={(e) => setInvoiceBookFilters({ ...invoiceBookFilters, dateTo: e.target.value })} className="w-full pl-10 pr-4 py-1.5 border border-slate-200 rounded-md text-[13px] focus:ring-4 focus:ring-indigo-500 focus:outline-none" />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Estado de pago</label>
-                <div className="flex gap-2">
-                  {[{ value: "all", label: "Todas" }, { value: "paid", label: "Pagadas" }, { value: "pending", label: "Pendientes" }].map(option => (
-                    <button key={option.value} onClick={() => setInvoiceBookFilters({ ...invoiceBookFilters, paymentStatus: option.value as "all" | "paid" | "pending" })} className={`flex-1 px-4 py-1.5 rounded-md text-[13px] font-medium transition-all ${invoiceBookFilters.paymentStatus === option.value ? "bg-indigo-100 text-indigo-700 border-2 border-indigo-200" : "bg-slate-100 text-slate-600 border-2 border-transparent hover:bg-slate-200"}`}>
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="flex items-center justify-between cursor-pointer">
-                  <div>
-                    <p className="text-[13px] font-medium text-slate-700">Incluir anuladas</p>
-                    <p className="text-xs text-slate-500">Por defecto las facturas anuladas no aparecen en el informe</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setInvoiceBookFilters({ ...invoiceBookFilters, includeCancelled: !invoiceBookFilters.includeCancelled })}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ml-4 ${invoiceBookFilters.includeCancelled ? "bg-indigo-600" : "bg-slate-200"}`}
-                  >
-                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${invoiceBookFilters.includeCancelled ? "translate-x-[18px]" : "translate-x-[3px]"}`} />
+            )}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-medium text-slate-500">En el informe · {selectedColumns.length}</span>
+                <div className="flex min-h-[240px] flex-col overflow-hidden rounded-md border border-slate-200">
+                  {selectedColumns.map((column, index) => {
+                    const isLocked = REPORT_COLUMNS[configReportType].find((c) => c.id === column.originalId)?.locked;
+                    return (
+                      <div
+                        key={column.id}
+                        draggable={!isLocked}
+                        onDragStart={() => handleDragStart(index)}
+                        onDragOver={(e) => handleDragOver(e, index)}
+                        onDrop={(e) => handleDrop(e, index)}
+                        onDragEnd={handleDragEnd}
+                        className={`flex items-center gap-2 border-b border-slate-100 px-2.5 py-1.5 ${dragOverItem === index ? "bg-[#F4F4F5]" : "bg-white"} ${draggedItem === index ? "opacity-50" : ""}`}
+                      >
+                        <GripVertical size={13} className={`text-slate-400 ${isLocked ? "opacity-30" : "cursor-grab"}`} />
+                        <span className={`flex-1 text-[13px] ${column.isBlank ? "italic text-slate-400" : "text-slate-800"}`}>{column.label}</span>
+                        <span className="font-mono text-[10px] text-slate-400">{String(index + 1).padStart(2, "0")}</span>
+                        {isLocked ? (
+                          <span className="text-[10px] text-slate-400">fija</span>
+                        ) : (
+                          <button onClick={() => removeColumn(column.id, column.originalId)} aria-label={`Quitar ${column.label}`} className="text-slate-400 hover:text-slate-900"><Minus size={12} /></button>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <button onClick={addBlankColumn} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:bg-[#FAFAFA] hover:text-slate-900">
+                    <Plus size={12} /> Columna vacía
                   </button>
-                </label>
+                </div>
               </div>
-
-              <div className="bg-slate-50 rounded-md p-4">
-                <p className="text-xs text-slate-500">
-                  {!invoiceBookFilters.supplierId && !invoiceBookFilters.dateFrom && !invoiceBookFilters.dateTo ? (
-                    "Sin filtros seleccionados. Se exportarán todas las facturas."
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-medium text-slate-500">Disponibles · {availableColumns.length}</span>
+                <div className="flex min-h-[240px] flex-col overflow-hidden rounded-md border border-slate-200">
+                  {availableColumns.length === 0 ? (
+                    <p className="py-8 text-center text-xs text-slate-500">Todas en uso</p>
                   ) : (
-                    <>Se exportarán las facturas
-                      {invoiceBookFilters.supplierName && <span className="font-medium text-slate-700"> de {invoiceBookFilters.supplierName}</span>}
-                      {invoiceBookFilters.dateFrom && <span className="font-medium text-slate-700"> desde {invoiceBookFilters.dateFrom}</span>}
-                      {invoiceBookFilters.dateTo && <span className="font-medium text-slate-700"> hasta {invoiceBookFilters.dateTo}</span>}
-                      {invoiceBookFilters.paymentStatus !== "all" && <span className="font-medium text-slate-700">{invoiceBookFilters.paymentStatus === "paid" ? " (solo pagadas)" : " (solo pendientes)"}</span>}.
-                    </>
+                    availableColumns.map((column) => (
+                      <button key={column.id} onClick={() => addColumn(column)} className="flex items-center gap-2 border-b border-slate-100 px-2.5 py-1.5 text-left text-[13px] text-slate-700 hover:bg-[#FAFAFA]">
+                        <Plus size={12} className="text-slate-400" /> {column.label}
+                      </button>
+                    ))
                   )}
-                </p>
+                </div>
               </div>
             </div>
-
-            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex gap-3">
-              <button onClick={() => setShowInvoiceBookModal(false)} className="flex-1 px-4 py-1.5 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100 transition-colors">Cancelar</button>
-              <button
-                onClick={() => generateInvoicesAccountingReport(getDefaultColumns("invoices"), invoiceBookFilters)}
-                disabled={generating !== null}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity disabled:opacity-50"
-              >
-                {generating === "invoices_accounting"
-                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Generando...</>
-                  : <><Download size={16} />Exportar Excel</>}
-              </button>
-            </div>
+            <p className="text-xs text-slate-500">Arrastra para cambiar el orden.</p>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </Modal>
+    </Page>
   );
 }
