@@ -2,6 +2,9 @@
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import CashBox from "@/components/box/CashBox";
+import { Button, EmptyState, IconButton, Input, Menu, MenuItem, MenuSeparator, Segmented } from "@/components/ds";
+import SearchBar, { type SearchField } from "@/components/SearchBar";
+import { matchAmount, matchCode, matchWords } from "@/lib/search";
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -70,6 +73,7 @@ import {
   SplitSquareHorizontal,
   Trash2,
   Upload,
+  MoreHorizontal,
   X,
 } from "lucide-react";
 
@@ -326,14 +330,14 @@ const validateIban = (iban: string): boolean => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG = {
-  open:      { bg: "bg-blue-50",    text: "text-blue-700",    label: "Abierto"     },
+  open:      { bg: "bg-[#F7F7F8]",    text: "text-slate-900",    label: "Abierto"     },
   reviewing: { bg: "bg-amber-50",   text: "text-amber-700",   label: "En revisión" },
   closed:    { bg: "bg-emerald-50", text: "text-emerald-700", label: "Cerrado"     },
 };
 
 const EXPENSE_STATUS_CONFIG = {
   pending:    { bg: "bg-slate-100",  text: "text-slate-600",   label: "Pendiente"     },
-  reviewed:   { bg: "bg-blue-50",    text: "text-blue-700",    label: "Revisado"      },
+  reviewed:   { bg: "bg-[#F7F7F8]",    text: "text-slate-900",    label: "Revisado"      },
   accounted:  { bg: "bg-emerald-50", text: "text-emerald-700", label: "Contabilizado" },
 };
 
@@ -375,6 +379,18 @@ export default function BoxesPage() {
   const [subAccounts, setSubAccounts] = useState<SubAccount[]>([]);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  // Búsqueda dentro de un sobre de tarjeta
+  const [envSearch, setEnvSearch] = useState("");
+  const [trfSearch, setTrfSearch] = useState("");
+  const [envField, setEnvField] = useState<"all" | "number" | "supplier" | "account" | "amount">("all");
+  const [envStatus, setEnvStatus] = useState<"all" | "pending" | "reviewed" | "conflict" | "nodoc">("all");
+  const ENV_FIELDS: SearchField<"all" | "number" | "supplier" | "account" | "amount">[] = [
+    { value: "all", label: "Buscar en todo", placeholder: "Nº, proveedor, concepto, cuenta o importe" },
+    { value: "number", label: "Nº de gasto", placeholder: "Ej. TP-02-T01", mono: true },
+    { value: "supplier", label: "Proveedor", placeholder: "Nombre o NIF" },
+    { value: "account", label: "Cuenta", placeholder: "Ej. 04.02", mono: true },
+    { value: "amount", label: "Importe", placeholder: "50 · >100 · 20-80", mono: true },
+  ];
   const [nextTransferNumber, setNextTransferNumber] = useState(1);
 
   // Export config (demo / preview — no conectado todavía a ningún servicio real)
@@ -2004,13 +2020,9 @@ export default function BoxesPage() {
   };
 
   // Derived Data
-  const filteredBoxes = boxes.filter(b =>
-    b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.code.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredBoxes = boxes.filter(b => matchWords(searchTerm, b.name, b.department) || matchCode(searchTerm, b.code));
   const filteredTransferEnvelopes = transferEnvelopes.filter(e =>
-    e.displayNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    e.paymentDate.includes(searchTerm)
+    matchWords(searchTerm, e.personName, e.personDepartment) || matchCode(searchTerm, e.displayNumber, e.paymentDate)
   );
   const cardEnvelopes = selectedBox ? envelopes.filter(e => e.boxId === selectedBox.id) : [];
   const envelopeExpenses = selectedEnvelope ? expenses.filter(e => e.envelopeId === selectedEnvelope.id) : [];
@@ -2085,7 +2097,7 @@ export default function BoxesPage() {
                   className={`flex items-center gap-2 px-2.5 py-1 rounded-md text-[13px] transition-colors ${mainTab === "tarjetas" ? "font-medium text-slate-900 bg-[#F1F1F3]" : "text-slate-500 hover:text-slate-700"}`}>
                   <CreditCard size={15} /> Tarjetas
                   {openEnvelopes > 0 && (
-                    <span className="bg-amber-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{openEnvelopes}</span>
+                    <span className="text-xs tabular-nums text-amber-800">{openEnvelopes}</span>
                   )}
                 </button>
                 <button
@@ -2093,7 +2105,7 @@ export default function BoxesPage() {
                   className={`flex items-center gap-2 px-2.5 py-1 rounded-md text-[13px] transition-colors ${mainTab === "transfers" ? "font-medium text-slate-900 bg-[#F1F1F3]" : "text-slate-500 hover:text-slate-700"}`}>
                   <Send size={15} /> Transferencias
                   {pendingFormSubmissions > 0 && (
-                    <span className="bg-amber-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{pendingFormSubmissions}</span>
+                    <span className="text-xs tabular-nums text-amber-800">{pendingFormSubmissions}</span>
                   )}
                 </button>
                 <button
@@ -2138,17 +2150,16 @@ export default function BoxesPage() {
         <div className="flex gap-6">
 
           {/* ── Left Panel ──────────────────────────────────────────────────────── */}
-          <div className="w-72 flex-shrink-0">
-            <div className="sticky top-24">
+          <div className="w-64 flex-shrink-0">
+            <div className="sticky top-[85px]">
               <div className="mb-4">
                 <div className="relative">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder={mainTab === "tarjetas" ? "Buscar tarjeta" : "Buscar sobre"}
+                  <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    placeholder={mainTab === "tarjetas" ? "Tarjeta, código o departamento" : "Persona, nº de sobre o departamento"}
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900"
+                    className="pl-8"
                   />
                 </div>
               </div>
@@ -2160,25 +2171,13 @@ export default function BoxesPage() {
                     const isSelected = selectedBox?.id === box.id;
                     return (
                       <button key={box.id} onClick={() => { setSelectedBox(box); setSelectedEnvelope(null); }}
-                        className={`w-full text-left p-3 rounded-md transition-all ${isSelected ? "bg-[#F1F1F3] text-slate-900" : "hover:bg-slate-50"}`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSelected ? "bg-white" : "bg-slate-100"}`}>
-                              <CreditCard size={16} className={isSelected ? "text-slate-900" : "text-slate-500"} />
-                            </div>
-                            <div>
-                              <p className={`text-[13px] font-medium ${isSelected ? "text-slate-900" : "text-slate-900"}`}>{box.name}</p>
-                              <p className={`text-xs ${isSelected ? "text-slate-500" : "text-slate-500"}`}>
-                                {box.code}{box.department ? ` · ${box.department}` : ""}
-                              </p>
-                            </div>
-                          </div>
-                          {openCount > 0 && (
-                            <span className={`text-xs px-1.5 py-0.5 rounded-full ${isSelected ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"}`}>
-                              {openCount}
-                            </span>
-                          )}
-                        </div>
+                        className={`relative flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left ${isSelected ? "bg-[#F4F4F5]" : "hover:bg-[#FAFAFA]"}`}>
+                        {isSelected && <span className="absolute inset-y-1 left-0 w-[2px] rounded bg-slate-900" />}
+                        <span className="min-w-0">
+                          <span className="block truncate text-[13px] font-medium text-slate-900">{box.name}</span>
+                          <span className="block text-xs text-slate-500"><span className="font-mono">{box.code}</span>{box.department ? ` · ${box.department}` : ""}</span>
+                        </span>
+                        {openCount > 0 && <span className="text-xs tabular-nums text-amber-800" title="Sobres abiertos">{openCount} abierto{openCount > 1 ? "s" : ""}</span>}
                       </button>
                     );
                   })}
@@ -2191,16 +2190,15 @@ export default function BoxesPage() {
                 {/* Solicitudes recibidas (pendientes de volcar) */}
                 {mainTab === "transfers" && pendingFormSubmissions > 0 && (
                   <div className="mb-4">
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">
-                      Solicitudes recibidas
-                      <span className="ml-1.5 bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5 text-xs">{pendingFormSubmissions}</span>
+                    <p className="mb-2 px-1 text-xs font-medium text-slate-500">
+                      Solicitudes recibidas <span className="font-normal text-amber-800">{pendingFormSubmissions}</span>
                     </p>
                     <div className="space-y-1">
                       {formSubmissions.filter((fs) => !fs.importedToEnvelopeId).map((fs) => (
-                        <div key={fs.id} className="p-3 rounded-md border border-amber-100 bg-amber-50 text-left">
+                        <div key={fs.id} className="rounded-md border border-slate-200 p-3 text-left">
                           <div className="flex items-start justify-between gap-1 mb-1">
                             <p className="text-[13px] font-medium text-slate-900 leading-tight">{fs.requesterName}</p>
-                            <span className="text-xs text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full flex-shrink-0">Pendiente</span>
+                            <span className="flex-shrink-0 text-xs text-amber-800">Pendiente</span>
                           </div>
                           <p className="text-xs text-slate-500">
                             {fs.expenseCount} gasto{fs.expenseCount !== 1 ? "s" : ""} · <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(fs.totalAmount)} €</strong>
@@ -2226,7 +2224,7 @@ export default function BoxesPage() {
                               }));
                               setShowVolcarSupplierDropdown(null);
                             }}
-                            className="mt-2 w-full text-xs font-medium py-1.5 px-2 rounded-lg border border-amber-300 text-amber-800 bg-white hover:bg-amber-50 transition-colors">
+                            className="mt-2 w-full rounded-md border border-[#E4E4E7] bg-[#F1F1F3] px-2 py-1.5 text-xs font-medium text-slate-900 hover:bg-[#E8E8EB]">
                             Volcar a sobre →
                           </button>
                         </div>
@@ -2243,7 +2241,7 @@ export default function BoxesPage() {
                       onClick={() => setShowVolcadas(!showVolcadas)}
                       className="w-full flex items-center justify-between px-1 mb-2"
                     >
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                      <p className="text-xs font-medium text-slate-500">
                         Solicitudes volcadas
                         <span className="ml-1.5 text-slate-300">{formSubmissions.filter((fs) => fs.importedToEnvelopeId).length}</span>
                       </p>
@@ -2252,10 +2250,10 @@ export default function BoxesPage() {
                     {showVolcadas && (
                       <div className="space-y-1">
                         {formSubmissions.filter((fs) => fs.importedToEnvelopeId).map((fs) => (
-                          <div key={fs.id} className="p-3 rounded-md border border-emerald-100 bg-emerald-50/50 text-left">
+                          <div key={fs.id} className="rounded-md border border-slate-200 p-3 text-left">
                             <div className="flex items-start justify-between gap-1 mb-1">
                               <p className="text-[13px] font-medium text-slate-900 leading-tight">{fs.requesterName}</p>
-                              <span className="text-xs text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full flex-shrink-0">Volcado</span>
+                              <span className="flex-shrink-0 text-xs text-emerald-800">Volcado</span>
                             </div>
                             <p className="text-xs text-slate-500">
                               {fs.expenseCount} gasto{fs.expenseCount !== 1 ? "s" : ""} · <strong>{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(fs.totalAmount)} €</strong>
@@ -2270,29 +2268,18 @@ export default function BoxesPage() {
                 )}
                 <div className="space-y-1">
                   {filteredTransferEnvelopes.map(envelope => {
-                    const sc = TRANSFER_STATUS_CONFIG[envelope.status];
                     const isSelected = selectedTransferEnvelope?.id === envelope.id;
                     return (
                       <button key={envelope.id} onClick={() => setSelectedTransferEnvelope(envelope)}
-                        className={`w-full text-left p-3 rounded-md transition-all ${isSelected ? "bg-[#F1F1F3] text-slate-900" : "hover:bg-slate-50"}`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSelected ? "bg-white" : envelope.status === "settled" ? "bg-emerald-50" : "bg-slate-100"}`}>
-                              {envelope.status === "settled" ? (
-                                <Lock size={16} className={isSelected ? "text-slate-900" : "text-emerald-500"} />
-                              ) : (
-                                <Calendar size={16} className={isSelected ? "text-slate-900" : "text-slate-400"} />
-                              )}
-                            </div>
-                            <div>
-                              <p className={`text-[13px] font-medium ${isSelected ? "text-slate-900" : "text-slate-900"}`}>{envelope.displayNumber}</p>
-                              <p className={`text-xs ${isSelected ? "text-slate-500" : "text-slate-500"}`}>{envelope.personName || envelope.paymentDate}</p>
-                            </div>
-                          </div>
-                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${isSelected ? "bg-white/20 text-white" : `${sc.bg} ${sc.text}`}`}>
-                            {envelope.expenseCount}
-                          </span>
-                        </div>
+                        className={`relative flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left ${isSelected ? "bg-[#F4F4F5]" : "hover:bg-[#FAFAFA]"}`}>
+                        {isSelected && <span className="absolute inset-y-1 left-0 w-[2px] rounded bg-slate-900" />}
+                        <span className="min-w-0">
+                          <span className="block truncate text-[13px] font-medium text-slate-900">{envelope.personName || "Sin persona"}</span>
+                          <span className="block text-xs text-slate-500"><span className="font-mono">{envelope.displayNumber}</span> · {envelope.expenseCount} gastos</span>
+                        </span>
+                        <span className={`inline-flex items-center gap-1.5 text-xs ${envelope.status === "settled" ? "text-emerald-800" : "text-amber-800"}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${envelope.status === "settled" ? "bg-emerald-500" : "bg-amber-500"}`} />{envelope.status === "settled" ? "Liquidado" : "Abierto"}
+                        </span>
                       </button>
                     );
                   })}
@@ -2310,497 +2297,389 @@ export default function BoxesPage() {
 
             {mainTab === "tarjetas" ? (
               !selectedBox ? (
-                <div className="flex items-center justify-center h-96">
-                  <p className="text-[13px] text-slate-400">{boxes.length === 0 ? "No hay cajas creadas" : "Selecciona una caja"}</p>
-                </div>
+                <EmptyState title={boxes.length === 0 ? "Aún no hay tarjetas" : "Elige una tarjeta"} />
               ) : !selectedEnvelope ? (
-                <div>
-                  <div className="flex items-center justify-between mb-5">
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h2 className="text-xl font-semibold text-slate-900">{selectedBox.name}</h2>
-                      <p className="text-[13px] text-slate-500">Código: {selectedBox.code}{selectedBox.department ? ` · ${selectedBox.department}` : ""}</p>
+                      <h2 className="flex items-center gap-2 text-[15px] font-semibold text-slate-900">
+                        {selectedBox.name}
+                        <span className="rounded border border-slate-200 bg-[#F7F7F8] px-1.5 font-mono text-[11px] font-normal text-slate-600">{selectedBox.code}</span>
+                      </h2>
+                      {selectedBox.department && <p className="text-xs text-slate-500">{selectedBox.department}</p>}
                     </div>
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => { setEditBoxForm({ name: selectedBox.name, code: selectedBox.code }); setShowEditBoxModal(true); }}
-                        className="flex items-center gap-2 px-3 py-2 border border-slate-200 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-50">
-                        <Edit size={14} /> Editar
-                      </button>
-                      {canDeleteBox(selectedBox) && (
-                        <button onClick={() => setShowDeleteBoxModal(true)}
-                          className="flex items-center gap-2 px-3 py-2 border border-red-100 text-red-500 rounded-md text-[13px] font-medium hover:bg-red-50">
-                          <Trash2 size={14} /> Eliminar
-                        </button>
-                      )}
+                      <Menu trigger={(t) => <IconButton label="Más acciones de la tarjeta" onClick={t}><MoreHorizontal size={15} /></IconButton>}>
+                        {(close) => (
+                          <>
+                            <MenuItem onClick={() => { close(); setEditBoxForm({ name: selectedBox.name, code: selectedBox.code }); setShowEditBoxModal(true); }}>Editar tarjeta</MenuItem>
+                            {canDeleteBox(selectedBox) && (<><MenuSeparator /><MenuItem danger onClick={() => { close(); setShowDeleteBoxModal(true); }}>Eliminar tarjeta</MenuItem></>)}
+                          </>
+                        )}
+                      </Menu>
+                      <Button variant="primary" onClick={() => setShowCreateEnvelopeModal(true)}><Plus size={14} /> Nuevo sobre</Button>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between mb-4">
-                    <p className="text-[13px] text-slate-500">{cardEnvelopes.length} sobres</p>
-                    <button onClick={() => setShowCreateEnvelopeModal(true)}
-                      className="flex items-center gap-2 px-4 py-2 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
-                      <Plus size={16} /> Nuevo sobre
-                    </button>
-                  </div>
                   {cardEnvelopes.length === 0 ? (
-                    <p className="text-center py-16 text-[13px] text-slate-400">No hay sobres en esta caja</p>
+                    <EmptyState title="Esta tarjeta aún no tiene sobres" />
                   ) : (
-                    <div className="space-y-2">
-                      {cardEnvelopes.map(envelope => {
-                        const envExpenses = expenses.filter(e => e.envelopeId === envelope.id);
-                        const pendingCount = envExpenses.filter(e => e.status === "pending").length;
-                        const conflictCount = envExpenses.filter(e => !!e.conflictType).length;
-                        const sc = STATUS_CONFIG[envelope.status];
-                        return (
-                          <div key={envelope.id} className="p-4 border border-slate-200 rounded-md hover:border-slate-300 transition-all">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3 cursor-pointer flex-1" onClick={() => setSelectedEnvelope(envelope)}>
-                                <div className="hidden">
-                                  <Layers size={18} className="text-slate-500" />
-                                </div>
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium text-slate-900">{envelope.displayNumber}</span>
-                                    <span className={`text-xs px-2 py-0.5 rounded-full ${sc.bg} ${sc.text}`}>{sc.label}</span>
-                                  </div>
-                                  <p className="text-xs text-slate-500">
-                                    {envelope.expenseCount} gastos · {fmt(envelope.totalAmount)} €
-                                    {pendingCount > 0 && <span className="text-amber-600 ml-2">· {pendingCount} pendientes</span>}
-                                    {conflictCount > 0 && <span className="text-amber-500 ml-2">· {conflictCount} con incidencia</span>}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-slate-400">{fmtDate(envelope.createdAt)}</span>
-                                {canDeleteEnvelope(envelope) && envelope.status !== "closed" && (
-                                  <button onClick={e => { e.stopPropagation(); setShowDeleteEnvelopeModal(envelope); }}
-                                    className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
-                                    <Trash2 size={14} />
-                                  </button>
-                                )}
-                                <ChevronRight size={16} className="text-slate-400 cursor-pointer" onClick={() => setSelectedEnvelope(envelope)} />
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                      <table className="w-full min-w-[720px] border-collapse text-[13px]">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
+                            <th scope="col" className="px-4 py-2 text-left font-medium">Sobre</th>
+                            <th scope="col" className="px-3 py-2 text-left font-medium">Estado</th>
+                            <th scope="col" className="px-3 py-2 text-right font-medium">Gastos</th>
+                            <th scope="col" className="px-3 py-2 text-left font-medium">Por revisar</th>
+                            <th scope="col" className="px-3 py-2 text-right font-medium">Total</th>
+                            <th scope="col" className="px-3 py-2 text-right font-medium">Abierto</th>
+                            <th scope="col" className="w-12 py-2 pr-3" />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {cardEnvelopes.map((envelope) => {
+                            const envExpenses = expenses.filter((e) => e.envelopeId === envelope.id);
+                            const pendingCount = envExpenses.filter((e) => e.status === "pending").length;
+                            const conflictCount = envExpenses.filter((e) => !!e.conflictType).length;
+                            const st = envelope.status === "open" ? { l: "Abierto", d: "bg-amber-500", t: "text-amber-800" } : envelope.status === "reviewing" ? { l: "En revisión", d: "bg-slate-400", t: "text-slate-600" } : { l: "Cerrado", d: "bg-emerald-500", t: "text-emerald-800" };
+                            return (
+                              <tr key={envelope.id} onClick={() => setSelectedEnvelope(envelope)} className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA]">
+                                <td className="px-4 py-1.5 font-mono text-xs font-medium">{envelope.displayNumber}</td>
+                                <td className="px-3 py-1.5 text-xs"><span className={`inline-flex items-center gap-1.5 ${st.t}`}><span className={`h-1.5 w-1.5 rounded-full ${st.d}`} />{st.l}</span></td>
+                                <td className="px-3 py-1.5 text-right tabular-nums">{envelope.expenseCount}</td>
+                                <td className="px-3 py-1.5 text-xs">
+                                  {pendingCount > 0 ? <span className="text-amber-800">{pendingCount} pendientes</span> : <span className="text-slate-400">—</span>}
+                                  {conflictCount > 0 && <span className="text-red-700"> · {conflictCount} con incidencia</span>}
+                                </td>
+                                <td className="px-3 py-1.5 text-right font-mono text-xs font-medium">{fmt(envelope.totalAmount)}</td>
+                                <td className="px-3 py-1.5 text-right tabular-nums text-slate-500">{fmtDate(envelope.createdAt)}</td>
+                                <td className="py-1.5 pr-3 text-right" onClick={(e) => e.stopPropagation()}>
+                                  {canDeleteEnvelope(envelope) && envelope.status !== "closed" && (
+                                    <Menu trigger={(t) => <IconButton label="Acciones del sobre" onClick={t} className="-my-1"><MoreHorizontal size={15} /></IconButton>}>
+                                      {(close) => <MenuItem danger onClick={() => { close(); setShowDeleteEnvelopeModal(envelope); }}>Eliminar sobre</MenuItem>}
+                                    </Menu>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     </div>
                   )}
                 </div>
               ) : (
                 /* Envelope detail */
-                <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <button onClick={() => setSelectedEnvelope(null)}
-                      className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
-                      <ArrowLeft size={18} />
-                    </button>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-xl font-semibold text-slate-900">{selectedEnvelope.displayNumber}</h2>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_CONFIG[selectedEnvelope.status].bg} ${STATUS_CONFIG[selectedEnvelope.status].text}`}>
-                          {STATUS_CONFIG[selectedEnvelope.status].label}
-                        </span>
+                (() => {
+                  const q = envSearch.trim();
+                  const visible = envelopeExpenses.filter((e) => {
+                    if (envStatus === "pending" && e.status !== "pending") return false;
+                    if (envStatus === "reviewed" && e.status === "pending") return false;
+                    if (envStatus === "conflict" && !e.conflictType) return false;
+                    if (envStatus === "nodoc" && e.documentUrl) return false;
+                    if (!q) return true;
+                    const byNumber = matchCode(q, e.displayNumber);
+                    const bySupplier = matchWords(q, e.supplier) || matchCode(q, e.supplierTaxId);
+                    const byConcept = matchWords(q, e.description);
+                    const byAccount = matchCode(q, e.subAccountCode) || matchWords(q, e.subAccountDescription);
+                    const byAmount = matchAmount(q, e.totalAmount, e.baseAmount) === true;
+                    return envField === "number" ? byNumber : envField === "supplier" ? bySupplier : envField === "account" ? byAccount : envField === "amount" ? byAmount : byNumber || bySupplier || byConcept || byAccount || byAmount;
+                  });
+                  const tot = visible.reduce((s, e) => ({ base: s.base + e.baseAmount, vat: s.vat + e.vatAmount, total: s.total + e.totalAmount }), { base: 0, vat: 0, total: 0 });
+                  const open = selectedEnvelope.status === "open";
+                  const pendingN = envelopeExpenses.filter((e) => e.status === "pending").length;
+                  const est = open ? { l: "Abierto", d: "bg-amber-500", t: "text-amber-800" } : selectedEnvelope.status === "reviewing" ? { l: "En revisión", d: "bg-slate-400", t: "text-slate-600" } : { l: "Cerrado", d: "bg-emerald-500", t: "text-emerald-800" };
+                  return (
+                    <div className="flex flex-col gap-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="flex flex-col gap-1">
+                          <button onClick={() => setSelectedEnvelope(null)} className="inline-flex w-fit items-center gap-1 text-xs text-slate-500 hover:text-slate-900"><ArrowLeft size={12} /> {selectedBox.name}</button>
+                          <h2 className="flex items-center gap-2 text-[15px] font-semibold text-slate-900">
+                            <span className="font-mono">{selectedEnvelope.displayNumber}</span>
+                            <span className={`inline-flex items-center gap-1.5 text-xs font-normal ${est.t}`}><span className={`h-1.5 w-1.5 rounded-full ${est.d}`} />{est.l}</span>
+                          </h2>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Menu trigger={(t) => <IconButton label="Más acciones del sobre" onClick={t}><MoreHorizontal size={15} /></IconButton>}>
+                            {(close) => (
+                              <>
+                                <MenuItem onClick={() => { close(); handleExportEnvelope(selectedEnvelope); }}>{exportingEnvelope ? "Exportando…" : "Exportar sobre"}</MenuItem>
+                                {open && <MenuItem onClick={() => { close(); setShowImportModal(true); }}>Importar Excel de la tarjeta</MenuItem>}
+                                {open && envelopeExpenses.length > 0 && <MenuItem onClick={() => { close(); setReceiptFiles([]); setShowReceiptImportModal(true); }}>Importar recibos</MenuItem>}
+                              </>
+                            )}
+                          </Menu>
+                          {open && <Button variant="secondary" onClick={() => { setCardExpensesList([createEmptyCardExpense()]); setShowManualExpenseModal(true); }}><Plus size={14} /> Gasto</Button>}
+                          {open && (
+                            <Button variant="primary" onClick={() => handleCloseEnvelope(selectedEnvelope)} disabled={pendingN > 0} title={pendingN > 0 ? `Quedan ${pendingN} gastos por revisar` : undefined}>
+                              <Lock size={14} /> Cerrar sobre
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-[13px] text-slate-500">
-                        {selectedEnvelope.expenseCount} gastos · Base: {fmt(selectedEnvelope.totalBase)} € · Total: {fmt(selectedEnvelope.totalAmount)} €
-                        {envelopeExpenses.filter(e => !!e.conflictType).length > 0 && (
-                          <span className="ml-2 text-amber-500">
-                            · {envelopeExpenses.filter(e => !!e.conflictType).length} incidencia{envelopeExpenses.filter(e => !!e.conflictType).length > 1 ? "s" : ""}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => handleExportEnvelope(selectedEnvelope)}
-                        disabled={exportingEnvelope || envelopeExpenses.length === 0}
-                        className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50 disabled:opacity-50">
-                        {exportingEnvelope
-                          ? <><RotateCcw size={16} className="animate-spin" /> Exportando...</>
-                          : <><Download size={16} /> Exportar sobre</>}
-                      </button>
-                    </div>
-                    {selectedEnvelope.status === "open" && (
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => setShowImportModal(true)}
-                          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">
-                          <Upload size={16} /> Importar Excel
-                        </button>
-                        {envelopeExpenses.length > 0 && (
-                          <button onClick={() => { setReceiptFiles([]); setShowReceiptImportModal(true); }}
-                            className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">
-                            <FileText size={16} /> Importar recibos
-                          </button>
-                        )}
-                        <button onClick={() => { setCardExpensesList([createEmptyCardExpense()]); setShowManualExpenseModal(true); }}
-                          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">
-                          <Plus size={16} /> Añadir gasto
-                        </button>
-                        <button
-                          onClick={() => handleCloseEnvelope(selectedEnvelope)}
-                          disabled={envelopeExpenses.some(e => e.status === "pending")}
-                          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-md text-[13px] font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                          <Lock size={16} /> Cerrar sobre
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  {envelopeExpenses.length === 0 ? (
-                    <div className="flex items-center justify-center h-64">
-                      <div className="text-center">
-                        <p className="text-[13px] text-slate-400 mb-4">No hay gastos en este sobre</p>
-                        {selectedEnvelope.status === "open" && (
-                          <div className="flex gap-2 justify-center">
-                            <button onClick={() => setShowImportModal(true)}
-                              className="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">
-                              <Upload size={16} /> Importar Excel
-                            </button>
-                            <button onClick={() => { setCardExpensesList([createEmptyCardExpense()]); setShowManualExpenseModal(true); }}
-                              className="inline-flex items-center gap-2 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium">
-                              <Plus size={16} /> Añadir gasto
-                            </button>
+
+                      {envelopeExpenses.length === 0 ? (
+                        <EmptyState
+                          title="Sin gastos en este sobre"
+                          action={open ? (
+                            <div className="flex gap-2">
+                              <Button variant="secondary" size="sm" onClick={() => setShowImportModal(true)}>Importar Excel</Button>
+                              <Button variant="primary" size="sm" onClick={() => { setCardExpensesList([createEmptyCardExpense()]); setShowManualExpenseModal(true); }}>Añadir gasto</Button>
+                            </div>
+                          ) : undefined}
+                        />
+                      ) : (
+                        <>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <SearchBar fields={ENV_FIELDS} field={envField} onField={setEnvField} value={envSearch} onChange={setEnvSearch} count={visible.length} />
+                            <Segmented
+                              value={envStatus}
+                              onChange={setEnvStatus}
+                              options={[
+                                { value: "all", label: "Todos" },
+                                { value: "pending", label: `Por revisar · ${pendingN}` },
+                                { value: "reviewed", label: "Revisados" },
+                                { value: "conflict", label: "Incidencias" },
+                                { value: "nodoc", label: "Sin documento" },
+                              ]}
+                            />
                           </div>
-                        )}
-                      </div>
+                          <div className="overflow-x-auto rounded-lg border border-slate-200">
+                            <table className="w-full min-w-[900px] border-collapse text-[13px]">
+                              <thead>
+                                <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
+                                  <th scope="col" className="px-4 py-2 text-left font-medium">Nº</th>
+                                  <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor</th>
+                                  <th scope="col" className="px-3 py-2 text-left font-medium">Cuenta</th>
+                                  <th scope="col" className="px-3 py-2 text-right font-medium">Base</th>
+                                  <th scope="col" className="px-3 py-2 text-right font-medium">IVA</th>
+                                  <th scope="col" className="px-3 py-2 text-right font-medium">Total</th>
+                                  <th scope="col" className="px-3 py-2 text-left font-medium">Estado</th>
+                                  <th scope="col" className="w-20 py-2 pr-3" />
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {visible.map((expense) => {
+                                  const hasConflict = !!expense.conflictType;
+                                  const isDrawerOpen = drawerExpense?.id === expense.id;
+                                  const missing = expense.subAccountCode && !subAccounts.some((sa) => sa.code === expense.subAccountCode);
+                                  const st = expense.status === "pending" ? { l: "Pendiente", d: "bg-amber-500", t: "text-amber-800" } : expense.status === "reviewed" ? { l: "Revisado", d: "bg-slate-400", t: "text-slate-600" } : { l: "Contabilizado", d: "bg-emerald-500", t: "text-emerald-800" };
+                                  return (
+                                    <tr key={expense.id} onClick={() => openDrawer(expense)} className={`cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA] ${isDrawerOpen ? "bg-[#F4F4F5]" : ""}`}>
+                                      <td className="whitespace-nowrap px-4 py-1.5">
+                                        <span className="font-mono text-xs font-medium">{expense.displayNumber}</span>
+                                        <span className="ml-1.5 text-[10px] text-slate-500">{expense.type === "ticket" ? "ticket" : "factura"}</span>
+                                        {hasConflict && <span className="block text-[11px] text-red-700">{CONFLICT_CONFIG[expense.conflictType!].label}</span>}
+                                      </td>
+                                      <td className="max-w-[240px] px-3 py-1.5">
+                                        <span className="block truncate font-medium text-slate-900">{expense.supplier}</span>
+                                        <span className="block font-mono text-[11px] text-slate-500">{expense.supplierTaxId}</span>
+                                      </td>
+                                      <td className="whitespace-nowrap px-3 py-1.5 font-mono text-xs">
+                                        <span className={missing ? "text-red-700" : "text-slate-600"} title={missing ? "La cuenta no existe en el presupuesto" : undefined}>{expense.subAccountCode || "—"}</span>
+                                      </td>
+                                      <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs text-slate-600">{fmt(expense.baseAmount)}</td>
+                                      <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs text-slate-600">{fmt(expense.vatAmount)}</td>
+                                      <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs font-medium">
+                                        {fmt(expense.totalAmount)}
+                                        {hasConflict && expense.pleoAmount && Math.abs(expense.pleoAmount - expense.totalAmount) > 0.02 && <span className="block text-[11px] font-normal text-red-700">tarjeta {fmt(expense.pleoAmount)}</span>}
+                                      </td>
+                                      <td className="whitespace-nowrap px-3 py-1.5 text-xs">
+                                        <span className={`inline-flex items-center gap-1.5 ${st.t}`}><span className={`h-1.5 w-1.5 rounded-full ${st.d}`} />{st.l}</span>
+                                        {!expense.documentUrl && <span className="ml-1.5 text-red-700">· sin doc.</span>}
+                                      </td>
+                                      <td className="py-1.5 pr-3" onClick={(e) => e.stopPropagation()}>
+                                        <div className="flex items-center justify-end gap-0.5">
+                                          {expense.status === "pending" && open && (
+                                            <IconButton label="Marcar revisado" onClick={() => handleReviewExpense(expense)} className="-my-1"><Check size={14} /></IconButton>
+                                          )}
+                                          <Menu trigger={(t) => <IconButton label="Acciones del gasto" onClick={t} className="-my-1"><MoreHorizontal size={15} /></IconButton>}>
+                                            {(close) => (
+                                              <>
+                                                <MenuItem onClick={() => { close(); openDrawer(expense); }}>Abrir</MenuItem>
+                                                {expense.documentUrl && <MenuItem onClick={() => { close(); openDrawer(expense, true); }}>Ver documento</MenuItem>}
+                                                {expense.pleoUrl && <MenuItem onClick={() => { close(); window.open(expense.pleoUrl, "_blank", "noopener"); }}>Ver en la tarjeta (Pleo)</MenuItem>}
+                                              </>
+                                            )}
+                                          </Menu>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                              <tfoot>
+                                <tr className="border-t border-slate-200 bg-[#F4F4F5] text-xs">
+                                  <td className="px-4 py-2 font-semibold" colSpan={3}>Total{visible.length !== envelopeExpenses.length ? " filtrado" : ""}</td>
+                                  <td className="px-3 py-2 text-right font-mono font-semibold">{fmt(tot.base)}</td>
+                                  <td className="px-3 py-2 text-right font-mono font-semibold">{fmt(tot.vat)}</td>
+                                  <td className="px-3 py-2 text-right font-mono font-semibold">{fmt(tot.total)}</td>
+                                  <td colSpan={2} />
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        </>
+                      )}
                     </div>
-                  ) : (
-                    <div className="border border-slate-200 rounded-md overflow-hidden">
-                      <table className="w-full text-[13px]">
-                        <thead className="bg-slate-50 border-b border-slate-200">
-                          <tr>
-                            <th className="text-left px-4 py-2.5 font-medium text-slate-600">Número</th>
-                            <th className="text-left px-4 py-2.5 font-medium text-slate-600">Proveedor</th>
-                            <th className="text-left px-4 py-2.5 font-medium text-slate-600">Cuenta</th>
-                            <th className="text-right px-4 py-2.5 font-medium text-slate-600">Base</th>
-                            <th className="text-right px-4 py-2.5 font-medium text-slate-600">IVA</th>
-                            <th className="text-right px-4 py-2.5 font-medium text-slate-600">Total</th>
-                            <th className="text-center px-4 py-2.5 font-medium text-slate-600">Estado</th>
-                            <th className="text-center px-4 py-2.5 font-medium text-slate-600">Acc.</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {envelopeExpenses.map(expense => {
-                            const sc = EXPENSE_STATUS_CONFIG[expense.status];
-                            const hasConflict = !!expense.conflictType;
-                            const conflictCfg = hasConflict ? CONFLICT_CONFIG[expense.conflictType!] : null;
-                            const isDrawerOpen = drawerExpense?.id === expense.id;
-                            return (
-                              <tr key={expense.id}
-                                className={`hover:bg-slate-50 cursor-pointer transition-colors ${isDrawerOpen ? "bg-amber-50/40" : ""}`}
-                                onClick={() => openDrawer(expense)}>
-                                <td className="px-4 py-3">
-                                  <div className="flex items-center gap-2">
-                                    {expense.type === "ticket"
-                                      ? <Receipt size={14} className="text-amber-500" />
-                                      : <FileText size={14} className="text-blue-500" />}
-                                    <span className="font-mono text-xs">{expense.displayNumber}</span>
-                                  </div>
-                                  {hasConflict && (
-                                    <div className="flex items-center gap-1 mt-1">
-                                      <Info size={11} className="text-amber-500 flex-shrink-0" />
-                                      <span className="text-xs text-amber-600">{conflictCfg!.label}</span>
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="px-4 py-3">
-                                  <p className="font-medium text-slate-900 truncate max-w-[180px]">{expense.supplier}</p>
-                                  <p className="text-xs text-slate-500">{expense.supplierTaxId}</p>
-                                </td>
-                                <td className="px-4 py-3">
-                                  {(() => {
-                                    const missing = expense.subAccountCode && !subAccounts.some(sa => sa.code === expense.subAccountCode);
-                                    return missing ? (
-                                      <div>
-                                        <span className="font-mono text-xs text-red-500 font-medium">{expense.subAccountCode}</span>
-                                        <p className="text-xs text-red-400 mt-0.5">La cuenta no existe</p>
-                                      </div>
-                                    ) : (
-                                      <span className="font-mono text-xs text-slate-600">{expense.subAccountCode}</span>
-                                    );
-                                  })()}
-                                </td>
-                                <td className="px-4 py-3 text-right font-mono">{fmt(expense.baseAmount)}</td>
-                                <td className="px-4 py-3 text-right font-mono text-emerald-600">+{fmt(expense.vatAmount)}</td>
-                                <td className="px-4 py-3 text-right">
-                                  <span className="font-mono font-medium">{fmt(expense.totalAmount)}</span>
-                                  {hasConflict && expense.pleoAmount && Math.abs(expense.pleoAmount - expense.totalAmount) > 0.02 && (
-                                    <p className="text-xs text-amber-500 font-mono">Pleo: {fmt(expense.pleoAmount)}</p>
-                                  )}
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                  <span className={`text-xs px-2 py-0.5 rounded-full ${sc.bg} ${sc.text}`}>{sc.label}</span>
-                                </td>
-                                <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                                  <div className="flex items-center justify-center gap-1">
-                                    {expense.documentUrl && (
-                                      <button
-                                        onClick={() => openDrawer(expense, true)}
-                                        className="p-1.5 text-blue-500 hover:text-blue-600 hover:bg-blue-50 rounded" title="Ver documento">
-                                        <Eye size={14} />
-                                      </button>
-                                    )}
-                                    {expense.pleoUrl && (
-                                      <a href={expense.pleoUrl} target="_blank" rel="noopener noreferrer"
-                                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded" title="Ver en Pleo">
-                                        <ExternalLink size={14} />
-                                      </a>
-                                    )}
-                                    {expense.status === "pending" && selectedEnvelope.status === "open" && (
-                                      <button onClick={() => handleReviewExpense(expense)}
-                                        className="p-1.5 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 rounded">
-                                        <Check size={14} />
-                                      </button>
-                                    )}
-                                    <button onClick={() => openDrawer(expense)}
-                                      className={`p-1.5 rounded transition-colors ${isDrawerOpen ? "text-amber-500 bg-amber-50" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"}`}>
-                                      <PanelRightOpen size={14} />
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
+                  );
+                })()
               )
             ) : (
-              /* ── PETTY CASH TAB ── */
+              /* ── TRANSFERENCIAS ── */
               !selectedTransferEnvelope ? (
-                <div className="flex items-center justify-center h-96">
-                  <p className="text-[13px] text-slate-400">
-                    {transferEnvelopes.length === 0 ? "No hay sobres de Petty Cash" : "Selecciona un sobre"}
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <button onClick={() => setSelectedTransferEnvelope(null)}
-                      className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
-                      <ArrowLeft size={18} />
-                    </button>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-xl font-semibold text-slate-900">{selectedTransferEnvelope.displayNumber}</h2>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${TRANSFER_STATUS_CONFIG[selectedTransferEnvelope.status].bg} ${TRANSFER_STATUS_CONFIG[selectedTransferEnvelope.status].text}`}>
-                          {TRANSFER_STATUS_CONFIG[selectedTransferEnvelope.status].label}
-                        </span>
+                <EmptyState title={transferEnvelopes.length === 0 ? "Aún no hay sobres de transferencias" : "Elige un sobre"} />
+              ) : (() => {
+                const env = selectedTransferEnvelope;
+                const draft = env.status === "draft";
+                const preview = getSettlementPreview(env);
+                const totalAdvance = getTotalAdvance(env);
+                const q = trfSearch.trim();
+                const visible = currentTransferExpenses.filter((exp) => {
+                  if (!q) return true;
+                  const items = exp.items?.length ? exp.items : [{ subAccountCode: exp.subAccountCode || "", subAccountDescription: exp.subAccountDescription || "", description: exp.description || "" } as any];
+                  return matchWords(q, exp.supplier, exp.description, ...items.map((i: any) => i.description)) || matchCode(q, exp.supplierTaxId, ...items.map((i: any) => i.subAccountCode)) || matchAmount(q, exp.totalAmount, exp.baseAmount) === true;
+                });
+                const bank = env.personIban ? detectBank(env.personIban) : null;
+                return (
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex flex-col gap-1">
+                        <button onClick={() => setSelectedTransferEnvelope(null)} className="inline-flex w-fit items-center gap-1 text-xs text-slate-500 hover:text-slate-900"><ArrowLeft size={12} /> Sobres</button>
+                        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-slate-900">
+                          <span className="font-mono">{env.displayNumber}</span>
+                          <span>{env.personName}</span>
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-normal ${draft ? "text-amber-800" : "text-emerald-800"}`}><span className={`h-1.5 w-1.5 rounded-full ${draft ? "bg-amber-500" : "bg-emerald-500"}`} />{draft ? "Abierto" : "Liquidado"}</span>
+                        </h2>
+                        <p className="text-xs text-slate-500">
+                          {[env.personDepartment, env.paymentDate && `pago ${env.paymentDate.split("-").reverse().join("/")}`].filter(Boolean).join(" · ")}
+                          {env.personIban && <> · <span className="font-mono">{env.personIban}</span>{bank && ` (${bank})`}</>}
+                        </p>
                       </div>
-                      <p className="text-[13px] text-slate-500">
-                        {selectedTransferEnvelope.personName}
-                        {selectedTransferEnvelope.personDepartment && ` · ${selectedTransferEnvelope.personDepartment}`}
-                        {" · "}{selectedTransferEnvelope.expenseCount} gastos · Total: {fmt(selectedTransferEnvelope.totalAmount)} €
-                      </p>
+                      {draft && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Menu trigger={(t) => <IconButton label="Más acciones del sobre" onClick={t}><MoreHorizontal size={15} /></IconButton>}>
+                            {(close) => (
+                              <>
+                                <MenuItem onClick={() => { close(); setAdvanceForm({ amount: "", method: "bank", date: new Date().toISOString().slice(0, 10), iban: "", proofFile: null }); setShowAddAdvanceModal(true); }}>Añadir anticipo</MenuItem>
+                                <MenuItem onClick={() => { close(); setBoxFormRequesterName(env.personName); setBoxFormMessage(""); setBoxFormTargetEnvelopeId(env.id); setGeneratedBoxResult(null); setShowSendBoxFormModal(true); }}>Pedir gastos por enlace</MenuItem>
+                                {canDeleteTransferEnvelope(env) && (<><MenuSeparator /><MenuItem danger onClick={() => { close(); setShowDeleteTransferEnvelopeModal(env); }}>Eliminar sobre</MenuItem></>)}
+                              </>
+                            )}
+                          </Menu>
+                          <Button variant="secondary" onClick={() => { setExpensesList([createEmptyExpense()]); setShowAddExpenseModal(true); }}><Plus size={14} /> Gasto</Button>
+                          <Button variant="primary" onClick={() => { setSettleForm({ reference: "", proofFile: null }); setShowSettleModal(true); }} disabled={env.advances.length === 0 && env.expenseCount === 0}><Scale size={14} /> Liquidar</Button>
+                        </div>
+                      )}
                     </div>
-                    {selectedTransferEnvelope.status === "draft" && (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => { setAdvanceForm({ amount: "", method: "bank", date: new Date().toISOString().slice(0, 10), iban: "", proofFile: null }); setShowAddAdvanceModal(true); }}
-                          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">
-                          <Banknote size={16} /> Añadir anticipo
-                        </button>
-                        <button
-                          onClick={() => { setBoxFormRequesterName(selectedTransferEnvelope.personName); setBoxFormMessage(""); setBoxFormTargetEnvelopeId(selectedTransferEnvelope.id); setGeneratedBoxResult(null); setShowSendBoxFormModal(true); }}
-                          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">
-                          <Link2 size={16} /> Enviar solicitud
-                        </button>
-                        <button
-                          onClick={() => { setExpensesList([createEmptyExpense()]); setShowAddExpenseModal(true); }}
-                          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50">
-                          <Plus size={16} /> Añadir gasto
-                        </button>
-                        <button
-                          onClick={() => { setSettleForm({ reference: "", proofFile: null }); setShowSettleModal(true); }}
-                          disabled={selectedTransferEnvelope.advances.length === 0 && selectedTransferEnvelope.expenseCount === 0}
-                          className="flex items-center gap-2 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50">
-                          <Scale size={16} /> Liquidación
-                        </button>
-                        {canDeleteTransferEnvelope(selectedTransferEnvelope) && (
-                          <button onClick={() => setShowDeleteTransferEnvelopeModal(selectedTransferEnvelope)}
-                            className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md">
-                            <Trash2 size={16} />
-                          </button>
+
+                    {/* Posición del sobre */}
+                    <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-slate-200">
+                      <div className="flex flex-col gap-0.5 border-r border-slate-100 px-4 py-3">
+                        <span className="text-[11px] uppercase tracking-wide text-slate-500">Anticipado</span>
+                        <span className="font-mono text-lg font-semibold">{fmt(totalAdvance)} €</span>
+                        {env.advances.length > 0 && (
+                          <span className="flex flex-wrap gap-x-2 text-xs text-slate-500">
+                            {env.advances.map((a) => (
+                              <span key={a.id}>{fmt(a.amount)} · {a.method === "cash" ? "efectivo" : "transf."} {a.date.slice(5).split("-").reverse().join("/")}{a.proofUrl && <> · <a href={a.proofUrl} target="_blank" rel="noopener noreferrer" className="underline">ver</a></>}</span>
+                            ))}
+                          </span>
                         )}
                       </div>
-                    )}
-                  </div>
+                      <div className="flex flex-col gap-0.5 border-r border-slate-100 px-4 py-3">
+                        <span className="text-[11px] uppercase tracking-wide text-slate-500">Gastado</span>
+                        <span className="font-mono text-lg font-semibold">{fmt(env.totalAmount)} €</span>
+                        <span className="text-xs text-slate-500">{env.expenseCount} gastos</span>
+                      </div>
+                      <div className="flex flex-col gap-0.5 px-4 py-3">
+                        <span className="text-[11px] uppercase tracking-wide text-slate-500">{draft ? "Liquidación prevista" : "Liquidación"}</span>
+                        {draft ? (
+                          <>
+                            <span className="font-mono text-lg font-semibold">{preview.direction === "none" ? "0,00" : fmt(preview.diff)} €</span>
+                            <span className="text-xs text-slate-500">{preview.label}</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="font-mono text-lg font-semibold">{fmt(env.settlementAmount || 0)} €</span>
+                            <span className="text-xs text-slate-500">
+                              {env.settlementDirection === "none" ? "Sin movimiento" : env.settlementDirection === "production_to_person" ? `Productora → ${env.personName}` : `${env.personName} → productora`}
+                              {" · "}{env.settledByName} {fmtDate(env.settledAt)}
+                              {env.settlementProofUrl && <> · <a href={env.settlementProofUrl} target="_blank" rel="noopener noreferrer" className="underline">extracto</a></>}
+                              {env.settlementReference && ` · ref. ${env.settlementReference}`}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
 
-                  {/* Resumen anticipo(s) / liquidación estimada — siempre visible en borrador */}
-                  {selectedTransferEnvelope.status === "draft" && (() => {
-                    const preview = getSettlementPreview(selectedTransferEnvelope);
-                    const totalAdvance = getTotalAdvance(selectedTransferEnvelope);
-                    return (
-                      <div className="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-md space-y-2 text-[13px]">
-                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-                          <div>
-                            <span className="text-slate-500">Anticipo{selectedTransferEnvelope.advances.length > 1 ? "s" : ""}: </span>
-                            {selectedTransferEnvelope.advances.length > 0 ? (
-                              <span className="font-semibold text-slate-900">
-                                {fmt(totalAdvance)} € {selectedTransferEnvelope.advances.length > 1 && <span className="font-normal text-slate-400">({selectedTransferEnvelope.advances.length} pagos)</span>}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">Sin anticipo</span>
-                            )}
-                          </div>
-                          <div className="text-slate-300">|</div>
-                          <div>
-                            <span className="text-slate-500">Liquidación estimada: </span>
-                            {preview.direction === "none" ? (
-                              <span className="text-slate-600">{preview.label}</span>
-                            ) : (
-                              <span className="font-semibold text-slate-900">{preview.label}: {fmt(preview.diff)} €</span>
-                            )}
+                    {env.notes && <p className="text-xs text-slate-600">Notas: {env.notes}</p>}
+
+                    {currentTransferExpenses.length === 0 ? (
+                      <EmptyState title="Sin gastos en este sobre" action={draft ? <Button variant="primary" size="sm" onClick={() => { setExpensesList([createEmptyExpense()]); setShowAddExpenseModal(true); }}>Añadir gasto</Button> : undefined} />
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <div className="relative min-w-[260px] flex-1">
+                            <Input value={trfSearch} onChange={(e) => setTrfSearch(e.target.value)} placeholder="Buscar proveedor, concepto, cuenta o importe (>50, 20-80)" />
                           </div>
                         </div>
-                        {selectedTransferEnvelope.advances.length > 0 && (
-                          <div className="flex flex-wrap gap-2 pt-1">
-                            {selectedTransferEnvelope.advances.map((a) => (
-                              <span key={a.id} className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-600">
-                                {fmt(a.amount)} € · {a.method === "cash" ? "Efectivo" : "Transferencia"} · {a.date}
-                                {a.proofUrl && (
-                                  <a href={a.proofUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">Ver</a>
-                                )}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-                  {selectedTransferEnvelope.status === "settled" && (
-                    <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-md flex items-start gap-3">
-                      <CheckSquare size={18} className="text-emerald-600 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-[13px] font-medium text-emerald-800">
-                          {selectedTransferEnvelope.settlementDirection === "none"
-                            ? "Liquidado — sin movimiento"
-                            : `Liquidado · ${selectedTransferEnvelope.settlementDirection === "production_to_person"
-                                ? `La productora pagó a ${selectedTransferEnvelope.personName}`
-                                : `${selectedTransferEnvelope.personName} devolvió a la productora`}: ${fmt(selectedTransferEnvelope.settlementAmount || 0)} €`}
-                        </p>
-                        <p className="text-xs text-emerald-600">
-                          {selectedTransferEnvelope.settlementReference && `Ref: ${selectedTransferEnvelope.settlementReference} · `}
-                          Por {selectedTransferEnvelope.settledByName} · {fmtDate(selectedTransferEnvelope.settledAt)}
-                          {selectedTransferEnvelope.settlementProofUrl && (
-                            <> · <a href={selectedTransferEnvelope.settlementProofUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-emerald-800">Ver extracto</a></>
-                          )}
-                          {selectedTransferEnvelope.advances.map((a, idx) => a.proofUrl && (
-                            <span key={a.id}> · <a href={a.proofUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-emerald-800">Ver anticipo {selectedTransferEnvelope.advances.length > 1 ? idx + 1 : ""}</a></span>
-                          ))}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedTransferEnvelope.notes && (
-                    <div className="mb-4 p-3 bg-amber-50 border border-amber-100 rounded-md">
-                      <p className="text-xs text-amber-700"><strong>Notas:</strong> {selectedTransferEnvelope.notes}</p>
-                    </div>
-                  )}
-
-                  {currentTransferExpenses.length === 0 ? (
-                    <div className="flex items-center justify-center h-48">
-                      <div className="text-center">
-                        <p className="text-[13px] text-slate-400 mb-4">No hay gastos en este sobre</p>
-                        {selectedTransferEnvelope.status === "draft" && (
-                          <button
-                            onClick={() => { setExpensesList([createEmptyExpense()]); setShowAddExpenseModal(true); }}
-                            className="inline-flex items-center gap-2 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium">
-                            <Plus size={16} /> Añadir gasto
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="border border-slate-200 rounded-md overflow-hidden">
-                      <table className="w-full text-[13px]">
-                        <thead className="bg-slate-50 border-b border-slate-200">
-                          <tr>
-                            <th className="text-left px-4 py-2.5 font-medium text-slate-600 w-[200px]">Persona</th>
-                            <th className="text-left px-4 py-2.5 font-medium text-slate-600 w-[160px]">Proveedor</th>
-                            <th className="text-left px-4 py-2.5 font-medium text-slate-600">Cuentas</th>
-                            <th className="text-right px-4 py-2.5 font-medium text-slate-600 w-[90px]">Base</th>
-                            <th className="text-right px-4 py-2.5 font-medium text-slate-600 w-[80px]">IVA</th>
-                            <th className="text-right px-4 py-2.5 font-medium text-slate-600 w-[90px]">Total</th>
-                            <th className="text-center px-2 py-2.5 font-medium text-slate-600 w-[60px]"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {currentTransferExpenses.map(exp => {
-                            const displayItems = exp.items && exp.items.length > 0
-                              ? exp.items
-                              : [{ subAccountCode: exp.subAccountCode || "", subAccountDescription: exp.subAccountDescription || "", baseAmount: exp.baseAmount, vatRate: 0, vatAmount: exp.vatAmount }];
-                            const bank = exp.personIban ? detectBank(exp.personIban) : null;
-                            return (
-                              <tr key={exp.id} className="hover:bg-slate-50 align-top">
-                                <td className="px-4 py-3">
-                                  <p className="font-medium text-slate-900 leading-tight">
-                                    {exp.personName}
-                                    {exp.personDepartment && (
-                                      <span className="font-normal text-slate-400"> · {exp.personDepartment}</span>
-                                    )}
-                                  </p>
-                                  {exp.personIban && (
-                                    <p className="font-mono text-xs text-slate-400 mt-0.5 leading-tight break-all">
-                                      {exp.personIban}
-                                      {bank && <span className="font-sans not-italic ml-1 text-slate-300">· {bank}</span>}
-                                    </p>
-                                  )}
-                                </td>
-                                <td className="px-4 py-3">
-                                  <p className="text-slate-900 truncate" title={exp.supplier}>{exp.supplier}</p>
-                                  <p className="text-xs text-slate-500">{exp.date}</p>
-                                </td>
-                                <td className="px-4 py-3">
-                                  {displayItems.map((item, idx) => (
-                                    <div key={idx} className={idx > 0 ? "mt-1 pt-1 border-t border-slate-100" : ""}>
-                                      <span className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">{item.subAccountCode}</span>
-                                      {displayItems.length > 1 && (
-                                        <span className="ml-2 text-xs text-slate-500">{fmt(item.baseAmount)} €</span>
-                                      )}
-                                    </div>
-                                  ))}
-                                </td>
-                                <td className="px-4 py-3 text-right font-mono">{fmt(exp.baseAmount)}</td>
-                                <td className="px-4 py-3 text-right font-mono text-emerald-600">+{fmt(exp.vatAmount)}</td>
-                                <td className="px-4 py-3 text-right font-mono font-medium">{fmt(exp.totalAmount)}</td>
-                                <td className="px-2 py-3 text-center">
-                                  <div className="flex items-center justify-center gap-1">
-                                    {exp.attachmentUrl && (
-                                      <a href={exp.attachmentUrl} target="_blank" rel="noopener noreferrer"
-                                        className="p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded" title="Ver documento">
-                                        <Eye size={14} />
-                                      </a>
-                                    )}
-                                    {selectedTransferEnvelope.status === "draft" && (
-                                      <button onClick={() => handleDeleteExpense(exp)}
-                                        className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded">
-                                        <Trash2 size={14} />
-                                      </button>
-                                    )}
-                                  </div>
-                                </td>
+                        <div className="overflow-x-auto rounded-lg border border-slate-200">
+                          <table className="w-full min-w-[760px] border-collapse text-[13px]">
+                            <thead>
+                              <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
+                                <th scope="col" className="px-4 py-2 text-left font-medium">Fecha</th>
+                                <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor</th>
+                                <th scope="col" className="px-3 py-2 text-left font-medium">Cuentas</th>
+                                <th scope="col" className="px-3 py-2 text-right font-medium">Base</th>
+                                <th scope="col" className="px-3 py-2 text-right font-medium">IVA</th>
+                                <th scope="col" className="px-3 py-2 text-right font-medium">Total</th>
+                                <th scope="col" className="w-20 py-2 pr-3" />
                               </tr>
-                            );
-                          })}
-                        </tbody>
-                        <tfoot className="bg-slate-50 border-t border-slate-200">
-                          <tr>
-                            <td colSpan={3} className="px-4 py-3 text-right font-semibold text-slate-600">Total</td>
-                            <td className="px-4 py-3 text-right font-mono font-semibold">{fmt(selectedTransferEnvelope.totalBase)}</td>
-                            <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-600">+{fmt(selectedTransferEnvelope.totalVat)}</td>
-                            <td className="px-4 py-3 text-right font-mono font-bold">{fmt(selectedTransferEnvelope.totalAmount)} €</td>
-                            <td></td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )
+                            </thead>
+                            <tbody>
+                              {visible.map((exp) => {
+                                const items = exp.items?.length ? exp.items : [{ subAccountCode: exp.subAccountCode || "", baseAmount: exp.baseAmount } as any];
+                                return (
+                                  <tr key={exp.id} className="border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA]">
+                                    <td className="whitespace-nowrap px-4 py-1.5 tabular-nums text-slate-600">{exp.date ? exp.date.split("-").reverse().slice(0, 2).join("/") : "—"}</td>
+                                    <td className="max-w-[260px] px-3 py-1.5">
+                                      <span className="block truncate font-medium text-slate-900">{exp.supplier}</span>
+                                      <span className="block text-[11px] text-slate-500">{exp.type === "invoice" ? "Factura" : "Ticket"}{exp.supplierTaxId && <> · <span className="font-mono">{exp.supplierTaxId}</span></>}</span>
+                                    </td>
+                                    <td className="px-3 py-1.5 font-mono text-xs text-slate-600">{items.map((i: any) => i.subAccountCode).filter(Boolean).join(", ") || "—"}</td>
+                                    <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs text-slate-600">{fmt(exp.baseAmount)}</td>
+                                    <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs text-slate-600">{fmt(exp.vatAmount)}</td>
+                                    <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs font-medium">{fmt(exp.totalAmount)}</td>
+                                    <td className="py-1.5 pr-3">
+                                      <div className="flex items-center justify-end gap-0.5">
+                                        {exp.attachmentUrl ? (
+                                          <IconButton label="Ver documento" onClick={() => window.open(exp.attachmentUrl, "_blank", "noopener")} className="-my-1"><Eye size={14} /></IconButton>
+                                        ) : <span className="mr-1 whitespace-nowrap text-[11px] text-red-700">sin doc.</span>}
+                                        {draft && <IconButton label="Eliminar gasto" onClick={() => handleDeleteExpense(exp)} className="-my-1"><Trash2 size={13} /></IconButton>}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                            <tfoot>
+                              <tr className="border-t border-slate-200 bg-[#F4F4F5] text-xs">
+                                <td className="px-4 py-2 font-semibold" colSpan={3}>Total</td>
+                                <td className="px-3 py-2 text-right font-mono font-semibold">{fmt(env.totalBase)}</td>
+                                <td className="px-3 py-2 text-right font-mono font-semibold">{fmt(env.totalVat)}</td>
+                                <td className="px-3 py-2 text-right font-mono font-semibold">{fmt(env.totalAmount)}</td>
+                                <td />
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })()
             )}
+
           </div>
         </div>
       </div>
@@ -2859,10 +2738,10 @@ export default function BoxesPage() {
                         <ChevronRight size={15} />
                       </button>
                     </div>
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${drawerExpense.type === "ticket" ? "bg-amber-50" : "bg-blue-50"}`}>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${drawerExpense.type === "ticket" ? "bg-amber-50" : "bg-[#F7F7F8]"}`}>
                       {drawerExpense.type === "ticket"
                         ? <Receipt size={16} className="text-amber-500" />
-                        : <FileText size={16} className="text-blue-500" />}
+                        : <FileText size={16} className="text-slate-500" />}
                     </div>
                     <div>
                       <p className="text-[13px] font-semibold text-slate-900">{drawerExpense.displayNumber}</p>
@@ -2874,7 +2753,7 @@ export default function BoxesPage() {
                       <button
                         onClick={() => setDrawerShowPreview(!drawerShowPreview)}
                         title={drawerShowPreview ? "Ocultar documento" : "Ver documento"}
-                        className={`p-1.5 rounded-lg transition-colors ${drawerShowPreview ? "text-blue-600 bg-blue-50" : "text-slate-400 hover:bg-slate-100"}`}>
+                        className={`p-1.5 rounded-lg transition-colors ${drawerShowPreview ? "text-slate-700 bg-[#F7F7F8]" : "text-slate-400 hover:bg-slate-100"}`}>
                         <Eye size={16} />
                       </button>
                     )}
@@ -2933,12 +2812,12 @@ export default function BoxesPage() {
                       </div>
                       {/* Linked charges: shown when invoice covers multiple card charges */}
                       {drawerExpense.conflictType === "invoice_covers_multiple" && drawerExpense.linkedCharges && drawerExpense.linkedCharges.length > 0 && (
-                        <div className="mt-1.5 border border-blue-100 rounded-lg overflow-hidden">
-                          <div className="bg-blue-50 px-3 py-1.5 flex items-center justify-between">
-                            <span className="text-xs font-medium text-blue-700">Cargos de tarjeta vinculados</span>
-                            <span className="text-xs text-blue-500">{drawerExpense.linkedCharges.length} cargo{drawerExpense.linkedCharges.length !== 1 ? "s" : ""}</span>
+                        <div className="mt-1.5 border border-slate-200 rounded-lg overflow-hidden">
+                          <div className="bg-[#F7F7F8] px-3 py-1.5 flex items-center justify-between">
+                            <span className="text-xs font-medium text-slate-900">Cargos de tarjeta vinculados</span>
+                            <span className="text-xs text-slate-500">{drawerExpense.linkedCharges.length} cargo{drawerExpense.linkedCharges.length !== 1 ? "s" : ""}</span>
                           </div>
-                          <div className="divide-y divide-blue-50 bg-white">
+                          <div className="divide-y divide-slate-200 bg-white">
                             {drawerExpense.linkedCharges.map((charge, ci) => (
                               <div key={ci} className="flex items-center justify-between px-3 py-2">
                                 <span className="text-xs text-slate-500">{charge.date || "—"}</span>
@@ -2946,9 +2825,9 @@ export default function BoxesPage() {
                               </div>
                             ))}
                           </div>
-                          <div className="bg-blue-50 px-3 py-1.5 flex items-center justify-between border-t border-blue-100">
-                            <span className="text-xs font-medium text-blue-600">Total cargos</span>
-                            <span className="text-xs font-mono font-semibold text-blue-700">
+                          <div className="bg-[#F7F7F8] px-3 py-1.5 flex items-center justify-between border-t border-slate-200">
+                            <span className="text-xs font-medium text-slate-700">Total cargos</span>
+                            <span className="text-xs font-mono font-semibold text-slate-900">
                               {fmt(drawerExpense.linkedCharges.reduce((s, c) => s + (c.amount || 0), 0))} €
                             </span>
                           </div>
@@ -3004,7 +2883,7 @@ export default function BoxesPage() {
                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Líneas ({drawerItems.length})</span>
                         <button type="button"
                           onClick={() => setDrawerItems(prev => [...prev, { id: crypto.randomUUID(), subAccountCode: "", subAccountDescription: "", description: "", baseAmount: 0, vatRate: 21 }])}
-                          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium">
+                          className="flex items-center gap-1 text-xs text-slate-700 hover:text-slate-900 font-medium">
                           <Plus size={12} /> Añadir línea
                         </button>
                       </div>
@@ -3147,21 +3026,21 @@ export default function BoxesPage() {
 
                     {/* Linked charges mini-table for invoice_covers_multiple */}
                     {drawerForm.conflictType === "invoice_covers_multiple" && (
-                      <div className="bg-blue-50 border border-blue-100 rounded-md p-3">
+                      <div className="bg-[#F7F7F8] border border-slate-200 rounded-md p-3">
                         <div className="flex items-center justify-between mb-2">
-                          <p className="text-xs font-semibold text-blue-700">Cargos de tarjeta que cubre esta factura</p>
+                          <p className="text-xs font-semibold text-slate-900">Cargos de tarjeta que cubre esta factura</p>
                           <button type="button"
                             onClick={() => setDrawerLinkedCharges(prev => [...prev, { amount: 0, date: "" }])}
-                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium">
+                            className="flex items-center gap-1 text-xs text-slate-700 hover:text-slate-900 font-medium">
                             <Plus size={12} /> Añadir cargo
                           </button>
                         </div>
                         {drawerLinkedCharges.length === 0 && (
-                          <p className="text-xs text-blue-400 text-center py-2">Sin cargos anotados aún</p>
+                          <p className="text-xs text-slate-400 text-center py-2">Sin cargos anotados aún</p>
                         )}
                         <div className="space-y-2">
                           {drawerLinkedCharges.map((charge, ci) => (
-                            <div key={ci} className="flex items-center gap-2 bg-white rounded-lg border border-blue-100 px-3 py-2">
+                            <div key={ci} className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 px-3 py-2">
                               <div className="flex-1">
                                 <input
                                   type="text"
@@ -3193,9 +3072,9 @@ export default function BoxesPage() {
                           ))}
                         </div>
                         {drawerLinkedCharges.length > 0 && (
-                          <div className="flex justify-between items-center mt-2 pt-2 border-t border-blue-100">
-                            <span className="text-xs text-blue-500">Total cargos</span>
-                            <span className="text-xs font-mono font-semibold text-blue-700">
+                          <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-200">
+                            <span className="text-xs text-slate-500">Total cargos</span>
+                            <span className="text-xs font-mono font-semibold text-slate-900">
                               {fmt(drawerLinkedCharges.reduce((s, c) => s + (c.amount || 0), 0))} €
                             </span>
                           </div>
@@ -3218,7 +3097,7 @@ export default function BoxesPage() {
                     {drawerExpense.documentUrl && (
                       <a href={drawerExpense.documentUrl} target="_blank" rel="noopener noreferrer"
                         title="Abrir documento en nueva pestaña"
-                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-[#F4F4F5] rounded-lg transition-colors">
                         <ExternalLink size={15} />
                       </a>
                     )}
@@ -3515,7 +3394,7 @@ export default function BoxesPage() {
                           }}
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] flex items-center justify-between hover:border-slate-300">
                             <span className="flex items-center gap-1.5">
-                              {exp.type === "ticket" ? <><Receipt size={13} className="text-amber-500" /> Ticket</> : <><FileText size={13} className="text-blue-500" /> Factura</>}
+                              {exp.type === "ticket" ? <><Receipt size={13} className="text-amber-500" /> Ticket</> : <><FileText size={13} className="text-slate-500" /> Factura</>}
                             </span>
                             <ChevronDown size={13} className="text-slate-400" />
                           </button>
@@ -3523,7 +3402,7 @@ export default function BoxesPage() {
                             <div className="fixed z-50 bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden"
                               style={{ top: cardTypeDropdownPos.top, left: cardTypeDropdownPos.left, width: cardTypeDropdownPos.width }}>
                               <button type="button" onClick={() => { updateCardExpense(idx, "type", "ticket"); setShowCardTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-[13px] hover:bg-slate-50 flex items-center gap-2"><Receipt size={13} className="text-amber-500" /> Ticket</button>
-                              <button type="button" onClick={() => { updateCardExpense(idx, "type", "invoice"); setShowCardTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-[13px] hover:bg-slate-50 flex items-center gap-2"><FileText size={13} className="text-blue-500" /> Factura</button>
+                              <button type="button" onClick={() => { updateCardExpense(idx, "type", "invoice"); setShowCardTypeDropdown(null); }} className="w-full px-3 py-2 text-left text-[13px] hover:bg-slate-50 flex items-center gap-2"><FileText size={13} className="text-slate-500" /> Factura</button>
                             </div>
                           )}
                         </div>
@@ -3570,7 +3449,7 @@ export default function BoxesPage() {
                       <div className="bg-slate-50 rounded-lg p-3">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-medium text-slate-500">Líneas de detalle ({exp.items.length})</span>
-                          <button onClick={() => addCardItem(idx)} className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"><Plus size={12} /> Añadir línea</button>
+                          <button onClick={() => addCardItem(idx)} className="flex items-center gap-1 text-xs text-slate-700 hover:text-slate-900"><Plus size={12} /> Añadir línea</button>
                         </div>
                         <div className="space-y-2">
                           {exp.items.map((item, itemIdx) => (
@@ -3654,7 +3533,7 @@ export default function BoxesPage() {
                   onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
                   onDragLeave={() => setIsDragging(false)}
                   onDrop={e => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f?.name.endsWith(".xlsx")) handleFileSelect(f); }}
-                  className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${isDragging ? "border-blue-400 bg-blue-50" : "border-slate-200"}`}>
+                  className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${isDragging ? "border-slate-400 bg-[#F7F7F8]" : "border-slate-200"}`}>
                   <Upload size={40} className="text-slate-300 mx-auto mb-4" />
                   <p className="text-slate-600 mb-2">Arrastra el archivo Excel aquí</p>
                   <p className="text-[13px] text-slate-400 mb-4">o</p>
@@ -3699,8 +3578,8 @@ export default function BoxesPage() {
                                 <td className="px-3 py-2.5">
                                   <div className="flex items-center gap-1.5">
                                     {isDup && <AlertTriangle size={12} className="text-amber-500 flex-shrink-0" />}
-                                    {exp.type === "ticket" ? <Receipt size={13} className="text-amber-500 flex-shrink-0" /> : <FileText size={13} className="text-blue-500 flex-shrink-0" />}
-                                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${exp.type === "ticket" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>{exp.type === "ticket" ? "Ticket" : "Factura"}</span>
+                                    {exp.type === "ticket" ? <Receipt size={13} className="text-amber-500 flex-shrink-0" /> : <FileText size={13} className="text-slate-500 flex-shrink-0" />}
+                                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${exp.type === "ticket" ? "bg-amber-100 text-amber-700" : "bg-[#F1F1F3] text-slate-900"}`}>{exp.type === "ticket" ? "Ticket" : "Factura"}</span>
                                   </div>
                                   <p className="text-xs text-slate-400 mt-1">{exp.date}</p>
                                   {isDup && <p className="text-xs text-amber-600 font-medium mt-0.5">{dupReason} — se omitirá</p>}
@@ -3792,8 +3671,8 @@ export default function BoxesPage() {
                 <button onClick={() => { setShowReceiptImportModal(false); setReceiptFiles([]); }} className="p-2 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
               </div>
               <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                <label className={`flex flex-col items-center justify-center gap-2 w-full py-8 border-2 border-dashed rounded-md cursor-pointer transition-colors ${receiptFiles.length > 0 ? "border-blue-300 bg-blue-50/30" : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"}`}>
-                  <FileText size={28} className={receiptFiles.length > 0 ? "text-blue-400" : "text-slate-300"} />
+                <label className={`flex flex-col items-center justify-center gap-2 w-full py-8 border-2 border-dashed rounded-md cursor-pointer transition-colors ${receiptFiles.length > 0 ? "border-slate-200 bg-[#F7F7F8]" : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"}`}>
+                  <FileText size={28} className={receiptFiles.length > 0 ? "text-slate-400" : "text-slate-300"} />
                   <div className="text-center">
                     <p className="text-[13px] font-medium text-slate-700">{receiptFiles.length > 0 ? `${receiptFiles.length} archivo${receiptFiles.length > 1 ? "s" : ""} seleccionado${receiptFiles.length > 1 ? "s" : ""}` : "Selecciona facturas y tickets"}</p>
                     <p className="text-xs text-slate-400 mt-0.5">PDF, JPG, PNG · varios archivos a la vez</p>
@@ -4045,7 +3924,7 @@ export default function BoxesPage() {
                       <div className="bg-slate-50 rounded-lg p-3">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-medium text-slate-500">Líneas de detalle ({exp.items.length})</span>
-                          <button onClick={() => addItemToExpense(idx)} className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"><Plus size={12} /> Añadir línea</button>
+                          <button onClick={() => addItemToExpense(idx)} className="flex items-center gap-1 text-xs text-slate-700 hover:text-slate-900"><Plus size={12} /> Añadir línea</button>
                         </div>
                         <div className="space-y-2">
                           {exp.items.map((item, itemIdx) => (
