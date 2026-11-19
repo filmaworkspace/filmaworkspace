@@ -71,6 +71,11 @@ import {
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
+import { PendingApprovalNotice } from "@/components/accounting/ApprovalFlow";
+import { stepLabel } from "@/lib/approvalFlow";
+import { repairDoc } from "@/lib/approvalActions";
+
+const toDateAny = (v: any): Date => (v?.toDate ? v.toDate() : new Date(v));
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { getCostSettings, shouldCommitPO } from "@/lib/budgetRules";
 import { FilmaPDF } from "@/lib/pdfBuilder";
@@ -129,7 +134,8 @@ interface ApprovalStepStatus {
   approvedBy: string[];
   approvedByNames?: string[];
   rejectedBy: string[];
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "skipped";
+  skipReason?: string | null;
   requireAll: boolean;
   approvedAt?: Date;
 }
@@ -250,6 +256,16 @@ export default function PODetailPage() {
   useEffect(() => {
     if (projectId && poId && !permissionsLoading) loadData();
   }, [projectId, poId, permissionsLoading]);
+
+  // Reparar un flujo atascado (pasos sin aprobador o fuera de umbral → omitidos).
+  const canRepairFlow = permissions.isProjectRole || ["accounting", "accounting_extended"].includes(String(permissions.accountingAccessLevel));
+  const handleRepairFlow = async () => {
+    try {
+      const r = await repairDoc(projectId, "po", poId, { uid: permissions.userId || "", name: permissions.userName || "" });
+      alert(r.changed ? "Flujo reparado" : "No había nada que reparar");
+      await loadData();
+    } catch (e: any) { alert("No se pudo reparar: " + (e?.message || "")); }
+  };
 
   const loadData = async () => {
     try {
@@ -1291,7 +1307,7 @@ export default function PODetailPage() {
               {po.status === "pending" && (
                 <span className="text-xs text-amber-600 font-medium flex items-center gap-1">
                   <Clock size={12} />
-                  {po.approvalSteps.filter(s => s.status === "approved").length}/{po.approvalSteps.length}
+                  {po.approvalSteps.filter(s => s.status === "approved").length}/{po.approvalSteps.filter(s => s.status !== "skipped").length}
                 </span>
               )}
               {po.status === "rejected" && (
@@ -1302,18 +1318,26 @@ export default function PODetailPage() {
               )}
             </div>
 
+            {po.status === "pending" && (
+              <div className="px-4 pt-4">
+                <PendingApprovalNotice doc={po as any} onRepair={canRepairFlow ? handleRepairFlow : undefined} />
+              </div>
+            )}
             <div className="p-4">
               <div className={`grid gap-3`} style={{ gridTemplateColumns: `repeat(${po.approvalSteps.length}, minmax(0, 1fr))` }}>
                 {po.approvalSteps.map((step, index) => {
                   const isApproved = step.status === "approved";
                   const isRejected = step.status === "rejected";
                   const isPending = step.status === "pending";
-                  const isCurrent = po.currentApprovalStep === index;
+                  const isSkipped = step.status === "skipped";
+                  const isCurrent = po.currentApprovalStep === index && isPending;
                   
                   // Obtener nombre del firmante
-                  const signerName = isApproved && step.approvedByNames?.[0] 
-                    ? step.approvedByNames[0] 
-                    : step.approverNames?.[0] || "—";
+                  const signerName = isSkipped
+                    ? stepLabel(step as any, po.department)
+                    : isApproved && step.approvedByNames?.length
+                    ? step.approvedByNames.join(", ")
+                    : step.approverNames?.join(", ") || "—";
                   
                   const signerId = isApproved && step.approvedBy?.[0] 
                     ? step.approvedBy[0] 
@@ -1331,6 +1355,7 @@ export default function PODetailPage() {
                       className={`p-3 rounded-md border text-center ${
                         isApproved ? "bg-emerald-50 border-emerald-200" : 
                         isRejected ? "bg-red-50 border-red-200" : 
+                        isSkipped ? "bg-white border-dashed border-slate-200" :
                         isCurrent ? "bg-amber-50 border-amber-200" : 
                         "bg-slate-50 border-slate-200"
                       }`}
@@ -1360,10 +1385,11 @@ export default function PODetailPage() {
                       }`}>
                         {isApproved ? <Check size={14} /> : 
                          isRejected ? <X size={14} /> : 
+                         isSkipped ? "—" :
                          signerName.charAt(0).toUpperCase()}
                       </div>
                       
-                      <p className={`text-[13px] font-medium truncate ${
+                      <p title={signerName} className={`text-[13px] font-medium truncate ${isSkipped ? "text-slate-400 " : ""}${
                         isApproved ? "text-emerald-800" : 
                         isRejected ? "text-red-800" : 
                         "text-slate-700"
@@ -1374,14 +1400,16 @@ export default function PODetailPage() {
                       {isApproved ? (
                         <p className="text-[10px] text-emerald-600 mt-0.5">
                           {step.approvedAt 
-                            ? `${new Date(step.approvedAt).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })} · ${new Date(step.approvedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}`
+                            ? `${toDateAny(step.approvedAt).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })} · ${toDateAny(step.approvedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}`
                             : "Firmado"
                           }
                         </p>
                       ) : isRejected ? (
                         <p className="text-[10px] text-red-600 mt-0.5">Rechazado</p>
+                      ) : isSkipped ? (
+                        <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-2" title={step.skipReason || ""}>Omitido · {step.skipReason || "sin aprobador"}</p>
                       ) : isCurrent ? (
-                        <p className="text-[10px] text-amber-600 mt-0.5">Pendiente</p>
+                        <p className="text-[10px] text-amber-600 mt-0.5">{step.requireAll ? `Pendiente · ${(step.approvedBy || []).length}/${(step.approvers || []).length}` : "Pendiente"}</p>
                       ) : (
                         <p className="text-[10px] text-slate-400 mt-0.5">En espera</p>
                       )}

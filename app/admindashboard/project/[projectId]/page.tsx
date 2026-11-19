@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ProjectSummary } from "@/components/admin/ProjectSummary";
+import { ProjectApprovals } from "@/components/admin/ProjectApprovals";
 import { PHASE_DOT } from "@/components/admin/ui";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
@@ -189,8 +190,8 @@ export default function AdminProjectPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<"summary" | "general" | "accounting" | "team" | "logs">(
-    (["summary", "general", "accounting", "team", "logs"].includes(searchParams.get("tab") || "") ? searchParams.get("tab") : "summary") as "summary"
+  const [activeTab, setActiveTab] = useState<"summary" | "general" | "accounting" | "approvals" | "team" | "logs">(
+    (["summary", "general", "accounting", "approvals", "team", "logs"].includes(searchParams.get("tab") || "") ? searchParams.get("tab") : "summary") as "summary"
   );
   const [logs, setLogs] = useState<Array<{
     id: string;
@@ -1092,7 +1093,7 @@ export default function AdminProjectPage() {
 
         <div className="mt-6 mb-6 flex w-fit gap-0.5 rounded-md border border-slate-200 bg-[#F7F7F8] p-0.5" role="tablist">
           {([
-            ["summary", "Resumen"], ["general", "Miembros y ajustes"], ["accounting", "Contabilidad"], ["team", "Equipo"], ["logs", "Registro"],
+            ["summary", "Resumen"], ["general", "Miembros y ajustes"], ["accounting", "Contabilidad"], ["approvals", "Aprobaciones"], ["team", "Equipo"], ["logs", "Registro"],
           ] as const).map(([id, label]) => (
             <button key={id} role="tab" aria-selected={activeTab === id} onClick={() => setActiveTab(id)}
               className={`flex h-7 items-center rounded-[5px] px-2.5 text-xs transition-colors ${activeTab === id ? "bg-white font-medium text-slate-900 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900"}`}>
@@ -1585,6 +1586,10 @@ export default function AdminProjectPage() {
           </div>
         )}
 
+        {activeTab === "approvals" && (
+          <ProjectApprovals projectId={projectId} onLog={(type, data) => writeLog(type, data)} />
+        )}
+
         {/* ══════════════════════════════════ LOGS TAB ══════════════════════════════════ */}
         {activeTab === "logs" && (
           <div className="space-y-4">
@@ -1604,6 +1609,7 @@ export default function AdminProjectPage() {
                 <div className="divide-y divide-slate-100">
                   {logs.map((log) => {
                     const logConfig: Record<string, { label: string; icon: any; iconBg: string; iconColor: string }> = {
+                      approval_admin:       { label: "Aprobaciones",              icon: CheckCircle, iconBg: "bg-amber-50", iconColor: "text-amber-600" },
                       invitation_sent:      { label: "Invitación enviada",        icon: Send,      iconBg: "bg-blue-50",    iconColor: "text-blue-600" },
                       invitation_accepted:  { label: "Invitación aceptada",       icon: UserCheck, iconBg: "bg-emerald-50", iconColor: "text-emerald-600" },
                       invitation_rejected:  { label: "Invitación rechazada",      icon: X,         iconBg: "bg-red-50",     iconColor: "text-red-600" },

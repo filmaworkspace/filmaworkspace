@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
+import { pendingTooltip } from "@/components/accounting/ApprovalFlow";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { getInvoiceDisplayState, inInvoiceView, type InvoiceView } from "@/lib/invoiceHelpers";
@@ -564,18 +565,19 @@ export default function InvoicesPage() {
   const getApprovalProgress = (invoice: Invoice) => {
     if (!invoice.approvalSteps?.length) return null;
     const approved = invoice.approvalSteps.filter((s) => s.status === "approved").length;
+    const counted = invoice.approvalSteps.filter((s) => s.status !== "skipped").length;
     return (
       <div className="flex items-center gap-1 mt-1">
         {invoice.approvalSteps.map((step, idx) => (
           <div
             key={idx}
             className={`w-2 h-2 rounded-full ${
-              step.status === "approved" ? "bg-emerald-500" : step.status === "rejected" ? "bg-red-500" : idx === invoice.currentApprovalStep ? "bg-amber-500" : "bg-slate-300"
+              step.status === "approved" ? "bg-emerald-500" : step.status === "rejected" ? "bg-red-500" : step.status === "skipped" ? "bg-slate-100 ring-1 ring-slate-200" : idx === invoice.currentApprovalStep ? "bg-amber-500" : "bg-slate-300"
             }`}
           />
         ))}
         <span className="text-xs text-slate-500 ml-1">
-          {approved}/{invoice.approvalSteps.length}
+          {approved}/{counted}
         </span>
       </div>
     );
@@ -792,7 +794,7 @@ export default function InvoicesPage() {
                   const due = dueLabel(invoice, state);
                   const needsReplacement = invoice.requiresReplacement && (invoice.paidAt || invoice.status === "paid") && !invoice.replacedByInvoiceId;
                   const progress = !invoice.approvedAt && (invoice.status === "submitted" || invoice.status === "pending_approval") && invoice.approvalSteps?.length
-                    ? `${invoice.currentApprovalStep ?? 0}/${invoice.approvalSteps.length}` : null;
+                    ? pendingTooltip(invoice as any) || null : null;
                   return (
                     <tr key={invoice.id} className={`cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA] ${dead ? "text-slate-400" : ""}`} onClick={() => router.push(href)}>
                       <td className="relative whitespace-nowrap px-4 py-1.5" title={`${st.label}${progress ? ` · ${progress}` : ""}`}>

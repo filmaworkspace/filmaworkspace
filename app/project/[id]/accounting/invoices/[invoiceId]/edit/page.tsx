@@ -14,6 +14,8 @@ import { AccountPickerModal, EpisodeModal, POItemsModal, SupplierPickerModal } f
 import { documentTotals, lineAmounts } from "@/lib/amounts";
 import { getScopedDocs, scopeFromPermissions } from "@/lib/accountingScope";
 import { approverIdsOf } from "@/lib/approvers";
+import { ApprovalSteps } from "@/components/accounting/ApprovalFlow";
+import { buildFlow, type ApprovalStepConfig, type FlowMember } from "@/lib/approvalFlow";
 import { loadBudgetFigures } from "@/lib/budgetFigures";
 import {
   arrayUnion,
@@ -135,6 +137,8 @@ interface Supplier {
 
 interface Member {
   userId: string;
+  permissions?: { accounting?: boolean } | null;
+  accountingAccessLevel?: string | null;
   name?: string;
   email?: string;
   role?: string;
@@ -166,7 +170,8 @@ interface ApprovalStepStatus {
   department?: string;
   approvedBy: string[];
   rejectedBy: string[];
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "skipped";
+  skipReason?: string | null;
   requireAll: boolean;
 }
 
@@ -652,36 +657,12 @@ export default function EditInvoicePage() {
   const isDueDatesValid = () => Math.abs(getDueDatesPercentage() - 100) < 0.1;
 
   // Aprobaciones
-  const resolveApprovers = (step: ApprovalStep, dept?: string): { ids: string[]; names: string[] } => {
-    const ids: string[] = [];
-    const names: string[] = [];
-    if (step.approverType === "fixed" && step.approvers) {
-      step.approvers.forEach(uid => {
-        const m = members.find(mb => mb.userId === uid);
-        if (m) { ids.push(uid); names.push(m.name || m.email || uid); }
-      });
-    } else if (step.approverType === "role" && step.roles) {
-      members.filter(m => step.roles!.includes(m.role || "")).forEach(m => { ids.push(m.userId); names.push(m.name || m.email || m.userId); });
-    } else if (step.approverType === "hod") {
-      const targetDept = step.department || dept;
-      members.filter(m => m.department === targetDept && (m.position?.toLowerCase().includes("head") || m.position?.toLowerCase().includes("jefe") || m.role === "HOD")).forEach(m => { ids.push(m.userId); names.push(m.name || m.email || m.userId); });
-    }
-    return { ids, names };
-  };
+  // Flujo de aprobación: lógica única en lib/approvalFlow (pasos sin aprobador
+  // o fuera de umbral se omiten con su motivo; nunca se bloquea).
+  const generateApprovalSteps = (): ApprovalStepStatus[] =>
+    buildFlow(approvalConfig as ApprovalStepConfig[], members as FlowMember[], { department: formData.department || linkedPO?.department || "", baseAmount: totals.baseAmount }).steps as unknown as ApprovalStepStatus[];
 
-  const generateApprovalSteps = (): ApprovalStepStatus[] => {
-    if (approvalConfig.length === 0) return [];
-    return approvalConfig.map(step => {
-      const { ids, names } = resolveApprovers(step, formData.department);
-      const stepData: any = { id: step.id || "", order: step.order || 0, approverType: step.approverType || "role", approvers: ids, approverNames: names, roles: step.roles || [], department: step.department || "", approvedBy: [], rejectedBy: [], status: "pending" as const, requireAll: step.requireAll ?? false, hasAmountThreshold: step.hasAmountThreshold || false };
-      if (step.amountThreshold !== undefined) stepData.amountThreshold = step.amountThreshold;
-      if (step.amountCondition !== undefined) stepData.amountCondition = step.amountCondition;
-      if (step.amountThresholdMax !== undefined) stepData.amountThresholdMax = step.amountThresholdMax;
-      return stepData;
-    });
-  };
-
-  const shouldAutoApprove = (steps: ApprovalStepStatus[]) => steps.length === 0 || steps.every(s => s.approvers.length === 0);
+  const shouldAutoApprove = (steps: ApprovalStepStatus[]): boolean => !steps.some((s) => s.status === "pending");
 
   // Validación
   const validateForm = (silent = false) => {
@@ -802,15 +783,15 @@ export default function EditInvoicePage() {
           updateData.approvedAt = Timestamp.now();
           updateData.approvedBy = permissions.userId || "";
           updateData.approvedByName = permissions.userName || "";
-          updateData.approvalSteps = deleteField();
+          updateData.approvalSteps = steps.length ? steps : deleteField();
           updateData.approverIds = [];
-          updateData.currentApprovalStep = deleteField();
+          updateData.currentApprovalStep = steps.length ? -1 : deleteField();
         } else {
           updateData.status = "pending_approval";
           updateData.approvalStatus = "pending";
           updateData.approvalSteps = steps;
           updateData.approverIds = approverIdsOf(steps);
-          updateData.currentApprovalStep = 0;
+          updateData.currentApprovalStep = steps.findIndex((x) => x.status === "pending");
           updateData.approvedAt = deleteField();
           updateData.approvedBy = deleteField();
           updateData.approvedByName = deleteField();
@@ -876,9 +857,11 @@ export default function EditInvoicePage() {
 
   const getApprovalPreview = () => {
     const steps = generateApprovalSteps();
-    if (shouldAutoApprove(steps)) return { autoApprove: true, message: "Se aprobará automáticamente", steps: [] };
-    return { autoApprove: false, message: `${steps.length} nivel${steps.length > 1 ? "es" : ""} de aprobación`, steps };
+    const pending = steps.filter((s) => s.status === "pending").length;
+    if (!pending) return { autoApprove: true, message: "Se aprobará automáticamente", steps };
+    return { autoApprove: false, message: pending + " nivel" + (pending > 1 ? "es" : "") + " de aprobación", steps };
   };
+
 
   const filteredSuppliers = suppliers.filter(s => s.fiscalName.toLowerCase().includes(supplierSearch.toLowerCase()) || s.taxId.toLowerCase().includes(supplierSearch.toLowerCase()));
   const filteredSubAccounts = subAccounts.filter(s => s.code.toLowerCase().includes(accountSearch.toLowerCase()) || s.description.toLowerCase().includes(accountSearch.toLowerCase()));
@@ -1342,25 +1325,11 @@ export default function EditInvoicePage() {
             {/* Aprobación */}
             <div className="bg-white border border-slate-200 rounded-lg p-5">
               <h3 className="font-semibold text-slate-900 mb-4">Aprobación</h3>
-              {approvalPreview.autoApprove ? (
-                <div className="flex items-center gap-2 text-[13px] text-emerald-600">
-                  <CheckCircle size={16} />
-                  <span>Se aprobará automáticamente</span>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-[13px] text-amber-600">
-                    <Clock size={16} />
-                    <span>{approvalPreview.message}</span>
-                  </div>
-                  {approvalPreview.steps.map((step, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs text-slate-500 ml-6">
-                      <ChevronRight size={12} />
-                      <span>{step.approverNames.join(", ") || "Sin aprobadores"}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className={cx("mb-3 flex items-center gap-2 text-[13px]", approvalPreview.autoApprove ? "text-emerald-600" : "text-amber-600")}>
+                {approvalPreview.autoApprove ? <CheckCircle size={16} /> : <Clock size={16} />}
+                <span>{approvalPreview.message}</span>
+              </div>
+              <ApprovalSteps steps={approvalPreview.steps} department={formData.department || linkedPO?.department} preview />
             </div>
 
             {/* Documento */}

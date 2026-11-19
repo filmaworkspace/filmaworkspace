@@ -15,6 +15,8 @@ import { documentTotals, lineAmounts } from "@/lib/amounts";
 import { getScopedDocs, scopeFromPermissions } from "@/lib/accountingScope";
 import { nextDocNumber } from "@/lib/docCounter";
 import { approverIdsOf } from "@/lib/approvers";
+import { ApprovalSteps } from "@/components/accounting/ApprovalFlow";
+import { buildFlow, type ApprovalStepConfig, type FlowMember } from "@/lib/approvalFlow";
 import { loadBudgetFigures } from "@/lib/budgetFigures";
 import {
   addDoc,
@@ -221,6 +223,8 @@ interface Supplier {
 
 interface Member {
   userId: string;
+  permissions?: { accounting?: boolean } | null;
+  accountingAccessLevel?: string | null;
   name?: string;
   email?: string;
   role?: string;
@@ -248,7 +252,8 @@ interface ApprovalStepStatus {
   department?: string;
   approvedBy: string[];
   rejectedBy: string[];
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "skipped";
+  skipReason?: string | null;
   requireAll: boolean;
 }
 
@@ -563,6 +568,8 @@ export default function NewInvoicePage() {
           role: mData.role,
           department: mData.department,
           position: mData.position,
+          permissions: mData.permissions || null,
+          accountingAccessLevel: mData.accountingAccessLevel || null,
         });
       }
       setMembers(membersData);
@@ -798,62 +805,20 @@ export default function NewInvoicePage() {
   };
 
   // Funciones de aprobación
-  const resolveApprovers = (step: ApprovalStep): { ids: string[]; names: string[] } => {
-    let ids: string[] = [];
+  // Flujo de aprobación: lógica única en lib/approvalFlow (pasos sin aprobador
+  // o fuera de umbral se omiten con su motivo; nunca se bloquea).
+  const generateApprovalSteps = (): ApprovalStepStatus[] =>
+    buildFlow(approvalConfig as ApprovalStepConfig[], members as FlowMember[], { department: formData.department || selectedPO?.department || permissions.fixedDepartment || "", baseAmount: totals.baseAmount }).steps as unknown as ApprovalStepStatus[];
 
-    if (step.approverType === "fixed") {
-      ids = step.approvers || [];
-    } else if (step.approverType === "role") {
-      ids = members.filter((m) => m.role && step.roles?.includes(m.role)).map((m) => m.userId);
-    } else if (step.approverType === "hod") {
-      ids = members.filter((m) => m.position === "HOD" && m.department === step.department).map((m) => m.userId);
-    } else if (step.approverType === "coordinator") {
-      ids = members.filter((m) => m.position === "Coordinator" && m.department === step.department).map((m) => m.userId);
-    }
-
-    return {
-      ids: ids,
-      names: ids.map((uid) => {
-        const m = members.find((x) => x.userId === uid);
-        return m?.name || m?.email || uid;
-      }),
-    };
-  };
-
-  const generateApprovalSteps = (): ApprovalStepStatus[] => {
-    return approvalConfig.map((s) => {
-      const resolved = resolveApprovers(s);
-      return {
-        id: s.id || "",
-        order: s.order || 0,
-        approverType: s.approverType || "fixed",
-        approvers: resolved.ids || [],
-        approverNames: resolved.names || [],
-        roles: s.roles || [],
-        department: s.department || "",
-        approvedBy: [],
-        rejectedBy: [],
-        status: "pending",
-        requireAll: s.requireAll || false,
-      };
-    });
-  };
-
-  const shouldAutoApprove = (steps: ApprovalStepStatus[]) => {
-    return steps.length === 0 || steps.every((s) => s.approvers.length === 0);
-  };
+  const shouldAutoApprove = (steps: ApprovalStepStatus[]): boolean => !steps.some((s) => s.status === "pending");
 
   const getApprovalPreview = () => {
     const steps = generateApprovalSteps();
-    if (shouldAutoApprove(steps)) {
-      return { autoApprove: true, message: "Se aprobará automáticamente", steps: [] };
-    }
-    return {
-      autoApprove: false,
-      message: steps.length + " nivel" + (steps.length > 1 ? "es" : "") + " de aprobación",
-      steps: steps,
-    };
+    const pending = steps.filter((s) => s.status === "pending").length;
+    if (!pending) return { autoApprove: true, message: "Se aprobará automáticamente", steps };
+    return { autoApprove: false, message: pending + " nivel" + (pending > 1 ? "es" : "") + " de aprobación", steps };
   };
+
 
   // Funciones de cálculo
   // Importes redondeados a céntimos (lib/amounts)
@@ -1473,6 +1438,7 @@ export default function NewInvoicePage() {
         invoiceData.status = "submitted";
         invoiceData.approvalStatus = "approved";
         invoiceData.autoApproved = true;
+        if (steps.length) { invoiceData.approvalSteps = steps; invoiceData.approverIds = []; invoiceData.currentApprovalStep = -1; }
         invoiceData.approvedAt = Timestamp.now();
         invoiceData.approvedBy = permissions.userId || "";
         invoiceData.approvedByName = permissions.userName || "";
@@ -1482,7 +1448,7 @@ export default function NewInvoicePage() {
         invoiceData.approvalStatus = "pending";
         invoiceData.approvalSteps = steps;
         invoiceData.approverIds = approverIdsOf(steps);
-        invoiceData.currentApprovalStep = 0;
+        invoiceData.currentApprovalStep = steps.findIndex((x) => x.status === "pending");
       }
 
       // Guardar factura
@@ -2778,41 +2744,9 @@ export default function NewInvoicePage() {
                     </div>
                   </div>
                 </div>
-                {!approvalPreview.autoApprove && approvalPreview.steps.length > 0 && (
-                  <div className="px-5 py-4">
-                    <div className="space-y-3">
-                      {approvalPreview.steps.map((step, idx) => (
-                        <div key={step.id} className="flex items-start gap-3">
-                          <div className="flex flex-col items-center">
-                            <div className="w-7 h-7 rounded-full bg-amber-200 text-amber-800 flex items-center justify-center text-xs font-bold">{idx + 1}</div>
-                            {idx < approvalPreview.steps.length - 1 && <div className="w-0.5 h-8 bg-amber-200 mt-1" />}
-                          </div>
-                          <div className="flex-1 pt-0.5">
-                            <p className="text-[13px] font-medium text-amber-900">
-                              {step.approverType === "role" && step.roles
-                                ? step.roles.join(", ")
-                                : step.approverType === "hod"
-                                ? "Jefe de departamento"
-                                : step.approverType === "coordinator"
-                                ? "Coordinador"
-                                : "Aprobador fijo"}
-                            </p>
-                            {step.approverNames.length > 0 && (
-                              <div className="mt-1 flex flex-wrap gap-1">
-                                {step.approverNames.slice(0, 3).map((name, i) => (
-                                  <span key={i} className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-lg">
-                                    <Users size={10} />
-                                    {name.split(" ")[0]}
-                                  </span>
-                                ))}
-                                {step.approverNames.length > 3 && <span className="text-xs text-amber-700">+{step.approverNames.length - 3} más</span>}
-                              </div>
-                            )}
-                            <p className="text-xs text-amber-700 mt-1">{step.requireAll ? "Todos deben aprobar" : "1 de " + step.approvers.length + " debe aprobar"}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                {approvalPreview.steps.length > 0 && (
+                  <div className="bg-white/60 px-5 py-4">
+                    <ApprovalSteps steps={approvalPreview.steps} department={formData.department || selectedPO?.department || permissions.fixedDepartment} preview />
                   </div>
                 )}
               </div>

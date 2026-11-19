@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { canApprove } from "@/lib/approvalFlow";
 import { ClipboardCheck, FolderDown, Plus, Settings, Upload } from "lucide-react";
 
 import { auth, db } from "@/lib/firebase";
@@ -354,10 +355,7 @@ export default function AccountingPanelPage() {
   useEffect(() => {
     if (!id || !userId || !isApprover) return;
     let po = 0, inv = 0;
-    const isMine = (d: any) => {
-      if (!d.approvalSteps || d.currentApprovalStep === undefined) return false;
-      return !!d.approvalSteps[d.currentApprovalStep]?.approvers?.includes(userId);
-    };
+    const isMine = (d: any) => canApprove(d, userId);
     // Solo los documentos en los que figura como aprobador (las reglas no dejan
     // a todos leer toda la colección).
     const u1 = onSnapshot(query(collection(db, `projects/${id}/pos`), where("approverIds", "array-contains", userId)), (s) => {

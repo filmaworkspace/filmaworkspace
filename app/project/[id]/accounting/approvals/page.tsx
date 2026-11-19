@@ -15,6 +15,9 @@ import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { auth, db } from "@/lib/firebase";
 import { getScopedDocs, scopeFromMember, type DocScope } from "@/lib/accountingScope";
 import { loadBudgetFigures } from "@/lib/budgetFigures";
+import { ApprovalSteps } from "@/components/accounting/ApprovalFlow";
+import { afterApprovalComplete } from "@/lib/approvalActions";
+import { applyApproval, applyRejection, canApprove, stripUndefined } from "@/lib/approvalFlow";
 import {
   onAuthStateChanged,
 } from "firebase/auth";
@@ -24,6 +27,7 @@ import {
   getDocs,
   getDoc,
   query,
+  runTransaction,
   Timestamp,
   updateDoc,
   where,
@@ -519,7 +523,7 @@ export default function ApprovalsPage() {
     if (docData.approvalSteps) {
       for (const step of docData.approvalSteps) {
         if (step.approvedBy?.length > 0) {
-          for (const approverId of step.approvedBy) events.push({ id: `approved-${step.order}-${approverId}`, type: "approved", date: new Date(), userId: approverId, userName: membersMap[approverId] || approverId, stepOrder: step.order });
+          for (const approverId of step.approvedBy) events.push({ id: `approved-${step.order}-${approverId}`, type: "approved", date: (step.approvals || []).find((x: any) => x.uid === approverId)?.at?.toDate?.() || step.approvedAt?.toDate?.() || docData.createdAt?.toDate?.() || new Date(), userId: approverId, userName: membersMap[approverId] || approverId, stepOrder: step.order });
         }
       }
     }
@@ -580,25 +584,10 @@ export default function ApprovalsPage() {
     return impact;
   };
 
-  const canUserApprove = (docData: any, uId: string, uRole: string, uDept: string, uPos: string): boolean => {
-    if (!docData.approvalSteps || docData.currentApprovalStep === undefined) return false;
-    const step = docData.approvalSteps[docData.currentApprovalStep];
-    if (!step || step.status !== "pending") return false;
-    if (step.approvedBy?.includes(uId) || step.rejectedBy?.includes(uId)) return false;
-    if (step.hasAmountThreshold && step.amountThreshold) {
-      const amount = docData.totalAmount || 0;
-      if (step.amountCondition === "above" && amount <= step.amountThreshold) return false;
-      if (step.amountCondition === "below" && amount >= step.amountThreshold) return false;
-      if (step.amountCondition === "between" && (amount < step.amountThreshold || amount > (step.amountThresholdMax || Infinity))) return false;
-    }
-    switch (step.approverType) {
-      case "fixed": return step.approvers?.includes(uId) || false;
-      case "role": return step.roles?.includes(uRole) || false;
-      case "hod": return uPos === "HOD" && uDept === (step.department || docData.department);
-      case "coordinator": return uPos === "Coordinator" && uDept === (step.department || docData.department);
-      default: return false;
-    }
-  };
+  // Quién puede aprobar sale de la lista fijada en el flujo del documento (la
+  // misma que usan las reglas), no del rol/puesto actual de la persona.
+  const canUserApprove = (docData: any, uId: string, _r?: string, _d?: string, _p?: string): boolean => canApprove(docData, uId);
+
 
   const handleApprove = async (approval: PendingApproval, withComment: boolean = false) => {
     if (withComment && !approvalComment.trim()) { setErrorMessage("Escribe un comentario"); return; }
@@ -613,114 +602,35 @@ export default function ApprovalsPage() {
       }
       
       const docRef = doc(db, `projects/${approval.projectId}/${collectionName}`, approval.documentId);
-      const docSnap = await getDoc(docRef);
-      if (!docSnap.exists()) { setErrorMessage("El documento ya no existe"); setProcessing(false); return; }
-      const docData = docSnap.data();
-      const currentStepIndex = docData.currentApprovalStep || 0;
-      const currentStep = docData.approvalSteps[currentStepIndex];
-      const newApprovedBy = [...(currentStep.approvedBy || []), userId];
-      let isStepComplete = currentStep.requireAll ? newApprovedBy.length >= (currentStep.approverType === "fixed" ? currentStep.approvers.length : currentStep.roles?.length || 1) : true;
-      const updatedSteps = [...docData.approvalSteps];
-      updatedSteps[currentStepIndex] = { ...currentStep, approvedBy: newApprovedBy, status: isStepComplete ? "approved" : "pending" };
-      const isLastStep = currentStepIndex === docData.approvalSteps.length - 1;
-      const allStepsComplete = isStepComplete && isLastStep;
-      const updates: any = { approvalSteps: updatedSteps };
-      if (approvalComment.trim()) { const comments = docData.comments || []; comments.push({ id: `comment-${Date.now()}`, userId, userName, text: approvalComment.trim(), createdAt: Timestamp.now(), type: "approval" }); updates.comments = comments; }
-      if (isStepComplete && !isLastStep) updates.currentApprovalStep = currentStepIndex + 1;
-      else if (allStepsComplete) {
-        const oldStatus = docData.status || "pending";
-        
-        if (approval.type === "po") {
-          updates.status = "approved";
-          updates.approvedAt = Timestamp.now();
-          updates.approvedBy = userId;
-          updates.approvedByName = userName;
-          
-          // Calcular totales para la PO
-          let totalBaseAmount = 0;
-          const budgetItems: Array<{ subAccountId: string; baseAmount: number }> = [];
-          
-          for (const item of (approval.items || [])) {
-            const itemBaseAmount = item.baseAmount || (item.quantity && item.unitPrice ? item.quantity * item.unitPrice : item.totalAmount ? item.totalAmount / 1.21 : 0);
-            totalBaseAmount += itemBaseAmount;
-            if (item.subAccountId) {
-              budgetItems.push({ subAccountId: item.subAccountId, baseAmount: itemBaseAmount });
-            }
-          }
-          
-          updates.committedAmount = totalBaseAmount;
-          updates.remainingAmount = totalBaseAmount;
-          
-          // Verificar si hay items comprometidos anteriores (edición de PO aprobada).
-          // Los enriquecemos con invoicedAmount para que uncommitPO no reste
-          // lo que ya pasó a actual vía facturas realizadas.
-          let previousCommittedItems = docData.previousCommittedItems || null;
-          if (previousCommittedItems && previousCommittedItems.length > 0) {
-            const invoicedBySubAccount: Record<string, number> = {};
-            for (const item of (docData.items || [])) {
-              if (item.subAccountId) {
-                invoicedBySubAccount[item.subAccountId] =
-                  (invoicedBySubAccount[item.subAccountId] || 0) + (item.invoicedAmount || 0);
-              }
-            }
-            previousCommittedItems = previousCommittedItems.map((item: any) => ({
-              ...item,
-              invoicedAmount: invoicedBySubAccount[item.subAccountId] || 0,
-            }));
-          }
-
-          await handlePOStatusChange(approval.projectId, oldStatus, "approved", budgetItems, previousCommittedItems);
-          
-          // Limpiar previousCommittedItems después de aprobar
-          updates.previousCommittedItems = null;
-          
-        } else if (approval.type === "invoice") {
-          // Factura: la aprobación completa el track de aprobación. El lifecycle
-          // pasa a "submitted" (estado activo). La realización del presupuesto solo
-          // ocurre aquí si el trigger es on_approve; para on_code/on_account ocurre
-          // al codificar/contabilizar.
-          const approvedAt = Timestamp.now();
-          updates.status = "submitted";
-          updates.approvalStatus = "approved";
-          updates.approvedAt = approvedAt;
-          updates.approvedBy = userId;
-          updates.approvedByName = userName;
-
-          const budgetItems: Array<{ subAccountId: string; baseAmount: number; poItemIndex?: number }> = [];
-          for (const item of (approval.items || [])) {
-            const itemBaseAmount = item.baseAmount || (item.quantity && item.unitPrice ? item.quantity * item.unitPrice : item.totalAmount ? item.totalAmount / 1.21 : 0);
-            if (item.subAccountId) {
-              budgetItems.push({ subAccountId: item.subAccountId, baseAmount: itemBaseAmount, poItemIndex: item.poItemIndex });
-            }
-          }
-
-          const costSettings = await getCostSettings(approval.projectId);
-          // Realizar solo si el trigger es on_approve. shouldRealizeInvoice con el
-          // track approvedAt devuelve true para on_approve y false para on_code/on_account.
-          const realizeNow = shouldRealizeInvoice("submitted", costSettings, { approvedAt });
-          if (realizeNow) {
-            const wasRealized = shouldRealizeInvoice(oldStatus, costSettings);
-            if (!wasRealized && budgetItems.length > 0) {
-              await realizeInvoice(approval.projectId, budgetItems.map(b => ({ subAccountId: b.subAccountId, baseAmount: b.baseAmount })));
-              if (approval.poId) await updatePOItemsInvoiced(approval.projectId, approval.poId, budgetItems, "add");
-            }
-          }
-        } else if (approval.type === "box") {
-          // Sobre BOX (tarjeta o transferencia)
-          updates.approvedAt = Timestamp.now();
-          updates.approvedBy = userId;
-          updates.approvedByName = userName;
-          
-          if (approval.boxType === "card") {
-            // Sobre de tarjeta: pasa a "reviewing" (revisado y aprobado, pendiente de cerrar)
-            updates.status = "reviewing";
-          } else {
-            // Sobre de transferencia: pasa directamente a "pending" (aprobado, pendiente de transferir)
-            updates.status = "pending";
+      const at = Timestamp.now();
+      const comment = approvalComment.trim();
+      // Transacción: dos aprobaciones a la vez no se pisan, y solo una completa el flujo.
+      const { docData, result } = await runTransaction(db, async (tx) => {
+        const snap = await tx.get(docRef);
+        if (!snap.exists()) throw new Error("El documento ya no existe");
+        const d = snap.data();
+        if (approval.type === "po" && d.status !== "pending") throw new Error("La PO ya no está pendiente de aprobación");
+        if (approval.type === "invoice" && (d.approvedAt || d.status === "rejected" || d.approvalStatus === "rejected")) throw new Error("La factura ya no está pendiente de aprobación");
+        const r = applyApproval(d as any, userId!, userName, at);
+        const upd: any = { approvalSteps: stripUndefined(r.steps), currentApprovalStep: r.currentApprovalStep };
+        if (comment) upd.comments = [...(d.comments || []), { id: `comment-${Date.now()}`, userId, userName, text: comment, createdAt: at, type: "approval" }];
+        if (r.complete) {
+          upd.approvedAt = at; upd.approvedBy = userId; upd.approvedByName = userName;
+          if (approval.type === "po") {
+            const base = (d.items || []).reduce((t: number, it: any) => t + (it.baseAmount || (it.quantity && it.unitPrice ? it.quantity * it.unitPrice : 0)), 0) || d.baseAmount || 0;
+            upd.status = "approved"; upd.committedAmount = base; upd.remainingAmount = base; upd.previousCommittedItems = null;
+          } else if (approval.type === "invoice") {
+            upd.status = "submitted"; upd.approvalStatus = "approved";
+          } else if (approval.type === "box") {
+            upd.status = approval.boxType === "card" ? "reviewing" : "pending";
           }
         }
-      }
-      await updateDoc(docRef, updates);
+        tx.update(docRef, upd);
+        return { docData: d, result: r };
+      });
+      const allStepsComplete = result.complete;
+      // Efectos de presupuesto (comprometer PO / realizar factura) una sola vez, al completarse.
+      if (allStepsComplete && (approval.type === "po" || approval.type === "invoice")) await afterApprovalComplete(approval.projectId, approval.type, docData, at);
       setPendingApprovals(pendingApprovals.filter((a) => a.id !== approval.id));
       setSuccessMessage(allStepsComplete ? `${approval.displayNumber} aprobado` : "Aprobación registrada");
       setTimeout(() => setSuccessMessage(""), 3000);
@@ -804,14 +714,22 @@ export default function ApprovalsPage() {
         newStatus = selectedApproval.boxType === "card" ? "open" : "draft";
       }
       
-      await updateDoc(docRef, { 
-        status: newStatus, 
-        rejectedAt: Timestamp.now(), 
-        rejectedBy: userId, 
-        rejectedByName: userName, 
+      const rejectedAt = Timestamp.now();
+      const rejUpd: any = {
+        status: newStatus,
+        rejectedAt,
+        rejectedBy: userId,
+        rejectedByName: userName,
         rejectionReason: rejectionReason.trim(),
-        previousCommittedItems: null // Limpiar al rechazar
-      });
+        previousCommittedItems: null, // Limpiar al rechazar
+      };
+      if (docSnap.exists() && (docSnap.data().approvalSteps || []).length) {
+        // El paso actual queda rechazado (con quién y cuándo) para el historial.
+        const r = applyRejection(docSnap.data() as any, userId!, userName, rejectedAt);
+        rejUpd.approvalSteps = stripUndefined(r.steps);
+      }
+      if (selectedApproval.type === "invoice") rejUpd.approvalStatus = "rejected";
+      await updateDoc(docRef, rejUpd);
       
       setPendingApprovals(pendingApprovals.filter((a) => a.id !== selectedApproval.id));
       setSuccessMessage(`${selectedApproval.displayNumber} rechazado`);
@@ -1062,26 +980,7 @@ export default function ApprovalsPage() {
 
                       <div className="flex flex-col gap-1.5">
                         <span className="text-xs text-slate-500">Circuito de aprobación</span>
-                        <ol className="flex flex-wrap items-center gap-2">
-                          {currentApproval.approvalSteps.map((step, index) => {
-                            const current = index === currentApproval.currentApprovalStep && step.status === "pending";
-                            const who = step.approverType === "role" && step.roles ? step.roles.join(", ")
-                              : step.approverType === "hod" ? `HOD${step.department ? ` ${step.department}` : ""}`
-                              : step.approverType === "coordinator" ? `Coord.${step.department ? ` ${step.department}` : ""}`
-                              : step.approverNames?.length ? step.approverNames.slice(0, 2).join(", ") + (step.approverNames.length > 2 ? ` +${step.approverNames.length - 2}` : "")
-                              : "Usuario";
-                            return (
-                              <li key={step.id || index} className="flex items-center gap-2">
-                                <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${current ? "border-slate-900 text-slate-900" : step.status === "approved" ? "border-slate-200 text-slate-500" : "border-slate-200 text-slate-400"}`}>
-                                  <span className={`h-1.5 w-1.5 rounded-full ${step.status === "approved" ? "bg-emerald-500" : current ? "bg-amber-500" : "bg-slate-300"}`} />
-                                  <span className="font-mono">{step.order}</span> {who}{step.requireAll ? " (todos)" : ""}
-                                  {step.hasAmountThreshold && step.amountThreshold ? <span className="text-slate-400">&gt;{step.amountThreshold.toLocaleString("es-ES")} €</span> : null}
-                                </span>
-                                {index < currentApproval.approvalSteps.length - 1 && <span className="text-slate-300">→</span>}
-                              </li>
-                            );
-                          })}
-                        </ol>
+                        <ApprovalSteps steps={currentApproval.approvalSteps as any} current={currentApproval.currentApprovalStep} department={currentApproval.department} />
                       </div>
                     </div>
 

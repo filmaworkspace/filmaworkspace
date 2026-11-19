@@ -1173,7 +1173,7 @@ export default function AccountingConfigPage() {
             </Button>
           </div>
           <p className="mb-3 mt-3 text-xs text-slate-500">
-            Los niveles se recorren en orden. Un nivel con condición de importe solo se aplica si el documento la cumple. Sin niveles, se aprueba automáticamente.
+            Los niveles van en orden; los importes se miran sobre la base imponible. Un nivel sin nadie que pueda aprobar (p. ej. departamento sin HOD) se omite y el flujo sigue.
           </p>
           {stepsOf(flow).length === 0 ? (
             <p className="border-y border-slate-200 py-8 text-center text-[13px] text-slate-500">Sin niveles: los documentos se aprueban automáticamente</p>

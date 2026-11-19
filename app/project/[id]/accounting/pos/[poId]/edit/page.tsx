@@ -14,6 +14,8 @@ import { AccountPickerModal, EpisodeModal, SupplierPickerModal } from "@/compone
 import { documentTotals, lineAmounts } from "@/lib/amounts";
 import { getScopedDocs, scopeFromPermissions } from "@/lib/accountingScope";
 import { approverIdsOf } from "@/lib/approvers";
+import { ApprovalSteps } from "@/components/accounting/ApprovalFlow";
+import { buildFlow, type ApprovalStepConfig, type FlowMember } from "@/lib/approvalFlow";
 import { loadBudgetFigures } from "@/lib/budgetFigures";
 import {
   collection,
@@ -146,7 +148,8 @@ interface ApprovalStepStatus {
   department?: string;
   approvedBy: string[];
   rejectedBy: string[];
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "skipped";
+  skipReason?: string | null;
   requireAll: boolean;
   hasAmountThreshold?: boolean;
   amountThreshold?: number;
@@ -156,6 +159,8 @@ interface ApprovalStepStatus {
 
 interface Member {
   userId: string;
+  permissions?: { accounting?: boolean } | null;
+  accountingAccessLevel?: string | null;
   name?: string;
   email?: string;
   role?: string;
@@ -402,7 +407,7 @@ export default function EditPOPage() {
           const userDoc = await getDoc(doc(db, "users", memberDocSnap.id));
           if (userDoc.exists()) name = userDoc.data().displayName || userDoc.data().email || name;
         } catch (e) {}
-        membersData.push({ userId: memberDocSnap.id, name, email: memberData.email, role: memberData.role, department: memberData.department, position: memberData.position });
+        membersData.push({ userId: memberDocSnap.id, name, email: memberData.email, role: memberData.role, department: memberData.department, position: memberData.position, permissions: memberData.permissions || null, accountingAccessLevel: memberData.accountingAccessLevel || null });
       }
       setMembers(membersData);
 
@@ -462,45 +467,12 @@ export default function EditPOPage() {
   };
 
 
-  const resolveApprovers = (step: ApprovalStep, dept?: string): { ids: string[]; names: string[] } => {
-    let approverIds: string[] = [];
-    switch (step.approverType) {
-      case "fixed": approverIds = step.approvers || []; break;
-      case "role": approverIds = members.filter((m) => m.role && step.roles?.includes(m.role)).map((m) => m.userId); break;
-      case "hod": approverIds = members.filter((m) => m.position === "HOD" && m.department === (step.department || dept)).map((m) => m.userId); break;
-      case "coordinator": approverIds = members.filter((m) => m.position === "Coordinator" && m.department === (step.department || dept)).map((m) => m.userId); break;
-    }
-    const approverNames = approverIds.map((id) => { const member = members.find((m) => m.userId === id); return member?.name || member?.email || id; });
-    return { ids: approverIds, names: approverNames };
-  };
+  // Flujo de aprobación: lógica única en lib/approvalFlow (pasos sin aprobador
+  // o fuera de umbral se omiten con su motivo; nunca se bloquea).
+  const generateApprovalSteps = (dept?: string): ApprovalStepStatus[] =>
+    buildFlow(approvalConfig as ApprovalStepConfig[], members as FlowMember[], { department: dept, baseAmount: totals.baseAmount }).steps as unknown as ApprovalStepStatus[];
 
-  const generateApprovalSteps = (dept?: string): ApprovalStepStatus[] => {
-    if (approvalConfig.length === 0) return [];
-    return approvalConfig.map((step) => {
-      const { ids, names } = resolveApprovers(step, dept);
-      const stepData: any = { 
-        id: step.id || "", 
-        order: step.order || 0, 
-        approverType: step.approverType || "role", 
-        approvers: ids, 
-        approverNames: names, 
-        roles: step.roles || [], 
-        department: step.department || "", 
-        approvedBy: [], 
-        rejectedBy: [], 
-        status: "pending" as const, 
-        requireAll: step.requireAll ?? false,
-        hasAmountThreshold: step.hasAmountThreshold || false,
-      };
-      // Solo añadir campos de threshold si existen
-      if (step.amountThreshold !== undefined) stepData.amountThreshold = step.amountThreshold;
-      if (step.amountCondition !== undefined) stepData.amountCondition = step.amountCondition;
-      if (step.amountThresholdMax !== undefined) stepData.amountThresholdMax = step.amountThresholdMax;
-      return stepData;
-    });
-  };
-
-  const shouldAutoApprove = (steps: ApprovalStepStatus[]): boolean => steps.length === 0 || steps.every((step) => step.approvers.length === 0);
+  const shouldAutoApprove = (steps: ApprovalStepStatus[]): boolean => !steps.some((s) => s.status === "pending");
 
   // Importes redondeados a céntimos (lib/amounts)
   const calculateItemTotal = (item: POItem) => lineAmounts(item);
@@ -740,6 +712,8 @@ export default function EditPOPage() {
           poData.approvedBy = permissions.userId || "";
           poData.approvedByName = permissions.userName || "";
           poData.autoApproved = true;
+          // Se guardan los pasos omitidos (con su motivo) para auditoría.
+          if (approvalSteps.length) { poData.approvalSteps = approvalSteps; poData.approverIds = []; poData.currentApprovalStep = -1; }
           poData.committedAmount = totals.baseAmount;
           poData.remainingAmount = totals.baseAmount;
           // Limpiar previousCommittedItems ya que se va a aprobar directamente
@@ -748,7 +722,7 @@ export default function EditPOPage() {
           poData.status = "pending";
           poData.approvalSteps = approvalSteps;
           poData.approverIds = approverIdsOf(approvalSteps);
-          poData.currentApprovalStep = 0;
+          poData.currentApprovalStep = approvalSteps.findIndex((x) => x.status === "pending");
           // Si la configuración es on_create, también comprometer en pending
           if (costSettings.poCommitmentTrigger === "on_create" && !wasApprovedBefore) {
             // Solo comprometer si NO tenía comprometido anterior (nuevo PO)
@@ -867,11 +841,12 @@ export default function EditPOPage() {
   const formatCurrency = (amount: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(amount);
 
   const getApprovalPreview = () => {
-    if (approvalConfig.length === 0) return { autoApprove: true, message: "Se aprobará automáticamente", steps: [] };
     const steps = generateApprovalSteps(formData.department);
-    if (steps.every((s) => s.approvers.length === 0)) return { autoApprove: true, message: "Se aprobará automáticamente", steps: [] };
-    return { autoApprove: false, message: `${steps.length} nivel${steps.length > 1 ? "es" : ""} de aprobación`, steps };
+    const pending = steps.filter((s) => s.status === "pending").length;
+    if (!pending) return { autoApprove: true, message: "Se aprobará automáticamente", steps };
+    return { autoApprove: false, message: pending + " nivel" + (pending > 1 ? "es" : "") + " de aprobación", steps };
   };
+
 
   const getCompletionPercentage = () => {
     let completed = 0, total = 4;
@@ -1525,37 +1500,11 @@ export default function EditPOPage() {
                     </div>
                   </div>
 
-                  {!approvalPreview.autoApprove && approvalPreview.steps && approvalPreview.steps.length > 0 && (
-                    <div className="px-5 py-4">
-                      <div className="space-y-3">
-                        {approvalPreview.steps.map((step, idx) => (
-                          <div key={step.id} className="flex items-start gap-3">
-                            <div className="flex flex-col items-center">
-                              <div className="w-7 h-7 rounded-full bg-amber-200 text-amber-800 flex items-center justify-center text-xs font-bold">{idx + 1}</div>
-                              {idx < approvalPreview.steps!.length - 1 && <div className="w-0.5 h-8 bg-amber-200 mt-1" />}
-                            </div>
-                            <div className="flex-1 pt-0.5">
-                              <p className="text-[13px] font-medium text-amber-900">
-                                {step.approverType === "role" && step.roles ? step.roles.join(", ") : step.approverType === "hod" ? "Jefe de departamento" : step.approverType === "coordinator" ? "Coordinador" : "Aprobador fijo"}
-                              </p>
-                              {step.approverNames.length > 0 && (
-                                <div className="mt-1 flex flex-wrap gap-1">
-                                  {step.approverNames.slice(0, 3).map((name, i) => (
-                                    <span key={i} className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-lg">
-                                      <Users size={10} />
-                                      {name.split(" ")[0]}
-                                    </span>
-                                  ))}
-                                  {step.approverNames.length > 3 && <span className="text-xs text-amber-700">+{step.approverNames.length - 3} más</span>}
-                                </div>
-                              )}
-                              <p className="text-xs text-amber-700 mt-1">{step.requireAll ? "Todos deben aprobar" : `1 de ${step.approvers.length} debe aprobar`}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  {approvalPreview.steps.length > 0 && (
+                  <div className="bg-white/60 px-5 py-4">
+                    <ApprovalSteps steps={approvalPreview.steps} department={formData.department} preview />
+                  </div>
+                )}
                 </div>
               )}
 

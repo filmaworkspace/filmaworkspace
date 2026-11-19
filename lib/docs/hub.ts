@@ -62,7 +62,8 @@ const PAY_METHOD: Record<string, string> = { transfer: "Transferencia", card: "T
 // ─── Aprobaciones e historial ────────────────────────────────────────────────
 interface RawStep { id?: string; order?: number; approverType?: string; roles?: string[]; department?: string; approverNames?: string[]; approvedByNames?: string[]; status?: string; approvedAt?: unknown; rejectedBy?: string[] }
 function approvalsFrom(docId: string, steps: RawStep[] | undefined): DocApproval[] {
-  return (steps || []).map((s, i) => {
+  // Los niveles omitidos (sin aprobador o fuera de umbral) no son firmas.
+  return (steps || []).filter((s) => s.status !== "skipped").map((s, i) => {
     const role = s.approverType === "hod" ? `Jefe de departamento${s.department ? ` · ${s.department}` : ""}`
       : s.approverType === "coordinator" ? "Coordinación"
       : s.approverType === "role" ? (s.roles || []).join(", ") || "Rol de proyecto"
@@ -70,7 +71,7 @@ function approvalsFrom(docId: string, steps: RawStep[] | undefined): DocApproval
     const at = toDate(s.approvedAt);
     const status = s.status === "approved" ? "approved" : s.status === "rejected" ? "rejected" : "pending";
     return {
-      level: s.order || i + 1,
+      level: i + 1,
       role,
       status,
       by: (s.approvedByNames || []).join(", ") || (s.approverNames || []).join(", ") || undefined,
