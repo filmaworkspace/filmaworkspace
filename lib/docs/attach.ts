@@ -3,7 +3,7 @@
 // del proveedor…) en un solo PDF. Las imágenes se convierten a página A4; cada
 // página añadida lleva una marca discreta con el número del documento.
 
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { degrees, PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 async function fetchOriginal(url: string): Promise<{ bytes: Uint8Array; type: string } | null> {
   try {
@@ -30,7 +30,7 @@ export interface Original { url: string; label: string }
  * Añade los originales a la carátula. Devuelve el PDF final y la lista de
  * originales que no se han podido añadir (para avisar en el hub).
  */
-export async function appendOriginals(cover: ArrayBuffer | Uint8Array, originals: Original[], stamp: string) {
+export async function appendOriginals(cover: ArrayBuffer | Uint8Array, originals: Original[], stamp: string, opts: { voided?: boolean } = {}) {
   const out = await PDFDocument.load(cover);
   const font = await out.embedFont(StandardFonts.Helvetica);
   const missing: string[] = [];
@@ -61,6 +61,23 @@ export async function appendOriginals(cover: ArrayBuffer | Uint8Array, originals
         mark(page, o.label);
       }
     } catch { missing.push(o.label); }
+  }
+  if (opts.voided) {
+    // Anulada: marca de agua en diagonal en TODAS las páginas (carátula y originales).
+    const bold = await out.embedFont(StandardFonts.HelveticaBold);
+    for (const page of out.getPages()) {
+      const { width, height } = page.getSize();
+      const size = Math.min(width, height) / 5.2;
+      const tw = bold.widthOfTextAtSize("ANULADA", size);
+      const angle = Math.atan2(height, width);
+      const cx = width / 2, cy = height / 2;
+      page.drawText("ANULADA", {
+        x: cx - (tw / 2) * Math.cos(angle) + (size / 3) * Math.sin(angle),
+        y: cy - (tw / 2) * Math.sin(angle) - (size / 3) * Math.cos(angle),
+        size, font: bold, color: rgb(0.86, 0.15, 0.15), opacity: 0.22,
+        rotate: degrees((angle * 180) / Math.PI),
+      });
+    }
   }
   return { bytes: await out.save(), missing };
 }

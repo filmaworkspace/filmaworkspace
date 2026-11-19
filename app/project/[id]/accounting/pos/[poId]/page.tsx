@@ -79,6 +79,7 @@ const toDateAny = (v: any): Date => (v?.toDate ? v.toDate() : new Date(v));
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { FilmaPDF } from "@/lib/pdfBuilder";
 import { syncBudget } from "@/lib/ledgerClient";
+import { needsNewVersion, revisePO } from "@/lib/poRevision";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -381,6 +382,8 @@ export default function PODetailPage() {
   };
 
   // Verificar si se puede eliminar (borrador sin versión anterior)
+  // Modificar (revisar) una PO: quien la puede editar, roles de proyecto y contabilidad.
+  const canModify = !!po && (getPOPermissions(po).canEdit || permissions.isProjectRole || ["accounting", "accounting_extended"].includes(String(permissions.accountingAccessLevel)));
   const canDeleteDraft = po?.status === "draft" && (!po.version || po.version === 1) && getPOPermissions(po).canEdit;
   
   // Verificar si se puede reemplazar el documento
@@ -618,45 +621,7 @@ export default function PODetailPage() {
     if (!po || !modificationReason.trim()) return;
     setProcessing(true);
     try {
-      const newVersion = (po.version || 1) + 1;
-      
-      // Guardar los items comprometidos actuales para calcular la diferencia al aprobar la nueva versión.
-      // Se incluyen subAccountCode e invoicedAmount para que:
-      // 1. La página de presupuesto pueda mostrar el committed anterior mientras está en borrador/pendiente.
-      // 2. Al aprobar la nueva versión, se descuente correctamente solo la porción no realizada.
-      // Todas las líneas y en su orden (el índice identifica el ítem).
-      const committedItems = po.items
-        .map((item, index) => ({
-          index,
-          subAccountId: item.subAccountId || "",
-          subAccountCode: item.subAccountCode || "",
-          baseAmount: item.baseAmount,
-          invoicedAmount: item.invoicedAmount || 0,
-        }));
-      
-      await updateDoc(doc(db, `projects/${projectId}/pos`, po.id), {
-        version: newVersion,
-        status: "draft",
-        modificationHistory: [
-          ...(po.modificationHistory || []),
-          {
-            date: Timestamp.now(),
-            userId: permissions.userId || "",
-            userName: permissions.userName || "",
-            reason: modificationReason.trim(),
-            previousVersion: po.version || 1,
-          },
-        ],
-        // Guardar items comprometidos anteriores para el cálculo de diferencia al aprobar
-        previousCommittedItems: committedItems.length > 0 ? committedItems : deleteField(),
-        // Limpiar campos de aprobación
-        approvedAt: deleteField(),
-        approvedBy: deleteField(),
-        approvedByName: deleteField(),
-        approvalSteps: deleteField(),
-        approverIds: [],
-        currentApprovalStep: deleteField(),
-      });
+      await revisePO(projectId, po as any, { uid: permissions.userId || "", name: permissions.userName || "" }, modificationReason.trim());
       setShowModifyModal(false);
       router.push(`/project/${projectId}/accounting/pos/${po.id}/edit`);
     } catch (error) {
@@ -793,17 +758,27 @@ export default function PODetailPage() {
                         </button>
                       )}
 
-                      {/* Acciones para estado Aprobada */}
-                      {po.status === "approved" && (
+                      {/* Modificar: siempre, sea cual sea el estado */}
+                      {canModify && (
                         <>
                           <div className="border-t border-slate-100 my-1" />
-                          <button 
-                            onClick={() => { resetModals(); setShowModifyModal(true); setShowActionsMenu(false); }} 
+                          <button
+                            onClick={() => {
+                              setShowActionsMenu(false);
+                              if (needsNewVersion(po as any)) { resetModals(); setShowModifyModal(true); }
+                              else router.push(`/project/${projectId}/accounting/pos/${po.id}/edit`);
+                            }}
                             className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3"
                           >
                             <FileEdit size={16} className="text-slate-400" />
                             Modificar PO
                           </button>
+                        </>
+                      )}
+
+                      {/* Acciones para estado Aprobada */}
+                      {po.status === "approved" && (
+                        <>
                           {poPerms.canClose && (
                             <button 
                               onClick={() => { resetModals(); setShowCloseModal(true); setShowActionsMenu(false); }} 
@@ -1423,7 +1398,7 @@ export default function PODetailPage() {
               open={showModifyModal}
               onClose={() => { setShowModifyModal(false); resetModals(); }}
               title={`Modificar PO-${po.number}`}
-              notice={<>Pasa a la versión <b>V{String((po.version || 1) + 1).padStart(2, "0")}</b> en borrador. Tendrás que editarla y enviarla de nuevo a aprobación.</>}
+              notice={<>Pasa a la versión <b>V{String((po.version || 1) + 1).padStart(2, "0")}</b> en borrador. Mientras la editas y se aprueba, la versión actual sigue contando en el presupuesto.</>}
               reason={{ label: "Motivo de la modificación", value: modificationReason, onChange: setModificationReason, placeholder: "Qué cambia y por qué", rows: 4 }}
               confirmLabel="Modificar"
               processingLabel="Modificando…"

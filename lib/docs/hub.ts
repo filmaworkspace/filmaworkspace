@@ -34,6 +34,8 @@ export interface HubItem {
   department?: string;
   originals: Original[];
   warnings: string[];         // falta el original, pagada sin justificante…
+  /** Anulada: el PDF sale con marca de agua ANULADA en todas las páginas. */
+  voided?: boolean;
   sortKey: string;
   source: { kind: string; id: string };
   spec: () => Promise<Omit<ProjectDocSpec, "project" | "generatedAt" | "generatedBy" | "fingerprint">>;
@@ -132,7 +134,7 @@ export async function loadHub(db: Firestore, projectId: string, scope: DocScope,
       id: `po:${d.id}`, path: ["Purchase Orders"], number, title: po.supplier || "Sin proveedor",
       fileName: hubFileName(number, po.supplier, version), type: "po", typeLabel: DOC_TYPES.po.label,
       date: created, base: num(po.baseAmount), total: num(po.totalAmount), status: PO_STATUS[po.status] || po.status, version,
-      department: po.department, originals, warnings: [], sortKey: number, source: { kind: "po", id: d.id },
+      department: po.department, originals, warnings: [], voided: po.status === "cancelled", sortKey: number, source: { kind: "po", id: d.id },
       spec: async () => ({
         docLabel: "Orden de compra", docType: "po", number, version,
         status: { label: PO_STATUS[po.status] || po.status, tone: po.status === "approved" ? "ok" : po.status === "cancelled" ? "bad" : "warn" },
@@ -182,7 +184,7 @@ export async function loadHub(db: Firestore, projectId: string, scope: DocScope,
     const supKey = String(inv.supplierId || inv.supplier || "");
     invoicesBySupplier.set(supKey, [...(invoicesBySupplier.get(supKey) || []), { ...inv, _id: d.id, _number: number }]);
     items.push({
-      id: `inv:${d.id}`, path: ["Invoices"], number, title: inv.supplier || "Sin proveedor",
+      id: `inv:${d.id}`, path: ["Invoices"], number, title: inv.supplier || "Sin proveedor", voided: status === "Anulada",
       fileName: hubFileName(number, inv.supplier, replaced ? version : undefined), type, typeLabel: DOC_TYPES[type].label,
       date: toDate(inv.invoiceDate) || created, base: num(inv.baseAmount), total: num(inv.totalAmount), status, version,
       department: inv.department, originals, warnings, sortKey: number, source: { kind: "invoice", id: d.id },
@@ -362,7 +364,7 @@ export async function renderHubItem(item: HubItem, project: HubProject, projectI
   const proj: DocProject = { name: project.name, code: project.code, producer: project.producer, phase: project.phase, seed: projectId, band: bandCache.get(key)!, legal: project.legal };
   const fingerprint = await contentFingerprint({ id: item.id, body, originals: item.originals.map((o) => o.url) });
   const cover = buildProjectDoc({ ...body, project: proj, generatedAt: new Date(), generatedBy: user, fingerprint }).output("arraybuffer");
-  const { bytes, missing } = await appendOriginals(cover, item.originals, `${item.number} · ${project.name}`);
+  const { bytes, missing } = await appendOriginals(cover, item.originals, `${item.number} · ${project.name}`, { voided: !!item.voided });
   return { bytes, missing, fingerprint };
 }
 

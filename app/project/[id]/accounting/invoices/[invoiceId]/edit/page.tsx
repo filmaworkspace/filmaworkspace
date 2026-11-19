@@ -739,7 +739,7 @@ export default function EditInvoicePage() {
 
         const steps = generateApprovalSteps();
         if (shouldAutoApprove(steps)) {
-          updateData.status = "pending";
+          updateData.status = "submitted";
           updateData.approvalStatus = "approved";
           updateData.autoApproved = true;
           updateData.approvedAt = Timestamp.now();
@@ -749,7 +749,7 @@ export default function EditInvoicePage() {
           updateData.approverIds = [];
           updateData.currentApprovalStep = steps.length ? -1 : deleteField();
         } else {
-          updateData.status = "pending_approval";
+          updateData.status = "submitted";
           updateData.approvalStatus = "pending";
           updateData.approvalSteps = steps;
           updateData.approverIds = approverIdsOf(steps);
@@ -920,7 +920,7 @@ export default function EditInvoicePage() {
         {!canEdit() && !isAdminCorrection && (
           <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3">
             <AlertTriangle size={18} className="text-amber-600" />
-            <span className="text-[13px] text-amber-700 font-medium">Esta factura está pendiente de aprobación. Guardar creará una nueva versión.</span>
+            <span className="text-[13px] text-amber-700 font-medium">Al enviar se crea una nueva versión y vuelve a aprobación.</span>
           </div>
         )}
 

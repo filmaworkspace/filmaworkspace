@@ -659,13 +659,14 @@ export default function InvoiceDetailPage() {
     if (invoice?.accounted) return false; // Bloqueada si está contabilizada
     return invoice && !["cancelled", "rejected", "void", "paid"].includes(invoice.status) && !invoice.paidAt && permissions.isProjectRole;
   };
-  // Solo contabilidad ampliada puede modificar (genera nueva versión y reinicia aprobaciones)
-  const canModify = () => {
-    if (invoice?.accounted || invoice?.accountedAt) return false;
-    if (invoice?.paidAt) return false;
-    if (["cancelled", "rejected", "void", "paid"].includes(invoice?.status || "")) return false;
-    return permissions.accountingAccessLevel === "accounting_extended";
-  };
+  // Modificar: siempre disponible para quien puede (autor, roles de proyecto y
+  // contabilidad). Pagada, contabilizada o anulada → corrección administrativa
+  // (sin nueva versión); el resto → nueva versión y vuelve a aprobación.
+  const canModify = () => !!invoice && (
+    invoice.createdBy === permissions.userId || permissions.isProjectRole ||
+    ["accounting", "accounting_extended"].includes(String(permissions.accountingAccessLevel)));
+  const modifyAsCorrection = () => !!invoice && (!!invoice.accounted || !!invoice.accountedAt || !!invoice.paidAt || ["cancelled", "void", "paid"].includes(invoice.status));
+
   // Solo contabilidad ampliada puede hacer corrección administrativa (sin nueva versión)
   const canAdminCorrect = () => {
     if (invoice?.accounted) return false;
@@ -1324,7 +1325,7 @@ export default function InvoiceDetailPage() {
               )}
 
               {canModify() && (
-                <Link href={`/project/${projectId}/accounting/invoices/${invoice.id}/edit`} className="flex items-center gap-2 px-4 py-1.5 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
+                <Link href={`/project/${projectId}/accounting/invoices/${invoice.id}/edit${modifyAsCorrection() ? "?mode=correction" : ""}`} className="flex items-center gap-2 px-4 py-1.5 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                   <Edit size={16} />Modificar
                 </Link>
               )}

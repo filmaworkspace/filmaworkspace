@@ -62,6 +62,7 @@ import jsPDF from "jspdf";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { syncBudget } from "@/lib/ledgerClient";
+import { needsNewVersion, revisePO } from "@/lib/poRevision";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
@@ -531,8 +532,9 @@ export default function POsPage() {
   };
 
   const handleModifyPO = (po: PO) => {
-    if (po.status !== "approved") return;
     closeMenu();
+    // Borrador o rechazada: se editan directamente; el resto abre versión nueva.
+    if (!needsNewVersion(po as any)) { router.push(`/project/${id}/accounting/pos/${po.id}/edit`); return; }
     setSelectedPO(po);
     resetModalState();
     setShowModifyModal(true);
@@ -542,31 +544,7 @@ export default function POsPage() {
     if (!selectedPO || !modificationReason.trim()) return;
     setProcessing(true);
     try {
-      const newVersion = (selectedPO.version || 1) + 1;
-      await updateDoc(doc(db, `projects/${id}/pos`, selectedPO.id), {
-        version: newVersion,
-        status: "draft",
-        modificationHistory: [
-          ...(selectedPO.modificationHistory || []),
-          {
-            date: Timestamp.now(),
-            userId: permissions.userId || "",
-            userName: permissions.userName,
-            reason: modificationReason.trim(),
-            previousVersion: selectedPO.version || 1,
-          },
-        ],
-        approvedAt: null,
-        approvedBy: null,
-        approvedByName: null,
-        approvalSteps: null,
-        approverIds: [],
-        currentApprovalStep: null,
-        // Mientras se modifica, sigue comprometida la versión aprobada.
-        previousCommittedItems: (selectedPO as any).previousCommittedItems?.length ? (selectedPO as any).previousCommittedItems
-          : (selectedPO.items || []).map((it: any, index: number) => ({ index, subAccountId: it.subAccountId || "", subAccountCode: it.subAccountCode || "", baseAmount: it.baseAmount || 0 })),
-      });
-      await syncBudget(id);
+      await revisePO(id, selectedPO as any, { uid: permissions.userId || "", name: permissions.userName || "" }, modificationReason.trim());
       setShowModifyModal(false);
       router.push(`/project/${id}/accounting/pos/${selectedPO.id}/edit`);
     } catch (error) {
@@ -785,7 +763,7 @@ export default function POsPage() {
                               {po.status === "draft" && poPerms.canEdit && <MenuItem onClick={() => { close(); handleEditDraft(po); }}>Editar borrador</MenuItem>}
                               {po.status === "approved" && poPerms.canCreateInvoice && <MenuItem onClick={() => { close(); handleCreateInvoice(po); }}>Subir factura de esta PO</MenuItem>}
                               {po.status === "approved" && (permissions.isProjectRole || poPerms.canClose || poPerms.canCancel) && <MenuSeparator />}
-                              {po.status === "approved" && permissions.isProjectRole && <MenuItem onClick={() => { close(); handleModifyPO(po); }}>Modificar</MenuItem>}
+                              {(permissions.isProjectRole || ["accounting", "accounting_extended"].includes(String(permissions.accountingAccessLevel)) || po.createdBy === permissions.userId) && <MenuItem onClick={() => { close(); handleModifyPO(po); }}>Modificar</MenuItem>}
                               {po.status === "approved" && poPerms.canClose && <MenuItem onClick={() => { close(); handleClosePO(po); }}>Cerrar</MenuItem>}
                               {po.status === "approved" && poPerms.canCancel && (po.invoicedAmount || 0) === 0 && <MenuItem danger onClick={() => { close(); handleCancelPO(po); }}>Anular</MenuItem>}
                               {po.status === "closed" && poPerms.canReopen && <MenuItem onClick={() => { close(); handleReopenPO(po); }}>Reabrir</MenuItem>}

@@ -811,7 +811,7 @@ export default function ApprovalsPage() {
                         {approval.displayNumber}
                         {approval.isUrgent && <span className="h-1.5 w-1.5 rounded-full bg-red-500" title="Urgente" />}
                       </span>
-                      <span className="tabular-nums text-xs">{formatCurrency(approval.amount, approval.currency)}</span>
+                      <span className="tabular-nums text-xs">{formatCurrency(approval.baseAmount, approval.currency)}</span>
                     </span>
                     <span className="flex items-center justify-between gap-2 text-xs text-slate-500">
                       <span className="truncate">{approval.supplier}</span>
@@ -1108,7 +1108,7 @@ export default function ApprovalsPage() {
       >
         {selectedApproval && (
           <p className="text-[13px] text-slate-700">
-            <span className="font-mono">{selectedApproval.displayNumber}</span> · {selectedApproval.supplier} · <span className="tabular-nums">{formatCurrency(selectedApproval.amount, selectedApproval.currency)}</span>
+            <span className="font-mono">{selectedApproval.displayNumber}</span> · {selectedApproval.supplier} · <span className="tabular-nums">{formatCurrency(selectedApproval.baseAmount, selectedApproval.currency)}</span>
           </p>
         )}
       </Modal>
