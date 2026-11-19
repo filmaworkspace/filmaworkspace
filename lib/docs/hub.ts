@@ -6,14 +6,14 @@
 // se descargan documentos de contabilidad.
 //
 //   Box/Cards/<tarjeta>/<sobre>      Box/Cash/<caja>/<vale>      Box/Transfers/<sobre>
-//   Invoices/INV-0001 · Proveedor    Purchase Orders/PO-0001 · Proveedor
+//   Invoices/FRA-0001 · Proveedor (PRF / FNZ según el tipo)    Purchase Orders/PO-0001 · Proveedor
 //   Suppliers/<proveedor>/Certificado de cierre · Extracto de facturas
 
 import { collection, doc, getDoc, getDocs, type Firestore } from "firebase/firestore";
 import { getScopedDocs, type DocScope } from "@/lib/accountingScope";
 import { appendOriginals, type Original } from "./attach";
 import {
-  buildProjectDoc, contentFingerprint, DOC_TYPES, hubFileName, hubNumber, renderProjectBand,
+  buildProjectDoc, contentFingerprint, DOC_TYPES, hubFileName, hubNumber, INVOICE_CODE, renderProjectBand,
   type DocApproval, type DocProject, type DocTypeKey, type ProjectDocSpec,
 } from "./projectPdf";
 
@@ -168,7 +168,7 @@ export async function loadHub(db: Firestore, projectId: string, scope: DocScope,
     if (!inv.number || inv.status === "draft") continue;
     const t = (inv.documentType || "invoice") as DocTypeKey;
     const type: DocTypeKey = (["invoice", "proforma", "budget", "guarantee"] as DocTypeKey[]).includes(t) ? t : "invoice";
-    const number = hubNumber("INV", inv.number);
+    const number = hubNumber(INVOICE_CODE[type] || "FRA", inv.number);
     const replaced = !!inv.replacedAt;
     const version = replaced ? "V02" : "V01";
     const created = toDate(inv.createdAt);
@@ -368,8 +368,8 @@ export async function renderHubItem(item: HubItem, project: HubProject, projectI
   return { bytes, missing, fingerprint };
 }
 
-/** Faltan números en la secuencia (PO-0003, INV-0007…), contando también los borradores. */
-export function numberingGaps(used: number[], prefix: "PO" | "INV") {
+/** Faltan números en la secuencia (PO-0003, FRA/PRF/FNZ-0007…), contando también los borradores. */
+export function numberingGaps(used: number[], prefix: string) {
   const nums = Array.from(new Set(used)).sort((a, b) => a - b);
   const gaps: string[] = [];
   for (let i = 1; i < nums.length; i++) for (let n = nums[i - 1] + 1; n < nums[i] && gaps.length < 20; n++) gaps.push(hubNumber(prefix, n));

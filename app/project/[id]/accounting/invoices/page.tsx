@@ -104,6 +104,9 @@ interface InvoiceItem {
 
 interface Invoice {
   id: string;
+  /** Número y fecha de la factura del proveedor. */
+  supplierNumber?: string;
+  invoiceDate?: Date;
   documentType: DocumentType;
   number: string;
   displayNumber: string;
@@ -255,6 +258,7 @@ export default function InvoicesPage() {
           displayNumber: data.displayNumber || `FRA-${data.number}`,
           createdAt: data.createdAt?.toDate() || new Date(),
           dueDate: data.dueDate?.toDate() || new Date(),
+          invoiceDate: data.invoiceDate?.toDate?.() || undefined,
           paymentDate: data.paymentDate?.toDate(),
           rejectedAt: data.rejectedAt?.toDate(),
           codedAt: data.codedAt?.toDate(),
@@ -523,7 +527,7 @@ export default function InvoicesPage() {
   const invMatches = (inv: Invoice) => {
     const q = searchTerm.trim();
     if (!q) return true;
-    const byNumber = matchCode(q, inv.displayNumber, inv.number, inv.poNumber ? `PO-${inv.poNumber}` : "");
+    const byNumber = matchCode(q, inv.displayNumber, inv.number, inv.supplierNumber || "", inv.poNumber ? `PO-${inv.poNumber}` : "");
     const bySupplier = matchWords(q, inv.supplier);
     const byConcept = matchWords(q, inv.description, ...(inv.items || []).map((i) => i.description));
     const byAccount = (inv.items || []).some((i) => matchCode(q, i.subAccountCode) || matchWords(q, i.subAccountDescription));
@@ -680,6 +684,7 @@ export default function InvoicesPage() {
                 <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
                   <th scope="col" className="w-44 px-4 py-2 text-left font-medium">Documento</th>
                   <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor y concepto</th>
+                  <th scope="col" className="w-40 px-3 py-2 text-left font-medium">Fra. proveedor</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Base</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Total</th>
                   <th scope="col" className="w-44 px-3 py-2 text-left font-medium">Vencimiento</th>
@@ -706,7 +711,6 @@ export default function InvoicesPage() {
                           <span className="w-8 font-mono text-[10px] text-slate-500" title={docType.label}>{docType.code}</span>
                           <span className={`font-mono text-xs font-medium ${dead ? "line-through" : ""}`}>{invoice.displayNumber}</span>
                           {(invoice.accounted || invoice.accountedAt) && <span title={`Contabilizada${invoice.accountingEntryNumber ? ` · asiento ${invoice.accountingEntryNumber}` : ""}`}><Lock size={11} className="text-slate-400" /></span>}
-                          {needsReplacement && <span className="rounded border border-amber-200 bg-amber-50 px-1 text-[10px] text-amber-800">falta factura</span>}
                         </span>
                       </td>
                       <td className="px-3 py-1.5" title={[invoice.supplier, invoice.description].filter(Boolean).join(" · ")}>
@@ -714,10 +718,21 @@ export default function InvoicesPage() {
                           {invoice.supplier}
                           {invoice.poNumber && <span className="ml-2 font-mono text-[11px] font-normal text-slate-400">PO-{invoice.poNumber}</span>}
                         </div>
-                        <div className="truncate text-xs text-slate-500">{invoice.description || <span className="text-slate-300">Sin concepto</span>}</div>
+                        <div className="truncate text-xs text-slate-500">
+                          {needsReplacement && <span className="mr-1.5 font-medium text-amber-700">Falta la factura definitiva ·</span>}
+                          {invoice.description || <span className="text-slate-300">Sin concepto</span>}
+                        </div>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-xs text-slate-600">{formatCurrency(invoice.baseAmount)}</td>
-                      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-xs font-medium">{formatCurrency(invoice.totalAmount)}</td>
+                      <td className="whitespace-nowrap px-3 py-1.5">
+                        {invoice.supplierNumber || invoice.invoiceDate ? (
+                          <>
+                            <div className="truncate font-mono text-xs text-slate-700">{invoice.supplierNumber || "—"}</div>
+                            <div className="text-xs text-slate-500">{invoice.invoiceDate ? formatDate(invoice.invoiceDate) : "—"}</div>
+                          </>
+                        ) : <span className="text-xs text-slate-300">—</span>}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums font-medium">{formatCurrency(invoice.baseAmount)}</td>
+                      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-xs text-slate-500">{formatCurrency(invoice.totalAmount)}</td>
                       <td className="whitespace-nowrap px-3 py-1.5 tabular-nums text-slate-600">
                         {formatDate(invoice.dueDate)}
                         {due && <span className={`ml-1.5 text-xs ${due.cls}`}>{due.text}</span>}
@@ -749,7 +764,7 @@ export default function InvoicesPage() {
               </tbody>
               <tfoot>
                 <tr className="border-t border-slate-200 bg-[#F4F4F5] text-xs">
-                  <td className="px-4 py-2 font-semibold" colSpan={2}>Total {rows.length === invoices.length ? "" : "filtrado "}sin anuladas</td>
+                  <td className="px-4 py-2 font-semibold" colSpan={3}>Total {rows.length === invoices.length ? "" : "filtrado "}sin anuladas</td>
                   <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(totals.base)}</td>
                   <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(totals.total)}</td>
                   <td colSpan={2} />

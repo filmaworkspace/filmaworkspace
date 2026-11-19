@@ -357,9 +357,12 @@ export function buildProjectDoc(spec: ProjectDocSpec): jsPDF {
 
 // ─── Nomenclatura del hub ────────────────────────────────────────────────────
 // Número del documento sin el código del proyecto (el proyecto ya va en la
-// cabecera): PO-0001, INV-0001… El nombre de archivo añade el proveedor.
-export type HubDocKind = "PO" | "INV" | "BOX" | "SUP" | "PAY";
-export const hubNumber = (kind: HubDocKind, n: number | string) =>
+// cabecera): PO-0001, FRA-0001, PRF-0002, FNZ-0003… (la numeración de
+// facturas, proformas y fianzas es una sola). El archivo añade el proveedor.
+export type HubDocKind = "PO" | "INV" | "FRA" | "PRF" | "FNZ" | "PRS" | "BOX" | "SUP" | "PAY";
+/** Código del número según el tipo de documento de la factura. */
+export const INVOICE_CODE: Record<string, HubDocKind> = { invoice: "FRA", proforma: "PRF", guarantee: "FNZ", budget: "PRS" };
+export const hubNumber = (kind: HubDocKind | string, n: number | string) =>
   `${kind}-${String(n).replace(/^\D+-?/, "").padStart(4, "0")}`;
 export const hubFileName = (number: string, supplier?: string, version?: string) =>
   `${number}${version && version !== "V01" ? `-${version}` : ""}${supplier ? ` · ${supplier.replace(/[\\/:*?"<>|]+/g, " ").trim()}` : ""}.pdf`;

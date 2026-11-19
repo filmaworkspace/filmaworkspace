@@ -25,7 +25,7 @@ import { DOC_TYPES, type DocTypeKey } from "@/lib/docs/projectPdf";
 type F = "all" | "number" | "name" | "status";
 const FIELDS: SearchField<F>[] = [
   { value: "all", label: "Buscar en todo", placeholder: "Número, proveedor o estado" },
-  { value: "number", label: "Número", placeholder: "PO-0013, INV-0012…", mono: true },
+  { value: "number", label: "Número", placeholder: "PO-0013, FRA-0012…", mono: true },
   { value: "name", label: "Proveedor / persona", placeholder: "Nombre" },
   { value: "status", label: "Estado", placeholder: "Pagada, aprobada…" },
 ];
@@ -183,7 +183,7 @@ function HubInner() {
   if (permLoading) return <PageLoading />;
   if (!permissions.hasAccountingAccess) return <NoAccess backHref={`/project/${projectId}`} />;
 
-  const gaps = permissions.canViewAllPOs ? [...numberingGaps(used.PO, "PO"), ...numberingGaps(used.INV, "INV")] : [];
+  const gaps = permissions.canViewAllPOs ? [...numberingGaps(used.PO, "PO"), ...numberingGaps(used.INV, "FRA/PRF/FNZ")] : [];
   const warnings = items.filter((i) => i.warnings.length).length;
   const folderItems = items.filter((it) => pathKey(it.path).startsWith(pathKey(path)));
   const selectedItems = items.filter((i) => selected.has(i.id));
